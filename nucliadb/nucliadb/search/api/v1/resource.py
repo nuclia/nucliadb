@@ -112,7 +112,7 @@ async def search(
     )
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.SEARCH, pb_query, shards
+        kbid, Method.PARAGRAPH, pb_query, shards
     )
 
     # We need to merge

@@ -284,7 +284,7 @@ async def search(
         with_synonyms=item.with_synonyms,
     )
 
-    results, incomplete_results, queried_nodes, queried_shards = await node_query(
+    results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
     # We need to merge
@@ -303,7 +303,9 @@ async def search(
     )
     await abort_transaction()
 
-    response.status_code = 206 if incomplete_results else 200
+    response.status_code = (
+        206 if incomplete_results or query_incomplete_results else 200
+    )
 
     if audit is not None and do_audit:
         await audit.search(

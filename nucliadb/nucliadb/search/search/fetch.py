@@ -97,7 +97,7 @@ async def fetch_resources(
 async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
     orm_resource: Optional[ResourceORM] = None
 
-    resouce_cache = get_resource_cache()
+    resource_cache = get_resource_cache()
 
     if uuid not in RESOURCE_LOCKS:
         lock = asyncio.Lock()
@@ -107,7 +107,7 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
         await RESOURCE_LOCKS[uuid].acquire()
 
     try:
-        if uuid not in resouce_cache:
+        if uuid not in resource_cache:
             transaction = await get_transaction()
             storage = await get_storage(service_name=SERVICE_NAME)
             cache = await get_cache()
@@ -115,9 +115,9 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
             orm_resource = await kb.get(uuid)
 
         if orm_resource is not None:
-            resouce_cache[uuid] = orm_resource
+            resource_cache[uuid] = orm_resource
         else:
-            orm_resource = resouce_cache.get(uuid)
+            orm_resource = resource_cache.get(uuid)
     finally:
         RESOURCE_LOCKS[uuid].release()
     return orm_resource

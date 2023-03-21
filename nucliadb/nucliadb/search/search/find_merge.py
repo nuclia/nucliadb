@@ -56,37 +56,43 @@ async def get_text_find_paragraph(
     field: str,
     start: int,
     end: int,
+    max_operations: asyncio.Semaphore,
     split: Optional[str] = None,
     highlight: bool = False,
     ematches: Optional[List[str]] = None,
     matches: Optional[List[str]] = None,
 ) -> str:
-    orm_resource = await get_resource_from_cache(kbid, rid)
+    await max_operations.acquire()
 
-    if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
-        return ""
+    try:
+        orm_resource = await get_resource_from_cache(kbid, rid)
 
-    field_type, field = field.split("/")
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warn(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return ""
+        if orm_resource is None:
+            logger.error(f"{rid} does not exist on DB")
+            return ""
 
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
+        field_type, field = field.split("/")
+        field_type_int = KB_REVERSE[field_type]
+        field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+        extracted_text = await field_obj.get_extracted_text()
+        if extracted_text is None:
+            logger.warn(
+                f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
+            )
+            return ""
 
-    if highlight:
-        splitted_text = highlight_paragraph(
-            splitted_text, words=matches, ematches=ematches  # type: ignore
-        )
+        if split not in (None, ""):
+            text = extracted_text.split_text[split]
+            splitted_text = text[start:end]
+        else:
+            splitted_text = extracted_text.text[start:end]
+
+        if highlight:
+            splitted_text = highlight_paragraph(
+                splitted_text, words=matches, ematches=ematches  # type: ignore
+            )
+    finally:
+        max_operations.release()
 
     return splitted_text
 
@@ -94,23 +100,28 @@ async def get_text_find_paragraph(
 async def set_text_value(
     kbid: str,
     result_paragraph: TempFindParagraph,
+    max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: List[str] = [],
 ):
     # TODO: Improve
-    assert result_paragraph.paragraph
-    assert result_paragraph.paragraph.position
-    result_paragraph.paragraph.text = await get_text_find_paragraph(
-        rid=result_paragraph.rid,
-        kbid=kbid,
-        field=result_paragraph.field,
-        start=result_paragraph.paragraph.position.start,
-        end=result_paragraph.paragraph.position.end,
-        split=None,  # TODO
-        highlight=highlight,
-        ematches=ematches,
-        matches=[],  # TODO
-    )
+    await max_operations.acquire()
+    try:
+        assert result_paragraph.paragraph
+        assert result_paragraph.paragraph.position
+        result_paragraph.paragraph.text = await get_text_find_paragraph(
+            rid=result_paragraph.rid,
+            kbid=kbid,
+            field=result_paragraph.field,
+            start=result_paragraph.paragraph.position.start,
+            end=result_paragraph.paragraph.position.end,
+            split=None,  # TODO
+            highlight=highlight,
+            ematches=ematches,
+            matches=[],  # TODO
+        )
+    finally:
+        await max_operations.release()
 
 
 async def set_resource_metadata_value(
@@ -144,6 +155,8 @@ async def fetch_find_metadata(
 ):
     resources = []
     operations = []
+    max_operations = asyncio.Semaphore(10)
+
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
             find_resources.setdefault(
@@ -160,6 +173,7 @@ async def fetch_find_metadata(
                     result_paragraph=result_paragraph,
                     highlight=highlight,
                     ematches=ematches,
+                    max_operations=max_operations,
                 )
             )
             resources.append(result_paragraph.rid)
@@ -173,6 +187,7 @@ async def fetch_find_metadata(
                 field_type_filter=field_type_filter,
                 extracted=extracted,
                 find_resources=find_resources,
+                max_operations=max_operations,
             )
         )
     await asyncio.wait(*operations)  # type: ignore
@@ -214,7 +229,8 @@ async def merge_paragraphs_vectors(
                         score=vector.score,
                     )
                 )
-    merged_paragrahs.sort(key=lambda r: r.score)
+
+    merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
     init_position = count * page
     end_position = init_position + count
     merged_paragrahs = merged_paragrahs[init_position:end_position]
