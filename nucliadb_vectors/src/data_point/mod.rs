@@ -276,6 +276,9 @@ impl Neighbour {
     pub fn id(&self) -> &[u8] {
         Node.get_key(&self.node)
     }
+    pub fn labels(&self) -> Vec<String> {
+        Node::labels(&self.node)
+    }
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = Node::metadata(&self.node);
         if metadata.is_empty() {

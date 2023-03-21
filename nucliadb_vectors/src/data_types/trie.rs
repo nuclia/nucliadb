@@ -90,6 +90,37 @@ pub fn has_word(trie: &[u8], word: &[u8]) -> bool {
     search(&trie[0..len], 0, word)
 }
 
+pub fn decompress(trie: &[u8]) -> Vec<String> {
+    let mut collector = vec![];
+    let mut current = vec![];
+    let len = usize_from_slice_le(&trie[0..USIZE_LEN]);
+    decompress_labels(&trie[0..len], 0, &mut collector, &mut current);
+    collector
+}
+
+fn decompress_labels(trie: &[u8], node: usize, collector: &mut Vec<String>, current: &mut Vec<u8>) {
+    let node_ptr = get_node_ptr(trie, node);
+    if trie[node_ptr] == 1 {
+        let label = String::from_utf8_lossy(current).to_string();
+        collector.push(label);
+    }
+    let offset = &trie[node_ptr..];
+    let length = usize_from_slice_le(&offset[LENGTH.0..LENGTH.1]);
+    let adjacency = &offset[TABLE..];
+    let mut i = 0;
+    while i < length {
+        let position = i * EDGE_LEN;
+        let number_s = position + 1;
+        let number_e = number_s + USIZE_LEN;
+        let new_byte = adjacency[position];
+        let new_node = usize_from_slice_le(&adjacency[number_s..number_e]);
+        current.push(new_byte);
+        decompress_labels(trie, new_node, collector, current);
+        current.pop();
+        i += 1;
+    }
+}
+
 fn search(trie: &[u8], node: usize, word: &[u8]) -> bool {
     let node_ptr = get_node_ptr(trie, node);
     match word {
@@ -139,7 +170,11 @@ mod tests {
 
         let trie = create_trie(&dictionary);
         let trie = serialize(trie);
+        let labels = super::decompress(&trie);
         assert!(dictionary.iter().all(|w| has_word(&trie, w)));
         assert!(not_in_dictionary.iter().all(|w| !has_word(&trie, w)));
+
+        assert_eq!(labels.len(), dictionary.len());
+        assert!(labels.iter().all(|w| dictionary.contains(&w.as_bytes())));
     }
 }

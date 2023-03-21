@@ -247,6 +247,8 @@ pub struct DocumentVectorIdentifier {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentScored {
+    #[prost(string, repeated, tag="4")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, optional, tag="3")]
     pub metadata: ::core::option::Option<super::noderesources::SentenceMetadata>,
     #[prost(message, optional, tag="1")]
