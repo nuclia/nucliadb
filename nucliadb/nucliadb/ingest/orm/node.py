@@ -439,7 +439,6 @@ class Node(AbstractNode):
             else:
                 grpc_address = f"{hostname}:{settings.node_writer_port}"
 
-            print(f"GRPC NATHAN: {grpc_address}")
             tracer_provider = get_telemetry(SERVICE_NAME)
             if tracer_provider is not None:
                 telemetry_grpc = OpenTelemetryGRPC(

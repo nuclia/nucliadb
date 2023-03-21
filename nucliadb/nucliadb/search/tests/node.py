@@ -372,7 +372,6 @@ def node(natsd: str, gcs: str):
             "port": sidecar2_port,
         },
     }
-    print(DATA)
     yield DATA
 
     nucliadb_node_1_reader.stop()
