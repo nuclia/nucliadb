@@ -119,14 +119,14 @@ class PredictEngine:
             if resp.status != 200:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
-    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncIterator[str]:
+    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncIterator[bytes]:
         # If token is offered
 
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.post(
                 url=f"{self.cluster_url}{PRIVATE_PREDICT}{CHAT}",
-                json=item.json(),
+                json=item.dict(),
                 headers={"X-STF-KBID": kbid},
             )
             if resp.status != 200:
@@ -140,7 +140,7 @@ class PredictEngine:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.post(
                 url=f"{self.public_url}{PUBLIC_PREDICT}{CHAT}",
-                json=item.json(),
+                json=item.dict(),
                 headers=headers,
             )
             if resp.status != 200:
