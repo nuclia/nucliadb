@@ -33,10 +33,12 @@ from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
+    Author,
     ChatModel,
     ChatRequest,
     FindRequest,
     KnowledgeboxFindResults,
+    Message,
     NucliaDBClientType,
     SearchOptions,
 )
@@ -116,20 +118,37 @@ async def chat_post_knowledgebox(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
+    flattened_text = " \n\n ".join(
+        [
+            paragraph.text
+            for result in results.resources.values()
+            for field in result.fields.values()
+            for paragraph in field.paragraphs.values()
+        ]
+    )
+    item.context.append(Message(author=Author.NUCLIA, text=flattened_text))
+
+    chat_model = ChatModel(
+        user_id=x_nucliadb_user, context=item.context, question=item.query
+    )
+
     async def generate_answer(
-        results: KnowledgeboxFindResults, kbid: str, predict: PredictEngine
+        results: KnowledgeboxFindResults,
+        kbid: str,
+        predict: PredictEngine,
+        chat_model: ChatModel,
     ):
         bytes_results = base64.b64encode(results.json().encode())
         yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
         yield bytes_results
 
         answer = []
-        async for data in predict.chat_query(kbid, ChatModel(context=item.context)):
+        async for data in predict.chat_query(kbid, chat_model):
             answer.append(data)
             yield data
         yield END_OF_STREAM
 
-        detected_entities = await predict.detect_entities(kbid, "".join(answer))
+        detected_entities = await predict.detect_entities(kbid, b"".join(answer))
         relation_request = RelationSearchRequest()
         relation_request.subgraph.entry_points.extend(detected_entities)
         relation_request.subgraph.depth = 1
@@ -152,6 +171,6 @@ async def chat_post_knowledgebox(
         )
 
     return StreamingResponse(
-        generate_answer(results, kbid, predict),
+        generate_answer(results, kbid, predict, chat_model),
         media_type="plain/text",
     )
