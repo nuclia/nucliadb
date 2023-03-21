@@ -437,6 +437,9 @@ class TempFindParagraph:
     rid: str
     field: str
     score: float
+    start: int
+    end: int
+    id: str
     paragraph: Optional[FindParagraph] = None
     vector_index: Optional[DocumentScored] = None
     paragraph_index: Optional[PBParagraphResult] = None
