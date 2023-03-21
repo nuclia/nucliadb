@@ -2,6 +2,7 @@ name: nucliadb (py)
 env:
   API_VERSION: 1
   COMPONENT: nucliadb
+  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
 permissions:
   contents: write
 on:
@@ -196,3 +197,54 @@ jobs:
           tags: nuclia/nucliadb:latest
           cache-from: type=registry,ref=nuclia/nucliadb:buildcache
           cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
+
+      - name: Get release version
+        id: version_step
+        run: |-
+          python bump.py --build=${{github.run_number}}
+          VERSION=`cat VERSION`
+          echo "::set-output name=version_number::$VERSION"
+
+      - name: Build and push tagged
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
+          cache-from: type=registry,ref=nuclia/nucliadb:buildcache
+          cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
+
+  push-dev:
+    name: Build dev image and push
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          echo "::set-output name=branch::$BRANCH"
+
+      - name: Docker - Build
+        run: |-
+          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${{ steps.env-vars.outputs.branch }}-${{github.run_number}} . -f Dockerfile
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v0"
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
+
+      - name: Docker - Push latest
+        run: |-
+          docker push $CONTAINER_REGISTRY/$COMPONENT:${{ steps.env-vars.outputs.branch }}-${{github.run_number}}
