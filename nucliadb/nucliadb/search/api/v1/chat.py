@@ -48,21 +48,10 @@ END_OF_STREAM = "_END_"
 
 CHAT_EXAMPLES = {
     "search_and_chat": {
-        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
-        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "summary": "Ask who won the final leage",
+        "description": "You can ask a question to your knowledge box",  # noqa
         "value": {
-            "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
-        },
-    },
-    "get_language_counts": {
-        "summary": "Get the number of documents for each language",
-        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
-        "value": {
-            "page_size": 0,
-            "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
+            "query": "Who won the final leage?",
         },
     },
 }

@@ -19,6 +19,7 @@
 #
 import asyncio
 from typing import Dict, List, Optional, Tuple, cast
+from nucliadb.search.search.merge import merge_relations_results
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -375,5 +376,9 @@ async def find_merge_results(
         extracted,
         highlight,
         ematches,
+    )
+
+    api_results.relations = await merge_relations_results(
+        relations, requested_relations
     )
     return api_results
