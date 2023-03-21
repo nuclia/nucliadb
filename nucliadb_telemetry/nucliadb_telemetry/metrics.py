@@ -34,16 +34,14 @@ class Observer:
         )
 
         self.counter = prometheus_client.Counter(
-            name + "_count",
-            f"Number of times {name} was called.",
+            f"{name}_count" f"Number of times {name} was called.",
             labelnames=list(self.labels.keys()) + ["status"],
         )
         hist_kwargs = {}
         if buckets is not None:
             hist_kwargs["buckets"] = buckets
         self.histogram = prometheus_client.Histogram(
-            name + "_duration_seconds",
-            f"Histogram for {name} duration.",
+            f"{name}_duration_seconds" f"Histogram for {name} duration.",
             labelnames=list(self.labels.keys()),
             **hist_kwargs,
         )
