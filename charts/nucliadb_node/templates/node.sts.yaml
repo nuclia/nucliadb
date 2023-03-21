@@ -34,6 +34,8 @@ spec:
         app.kubernetes.io/managed-by: {{ .Release.Service }}
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
+        # do not have access to dependency chart cm this component references
+        checksum/cm: {{ include (print $.Template.BasePath "/node.cm.yaml") . | sha256sum }}
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
