@@ -214,24 +214,25 @@ async def _get_message_with_file(test_resource):
     return msg_id, file_num
 
 
-FILE_SIZE = 10
-
-
 @pytest.mark.parametrize(
     "range_request,filesize,start,end,range_size,exception",
     [
         # No end range specified
-        ("bytes=0-", FILE_SIZE, 0, FILE_SIZE - 1, FILE_SIZE, None),
+        ("bytes=0-", 10, 0, 9, 10, None),
         # End range == file size
-        (f"bytes=0-{FILE_SIZE}", FILE_SIZE, 0, FILE_SIZE - 1, FILE_SIZE, None),
+        (f"bytes=0-10", 10, 0, 9, 10, None),
         # End range < file size
-        (f"bytes=0-5", FILE_SIZE, 0, 5, 6, None),
+        (f"bytes=0-5", 10, 0, 5, 6, None),
         # End range > file size
-        (f"bytes=0-{FILE_SIZE + 1}", FILE_SIZE, 0, FILE_SIZE - 1, FILE_SIZE, None),
+        (f"bytes=0-11", 10, 0, 9, 10, None),
+        # Starting at a middle point until the end
+        (f"bytes=2-", 10, 2, 9, 8, None),
+        # A slice of bytes in the middle of the file
+        (f"bytes=2-8", 10, 2, 8, 7, None),
         # Invalid range
-        ("bytes=something", FILE_SIZE, None, None, None, ValueError),
+        ("bytes=something", 10, None, None, None, ValueError),
         # Multi-part ranges not supported yet
-        ("bytes=0-50, 100-150", FILE_SIZE, None, None, None, NotImplementedError),
+        ("bytes=0-50, 100-150", 10, None, None, None, NotImplementedError),
     ],
 )
 def test_parse_media_range(range_request, filesize, start, end, range_size, exception):

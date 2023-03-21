@@ -189,7 +189,6 @@ async def download_api(sf: StorageField, headers: Headers):
         "Content-Disposition": '{}; filename="{}"'.format("attachment", filename),
     }
     download_headers = {}
-
     if "range" in headers and file_size > -1:
         range_request = headers["range"]
         try:
@@ -234,7 +233,7 @@ async def download_api(sf: StorageField, headers: Headers):
         status_code = 206
         logger.debug(f"Range request: {range_request}")
         extra_headers["Content-Length"] = f"{range_size}"
-        extra_headers["Content-Range"] = f"bytes {start}-{end - 1}/{file_size}"
+        extra_headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
         download_headers["Range"] = range_request
 
     return StreamingResponse(
@@ -271,7 +270,7 @@ def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int, int
     if len(end_str) == 0:
         # bytes=0- is valid
         end = max_range_size
-        range_size = file_size
+        range_size = file_size - start
     else:
         end = int(end_str)
         end = min(end, max_range_size)
