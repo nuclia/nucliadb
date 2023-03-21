@@ -137,6 +137,7 @@ async def node_query(
     queried_shards = []
     queried_nodes = []
     incomplete_results = False
+
     for shard_obj in shard_groups:
         try:
             node, shard_id, node_id = nodemanager.choose_node(shard_obj, shards)

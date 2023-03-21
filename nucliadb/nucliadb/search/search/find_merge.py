@@ -67,7 +67,7 @@ async def get_text_find_paragraph(
         logger.error(f"{rid} does not exist on DB")
         return ""
 
-    field_type, field = field.split("/")
+    _, field_type, field = field.split("/")
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
@@ -137,7 +137,7 @@ async def set_resource_metadata_value(
             extracted=extracted,
             service_name=SERVICE_NAME,
         )
-        find_resources[resource].parse_obj(serialized_resource)
+        find_resources[resource].__dict__.update(serialized_resource.__dict__)
     finally:
         max_operations.release()
 
@@ -189,7 +189,8 @@ async def fetch_find_metadata(
                 max_operations=max_operations,
             )
         )
-    await asyncio.wait(*operations)  # type: ignore
+    if len(operations) > 0:
+        await asyncio.wait(operations)  # type: ignore
 
 
 async def merge_paragraphs_vectors(
@@ -224,7 +225,7 @@ async def merge_paragraphs_vectors(
                     TempFindParagraph(
                         vector_index=vector,
                         rid=rid,
-                        field=f"{field_type}/{field}",
+                        field=f"/{field_type}/{field}",
                         score=vector.score,
                     )
                 )
@@ -266,7 +267,7 @@ async def merge_paragraphs_vectors(
                 score=merged_paragraph.paragraph_index.score.bm25,
                 score_type=SCORE_TYPE.BM25,
                 text="",
-                labels=merged_paragraph.paragraph_index.labels,
+                labels=[x for x in merged_paragraph.paragraph_index.labels],
                 position=TextPosition(
                     page_number=merged_paragraph.paragraph_index.metadata.position.page_number,
                     index=merged_paragraph.paragraph_index.metadata.position.index,
