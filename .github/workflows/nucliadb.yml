@@ -225,9 +225,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - uses: nelonoel/branch-name@v1
+
       - name: Docker - Build
         run: |-
-          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${GITHUB_REF##*/} . -f Dockerfile
+          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${BRANCH_NAME} . -f Dockerfile
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
@@ -242,4 +244,4 @@ jobs:
 
       - name: Docker - Push latest
         run: |-
-          docker push $CONTAINER_REGISTRY/$COMPONENT:${GITHUB_REF##*/}
+          docker push $CONTAINER_REGISTRY/$COMPONENT:${BRANCH_NAME}
