@@ -218,12 +218,21 @@ impl Elem {
 
 impl key_value::KVElem for Elem {
     fn serialized_len(&self) -> usize {
-        let metadata: Option<&[u8]> = None;
-        Node::serialized_len(&self.key, &self.vector, &self.labels.0, metadata)
+        Node::serialized_len(
+            &self.key,
+            &self.vector,
+            &self.labels.0,
+            self.metadata.as_ref(),
+        )
     }
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
-        let metadata: Option<&[u8]> = None;
-        Node::serialize_into(w, self.key, self.vector, self.labels.0, metadata)
+        Node::serialize_into(
+            w,
+            self.key,
+            self.vector,
+            self.labels.0,
+            self.metadata.as_ref(),
+        )
     }
 }
 
@@ -275,6 +284,9 @@ impl Neighbour {
     }
     pub fn id(&self) -> &[u8] {
         Node.get_key(&self.node)
+    }
+    pub fn labels(&self) -> Vec<String> {
+        Node::labels(&self.node)
     }
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = Node::metadata(&self.node);

@@ -1,4 +1,7 @@
 # Changelog
+## 0.7.4
+
+- Vectors returns the labels of the nearest neighbors 
 ## 0.7.3
 
 - Unbounded prefix search on relations

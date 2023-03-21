@@ -191,9 +191,10 @@ message DocumentVectorIdentifier {
 }
 
 message DocumentScored {
-    noderesources.SentenceMetadata metadata = 3;
     DocumentVectorIdentifier doc_id = 1;
     float score = 2;
+    noderesources.SentenceMetadata metadata = 3;
+    repeated string labels = 4;
 }
 
 message VectorSearchResponse {

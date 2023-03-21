@@ -137,6 +137,13 @@ impl Node {
         &x[metadata_start..metadata_end]
     }
     // x must be serialized using Node, may have trailing bytes.
+    // This function will decompress the trie data structure that contains the
+    // labels. Use only if you need all the labels.
+    pub fn labels(x: &[u8]) -> Vec<String> {
+        let xlabel_ptr = usize_from_slice_le(&x[LABEL_START.0..LABEL_START.1]);
+        trie::decompress(&x[xlabel_ptr..])
+    }
+    // x must be serialized using Node, may have trailing bytes.
     pub fn key(x: &[u8]) -> &[u8] {
         let xkey_ptr = usize_from_slice_le(&x[KEY_START.0..KEY_START.1]);
         let xkey_len = usize_from_slice_le(&x[xkey_ptr..(xkey_ptr + USIZE_LEN)]);

@@ -179,6 +179,7 @@ impl TryFrom<Neighbour> for DocumentScored {
     fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
         let id = std::str::from_utf8(neighbour.id());
         let metadata = neighbour.metadata().map(SentenceMetadata::decode);
+        let labels = neighbour.labels();
         let Ok(id) = id.map(|i| i.to_string())else {
             return Err("Id could not be decoded".to_string())
         };
@@ -186,6 +187,7 @@ impl TryFrom<Neighbour> for DocumentScored {
             return Err("The metadata could not be decoded".to_string());
         };
         Ok(DocumentScored {
+            labels,
             metadata,
             doc_id: Some(DocumentVectorIdentifier { id }),
             score: neighbour.score(),
