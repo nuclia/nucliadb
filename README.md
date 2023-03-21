@@ -14,7 +14,7 @@
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
 </p>
-<h3 align="center">The database for data scientists and machine learning engineers working with HuggingFace and other data pipelines</h3>
+<h3 align="center">The database for data scientists and machine learning experts working with HuggingFace and other data pipelines platforms.</h3>
 
 <h4 align="center">
   <a href="docs/getting-started/quickstart.md">Quickstart</a> |
@@ -23,7 +23,7 @@
   <a href="https://discord.gg/AgevjFJUvk">Chat</a>
 </h4>
 
-### Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
+> Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
 
 As a data scientist or NLP person your hard-drive is probably full of datasets and corpora. So, if you have found yourself crashing a notebook trying to load something too big with Pandas, doing way too many shuffles in your shell just to explore your data a bit, or just not really knowing how to perform a better search through your dataset, this is a tool for you.
 
@@ -69,11 +69,6 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 - Distributed search
 - Cloud-native: Kubernetes only
 
-## Upcomming Features
-
-- Blob support with Azure Blob storage
-- Index relations on index storage
-
 ## Architecture
 
 <p align="center">
@@ -85,11 +80,11 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 Trying NucliaDB is super easy! You can extend your knowledge with the
 following readings:
 
-- [Run NucliaDB with docker with a single command!](docs/getting-started/quickstart.md)
+- [Quick start!](docs/getting-started/quickstart.md)
 - Join forces with Nuclia to run [NucliaDB with unlimited power](docs/getting-started/limitless-nucliadb-with-nuclia.md)
-- We use own concepts as Knowledge Box in NucliaDB, so ensure you read about [our basic concepts](docs/getting-started/basic-concepts.md)
-- Further dive into our [tutorials](docs/tutorials),
-  [reference](docs/reference) or [internal](docs/internal) documentation
+- Read about what Knowledge boxes are in [our basic concepts](docs/getting-started/basic-concepts.md) section
+- Dive deeper with our [tutorials](docs/tutorials),
+  [reference](docs/reference) or [internal](docs/internal)
 
 ## API Tutorials
 
