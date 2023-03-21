@@ -19,7 +19,6 @@
 #
 import asyncio
 from typing import Dict, List, Optional, Tuple, cast
-from nucliadb.search.search.merge import merge_relations_results
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -36,6 +35,7 @@ from nucliadb.search.search.fetch import (
     get_resource_from_cache,
     highlight_paragraph,
 )
+from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (

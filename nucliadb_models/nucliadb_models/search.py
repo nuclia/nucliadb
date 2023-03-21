@@ -55,6 +55,11 @@ class SearchOptions(str, Enum):
     VECTOR = "vector"
 
 
+class ChatOptions(str, Enum):
+    PARAGRAPHS = "paragraphs"
+    RELATIONS = "relations"
+
+
 class SuggestOptions(str, Enum):
     PARAGRAPH = "paragraph"
     ENTITIES = "entities"
@@ -391,6 +396,10 @@ class ChatRequest(BaseModel):
     fields: List[str] = []
     filters: List[str] = []
     min_score: float = 0.70
+    features: List[ChatOptions] = [
+        ChatOptions.PARAGRAPHS,
+        ChatOptions.RELATIONS,
+    ]
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
