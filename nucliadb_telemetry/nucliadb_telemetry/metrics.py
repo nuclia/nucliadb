@@ -1,3 +1,21 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import time
 from functools import wraps
@@ -34,16 +52,18 @@ class Observer:
         )
 
         self.counter = prometheus_client.Counter(
-            f"{name}_count" f"Number of times {name} was called.",
-            labelnames=list(self.labels.keys()) + ["status"],
+            f"{name}_count",
+            f"Number of times {name} was called.",
+            labelnames=tuple(self.labels.keys()) + ("status",),
         )
         hist_kwargs = {}
         if buckets is not None:
             hist_kwargs["buckets"] = buckets
         self.histogram = prometheus_client.Histogram(
-            f"{name}_duration_seconds" f"Histogram for {name} duration.",
-            labelnames=list(self.labels.keys()),
-            **hist_kwargs,
+            f"{name}_duration_seconds",
+            f"Histogram for {name} duration.",
+            labelnames=tuple(self.labels.keys()),
+            **hist_kwargs,  # type: ignore
         )
 
     def wrap(self, labels: Optional[dict[str, str]] = None):
