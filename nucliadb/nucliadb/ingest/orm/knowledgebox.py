@@ -282,8 +282,6 @@ class KnowledgeBox:
 
     async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractNode, str]]:
         shards_obj = await self.get_shards_object()
-        if not indexing_settings.index_local:
-            await Node.load_active_nodes()
 
         for shard in shards_obj.shards:
             for replica in shard.replicas:
