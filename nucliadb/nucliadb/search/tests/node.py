@@ -342,7 +342,7 @@ def node(natsd: str, gcs: str):
     settings.node_reader_port = None  # type: ignore
     settings.node_sidecar_port = None  # type: ignore
 
-    yield {
+    DATA = {
         "writer1": {
             "host": writer1_host,
             "port": writer1_port,
@@ -372,6 +372,8 @@ def node(natsd: str, gcs: str):
             "port": sidecar2_port,
         },
     }
+    print(DATA)
+    yield DATA
 
     nucliadb_node_1_reader.stop()
     nucliadb_node_1_writer.stop()
