@@ -158,13 +158,27 @@ async def fetch_find_metadata(
 
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
-            find_resources.setdefault(
-                result_paragraph.rid, FindResource(id=result_paragraph.rid, fields={})
-            ).fields.setdefault(
-                result_paragraph.field, FindField(paragraphs={})
-            ).paragraphs[
-                result_paragraph.paragraph.id
-            ] = result_paragraph.paragraph
+            if result_paragraph.rid not in find_resources:
+                find_resource = FindResource(id=result_paragraph.rid, fields={})
+                find_resources[result_paragraph.rid] = find_resource
+            else:
+                find_resource = find_resources[result_paragraph.rid]
+
+            if result_paragraph.field not in find_resource.fields:
+                find_field = FindField(paragraphs={})
+                find_resource.fields[result_paragraph.field] = find_field
+            else:
+                find_field = find_resource.fields[result_paragraph.field]
+
+            if result_paragraph.paragraph.id in find_field.paragraphs:
+                # Its a multiple match, push the score
+                find_field.paragraphs[result_paragraph.paragraph.id].score = (
+                    find_field.paragraphs[result_paragraph.paragraph.id].score ** 2
+                )
+            else:
+                find_field.paragraphs[
+                    result_paragraph.paragraph.id
+                ] = result_paragraph.paragraph
 
             operations.append(
                 set_text_value(
@@ -202,6 +216,7 @@ async def merge_paragraphs_vectors(
 ) -> Tuple[List[TempFindParagraph], bool]:
     merged_paragrahs: List[TempFindParagraph] = []
 
+    # We assume that paragraphs_shards and vectors_shards are already ordered
     for paragraphs_shard in paragraphs_shards:
         for paragraph in paragraphs_shard:
             merged_paragrahs.append(
@@ -210,27 +225,41 @@ async def merge_paragraphs_vectors(
                     field=paragraph.field,
                     rid=paragraph.uuid,
                     score=paragraph.score.bm25,
+                    start=paragraph.start,
+                    end=paragraph.end,
+                    id=paragraph.paragraph,
                 )
             )
 
+    # merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
+
+    nextpos = 1
     for vectors_shard in vectors_shards:
         for vector in vectors_shard:
             if vector.score >= min_score:
                 doc_id_split = vector.doc_id.id.split("/")
                 if len(doc_id_split) == 5:
                     rid, field_type, field, index, position = doc_id_split
+                    paragraph_id = f"{rid}/{field_type}/{field}/{position}"
                 elif len(doc_id_split) == 6:
                     rid, field_type, field, split, index, position = doc_id_split
-                merged_paragrahs.append(
+                    paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
+                start, end = position.split("-")
+                merged_paragrahs.insert(
+                    nextpos,
                     TempFindParagraph(
                         vector_index=vector,
                         rid=rid,
                         field=f"/{field_type}/{field}",
                         score=vector.score,
-                    )
+                        start=int(start),
+                        end=int(end),
+                        id=paragraph_id,
+                    ),
                 )
+                nextpos += 3
 
-    merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
+    # merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
     init_position = count * page
     end_position = init_position + count
     merged_paragrahs = merged_paragrahs[init_position:end_position]
@@ -239,18 +268,16 @@ async def merge_paragraphs_vectors(
 
     for merged_paragraph in merged_paragrahs:
         if merged_paragraph.vector_index is not None:
-            # TODO: Place for reranking
-            score = 25 ** (vector.score**8)
             merged_paragraph.paragraph = FindParagraph(
-                score=score,
+                score=vector.score,
                 score_type=SCORE_TYPE.VECTOR,
                 text="",
                 labels=[],  # TODO: Get labels from index
                 position=TextPosition(
                     page_number=merged_paragraph.vector_index.metadata.position.page_number,
                     index=merged_paragraph.vector_index.metadata.position.index,
-                    start=merged_paragraph.vector_index.metadata.position.start,
-                    end=merged_paragraph.vector_index.metadata.position.end,
+                    start=merged_paragraph.start,
+                    end=merged_paragraph.end,
                     start_seconds=[
                         x
                         for x in merged_paragraph.vector_index.metadata.position.start_seconds
@@ -260,7 +287,7 @@ async def merge_paragraphs_vectors(
                         for x in merged_paragraph.vector_index.metadata.position.end_seconds
                     ],
                 ),
-                id=vector.doc_id.id,
+                id=merged_paragraph.id,
             )
         if merged_paragraph.paragraph_index is not None:
             merged_paragraph.paragraph = FindParagraph(
@@ -271,8 +298,8 @@ async def merge_paragraphs_vectors(
                 position=TextPosition(
                     page_number=merged_paragraph.paragraph_index.metadata.position.page_number,
                     index=merged_paragraph.paragraph_index.metadata.position.index,
-                    start=merged_paragraph.paragraph_index.metadata.position.start,
-                    end=merged_paragraph.paragraph_index.metadata.position.end,
+                    start=merged_paragraph.start,
+                    end=merged_paragraph.end,
                     start_seconds=[
                         x
                         for x in merged_paragraph.paragraph_index.metadata.position.start_seconds
@@ -282,7 +309,7 @@ async def merge_paragraphs_vectors(
                         for x in merged_paragraph.paragraph_index.metadata.position.end_seconds
                     ],
                 ),
-                id=paragraph.paragraph,
+                id=merged_paragraph.id,
             )
     return merged_paragrahs, next_page
 
