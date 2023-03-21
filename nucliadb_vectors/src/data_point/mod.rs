@@ -218,12 +218,21 @@ impl Elem {
 
 impl key_value::KVElem for Elem {
     fn serialized_len(&self) -> usize {
-        let metadata: Option<&[u8]> = None;
-        Node::serialized_len(&self.key, &self.vector, &self.labels.0, metadata)
+        Node::serialized_len(
+            &self.key,
+            &self.vector,
+            &self.labels.0,
+            self.metadata.as_ref(),
+        )
     }
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
-        let metadata: Option<&[u8]> = None;
-        Node::serialize_into(w, self.key, self.vector, self.labels.0, metadata)
+        Node::serialize_into(
+            w,
+            self.key,
+            self.vector,
+            self.labels.0,
+            self.metadata.as_ref(),
+        )
     }
 }
 
