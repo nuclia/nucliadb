@@ -42,7 +42,6 @@ impl Debug for RelationsReaderService {
 }
 
 impl RelationsReaderService {
-    const NO_RESULTS: usize = 10;
     #[tracing::instrument(skip_all)]
     fn graph_search(
         &self,
@@ -166,7 +165,7 @@ impl RelationsReaderService {
             info!("{id:?} - running prefix search: starts {v} ms");
         }
         let prefixes = reader
-            .prefix_search(&self.rmode, Self::NO_RESULTS, prefix)?
+            .prefix_search(&self.rmode, prefix)?
             .into_iter()
             .flat_map(|key| reader.get_node_id(&key).ok().flatten());
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {

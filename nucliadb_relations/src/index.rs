@@ -116,13 +116,8 @@ impl Index {
     fn get_nodeid(&self, txn: &RoToken, x: &str) -> RResult<Option<Entity>> {
         self.graphdb.get_nodeid(txn, x)
     }
-    fn prefix_search(
-        &self,
-        dict_reader: &DReader,
-        results: usize,
-        prefix: &str,
-    ) -> RResult<Vec<String>> {
-        self.dictionary.search(dict_reader, results, prefix)
+    fn prefix_search(&self, dict_reader: &DReader, prefix: &str) -> RResult<Vec<String>> {
+        self.dictionary.search(dict_reader, prefix)
     }
     fn get_inedges<'a>(
         &self,
@@ -214,13 +209,8 @@ impl<'a> GraphReader<'a> {
     pub fn get_node_id(&self, x: &str) -> RResult<Option<Entity>> {
         self.index.get_nodeid(&self.graph_txn, x)
     }
-    pub fn prefix_search(
-        &self,
-        RMode(reader): &RMode,
-        results: usize,
-        prefix: &str,
-    ) -> RResult<Vec<String>> {
-        self.index.prefix_search(reader, results, prefix)
+    pub fn prefix_search(&self, RMode(reader): &RMode, prefix: &str) -> RResult<Vec<String>> {
+        self.index.prefix_search(reader, prefix)
     }
     pub fn search<G: BfsGuide>(
         &self,

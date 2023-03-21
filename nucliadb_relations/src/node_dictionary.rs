@@ -21,7 +21,7 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use tantivy::collector::TopDocs;
+use tantivy::collector::DocSetCollector;
 use tantivy::query::RegexQuery;
 use tantivy::schema::{Field, Schema, Term, TextFieldIndexing, TextOptions, STORED, STRING};
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy};
@@ -86,21 +86,16 @@ impl NodeDictionary {
             .try_into()?;
         Ok((dictionary, reader))
     }
-    pub fn search(
-        &self,
-        reader: &IndexReader,
-        no_results: usize,
-        query: &str,
-    ) -> RResult<Vec<String>> {
+    pub fn search(&self, reader: &IndexReader, query: &str) -> RResult<Vec<String>> {
         let query = self.adapt_text(query);
         let query = self.build_query(&query);
         let termq = Box::new(RegexQuery::from_pattern(&query, self.node_value)?);
-        let collector = TopDocs::with_limit(no_results);
+        let collector = DocSetCollector;
         let searcher = reader.searcher();
         let results = searcher
             .search(termq.as_ref(), &collector)?
             .into_iter()
-            .flat_map(|(_, d)| searcher.doc(d).ok())
+            .flat_map(|d| searcher.doc(d).ok())
             .flat_map(|d| {
                 d.get_first(self.node_hash)
                     .and_then(|v| v.as_text())
@@ -136,11 +131,11 @@ mod test {
         index.add_node(&writer, &node).unwrap();
         writer.commit().unwrap();
         let (index, reader) = NodeDictionary::new_reader(dir.path()).unwrap();
-        let r1 = index.search(&reader, 10, "new york").unwrap();
-        let r2 = index.search(&reader, 10, "new York").unwrap();
-        let r3 = index.search(&reader, 10, "new").unwrap();
-        let r4 = index.search(&reader, 10, "york").unwrap();
-        let r5 = index.search(&reader, 10, "bár").unwrap();
+        let r1 = index.search(&reader, "new york").unwrap();
+        let r2 = index.search(&reader, "new York").unwrap();
+        let r3 = index.search(&reader, "new").unwrap();
+        let r4 = index.search(&reader, "york").unwrap();
+        let r5 = index.search(&reader, "bár").unwrap();
 
         assert_eq!(r1.len(), 1);
         assert_eq!(r2.len(), 1);
