@@ -428,7 +428,7 @@ class FindParagraph(BaseModel):
     score_type: SCORE_TYPE
     text: str
     id: str
-    labels: List[str] = []
+    labels: Optional[List[str]] = []
     position: Optional[TextPosition] = None
 
 
