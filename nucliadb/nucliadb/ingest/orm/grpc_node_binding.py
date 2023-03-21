@@ -126,7 +126,12 @@ class LocalReaderWrapper:
 
     async def Documents(
         self, stream_request: StreamRequest
-    ) -> AsyncIterator[DocumentItem]:
+    ) -> AsyncIterator[DocumentItem]:  # pragma: no cover
+        """
+        This is a workaround for the fact that the node binding does not support async generators.
+
+        Very difficult to write tests for
+        """
         loop = asyncio.get_running_loop()
         q: asyncio.Queue[DocumentItem] = asyncio.Queue(1)
         exception = None

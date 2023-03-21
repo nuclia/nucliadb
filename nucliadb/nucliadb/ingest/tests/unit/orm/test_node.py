@@ -51,6 +51,7 @@ def get_cluster_member(
 
 @pytest.mark.asyncio
 async def test_chitchat_update_node():
+    NODES.clear()
     assert NODES == {}
     await chitchat_update_node([])
     assert len(NODES) == 0

@@ -24,11 +24,11 @@ from uuid import uuid4
 import pytest
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
-    ExtractedVectorsWrapper,
+    ExtractedText,
+    ExtractedTextWrapper,
     FieldID,
     FieldType,
 )
-from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -36,7 +36,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_vector(
+async def test_create_resource_orm_extracted(
     gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
@@ -44,94 +44,95 @@ async def test_create_resource_orm_vector(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
-    ex1 = ExtractedVectorsWrapper()
+    ex1 = ExtractedTextWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
-    v1 = Vector(start=1, end=2, vector=b"ansjkdn")
-    ex1.vectors.vectors.vectors.append(v1)
+    ex1.body.text = "My Text"
 
-    field_obj: Text = await r.get_field(
+    field_obj: Optional[Text] = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
     )
-    await field_obj.set_vectors(ex1)
+    assert field_obj is not None
+    await field_obj.set_extracted_text(ex1)
 
-    ex2: Optional[VectorObject] = await field_obj.get_vectors()
+    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
     assert ex2 is not None
-    assert ex2.vectors.vectors[0].vector == ex1.vectors.vectors.vectors[0].vector
+    assert ex2.text == ex1.body.text
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_vector_file(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+async def test_create_resource_orm_extracted_file(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    knowledgebox_ingest: str,
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
-    ex1 = ExtractedVectorsWrapper()
+    ex1 = ExtractedTextWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
 
-    filename = f"{dirname(__file__)}/assets/vectors.pb"
+    filename = f"{dirname(__file__)}/assets/text.pb"
     cf1 = CloudFile(
-        uri="vectors.pb",
+        uri="text.pb",
         source=CloudFile.Source.LOCAL,
+        bucket_name="/integration/orm/assets",
         size=getsize(filename),
-        bucket_name="/orm/assets",
         content_type="application/octet-stream",
-        filename="vectors.pb",
+        filename="text.pb",
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Text = await r.get_field(
+    field_obj: Optional[Text] = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
     )
-    await field_obj.set_vectors(ex1)
+    assert field_obj is not None
+    await field_obj.set_extracted_text(ex1)
 
-    ex2: Optional[VectorObject] = await field_obj.get_vectors()
-    ex3 = VectorObject()
+    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
+    assert ex2 is not None
+    ex3 = ExtractedText()
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     ex3.ParseFromString(data2)
-    assert ex2 is not None
-
-    assert ex3.vectors.vectors[0].vector == ex2.vectors.vectors[0].vector
+    assert ex3.text == ex2.text
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_vector_split(
+async def test_create_resource_orm_extracted_delta(
     gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
-
-    ex1 = ExtractedVectorsWrapper()
+    ex1 = ExtractedTextWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
-    v1 = Vector(start=1, vector=b"ansjkdn")
-    vs1 = Vectors()
-    vs1.vectors.append(v1)
-    ex1.vectors.split_vectors["es1"].vectors.append(v1)
-    ex1.vectors.split_vectors["es2"].vectors.append(v1)
+    ex1.body.split_text["ident1"] = "My text"
+    ex1.body.text = "all text"
 
     field_obj: Text = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
     )
-    await field_obj.set_vectors(ex1)
+    await field_obj.set_extracted_text(ex1)
 
-    ex1 = ExtractedVectorsWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
-    v1 = Vector(start=1, vector=b"ansjkdn")
-    vs1 = Vectors()
-    vs1.vectors.append(v1)
-    ex1.vectors.split_vectors["es3"].vectors.append(v1)
-    ex1.vectors.split_vectors["es2"].vectors.append(v1)
-
-    field_obj2: Text = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
-    await field_obj2.set_vectors(ex1)
-
-    ex2: Optional[VectorObject] = await field_obj2.get_vectors()
+    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
     assert ex2 is not None
-    assert len(ex2.split_vectors) == 3
+    assert ex2.text == ex1.body.text
+
+    ex1 = ExtractedTextWrapper()
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    ex1.body.split_text["ident2"] = "My text"
+    ex1.body.text = "all text 2"
+
+    field_obj = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    await field_obj.set_extracted_text(ex1)
+
+    ex2 = await field_obj.get_extracted_text()
+    assert ex2 is not None
+    assert ex2.text == ex1.body.text
+    assert len(ex2.split_text) == 2

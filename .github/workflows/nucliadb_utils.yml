@@ -26,12 +26,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          cd nucliadb_utils && make install-dev
+        run: make -C nucliadb_utils/ install-dev
 
       - name: Run pre-checks
-        run: |
-          cd nucliadb_utils && make lint
+        run: make -C nucliadb_utils/ lint
 
   # Job to run tests
   tests:
@@ -53,12 +51,10 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: |
-          cd nucliadb_utils && make install-dev
+        run: make -C nucliadb_utils/ install-dev
 
       - name: Run tests
-        run: |
-          cd nucliadb_utils && make test-cov
+        run: make -C nucliadb_utils/ test-cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

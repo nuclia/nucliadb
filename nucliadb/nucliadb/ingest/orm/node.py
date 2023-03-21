@@ -406,7 +406,7 @@ class Node(AbstractNode):
                 grpc_address = f"{hostname}:{settings.node_sidecar_port}"
 
             tracer_provider = get_telemetry(SERVICE_NAME)
-            if tracer_provider is not None:
+            if tracer_provider is not None:  # pragma: no cover
                 telemetry_grpc = OpenTelemetryGRPC(
                     f"{SERVICE_NAME}_grpc_sidecar", tracer_provider
                 )
@@ -441,7 +441,7 @@ class Node(AbstractNode):
                 grpc_address = f"{hostname}:{settings.node_writer_port}"
 
             tracer_provider = get_telemetry(SERVICE_NAME)
-            if tracer_provider is not None:
+            if tracer_provider is not None:  # pragma: no cover
                 telemetry_grpc = OpenTelemetryGRPC(
                     f"{SERVICE_NAME}_grpc_writer", tracer_provider
                 )
@@ -476,7 +476,7 @@ class Node(AbstractNode):
                 grpc_address = f"{hostname}:{settings.node_reader_port}"
 
             tracer_provider = get_telemetry(SERVICE_NAME)
-            if tracer_provider is not None:
+            if tracer_provider is not None:  # pragma: no cover
                 telemetry_grpc = OpenTelemetryGRPC(
                     f"{SERVICE_NAME}_grpc_reader", tracer_provider
                 )

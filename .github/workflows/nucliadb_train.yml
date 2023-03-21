@@ -32,13 +32,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb/ install-dev
+
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb/nucliadb/train --config=nucliadb/setup.cfg
-          isort -c --profile black nucliadb/nucliadb/train
-          black --check --verbose nucliadb/nucliadb/train
+        run: make -C nucliadb/ lint-train
 
   # Job to run tests
   tests:
@@ -59,15 +56,7 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb/requirements-sources.txt
-          pip install -r nucliadb/requirements.txt
-          pip install -e nucliadb
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/train
+        run: make -C nucliadb/ install-dev
 
       - uses: dorny/paths-filter@v2
         id: filter

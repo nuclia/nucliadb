@@ -32,14 +32,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb/ install-dev
 
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb/nucliadb/writer --config=nucliadb/setup.cfg
-          isort -c --profile black nucliadb/nucliadb/writer
-          black --check --verbose nucliadb/nucliadb/writer
+        run: make -C nucliadb/ lint-writer
 
   # Job to run tests
   tests:
@@ -60,15 +56,7 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb/requirements-sources.txt
-          pip install -r nucliadb/requirements.txt
-          pip install -e nucliadb
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/writer/
+        run: make -C nucliadb/ install-dev
 
       - name: Run tests
         run: |

@@ -47,7 +47,7 @@ async def start_train_grpc(service_name: Optional[str] = None):
 
     tracer_provider = get_telemetry(service_name)
 
-    if tracer_provider is not None:
+    if tracer_provider is not None:  # pragma: no cover
         await init_telemetry(tracer_provider)
         otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
         server = otgrpc.init_server()

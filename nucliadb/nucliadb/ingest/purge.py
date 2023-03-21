@@ -24,6 +24,7 @@ import sys
 import pkg_resources
 
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE,
@@ -33,17 +34,12 @@ from nucliadb.ingest.orm.knowledgebox import (
 )
 from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 
-async def main():
+async def purge_kb(driver: Driver):
     logger.info("START PURGING KB")
-    # Clean up all kb marked to delete
-    driver = await get_driver()
-    storage = await get_storage(
-        gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
-        service_name=SERVICE_NAME,
-    )
     async for key in driver.keys(match=KB_TO_DELETE_BASE, count=-1):
         logger.info(f"Purging kb {key}")
         try:
@@ -88,9 +84,10 @@ async def main():
             errors.capture_exception(exc)
             logger.info(f"  X Error while deleting key {key_to_purge}")
             await txn.abort()
-
     logger.info("END PURGING KB")
 
+
+async def purge_kb_storage(driver: Driver, storage: Storage):
     # Last iteration deleted all kbs, and set their storages marked to be deleted also in tikv
     # Here we'll delete those storage buckets
     logger.info("START PURGING KB STORAGE")
@@ -132,11 +129,24 @@ async def main():
             else:
                 await txn.commit(resource=False)
 
-    await storage.finalize()
     logger.info("FINISH PURGING KB STORAGE")
 
 
-def run() -> int:
+async def main():
+    # Clean up all kb marked to delete
+    driver = await get_driver()
+
+    await purge_kb(driver)
+
+    storage = await get_storage(
+        gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
+        service_name=SERVICE_NAME,
+    )
+    await purge_kb_storage(driver, storage)
+    await storage.finalize()
+
+
+def run() -> int:  # pragma: no cover
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     logging.basicConfig(

@@ -80,7 +80,7 @@ async def test_ingest_messages_autocommit(
     cf1 = CloudFile(
         uri="file.png",
         source=CloudFile.Source.LOCAL,
-        bucket_name="/ingest/assets",
+        bucket_name="/integration/ingest/assets",
         size=getsize(filename),
         content_type="image/png",
         filename="file.png",
@@ -221,7 +221,7 @@ def add_filefields(message, items=None):
         cf1 = CloudFile(
             uri=filename,
             source=CloudFile.Source.LOCAL,
-            bucket_name="/ingest/assets",
+            bucket_name="/integration/ingest/assets",
             size=getsize(file_path),
             content_type="application/octet-stream",
             filename=filename,

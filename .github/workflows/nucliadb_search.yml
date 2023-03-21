@@ -52,13 +52,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb/ install-dev
+
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb/nucliadb/search --config=nucliadb/setup.cfg
-          isort -c --profile black nucliadb/nucliadb/search
-          black --check --verbose nucliadb/nucliadb/search
+        run: make -C nucliadb/ lint-search
 
   # Job to run tests
   tests:
@@ -151,7 +148,7 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: true
@@ -159,13 +156,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: '@nuclia/nuclia-db'
+          alert-comment-cc-users: "@nuclia/nuclia-db"
 
       - name: Comment benchmark result based on main
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name != 'push'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: false
@@ -173,13 +170,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: '@nuclia/nuclia-db'
+          alert-comment-cc-users: "@nuclia/nuclia-db"
 
       - name: Store on GH Pages
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmarks.json
           auto-push: true
           gh-repository: github.com/nuclia/nucliadb_performance

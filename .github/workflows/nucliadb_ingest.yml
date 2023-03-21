@@ -31,14 +31,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb/ install-dev
 
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb/nucliadb/ingest --config=nucliadb/setup.cfg
-          isort -c --profile black nucliadb/nucliadb/ingest
-          black --check --verbose nucliadb/nucliadb/ingest
+        run: make -C nucliadb/ lint
 
   # Job to run tests
   tests:
@@ -59,16 +55,7 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb/requirements-sources.txt
-          pip install -r nucliadb/requirements.txt
-          pip install -r nucliadb/requirements-test.txt
-          pip install -e nucliadb
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/ingest/
+        run: make -C nucliadb/ install-dev
 
       - name: Install tikv
         run: |
@@ -78,7 +65,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb.ingest -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/ingest
+          make -C nucliadb/ test-cov-ingest
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

@@ -15,8 +15,8 @@ format:
 lint:
 	flake8 nucliadb_utils --config=setup.cfg
 	isort -c --profile black .
-	black --check --verbose .
-	MYPYPATH=./mypy_stubs mypy --config-file=../mypy.ini .
+	black --check .
+	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
 test:

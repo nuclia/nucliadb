@@ -75,7 +75,7 @@ async def main() -> App:
         raise Exception("No Key defined")
 
     tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:
+    if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
 
