@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from enum import Enum
 from typing import AsyncIterator, Callable, List, Optional
 
@@ -107,26 +106,16 @@ async def resource(redis, writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
+            headers={"X-Synchronous": "true"},
             json={
                 "slug": "resource1",
                 "title": "Resource 1",
             },
         )
         assert resp.status_code == 201
-        uuid = resp.json().get("uuid")
-        driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-        count = 0
-        found = False
-        while count < 10:
-            found = await driver.get(f"/kbs/{knowledgebox_writer}/r/{uuid}")
-            count += 1
-            if found:
-                break
-            else:
-                await asyncio.sleep(1)
-        assert found
+        uuid = resp.json()["uuid"]
 
-    return resp.json()["uuid"]
+    return uuid
 
 
 @pytest.fixture(scope="function")

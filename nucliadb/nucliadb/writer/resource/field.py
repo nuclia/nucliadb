@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Union
+from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -40,6 +40,29 @@ from nucliadb_models.writer import (
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
+
+
+async def extract_file_field(
+    field_id: str,
+    resource: ORMResource,
+    toprocess: PushPayload,
+    password: Optional[str] = None,
+):
+    processing = get_processing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    field_type = resources_pb2.FieldType.FILE
+    field = await resource.get_field(field_id, field_type)
+    field_pb = await field.get_value()
+    if field_pb is None:
+        raise KeyError(f"Field {field_id} does not exists")
+
+    if password is not None:
+        field_pb.password = password
+
+    toprocess.filefield[field_id] = await processing.convert_internal_filefield_to_str(
+        field_pb, storage
+    )
 
 
 async def extract_fields(resource: ORMResource, toprocess: PushPayload):

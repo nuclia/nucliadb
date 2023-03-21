@@ -22,17 +22,21 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from fastapi import HTTPException, Response
 from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
-from nucliadb_protos.resources_pb2 import FieldID, FieldType
+from nucliadb_protos.resources_pb2 import FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 import nucliadb_models as models
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
+from nucliadb.ingest.utils import get_driver
+from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import set_processing_info
 from nucliadb.writer.resource.field import (
+    extract_file_field,
     parse_conversation_field,
     parse_datetime_field,
     parse_file_field,
@@ -43,20 +47,29 @@ from nucliadb.writer.resource.field import (
 )
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.writer import ResourceFieldAdded
+from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_partitioning, get_transaction
+from nucliadb_utils.utilities import (
+    get_cache,
+    get_partitioning,
+    get_storage,
+    get_transaction,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     SKIP_STORE_DEFAULT = False
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, FieldType.V]
     SYNC_CALL = False
+    X_NUCLIADB_USER = ""
+    X_FILE_PASSWORD = None
 else:
     SKIP_STORE_DEFAULT = Header(False)
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, int]
     SYNC_CALL = Header(False)
+    X_NUCLIADB_USER = Header("")
+    X_FILE_PASSWORD = Header(None)
 
 
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
@@ -566,3 +579,77 @@ async def delete_resource_field(
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return Response(status_code=204)
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}/reprocess",
+    status_code=202,
+    name="Reprocess file field (by id)",
+    response_model=models.writer.ResourceUpdated,
+    tags=["Resource fields"],
+)
+async def reprocess_file_field(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
+    x_file_password: Optional[str] = X_FILE_PASSWORD,
+):
+    transaction = get_transaction()
+    processing = get_processing()
+    partitioning = get_partitioning()
+
+    partition = partitioning.generate_partition(kbid, rid)
+
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=x_nucliadb_user,
+    )
+
+    toprocess.kbid = kbid
+    toprocess.uuid = rid
+    toprocess.source = Source.HTTP
+
+    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
+
+    storage = await get_storage(service_name=SERVICE_NAME)
+    cache = await get_cache()
+    driver = await get_driver()
+
+    async with driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, cache, kbid)
+
+        resource = await kb.get(rid)
+        if resource is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
+        try:
+            await extract_file_field(
+                field_id,
+                resource=resource,
+                toprocess=toprocess,
+                password=x_file_password,
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Field does not exist")
+
+    # Send current resource to reprocess.
+
+    try:
+        processing_info = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
+
+    writer = BrokerMessage()
+    writer.kbid = kbid
+    writer.uuid = rid
+    writer.source = BrokerMessage.MessageSource.WRITER
+    writer.basic.metadata.useful = True
+    writer.basic.metadata.status = Metadata.Status.PENDING
+    set_processing_info(writer, processing_info)
+    await transaction.commit(writer, partition, wait=False)
+
+    return ResourceUpdated(seqid=processing_info.seqid)

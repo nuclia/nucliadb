@@ -203,7 +203,7 @@ async def post(
         raise HTTPServiceUnavailable("Upload not available right now, try again")
 
     if implies_resource_creation:
-        # When uploading a file to a new kb resource, we want to  allow multiple
+        # When uploading a file to a new kb resource, we want to allow multiple
         # concurrent uploads, so upload id will be randmon
         upload_id = uuid.uuid4().hex
     else:
