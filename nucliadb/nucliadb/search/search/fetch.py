@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import re
 import string
 from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
+from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
 
@@ -41,6 +43,8 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
+
+RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)
 
 PRE_WORD = string.punctuation + " "
 
@@ -91,18 +95,31 @@ async def fetch_resources(
 
 
 async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    resouce_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
-    if uuid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource = await kb.get(uuid)
-        if orm_resource is not None:
-            resouce_cache[uuid] = orm_resource
+
+    resource_cache = get_resource_cache()
+
+    if uuid not in RESOURCE_LOCKS:
+        lock = asyncio.Lock()
+        RESOURCE_LOCKS[uuid] = lock
+        await lock.acquire()
     else:
-        orm_resource = resouce_cache.get(uuid)
+        await RESOURCE_LOCKS[uuid].acquire()
+
+    try:
+        if uuid not in resource_cache:
+            transaction = await get_transaction()
+            storage = await get_storage(service_name=SERVICE_NAME)
+            cache = await get_cache()
+            kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+            orm_resource = await kb.get(uuid)
+
+        if orm_resource is not None:
+            resource_cache[uuid] = orm_resource
+        else:
+            orm_resource = resource_cache.get(uuid)
+    finally:
+        RESOURCE_LOCKS[uuid].release()
     return orm_resource
 
 

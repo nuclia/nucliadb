@@ -17,13 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
-from nucliadb_protos.nodereader_pb2 import OrderBy
+from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
+from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -88,6 +90,8 @@ class TextPosition(BaseModel):
     index: int
     start: int
     end: int
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
 
 
 class Sentence(BaseModel):
@@ -217,7 +221,7 @@ class KnowledgeboxSearchResults(BaseModel):
 class KnowledgeboxSuggestResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     entities: Optional[RelatedEntities] = None
-    shards: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -225,7 +229,7 @@ class KnowledgeboxCounters(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
-    shards: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
 
 
 class SortField(str, Enum):
@@ -363,3 +367,101 @@ class SearchRequest(BaseModel):
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
     with_synonyms: bool = False
+
+
+class Author(str, Enum):
+    NUCLIA = "NUCLIA"
+    USER = "USER"
+
+
+class Message(BaseModel):
+    author: Author
+    text: str
+
+
+class ChatModel(BaseModel):
+    question: str
+    user_id: str
+    system: Optional[str] = None
+    context: List[Message] = []
+
+
+class ChatRequest(BaseModel):
+    query: str = ""
+    fields: List[str] = []
+    filters: List[str] = []
+    sort: Optional[SortOptions] = None
+    min_score: float = 0.70
+    range_creation_start: Optional[datetime] = None
+    range_creation_end: Optional[datetime] = None
+    range_modification_start: Optional[datetime] = None
+    range_modification_end: Optional[datetime] = None
+    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
+    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
+    shards: List[str] = []
+    context: Optional[List[Message]] = None
+
+
+class FindRequest(SearchRequest):
+    features: List[SearchOptions] = [
+        SearchOptions.PARAGRAPH,
+        SearchOptions.VECTOR,
+    ]
+
+
+class SCORE_TYPE(str, Enum):
+    VECTOR = "VECTOR"
+    BM25 = "BM25"
+
+
+class FindTextPosition(BaseModel):
+    page_number: Optional[int]
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
+    index: int
+    start: int
+    end: int
+
+
+class FindParagraph(BaseModel):
+    score: float
+    score_type: SCORE_TYPE
+    text: str
+    id: str
+    labels: List[str] = []
+    position: Optional[TextPosition] = None
+
+
+@dataclass
+class TempFindParagraph:
+    rid: str
+    field: str
+    score: float
+    paragraph: Optional[FindParagraph] = None
+    vector_index: Optional[DocumentScored] = None
+    paragraph_index: Optional[PBParagraphResult] = None
+
+
+class FindField(BaseModel):
+    paragraphs: Dict[str, FindParagraph]
+
+
+class FindResource(Resource):
+    fields: Dict[str, FindField]
+
+
+class KnowledgeboxFindResults(BaseModel):
+    resources: Dict[str, FindResource]
+    facets: FacetsResult
+    query: Optional[str] = None
+    total: int = 0
+    page_number: int = 0
+    page_size: int = 20
+    next_page: bool = False
+    nodes: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
+
+
+class FeedbackRequest(BaseModel):
+    # TODO
+    pass

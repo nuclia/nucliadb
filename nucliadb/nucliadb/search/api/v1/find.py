@@ -27,13 +27,14 @@ from fastapi_versioning import version
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
-from nucliadb.search.search.merge import merge_results
+from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
-    KnowledgeboxSearchResults,
+    FindRequest,
+    KnowledgeboxFindResults,
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
@@ -47,7 +48,7 @@ from nucliadb_models.search import (
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_audit
 
-SEARCH_EXAMPLES = {
+FIND_EXAMPLES = {
     "filtering_by_icon": {
         "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
         "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
@@ -70,17 +71,17 @@ SEARCH_EXAMPLES = {
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/search",
+    f"/{KB_PREFIX}/{{kbid}}/find",
     status_code=200,
-    name="Search Knowledge Box",
-    description="Search on a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
+    name="Find Knowledge Box",
+    description="Find on a Knowledge Box",
+    response_model=KnowledgeboxFindResults,
     response_model_exclude_unset=True,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def search_knowledgebox(
+async def find_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
@@ -102,7 +103,6 @@ async def search_knowledgebox(
     features: List[SearchOptions] = Query(
         default=[
             SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
             SearchOptions.VECTOR,
         ]
     ),
@@ -121,8 +121,8 @@ async def search_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    item = SearchRequest(
+) -> KnowledgeboxFindResults:
+    item = FindRequest(
         query=query,
         advanced_query=advanced_query,
         fields=fields,
@@ -152,102 +152,46 @@ async def search_knowledgebox(
         with_status=with_status,
         with_synonyms=with_synonyms,
     )
-    return await search(
+    return await find(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
-
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/catalog",
-    status_code=200,
-    name="List resources of a Knowledge Box",
-    description="List resources of a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
-    response_model_exclude_unset=True,
-    tags=["Search"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def catalog(
-    request: Request,
-    response: Response,
-    kbid: str,
-    query: str = Query(default=""),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    shards: List[str] = Query([]),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    sort = None
-    if sort_field:
-        sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-    item = SearchRequest(
-        query=query,
-        fields=["a/title"],
-        faceted=faceted,
-        filters=filters,
-        sort=sort,
-        page_number=page_number,
-        page_size=page_size,
-        features=[SearchOptions.DOCUMENT],
-        show=[ResourceProperties.BASIC],
-        shards=shards,
-        with_status=with_status,
-    )
-    return await search(
-        response,
-        kbid,
-        item,
-        x_ndb_client,
-        x_nucliadb_user,
-        x_forwarded_for,
-        do_audit=False,
     )
 
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/search",
+    f"/{KB_PREFIX}/{{kbid}}/find",
     status_code=200,
-    name="Search Knowledge Box",
-    description="Search on a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
+    name="Find Knowledge Box",
+    description="Find on a Knowledge Box",
+    response_model=KnowledgeboxFindResults,
     response_model_exclude_unset=True,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def search_post_knowledgebox(
+async def find_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: SearchRequest = Body(examples=SEARCH_EXAMPLES),
+    item: FindRequest = Body(examples=FIND_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> KnowledgeboxFindResults:
     # We need the nodes/shards that are connected to the KB
-    return await search(
+    return await find(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
 
-async def search(
+async def find(
     response: Response,
     kbid: str,
-    item: SearchRequest,
+    item: FindRequest,
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-) -> KnowledgeboxSearchResults:
+) -> KnowledgeboxFindResults:
     audit = get_audit()
     start_time = time()
 
@@ -284,11 +228,12 @@ async def search(
         with_synonyms=item.with_synonyms,
     )
 
-    results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
+    results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
+
     # We need to merge
-    search_results = await merge_results(
+    search_results = await find_merge_results(
         results,
         count=item.page_size,
         page=item.page_number,
@@ -303,9 +248,7 @@ async def search(
     )
     await abort_transaction()
 
-    response.status_code = (
-        206 if incomplete_results or query_incomplete_results else 200
-    )
+    response.status_code = 206 if incomplete_results else 200
 
     if audit is not None and do_audit:
         await audit.search(

@@ -1,0 +1,351 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+import asyncio
+from typing import Dict, List, Optional, Tuple, cast
+
+from nucliadb_protos.nodereader_pb2 import (
+    DocumentScored,
+    EntitiesSubgraphRequest,
+    ParagraphResult,
+    SearchResponse,
+)
+
+from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.serialize import serialize
+from nucliadb.search import SERVICE_NAME, logger
+from nucliadb.search.search.fetch import (
+    get_resource_cache,
+    get_resource_from_cache,
+    highlight_paragraph,
+)
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.search import (
+    SCORE_TYPE,
+    FindField,
+    FindParagraph,
+    FindResource,
+    KnowledgeboxFindResults,
+    ResourceProperties,
+    SortOptions,
+    TempFindParagraph,
+    TextPosition,
+)
+
+
+async def get_text_find_paragraph(
+    rid: str,
+    kbid: str,
+    field: str,
+    start: int,
+    end: int,
+    split: Optional[str] = None,
+    highlight: bool = False,
+    ematches: Optional[List[str]] = None,
+    matches: Optional[List[str]] = None,
+) -> str:
+    orm_resource = await get_resource_from_cache(kbid, rid)
+
+    if orm_resource is None:
+        logger.error(f"{rid} does not exist on DB")
+        return ""
+
+    field_type, field = field.split("/")
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    extracted_text = await field_obj.get_extracted_text()
+    if extracted_text is None:
+        logger.warn(
+            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
+        )
+        return ""
+
+    if split not in (None, ""):
+        text = extracted_text.split_text[split]
+        splitted_text = text[start:end]
+    else:
+        splitted_text = extracted_text.text[start:end]
+
+    if highlight:
+        splitted_text = highlight_paragraph(
+            splitted_text, words=matches, ematches=ematches  # type: ignore
+        )
+    return splitted_text
+
+
+async def set_text_value(
+    kbid: str,
+    result_paragraph: TempFindParagraph,
+    max_operations: asyncio.Semaphore,
+    highlight: bool = False,
+    ematches: List[str] = [],
+):
+    # TODO: Improve
+    await max_operations.acquire()
+    try:
+        assert result_paragraph.paragraph
+        assert result_paragraph.paragraph.position
+        result_paragraph.paragraph.text = await get_text_find_paragraph(
+            rid=result_paragraph.rid,
+            kbid=kbid,
+            field=result_paragraph.field,
+            start=result_paragraph.paragraph.position.start,
+            end=result_paragraph.paragraph.position.end,
+            split=None,  # TODO
+            highlight=highlight,
+            ematches=ematches,
+            matches=[],  # TODO
+        )
+    finally:
+        max_operations.release()
+
+
+async def set_resource_metadata_value(
+    kbid: str,
+    resource: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    find_resources: Dict[str, FindResource],
+    max_operations: asyncio.Semaphore,
+):
+    await max_operations.acquire()
+
+    try:
+        serialized_resource = await serialize(
+            kbid,
+            resource,
+            show,
+            field_type_filter=field_type_filter,
+            extracted=extracted,
+            service_name=SERVICE_NAME,
+        )
+        find_resources[resource].parse_obj(serialized_resource)
+    finally:
+        max_operations.release()
+
+
+async def fetch_find_metadata(
+    find_resources: Dict[str, FindResource],
+    result_paragraphs: List[TempFindParagraph],
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    highlight: bool = False,
+    ematches: List[str] = [],
+):
+    resources = []
+    operations = []
+    max_operations = asyncio.Semaphore(10)
+
+    for result_paragraph in result_paragraphs:
+        if result_paragraph.paragraph is not None:
+            find_resources.setdefault(
+                result_paragraph.rid, FindResource(id=result_paragraph.rid, fields={})
+            ).fields.setdefault(
+                result_paragraph.field, FindField(paragraphs={})
+            ).paragraphs[
+                result_paragraph.paragraph.id
+            ] = result_paragraph.paragraph
+
+            operations.append(
+                set_text_value(
+                    kbid=kbid,
+                    result_paragraph=result_paragraph,
+                    highlight=highlight,
+                    ematches=ematches,
+                    max_operations=max_operations,
+                )
+            )
+            resources.append(result_paragraph.rid)
+
+    for resource in set(resources):
+        operations.append(
+            set_resource_metadata_value(
+                kbid=kbid,
+                resource=resource,
+                show=show,
+                field_type_filter=field_type_filter,
+                extracted=extracted,
+                find_resources=find_resources,
+                max_operations=max_operations,
+            )
+        )
+    await asyncio.wait(*operations)  # type: ignore
+
+
+async def merge_paragraphs_vectors(
+    paragraphs_shards: List[List[ParagraphResult]],
+    vectors_shards: List[List[DocumentScored]],
+    count: int,
+    page: int,
+    min_score: float,
+) -> Tuple[List[TempFindParagraph], bool]:
+    merged_paragrahs: List[TempFindParagraph] = []
+
+    for paragraphs_shard in paragraphs_shards:
+        for paragraph in paragraphs_shard:
+            merged_paragrahs.append(
+                TempFindParagraph(
+                    paragraph_index=paragraph,
+                    field=paragraph.field,
+                    rid=paragraph.uuid,
+                    score=paragraph.score.bm25,
+                )
+            )
+
+    for vectors_shard in vectors_shards:
+        for vector in vectors_shard:
+            if vector.score >= min_score:
+                doc_id_split = vector.doc_id.id.split("/")
+                if len(doc_id_split) == 5:
+                    rid, field_type, field, index, position = doc_id_split
+                elif len(doc_id_split) == 6:
+                    rid, field_type, field, split, index, position = doc_id_split
+                merged_paragrahs.append(
+                    TempFindParagraph(
+                        vector_index=vector,
+                        rid=rid,
+                        field=f"{field_type}/{field}",
+                        score=vector.score,
+                    )
+                )
+
+    merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
+    init_position = count * page
+    end_position = init_position + count
+    merged_paragrahs = merged_paragrahs[init_position:end_position]
+
+    next_page = len(merged_paragrahs) > end_position
+
+    for merged_paragraph in merged_paragrahs:
+        if merged_paragraph.vector_index is not None:
+            # TODO: Place for reranking
+            score = 25 ** (vector.score**8)
+            merged_paragraph.paragraph = FindParagraph(
+                score=score,
+                score_type=SCORE_TYPE.VECTOR,
+                text="",
+                labels=[],  # TODO: Get labels from index
+                position=TextPosition(
+                    page_number=merged_paragraph.vector_index.metadata.position.page_number,
+                    index=merged_paragraph.vector_index.metadata.position.index,
+                    start=merged_paragraph.vector_index.metadata.position.start,
+                    end=merged_paragraph.vector_index.metadata.position.end,
+                    start_seconds=[
+                        x
+                        for x in merged_paragraph.vector_index.metadata.position.start_seconds
+                    ],
+                    end_seconds=[
+                        x
+                        for x in merged_paragraph.vector_index.metadata.position.end_seconds
+                    ],
+                ),
+                id=vector.doc_id.id,
+            )
+        if merged_paragraph.paragraph_index is not None:
+            merged_paragraph.paragraph = FindParagraph(
+                score=merged_paragraph.paragraph_index.score.bm25,
+                score_type=SCORE_TYPE.BM25,
+                text="",
+                labels=merged_paragraph.paragraph_index.labels,
+                position=TextPosition(
+                    page_number=merged_paragraph.paragraph_index.metadata.position.page_number,
+                    index=merged_paragraph.paragraph_index.metadata.position.index,
+                    start=merged_paragraph.paragraph_index.metadata.position.start,
+                    end=merged_paragraph.paragraph_index.metadata.position.end,
+                    start_seconds=[
+                        x
+                        for x in merged_paragraph.paragraph_index.metadata.position.start_seconds
+                    ],
+                    end_seconds=[
+                        x
+                        for x in merged_paragraph.paragraph_index.metadata.position.end_seconds
+                    ],
+                ),
+                id=paragraph.paragraph,
+            )
+    return merged_paragrahs, next_page
+
+
+async def find_merge_results(
+    search_responses: List[SearchResponse],
+    count: int,
+    page: int,
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    sort: SortOptions,
+    requested_relations: EntitiesSubgraphRequest,
+    min_score: float = 0.85,
+    highlight: bool = False,
+) -> KnowledgeboxFindResults:
+    paragraphs: List[List[ParagraphResult]] = []
+    vectors: List[List[DocumentScored]] = []
+    relations = []
+
+    # facets_counter = Counter()
+    next_page = True
+    ematches: List[str] = []
+    real_query = ""
+    for response in search_responses:
+        # Iterate over answers from different logic shards
+
+        # Merge facets
+        # TODO
+        # facets_counter.update(response.paragraph.facets)
+        ematches.extend(response.paragraph.ematches)
+        real_query = response.paragraph.query
+        next_page = next_page and response.paragraph.next_page
+
+        paragraphs.append(cast(List[ParagraphResult], response.paragraph.results))
+        vectors.append(cast(List[DocumentScored], response.vector.documents))
+
+        relations.append(response.relation)
+
+    get_resource_cache(clear=True)
+
+    result_paragraphs, next_page = await merge_paragraphs_vectors(
+        paragraphs, vectors, count, page, min_score
+    )
+
+    api_results = KnowledgeboxFindResults(
+        resources={},
+        facets={},
+        query=real_query,
+        total=len(result_paragraphs),
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+    )
+
+    await fetch_find_metadata(
+        api_results.resources,
+        result_paragraphs,
+        kbid,
+        show,
+        field_type_filter,
+        extracted,
+        highlight,
+        ematches,
+    )
+    return api_results

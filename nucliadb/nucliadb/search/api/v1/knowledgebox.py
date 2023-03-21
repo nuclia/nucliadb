@@ -120,7 +120,7 @@ async def knowledgebox_counters(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(get_shard(node, shard_id, vectorset=vectorset))
-                queried_shards.append((node.label, shard_id, node_id))
+                queried_shards.append(shard_id)
 
     if not ops:
         await abort_transaction()

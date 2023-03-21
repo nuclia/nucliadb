@@ -23,6 +23,8 @@ from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
+    RelationSearchRequest,
+    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -56,3 +58,10 @@ def query_paragraph_shard(
 def suggest_shard(node: Node, shard: str, query: SuggestRequest) -> SuggestResponse:
     query.shard = shard
     return node.reader.Suggest(query)
+
+
+def relations_shard(
+    node: Node, shard: str, query: RelationSearchRequest
+) -> RelationSearchResponse:
+    query.shard_id = shard
+    return node.reader.RelationSearch(query)
