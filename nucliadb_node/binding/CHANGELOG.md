@@ -1,4 +1,7 @@
 # Changelog
+## 0.7.3
+
+- Unbounded prefix search on relations
 ## 0.7.2
 
 - Unbounded prefix search on relations

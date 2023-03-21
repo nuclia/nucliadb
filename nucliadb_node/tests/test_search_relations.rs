@@ -335,7 +335,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 
-    create_knowledge_graph(&mut writer, shard_id.clone()).await;
+    let nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;
 
     // --------------------------------------------------------------
     // Test: prefixed search with empty term. Results are limited
@@ -356,7 +356,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = &prefix_response.nodes;
     // TODO: get constants from RelationsReaderService (.../relations/service/reader.rs)
-    assert_eq!(results.len(), 10);
+    assert_eq!(results.len(), nodes.len());
 
     // --------------------------------------------------------------
     // Test: prefixed search with "cat" term (some results)
