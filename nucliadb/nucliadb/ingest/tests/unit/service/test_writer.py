@@ -587,7 +587,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
 
     async def test_DelEntities_handle_error(self, writer: WriterServicer):
-        request = writer_pb2.SetEntitiesRequest(
+        request = writer_pb2.DelEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
