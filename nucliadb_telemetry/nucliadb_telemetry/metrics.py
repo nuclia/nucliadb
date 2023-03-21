@@ -101,6 +101,7 @@ class ObserverRecorder:
 
     def __enter__(self):
         self.start = time.time()
+        return self
 
     def __exit__(
         self,
