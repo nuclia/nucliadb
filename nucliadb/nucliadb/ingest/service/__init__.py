@@ -32,7 +32,7 @@ from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
 
-async def health_check(health_servicer: health.aio.HealthServicer):
+async def health_check(health_servicer):
     while True:
         if len(NODES) == 0:
             await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
