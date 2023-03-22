@@ -55,6 +55,11 @@ class SearchOptions(str, Enum):
     VECTOR = "vector"
 
 
+class ChatOptions(str, Enum):
+    PARAGRAPHS = "paragraphs"
+    RELATIONS = "relations"
+
+
 class SuggestOptions(str, Enum):
     PARAGRAPH = "paragraph"
     ENTITIES = "entities"
@@ -390,8 +395,11 @@ class ChatRequest(BaseModel):
     query: str = ""
     fields: List[str] = []
     filters: List[str] = []
-    sort: Optional[SortOptions] = None
     min_score: float = 0.70
+    features: List[ChatOptions] = [
+        ChatOptions.PARAGRAPHS,
+        ChatOptions.RELATIONS,
+    ]
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
@@ -455,6 +463,7 @@ class FindResource(Resource):
 
 class KnowledgeboxFindResults(BaseModel):
     resources: Dict[str, FindResource]
+    relations: Optional[Relations] = None
     facets: FacetsResult
     query: Optional[str] = None
     total: int = 0

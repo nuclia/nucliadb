@@ -35,6 +35,7 @@ from nucliadb.search.search.fetch import (
     get_resource_from_cache,
     highlight_paragraph,
 )
+from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
@@ -375,5 +376,9 @@ async def find_merge_results(
         extracted,
         highlight,
         ematches,
+    )
+
+    api_results.relations = await merge_relations_results(
+        relations, requested_relations
     )
     return api_results

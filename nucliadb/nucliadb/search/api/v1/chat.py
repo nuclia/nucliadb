@@ -35,6 +35,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     Author,
     ChatModel,
+    ChatOptions,
     ChatRequest,
     FindRequest,
     KnowledgeboxFindResults,
@@ -48,21 +49,10 @@ END_OF_STREAM = "_END_"
 
 CHAT_EXAMPLES = {
     "search_and_chat": {
-        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
-        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "summary": "Ask who won the final leage",
+        "description": "You can ask a question to your knowledge box",  # noqa
         "value": {
-            "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
-        },
-    },
-    "get_language_counts": {
-        "summary": "Get the number of documents for each language",
-        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
-        "value": {
-            "page_size": 0,
-            "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
+            "query": "Who won the final leage?",
         },
     },
 }
@@ -90,20 +80,30 @@ async def chat_post_knowledgebox(
 
     if item.context is not None and len(item.context) > 0:
         # There is context lets do a query
-        req = ChatModel()
-        req.context = item.context
-        # req.system = "You help creating new queries"
-        req.question = "Which question should be done to answer: " + item.query
+        req = ChatModel(
+            question="Given the context, which question should be done to answer: "
+            + item.query,
+            context=item.context,
+            user_id=x_nucliadb_user,
+        )
+        req.system = "You help creating new queries based on context"
 
         new_query_elements = []
         async for new_query_data in predict.chat_query(kbid, req):
             new_query_elements.append(new_query_data)
 
         new_query = (b"".join(new_query_elements)).decode()
+        possible_new_query = new_query.split('"')
+        if len(possible_new_query) == 5:
+            # The possible answer may have the format of : Question to answer: "XXXXX" is "YYYYY"
+            new_query = possible_new_query[3]
 
     else:
         new_query = item.query
 
+    import pdb
+
+    pdb.set_trace()
     # ONLY PARAGRAPHS I VECTORS
     find_request = FindRequest()
     find_request.features = [
@@ -142,42 +142,48 @@ async def chat_post_knowledgebox(
         kbid: str,
         predict: PredictEngine,
         chat_model: ChatModel,
+        features: List[ChatOptions],
     ):
-        bytes_results = base64.b64encode(results.json().encode())
-        yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
-        yield bytes_results
+        if ChatOptions.PARAGRAPHS in features:
+            bytes_results = base64.b64encode(results.json().encode())
+            yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+            yield bytes_results
 
         answer = []
         async for data in predict.chat_query(kbid, chat_model):
             answer.append(data)
             yield data
-        yield END_OF_STREAM
 
-        text_answer = b"".join(answer)
+        if ChatOptions.RELATIONS in features:
+            yield END_OF_STREAM
 
-        detected_entities = await predict.detect_entities(kbid, text_answer.decode())
-        relation_request = RelationSearchRequest()
-        relation_request.subgraph.entry_points.extend(detected_entities)
-        relation_request.subgraph.depth = 1
+            text_answer = b"".join(answer)
 
-        relations_results: List[RelationSearchResponse]
-        (
-            relations_results,
-            incomplete_results,
-            queried_nodes,
-            queried_shards,
-        ) = await node_query(kbid, Method.RELATIONS, relation_request, item.shards)
-        yield base64.b64encode(
-            (
-                await merge_relations_results(
-                    relations_results, relation_request.subgraph
-                )
+            detected_entities = await predict.detect_entities(
+                kbid, text_answer.decode()
             )
-            .json()
-            .encode()
-        )
+            relation_request = RelationSearchRequest()
+            relation_request.subgraph.entry_points.extend(detected_entities)
+            relation_request.subgraph.depth = 1
+
+            relations_results: List[RelationSearchResponse]
+            (
+                relations_results,
+                incomplete_results,
+                queried_nodes,
+                queried_shards,
+            ) = await node_query(kbid, Method.RELATIONS, relation_request, item.shards)
+            yield base64.b64encode(
+                (
+                    await merge_relations_results(
+                        relations_results, relation_request.subgraph
+                    )
+                )
+                .json()
+                .encode()
+            )
 
     return StreamingResponse(
-        generate_answer(results, kbid, predict, chat_model),
+        generate_answer(results, kbid, predict, chat_model, item.features),
         media_type="plain/text",
     )
