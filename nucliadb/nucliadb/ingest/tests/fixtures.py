@@ -137,6 +137,9 @@ async def grpc_servicer(redis, transaction_utility, gcs_storage, fake_node):
     cache_settings.cache_pubsub_driver = default_driver_pubsub
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
+    pubsub = get_utility(Utility.PUBSUB)
+    if pubsub is not None:
+        await pubsub.finalize()
     clear_global_cache()
 
 

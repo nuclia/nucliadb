@@ -195,7 +195,9 @@ class RedisDriver(Driver):
         self.initialized = True
 
     async def finalize(self):
-        pass
+        if self.initialized is True:
+            await self.redis.close()
+            self.initialized = False
 
     async def begin(self) -> RedisTransaction:
         return RedisTransaction(self.redis, driver=self)
