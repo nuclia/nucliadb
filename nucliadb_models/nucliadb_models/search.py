@@ -387,6 +387,7 @@ class Message(BaseModel):
 class ChatModel(BaseModel):
     question: str
     user_id: str
+    retrieval: bool = True
     system: Optional[str] = None
     context: List[Message] = []
 
