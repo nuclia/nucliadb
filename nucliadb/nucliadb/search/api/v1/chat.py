@@ -95,11 +95,15 @@ async def chat_post_knowledgebox(
         new_query = (b"".join(new_query_elements)).decode()
         possible_new_query = new_query.split('"')
         if len(possible_new_query) == 5:
+            # The possible answer may have the format of : Question to answer: "XXXXX" is "YYYYY"
             new_query = possible_new_query[3]
 
     else:
         new_query = item.query
 
+    import pdb
+
+    pdb.set_trace()
     # ONLY PARAGRAPHS I VECTORS
     find_request = FindRequest()
     find_request.features = [
