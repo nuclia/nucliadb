@@ -18,3 +18,4 @@ requests
 fastapi
 types-protobuf>=3.19.5,<4.0
 types-requests
+prometheus-client>=0.12.0

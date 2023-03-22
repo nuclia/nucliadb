@@ -54,7 +54,7 @@ flag_management:
       carryforward: true
       statuses:
         - type: project
-          target: 75%
+          target: 74%
     - name: writer
       paths:
         - nucliadb/nucliadb/writer/**

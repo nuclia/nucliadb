@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import time
 import traceback
 from typing import Dict, Optional, Type
@@ -32,6 +31,10 @@ ERROR_GENERAL_EXCEPTION = "exception"
 
 
 class watch:
+    """
+    remove in favor of telemetry eventually
+    """
+
     start: float
 
     def __init__(
@@ -79,28 +82,3 @@ class watch:
                 else:
                     error = ERROR_GENERAL_EXCEPTION
             self.counter.labels(error=error, **self.labels).inc()
-
-
-class watch_lock:
-    def __init__(
-        self,
-        histogram: Histogram,
-        lock: asyncio.Lock,
-        labels: Optional[Dict[str, str]] = None,
-    ):
-        self.histogram = histogram
-        self.lock = lock
-        self.labels = labels or {}
-
-    async def __aenter__(self) -> None:
-        start = time.time()
-        await self.lock.acquire()
-        if self.histogram is not None:
-            finished = time.time()
-            if len(self.labels) > 0:
-                self.histogram.labels(**self.labels).observe(finished - start)
-            else:
-                self.histogram.observe(finished - start)
-
-    async def __aexit__(self, exc_type, exc, tb):
-        self.lock.release()
