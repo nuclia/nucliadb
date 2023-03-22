@@ -22,14 +22,14 @@ spec:
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.services.nats }},{{ .Values.services.maindb }}"
         traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
+        # do not have access to dependency chart cm this component references
+        checksum/cm: {{ include (print $.Template.BasePath "/search.cm.yaml") . | sha256sum }}
       labels:
         app: search
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
-        # do not have access to dependency chart cm this component references
-        # checksum/cm: {{ include (print $.Template.BasePath "/search.cm.yaml") . | sha256sum }}
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
