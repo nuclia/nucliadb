@@ -29,7 +29,7 @@ spec:
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
         # do not have access to dependency chart cm this component references
-        checksum/cm: {{ include (print $.Template.BasePath "/search.cm.yaml") . | sha256sum }}
+        # checksum/cm: {{ include (print $.Template.BasePath "/search.cm.yaml") . | sha256sum }}
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}

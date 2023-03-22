@@ -26,7 +26,7 @@ spec:
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
         # do not have access to dependency chart cm this component references
-        checksum/cm: {{ include (print $.Template.BasePath "/writer.cm.yaml") . | sha256sum }}
+        # checksum/cm: {{ include (print $.Template.BasePath "/writer.cm.yaml") . | sha256sum }}
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.config.dm_redis_port }},{{.Values.services.maindb }},{{.Values.services.nats }}"
         traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
