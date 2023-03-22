@@ -19,10 +19,9 @@
 import asyncio
 import time
 from functools import wraps
-from typing import TYPE_CHECKING, Optional, Type
+from typing import TYPE_CHECKING, Optional, Type, Union
 
 import prometheus_client
-from prometheus_client import Counter, Gauge, Histogram
 
 if TYPE_CHECKING:  # pragma: no cover
     from traceback import StackSummary
@@ -127,12 +126,43 @@ class ObserverRecorder:
         self.observer.counter.labels(status=status, **self.labels).inc()
 
 
+class Gauge:
+    def __init__(self, name: str, *, labelnames: Optional[list[str]] = None):
+        self.labelnames = labelnames or []
+        self.gauge = prometheus_client.Gauge(
+            name, f"Gauge for {name}.", labelnames=self.labelnames
+        )
+
+    def set(self, value: Union[float, int], labels: Optional[dict[str, str]] = None):
+        if labels is not None:
+            self.gauge.labels(**labels).set(value)
+        else:
+            self.gauge.set(value)
+
+    def remove(self, labels: Optional[dict[str, str]] = None):
+        labels = labels or {}
+        self.gauge.remove(*[labels[k] for k in self.labelnames])
+
+
+class Counter:
+    def __init__(self, name: str, *, labelnames: Optional[list[str]] = None):
+        self.labelnames = labelnames or []
+        self.counter = prometheus_client.Counter(
+            name, f"Counter for {name}.", labelnames=self.labelnames
+        )
+
+    def inc(self, labels: Optional[dict[str, str]] = None):
+        if labels is not None:
+            self.counter.labels(**labels).inc()
+        else:
+            self.counter.inc()
+
+
 __all__ = (
     "Observer",
     "ObserverRecorder",
     "OK",
     "ERROR",
     "Counter",
-    "Histogram",
     "Gauge",
 )

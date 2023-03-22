@@ -25,25 +25,23 @@ from nucliadb_telemetry import metrics
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture(autouse=True)
-def histogram():
-    mock = MagicMock()
-    with patch(
-        "nucliadb_telemetry.metrics.prometheus_client.Histogram", return_value=mock
-    ):
-        yield mock
-
-
-@pytest.fixture(autouse=True)
-def counter():
-    mock = MagicMock()
-    with patch(
-        "nucliadb_telemetry.metrics.prometheus_client.Counter", return_value=mock
-    ):
-        yield mock
-
-
 class TestObserver:
+    @pytest.fixture(autouse=True)
+    def histogram(self):
+        mock = MagicMock()
+        with patch(
+            "nucliadb_telemetry.metrics.prometheus_client.Histogram", return_value=mock
+        ):
+            yield mock
+
+    @pytest.fixture(autouse=True)
+    def counter(self):
+        mock = MagicMock()
+        with patch(
+            "nucliadb_telemetry.metrics.prometheus_client.Counter", return_value=mock
+        ):
+            yield mock
+
     def test_observer(self, histogram, counter):
         observer = metrics.Observer(
             "my_metric", buckets=[1, 2, 3], labels={"foo": "bar"}
@@ -91,3 +89,33 @@ class TestObserver:
 
         histogram.observe.assert_called_once()
         counter.labels().inc.assert_called_once()
+
+
+class TestGauge:
+    def test_guage(self):
+        gauge = metrics.Gauge("my_guage")
+        gauge.set(5)
+
+        assert gauge.gauge._value.get() == 5.0
+
+    def test_guage_with_labels(self):
+        gauge = metrics.Gauge("my_guage2", labelnames=["foo", "bar"])
+        gauge.set(5, labels={"foo": "baz", "bar": "qux"})
+
+        assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 5.0
+
+
+class TestCounter:
+    def test_counter(self):
+        counter = metrics.Counter("my_counter")
+        counter.inc()
+
+        assert counter.counter._value.get() == 1.0
+
+    def test_counter_with_labels(self):
+        counter = metrics.Counter("my_counter2", labelnames=["foo", "bar"])
+        counter.inc(labels={"foo": "baz", "bar": "qux"})
+
+        assert (
+            counter.counter.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 1.0
+        )
