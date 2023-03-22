@@ -30,6 +30,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.maindb.driver import Driver
+from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     ReallyStopPulling,
@@ -192,6 +193,12 @@ class PullWorker:
             await self.nc.close()
 
     async def subscription_worker(self, msg: Msg):
+        while len(NODES) == 0:
+            logger.warning(
+                "Waiting for nodes to be discovered before processing any messages"
+            )
+            await asyncio.sleep(1)
+
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])
