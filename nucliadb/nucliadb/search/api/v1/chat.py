@@ -85,6 +85,7 @@ async def chat_post_knowledgebox(
             + item.query,
             context=item.context,
             user_id=x_nucliadb_user,
+            retrieval=False,
         )
         req.system = "You help creating new queries based on context"
 
@@ -101,9 +102,6 @@ async def chat_post_knowledgebox(
     else:
         new_query = item.query
 
-    import pdb
-
-    pdb.set_trace()
     # ONLY PARAGRAPHS I VECTORS
     find_request = FindRequest()
     find_request.features = [
