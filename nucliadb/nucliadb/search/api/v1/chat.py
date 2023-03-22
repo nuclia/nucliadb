@@ -81,16 +81,21 @@ async def chat_post_knowledgebox(
     if item.context is not None and len(item.context) > 0:
         # There is context lets do a query
         req = ChatModel(
-            question="Which question should be done to answer: " + item.query,
+            question="Given the context, which question should be done to answer: "
+            + item.query,
             context=item.context,
+            user_id=x_nucliadb_user,
         )
-        req.system = "You help creating new queries"
+        req.system = "You help creating new queries based on context"
 
         new_query_elements = []
         async for new_query_data in predict.chat_query(kbid, req):
             new_query_elements.append(new_query_data)
 
         new_query = (b"".join(new_query_elements)).decode()
+        possible_new_query = new_query.split('"')
+        if len(possible_new_query) == 5:
+            new_query = possible_new_query[3]
 
     else:
         new_query = item.query
