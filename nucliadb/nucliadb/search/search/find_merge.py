@@ -138,7 +138,8 @@ async def set_resource_metadata_value(
             extracted=extracted,
             service_name=SERVICE_NAME,
         )
-        find_resources[resource].__dict__.update(serialized_resource.__dict__)
+        if serialized_resource is not None:
+            find_resources[resource].updated_from(serialized_resource)
     finally:
         max_operations.release()
 
@@ -173,9 +174,10 @@ async def fetch_find_metadata(
 
             if result_paragraph.paragraph.id in find_field.paragraphs:
                 # Its a multiple match, push the score
-                find_field.paragraphs[result_paragraph.paragraph.id].score = (
-                    find_field.paragraphs[result_paragraph.paragraph.id].score ** 2
-                )
+                find_field.paragraphs[result_paragraph.paragraph.id].score = 25
+                find_field.paragraphs[
+                    result_paragraph.paragraph.id
+                ].score_type = SCORE_TYPE.BOTH
             else:
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
@@ -377,7 +379,6 @@ async def find_merge_results(
         highlight,
         ematches,
     )
-
     api_results.relations = await merge_relations_results(
         relations, requested_relations
     )

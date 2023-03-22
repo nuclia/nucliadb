@@ -421,6 +421,7 @@ class FindRequest(SearchRequest):
 class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
+    BOTH = "BOTH"
 
 
 class FindTextPosition(BaseModel):
@@ -460,6 +461,10 @@ class FindField(BaseModel):
 
 class FindResource(Resource):
     fields: Dict[str, FindField]
+
+    def updated_from(self, origin: Resource):
+        for key in origin.__fields__.keys():
+            self.__setattr__(key, getattr(origin, key))
 
 
 class KnowledgeboxFindResults(BaseModel):
