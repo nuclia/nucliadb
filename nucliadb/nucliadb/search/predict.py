@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import AsyncIterator, List, Optional
+from typing import AsyncIterator, List, Optional, Tuple
 
 import aiohttp
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -119,7 +119,9 @@ class PredictEngine:
             if resp.status != 200:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
-    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncIterator[bytes]:
+    async def chat_query(
+        self, kbid: str, item: ChatModel
+    ) -> Tuple[str, AsyncIterator[bytes]]:
         # If token is offered
 
         if self.onprem is False:
@@ -145,8 +147,8 @@ class PredictEngine:
             )
             if resp.status != 200:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
-        async for data in resp.content.iter_any():
-            yield data
+        ident = resp.headers.get("NUCLIA-LEARNING-ID")
+        return ident, resp.content.iter_any()
 
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         # If token is offered
