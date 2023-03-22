@@ -104,6 +104,10 @@ class TestGauge:
 
         assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 5.0
 
+        gauge.remove({"foo": "baz", "bar": "qux"})
+
+        assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 0.0
+
 
 class TestCounter:
     def test_counter(self):

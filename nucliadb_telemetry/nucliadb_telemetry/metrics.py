@@ -139,8 +139,7 @@ class Gauge:
         else:
             self.gauge.set(value)
 
-    def remove(self, labels: Optional[dict[str, str]] = None):
-        labels = labels or {}
+    def remove(self, labels: dict[str, str]):
         self.gauge.remove(*[labels[k] for k in self.labelnames])
 
 
