@@ -146,6 +146,7 @@ async def create_resource(
 
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
+        writer.writer_updates.append(BrokerMessage.UpdateTypes.ORIGIN)
 
     await parse_fields(
         writer=writer,
@@ -259,6 +260,7 @@ async def modify_resource(
     parse_audit(writer.audit, request)
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
+        writer.writer_updates.append(BrokerMessage.UpdateTypes.ORIGIN)
 
     await parse_fields(
         writer=writer,

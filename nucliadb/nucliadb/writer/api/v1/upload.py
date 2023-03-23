@@ -692,6 +692,7 @@ async def store_file_on_nuclia_db(
         parse_basic(writer, item, toprocess)
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)
+            writer.writer_updates.append(BrokerMessage.UpdateTypes.ORIGIN)
 
         await parse_fields(
             writer=writer,

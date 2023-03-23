@@ -253,6 +253,19 @@ class BrokerMessage(google.protobuf.message.Message):
     WRITER: BrokerMessage.MessageSource.ValueType  # 0
     PROCESSOR: BrokerMessage.MessageSource.ValueType  # 1
 
+    class _UpdateTypes:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _UpdateTypesEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BrokerMessage._UpdateTypes.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        UNSET: BrokerMessage._UpdateTypes.ValueType  # 0
+        ORIGIN: BrokerMessage._UpdateTypes.ValueType  # 1
+
+    class UpdateTypes(_UpdateTypes, metaclass=_UpdateTypesEnumTypeWrapper): ...
+    UNSET: BrokerMessage.UpdateTypes.ValueType  # 0
+    ORIGIN: BrokerMessage.UpdateTypes.ValueType  # 1
+
     @typing_extensions.final
     class ConversationsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -412,6 +425,7 @@ class BrokerMessage(google.protobuf.message.Message):
     SOURCE_FIELD_NUMBER: builtins.int
     ACCOUNT_SEQ_FIELD_NUMBER: builtins.int
     USER_VECTORS_FIELD_NUMBER: builtins.int
+    WRITER_UPDATES_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     uuid: builtins.str
     slug: builtins.str
@@ -478,6 +492,8 @@ class BrokerMessage(google.protobuf.message.Message):
     account_seq: builtins.int
     @property
     def user_vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.UserVectorsWrapper]: ...
+    @property
+    def writer_updates(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[global___BrokerMessage.UpdateTypes.ValueType]: ...
     def __init__(
         self,
         *,
@@ -514,9 +530,10 @@ class BrokerMessage(google.protobuf.message.Message):
         source: global___BrokerMessage.MessageSource.ValueType = ...,
         account_seq: builtins.int = ...,
         user_vectors: collections.abc.Iterable[nucliadb_protos.resources_pb2.UserVectorsWrapper] | None = ...,
+        writer_updates: collections.abc.Iterable[global___BrokerMessage.UpdateTypes.ValueType] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "origin", b"origin"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "relations", b"relations", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "relations", b"relations", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid", "writer_updates", b"writer_updates"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 

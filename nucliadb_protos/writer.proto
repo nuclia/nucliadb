@@ -53,6 +53,11 @@ message BrokerMessage {
         PROCESSOR = 1;
     }
 
+    enum UpdateTypes {
+        UNSET = 0;
+        ORIGIN = 1;
+    }
+
     MessageType type = 6;
     string multiid = 7;
 
@@ -114,6 +119,8 @@ message BrokerMessage {
     int64 account_seq = 34;
 
     repeated resources.UserVectorsWrapper user_vectors = 35;
+
+    repeated UpdateTypes writer_updates = 36;
 }
 
 message WriterStatusResponse {
