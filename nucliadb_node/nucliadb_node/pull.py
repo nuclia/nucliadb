@@ -28,6 +28,7 @@ from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js import JetStreamContext
+from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
 from nucliadb_protos.nodewriter_pb2 import (
     IndexedMessage,
@@ -277,7 +278,7 @@ class Worker:
 
         try:
             await self.js.stream_info(indexing_settings.index_jetstream_stream)
-        except nats.js.errors.NotFoundError:
+        except StreamNotFoundError:
             logger.info("Creating stream")
             res = await self.js.add_stream(
                 name=indexing_settings.index_jetstream_stream,
@@ -343,7 +344,7 @@ class IndexedPublisher:
     async def create_stream_if_not_exists(self):
         try:
             await self.js.stream_info(self.stream)
-        except nats.js.errors.NotFoundError:
+        except StreamNotFoundError:
             logger.info("Creating publisher stream")
             await self.js.add_stream(
                 name=self.stream,
@@ -368,6 +369,7 @@ class IndexedPublisher:
                 # RuntimeError: can be thrown if event loop is closed
                 # AttributeError: can be thrown by nats-py when handling shutdown
                 pass
+            self.nc = None
 
     async def indexed(self, indexpb: IndexMessage):
         if self.js is None:
