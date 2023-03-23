@@ -49,6 +49,7 @@ from nucliadb_models.search import (
     TempFindParagraph,
     TextPosition,
 )
+from .metrics import merge_observer
 
 
 async def get_text_find_paragraph(
@@ -317,6 +318,7 @@ async def merge_paragraphs_vectors(
     return merged_paragrahs, next_page
 
 
+@merge_observer.wrap({"type": "find_merge"})
 async def find_merge_results(
     search_responses: List[SearchResponse],
     count: int,

@@ -45,6 +45,7 @@ from nucliadb.search.search.fetch import (
     get_text_paragraph,
     get_text_sentence,
 )
+from .metrics import merge_observer
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -446,6 +447,7 @@ async def merge_relations_results(
     return relations
 
 
+@merge_observer.wrap({"type": "merge"})
 async def merge_results(
     search_responses: List[SearchResponse],
     count: int,

@@ -29,6 +29,7 @@ from nucliadb.ingest.maindb.driver import (
     Transaction,
 )
 from nucliadb.ingest.maindb.exceptions import NoWorkerCommit
+from nucliadb_telemetry import metrics
 
 try:
     from tikv_client.asynchronous import TransactionClient  # type: ignore
@@ -36,6 +37,8 @@ try:
     TiKV = True
 except ImportError:  # pragma: no cover
     TiKV = False
+
+tikv_observer = metrics.Observer("tikv_client", labels={"type": ""})
 
 
 class TiKVTransaction(Transaction):
@@ -47,7 +50,8 @@ class TiKVTransaction(Transaction):
         self.open = True
 
     async def abort(self):
-        await self.txn.rollback()
+        with tikv_observer({"type": "rollback"}):
+            await self.txn.rollback()
         self.open = False
 
     async def commit(
@@ -64,22 +68,29 @@ class TiKVTransaction(Transaction):
                 # want to save the tid in this case, as it would break the next
                 # transactionability check.
                 key = TXNID.format(worker=worker)
-                await self.txn.put(key.encode(), str(tid).encode())
-        await self.txn.commit()
+                with tikv_observer({"type": "put"}):
+                    await self.txn.put(key.encode(), str(tid).encode())
+
+        with tikv_observer({"type": "commit"}):
+            await self.txn.commit()
         self.open = False
 
     async def batch_get(self, keys: List[str]):
         bytes_keys: List[bytes] = [x.encode() for x in keys]
-        return await self.txn.batch_get(bytes_keys)
+        with tikv_observer({"type": "batch_get"}):
+            return await self.txn.batch_get(bytes_keys)
 
     async def get(self, key: str) -> Optional[bytes]:
-        return await self.txn.get(key.encode())
+        with tikv_observer({"type": "get"}):
+            return await self.txn.get(key.encode())
 
     async def set(self, key: str, value: bytes):
-        await self.txn.put(key.encode(), value)
+        with tikv_observer({"type": "put"}):
+            await self.txn.put(key.encode(), value)
 
     async def delete(self, key: str):
-        await self.txn.delete(key.encode())
+        with tikv_observer({"type": "delete"}):
+            await self.txn.delete(key.encode())
 
     async def keys(
         self,
@@ -95,7 +106,8 @@ class TiKVTransaction(Transaction):
         With any other count, only up to count keys will be returned.
         """
         assert self.driver.tikv is not None
-        txn = await self.driver.tikv.begin(pessimistic=False)
+        with tikv_observer({"type": "begin"}):
+            txn = await self.driver.tikv.begin(pessimistic=False)
 
         get_all_keys = count == -1
         limit = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
@@ -104,9 +116,13 @@ class TiKVTransaction(Transaction):
 
         try:
             while True:
-                keys = await txn.scan_keys(
-                    start=start_key, end=None, limit=limit, include_start=_include_start
-                )
+                with tikv_observer({"type": "scan_keys"}):
+                    keys = await txn.scan_keys(
+                        start=start_key,
+                        end=None,
+                        limit=limit,
+                        include_start=_include_start,
+                    )
                 for key in keys:
                     str_key = key.decode()
                     if str_key.startswith(match):

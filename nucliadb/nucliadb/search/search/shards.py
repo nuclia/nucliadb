@@ -33,19 +33,26 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.noderesources_pb2 import Shard
 
 from nucliadb.ingest.orm.node import Node
+from nucliadb_telemetry import metrics
+
+node_observer = metrics.Observer("node_client", labels={"type": ""})
 
 
-def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:
+async def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:
     query.shard = shard
-    return node.reader.Search(query)
+    with node_observer({"type": "search"}):
+        return await node.reader.Search(query)
 
 
-def get_shard(node: Node, shard_id: str, vectorset: Optional[str] = None) -> Shard:
+async def get_shard(
+    node: Node, shard_id: str, vectorset: Optional[str] = None
+) -> Shard:
     req = GetShardRequest()
     req.shard_id.id = shard_id
     if vectorset is not None:
         req.vectorset = vectorset
-    return node.reader.GetShard(req)
+    with node_observer({"type": "get_shard"}):
+        return await node.reader.GetShard(req)
 
 
 def query_paragraph_shard(
@@ -55,13 +62,17 @@ def query_paragraph_shard(
     return node.reader.ParagraphSearch(query)
 
 
-def suggest_shard(node: Node, shard: str, query: SuggestRequest) -> SuggestResponse:
+async def suggest_shard(
+    node: Node, shard: str, query: SuggestRequest
+) -> SuggestResponse:
     query.shard = shard
-    return node.reader.Suggest(query)
+    with node_observer({"type": "suggest"}):
+        return await node.reader.Suggest(query)
 
 
-def relations_shard(
+async def relations_shard(
     node: Node, shard: str, query: RelationSearchRequest
 ) -> RelationSearchResponse:
     query.shard_id = shard
-    return node.reader.RelationSearch(query)
+    with node_observer({"type": "relation_search"}):
+        return await node.reader.RelationSearch(query)

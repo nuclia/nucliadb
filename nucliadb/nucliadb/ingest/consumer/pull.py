@@ -45,6 +45,9 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction
+from nucliadb_telemetry import metrics
+
+consumer_observer = metrics.Observer("message_processor", types={"source": ""})
 
 
 class PullWorker:
@@ -218,7 +221,14 @@ class PullWorker:
                 )
 
                 try:
-                    await self.processor.process(pb, seqid, self.partition)
+                    with consumer_observer(
+                        {
+                            "source": "writer"
+                            if pb.source == pb.MessageSource.WRITER
+                            else "processor"
+                        }
+                    ):
+                        await self.processor.process(pb, seqid, self.partition)
                 except SequenceOrderViolation as err:
                     logger.error(
                         f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). \
