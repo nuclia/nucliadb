@@ -542,10 +542,14 @@ class Processor:
             )
             return None
 
-        if resource and message.source == message.MessageSource.WRITER:
-            # message.source will always be not null
-            if BrokerMessage.UpdateTypes.ORIGIN in message.writer_updates:
-                await resource.set_origin(message.origin)
+        if (
+            resource
+            and message.source == message.MessageSource.WRITER
+            and BrokerMessage.UpdateTypes.ORIGIN in message.writer_updates
+        ):
+            # message.source will always be not null so we need to only
+            # update origin under certain conditions
+            await resource.set_origin(message.origin)
 
         if resource:
             await resource.apply_fields(message)
