@@ -49,6 +49,7 @@ from nucliadb_models.search import (
     TempFindParagraph,
     TextPosition,
 )
+
 from .metrics import merge_observer
 
 

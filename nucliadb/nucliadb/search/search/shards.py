@@ -41,7 +41,7 @@ node_observer = metrics.Observer("node_client", labels={"type": ""})
 async def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:
     query.shard = shard
     with node_observer({"type": "search"}):
-        return await node.reader.Search(query)
+        return await node.reader.Search(query)  # type: ignore
 
 
 async def get_shard(
@@ -52,14 +52,15 @@ async def get_shard(
     if vectorset is not None:
         req.vectorset = vectorset
     with node_observer({"type": "get_shard"}):
-        return await node.reader.GetShard(req)
+        return await node.reader.GetShard(req)  # type: ignore
 
 
-def query_paragraph_shard(
+async def query_paragraph_shard(
     node: Node, shard: str, query: ParagraphSearchRequest
 ) -> ParagraphSearchResponse:
     query.id = shard
-    return node.reader.ParagraphSearch(query)
+    with node_observer({"type": "paragraph_search"}):
+        return await node.reader.ParagraphSearch(query)  # type: ignore
 
 
 async def suggest_shard(
@@ -67,7 +68,7 @@ async def suggest_shard(
 ) -> SuggestResponse:
     query.shard = shard
     with node_observer({"type": "suggest"}):
-        return await node.reader.Suggest(query)
+        return await node.reader.Suggest(query)  # type: ignore
 
 
 async def relations_shard(
@@ -75,4 +76,4 @@ async def relations_shard(
 ) -> RelationSearchResponse:
     query.shard_id = shard
     with node_observer({"type": "relation_search"}):
-        return await node.reader.RelationSearch(query)
+        return await node.reader.RelationSearch(query)  # type: ignore

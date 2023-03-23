@@ -45,7 +45,6 @@ from nucliadb.search.search.fetch import (
     get_text_paragraph,
     get_text_sentence,
 )
-from .metrics import merge_observer
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -72,6 +71,8 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_telemetry import errors
+
+from .metrics import merge_observer
 
 Bm25Score = Tuple[int, int]
 TimestampScore = datetime.datetime
