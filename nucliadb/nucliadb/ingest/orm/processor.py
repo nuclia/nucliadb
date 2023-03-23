@@ -543,7 +543,11 @@ class Processor:
             return None
 
         if message.origin and resource:
-            await resource.update_origin(message.origin)
+            if message.source == message.MessageSource.WRITER:
+                await resource.set_origin(message.origin)
+            else:
+                # process should only add fields to origin, not completely replace it
+                await resource.update_origin(message.origin)
 
         if resource:
             await resource.apply_fields(message)

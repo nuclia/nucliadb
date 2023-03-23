@@ -196,6 +196,8 @@ async def test_ingest_messages_merge_origin(
         Origin(source=Origin.Source.API, url="http://www.google.com")
     )
 
+    # now update from processor
+    message1.source = BrokerMessage.MessageSource.PROCESSOR
     await processor.process(message=message1, seqid=2)
     storage = await get_storage(service_name=SERVICE_NAME)
 
@@ -203,6 +205,7 @@ async def test_ingest_messages_merge_origin(
     res = Resource(txn, storage, kb, rid)
     origin = await res.get_origin()
 
+    assert origin is not None
     assert origin.url == "http://www.google.com"
     assert origin.source == Origin.Source.API
     assert origin.filename == "file.png"
