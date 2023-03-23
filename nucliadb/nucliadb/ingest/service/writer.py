@@ -271,7 +271,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         async for message in request_stream:
             try:
                 await self.proc.process(
-                    message, -1, partition="0", transaction_check=False
+                    message, -1, partition="process", transaction_check=False
                 )
             except Exception:
                 logger.exception("Error processing", stack_info=True)
@@ -777,14 +777,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
             if shard is not None:
-                logger.info("Calling shard.add_resource")
                 counter = await shard.add_resource(
                     brain.brain,
                     0,
-                    partition=self.proc.partition,
+                    partition="reindex",
                     reindex_id=uuid.uuid4().hex,
                 )
-                logger.info("Finished shard.add_resource")
 
                 if counter is not None and counter.fields > settings.max_node_fields:
                     similarity = await kbobj.get_similarity()
