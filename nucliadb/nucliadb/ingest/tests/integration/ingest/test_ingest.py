@@ -167,7 +167,7 @@ async def test_ingest_messages_autocommit(
 
 
 @pytest.mark.asyncio
-async def test_ingest_messages_merge_origin(
+async def test_ingest_messages_origin(
     local_files,
     gcs_storage: Storage,
     txn,
@@ -176,7 +176,7 @@ async def test_ingest_messages_merge_origin(
     processor,
     knowledgebox_ingest,
 ):
-    rid = str(uuid.uuid4())
+    rid = "43ece3e4-b706-4c74-b41b-3637f6d28197"
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox_ingest,
         uuid=rid,
@@ -185,22 +185,27 @@ async def test_ingest_messages_merge_origin(
     )
     message1.origin.CopyFrom(
         Origin(
-            source=Origin.Source.DESKTOP,
+            source=Origin.Source.API,
             filename="file.png",
+            url="http://www.google.com",
         )
     )
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
-    message1.origin.CopyFrom(
-        Origin(source=Origin.Source.API, url="http://www.google.com")
-    )
-
-    # now update from processor
-    message1.source = BrokerMessage.MessageSource.PROCESSOR
-    await processor.process(message=message1, seqid=2)
     storage = await get_storage(service_name=SERVICE_NAME)
+    kb = KnowledgeBox(txn, storage, None, knowledgebox_ingest)
+    res = Resource(txn, storage, kb, rid)
+    origin = await res.get_origin()
 
+    # should not be set
+    assert origin is None
+
+    # now tell it to update origin
+    message1.writer_updates.append(BrokerMessage.UpdateTypes.ORIGIN)
+    await processor.process(message=message1, seqid=2)
+
+    await txn.abort()  # force clearing txn cache from last pull
     kb = KnowledgeBox(txn, storage, None, knowledgebox_ingest)
     res = Resource(txn, storage, kb, rid)
     origin = await res.get_origin()

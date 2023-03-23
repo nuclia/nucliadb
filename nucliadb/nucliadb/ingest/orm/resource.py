@@ -256,14 +256,6 @@ class Resource:
             self.origin = pb
         return self.origin
 
-    async def update_origin(self, payload: PBOrigin):
-        original = await self.get_origin()
-        if original is not None:
-            original.MergeFrom(payload)
-            await self.set_origin(original)
-        else:
-            await self.set_origin(payload)
-
     async def set_origin(self, payload: PBOrigin):
         await self.txn.set(
             KB_RESOURCE_ORIGIN.format(kbid=self.kb.kbid, uuid=self.uuid),
