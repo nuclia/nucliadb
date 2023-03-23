@@ -1016,7 +1016,6 @@ class Resource:
                         text = extracted_text.text
 
                 for paragraph in field_metadata.paragraphs:
-                    breakpoint()
                     if subfield is not None:
                         paragraph_key = f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
                     else:
