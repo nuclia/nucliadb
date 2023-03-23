@@ -53,7 +53,7 @@ chitchat:
   cluster_manager:
     port: 31337
     host: "0.0.0.0"
-    update_interval: "30s"
+    update_interval: "5s"
     liveliness_update: "500ms"
   node:
     node_type: Train

@@ -168,3 +168,16 @@ def build_member_from_json(member_serial: JsonObject):
         shard_count=parse_shard_count(member_serial),
         online=True,
     )
+
+
+if __name__ == "__main__":  # pragma: no cover
+    # run chitchat server locally without dependencies
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+
+    async def run_forever():
+        cc = await start_chitchat("test")
+        await cc.task
+
+    asyncio.run(run_forever())
