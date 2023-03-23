@@ -166,7 +166,7 @@ class Resource:
             fcmw.metadata.split_metadata[split].paragraphs.append(
                 Paragraph(
                     start=0,
-                    end=len(text),
+                    end=len(text) - 1,
                     kind=Paragraph.TypeParagraph.TEXT,
                 )
             )
@@ -174,7 +174,7 @@ class Resource:
             fcmw.metadata.metadata.paragraphs.append(
                 Paragraph(
                     start=0,
-                    end=len(text),
+                    end=len(text) - 1,
                     kind=Paragraph.TypeParagraph.TEXT,
                 )
             )

@@ -67,7 +67,7 @@ def parse_basic_modify(
         bm.extracted_text.append(etw)
         fmw = FieldComputedMetadataWrapper()
         basic_paragraph = Paragraph(
-            start=0, end=len(item.summary), kind=Paragraph.TypeParagraph.DESCRIPTION
+            start=0, end=len(item.summary) - 1, kind=Paragraph.TypeParagraph.DESCRIPTION
         )
         fmw.metadata.metadata.paragraphs.append(basic_paragraph)
         fmw.field.field = "summary"

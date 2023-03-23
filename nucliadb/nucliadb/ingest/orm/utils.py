@@ -79,7 +79,9 @@ def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
     etw.body.text = title
     writer.extracted_text.append(etw)
     fmw = FieldComputedMetadataWrapper()
-    paragraph = Paragraph(start=0, end=len(title), kind=Paragraph.TypeParagraph.TITLE)
+    paragraph = Paragraph(
+        start=0, end=len(title) - 1, kind=Paragraph.TypeParagraph.TITLE
+    )
     fmw.metadata.metadata.paragraphs.append(paragraph)
     fmw.field.field = "title"
     fmw.field.field_type = FieldType.GENERIC
