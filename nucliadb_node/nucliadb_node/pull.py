@@ -261,7 +261,7 @@ class Worker:
             await msg.ack()
             self.event.set()
             await storage.delete_indexing(pb)
-            await self.publisher.publish(pb)
+            await self.publisher.indexed(pb)
         except Exception as e:
             errors.capture_exception(e)
             logger.error(
@@ -360,7 +360,7 @@ class IndexedPublisher:
         logger.warning("Connection is closed on NATS")
 
     async def finalize(self):
-        if self.nc:
+        if self.nc is not None:
             try:
                 await self.nc.flush()
                 await self.nc.close()
@@ -369,7 +369,7 @@ class IndexedPublisher:
                 # AttributeError: can be thrown by nats-py when handling shutdown
                 pass
 
-    async def publish(self, indexpb: IndexMessage):
+    async def indexed(self, indexpb: IndexMessage):
         if self.js is None:
             raise RuntimeError("Not initialized")
 

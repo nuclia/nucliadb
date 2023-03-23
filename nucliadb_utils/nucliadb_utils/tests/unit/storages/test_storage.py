@@ -88,7 +88,7 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_indexing(self, storage: StorageTest):
         msg = BrainResource()
-        await storage.indexing(msg, "node", "shard", 1, 1)
+        await storage.indexing(msg, "node", "shard", 1, "1")
 
         storage.uploadbytes.assert_called_once_with(
             "indexing_bucket", "index/node/shard/1", msg.SerializeToString()
@@ -97,7 +97,7 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_reindexing(self, storage: StorageTest):
         msg = BrainResource()
-        await storage.reindexing(msg, "node", "shard", "reindex_id", 1)
+        await storage.reindexing(msg, "node", "shard", "reindex_id", "1")
 
         storage.uploadbytes.assert_called_once_with(
             "indexing_bucket", "index/node/shard/reindex_id", msg.SerializeToString()
@@ -137,10 +137,10 @@ class TestStorage:
         im = IndexMessage(node="node", shard="shard", txid=0)
 
         with pytest.raises(AttributeError):
-            await storage.indexing(msg, "node", "shard", 1, 1)
+            await storage.indexing(msg, "node", "shard", 1, "1")
 
         with pytest.raises(AttributeError):
-            await storage.reindexing(msg, "node", "shard", "reindex_id", 1)
+            await storage.reindexing(msg, "node", "shard", "reindex_id", "1")
 
         with pytest.raises(AttributeError):
             await storage.get_indexing(im)

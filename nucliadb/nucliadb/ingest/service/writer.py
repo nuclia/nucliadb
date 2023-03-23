@@ -779,7 +779,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if shard is not None:
                 logger.info("Calling shard.add_resource")
                 counter = await shard.add_resource(
-                    brain.brain, 0, kbid=request.kbid, reindex_id=uuid.uuid4().hex
+                    brain.brain,
+                    0,
+                    partition=self.proc.partition,
+                    reindex_id=uuid.uuid4().hex,
                 )
                 logger.info("Finished shard.add_resource")
 
