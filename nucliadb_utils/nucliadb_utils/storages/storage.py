@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -141,7 +141,7 @@ class Storage:
         await self.uploadbytes(self.deadletter_bucket, key, message.SerializeToString())
 
     async def indexing(
-        self, message: BrainResource, node: str, shard: str, txid: int
+        self, message: BrainResource, node: str, shard: str, txid: int, partition: str
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
@@ -153,11 +153,17 @@ class Storage:
         response.node = node
         response.shard = shard
         response.txid = txid
-        response.typemessage = IndexMessage.TypeMessage.CREATION
+        response.typemessage = TypeMessage.CREATION
+        response.partition = partition
         return response
 
     async def reindexing(
-        self, message: BrainResource, node: str, shard: str, reindex_id: str
+        self,
+        message: BrainResource,
+        node: str,
+        shard: str,
+        reindex_id: str,
+        partition: str,
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
@@ -171,7 +177,8 @@ class Storage:
         response.node = node
         response.shard = shard
         response.reindex_id = reindex_id
-        response.typemessage = IndexMessage.TypeMessage.CREATION
+        response.typemessage = TypeMessage.CREATION
+        response.partition = partition
         return response
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:

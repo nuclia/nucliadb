@@ -60,12 +60,16 @@ class AbstractShard(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def delete_resource(self, uuid: str, txid: int):
+    async def delete_resource(self, uuid: str, txid: int, partition: str):
         pass
 
     @abstractmethod
     async def add_resource(
-        self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
+        self,
+        resource: PBBrainResource,
+        txid: int,
+        partition: str,
+        reindex_id: Optional[str] = None,
     ) -> Optional[ShardCounter]:
         pass
 

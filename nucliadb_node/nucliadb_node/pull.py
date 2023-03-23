@@ -27,8 +27,14 @@ from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
+from nats.js import JetStreamContext
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus
+from nucliadb_protos.nodewriter_pb2 import (
+    IndexedMessage,
+    IndexMessage,
+    OpStatus,
+    TypeMessage,
+)
 
 from nucliadb_node import SERVICE_NAME, logger, shadow_shards
 from nucliadb_node.reader import Reader
@@ -65,29 +71,26 @@ class Worker:
         self.node = node
         self.gc_task = None
         self.ssm = shadow_shards.get_manager()
+        self.publisher = IndexedPublisher(
+            stream=indexing_settings.indexed_jetstream_stream,
+            subject=indexing_settings.indexed_jetstream_target,
+            queue=indexing_settings.indexed_jetstream_group,
+            auth=indexing_settings.index_jetstream_auth,
+            servers=indexing_settings.index_jetstream_servers,
+        )
 
     async def finalize(self):
         if self.gc_task:
             self.gc_task.cancel()
 
-        for subscription in self.subscriptions:
-            try:
-                await subscription.drain()
-            except nats.errors.ConnectionClosedError:
-                pass
-        self.subscriptions = []
-
-        try:
-            await self.nc.close()
-        except (RuntimeError, AttributeError):  # pragma: no cover
-            # RuntimeError: can be thrown if event loop is closed
-            # AttributeError: can be thrown by nats-py when handling shutdown
-            pass
+        await self.subscriber_finalize()
 
         transaction_utility = get_transaction()
         if transaction_utility:
             await transaction_utility.finalize()
             clean_utility(Utility.TRANSACTION)
+
+        await self.publisher.finalize()
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -109,6 +112,11 @@ class Worker:
     async def initialize(self):
         await self.ssm.load()
         self.event.clear()
+        await self.subscriber_initialize()
+        await self.publisher.initialize()
+        self.gc_task = asyncio.create_task(self.garbage())
+
+    async def subscriber_initialize(self):
         options = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
@@ -122,20 +130,26 @@ class Worker:
             options["servers"] = indexing_settings.index_jetstream_servers
 
         self.nc = await nats.connect(**options)
-
-        tracer_provider = get_telemetry(SERVICE_NAME)
-        jetstream = self.nc.jetstream()
-        if tracer_provider is not None:  # pragma: no cover
-            logger.info("Configuring node queue with telemetry")
-            self.js = JetStreamContextTelemetry(
-                jetstream, f"{SERVICE_NAME}_js_worker", tracer_provider
-            )
-        else:
-            self.js = jetstream
-
+        self.js = maybe_configure_tracing(
+            self.nc.jetstream(), f"{SERVICE_NAME}_js_worker"
+        )
         logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
         await self.subscribe()
-        self.gc_task = asyncio.create_task(self.garbage())
+
+    async def subscriber_finalize(self):
+        for subscription in self.subscriptions:
+            try:
+                await subscription.drain()
+            except nats.errors.ConnectionClosedError:
+                pass
+        self.subscriptions = []
+
+        try:
+            await self.nc.close()
+        except (RuntimeError, AttributeError):  # pragma: no cover
+            # RuntimeError: can be thrown if event loop is closed
+            # AttributeError: can be thrown by nats-py when handling shutdown
+            pass
 
     async def garbage(self) -> None:
         while True:
@@ -214,9 +228,9 @@ class Worker:
             try:
                 pb = IndexMessage()
                 pb.ParseFromString(msg.data)
-                if pb.typemessage == IndexMessage.TypeMessage.CREATION:
+                if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb, storage)
-                elif pb.typemessage == IndexMessage.TypeMessage.DELETION:
+                elif pb.typemessage == TypeMessage.DELETION:
                     status = await self.delete_resource(pb)
                 if status:
                     self.reader.update(pb.shard, status)
@@ -247,6 +261,7 @@ class Worker:
             await msg.ack()
             self.event.set()
             await storage.delete_indexing(pb)
+            await self.publisher.publish(pb)
         except Exception as e:
             errors.capture_exception(e)
             logger.error(
@@ -291,3 +306,94 @@ class Worker:
             f"Subscribed to {indexing_settings.index_jetstream_target.format(node=self.node)} on \
              stream {indexing_settings.index_jetstream_stream}"
         )
+
+
+class IndexedPublisher:
+    def __init__(
+        self,
+        stream: str,
+        subject: str,
+        queue: str,
+        servers: List[str],
+        auth: Optional[str],
+    ):
+        self.stream = stream
+        self.subject = subject
+        self.queue = queue
+        self.auth: Optional[str] = auth
+        self.servers: List[str] = servers
+        self.js = None
+        self.nc = None
+
+    async def initialize(self):
+        options = dict(
+            closed_cb=self.on_connection_closed,
+            reconnected_cb=self.on_reconnection,
+        )
+        if self.auth is not None:
+            options["user_credentials"] = self.auth
+        if len(self.servers) > 0:
+            options["servers"] = self.servers
+        self.nc = await nats.connect(**options)
+        self.js = maybe_configure_tracing(
+            self.nc.jetstream(), f"{SERVICE_NAME}_js_publisher"
+        )
+        await self.create_stream_if_not_exists()
+
+    async def create_stream_if_not_exists(self):
+        try:
+            await self.js.stream_info(self.stream)
+        except nats.js.errors.NotFoundError:
+            logger.info("Creating publisher stream")
+            await self.js.add_stream(
+                name=self.stream,
+                subjects=[self.subject.format(partition=">")],
+            )
+            await self.js.stream_info(self.stream)
+
+    async def on_reconnection(self):
+        logger.warning(
+            "Got reconnected to NATS {url}".format(url=self.nc.connected_url)
+        )
+
+    async def on_connection_closed(self):
+        logger.warning("Connection is closed on NATS")
+
+    async def finalize(self):
+        if self.nc:
+            try:
+                await self.nc.flush()
+                await self.nc.close()
+            except (RuntimeError, AttributeError):  # pragma: no cover
+                # RuntimeError: can be thrown if event loop is closed
+                # AttributeError: can be thrown by nats-py when handling shutdown
+                pass
+
+    async def publish(self, indexpb: IndexMessage):
+        if self.js is None:
+            raise RuntimeError("Not initialized")
+
+        if not indexpb.HasField("partition"):
+            # Old versions of IndexMessage can't be published
+            return
+
+        indexedpb = IndexedMessage()
+        indexedpb.node = indexpb.node
+        indexedpb.shard = indexpb.shard
+        indexedpb.txid = indexpb.txid
+        indexedpb.resource = indexpb.resource
+        indexedpb.typemessage = indexpb.typemessage
+        indexedpb.reindex_id = indexpb.reindex_id
+        await self.js.publish(
+            self.subject.format(partition=indexpb.partition),
+            indexedpb.SerializeToString(),
+        )
+        return
+
+
+def maybe_configure_tracing(jetstream: JetStreamContext, name: str):
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider is not None:  # pragma: no cover
+        return JetStreamContextTelemetry(jetstream, name, tracer_provider)
+    logger.warning("Telemetry is not set!")
+    return jetstream

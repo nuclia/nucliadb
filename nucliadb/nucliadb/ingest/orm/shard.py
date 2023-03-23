@@ -29,7 +29,7 @@ from nucliadb_protos.noderesources_pb2 import (
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodesidecar_pb2 import Counter
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb.ingest import SERVICE_NAME  # type: ignore
@@ -59,7 +59,7 @@ class Shard(AbstractShard):
                 result.append((shadow_replica.shard.id, shadow_replica.node))
         return result
 
-    async def delete_resource(self, uuid: str, txid: int):
+    async def delete_resource(self, uuid: str, txid: int, partition: str):
         indexing = get_indexing()
 
         for replica_id, node_id in self.indexing_replicas():
@@ -68,11 +68,16 @@ class Shard(AbstractShard):
             indexpb.shard = replica_id
             indexpb.txid = txid
             indexpb.resource = uuid
-            indexpb.typemessage = IndexMessage.TypeMessage.DELETION
+            indexpb.typemessage = TypeMessage.DELETION
+            indexpb.partition = partition
             await indexing.index(indexpb, node_id)
 
     async def add_resource(
-        self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
+        self,
+        resource: PBBrainResource,
+        txid: int,
+        partition: str,
+        reindex_id: Optional[str] = None,
     ) -> Optional[ShardCounter]:
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
@@ -85,15 +90,16 @@ class Shard(AbstractShard):
         indexpb: IndexMessage
 
         shard_counter: Optional[ShardCounter] = None
-
         for replica_id, node_id in self.indexing_replicas():
             resource.shard_id = resource.resource.shard_id = replica_id
             if reindex_id is not None:
                 indexpb = await storage.reindexing(
-                    resource, node_id, replica_id, reindex_id
+                    resource, node_id, replica_id, reindex_id, partition
                 )
             else:
-                indexpb = await storage.indexing(resource, node_id, replica_id, txid)
+                indexpb = await storage.indexing(
+                    resource, node_id, replica_id, txid, partition
+                )
 
             await indexing.index(indexpb, node_id)
 

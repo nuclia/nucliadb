@@ -620,24 +620,24 @@ global___DocumentVectorIdentifier = DocumentVectorIdentifier
 class DocumentScored(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    LABELS_FIELD_NUMBER: builtins.int
-    METADATA_FIELD_NUMBER: builtins.int
     DOC_ID_FIELD_NUMBER: builtins.int
     SCORE_FIELD_NUMBER: builtins.int
-    @property
-    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    @property
-    def metadata(self) -> nucliadb_protos.noderesources_pb2.SentenceMetadata: ...
+    METADATA_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     @property
     def doc_id(self) -> global___DocumentVectorIdentifier: ...
     score: builtins.float
+    @property
+    def metadata(self) -> nucliadb_protos.noderesources_pb2.SentenceMetadata: ...
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        labels: collections.abc.Iterable[builtins.str] | None = ...,
-        metadata: nucliadb_protos.noderesources_pb2.SentenceMetadata | None = ...,
         doc_id: global___DocumentVectorIdentifier | None = ...,
         score: builtins.float = ...,
+        metadata: nucliadb_protos.noderesources_pb2.SentenceMetadata | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["doc_id", b"doc_id", "metadata", b"metadata"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["doc_id", b"doc_id", "labels", b"labels", "metadata", b"metadata", "score", b"score"]) -> None: ...

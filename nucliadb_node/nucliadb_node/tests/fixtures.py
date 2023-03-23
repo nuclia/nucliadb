@@ -38,6 +38,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from nucliadb_node import shadow_shards
 from nucliadb_node.app import App, main
 from nucliadb_node.settings import settings
+from nucliadb_utils.settings import indexing_settings
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -179,6 +180,7 @@ async def sidecar(
 ) -> AsyncIterable[App]:
     settings.force_host_id = "node1"
     settings.data_path = data_path
+    indexing_settings.index_jetstream_servers = [natsd]
     app = await main()
 
     yield app
