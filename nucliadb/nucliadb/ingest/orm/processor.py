@@ -543,7 +543,7 @@ class Processor:
             return None
 
         if message.origin and resource:
-            await resource.set_origin(message.origin)
+            await resource.update_origin(message.origin)
 
         if resource:
             await resource.apply_fields(message)
