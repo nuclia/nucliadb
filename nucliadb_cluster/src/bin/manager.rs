@@ -96,11 +96,24 @@ async fn send_update(
     stream: &mut TcpStream,
     args: &Args,
 ) -> anyhow::Result<()> {
-    if !check_peer(stream).await? {
-        error!("Check peer failed before cluster snapshot sending. Try to reconnect");
+    match check_peer(stream).await {
+        Ok(true) => {}
+        Ok(false) => {
+            error!("Check peer failed before cluster snapshot sending. Try to reconnect");
 
-        stream.shutdown().await?;
-        *stream = get_stream(args.monitor_addr.clone()).await?;
+            if let Err(e) = stream.shutdown().await {
+                error!("Error during shutdown stream: {e}");
+            }
+            *stream = get_stream(args.monitor_addr.clone()).await?;
+        }
+        Err(e) => {
+            error!("Check peer failed before cluster snapshot sending. Try to reconnect: {e}");
+
+            if let Err(e) = stream.shutdown().await {
+                error!("Error during shutdown stream: {e}");
+            }
+            *stream = get_stream(args.monitor_addr.clone()).await?;
+        }
     }
 
     if !cluster_snapshot.is_empty() {
