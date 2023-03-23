@@ -141,7 +141,12 @@ class Storage:
         await self.uploadbytes(self.deadletter_bucket, key, message.SerializeToString())
 
     async def indexing(
-        self, message: BrainResource, node: str, shard: str, txid: int, partition: str
+        self,
+        message: BrainResource,
+        node: str,
+        shard: str,
+        txid: int,
+        partition: Optional[str],
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
@@ -154,7 +159,8 @@ class Storage:
         response.shard = shard
         response.txid = txid
         response.typemessage = TypeMessage.CREATION
-        response.partition = partition
+        if partition:
+            response.partition = partition
         return response
 
     async def reindexing(
@@ -163,7 +169,7 @@ class Storage:
         node: str,
         shard: str,
         reindex_id: str,
-        partition: str,
+        partition: Optional[str],
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
@@ -178,7 +184,8 @@ class Storage:
         response.shard = shard
         response.reindex_id = reindex_id
         response.typemessage = TypeMessage.CREATION
-        response.partition = partition
+        if partition:
+            response.partition = partition
         return response
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:

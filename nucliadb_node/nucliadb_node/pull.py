@@ -376,7 +376,8 @@ class IndexedPublisher:
             raise RuntimeError("Not initialized")
 
         if not indexpb.HasField("partition"):
-            # Old versions of IndexMessage can't be published
+            # Reindex messages don't have it either as they come from the gRPC servicer
+            logger.warning(f"Could not publish message without partition")
             return
 
         indexedpb = IndexedMessage()
