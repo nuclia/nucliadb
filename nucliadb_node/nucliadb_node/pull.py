@@ -75,7 +75,6 @@ class Worker:
         self.publisher = IndexedPublisher(
             stream=indexing_settings.indexed_jetstream_stream,
             subject=indexing_settings.indexed_jetstream_target,
-            queue=indexing_settings.indexed_jetstream_group,
             auth=indexing_settings.index_jetstream_auth,
             servers=indexing_settings.index_jetstream_servers,
         )
@@ -320,7 +319,6 @@ class IndexedPublisher:
     ):
         self.stream = stream
         self.subject = subject
-        self.queue = queue
         self.auth: Optional[str] = auth
         self.servers: List[str] = servers
         self.js = None
