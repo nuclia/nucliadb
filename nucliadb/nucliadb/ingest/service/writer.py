@@ -271,7 +271,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         async for message in request_stream:
             try:
                 await self.proc.process(
-                    message, -1, partition=0, transaction_check=False
+                    message, -1, partition="0", transaction_check=False
                 )
             except Exception:
                 logger.exception("Error processing", stack_info=True)
