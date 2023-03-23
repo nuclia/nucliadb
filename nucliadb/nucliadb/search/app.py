@@ -39,6 +39,7 @@ from nucliadb.ingest.orm import NODES
 from nucliadb.search import API_PREFIX, SERVICE_NAME
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
+from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.utils import get_telemetry
@@ -142,7 +143,7 @@ async def chitchat_members(request: Request) -> JSONResponse:
 
 
 async def alive(request: Request) -> JSONResponse:
-    if len(NODES) == 0:
+    if len(NODES) == 0 and settings.driver != "local":
         return JSONResponse({"status": "error"}, status_code=503)
     else:
         return JSONResponse({"status": "ok"})
