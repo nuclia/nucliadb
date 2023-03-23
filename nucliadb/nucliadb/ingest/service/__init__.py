@@ -26,7 +26,7 @@ from grpc_health.v1 import health, health_pb2, health_pb2_grpc  # type: ignore
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import settings
+from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
@@ -34,7 +34,7 @@ from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
 async def health_check(health_servicer):
     while True:
-        if len(NODES) == 0:
+        if len(NODES) == 0 and settings.driver != DriverConfig.local:
             await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
         else:
             await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
