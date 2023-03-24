@@ -61,7 +61,7 @@ async fn main() -> NodeResult<()> {
     let start_bootstrap = Instant::now();
 
     let metadata_path = env::metadata_path();
-    let node_metadata = NodeMetadata::load_or_create(&metadata_path).await?;
+    let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
     let mut node_writer_service = NodeWriterService::new();
 
     std::fs::create_dir_all(env::shards_path())?;

@@ -23,9 +23,8 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
-use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
-use nucliadb_core::{node_error, NodeResult};
+use nucliadb_core::NodeResult;
 use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -88,34 +87,31 @@ impl NodeMetadata {
     }
 
     pub fn new_shard(&mut self, shard_id: String, kbid: String, load_score: f32) {
-        let load_score = if let Some(shard) = self
+        let load_score = self
             .shards
             .insert(shard_id, ShardMetadata { kbid, load_score })
-        {
-            load_score - shard.load_score
-        } else {
-            load_score
-        };
-
+            .map(|shard| load_score - shard.load_score)
+            .unwrap_or(load_score);
         self.load_score += load_score;
     }
 
     pub fn delete_shard(&mut self, shard_id: String) {
-        if let Some(shard) = self.shards.remove(&shard_id) {
-            self.load_score -= shard.load_score;
-        }
+        let Some(shard) = self.shards.remove(&shard_id) else {
+             return;
+        };
+        self.load_score -= shard.load_score;
     }
 
     pub fn update_shard(&mut self, shard_id: String, paragraph_count: u64) {
-        if let Some(mut shard) = self.shards.get_mut(&shard_id) {
-            let load_score = paragraph_count as f32;
-
-            self.load_score += load_score - shard.load_score;
-            shard.load_score = load_score;
-        }
+        let Some(shard) = self.shards.get_mut(&shard_id) else {
+            return;
+        };
+        let load_score = paragraph_count as f32;
+        self.load_score += load_score - shard.load_score;
+        shard.load_score = load_score;
     }
 
-    pub async fn load_or_create(path: &Path) -> NodeResult<Self> {
+    pub fn load_or_create(path: &Path) -> NodeResult<Self> {
         if !path.exists() {
             info!("Node metadata file does not exist.");
 
@@ -127,7 +123,6 @@ impl NodeMetadata {
             });
 
             node_metadata.save(path)?;
-
             Ok(node_metadata)
         } else {
             Self::load(path)
@@ -136,54 +131,29 @@ impl NodeMetadata {
 
     pub fn save(&self, path: &Path) -> NodeResult<()> {
         info!("Saving node metadata file '{}'", path.display());
-
-        let file =
-            File::create(path).map_err(|e| node_error!("Cannot open node metadata file: {e}"))?;
-
+        let file = File::create(path)?;
         let mut writer = BufWriter::new(file);
-
-        serde_json::to_writer(&mut writer, &self)
-            .map_err(|e| node_error!("Cannot serialize node metadata: {e}"))?;
-
+        serde_json::to_writer(&mut writer, &self)?;
         Ok(writer.flush()?)
     }
 
     pub fn load(path: &Path) -> NodeResult<Self> {
         info!("Loading node metadata file '{}'", path.display());
-
-        let file =
-            File::open(path).map_err(|e| node_error!("Cannot open node metadata file: {e}"))?;
-
+        let file = File::open(path)?;
         let reader = BufReader::new(file);
-
-        serde_json::from_reader(reader)
-            .map_err(|e| node_error!("Cannot deserialize node metadata: {e}"))
+        Ok(serde_json::from_reader(reader)?)
     }
 
     pub fn create(path: &Path) -> NodeResult<Self> {
         info!("Creating node metadata file '{}'", path.display());
-
-        let mut reader = NodeReaderService::new();
-
-        reader
-            .iter_shards()
-            .map_err(|e| node_error!("Cannot read shards folder: {e}"))?
-            .try_fold(NodeMetadata::default(), |mut node_metadata, shard| {
-                let shard = shard.map_err(|e| node_error!("Cannot load shard: {e}"))?;
-
-                match shard.get_info(&GetShardRequest::default()) {
-                    Ok(shard_info) if shard_info.metadata.is_some() => {
-                        node_metadata.new_shard(
-                            shard.id,
-                            shard_info.metadata.unwrap().kbid,
-                            shard_info.paragraphs as f32,
-                        );
-
-                        Ok(node_metadata)
-                    }
-                    Ok(_) => Err(node_error!("Missing shard metadata for {}", shard.id)),
-                    Err(e) => Err(node_error!("Cannot get metrics for {}: {e:?}", shard.id)),
-                }
-            })
+        let reader = NodeReaderService::new();
+        let mut node_metadata = NodeMetadata::default();
+        for shard in reader.iter_shards()?.flatten() {
+            let shard_id = shard.id.clone();
+            let kbid = shard.metadata.kbid().map(String::from).unwrap_or_default();
+            let paragraphs = shard.paragraph_count().unwrap_or_default() as f32;
+            node_metadata.new_shard(shard_id, kbid, paragraphs)
+        }
+        Ok(node_metadata)
     }
 }

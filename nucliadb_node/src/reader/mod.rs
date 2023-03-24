@@ -64,9 +64,7 @@ impl NodeReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn iter_shards(
-        &mut self,
-    ) -> NodeResult<impl Iterator<Item = NodeResult<ShardReaderService>>> {
+    pub fn iter_shards(&self) -> NodeResult<impl Iterator<Item = NodeResult<ShardReaderService>>> {
         let shards_path = env::shards_path();
         Ok(std::fs::read_dir(shards_path)?.flatten().map(|entry| {
             let file_name = entry.file_name().to_str().unwrap().to_string();
