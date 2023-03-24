@@ -66,6 +66,8 @@ from nucliadb_protos.writer_pb2 import (
     ListEntitiesGroupsResponse,
     ListMembersRequest,
     ListMembersResponse,
+    NewEntitiesGroupRequest,
+    NewEntitiesGroupResponse,
     OpStatusWriter,
     ResourceFieldExistsResponse,
     ResourceFieldId,
@@ -81,6 +83,8 @@ from nucliadb_protos.writer_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2 import (
+    UpdateEntitiesGroupRequest,
+    UpdateEntitiesGroupResponse,
     UploadBinaryData,
     WriterStatusRequest,
     WriterStatusResponse,
@@ -89,7 +93,11 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
+from nucliadb.ingest.orm.exceptions import (
+    AlreadyExists,
+    KnowledgeBoxConflict,
+    KnowledgeBoxNotFound,
+)
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb.ingest.orm.node import Node
@@ -393,6 +401,29 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
 
+    async def NewEntitiesGroup(  # type: ignore
+        self, request: NewEntitiesGroupRequest, context=None
+    ) -> NewEntitiesGroupResponse:
+        response = NewEntitiesGroupResponse()
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            if kbobj is None:
+                response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
+                return response
+
+            entities_manager = EntitiesManager(kbobj, txn)
+            try:
+                await entities_manager.create_entities_group(
+                    request.group, request.entities
+                )
+            except AlreadyExists:
+                response.status = NewEntitiesGroupResponse.Status.ALREADY_EXISTS
+                return response
+
+            await txn.commit(resource=False)
+            response.status = NewEntitiesGroupResponse.Status.OK
+            return response
+
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
@@ -485,7 +516,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return response
         entities_manager = EntitiesManager(kbobj, txn)
         try:
-            await entities_manager.set_entities(request.group, request.entities)
+            await entities_manager.set_entities_group(request.group, request.entities)
         except Exception as e:
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
@@ -496,25 +527,54 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.commit(resource=False)
         return response
 
-    async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is not None:
+    async def UpdateEntitiesGroup(  # type: ignore
+        self, request: UpdateEntitiesGroupRequest, context=None
+    ) -> UpdateEntitiesGroupResponse:
+        response = UpdateEntitiesGroupResponse()
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            if kbobj is None:
+                response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
+                return response
+
+            entities_manager = EntitiesManager(kbobj, txn)
+
             try:
-                entities_manager = EntitiesManager(kbobj, txn)
-                await entities_manager.del_entities(request.group)
-                await txn.commit(resource=False)
-                response.status = OpStatusWriter.Status.OK
+                updates = {**request.add, **request.update}
+                await entities_manager.update_entities(request.group, updates)
+                await entities_manager.delete_entities(request.group, request.delete)  # type: ignore
+            except KeyError:
+                response.status = (
+                    UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
+                )
+                return response
+
+            await txn.commit(resource=False)
+            response.status = UpdateEntitiesGroupResponse.Status.OK
+            return response
+
+    async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
+        response = OpStatusWriter()
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            if kbobj is None:
+                await txn.abort()
+                response.status = OpStatusWriter.Status.NOTFOUND
+                return response
+
+            entities_manager = EntitiesManager(kbobj, txn)
+            try:
+                await entities_manager.delete_entities_group(request.group)
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
-        else:
-            await txn.abort()
-            response.status = OpStatusWriter.Status.NOTFOUND
-        return response
+                return response
+
+            await txn.commit(resource=False)
+            response.status = OpStatusWriter.Status.OK
+            return response
 
     async def GetSynonyms(  # type: ignore
         self, request: KnowledgeBoxID, context=None

@@ -84,3 +84,16 @@ class EntitiesGroup(BaseModel):
 class KnowledgeBoxEntities(BaseModel):
     uuid: str
     groups: Dict[str, EntitiesGroup] = {}
+
+
+class CreateEntitiesGroupPayload(BaseModel):
+    group: str
+    entities: Dict[str, Entity] = {}
+    title: Optional[str] = None
+    color: Optional[str] = None
+
+
+class UpdateEntitiesGroupPayload(BaseModel):
+    add: Dict[str, Entity]
+    update: Dict[str, Entity]
+    delete: List[str]
