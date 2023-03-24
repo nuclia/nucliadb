@@ -216,7 +216,7 @@ fn remove_stop_words(query: &str) -> Cow<'_, str> {
     match query.rsplit_once(' ') {
         Some((query, last_term)) => query
             .split(' ')
-            .filter(|term| !is_stop_word(term))
+            .filter(|term| !is_stop_word(&term.to_lowercase()))
             .chain([last_term])
             .join(" ")
             .into(),
@@ -230,6 +230,7 @@ struct ProcessedQuery {
     regular_query: String,
 }
 fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
+    let mut regular_query = String::new();
     let mut fuzzy_query = String::new();
     let mut quote_starts = vec![];
     let mut quote_ends = vec![];
@@ -244,26 +245,51 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
     for (qstart, qend) in quote_starts.into_iter().zip(quote_ends.into_iter()) {
         let quote = query[(qstart + 1)..qend].trim();
         let unquote = query[start..qstart].trim();
-        fuzzy_query.push(' ');
-        fuzzy_query.push_str(unquote);
-        tc.log_eterm(quote.to_string());
-        start = qend + 1;
+        let unquote = remove_stop_words(unquote);
+
         unquote
             .split(' ')
             .filter(|s| !s.is_empty())
             .for_each(|t| tc.log_eterm(t.to_string()));
+        tc.log_eterm(quote.to_string());
+
+        if !regular_query.is_empty() {
+            regular_query.push(' ');
+        }
+        regular_query.push_str(&unquote);
+        regular_query.push(' ');
+        regular_query.push('"');
+        regular_query.push_str(quote);
+        regular_query.push('"');
+
+        if !fuzzy_query.is_empty() {
+            fuzzy_query.push(' ');
+        }
+        fuzzy_query.push_str(&unquote);
+
+        start = qend + 1;
     }
     if start < query.len() {
         let tail = query[start..].trim();
-        fuzzy_query.push(' ');
-        fuzzy_query.push_str(tail);
+        let tail = remove_stop_words(tail);
+
         tail.split(' ')
             .filter(|s| !s.is_empty())
             .for_each(|t| tc.log_eterm(t.to_string()));
+
+        if !regular_query.is_empty() {
+            regular_query.push(' ');
+        }
+        regular_query.push_str(&tail);
+
+        if !fuzzy_query.is_empty() {
+            fuzzy_query.push(' ');
+        }
+        fuzzy_query.push_str(&tail);
     }
     ProcessedQuery {
-        regular_query: query.to_string(),
-        fuzzy_query: remove_stop_words(fuzzy_query.trim()).to_string(),
+        regular_query,
+        fuzzy_query,
     }
 }
 pub fn suggest_query(
@@ -433,17 +459,17 @@ mod tests {
         let mut term_collector = TermCollector::default();
         let _ = preprocess_raw_query(text, &mut term_collector);
         let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
-        let expect = HashSet::from(["This is great", "test", "own"]);
+        let expect = HashSet::from(["This is great", "test"]);
         assert_eq!(terms, expect);
 
         let text = "The test \"is correct\" always";
         let mut term_collector = TermCollector::default();
         let processed = preprocess_raw_query(text, &mut term_collector);
         let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
-        let expect = HashSet::from(["The", "test", "always", "is correct"]);
+        let expect = HashSet::from(["test", "always", "is correct"]);
         assert_eq!(terms, expect);
-        assert_eq!(processed.regular_query, text);
-        assert_eq!(processed.fuzzy_query, "The test always");
+        assert_eq!(processed.regular_query, "test \"is correct\" always");
+        assert_eq!(processed.fuzzy_query, "test always");
     }
 
     #[test]
