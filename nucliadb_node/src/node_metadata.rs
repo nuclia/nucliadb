@@ -54,7 +54,9 @@ pub struct NodeMetadata {
 
 impl Serialize for NodeMetadata {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         let mut s = serializer.serialize_struct("NodeMetadata", 3)?;
         s.serialize_field("load_score", &self.load_score())?;
         s.serialize_field("shard_count", &self.shard_count())?;
@@ -88,31 +90,28 @@ impl NodeMetadata {
     }
 
     pub fn new_shard(&mut self, shard_id: String, kbid: String, load_score: f32) {
-        let load_score = if let Some(shard) = self
+        let load_score = self
             .shards
             .insert(shard_id, ShardMetadata { kbid, load_score })
-        {
-            load_score - shard.load_score
-        } else {
-            load_score
-        };
-
+            .map(|shard| load_score - shard.load_score)
+            .unwrap_or(load_score);
         self.load_score += load_score;
     }
 
     pub fn delete_shard(&mut self, shard_id: String) {
-        if let Some(shard) = self.shards.remove(&shard_id) {
-            self.load_score -= shard.load_score;
-        }
+        let Some(shard) = self.shards.remove(&shard_id) else {
+             return;
+        };
+        self.load_score -= shard.load_score;
     }
 
     pub fn update_shard(&mut self, shard_id: String, paragraph_count: u64) {
-        if let Some(mut shard) = self.shards.get_mut(&shard_id) {
-            let load_score = paragraph_count as f32;
-
-            self.load_score += load_score - shard.load_score;
-            shard.load_score = load_score;
-        }
+        let Some(shard) = self.shards.get_mut(&shard_id) else {
+            return;
+        };
+        let load_score = paragraph_count as f32;
+        self.load_score += load_score - shard.load_score;
+        shard.load_score = load_score;
     }
 
     pub fn load_or_create(path: &Path) -> NodeResult<Self> {
@@ -127,7 +126,6 @@ impl NodeMetadata {
             });
 
             node_metadata.save(path)?;
-
             Ok(node_metadata)
         } else {
             Self::load(path)
@@ -136,28 +134,17 @@ impl NodeMetadata {
 
     pub fn save(&self, path: &Path) -> NodeResult<()> {
         info!("Saving node metadata file '{}'", path.display());
-
-        let file =
-            File::create(path).map_err(|e| node_error!("Cannot open node metadata file: {e}"))?;
-
+        let file = File::create(path)?;
         let mut writer = BufWriter::new(file);
-
-        serde_json::to_writer(&mut writer, &self)
-            .map_err(|e| node_error!("Cannot serialize node metadata: {e}"))?;
-
+        serde_json::to_writer(&mut writer, &self)?;
         Ok(writer.flush()?)
     }
 
     pub fn load(path: &Path) -> NodeResult<Self> {
         info!("Loading node metadata file '{}'", path.display());
-
-        let file =
-            File::open(path).map_err(|e| node_error!("Cannot open node metadata file: {e}"))?;
-
+        let file = File::open(path)?;
         let reader = BufReader::new(file);
-
-        serde_json::from_reader(reader)
-            .map_err(|e| node_error!("Cannot deserialize node metadata: {e}"))
+        Ok(serde_json::from_reader(reader)?)
     }
 
     pub fn create(path: &Path) -> NodeResult<Self> {
