@@ -29,6 +29,8 @@ target
 venv/
 nucliadb/.mypy_cache
 
+nucliadb/nucliadb/static/tmp
+
 # Coverage
 .coverage
 coverage.xml
