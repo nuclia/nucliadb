@@ -141,12 +141,6 @@ pub mod broker_message {
         Writer = 0,
         Processor = 1,
     }
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum UpdateTypes {
-        Unset = 0,
-        Origin = 1,
-    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct WriterStatusResponse {

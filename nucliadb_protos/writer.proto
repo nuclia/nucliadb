@@ -53,11 +53,6 @@ message BrokerMessage {
         PROCESSOR = 1;
     }
 
-    enum UpdateTypes {
-        UNSET = 0;
-        ORIGIN = 1;
-    }
-
     MessageType type = 6;
     string multiid = 7;
 

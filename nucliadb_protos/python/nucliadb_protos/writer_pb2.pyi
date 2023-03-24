@@ -253,19 +253,6 @@ class BrokerMessage(google.protobuf.message.Message):
     WRITER: BrokerMessage.MessageSource.ValueType  # 0
     PROCESSOR: BrokerMessage.MessageSource.ValueType  # 1
 
-    class _UpdateTypes:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _UpdateTypesEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BrokerMessage._UpdateTypes.ValueType], builtins.type):  # noqa: F821
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        UNSET: BrokerMessage._UpdateTypes.ValueType  # 0
-        ORIGIN: BrokerMessage._UpdateTypes.ValueType  # 1
-
-    class UpdateTypes(_UpdateTypes, metaclass=_UpdateTypesEnumTypeWrapper): ...
-    UNSET: BrokerMessage.UpdateTypes.ValueType  # 0
-    ORIGIN: BrokerMessage.UpdateTypes.ValueType  # 1
-
     @typing_extensions.final
     class ConversationsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
