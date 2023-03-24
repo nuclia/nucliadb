@@ -146,7 +146,7 @@ impl NodeMetadata {
 
     pub fn create(path: &Path) -> NodeResult<Self> {
         info!("Creating node metadata file '{}'", path.display());
-        let mut reader = NodeReaderService::new();
+        let reader = NodeReaderService::new();
         let mut node_metadata = NodeMetadata::default();
         for shard in reader.iter_shards()?.flatten() {
             let shard_id = shard.id.clone();
