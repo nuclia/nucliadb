@@ -214,6 +214,55 @@ async def test_ingest_error_message(
     assert field_obj.value.body == message0.texts["wikipedia_ml"].body
 
 
+@pytest.mark.asyncio
+async def test_ingest_messages_origin(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    processor,
+    knowledgebox_ingest,
+):
+    rid = "43ece3e4-b706-4c74-b41b-3637f6d28197"
+    message1: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox_ingest,
+        uuid=rid,
+        slug="slug1",
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+    message1.source = BrokerMessage.MessageSource.WRITER
+    await processor.process(message=message1, seqid=1)
+
+    storage = await get_storage(service_name=SERVICE_NAME)
+    kb = KnowledgeBox(txn, storage, None, knowledgebox_ingest)
+    res = Resource(txn, storage, kb, rid)
+    origin = await res.get_origin()
+
+    # should not be set
+    assert origin is None
+
+    # now set the origin
+    message1.origin.CopyFrom(
+        Origin(
+            source=Origin.Source.API,
+            filename="file.png",
+            url="http://www.google.com",
+        )
+    )
+    await processor.process(message=message1, seqid=2)
+
+    await txn.abort()  # force clearing txn cache from last pull
+    kb = KnowledgeBox(txn, storage, None, knowledgebox_ingest)
+    res = Resource(txn, storage, kb, rid)
+    origin = await res.get_origin()
+
+    assert origin is not None
+    assert origin.url == "http://www.google.com"
+    assert origin.source == Origin.Source.API
+    assert origin.filename == "file.png"
+
+
 def add_filefields(message, items=None):
     items = items or []
     for fieldid, filename in items:
