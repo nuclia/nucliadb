@@ -123,8 +123,6 @@ pub struct BrokerMessage {
     pub account_seq: i64,
     #[prost(message, repeated, tag="35")]
     pub user_vectors: ::prost::alloc::vec::Vec<super::resources::UserVectorsWrapper>,
-    #[prost(enumeration="broker_message::UpdateTypes", repeated, tag="36")]
-    pub writer_updates: ::prost::alloc::vec::Vec<i32>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {

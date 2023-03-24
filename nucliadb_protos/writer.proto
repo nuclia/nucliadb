@@ -119,8 +119,6 @@ message BrokerMessage {
     int64 account_seq = 34;
 
     repeated resources.UserVectorsWrapper user_vectors = 35;
-
-    repeated UpdateTypes writer_updates = 36;
 }
 
 message WriterStatusResponse {

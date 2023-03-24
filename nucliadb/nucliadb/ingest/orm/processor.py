@@ -542,13 +542,7 @@ class Processor:
             )
             return None
 
-        if (
-            resource
-            and message.source == message.MessageSource.WRITER
-            and BrokerMessage.UpdateTypes.ORIGIN in message.writer_updates
-        ):
-            # message.source will always be not null so we need to only
-            # update origin under certain conditions
+        if message.HasField("origin") and resource:
             await resource.set_origin(message.origin)
 
         if resource:

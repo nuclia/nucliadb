@@ -183,13 +183,6 @@ async def test_ingest_messages_origin(
         slug="slug1",
         type=BrokerMessage.AUTOCOMMIT,
     )
-    message1.origin.CopyFrom(
-        Origin(
-            source=Origin.Source.API,
-            filename="file.png",
-            url="http://www.google.com",
-        )
-    )
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
@@ -201,8 +194,14 @@ async def test_ingest_messages_origin(
     # should not be set
     assert origin is None
 
-    # now tell it to update origin
-    message1.writer_updates.append(BrokerMessage.UpdateTypes.ORIGIN)
+    # now set the origin
+    message1.origin.CopyFrom(
+        Origin(
+            source=Origin.Source.API,
+            filename="file.png",
+            url="http://www.google.com",
+        )
+    )
     await processor.process(message=message1, seqid=2)
 
     await txn.abort()  # force clearing txn cache from last pull
