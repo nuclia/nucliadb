@@ -42,16 +42,13 @@ class NatsTest:
 
 class TestIndexedPublisher:
     stream = "stream"
-    queue = "queue-{partition}"
     target = "target.{partition}"
     auth = "token"
     servers = ["nats://localhost:4222"]
 
     @pytest.fixture(scope="function")
     def publisher(self, nats_mock):
-        return IndexedPublisher(
-            self.stream, self.target, self.queue, self.servers, self.auth
-        )
+        return IndexedPublisher(self.stream, self.target, self.servers, self.auth)
 
     @pytest.fixture(scope="function")
     def index_message(self):
