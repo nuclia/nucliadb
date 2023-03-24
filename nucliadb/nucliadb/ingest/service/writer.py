@@ -270,9 +270,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         cache = await get_cache()
         async for message in request_stream:
             try:
-                await self.proc.process(
-                    message, -1, partition="process", transaction_check=False
-                )
+                await self.proc.process(message, -1, transaction_check=False)
             except Exception:
                 logger.exception("Error processing", stack_info=True)
                 response.status = OpStatusWriter.Status.ERROR
@@ -780,7 +778,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 counter = await shard.add_resource(
                     brain.brain,
                     0,
-                    partition="reindex",
+                    partition=self.proc.partition,
                     reindex_id=uuid.uuid4().hex,
                 )
 

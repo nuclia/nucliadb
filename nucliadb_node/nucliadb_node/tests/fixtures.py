@@ -37,8 +37,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_node import shadow_shards
 from nucliadb_node.app import App, main
-from nucliadb_node.settings import settings
-from nucliadb_utils.settings import indexing_settings
+from nucliadb_node.settings import indexing_settings, settings
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",

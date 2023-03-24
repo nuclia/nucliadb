@@ -29,9 +29,8 @@ from nucliadb_protos.nodewriter_pb2 import IndexedMessage, IndexMessage, TypeMes
 
 from nucliadb_node import SERVICE_NAME, shadow_shards
 from nucliadb_node.app import App
-from nucliadb_node.settings import settings
+from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.shadow_shards import OperationCode
-from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import get_storage
 
 TEST_PARTITION = "111"
@@ -210,9 +209,7 @@ async def get_indexed_message(natsd):
         subject=indexing_settings.indexed_jetstream_target.format(
             partition=TEST_PARTITION
         ),
-        queue=indexing_settings.indexed_jetstream_group.format(
-            partition=TEST_PARTITION
-        ),
+        queue="indexed-{partition}".format(partition=TEST_PARTITION),
         cb=cb,
         config=nats.js.api.ConsumerConfig(
             deliver_policy=nats.js.api.DeliverPolicy.NEW,

@@ -39,12 +39,11 @@ from nucliadb_protos.nodewriter_pb2 import (
 
 from nucliadb_node import SERVICE_NAME, logger, shadow_shards
 from nucliadb_node.reader import Reader
-from nucliadb_node.settings import settings
+from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
-from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
@@ -313,7 +312,6 @@ class IndexedPublisher:
         self,
         stream: str,
         subject: str,
-        queue: str,
         servers: List[str],
         auth: Optional[str],
     ):

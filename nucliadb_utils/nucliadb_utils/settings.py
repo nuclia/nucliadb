@@ -125,10 +125,6 @@ class IndexingSettings(BaseSettings):
     index_jetstream_auth: Optional[str] = None
     index_local: bool = False
 
-    indexed_jetstream_target: str = "indexed.{partition}"
-    indexed_jetstream_group: str = "indexed-{partition}"
-    indexed_jetstream_stream: str = "indexed"
-
 
 indexing_settings = IndexingSettings()
 
