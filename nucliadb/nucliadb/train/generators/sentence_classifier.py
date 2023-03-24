@@ -69,7 +69,7 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
                 key = paragraph.key
             if key == result:
                 for sentence in paragraph.sentences:
-                    splitted_text = text[sentence.start : sentence.end]
+                    splitted_text = text[sentence.start : sentence.end + 1]
                     splitted_texts.append(splitted_text)
     else:
         text = extracted_text.text
@@ -80,7 +80,7 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
                 key = paragraph.key
             if key == result:
                 for sentence in paragraph.sentences:
-                    splitted_text = text[sentence.start : sentence.end]
+                    splitted_text = text[sentence.start : sentence.end + 1]
                     splitted_texts.append(splitted_text)
     return splitted_texts
 

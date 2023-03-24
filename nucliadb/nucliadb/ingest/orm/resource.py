@@ -940,12 +940,12 @@ class Resource:
                                 metadata.vector.extend(vector_tmp)
 
                         if extracted_text is not None and text is not None:
-                            metadata.text = text[sentence.start : sentence.end]
+                            metadata.text = text[sentence.start : sentence.end + 1]
 
                         metadata.ClearField("entities")
                         metadata.ClearField("entity_positions")
                         if enabled_metadata.entities and text is not None:
-                            local_text = text[sentence.start : sentence.end]
+                            local_text = text[sentence.start : sentence.end + 1]
                             add_entities_to_metadata(entities, local_text, metadata)
 
                         pb_sentence = TrainSentence()
@@ -1020,12 +1020,12 @@ class Resource:
                         metadata.labels.paragraph.extend(paragraph.classifications)
 
                         if extracted_text is not None and text is not None:
-                            metadata.text = text[paragraph.start : paragraph.end]
+                            metadata.text = text[paragraph.start : paragraph.end + 1]
 
                         metadata.ClearField("entities")
                         metadata.ClearField("entity_positions")
                         if enabled_metadata.entities and text is not None:
-                            local_text = text[paragraph.start : paragraph.end]
+                            local_text = text[paragraph.start : paragraph.end + 1]
                             add_entities_to_metadata(entities, local_text, metadata)
 
                         if paragraph_key in userdefinedparagraphclass:

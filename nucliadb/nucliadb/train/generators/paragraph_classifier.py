@@ -63,9 +63,9 @@ async def get_paragraph(kbid: str, result: str) -> str:
 
     if split is not None:
         text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
+        splitted_text = text[start : end + 1]
     else:
-        splitted_text = extracted_text.text[start:end]
+        splitted_text = extracted_text.text[start : end + 1]
 
     return splitted_text
 

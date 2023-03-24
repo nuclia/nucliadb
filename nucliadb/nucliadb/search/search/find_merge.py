@@ -82,7 +82,7 @@ async def get_text_find_paragraph(
         text = extracted_text.split_text[split]
         splitted_text = text[start:end]
     else:
-        splitted_text = extracted_text.text[start:end]
+        splitted_text = extracted_text.text[start : end + 1]
 
     if highlight:
         splitted_text = highlight_paragraph(

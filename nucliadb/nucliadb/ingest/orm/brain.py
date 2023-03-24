@@ -75,7 +75,7 @@ def get_paragraph_text(
         text = extracted_text.split_text[split]
     else:
         text = extracted_text.text
-    return text[start:end]
+    return text[start : end + 1]
 
 
 def is_paragraph_repeated_in_field(

@@ -169,9 +169,9 @@ async def get_text_sentence(
         start = 0
     if split not in (None, ""):
         text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
+        splitted_text = text[start : end + 1]
     else:
-        splitted_text = extracted_text.text[start:end]
+        splitted_text = extracted_text.text[start : end + 1]
     return splitted_text
 
 
@@ -199,9 +199,9 @@ async def get_text_paragraph(
 
     if result.split not in (None, ""):
         text = extracted_text.split_text[result.split]
-        splitted_text = text[result.start : result.end]
+        splitted_text = text[result.start : result.end + 1]
     else:
-        splitted_text = extracted_text.text[result.start : result.end]
+        splitted_text = extracted_text.text[result.start : result.end + 1]
 
     if highlight:
         splitted_text = highlight_paragraph(
