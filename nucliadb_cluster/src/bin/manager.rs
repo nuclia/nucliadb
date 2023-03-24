@@ -99,7 +99,9 @@ async fn send_update(
     if !check_peer(stream).await? {
         error!("Check peer failed before cluster snapshot sending. Try to reconnect");
 
-        stream.shutdown().await?;
+        if let Err(e) = stream.shutdown().await {
+            error!("Error during shutdown stream: {e}");
+        }
         *stream = get_stream(args.monitor_addr.clone()).await?;
     }
 

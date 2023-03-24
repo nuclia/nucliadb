@@ -72,6 +72,8 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 
+from .metrics import merge_observer
+
 Bm25Score = Tuple[int, int]
 TimestampScore = datetime.datetime
 TitleScore = str
@@ -446,6 +448,7 @@ async def merge_relations_results(
     return relations
 
 
+@merge_observer.wrap({"type": "merge"})
 async def merge_results(
     search_responses: List[SearchResponse],
     count: int,

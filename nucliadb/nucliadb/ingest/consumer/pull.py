@@ -36,7 +36,7 @@ from nucliadb.ingest.orm.exceptions import (
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb_telemetry import errors
+from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.audit.audit import AuditStorage
@@ -45,6 +45,8 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction
+
+consumer_observer = metrics.Observer("message_processor", labels={"source": ""})
 
 
 class PullWorker:
@@ -218,7 +220,14 @@ class PullWorker:
                 )
 
                 try:
-                    await self.processor.process(pb, seqid, self.partition)
+                    with consumer_observer(
+                        {
+                            "source": "writer"
+                            if pb.source == pb.MessageSource.WRITER
+                            else "processor"
+                        }
+                    ):
+                        await self.processor.process(pb, seqid, self.partition)
                 except SequenceOrderViolation as err:
                     logger.error(
                         f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). \

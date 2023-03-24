@@ -541,6 +541,21 @@ impl ShardReaderService {
         })
     }
 
+    #[tracing::instrument(skip_all)]
+    pub fn paragraph_count(&self) -> NodeResult<usize> {
+        self.paragraph_reader.count()
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn vector_count(&self, vector_set: &str) -> NodeResult<usize> {
+        self.vector_reader.count(vector_set)
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn text_count(&self) -> NodeResult<usize> {
+        self.text_reader.count()
+    }
+
     fn reload_policy(&self, trigger: bool) {
         let elapsed = self
             .creation_time

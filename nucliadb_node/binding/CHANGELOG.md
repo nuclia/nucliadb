@@ -1,4 +1,7 @@
 # Changelog
+## 0.7.5
+
+- Fully remove stop-words from paragraphs
 ## 0.7.4
 
 - Vectors returns the labels of the nearest neighbors 
