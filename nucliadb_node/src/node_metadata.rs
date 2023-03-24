@@ -24,7 +24,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
 use nucliadb_core::tracing::*;
-use nucliadb_core::{node_error, NodeResult};
+use nucliadb_core::NodeResult;
 use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +53,9 @@ pub struct NodeMetadata {
 
 impl Serialize for NodeMetadata {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         let mut s = serializer.serialize_struct("NodeMetadata", 3)?;
         s.serialize_field("load_score", &self.load_score())?;
         s.serialize_field("shard_count", &self.shard_count())?;
@@ -148,11 +150,7 @@ impl NodeMetadata {
         info!("Creating node metadata file '{}'", path.display());
         let mut reader = NodeReaderService::new();
         let mut node_metadata = NodeMetadata::default();
-        let shard_iter = reader
-            .iter_shards()
-            .map_err(|e| node_error!("Cannot read shards folder: {e}"))?
-            .flat_map(|shard| shard);
-        for shard in shard_iter {
+        for shard in reader.iter_shards()?.flatten() {
             let shard_id = shard.id.clone();
             let kbid = shard.metadata.kbid().map(String::from).unwrap_or_default();
             let paragraphs = shard.paragraph_count().unwrap_or_default() as f32;
