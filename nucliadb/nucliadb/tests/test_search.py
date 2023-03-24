@@ -32,6 +32,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.ingest.tests.vectors import V1
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.query import pre_process_query
@@ -1215,3 +1216,146 @@ async def test_search_handles_predict_errors(
         )
         assert resp.status_code == 200
         predict_mock.detect_entities.assert_awaited_once()
+
+
+async def create_dummy_resources(
+    nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, kbid, n=10
+):
+    payloads = [
+        {
+            "slug": f"dummy-resource-{i}",
+            "title": f"Dummy resource {i}",
+            "summary": f"Dummy resource {i} summary",
+        }
+        for i in range(n)
+    ]
+    for payload in payloads:
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            headers={"X-Synchronous": "true"},
+            json=payload,
+        )
+        assert resp.status_code == 201
+        uuid = resp.json()["uuid"]
+
+        # Inject a vector
+        message = BrokerMessage()
+        message.kbid = kbid
+        message.uuid = uuid
+        message.texts[
+            "text"
+        ].body = "My own text Ramon. This is great to be here. \n Where is my beer?"
+        etw = rpb.ExtractedTextWrapper()
+        etw.body.text = (
+            "My own text Ramon. This is great to be here. \n Where is my beer?"
+        )
+        etw.field.field = "text"
+        etw.field.field_type = rpb.FieldType.FILE
+        message.extracted_text.append(etw)
+        ev = rpb.ExtractedVectorsWrapper()
+        ev.field.field = "text"
+        ev.field.field_type = rpb.FieldType.FILE
+        v1 = rpb.Vector()
+        v1.start = 0
+        v1.end = 19
+        v1.start_paragraph = 0
+        v1.end_paragraph = 45
+        v1.vector.extend(V1)
+        ev.vectors.vectors.vectors.append(v1)
+        message.field_vectors.append(ev)
+        message.source = BrokerMessage.MessageSource.PROCESSOR
+
+        await inject_message(nucliadb_grpc, message)
+
+
+@pytest.fixture(scope="function")
+async def kb_with_one_logic_shard(
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+):
+    resp = await nucliadb_manager.post("/kbs", json={})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10)
+
+    yield kbid
+
+    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+def max_shard_fields():
+    prev = ingest_settings.max_shard_fields
+    ingest_settings.max_shard_fields = 20
+
+    yield
+
+    ingest_settings.max_shard_fields = prev
+
+
+@pytest.fixture(scope="function")
+async def kb_with_two_logic_shards(
+    max_shard_fields,
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+):
+    resp = await nucliadb_manager.post("/kbs", json={})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10)
+
+    yield kbid
+
+    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_search_two_logic_shards(
+    nucliadb_reader: AsyncClient,
+    nucliadb_manager: AsyncClient,
+    kb_with_one_logic_shard,
+    kb_with_two_logic_shards,
+):
+    kbid1 = kb_with_one_logic_shard
+    kbid2 = kb_with_two_logic_shards
+
+    # Check that they have one and two logic shards, respectively
+    resp = await nucliadb_manager.get(f"kb/{kbid1}/shards")
+    assert resp.status_code == 200
+    assert len(resp.json()["shards"]) == 1
+
+    resp = await nucliadb_manager.get(f"kb/{kbid2}/shards")
+    assert resp.status_code == 200
+    assert len(resp.json()["shards"]) == 2
+
+    # Check that search returns the same results
+    resp1 = await nucliadb_reader.post(
+        f"/kb/{kbid1}/search",
+        json=dict(query="dummy", vector=V1, min_score=-1),
+    )
+    resp2 = await nucliadb_reader.post(
+        f"/kb/{kbid2}/search",
+        json=dict(query="dummy", vector=V1, min_score=-1),
+    )
+    assert resp1.status_code == resp2.status_code == 200
+    content1 = resp1.json()
+    content2 = resp2.json()
+
+    assert len(content1["shards"]) == 1
+    assert len(content2["shards"]) == 2
+
+    assert (
+        len(content1["paragraphs"]["results"])
+        == len(content2["paragraphs"]["results"])
+        == 20
+    )
+
+    assert len(content1["sentences"]["results"]) == len(
+        content2["sentences"]["results"]
+    )
