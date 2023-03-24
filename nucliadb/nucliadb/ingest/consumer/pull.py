@@ -193,11 +193,12 @@ class PullWorker:
             await self.nc.close()
 
     async def subscription_worker(self, msg: Msg):
-        while len(NODES) == 0:
+        if len(NODES) == 0:
             logger.warning(
                 "Waiting for nodes to be discovered before processing any messages"
             )
-            await asyncio.sleep(1)
+            await msg.nak(delay=1)
+            return
 
         subject = msg.subject
         reply = msg.reply
