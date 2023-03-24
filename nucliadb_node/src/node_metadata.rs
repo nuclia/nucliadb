@@ -115,7 +115,7 @@ impl NodeMetadata {
         }
     }
 
-    pub async fn load_or_create(path: &Path) -> NodeResult<Self> {
+    pub fn load_or_create(path: &Path) -> NodeResult<Self> {
         if !path.exists() {
             info!("Node metadata file does not exist.");
 
