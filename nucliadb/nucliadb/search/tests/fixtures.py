@@ -198,14 +198,22 @@ async def multiple_search_resource(
     Create a resource that has every possible bit of information
     """
     for count in range(100):
-        message1 = broker_resource(knowledgebox_ingest)
-        await inject_message(processor, knowledgebox_ingest, message1, count + 1)
+        message = broker_resource(knowledgebox_ingest)
+        await processor.process(message=message, seqid=count)
+
+    await wait_for_shard(knowledgebox_ingest, 100)
     return knowledgebox_ingest
 
 
-async def inject_message(processor, knowledgebox_ingest, message, count: int = 1):
+async def inject_message(
+    processor, knowledgebox_ingest, message, count: int = 1
+) -> str:
     await processor.process(message=message, seqid=count)
+    await wait_for_shard(knowledgebox_ingest, count)
+    return knowledgebox_ingest
 
+
+async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
     driver = await get_driver()
     txn = await driver.begin()
