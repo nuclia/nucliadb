@@ -23,7 +23,6 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
-use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{node_error, NodeResult};
 use serde::ser::{SerializeStruct, Serializer};
@@ -147,28 +146,18 @@ impl NodeMetadata {
 
     pub fn create(path: &Path) -> NodeResult<Self> {
         info!("Creating node metadata file '{}'", path.display());
-
         let mut reader = NodeReaderService::new();
-
-        reader
+        let mut node_metadata = NodeMetadata::default();
+        let shard_iter = reader
             .iter_shards()
             .map_err(|e| node_error!("Cannot read shards folder: {e}"))?
-            .try_fold(NodeMetadata::default(), |mut node_metadata, shard| {
-                let shard = shard.map_err(|e| node_error!("Cannot load shard: {e}"))?;
-
-                match shard.get_info(&GetShardRequest::default()) {
-                    Ok(shard_info) if shard_info.metadata.is_some() => {
-                        node_metadata.new_shard(
-                            shard.id,
-                            shard_info.metadata.unwrap().kbid,
-                            shard_info.paragraphs as f32,
-                        );
-
-                        Ok(node_metadata)
-                    }
-                    Ok(_) => Err(node_error!("Missing shard metadata for {}", shard.id)),
-                    Err(e) => Err(node_error!("Cannot get metrics for {}: {e:?}", shard.id)),
-                }
-            })
+            .flat_map(|shard| shard);
+        for shard in shard_iter {
+            let shard_id = shard.id.clone();
+            let kbid = shard.metadata.kbid().map(String::from).unwrap_or_default();
+            let paragraphs = shard.paragraph_count().unwrap_or_default() as f32;
+            node_metadata.new_shard(shard_id, kbid, paragraphs)
+        }
+        Ok(node_metadata)
     }
 }
