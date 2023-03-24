@@ -54,9 +54,7 @@ pub struct NodeMetadata {
 
 impl Serialize for NodeMetadata {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    where S: Serializer {
         let mut s = serializer.serialize_struct("NodeMetadata", 3)?;
         s.serialize_field("load_score", &self.load_score())?;
         s.serialize_field("shard_count", &self.shard_count())?;
