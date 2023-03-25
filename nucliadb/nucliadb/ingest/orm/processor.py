@@ -544,7 +544,7 @@ class Processor:
             )
             return None
 
-        if message.origin and resource:
+        if message.HasField("origin") and resource:
             await resource.set_origin(message.origin)
 
         if resource:
