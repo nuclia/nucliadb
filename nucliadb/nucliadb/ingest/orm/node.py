@@ -328,7 +328,9 @@ class Node(AbstractNode):
         await txn.set(key, updated_shards.SerializeToString())
 
     @classmethod
-    async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[Shard]:
+    async def get_current_active_shard(
+        cls, txn: Transaction, kbid: str
+    ) -> Optional[Shard]:
         key = KB_SHARDS.format(kbid=kbid)
         kb_shards_bytes: Optional[bytes] = await txn.get(key)
         if kb_shards_bytes is not None:

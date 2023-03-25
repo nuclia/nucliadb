@@ -71,16 +71,16 @@ def test_find_nodes_raises_error_if_not_enough_nodes_are_found(nodes):
     settings.node_replicas = prev
 
 
-def test_find_nodes_checks_max_node_shards_only_if_set(nodes):
+def test_find_nodes_checks_max_node_replicas_only_if_set(nodes):
     cluster = orm.ClusterObject()
 
-    prev = settings.max_node_shards
-    settings.max_node_shards = 0
+    prev = settings.max_node_replicas
+    settings.max_node_replicas = 0
 
     with pytest.raises(NodeClusterSmall):
         cluster.find_nodes()
 
-    settings.max_node_shards = -1
+    settings.max_node_replicas = -1
     assert len(cluster.find_nodes())
 
-    settings.max_node_shards = prev
+    settings.max_node_replicas = prev

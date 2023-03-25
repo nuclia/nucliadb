@@ -217,7 +217,7 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
     driver = await get_driver()
     txn = await driver.begin()
-    shard = await Node.actual_shard(txn, knowledgebox_ingest)
+    shard = await Node.get_current_active_shard(txn, knowledgebox_ingest)
     if shard is None:
         raise Exception("Could not find shard")
     await txn.abort()

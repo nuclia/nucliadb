@@ -56,11 +56,13 @@ class ShardCounter(BaseModel):
 
 class AbstractShard(metaclass=ABCMeta):
     @abstractmethod
-    def __init__(self, sharduuid: str, shard: PBShard, node: Optional[Any] = None):
+    def __init__(
+        self, sharduuid: str, shard: PBShard, node: Optional[Any] = None
+    ):  # pragma: no cover
         pass
 
     @abstractmethod
-    async def delete_resource(self, uuid: str, txid: int, partition: str):
+    async def delete_resource(self, uuid: str, txid: int, partition: str):  # pragma: no cover
         pass
 
     @abstractmethod
@@ -70,7 +72,7 @@ class AbstractShard(metaclass=ABCMeta):
         txid: int,
         partition: str,
         reindex_id: Optional[str] = None,
-    ) -> Optional[ShardCounter]:
+    ) -> Optional[ShardCounter]:  # pragma: no cover
         pass
 
 
@@ -79,39 +81,52 @@ class AbstractNode(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def reader(self) -> NodeReaderStub:
+    def reader(self) -> NodeReaderStub:  # pragma: no cover
         pass
 
     @property
     @abstractmethod
-    def writer(self) -> NodeWriterStub:
+    def writer(self) -> NodeWriterStub:  # pragma: no cover
         pass
 
     @classmethod
     @abstractmethod
-    def create_shard_klass(cls, shard_id: str, pbshard: PBShard) -> AbstractShard:
+    def create_shard_klass(
+        cls, shard_id: str, pbshard: PBShard
+    ) -> AbstractShard:  # pragma: no cover
         pass
 
     @classmethod
     @abstractmethod
     async def create_shard_by_kbid(
         cls, txn: Transaction, kbid: str, similarity: VectorSimilarity.ValueType
-    ) -> AbstractShard:
+    ) -> AbstractShard:  # pragma: no cover
+        """
+        Create a new shard for a knowledge box and assign the current active
+        shard for new resources to be indexed into.
+        """
         pass
 
     @classmethod
     async def create_shadow_shard(
         cls, txn: Transaction, kbid: str, node_id: str, replica_id: str
-    ):
+    ):  # pragma: no cover
         raise NotImplementedError()
 
     @classmethod
-    async def delete_shadow_shard(cls, txn: Transaction, kbid: str, replica_id: str):
+    async def delete_shadow_shard(
+        cls, txn: Transaction, kbid: str, replica_id: str
+    ):  # pragma: no cover
         raise NotImplementedError()
 
     @classmethod
     @abstractmethod
-    async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[AbstractShard]:
+    async def get_current_active_shard(
+        cls, txn: Transaction, kbid: str
+    ) -> Optional[AbstractShard]:  # pragma: no cover
+        """
+        Shard that is currently receiving new resources
+        """
         pass
 
     async def stream_get_fields(
