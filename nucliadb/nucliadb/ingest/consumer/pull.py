@@ -197,9 +197,13 @@ class PullWorker:
             logger.warning(
                 "Waiting for nodes to be discovered before processing any messages"
             )
-            # XXX need to validate with carles this stays at front of stream
-            await msg.nak(delay=1)
-            return
+            # XXX need to validate with carles
+            # according to docs,
+            # "Nak Signals that the message will not be processed now and processing
+            #  can move onto the next message, NAK'd message will be retried"
+            # so in progress makes more sense
+            await msg.in_progress()
+            await asyncio.sleep(1)
 
         subject = msg.subject
         reply = msg.reply
