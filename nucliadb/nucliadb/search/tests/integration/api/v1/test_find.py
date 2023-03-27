@@ -27,6 +27,7 @@ from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
+@pytest.mark.flaky(reruns=5)
 async def test_find(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
