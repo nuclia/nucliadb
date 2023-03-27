@@ -33,10 +33,6 @@ from nucliadb_protos.writer_pb2 import (
     GetSynonymsResponse,
     GetVectorSetsRequest,
     GetVectorSetsResponse,
-    GetWidgetRequest,
-    GetWidgetResponse,
-    GetWidgetsRequest,
-    GetWidgetsResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
     OpStatusWriter,
@@ -49,7 +45,6 @@ from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet, VectorSets
-from nucliadb_models.widgets import KnowledgeBoxWidgets, Widget, WidgetMode
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
@@ -216,96 +211,6 @@ async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
         )
         return response
     elif kbobj.status == GetLabelSetResponse.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
-
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/widgets",
-    status_code=200,
-    name="Get Knowledge Box Widgets",
-    response_model=KnowledgeBoxWidgets,
-    tags=["Knowledge Box Services"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def get_widgets(request: Request, kbid: str) -> KnowledgeBoxWidgets:
-    ingest = get_ingest()
-    l_request: GetWidgetsRequest = GetWidgetsRequest()
-    l_request.kb.uuid = kbid
-    set_info_on_span({"nuclia.kbid": kbid})
-
-    kbobj: GetWidgetsResponse = await ingest.GetWidgets(l_request)  # type: ignore
-    if kbobj.status == GetWidgetsResponse.Status.OK:
-        response = KnowledgeBoxWidgets(uuid=kbid)
-        for key, widget_obj in kbobj.widgets.items():
-            widget = Widget(id=key)
-            if widget_obj.id != key:
-                raise HTTPException(
-                    status_code=500, detail="Inconsistency on widget id"
-                )
-            widget.description = widget_obj.description
-            if widget_obj.mode == 0:
-                widget_mode = WidgetMode.BUTTON
-            elif widget_obj.mode == 1:
-                widget_mode = WidgetMode.INPUT
-            elif widget_obj.mode == 2:
-                widget_mode = WidgetMode.FORM
-            widget.mode = widget_mode
-            widget.features = MessageToDict(
-                widget_obj.features,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )  # type: ignore
-            widget.filters = [x for x in widget_obj.filters]
-            widget.topEntities = [x for x in widget_obj.topEntities]
-            widget.style = {x: y for x, y in widget_obj.style.items()}
-            response.widgets[key] = widget
-        return response
-    elif kbobj.status == GetWidgetsResponse.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
-
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/widget/{{widget}}",
-    status_code=200,
-    name="Get Knowledge Box Widgets",
-    response_model=Widget,
-    tags=["Knowledge Box Services"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def get_widget(request: Request, kbid: str, widget: str) -> Widget:
-    ingest = get_ingest()
-    l_request: GetWidgetRequest = GetWidgetRequest()
-    l_request.kb.uuid = kbid
-    l_request.widget = widget
-    set_info_on_span({"nuclia.kbid": kbid})
-
-    kbobj: GetWidgetResponse = await ingest.GetWidget(l_request)  # type: ignore
-    if kbobj.status == GetWidgetResponse.Status.OK:
-        response = Widget(id=kbobj.widget.id)
-        response.description = kbobj.widget.description
-        if kbobj.widget.mode == 0:
-            widget_mode = WidgetMode.BUTTON
-        elif kbobj.widget.mode == 1:
-            widget_mode = WidgetMode.INPUT
-        elif kbobj.widget.mode == 2:
-            widget_mode = WidgetMode.FORM
-        response.mode = widget_mode
-        response.features = MessageToDict(
-            kbobj.widget.features,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )  # type: ignore
-        response.filters = [x for x in kbobj.widget.filters]
-        response.topEntities = [x for x in kbobj.widget.topEntities]
-        response.style = {x: y for x, y in kbobj.widget.style.items()}
-        return response
-    elif kbobj.status == GetWidgetResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     else:
         raise HTTPException(status_code=500, detail="Unknown GRPC response")

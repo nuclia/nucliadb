@@ -130,26 +130,6 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.DelEntitiesRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
-        self.GetWidget = channel.unary_unary(
-                '/fdbwriter.Writer/GetWidget',
-                request_serializer=nucliadb__protos_dot_writer__pb2.GetWidgetRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.GetWidgetResponse.FromString,
-                )
-        self.GetWidgets = channel.unary_unary(
-                '/fdbwriter.Writer/GetWidgets',
-                request_serializer=nucliadb__protos_dot_writer__pb2.GetWidgetsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.GetWidgetsResponse.FromString,
-                )
-        self.SetWidgets = channel.unary_unary(
-                '/fdbwriter.Writer/SetWidgets',
-                request_serializer=nucliadb__protos_dot_writer__pb2.SetWidgetsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
-        self.DelWidgets = channel.unary_unary(
-                '/fdbwriter.Writer/DelWidgets',
-                request_serializer=nucliadb__protos_dot_writer__pb2.DetWidgetsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-                )
         self.GetSynonyms = channel.unary_unary(
                 '/fdbwriter.Writer/GetSynonyms',
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
@@ -356,31 +336,6 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetWidget(self, request, context):
-        """Widgets
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetWidgets(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetWidgets(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DelWidgets(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def GetSynonyms(self, request, context):
         """Synonyms
         """
@@ -571,26 +526,6 @@ def add_WriterServicer_to_server(servicer, server):
             'DelEntities': grpc.unary_unary_rpc_method_handler(
                     servicer.DelEntities,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.DelEntitiesRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'GetWidget': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetWidget,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.GetWidgetRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.GetWidgetResponse.SerializeToString,
-            ),
-            'GetWidgets': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetWidgets,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.GetWidgetsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.GetWidgetsResponse.SerializeToString,
-            ),
-            'SetWidgets': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetWidgets,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.SetWidgetsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
-            ),
-            'DelWidgets': grpc.unary_unary_rpc_method_handler(
-                    servicer.DelWidgets,
-                    request_deserializer=nucliadb__protos_dot_writer__pb2.DetWidgetsRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
             'GetSynonyms': grpc.unary_unary_rpc_method_handler(
@@ -1050,74 +985,6 @@ class Writer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelEntities',
             nucliadb__protos_dot_writer__pb2.DelEntitiesRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetWidget(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetWidget',
-            nucliadb__protos_dot_writer__pb2.GetWidgetRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.GetWidgetResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetWidgets(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetWidgets',
-            nucliadb__protos_dot_writer__pb2.GetWidgetsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.GetWidgetsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetWidgets(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetWidgets',
-            nucliadb__protos_dot_writer__pb2.SetWidgetsRequest.SerializeToString,
-            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DelWidgets(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelWidgets',
-            nucliadb__protos_dot_writer__pb2.DetWidgetsRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

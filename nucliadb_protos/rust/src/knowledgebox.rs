@@ -176,52 +176,6 @@ pub struct DeletedEntitiesGroups {
     #[prost(string, repeated, tag="1")]
     pub entities_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
-// Widgets of the Knowledge Box
-
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Widget {
-    #[prost(string, tag="1")]
-    pub id: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub description: ::prost::alloc::string::String,
-    #[prost(enumeration="widget::WidgetMode", tag="3")]
-    pub mode: i32,
-    #[prost(message, optional, tag="4")]
-    pub features: ::core::option::Option<widget::WidgetFeatures>,
-    #[prost(string, repeated, tag="5")]
-    pub filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(string, repeated, tag="6")]
-    pub top_entities: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(map="string, string", tag="7")]
-    pub style: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
-}
-/// Nested message and enum types in `Widget`.
-pub mod widget {
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct WidgetFeatures {
-        #[prost(bool, tag="1")]
-        pub use_filters: bool,
-        #[prost(bool, tag="2")]
-        pub suggest_entities: bool,
-        #[prost(bool, tag="3")]
-        pub suggest_sentences: bool,
-        #[prost(bool, tag="4")]
-        pub suggest_paragraphs: bool,
-        #[prost(bool, tag="5")]
-        pub suggest_labels: bool,
-        #[prost(bool, tag="6")]
-        pub edit_labels: bool,
-        #[prost(bool, tag="7")]
-        pub entity_annotation: bool,
-    }
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum WidgetMode {
-        Button = 0,
-        Input = 1,
-        Form = 2,
-    }
-}
 // Vectorsets
 
 #[derive(Clone, PartialEq, ::prost::Message)]

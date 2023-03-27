@@ -27,51 +27,6 @@ from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
-async def test_widget_service(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
-) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        widget = {
-            "id": "widget1",
-            "description": "description",
-            "mode": "button",
-            "features": {
-                "useFilters": True,
-                "suggestEntities": True,
-                "suggestSentences": True,
-                "suggestParagraphs": True,
-                "suggestLabels": True,
-                "editLabels": True,
-                "entityAnnotation": True,
-            },
-            "filters": ["filter1"],
-            "topEntities": ["entity1"],
-            "style": {"top-border": "0px"},
-        }
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/widget/widget1", json=widget
-        )
-        assert resp.status_code == 200
-
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/widgets")
-        # default 'dashboard' widget and the one created here
-        assert len(resp.json()["widgets"]) == 2
-
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/widget/widget1")
-        assert resp.status_code == 200
-        assert resp.json() == widget
-
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_one}/widget/widget1")
-        assert resp.status_code == 200
-
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/widgets")
-        assert len(resp.json()["widgets"]) == 1
-
-
-@pytest.mark.asyncio
 async def test_disable_vectors_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
@@ -138,12 +93,12 @@ async def test_labelsets_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        widget = {
+        payload = {
             "title": "labelset1",
             "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],
         }
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1", json=widget
+            f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1", json=payload
         )
         assert resp.status_code == 200
 
