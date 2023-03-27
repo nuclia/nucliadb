@@ -54,7 +54,7 @@ def strip_query_params(url: yarl.URL) -> str:
 
 MAX_SIZE = 1073741824
 
-DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.read_write"]
+DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.full_control"]
 MAX_RETRIES = 5
 
 POLICY_DELETE = {
