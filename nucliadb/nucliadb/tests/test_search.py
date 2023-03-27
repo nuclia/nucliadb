@@ -98,14 +98,14 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     fcm.field.field_type = rpb.FieldType.FILE
     p1 = rpb.Paragraph(
         start=0,
-        end=len(paragraph),
+        end=len(paragraph) - 1,
     )
     p1.start_seconds.append(0)
     p1.end_seconds.append(10)
 
     p2 = rpb.Paragraph(
         start=len(paragraph),
-        end=len(paragraph) * 2,
+        end=(len(paragraph) * 2) - 1,
     )
     p2.start_seconds.append(10)
     p2.end_seconds.append(20)
@@ -142,7 +142,7 @@ async def test_search_filters_out_duplicate_paragraphs(
         knowledgebox, nucliadb_grpc, sentence="My own text Ramon. "
     )
     await create_resource_with_duplicates(
-        knowledgebox, nucliadb_grpc, sentence="Another different paragraph with text"
+        knowledgebox, nucliadb_grpc, sentence="Another different paragraph with text."
     )
 
     query = "text"
@@ -185,7 +185,7 @@ async def test_search_returns_paragraph_positions(
     content = resp.json()
     position = content["paragraphs"]["results"][0]["position"]
     assert position["start"] == 0
-    assert position["end"] == len(sentence)
+    assert position["end"] == len(sentence) - 1
     assert position["index"] == 0
     assert position["page_number"] is not None
 
