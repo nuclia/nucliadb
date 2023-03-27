@@ -29,5 +29,5 @@ content.
 
 *Writer* role is intended for all write operations. That include creation, update
 and deletion of resources and fields, set and remove entities groups,
-labels and widgets, upload files, reindex resources and send resources
+labels, upload files, reindex resources and send resources
 to reprocess.
