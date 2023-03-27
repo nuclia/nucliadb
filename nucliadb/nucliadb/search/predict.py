@@ -89,14 +89,14 @@ class PredictEngine:
         x_forwarded_for: str,
     ):
         data = item.dict()
-        data["user"] = x_nucliadb_user
+        data["user_id"] = x_nucliadb_user
         data["client"] = x_ndb_client
         data["forwarded"] = x_forwarded_for
 
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.post(
-                url=f"{self.cluster_url}{PRIVATE_PREDICT}{CHAT}",
+                url=f"{self.cluster_url}{PRIVATE_PREDICT}{FEEDBACK}",
                 json=data,
                 headers={"X-STF-KBID": kbid},
             )
@@ -111,7 +111,7 @@ class PredictEngine:
             # Upload the payload
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.post(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{CHAT}",
+                url=f"{self.public_url}{PUBLIC_PREDICT}{FEEDBACK}",
                 json=data,
                 headers=headers,
             )
