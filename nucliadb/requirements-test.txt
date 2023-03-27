@@ -8,3 +8,4 @@ s3fs
 datasets
 asyncpg
 redis>=4.3.4
+pytest-rerunfailures>=11.1.2
