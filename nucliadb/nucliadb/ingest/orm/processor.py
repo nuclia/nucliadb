@@ -26,7 +26,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     KnowledgeBoxID,
     KnowledgeBoxResponseStatus,
-    Widget,
 )
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
@@ -49,15 +48,6 @@ from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_cache, get_storage
-
-DEFAULT_WIDGET = Widget(id="dashboard", mode=Widget.WidgetMode.INPUT)
-DEFAULT_WIDGET.features.useFilters = True
-DEFAULT_WIDGET.features.suggestEntities = True
-DEFAULT_WIDGET.features.suggestSentences = True
-DEFAULT_WIDGET.features.suggestParagraphs = True
-DEFAULT_WIDGET.features.suggestLabels = False
-DEFAULT_WIDGET.features.editLabels = True
-DEFAULT_WIDGET.features.entityAnnotation = True
 
 
 class TxnAction(Enum):
@@ -636,28 +626,18 @@ class Processor:
         forceuuid: Optional[str] = None,
         similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
     ) -> str:
-        txn = await self.driver.begin()
-        try:
-            uuid, failed = await KnowledgeBox.create(
-                txn, slug, config=config, uuid=forceuuid, similarity=similarity
-            )
-        except Exception as e:
-            await txn.abort()
-            errors.capture_exception(e)
-            raise e
-
-        if not failed:
-            storage = await get_storage(service_name=SERVICE_NAME)
-            cache = await get_cache()
-            kb = KnowledgeBox(txn, storage, cache, uuid)
-            await kb.set_widgets(DEFAULT_WIDGET)
-
-        if failed:
-            await txn.abort()
-            raise Exception("Failed to create KB")
-        else:
-            await txn.commit(resource=False)
-        return uuid
+        async with self.driver.transaction() as txn:
+            try:
+                uuid, failed = await KnowledgeBox.create(
+                    txn, slug, config=config, uuid=forceuuid, similarity=similarity
+                )
+                if failed:
+                    raise Exception("Failed to create KB")
+                await txn.commit(resource=False)
+                return uuid
+            except Exception as e:
+                errors.capture_exception(e)
+                raise e
 
     async def update_kb(
         self, kbid: str, slug: str, config: Optional[KnowledgeBoxConfig]

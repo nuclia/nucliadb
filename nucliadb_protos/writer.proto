@@ -235,22 +235,6 @@ message GetEntitiesGroupResponse {
     Status status = 3;
 }
 
-
-message GetWidgetRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string widget = 2;
-}
-
-message GetWidgetResponse {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    knowledgebox.Widget widget = 2;
-    enum Status {
-        OK = 0;
-        NOTFOUND = 1;
-    }
-    Status status = 3;
-}
-
 message GetVectorSetsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
 }
@@ -276,31 +260,6 @@ message SetVectorSetRequest {
     string id = 2;
     knowledgebox.VectorSet vectorset = 3;
 }
-
-message GetWidgetsRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-}
-
-message GetWidgetsResponse {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    map <string, knowledgebox.Widget> widgets = 2;
-    enum Status {
-        OK = 0;
-        NOTFOUND = 1;
-    }
-    Status status = 3;
-}
-
-message SetWidgetsRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    knowledgebox.Widget widget = 2;
-}
-
-message DetWidgetsRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    string widget = 2;
-}
-
 
 message OpStatusWriter {
     enum Status {
@@ -528,12 +487,6 @@ service Writer {
     rpc GetEntitiesGroup(GetEntitiesGroupRequest) returns (GetEntitiesGroupResponse) {}
     rpc SetEntities(SetEntitiesRequest) returns (OpStatusWriter) {}
     rpc DelEntities(DelEntitiesRequest) returns (OpStatusWriter) {}
-
-    // Widgets
-    rpc GetWidget(GetWidgetRequest) returns (GetWidgetResponse) {}
-    rpc GetWidgets(GetWidgetsRequest) returns (GetWidgetsResponse) {}
-    rpc SetWidgets(SetWidgetsRequest) returns (OpStatusWriter) {}
-    rpc DelWidgets(DetWidgetsRequest) returns (OpStatusWriter) {}
 
     // Synonyms
     rpc GetSynonyms(knowledgebox.KnowledgeBoxID) returns (GetSynonymsResponse) {}

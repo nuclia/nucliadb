@@ -45,7 +45,6 @@ from nucliadb_protos.writer_pb2 import (
     DeleteShadowShardRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
-    DetWidgetsRequest,
     ExportRequest,
     ExtractedVectorsWrapper,
     FileRequest,
@@ -61,10 +60,6 @@ from nucliadb_protos.writer_pb2 import (
     GetSynonymsResponse,
     GetVectorSetsRequest,
     GetVectorSetsResponse,
-    GetWidgetRequest,
-    GetWidgetResponse,
-    GetWidgetsRequest,
-    GetWidgetsResponse,
     IndexResource,
     IndexStatus,
     ListEntitiesGroupsRequest,
@@ -82,7 +77,6 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorSetRequest,
     SetVectorsRequest,
     SetVectorsResponse,
-    SetWidgetsRequest,
     ShadowShardResponse,
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -510,68 +504,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             try:
                 entities_manager = EntitiesManager(kbobj, txn)
                 await entities_manager.del_entities(request.group)
-                await txn.commit(resource=False)
-                response.status = OpStatusWriter.Status.OK
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.error("Error in ingest gRPC servicer", exc_info=True)
-                response.status = OpStatusWriter.Status.ERROR
-                await txn.abort()
-        else:
-            await txn.abort()
-            response.status = OpStatusWriter.Status.NOTFOUND
-        return response
-
-    async def GetWidget(  # type: ignore
-        self, request: GetWidgetRequest, context=None
-    ) -> GetWidgetResponse:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetWidgetResponse()
-        if kbobj is not None:
-            await kbobj.get_widget(request.widget, response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetWidgetResponse.Status.OK
-        await txn.abort()
-        if kbobj is None:
-            response.status = GetWidgetResponse.Status.NOTFOUND
-        return response
-
-    async def GetWidgets(  # type: ignore
-        self, request: GetWidgetsRequest, context=None
-    ) -> GetWidgetsResponse:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetWidgetsResponse()
-        if kbobj is not None:
-            await kbobj.get_widgets(response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetWidgetsResponse.Status.OK
-        await txn.abort()
-        if kbobj is None:
-            response.status = GetWidgetsResponse.Status.NOTFOUND
-        return response
-
-    async def SetWidgets(self, request: SetWidgetsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is None:
-            await txn.abort()
-            response.status = OpStatusWriter.Status.NOTFOUND
-            return response
-        await kbobj.set_widgets(request.widget)
-        response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
-        return response
-
-    async def DelWidgets(self, request: DetWidgetsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is not None:
-            try:
-                await kbobj.del_widgets(request.widget)
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:

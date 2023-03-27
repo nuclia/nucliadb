@@ -217,23 +217,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.DelEntitiesRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
-    GetWidget: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetWidgetRequest,
-        nucliadb_protos.writer_pb2.GetWidgetResponse,
-    ]
-    """Widgets"""
-    GetWidgets: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.GetWidgetsRequest,
-        nucliadb_protos.writer_pb2.GetWidgetsResponse,
-    ]
-    SetWidgets: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.SetWidgetsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
-    DelWidgets: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DetWidgetsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter,
-    ]
     GetSynonyms: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.writer_pb2.GetSynonymsResponse,
@@ -425,31 +408,6 @@ class WriterServicer(metaclass=abc.ABCMeta):
     def DelEntities(
         self,
         request: nucliadb_protos.writer_pb2.DelEntitiesRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-    @abc.abstractmethod
-    def GetWidget(
-        self,
-        request: nucliadb_protos.writer_pb2.GetWidgetRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.GetWidgetResponse:
-        """Widgets"""
-    @abc.abstractmethod
-    def GetWidgets(
-        self,
-        request: nucliadb_protos.writer_pb2.GetWidgetsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.GetWidgetsResponse: ...
-    @abc.abstractmethod
-    def SetWidgets(
-        self,
-        request: nucliadb_protos.writer_pb2.SetWidgetsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-    @abc.abstractmethod
-    def DelWidgets(
-        self,
-        request: nucliadb_protos.writer_pb2.DetWidgetsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
     @abc.abstractmethod

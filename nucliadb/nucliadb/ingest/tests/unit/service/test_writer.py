@@ -365,16 +365,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetLabelSetResponse.Status.NOTFOUND
 
-    async def test_GetWidget(self, writer: WriterServicer):
-        request = writer_pb2.GetWidgetRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), widget="widget"
-        )
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
-
-        resp = await writer.GetWidget(request)
-
-        assert resp.status == writer_pb2.GetWidgetsResponse.Status.OK
-
     async def test_GetEntities(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -600,93 +590,6 @@ class TestWriterServicer:
             return_value=entities_manager,
         ):
             resp = await writer.DelEntities(request)
-
-        assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
-
-    async def test_GetWidget_kb_missing(self, writer: WriterServicer):
-        request = writer_pb2.GetWidgetRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), widget="widget"
-        )
-        writer.proc.get_kb_obj.return_value = None
-
-        resp = await writer.GetWidget(request)
-
-        assert resp.status == writer_pb2.GetWidgetsResponse.Status.NOTFOUND
-
-    async def test_GetWidgets(self, writer: WriterServicer):
-        request = writer_pb2.GetWidgetRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), widget="widget"
-        )
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
-
-        resp = await writer.GetWidget(request)
-
-        assert resp.status == writer_pb2.GetWidgetsResponse.Status.OK
-
-    async def test_GetWidgets_kb_missing(self, writer: WriterServicer):
-        request = writer_pb2.GetWidgetsRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-        )
-        writer.proc.get_kb_obj.return_value = None
-
-        resp = await writer.GetWidgets(request)
-
-        assert resp.status == writer_pb2.GetWidgetsResponse.Status.NOTFOUND
-
-    async def test_SetWidgets(self, writer: WriterServicer):
-        request = writer_pb2.SetWidgetsRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"),
-            widget=writer_pb2.Widget(),
-        )
-
-        resp = await writer.SetWidgets(request)
-
-        assert resp.status == writer_pb2.OpStatusWriter.Status.OK
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
-        writer.proc.get_kb_obj.return_value.set_widgets.assert_called_once_with(
-            request.widget
-        )
-
-    async def test_SetWidgets_kb_missing(self, writer: WriterServicer):
-        request = writer_pb2.SetWidgetsRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
-        )
-        writer.proc.get_kb_obj.return_value = None
-
-        resp = await writer.SetWidgets(request)
-
-        assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
-
-    async def test_DelWidgets(self, writer: WriterServicer):
-        request = writer_pb2.DetWidgetsRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), widget="widget"
-        )
-
-        resp = await writer.DelWidgets(request)
-
-        assert resp.status == writer_pb2.OpStatusWriter.Status.OK
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
-        writer.proc.get_kb_obj.return_value.del_widgets.assert_called_once_with(
-            request.widget
-        )
-
-    async def test_DelWidgets_kb_missing(self, writer: WriterServicer):
-        request = writer_pb2.DetWidgetsRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), widget="widget"
-        )
-        writer.proc.get_kb_obj.return_value = None
-
-        resp = await writer.DelWidgets(request)
-
-        assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
-
-    async def test_DelWidgets_error(self, writer: WriterServicer):
-        request = writer_pb2.DetWidgetsRequest(
-            kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), widget="widget"
-        )
-        writer.proc.get_kb_obj.return_value.del_widgets.side_effect = Exception("error")
-
-        resp = await writer.DelWidgets(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
 

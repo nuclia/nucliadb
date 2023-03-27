@@ -25,15 +25,10 @@ from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, Labels, LabelSet
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
-from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
+from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import (
-    GetLabelSetResponse,
-    GetVectorSetsResponse,
-    GetWidgetResponse,
-    GetWidgetsResponse,
-)
+from nucliadb_protos.writer_pb2 import GetLabelSetResponse, GetVectorSetsResponse
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
@@ -72,8 +67,6 @@ KB_KEYS = "/kbs/{kbid}/"
 KB_UUID = "/kbs/{kbid}/config"
 KB_LABELSET = "/kbs/{kbid}/labels/{id}"
 KB_LABELS = "/kbs/{kbid}/labels"
-KB_WIDGETS = "/kbs/{kbid}/widgets"
-KB_WIDGETS_WIDGET = "/kbs/{kbid}/widgets/{id}"
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
@@ -351,30 +344,6 @@ class KnowledgeBox:
     async def del_labelset(self, id: str):
         labelset_key = KB_LABELSET.format(kbid=self.kbid, id=id)
         await self.txn.delete(labelset_key)
-
-    # Widget
-    async def get_widget(self, widget: str, widgets: GetWidgetResponse):
-        widgets_key = KB_WIDGETS_WIDGET.format(kbid=self.kbid, id=widget)
-        payload = await self.txn.get(widgets_key)
-        if payload is not None:
-            widgets.widget.ParseFromString(payload)
-
-    async def get_widgets(self, widgets: GetWidgetsResponse):
-        widgets_key = KB_WIDGETS.format(kbid=self.kbid)
-        async for key in self.txn.keys(widgets_key, count=-1):
-            widget = await self.txn.get(key)
-            if widget is not None:
-                wd = Widget()
-                wd.ParseFromString(widget)
-                widgets.widgets[wd.id].CopyFrom(wd)
-
-    async def set_widgets(self, widget: Widget):
-        entities_key = KB_WIDGETS_WIDGET.format(kbid=self.kbid, id=widget.id)
-        await self.txn.set(entities_key, widget.SerializeToString())
-
-    async def del_widgets(self, widget: str):
-        entities_key = KB_WIDGETS_WIDGET.format(kbid=self.kbid, id=widget)
-        await self.txn.delete(entities_key)
 
     async def get_synonyms(self, synonyms: PBSynonyms):
         pbsyn = await self.synonyms.get()

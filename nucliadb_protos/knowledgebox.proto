@@ -148,35 +148,6 @@ message DeletedEntitiesGroups {
     repeated string entities_groups = 1;
 }
 
-// Widgets of the Knowledge Box
-
-message Widget {
-    string id = 1;
-    string description = 2;
-    enum WidgetMode {
-        BUTTON = 0;
-        INPUT = 1;
-        FORM = 2;
-    }
-    WidgetMode mode = 3;
-
-    message WidgetFeatures {
-        bool useFilters = 1;
-        bool suggestEntities = 2;
-        bool suggestSentences = 3;
-        bool suggestParagraphs = 4;
-        bool suggestLabels = 5;
-        bool editLabels = 6;
-        bool entityAnnotation = 7;
-    }
-    WidgetFeatures features = 4;
-
-    repeated string filters = 5;
-    repeated string topEntities = 6;
-    map<string, string> style = 7;
-}
-
-
 // Vectorsets
 
 
