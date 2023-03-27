@@ -100,7 +100,7 @@ class PredictEngine:
                 json=data,
                 headers={"X-STF-KBID": kbid},
             )
-            if resp.status != 200:
+            if resp.status != 204:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
             if self.nuclia_service_account is None:
@@ -115,7 +115,7 @@ class PredictEngine:
                 json=data,
                 headers=headers,
             )
-            if resp.status != 200:
+            if resp.status != 204:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
     async def chat_query(
