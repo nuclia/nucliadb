@@ -98,7 +98,7 @@ class PredictEngine:
             # Upload the payload
             resp = await self.session.post(
                 url=f"{self.cluster_url}{PRIVATE_PREDICT}{CHAT}",
-                json=json.dumps(data),
+                json=data,
                 headers={"X-STF-KBID": kbid},
             )
             if resp.status != 200:
@@ -113,7 +113,7 @@ class PredictEngine:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.post(
                 url=f"{self.public_url}{PUBLIC_PREDICT}{CHAT}",
-                json=json.dumps(data),
+                json=data,
                 headers=headers,
             )
             if resp.status != 200:
