@@ -326,31 +326,6 @@ pub mod get_entities_group_response {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetWidgetRequest {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag="2")]
-    pub widget: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetWidgetResponse {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(message, optional, tag="2")]
-    pub widget: ::core::option::Option<super::knowledgebox::Widget>,
-    #[prost(enumeration="get_widget_response::Status", tag="3")]
-    pub status: i32,
-}
-/// Nested message and enum types in `GetWidgetResponse`.
-pub mod get_widget_response {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum Status {
-        Ok = 0,
-        Notfound = 1,
-    }
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetVectorSetsRequest {
     #[prost(message, optional, tag="1")]
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
@@ -389,43 +364,6 @@ pub struct SetVectorSetRequest {
     pub id: ::prost::alloc::string::String,
     #[prost(message, optional, tag="3")]
     pub vectorset: ::core::option::Option<super::knowledgebox::VectorSet>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetWidgetsRequest {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetWidgetsResponse {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(map="string, message", tag="2")]
-    pub widgets: ::std::collections::HashMap<::prost::alloc::string::String, super::knowledgebox::Widget>,
-    #[prost(enumeration="get_widgets_response::Status", tag="3")]
-    pub status: i32,
-}
-/// Nested message and enum types in `GetWidgetsResponse`.
-pub mod get_widgets_response {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum Status {
-        Ok = 0,
-        Notfound = 1,
-    }
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetWidgetsRequest {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(message, optional, tag="2")]
-    pub widget: ::core::option::Option<super::knowledgebox::Widget>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DetWidgetsRequest {
-    #[prost(message, optional, tag="1")]
-    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
-    #[prost(string, tag="2")]
-    pub widget: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OpStatusWriter {

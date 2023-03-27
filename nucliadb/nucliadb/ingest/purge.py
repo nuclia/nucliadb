@@ -135,13 +135,12 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 async def main():
     # Clean up all kb marked to delete
     driver = await get_driver()
-
-    await purge_kb(driver)
-
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
         service_name=SERVICE_NAME,
     )
+
+    await purge_kb(driver)
     await purge_kb_storage(driver, storage)
     await storage.finalize()
 
