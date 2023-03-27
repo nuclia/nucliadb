@@ -93,8 +93,8 @@ impl ShardMetadata {
     pub fn kbid(&self) -> Option<&str> {
         self.kbid.as_deref()
     }
-    pub fn similarity(&self) -> Option<VectorSimilarity> {
-        self.similarity.map(VectorSimilarity::from)
+    pub fn similarity(&self) -> VectorSimilarity {
+        self.similarity.unwrap_or(Similarity::Cosine).into()
     }
 }
 
