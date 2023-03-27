@@ -153,7 +153,7 @@ impl ShardWriterService {
 
         let vsc = VectorConfig {
             no_results: None,
-            similarity: metadata.similarity(),
+            similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
         };

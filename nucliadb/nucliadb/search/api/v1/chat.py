@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from typing import List
+from typing import AsyncIterator, List
 
 from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
@@ -90,7 +90,8 @@ async def chat_post_knowledgebox(
         req.system = "You help creating new queries based on context"
 
         new_query_elements = []
-        async for new_query_data in predict.chat_query(kbid, req):
+        _, generator = await predict.chat_query(kbid, req)
+        async for new_query_data in generator:
             new_query_elements.append(new_query_data)
 
         new_query = (b"".join(new_query_elements)).decode()
@@ -135,11 +136,13 @@ async def chat_post_knowledgebox(
         user_id=x_nucliadb_user, context=context, question=item.query
     )
 
+    ident, generator = await predict.chat_query(kbid, chat_model)
+
     async def generate_answer(
         results: KnowledgeboxFindResults,
         kbid: str,
         predict: PredictEngine,
-        chat_model: ChatModel,
+        generator: AsyncIterator[bytes],
         features: List[ChatOptions],
     ):
         if ChatOptions.PARAGRAPHS in features:
@@ -148,7 +151,7 @@ async def chat_post_knowledgebox(
             yield bytes_results
 
         answer = []
-        async for data in predict.chat_query(kbid, chat_model):
+        async for data in generator:
             answer.append(data)
             yield data
 
@@ -182,6 +185,10 @@ async def chat_post_knowledgebox(
             )
 
     return StreamingResponse(
-        generate_answer(results, kbid, predict, chat_model, item.features),
+        generate_answer(results, kbid, predict, generator, item.features),
         media_type="plain/text",
+        headers={
+            "NUCLIA-LEARNING-ID": ident,
+            "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
+        },
     )

@@ -480,6 +480,12 @@ class KnowledgeboxFindResults(BaseModel):
     shards: Optional[List[str]]
 
 
+class FeedbackTasks(str, Enum):
+    CHAT = "CHAT"
+
+
 class FeedbackRequest(BaseModel):
-    # TODO
-    pass
+    ident: str
+    good: bool
+    task: FeedbackTasks
+    feedback: Optional[str]

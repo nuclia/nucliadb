@@ -267,9 +267,8 @@ async def merge_paragraphs_vectors(
     # merged_paragrahs.sort(key=lambda r: r.score, reverse=True)
     init_position = count * page
     end_position = init_position + count
-    merged_paragrahs = merged_paragrahs[init_position:end_position]
-
     next_page = len(merged_paragrahs) > end_position
+    merged_paragrahs = merged_paragrahs[init_position:end_position]
 
     for merged_paragraph in merged_paragrahs:
         if merged_paragraph.vector_index is not None:
