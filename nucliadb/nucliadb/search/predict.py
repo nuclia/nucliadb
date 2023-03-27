@@ -24,9 +24,8 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
+from nucliadb.search.settings import PredictModelSettings
 from nucliadb_models.search import ChatModel, FeedbackRequest
-import pydantic
-from nucliadb_models import predict as predict_models
 
 
 class SendToPredictError(Exception):
@@ -51,13 +50,6 @@ SENTENCE = "/sentence"
 TOKENS = "/tokens"
 CHAT = "/chat"
 FEEDBACK = "/feedback"
-
-
-class PredictModelSettings(pydantic.BaseSettings):
-    predict_generative_model: Optional[predict_models.GenerativeModel] = None
-    predict_anonymization_model: Optional[predict_models.AnonimizationModel] = None
-    predict_semantic_model: Optional[predict_models.SemanticModel] = None
-    predict_ner_model: Optional[predict_models.NERModel] = None
 
 
 class PredictEngine:

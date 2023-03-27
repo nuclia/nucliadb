@@ -21,6 +21,8 @@ from typing import List, Optional
 
 from pydantic import BaseSettings
 
+from nucliadb_models import predict as predict_models
+
 
 class Settings(BaseSettings):
     driver: str = "redis"  # redis | tikv
@@ -33,3 +35,17 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class PredictModelSettings(BaseSettings):
+    """
+    Settings related to predict engine.
+
+    These settings enable someone running predict in standalone mode to
+    override the models used by the predict engine.
+    """
+
+    predict_generative_model: Optional[predict_models.GenerativeModel] = None
+    predict_anonymization_model: Optional[predict_models.AnonimizationModel] = None
+    predict_semantic_model: Optional[predict_models.SemanticModel] = None
+    predict_ner_model: Optional[predict_models.NERModel] = None
