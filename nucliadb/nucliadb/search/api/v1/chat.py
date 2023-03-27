@@ -187,5 +187,5 @@ async def chat_post_knowledgebox(
     return StreamingResponse(
         generate_answer(results, kbid, predict, generator, item.features),
         media_type="plain/text",
-        headers={"NNUCLIA-LEARNING-ID": ident},
+        headers={"NUCLIA-LEARNING-ID": ident},
     )
