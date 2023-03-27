@@ -66,7 +66,7 @@ class EntitiesManager:
         self.kbid = self.kb.kbid
 
     async def create_entities_group(self, group: str, entities: EntitiesGroup):
-        # XXX It's useful enough to check existence to return
+        # XXX: It's useful enough to check existence to return
         # if await self.entities_group_exists(group):
         #     raise AlreadyExists(f"Entities group {group} already exists")
 
@@ -117,7 +117,7 @@ class EntitiesManager:
             entities_group.entities[name].CopyFrom(entity)
 
         await self.store_entities_group(group, entities_group)
-        # XXX this is indexing everything. We could do it better indexing only diffs
+        # XXX: this is indexing everything. We could do it better indexing only diffs
         await self.index_entities_group(group, entities_group)
 
     async def set_entities_group(self, group: str, entities: EntitiesGroup):

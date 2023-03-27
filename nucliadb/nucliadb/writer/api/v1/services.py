@@ -46,6 +46,7 @@ from nucliadb_models.entities import (
 )
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.responses import HTTPConflict, HTTPNotFound
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet
 from nucliadb_telemetry.utils import set_info_on_span
@@ -131,10 +132,9 @@ async def create_entities_group(
     if status.status == NewEntitiesGroupResponse.Status.OK:
         return
     elif status.status == NewEntitiesGroupResponse.Status.KB_NOT_FOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+        return HTTPNotFound(detail="Knowledge Box does not exist")
     elif status.status == NewEntitiesGroupResponse.Status.ALREADY_EXISTS:
-        raise HTTPException(
-            status_code=409,
+        return HTTPConflict(
             detail=f"Entities group {item.group} already exists in this Knowledge box",
         )
     elif status.status == NewEntitiesGroupResponse.Status.ERROR:
@@ -181,9 +181,9 @@ async def update_entities_group(
     if status.status == UpdateEntitiesGroupResponse.Status.OK:
         return
     elif status.status == UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+        return HTTPNotFound(detail="Knowledge Box does not exist")
     elif status.status == UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND:
-        raise HTTPException(status_code=404, detail="Entities group does not exist")
+        return HTTPNotFound(detail="Entities group does not exist")
     elif status.status == UpdateEntitiesGroupResponse.Status.ERROR:
         raise HTTPException(
             status_code=500, detail="Error on settings entities on a Knowledge box"
