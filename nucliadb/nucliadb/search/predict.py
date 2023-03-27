@@ -25,6 +25,8 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
 from nucliadb_models.search import ChatModel, FeedbackRequest
+import pydantic
+from nucliadb_models import predict as predict_models
 
 
 class SendToPredictError(Exception):
@@ -51,6 +53,13 @@ CHAT = "/chat"
 FEEDBACK = "/feedback"
 
 
+class PredictModelSettings(pydantic.BaseSettings):
+    predict_generative_model: Optional[predict_models.GenerativeModel] = None
+    predict_anonymization_model: Optional[predict_models.AnonimizationModel] = None
+    predict_semantic_model: Optional[predict_models.SemanticModel] = None
+    predict_ner_model: Optional[predict_models.NERModel] = None
+
+
 class PredictEngine:
     def __init__(
         self,
@@ -69,6 +78,8 @@ class PredictEngine:
             self.public_url = None
         self.zone = zone
         self.onprem = onprem
+        self.model_settings = PredictModelSettings()
+
         self.dummy = dummy
         # TODO: Should we accumulate sentences requested,
         # or is this only for testing purposes?
@@ -139,10 +150,14 @@ class PredictEngine:
                 raise SendToPredictError(error)
             # Upload the payload
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            params = {}
+            if self.model_settings.predict_semantic_model is not None:
+                params["model"] = self.model_settings.predict_semantic_model
             resp = await self.session.post(
                 url=f"{self.public_url}{PUBLIC_PREDICT}{CHAT}",
                 json=item.dict(),
                 headers=headers,
+                params=params,
             )
             if resp.status != 200:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
@@ -173,9 +188,13 @@ class PredictEngine:
                 return []
             # Upload the payload
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            params = {"text": sentence}
+            if self.model_settings.predict_semantic_model is not None:
+                params["model"] = self.model_settings.predict_semantic_model
             resp = await self.session.get(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
+                url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}",
                 headers=headers,
+                params=params,
             )
             if resp.status == 200:
                 data = await resp.json()
@@ -209,9 +228,15 @@ class PredictEngine:
                 return []
             # Upload the payload
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            params = {
+                "text": sentence,
+            }
+            if self.model_settings.predict_ner_model is not None:
+                params["model"] = self.model_settings.predict_ner_model
             resp = await self.session.get(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{TOKENS}?text={sentence}",
+                url=f"{self.public_url}{PUBLIC_PREDICT}{TOKENS}",
                 headers=headers,
+                params=params,
             )
             if resp.status == 200:
                 data = await resp.json()
