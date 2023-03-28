@@ -271,22 +271,30 @@ class ResourceBrain:
             # For each split of this field
 
             for index, vector in enumerate(vectors.vectors):
-                self.brain.paragraphs[field_key].paragraphs[
+                sparagraph = self.brain.paragraphs[field_key].paragraphs[
                     f"{self.rid}/{field_key}/{subfield}/{vector.start_paragraph}-{vector.end_paragraph}"
-                ].sentences[
+                ]
+                ssentence = sparagraph.sentences[
                     f"{self.rid}/{field_key}/{subfield}/{index}/{vector.start}-{vector.end}"
-                ].vector.extend(
-                    vector.vector
-                )
+                ]
+                ssentence.vector.extend(vector.vector)
 
         for index, vector in enumerate(vo.vectors.vectors):
-            self.brain.paragraphs[field_key].paragraphs[
+            paragraph = self.brain.paragraphs[field_key].paragraphs[
                 f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
-            ].sentences[
+            ]
+            sentence = paragraph.sentences[
                 f"{self.rid}/{field_key}/{index}/{vector.start}-{vector.end}"
-            ].vector.extend(
-                vector.vector
+            ]
+            sentence.vector.extend(vector.vector)
+            sentence.metadata.position.start = vector.start
+            sentence.metadata.position.end = vector.end
+
+            # does it make sense to copy forward paragraph values here?
+            sentence.metadata.position.page_number = (
+                paragraph.metadata.position.page_number
             )
+            sentence.metadata.position.index = paragraph.metadata.position.index
 
         for split in replace_splits:
             self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{split}")

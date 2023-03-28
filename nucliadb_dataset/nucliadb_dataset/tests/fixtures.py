@@ -78,7 +78,7 @@ def temp_folder():
 
 images.settings["gcs"] = {
     "image": "fsouza/fake-gcs-server",
-    "version": "v1.30.1",
+    "version": "1.44.1",
     "options": {
         "command": f"-scheme http -external-url http://{DOCKER_HOST}:4443 -port 4443",
         "ports": {"4443": "4443"},

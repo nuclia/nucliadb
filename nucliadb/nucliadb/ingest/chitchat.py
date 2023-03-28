@@ -114,6 +114,13 @@ class ChitchatNucliaDB:
                     else:
                         logger.debug("connection closed by writer")
                         break
+            except (
+                KeyboardInterrupt,
+                SystemExit,
+                asyncio.CancelledError,
+            ):  # pragma: no cover
+                logger.info("Exiting chitchat")
+                return
             except IOError as e:
                 logger.exception("Failed on chitchat", stack_info=True)
                 errors.capture_exception(e)
