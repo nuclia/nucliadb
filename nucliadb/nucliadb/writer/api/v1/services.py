@@ -37,7 +37,11 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
-from nucliadb.models.responses import HTTPConflict, HTTPNotFound
+from nucliadb.models.responses import (
+    HTTPConflict,
+    HTTPInternalServerError,
+    HTTPNotFound,
+)
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
 from nucliadb_models.entities import (
@@ -138,8 +142,8 @@ async def create_entities_group(
             detail=f"Entities group {item.group} already exists in this Knowledge box",
         )
     elif status.status == NewEntitiesGroupResponse.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on settings entities on a Knowledge box"
+        return HTTPInternalServerError(
+            detail="Error on settings entities on a Knowledge box"
         )
 
 
@@ -185,8 +189,8 @@ async def update_entities_group(
     elif status.status == UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND:
         return HTTPNotFound(detail="Entities group does not exist")
     elif status.status == UpdateEntitiesGroupResponse.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on settings entities on a Knowledge box"
+        return HTTPInternalServerError(
+            detail="Error on settings entities on a Knowledge box"
         )
 
 

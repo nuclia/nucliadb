@@ -27,18 +27,19 @@ class Response(JSONResponse):
 class HTTPNotFound(Response):
     status_code = 404
 
-    def __init__(
-        self,
-        detail: str,
-    ):
+    def __init__(self, detail: str):
         super().__init__(content=detail, status_code=self.status_code)
 
 
 class HTTPConflict(Response):
     status_code = 409
 
-    def __init__(
-        self,
-        detail: str,
-    ):
+    def __init__(self, detail: str):
+        super().__init__(content=detail, status_code=self.status_code)
+
+
+class HTTPInternalServerError(Response):
+    status_code = 500
+
+    def __init__(self, detail: str):
         super().__init__(content=detail, status_code=self.status_code)
