@@ -154,7 +154,7 @@ def create_resource(
         for vector in vectors:
             vector_id = vector.key if vector.key is not None else uuid4().hex
             if vectorsets is not None and vector.vectorset not in vectorsets.vectorsets:
-                logger.warn("Vectorset is not created, we will create it for you")
+                logger.warning("Vectorset is not created, we will create it for you")
                 vectorsets.vectorsets[vector.vectorset] = VectorSet(
                     dimension=len(vector.value)
                 )
@@ -230,7 +230,7 @@ def update_resource(
                 )
             elif isinstance(label, str):
                 if label.count("/") != 1:
-                    logger.warn(f"Labelset default linked to label {label}")
+                    logger.warning(f"Labelset default linked to label {label}")
                     labelset = DEFAULT_LABELSET
                     label_str = label
                 else:
@@ -278,7 +278,7 @@ def update_resource(
         for vector in vectors:
             vector_id = vector.key if vector.key is not None else uuid4().hex
             if vectorsets is not None and vector.vectorset not in vectorsets.vectorsets:
-                logger.warn("Vectorset is not created, we will create it for you")
+                logger.warning("Vectorset is not created, we will create it for you")
                 vectorsets.vectorsets[vector.vectorset] = VectorSet(
                     dimension=len(vector.value)
                 )

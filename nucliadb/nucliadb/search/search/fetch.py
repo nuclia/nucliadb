@@ -153,7 +153,7 @@ async def get_text_sentence(
     orm_resource = await get_resource_from_cache(kbid, rid)
 
     if orm_resource is None:
-        logger.warn(f"{rid} does not exist on DB")
+        logger.warning(f"{rid} does not exist on DB")
         return ""
 
     field_type_int = KB_REVERSE[field_type]
@@ -192,7 +192,7 @@ async def get_text_paragraph(
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warn(
+        logger.warning(
             f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
         )
         return ""

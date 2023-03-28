@@ -101,10 +101,10 @@ class TransactionUtility:
 
     async def stop_waiting(self, kbid: str, request_id: str):
         if self.pubsub is None:
-            logger.warn("No PubSub configured")
+            logger.warning("No PubSub configured")
             return
         if self.notify_subject is None:
-            logger.warn("No subject defined")
+            logger.warning("No subject defined")
             return
         await self.pubsub.unsubscribe(
             key=self.notify_subject.format(kbid=kbid), subscription_id=request_id
@@ -114,11 +114,11 @@ class TransactionUtility:
         self, kbid: str, waiting_for: WaitFor, request_id: str
     ) -> Optional[Event]:
         if self.notify_subject is None:
-            logger.warn("Not waiting because there is not subject to wait")
+            logger.warning("Not waiting because there is not subject to wait")
             return None
 
         if self.pubsub is None:
-            logger.warn("No PubSub configured")
+            logger.warning("No PubSub configured")
             return None
 
         def received(waiting_for: WaitFor, event: Event, raw_data: bytes):

@@ -53,7 +53,7 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
     extracted_text = await field_obj.get_extracted_text()
     field_metadata = await field_obj.get_field_metadata()
     if extracted_text is None:
-        logger.warn(
+        logger.warning(
             f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
         )
         return []

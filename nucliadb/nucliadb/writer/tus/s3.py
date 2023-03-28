@@ -56,7 +56,7 @@ class S3FileStorageManager(FileStorageManager):
                 Bucket=self.storage.bucket, Key=upload_file_id, UploadId=mpu["UploadId"]
             )
         except Exception:
-            logger.warn("Could not abort multipart upload", exc_info=True)
+            logger.warning("Could not abort multipart upload", exc_info=True)
 
     async def start(self, dm: FileDataMangaer, path: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
@@ -171,7 +171,7 @@ class S3FileStorageManager(FileStorageManager):
             try:
                 await self.storage._s3aioclient.delete_object(Bucket=bucket, Key=uri)
             except botocore.exceptions.ClientError:
-                logger.warn("Error deleting object", exc_info=True)
+                logger.warning("Error deleting object", exc_info=True)
         else:
             raise AttributeError("No valid uri")
 

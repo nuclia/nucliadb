@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import tempfile
 from io import StringIO
 from typing import Any, List, Optional, Union
@@ -223,8 +224,8 @@ class NucliaDBClient:
 
     def init_async_grpc(self):
         if self.writer_stub_async is not None:
-            logger.warn("Exists already a writer, replacing on the new loop")
-            self.writer_channel_async.close()
+            logger.warning("Exists already a writer, replacing on the new loop")
+            asyncio.ensure_future(self.writer_channel_async.close())
 
         max_send_message = 1024
         grpc_addr = f"{self.grpc_host}:{self.grpc_port}"
@@ -245,6 +246,6 @@ class NucliaDBClient:
 
     def finish_async_grpc(self):
         if self.writer_stub_async is None:
-            logger.warn("Writer does not exist")
+            logger.warning("Writer does not exist")
         self.writer_stub_async = None
         self.writer_channel_async.close()

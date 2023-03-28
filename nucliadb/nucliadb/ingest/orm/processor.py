@@ -325,7 +325,7 @@ class Processor:
         uuid = await self.get_resource_uuid(kb, message)
         shard_id = await kb.get_resource_shard_id(uuid)
         if shard_id is None:
-            logger.warn(f"Resource {uuid} does not exist")
+            logger.warning(f"Resource {uuid} does not exist")
         else:
             node_klass = get_node_klass()
             shard: Optional[Shard] = await kb.get_resource_shard(shard_id, node_klass)
@@ -433,7 +433,7 @@ class Processor:
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
-                logger.warn(f"This message did not modify the resource")
+                logger.warning(f"This message did not modify the resource")
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. The exception will be reraised at the end of the function

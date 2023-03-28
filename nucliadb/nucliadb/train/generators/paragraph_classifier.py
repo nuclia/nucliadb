@@ -56,7 +56,7 @@ async def get_paragraph(kbid: str, result: str) -> str:
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warn(
+        logger.warning(
             f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
         )
         return ""
