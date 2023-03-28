@@ -62,7 +62,9 @@ class AbstractShard(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def delete_resource(self, uuid: str, txid: int, partition: str):  # pragma: no cover
+    async def delete_resource(
+        self, uuid: str, txid: int, partition: str
+    ):  # pragma: no cover
         pass
 
     @abstractmethod
