@@ -37,6 +37,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.models.responses import HTTPConflict, HTTPNotFound
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
 from nucliadb_models.entities import (
@@ -46,7 +47,6 @@ from nucliadb_models.entities import (
 )
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.responses import HTTPConflict, HTTPNotFound
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet
 from nucliadb_telemetry.utils import set_info_on_span
