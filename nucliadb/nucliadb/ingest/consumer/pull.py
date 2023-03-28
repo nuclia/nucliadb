@@ -195,7 +195,7 @@ class PullWorker:
     async def subscription_worker(self, msg: Msg):
         if len(NODES) == 0:
             logger.warning(
-                "Waiting for nodes to be discovered before processing any messages"
+                "Waiting for nodes to be discovered through chitchat before processing any messages"
             )
             # use in_progress instead of a nak since a nak can put the
             # message behind another message and ordering matters
