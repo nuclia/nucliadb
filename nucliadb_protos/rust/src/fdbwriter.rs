@@ -481,6 +481,7 @@ pub struct Shards {
     pub shards: ::prost::alloc::vec::Vec<ShardObject>,
     #[prost(string, tag="2")]
     pub kbid: ::prost::alloc::string::String,
+    /// current shard that resources index to
     #[prost(int32, tag="3")]
     pub actual: i32,
     #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
