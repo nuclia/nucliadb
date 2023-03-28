@@ -25,7 +25,7 @@ Telemetry enabled
 
 The line `Telemetry enabled` disappears when you disable it.
 
-## Which data are collected?
+## Which data is collected?
 
 We collect the minimum amount of information to respect privacy. Here are the data collected:
 

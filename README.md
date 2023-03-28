@@ -14,20 +14,20 @@
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
 </p>
-<h3 align="center">The database for data scientists and machine learning engineers working with HuggingFace and other data pipelines</h3>
+<h3 align="center">The database for data scientists and machine learning experts working with HuggingFace and other data pipelines platforms.</h3>
 
 <h4 align="center">
-  <a href="docs/getting-started/quickstart.md">Quickstart</a> |
-  <a href="docs/">Docs</a> |
-  <a href="docs/tutorials">Tutorials</a> |
+  <a href="https://docs.nuclia.dev/docs/nucliadb/intro">Quickstart</a> |
+  <a href="https://docs.nuclia.dev/docs/intro">Nuclia Docs</a> |
+  <a href="docs/">NuclicDB Developer docs</a> |
   <a href="https://discord.gg/AgevjFJUvk">Chat</a>
 </h4>
 
-### Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
+> Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to learn about what we have been up to.
 
-As a data scientist or NLP person your hard-drive is probably full of datasets and corpora. So, if you have found yourself crashing a notebook trying to load something too big with Pandas, doing way too many shuffles in your shell just to explore your data a bit, or just not really knowing how to perform a better search through your dataset, this is a tool for you.
+As a data scientist or NLP engineer your hard-drive is probably full of datasets and corpora. If you have found yourself crashing a notebook trying to load something too big with Pandas, doing gymnastics in your shell just to explore your data or just not really knowing how to perform robust search through your dataset, this is a tool for you.
 
-NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index big datasets and provide multi-teanant suport.
+NucliaDB is written in Rust and Python and built on top of the [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index large datasets and provide multi-teanant suport.
 
 
 ## Component code coverage
@@ -44,18 +44,18 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 
 
 # Features
-- Compare the vectors from different models in a super easy way.
-- Store text, files and vectors, labels and annotations.
-- Access and modify your resources efficiently.
-- Annotate your resources.
-- Perform text searches, given a word or set of words, return resources in our database that contain them.
-- Perform semantic searches with vectors, that is, given a set of vectors return the closest matches in our database. In an NLP use case, this allows us to look for similar sentences without being constrained by exact keywords
+- Compare the vectors from different models in an easy way
+- Store text, files, vectors, labels and annotations
+- Access and modify your resources efficiently
+- Annotate your resources
+- Perform text searches and given a word or set of words, return resources in our database that contain them.
+- Perform semantic searches with vectors. For example, given a set of vectors, return the closest matches in our database. With NLP, this allows us to look for similar sentences without being constrained by exact keywords.
 - Export your data in a format compatible with most NLP pipelines (HuggingFace datasets, pytorch, etc)
-- Store original data, extracting and understanding data on object and blob storage
+- Store original data, extracting and data pulled from the Understanding API
 - Index fields, paragraphs, and semantic sentences on index storage
-- Cloud extraction and understanding with Nuclia Understanding API™
+- Cloud data and insight extraction with the Nuclia Understanding API™
 - Cloud connection to train ML models with Nuclia Learning API™
-- Container security based with Reader, Manager, Writer Roles
+- Role based security system with upstream proxy authentication validation
 - Resources with multiple fields and metadata
 - Text/HTML/Markdown plain fields support
 - File field support with direct upload and TUS upload
@@ -63,16 +63,12 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 - Conversation field support
 - Blocks/Layout field support
 - Eventual consistency transactions based on Nats.io
-- Distributed source of truth with TiKV and Redis support
-- Blob support with S3-compatible API and GCS
+- Distributed storage layer support with TiKV and Redis support
+- PostgreSQL storage layer support for standalone installs
+- Blob support with S3-compatible API, GCS and PG drivers
 - Replication of index storage
 - Distributed search
-- Cloud-native: Kubernetes only
-
-## Upcomming Features
-
-- Blob support with Azure Blob storage
-- Index relations on index storage
+- Cloud-native
 
 ## Architecture
 
@@ -85,11 +81,11 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 Trying NucliaDB is super easy! You can extend your knowledge with the
 following readings:
 
-- [Run NucliaDB with docker with a single command!](docs/getting-started/quickstart.md)
+- [Quick start!](https://docs.nuclia.dev/docs/nucliadb/intro)
 - Join forces with Nuclia to run [NucliaDB with unlimited power](docs/getting-started/limitless-nucliadb-with-nuclia.md)
-- We use own concepts as Knowledge Box in NucliaDB, so ensure you read about [our basic concepts](docs/getting-started/basic-concepts.md)
-- Further dive into our [tutorials](docs/tutorials),
-  [reference](docs/reference) or [internal](docs/internal) documentation
+- Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/nucliadb/basics) section
+- Dive deeper with our [tutorials](docs/tutorials),
+  [reference](docs/reference) or [internal](docs/internal)
 
 ## API Tutorials
 
@@ -106,7 +102,7 @@ following readings:
 
 ## How is NucliaDB different from traditional search engines like Elasticsearch or Solr?
 
-The core difference and advantage of NucliaDB is its architecture built from the ground up for cloud and unstructured data. Its vector index plus standard keyword and fuzzy search provide an API to use all extracted and learned information from Nuclia, understanding API and provide super NLP powers to any application with low code and peace of mind.
+The core difference and advantage of NucliaDB is its architecture built from the ground up for unstructured data. Its vector index, keyword, graph and fuzzy search provide an API to use all extracted and extracted information from Nuclia, Understanding API and provides powerful NLP abilities to any application with low code and peace of mind.
 
 ## What license does NucliaDB use?
 
@@ -118,9 +114,8 @@ Our business model relies on our normalization API, this one is based on `Nuclia
 
 # 🤝 Contribute and spread the word
 
-We are always super happy to have contributions: code, documentation, issues, feedback, or even saying hello on discord! Here is how you can get started:
+We are always happy to have contributions: code, documentation, issues, feedback, or even saying hello on discord! Here is how you can get started:
 
-- Have a look through GitHub issues labeled "Good first issue".
 - Read our [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md)
 - Create a fork of NucliaDB and submit your pull request!
 
