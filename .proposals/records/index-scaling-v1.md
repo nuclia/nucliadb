@@ -1,15 +1,15 @@
-# Node Scaling: Decoupling disk, reads/writes 
+# Index Scaling: Decoupling disk, reads/writes 
 
-This proposal focuses on decoupling shard disk storage from the nodes
+This proposal focuses on decoupling shard disk storage from the IndexNodes
 they are being written to and also enables scaling reads separately from writes.
 
 It primarily accomplishes this by using a replicated shared write storage layer and allowing
-read replicas of the storage layer to enable easier ownership of shards and being able to
-scale read replicas separately from writes.
+read replicas of the file storage layer to enable decoupled ownership of shard data. This enables\
+scaling index read replicas separately from writes.
 
 
 *Goals*:
-- Allow short term scaling needs of node and search requests
+- Allow short term scaling needs of IndexNode and search requests
 - Allow to scale reads separately from writes without rebalancing churn
 - Minimize impact of strategy on existing design to validate strategy without too much refactoring churn
 
@@ -30,22 +30,27 @@ scale read replicas separately from writes.
 - Shard: the storage of a knowledge box's indexes(keyword, bm25, graph, vector).
   We currently store multiple replicas of a knowledge box's indexes
   across different nodes.
-- Node: Storage, writer, reader and node coordinator(sidecar) for a set of shards
+- Node: Storage, writer, reader and node coordinator(sidecar) for a set of shards that
+  contain index data. This is separate from resource data.
+- IndexNode: For the purpose of this proposal and to prevent confusion around naming,
+  a node will be called `IndexNode`
+- IndexNodeReaderReplica: Different from shard replica, this refers to a deployment replica
+  that will contained a copy of index data for many shards.
 
 
 ## Current solution/situation
 
-Currently, a node is deployed for writes(indexing) and reads(searching) for a set
+Currently, an IndexNode is deployed for writes(indexing) and reads(searching) for a set
 of shards. Each shard is replicated and read(search) requests are typically
-round robin load balanced against the nodes that hold replicas.
+round robin load balanced against the IndexNodes that hold replicas.
 
 Scaling this design requires the following:
-- scale disk: spread shards across more nodes
-- scale disk: physically copy/move shards around between nodes to rebalance
-- scale write CPU: spread shards out and move shards around between nodes to balance
-- scale read CPU: increase replicas
+- scale disk: spread shards across more IndexNodes
+- scale disk: physically copy/move shards around between IndexNodes to rebalance
+- scale write CPU: spread shards out and move shards around between IndexNodes to balance
+- scale read CPU: increase shard replicas
 
-The persistent storage for our node data is on a local disk owned by the node so
+The persistent storage for our IndexNode data is on a local disk owned by the IndexNode so
 scaling would involve a lot of moving data around and then locking of data
 while sychronization was happening.
 
@@ -62,14 +67,15 @@ flowchart TD
     LocalDisk --> ShardReplicaZ
 ```
 
-Each indexing operation happens on each replica a resource is on
+Each indexing operation happens on each shard replica a resource is on
 
-Then, search requests are round robin balanced against the nodes a knowledge box replicas are located on(2 replicas typically):
+Finally, search requests are round robin load balanced against the IndexNodes a knowledge box
+shard replicas are located on(2 shard replicas typically):
 
 ```mermaid
 flowchart TD
-    Search --> KBNodeReplica1
-    Search --> KBNodeReplica2
+    Search --> KBIndexNodeReplica1
+    Search --> KBIndexNodeReplica2
 ```
 
 
@@ -82,14 +88,14 @@ architecture and allows us to test/gather feedback on feasability quickly.
 
 Every write to a shard's data files should also be written to GCS(Google Cloud Storage).
 
-A shard's local disk is the primary write location; however, these data
+A IndexNode's local disk is the primary write location; however, these data
 files will also be copied to GCS on a configurable interval.
 
 
 #### Write replication:
 
-On a node, in phase 1, use file system events to detect changes and manage
-synchonizing data to write storage.
+On an IndexNode, in phase 1, use file system events to detect changes and manage
+synchonizing data to write storage, writes will be synchronized to GCS.
 
 ```mermaid
 flowchart TB
@@ -102,7 +108,7 @@ flowchart TB
 
 #### Read storage replication:
 
-Read replicas then consume writes finished events from NATS and use that
+Read replicas then consume write finished events from NATS and use that
 to know when to sync changes from GCS.
 
 ```mermaid
@@ -111,12 +117,12 @@ flowchart LR
     ReadReplicator-- sync GCS files --->Disk
 ```
 
-`write in progress` events notify the reader replica that the current shard it maintains is stale
+`write in progress` events notify the IndexNodeReaderReplica that the current shard it maintains is stale
 
 
-### Reader "replicas"
+### IndexNodeReaderReplica
 
-To start off, this proposal suggests we implement reader replicas with a
+To start off, this proposal suggests we implement IndexNodeReaderReplicas with a
 stateless architecture consistent hashing keyring distribution.
 
 Benefits:
@@ -126,29 +132,31 @@ Benefits:
 
 
 Drawbacks:
-- CPU distribution will likely be uneven; however, as we get manage more data, it is possible this will even out
+- CPU distribution will likely be uneven; however, as we manage more data,
+  it is possible this will even out
 
 
 ### Search readiness
 
 Since there is a lag between when an index is written to and when the data is repliced
-and available in a reader replica, a reader replica will maintain state on the
-readiness of a shard. If a write is in progress, the replica will be considered not ready
-and can reject the request. In this scenario, the client will redirect search requests
-to the leader node that has the source of truth for index data.
+and available in a IndexNodeReaderReplica, a IndexNodeReaderReplica will maintain state on the
+readiness of each shard. If a write is in progress, the shard will be considered not ready
+and the IndexNodeReaderReplica can reject the request. In this scenario, the client will
+retry the search requests to the leader IndexNode that has the source of truth for index data.
 
 ```mermaid
 sequenceDiagram
-    SearchClient->>ReaderReplica: Search Request
-    ReaderReplica->>SearchClient: Ready, fullfil
-    ReaderReplica-->>SearchClient: Reject, not ready
+    SearchClient->>IndexNodeReaderReplica: Search Request
+    IndexNodeReaderReplica->>SearchClient: Ready, fullfil
+    IndexNodeReaderReplica-->>SearchClient: Reject, not ready
     SearchClient->>LeaderNode: Search Request
 ```
 
 
 Tunable parameters:
 - shard replicas: number of nodes a shard should be repliced on
-- deployment size: number of readers, this determines keyring size. Should be odd number like 1, 3 or 5, etc.
+- deployment size: number of IndexNodeReaderReplica, this determines keyring size.
+  Should be odd number like 1, 3 or 5, etc.
 
 
 Example 1:
@@ -169,13 +177,13 @@ Example 2:
 We still have the problem where a single node is having difficulty keeping up with the
 amount of writes going to it and we need to rebalance the shards it is managing.
 
-> :warning: Keep in mind, writes are handling in a single, sequential stream on the
-  node so if writes are falling behind, it is because we have too active of shards
-  on a single node, not necessarily that nodes are too large. In this scenario, write
-  scaling is more about CPU and write speed on a single pipe.
+> :warning: Keep in mind, writes are handled in a single, sequential stream on the
+  IndexNode so if writes are falling behind, it is because we have too active of shards
+  on a single IndexNode, not necessarily that nodes are too large. In this scenario, write
+  scaling is more about CPU and write speed on a single pipe. WE CAN ADJUST HOW THIS SCALES AS WELL.
 
 
-In the scenario where a shards needs to be moved to be owned by different node, the
+In the scenario where a data shards needs to be moved to be owned by different IndexNode, the
 sequencing is the following:
 
 1. Lock shard: forward all indexing messages to shard mover stream
@@ -192,7 +200,7 @@ Phase 1 will focus on an approach with limited impact on the existing implementa
 
 Writer disk changes will be detected by file system events, md5 checks and disk scanning.
 
-Reader replicas will be managed through stateless consistent hashing and round robin
+IndexNodeReaderReplicas will be managed through stateless consistent hashing and round robin
 search requests against readers.
 
 Validate metrics.
@@ -208,9 +216,9 @@ replicas at this layer.
 ### Phase 3: Re-evaluate reader consistent hasing sharding strategy
 
 Evaluate how even of CPU usage distribution is achieved by consistent hashing
-of reader replicas.
+of IndexNodeReaderReplicas.
 
-If other phases complete, move on to state managemet of reader replicas to manage shard load balancing.
+If other phases complete, move on to state managemet of IndexNodeReaderReplicas to manage shard load balancing.
 
 ## Key metrics
 
