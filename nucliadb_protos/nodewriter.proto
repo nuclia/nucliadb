@@ -21,15 +21,26 @@ message OpStatus {
 
 // Implemented at nucliadb_object_storage
 
+enum TypeMessage {
+    CREATION = 0;
+    DELETION = 1;
+}
+
 message IndexMessage {
     string node = 1;
     string shard = 2;
     uint64 txid = 3;
     string resource = 4;
-    enum TypeMessage {
-        CREATION = 0;
-        DELETION = 1;
-    }
+    TypeMessage typemessage = 5;
+    string reindex_id = 6;
+    optional string partition = 7;
+}
+
+message IndexedMessage {
+    string node = 1;
+    string shard = 2;
+    uint64 txid = 3;
+    string resource = 4;
     TypeMessage typemessage = 5;
     string reindex_id = 6;
 }

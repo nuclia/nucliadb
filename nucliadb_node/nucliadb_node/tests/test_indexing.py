@@ -21,27 +21,28 @@ import asyncio
 from datetime import datetime
 from typing import Optional
 
+import nats
 import pytest
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nucliadb_protos.nodewriter_pb2 import IndexedMessage, IndexMessage, TypeMessage
 
 from nucliadb_node import SERVICE_NAME, shadow_shards
 from nucliadb_node.app import App
-from nucliadb_node.settings import settings
+from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.shadow_shards import OperationCode
-from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import get_storage
+
+TEST_PARTITION = "111"
 
 
 @pytest.mark.asyncio
 async def test_indexing(sidecar: App, shard: str):
     node = settings.force_host_id
-    assert node is not None
 
     resource = resource_payload(shard)
-    index = await create_indexing_message(resource, shard)
-    await send_indexing_message(sidecar, index, node)
+    index = await create_indexing_message(resource, shard, node)
+    await send_indexing_message(sidecar, index, node)  # type: ignore
 
     sipb = ShardId()
     sipb.id = shard
@@ -72,12 +73,11 @@ async def test_indexing(sidecar: App, shard: str):
 @pytest.mark.asyncio
 async def test_indexing_not_found(sidecar: App):
     node = settings.force_host_id
-    assert node is not None
-
     shard = "fake-shard"
+
     resource = resource_payload(shard)
-    index = await create_indexing_message(resource, shard)
-    await send_indexing_message(sidecar, index, node)
+    index = await create_indexing_message(resource, shard, node)
+    await send_indexing_message(sidecar, index, node)  # type: ignore
 
     sipb = ShardId()
     sipb.id = shard
@@ -89,32 +89,17 @@ async def test_indexing_not_found(sidecar: App):
 @pytest.mark.asyncio
 async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str):
     node_id = settings.force_host_id
-    pb = resource_payload(shadow_shard)
 
     # Add a set resource operation
-    storage = await get_storage(service_name=SERVICE_NAME)
-    assert settings.force_host_id is not None
-    index: IndexMessage = await storage.indexing(pb, node_id, shadow_shard, 1)  # type: ignore
+    pb = resource_payload(shadow_shard)
+    setpb = await create_indexing_message(pb, shadow_shard, node_id)
+    await send_indexing_message(sidecar, setpb, node_id)  # type: ignore
 
     # Add a delete operation
-    deletepb: IndexMessage = IndexMessage()
-    deletepb.node = node_id  # type: ignore
-    deletepb.shard = shadow_shard
-    deletepb.txid = 123
-    deletepb.resource = "bar"
-    deletepb.typemessage = IndexMessage.TypeMessage.DELETION
+    deletepb = delete_indexing_message("bar", shadow_shard, node_id)  # type: ignore
+    await send_indexing_message(sidecar, deletepb, node_id)  # type: ignore
 
-    # Push them on stream
-    assert indexing_settings.index_jetstream_target is not None
-    await sidecar.worker.js.publish(
-        indexing_settings.index_jetstream_target.format(node=node_id),
-        index.SerializeToString(),
-    )
-    await sidecar.worker.js.publish(
-        indexing_settings.index_jetstream_target.format(node=node_id),
-        deletepb.SerializeToString(),
-    )
-
+    # Check that they were stored in a shadow shard
     ssm = shadow_shards.get_manager()
 
     ops = []
@@ -134,15 +119,39 @@ async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str)
 
     # Check that indexing messages have been deleted from storage
     storage = await get_storage(service_name=SERVICE_NAME)
-    with pytest.raises(KeyError):
-        await storage.get_indexing(index)
+    for indexpb in (setpb, deletepb):
+        with pytest.raises(KeyError):
+            await storage.get_indexing(indexpb)
+
+
+@pytest.mark.asyncio
+async def test_indexing_publishes_to_sidecar_index_stream(
+    sidecar: App, shard: str, natsd
+):
+    node_id = settings.force_host_id
+    assert node_id
+
+    indexpb = await create_indexing_message(resource_payload(shard), shard, node_id)
+
+    await send_indexing_message(sidecar, indexpb, node_id)  # type: ignore
+
+    msg = await get_indexed_message(natsd)
+
+    assert msg.subject == f"indexed.{TEST_PARTITION}"
+    indexedpb = IndexedMessage()
+    indexedpb.ParseFromString(msg.data)
+    assert indexedpb.node == indexpb.node
+    assert indexedpb.shard == indexpb.shard
+    assert indexedpb.txid == indexpb.txid
+    assert indexedpb.typemessage == indexpb.typemessage
+    assert indexedpb.reindex_id == indexpb.reindex_id
 
 
 def resource_payload(shard: str) -> Resource:
     pb = Resource()
     pb.shard_id = shard
     pb.resource.shard_id = shard
-    pb.resource.uuid = "1"
+    pb.resource.uuid = "uuid"
     pb.metadata.modified.FromDatetime(datetime.now())
     pb.metadata.created.FromDatetime(datetime.now())
     pb.texts["title"].text = "My title"
@@ -159,11 +168,20 @@ def resource_payload(shard: str) -> Resource:
     return pb
 
 
-async def create_indexing_message(resource: Resource, shard: str) -> IndexMessage:
+def delete_indexing_message(uuid: str, shard: str, node_id: str):
+    deletepb: IndexMessage = IndexMessage()
+    deletepb.node = node_id
+    deletepb.shard = shard
+    deletepb.txid = 123
+    deletepb.resource = uuid
+    deletepb.typemessage = TypeMessage.DELETION
+    return deletepb
+
+
+async def create_indexing_message(resource: Resource, shard: str, node) -> IndexMessage:
     storage = await get_storage(service_name=SERVICE_NAME)
-    assert settings.force_host_id is not None
     index: IndexMessage = await storage.indexing(
-        resource, settings.force_host_id, shard, 1
+        resource, node, shard, txid=1, partition=TEST_PARTITION
     )
     return index
 
@@ -175,3 +193,34 @@ async def send_indexing_message(sidecar: App, index: IndexMessage, node: str):
         indexing_settings.index_jetstream_target.format(node=node),
         index.SerializeToString(),
     )
+
+
+async def get_indexed_message(natsd):
+    nc = await nats.connect(servers=[natsd])
+    future = asyncio.Future()
+
+    async def cb(msg):
+        nonlocal future
+        future.set_result(msg)
+
+    js = nc.jetstream()
+    await js.subscribe(
+        stream=indexing_settings.indexed_jetstream_stream,
+        subject=indexing_settings.indexed_jetstream_target.format(
+            partition=TEST_PARTITION
+        ),
+        queue="indexed-{partition}".format(partition=TEST_PARTITION),
+        cb=cb,
+        config=nats.js.api.ConsumerConfig(
+            deliver_policy=nats.js.api.DeliverPolicy.NEW,
+        ),
+    )
+    msg = None
+    try:
+        msg = await asyncio.wait_for(future, 1)
+    except TimeoutError:
+        pass
+    finally:
+        await nc.flush()
+        await nc.close()
+        return msg

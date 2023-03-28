@@ -23,8 +23,6 @@ pub mod op_status {
         Error = 2,
     }
 }
-// Implemented at nucliadb_object_storage
-
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexMessage {
     #[prost(string, tag="1")]
@@ -35,19 +33,27 @@ pub struct IndexMessage {
     pub txid: u64,
     #[prost(string, tag="4")]
     pub resource: ::prost::alloc::string::String,
-    #[prost(enumeration="index_message::TypeMessage", tag="5")]
+    #[prost(enumeration="TypeMessage", tag="5")]
     pub typemessage: i32,
     #[prost(string, tag="6")]
     pub reindex_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag="7")]
+    pub partition: ::core::option::Option<::prost::alloc::string::String>,
 }
-/// Nested message and enum types in `IndexMessage`.
-pub mod index_message {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum TypeMessage {
-        Creation = 0,
-        Deletion = 1,
-    }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IndexedMessage {
+    #[prost(string, tag="1")]
+    pub node: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub shard: ::prost::alloc::string::String,
+    #[prost(uint64, tag="3")]
+    pub txid: u64,
+    #[prost(string, tag="4")]
+    pub resource: ::prost::alloc::string::String,
+    #[prost(enumeration="TypeMessage", tag="5")]
+    pub typemessage: i32,
+    #[prost(string, tag="6")]
+    pub reindex_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetGraph {
@@ -92,6 +98,14 @@ pub struct NewVectorSetRequest {
     pub id: ::core::option::Option<super::noderesources::VectorSetId>,
     #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
     pub similarity: i32,
+}
+// Implemented at nucliadb_object_storage
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum TypeMessage {
+    Creation = 0,
+    Deletion = 1,
 }
 /// Generated client implementations.
 pub mod node_writer_client {

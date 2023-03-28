@@ -331,7 +331,7 @@ class Processor:
             shard: Optional[Shard] = await kb.get_resource_shard(shard_id, node_klass)
             if shard is None:
                 raise AttributeError("Shard not available")
-            await shard.delete_resource(message.uuid, seqid)
+            await shard.delete_resource(message.uuid, seqid, partition)
             try:
                 await kb.delete_resource(message.uuid)
             except Exception as exc:
@@ -407,7 +407,9 @@ class Processor:
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
-                    counter = await shard.add_resource(resource.indexer.brain, seqid)
+                    counter = await shard.add_resource(
+                        resource.indexer.brain, seqid, partition=partition
+                    )
                     if (
                         counter is not None
                         and counter.fields > settings.max_node_fields

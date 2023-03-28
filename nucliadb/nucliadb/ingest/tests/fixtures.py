@@ -66,7 +66,7 @@ from nucliadb_utils.utilities import (
 
 @pytest.fixture(scope="function")
 async def processor(redis_driver, gcs_storage, cache, audit):
-    proc = Processor(redis_driver, gcs_storage, audit, cache, 1)
+    proc = Processor(redis_driver, gcs_storage, audit, cache, partition="1")
     await proc.initialize()
     yield proc
     await proc.finalize()
@@ -74,7 +74,7 @@ async def processor(redis_driver, gcs_storage, cache, audit):
 
 @pytest.fixture(scope="function")
 async def stream_processor(redis_driver, gcs_storage, cache, stream_audit):
-    proc = Processor(redis_driver, gcs_storage, stream_audit, cache, 1)
+    proc = Processor(redis_driver, gcs_storage, stream_audit, cache, partition="1")
     await proc.initialize()
     yield proc
     await proc.finalize()

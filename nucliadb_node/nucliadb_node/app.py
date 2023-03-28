@@ -34,11 +34,10 @@ from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
 from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
-from nucliadb_node.settings import settings
+from nucliadb_node.settings import running_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
-from nucliadb_utils.settings import running_settings
 
 
 class App:
