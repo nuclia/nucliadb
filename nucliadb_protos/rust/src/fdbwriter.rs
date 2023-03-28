@@ -232,10 +232,13 @@ pub struct UpdateEntitiesGroupRequest {
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
     #[prost(string, tag="2")]
     pub group: ::prost::alloc::string::String,
+    /// entity_id: Entity
     #[prost(map="string, message", tag="3")]
     pub add: ::std::collections::HashMap<::prost::alloc::string::String, super::knowledgebox::Entity>,
+    /// entity_id: Entity
     #[prost(map="string, message", tag="4")]
     pub update: ::std::collections::HashMap<::prost::alloc::string::String, super::knowledgebox::Entity>,
+    /// entity_id
     #[prost(string, repeated, tag="5")]
     pub delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }

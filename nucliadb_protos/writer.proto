@@ -176,9 +176,16 @@ message SetEntitiesRequest {
 
 message UpdateEntitiesGroupRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
+
     string group = 2;
+
+    // entity_id: Entity
     map<string, knowledgebox.Entity> add = 3;
+
+    // entity_id: Entity
     map<string, knowledgebox.Entity> update = 4;
+
+    // entity_id
     repeated string delete = 5;
 }
 

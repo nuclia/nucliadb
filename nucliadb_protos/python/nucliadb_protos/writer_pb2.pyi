@@ -793,11 +793,14 @@ class UpdateEntitiesGroupRequest(google.protobuf.message.Message):
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     group: builtins.str
     @property
-    def add(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.knowledgebox_pb2.Entity]: ...
+    def add(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.knowledgebox_pb2.Entity]:
+        """entity_id: Entity"""
     @property
-    def update(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.knowledgebox_pb2.Entity]: ...
+    def update(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.knowledgebox_pb2.Entity]:
+        """entity_id: Entity"""
     @property
-    def delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """entity_id"""
     def __init__(
         self,
         *,
