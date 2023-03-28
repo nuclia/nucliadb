@@ -82,7 +82,6 @@ def config_nucliadb(nucliadb_args: Settings):
     ingest_settings.total_replicas = 1
     ingest_settings.replica_number = 0
     ingest_settings.partitions = ["1"]
-    running_settings.debug = True
     nuclia_settings.onprem = True
     http_settings.cors_origins = ["*"]
     nucliadb_settings.nucliadb_ingest = None
