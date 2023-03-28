@@ -251,7 +251,6 @@ async def test_list_entities_groups(
     assert len(body["groups"]["ANIMALS"]["entities"]) == 0
 
 
-@pytest.mark.skip(reason="Worth implementing this?")
 async def test_create_entities_group_twice(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
