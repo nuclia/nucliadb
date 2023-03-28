@@ -193,7 +193,7 @@ class PullWorker:
             await self.nc.close()
 
     async def subscription_worker(self, msg: Msg):
-        if len(NODES) == 0:
+        while len(NODES) == 0:
             logger.warning(
                 "Waiting for nodes to be discovered through chitchat before processing any messages"
             )
