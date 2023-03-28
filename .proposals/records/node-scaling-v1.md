@@ -51,7 +51,7 @@ while sychronization was happening.
 
 Node design:
 
-::: mermaid
+```mermaid
 flowchart TD
     Reader --> LocalDisk
     Writer --> LocalDisk
@@ -60,17 +60,17 @@ flowchart TD
     LocalDisk --> ShardReplicaX
     LocalDisk --> ShardReplicaY
     LocalDisk --> ShardReplicaZ
-:::
+```
 
 Each indexing operation happens on each replica a resource is on
 
 Then, search requests are round robin balanced against the nodes a knowledge box replicas are located on(2 replicas typically):
 
-::: mermaid
+```mermaid
 flowchart TD
     Search --> KBNodeReplica1
     Search --> KBNodeReplica2
-:::
+```
 
 
 ## Proposed Solution
@@ -91,13 +91,13 @@ files will also be copied to GCS on a configurable interval.
 On a node, in phase 1, use file system events to detect changes and manage
 synchonizing data to write storage.
 
-::: mermaid
+```mermaid
 flowchart TB
     Disk-- shard changes --->WriteReplicator
     WriteReplicator-- write in progress --->NATS
     WriteReplicator-- wait interval --->GCS
     WriteReplicator-- write finished event --->NATS
-:::
+```
 
 
 #### Read storage replication:
@@ -105,11 +105,11 @@ flowchart TB
 Read replicas then consume writes finished events from NATS and use that
 to know when to sync changes from GCS.
 
-::: mermaid
+```mermaid
 flowchart LR
     NATS-- write finished event --->ReadReplicator
     ReadReplicator-- sync GCS files --->Disk
-:::
+```
 
 `write in progress` events notify the reader replica that the current shard it maintains is stale
 
@@ -137,13 +137,13 @@ readiness of a shard. If a write is in progress, the replica will be considered 
 and can reject the request. In this scenario, the client will redirect search requests
 to the leader node that has the source of truth for index data.
 
-::: mermaid
+```mermaid
 sequenceDiagram
     SearchClient->>ReaderReplica: Search Request
     ReaderReplica->>SearchClient: Ready, fullfil
     ReaderReplica-->>SearchClient: Reject, not ready
     SearchClient->>LeaderNode: Search Request
-:::
+```
 
 
 Tunable parameters:
