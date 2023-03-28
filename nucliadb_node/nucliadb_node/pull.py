@@ -41,7 +41,7 @@ from nucliadb_node import SERVICE_NAME, logger, shadow_shards
 from nucliadb_node.reader import Reader
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
-from nucliadb_telemetry import errors
+from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.storages.storage import Storage
@@ -51,6 +51,8 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction,
 )
+
+subscriber_observer = metrics.Observer("message_processor")
 
 
 class Worker:
@@ -216,6 +218,7 @@ class Worker:
         if pb.typemessage == TypeMessage.CREATION:
             await self.storage.delete_indexing(pb)
 
+    @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
