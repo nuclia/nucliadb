@@ -221,7 +221,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
             callback = self._cleanup_callbacks.pop()
             callback()
         if not self._mode and not self.skipped:
-            self._logger.warn(
+            self._logger.warning(
                 "Benchmark fixture was not used at all in this test!",
                 warner=self._warner,
                 suspend=True,

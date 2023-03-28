@@ -233,7 +233,7 @@ class Worker:
 
             except KeyError as storage_error:
                 errors.capture_exception(storage_error)
-                logger.warn(
+                logger.warning(
                     "Error retrieving the indexing payload we do not block as that means its already deleted"
                 )
             except Exception as e:

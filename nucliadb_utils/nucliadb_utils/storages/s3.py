@@ -106,7 +106,7 @@ class S3StorageField(StorageField):
                 Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
             )
         except Exception:
-            logger.warn("Could not abort multipart upload", exc_info=True)
+            logger.warning("Could not abort multipart upload", exc_info=True)
 
     async def start(self, cf: CloudFile) -> CloudFile:
         if self.field is not None and self.field.upload_uri is not None:
@@ -192,7 +192,7 @@ class S3StorageField(StorageField):
                 logger.error(
                     f"Referenced key {self.field.uri} could not be found", exc_info=True
                 )
-                logger.warn("Error deleting object", exc_info=True)
+                logger.warning("Error deleting object", exc_info=True)
 
         if self.field.resumable_uri is not None:
             await self._complete_multipart_upload()
@@ -344,7 +344,7 @@ class S3Storage(Storage):
             try:
                 await self._s3aioclient.delete_object(Bucket=bucket, Key=uri)
             except botocore.exceptions.ClientError:
-                logger.warn("Error deleting object", exc_info=True)
+                logger.warning("Error deleting object", exc_info=True)
         else:
             raise AttributeError("No valid uri")
 
