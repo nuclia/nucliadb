@@ -240,7 +240,7 @@ class PullWorker:
                         await self.processor.process(pb, seqid, self.partition)
                 except SequenceOrderViolation as err:
                     log_func = logger.error
-                    if seqid == err.last_seqid:
+                    if seqid == err.last_seqid:  # pragma: no cover
                         # Occasional retries of the last processed message may happen
                         log_func = logger.warning
                     log_func(
