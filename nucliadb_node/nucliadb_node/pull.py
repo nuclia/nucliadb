@@ -44,6 +44,7 @@ from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -54,6 +55,7 @@ from nucliadb_utils.utilities import (
 
 class Worker:
     subscriptions: List[Subscription]
+    storage: Storage
 
     def __init__(
         self,
