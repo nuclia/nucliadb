@@ -383,10 +383,9 @@ class IndexedPublisher:
         indexedpb.resource = indexpb.resource
         indexedpb.typemessage = indexpb.typemessage
         indexedpb.reindex_id = indexpb.reindex_id
-        await self.js.publish(
-            self.subject.format(partition=indexpb.partition),
-            indexedpb.SerializeToString(),
-        )
+        subject = self.subject.format(partition=indexpb.partition)
+        await self.js.publish(subject, indexedpb.SerializeToString())
+        logger.info(f"Published to indexed stream {subject}")
         return
 
 
