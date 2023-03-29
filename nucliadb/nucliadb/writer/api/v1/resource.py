@@ -188,7 +188,7 @@ async def create_resource(
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=402, detail=str(exc))
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
 
@@ -281,7 +281,7 @@ async def modify_resource(
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=402, detail=str(exc))
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
 
@@ -358,7 +358,7 @@ async def reprocess_resource(
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=402, detail=str(exc))
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
 

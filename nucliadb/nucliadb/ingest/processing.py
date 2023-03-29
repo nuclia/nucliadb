@@ -332,16 +332,6 @@ class ProcessingEngine:
             resp = await self.session.post(
                 url=f"{self.nuclia_internal_push}", data=item.json(), headers=headers
             )
-            if resp.status == 200:
-                data = await resp.json()
-                seqid = data.get("seqid")
-                account_seq = data.get("account_seq")
-                queue_type = data.get("queue")
-            elif resp.status == 402:
-                data = await resp.json()
-                raise LimitsExceededError(data["detail"])
-            else:
-                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         else:
             headers.update({"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"})
             # Upload the payload
@@ -350,16 +340,17 @@ class ProcessingEngine:
                 data=item.json(),
                 headers=headers,
             )
-            if resp.status == 200:
-                data = await resp.json()
-                seqid = data.get("seqid")
-                account_seq = data.get("account_seq")
-                queue_type = data.get("queue")
-            elif resp.status == 402:
-                data = await resp.json()
-                raise LimitsExceededError(data["detail"])
-            else:
-                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
+        if resp.status == 200:
+            data = await resp.json()
+            seqid = data.get("seqid")
+            account_seq = data.get("account_seq")
+            queue_type = data.get("queue")
+        elif resp.status in (402, 413):
+            data = await resp.json()
+            raise LimitsExceededError(resp.status, data["detail"])
+        else:
+            raise SendToProcessError(f"{resp.status}: {await resp.text()}")
+
         logger.info(
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
                 ingest seqid: {seqid}, partition: {partition}"
