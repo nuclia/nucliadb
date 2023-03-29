@@ -10,6 +10,7 @@
 [![Discord](https://img.shields.io/discord/911636727150575649?logo=Discord&logoColor=%23FFFFFF&style=plastic)](https://discord.gg/6wMQ8a3bHX)
 ![Rust](https://img.shields.io/badge/Rust-black?logo=rust&style=plastic)
 ![Python](https://img.shields.io/badge/Python-black?logo=python&style=plastic)
+[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=search)](https://codecov.io/gh/nuclia/nucliadb)
 
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
@@ -28,19 +29,6 @@
 As a data scientist or NLP engineer your hard-drive is probably full of datasets and corpora. If you have found yourself crashing a notebook trying to load something too big with Pandas, doing gymnastics in your shell just to explore your data or just not really knowing how to perform robust search through your dataset, this is a tool for you.
 
 NucliaDB is written in Rust and Python and built on top of the [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index large datasets and provide multi-teanant suport.
-
-
-## Component code coverage
-
-|Module|Coverage|
-|------|--------|
-|search|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=search)](https://codecov.io/gh/nuclia/nucliadb)|
-|reader|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=reader)](https://codecov.io/gh/nuclia/nucliadb)|
-|writer|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=writer)](https://codecov.io/gh/nuclia/nucliadb)|
-|ingest|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=ingest)](https://codecov.io/gh/nuclia/nucliadb)|
-|one|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=one)](https://codecov.io/gh/nuclia/nucliadb)|
-|sidecar|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=node-sidecar)](https://codecov.io/gh/nuclia/nucliadb)|
-|utils|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=utils)](https://codecov.io/gh/nuclia/nucliadb)|
 
 
 # Features
