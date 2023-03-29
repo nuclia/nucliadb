@@ -55,6 +55,7 @@ from nucliadb_utils.utilities import (
 
 class Worker:
     subscriptions: List[Subscription]
+    storage: Storage
 
     def __init__(
         self,
@@ -109,6 +110,7 @@ class Worker:
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
+        self.storage = await get_storage(service_name=SERVICE_NAME)
         await self.ssm.load()
         self.event.clear()
         await self.subscriber_initialize()
@@ -183,10 +185,8 @@ class Worker:
         except FileNotFoundError:
             return None
 
-    async def set_resource(
-        self, pb: IndexMessage, storage: Storage
-    ) -> Optional[OpStatus]:
-        brain: Resource = await storage.get_indexing(pb)
+    async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+        brain: Resource = await self.storage.get_indexing(pb)
         is_shadow_shard = self.ssm.exists(pb.shard)
         logger.info(
             f"Added [shadow={is_shadow_shard}] {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
@@ -212,6 +212,10 @@ class Worker:
         logger.info(f"...done")
         return status
 
+    async def cleanup_storage(self, pb: IndexMessage):
+        if pb.typemessage == TypeMessage.CREATION:
+            await self.storage.delete_indexing(pb)
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -219,7 +223,6 @@ class Worker:
         logger.info(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
-        storage = await get_storage(service_name=SERVICE_NAME)
         self.event.clear()
 
         status: Optional[OpStatus] = None
@@ -228,7 +231,7 @@ class Worker:
                 pb = IndexMessage()
                 pb.ParseFromString(msg.data)
                 if pb.typemessage == TypeMessage.CREATION:
-                    status = await self.set_resource(pb, storage)
+                    status = await self.set_resource(pb)
                 elif pb.typemessage == TypeMessage.DELETION:
                     status = await self.delete_resource(pb)
                 if status:
@@ -259,7 +262,7 @@ class Worker:
             self.store_seqid(seqid)
             await msg.ack()
             self.event.set()
-            await storage.delete_indexing(pb)
+            await self.cleanup_storage(pb)
             await self.publisher.indexed(pb)
         except Exception as e:
             errors.capture_exception(e)
@@ -382,10 +385,9 @@ class IndexedPublisher:
         indexedpb.resource = indexpb.resource
         indexedpb.typemessage = indexpb.typemessage
         indexedpb.reindex_id = indexpb.reindex_id
-        await self.js.publish(
-            self.subject.format(partition=indexpb.partition),
-            indexedpb.SerializeToString(),
-        )
+        subject = self.subject.format(partition=indexpb.partition)
+        await self.js.publish(subject, indexedpb.SerializeToString())
+        logger.info(f"Published to indexed stream {subject}")
         return
 
 
