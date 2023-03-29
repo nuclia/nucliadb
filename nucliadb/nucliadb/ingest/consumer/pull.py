@@ -239,11 +239,13 @@ class PullWorker:
                     ):
                         await self.processor.process(pb, seqid, self.partition)
                 except SequenceOrderViolation as err:
-                    log_message = f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). Current seqid: {err.last_seqid}"  # noqa
-                    if seqid != err.last_seqid:
-                        logger.error(log_message)
-                    else:
-                        logger.warning(log_message)
+                    log_func = logger.error
+                    if seqid == err.last_seqid:
+                        # Occasional retries of the last processed message may happen
+                        log_func = logger.warning
+                    log_func(
+                        f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). Current seqid: {err.last_seqid}"  # noqa
+                    )
                 else:
                     message_type_name = pb.MessageType.Name(pb.type)
                     logger.info(
