@@ -92,7 +92,9 @@ class LocalNode(AbstractNode):
         return LocalShard(sharduuid=shard_id, shard=pbshard, node=node)
 
     @classmethod
-    async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[LocalShard]:
+    async def get_current_active_shard(
+        cls, txn: Transaction, kbid: str
+    ) -> Optional[LocalShard]:
         key = KB_SHARDS.format(kbid=kbid)
         kb_shards_bytes: Optional[bytes] = await txn.get(key)
         if kb_shards_bytes is not None:

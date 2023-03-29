@@ -107,6 +107,8 @@ class Shard(AbstractShard):
                 counter: Counter = await NODES[node_id].sidecar.GetCount(ShardId(id=replica_id))  # type: ignore
                 shard_counter = ShardCounter(
                     shard=self.sharduuid,
+                    # even though counter returns a `resources` value here,
+                    # `resources` here from a shard is actually more like `fields`
                     fields=counter.resources,
                     paragraphs=counter.paragraphs,
                 )

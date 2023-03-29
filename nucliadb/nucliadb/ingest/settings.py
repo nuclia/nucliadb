@@ -88,8 +88,10 @@ class Settings(BaseSettings):
     sidecar_port_map: Dict[int, int] = {}
 
     # Node limits
-    max_node_fields: int = 200000
-    max_node_shards: int = 600
+    max_shard_fields: int = 200000  # max number of fields to target per shard
+    max_node_replicas: int = (
+        600  # max number of shard replicas a single node will manage
+    )
 
     local_reader_threads = 5
     local_writer_threads = 5
