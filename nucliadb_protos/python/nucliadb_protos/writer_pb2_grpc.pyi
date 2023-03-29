@@ -195,9 +195,9 @@ class WriterStub:
         nucliadb_protos.writer_pb2.SetVectorSetRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
-    ListEntitiesGroups: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.ListEntitiesGroupsRequest,
-        nucliadb_protos.writer_pb2.ListEntitiesGroupsResponse,
+    NewEntitiesGroup: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.NewEntitiesGroupRequest,
+        nucliadb_protos.writer_pb2.NewEntitiesGroupResponse,
     ]
     """Entities"""
     GetEntities: grpc.UnaryUnaryMultiCallable[
@@ -208,9 +208,17 @@ class WriterStub:
         nucliadb_protos.writer_pb2.GetEntitiesGroupRequest,
         nucliadb_protos.writer_pb2.GetEntitiesGroupResponse,
     ]
+    ListEntitiesGroups: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.ListEntitiesGroupsRequest,
+        nucliadb_protos.writer_pb2.ListEntitiesGroupsResponse,
+    ]
     SetEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetEntitiesRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
+    UpdateEntitiesGroup: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.UpdateEntitiesGroupRequest,
+        nucliadb_protos.writer_pb2.UpdateEntitiesGroupResponse,
     ]
     DelEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelEntitiesRequest,
@@ -379,11 +387,11 @@ class WriterServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
     @abc.abstractmethod
-    def ListEntitiesGroups(
+    def NewEntitiesGroup(
         self,
-        request: nucliadb_protos.writer_pb2.ListEntitiesGroupsRequest,
+        request: nucliadb_protos.writer_pb2.NewEntitiesGroupRequest,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.ListEntitiesGroupsResponse:
+    ) -> nucliadb_protos.writer_pb2.NewEntitiesGroupResponse:
         """Entities"""
     @abc.abstractmethod
     def GetEntities(
@@ -398,11 +406,23 @@ class WriterServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetEntitiesGroupResponse: ...
     @abc.abstractmethod
+    def ListEntitiesGroups(
+        self,
+        request: nucliadb_protos.writer_pb2.ListEntitiesGroupsRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.ListEntitiesGroupsResponse: ...
+    @abc.abstractmethod
     def SetEntities(
         self,
         request: nucliadb_protos.writer_pb2.SetEntitiesRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
+    @abc.abstractmethod
+    def UpdateEntitiesGroup(
+        self,
+        request: nucliadb_protos.writer_pb2.UpdateEntitiesGroupRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.UpdateEntitiesGroupResponse: ...
     @abc.abstractmethod
     def DelEntities(
         self,

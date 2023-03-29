@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator, Dict, Optional, Set, Tuple
+from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
@@ -45,7 +45,7 @@ from nucliadb.ingest.maindb.keys import (
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
 )
-from nucliadb.ingest.orm.exceptions import NodeError
+from nucliadb.ingest.orm.exceptions import AlreadyExists, NodeError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.nodes_manager import NodesManager
@@ -65,21 +65,28 @@ class EntitiesManager:
         self.txn = txn
         self.kbid = self.kb.kbid
 
+    async def create_entities_group(self, group: str, entities: EntitiesGroup):
+        if await self.entities_group_exists(group):
+            raise AlreadyExists(f"Entities group {group} already exists")
+
+        await self.store_entities_group(group, entities)
+        await self.index_entities_group(group, entities)
+
     async def get_entities(self, entities: GetEntitiesResponse):
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
             entities.groups[group].CopyFrom(eg)
-
-    async def get_entities_groups(self) -> Dict[str, EntitiesGroup]:
-        groups = {}
-        async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
-            groups[group] = eg
-        return groups
 
     async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         deleted = await self.is_entities_group_deleted(group)
         if deleted:
             return None
         return await self.get_entities_group_inner(group)
+
+    async def get_entities_groups(self) -> Dict[str, EntitiesGroup]:
+        groups = {}
+        async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
+            groups[group] = eg
+        return groups
 
     async def list_entities_groups(self) -> Dict[str, EntitiesGroupSummary]:
         groups = {}
@@ -95,7 +102,24 @@ class EntitiesManager:
                 groups[group] = EntitiesGroupSummary()
         return groups
 
-    async def set_entities(self, group: str, entities: EntitiesGroup):
+    async def update_entities(self, group: str, entities: Dict[str, Entity]):
+        """Update entities on an entity group. New entities are appended and existing
+        are overwriten. Existing entities not appearing in `entities` are left
+        intact. Use `delete_entities` to delete them instead.
+
+        """
+        entities_group = await self.get_stored_entities_group(group)
+        if entities_group is None:
+            raise KeyError(f"Entities group '{group}' doesn't exist")
+
+        for name, entity in entities.items():
+            entities_group.entities[name].CopyFrom(entity)
+
+        await self.store_entities_group(group, entities_group)
+        # XXX: this is indexing everything. We could do it better indexing only diffs
+        await self.index_entities_group(group, entities_group)
+
+    async def set_entities_group(self, group: str, entities: EntitiesGroup):
         indexed = await self.get_indexed_entities_group(group)
         if indexed is None:
             updated = entities
@@ -111,12 +135,24 @@ class EntitiesManager:
         await self.store_entities_group(group, updated)
         await self.index_entities_group(group, updated)
 
-    async def set_entities_force(self, group: str, entitiesgroup: EntitiesGroup):
+    async def set_entities_group_force(self, group: str, entitiesgroup: EntitiesGroup):
         await self.store_entities_group(group, entitiesgroup)
         await self.index_entities_group(group, entitiesgroup)
 
-    async def del_entities(self, group: str):
-        await self.delete_entities_group(group)
+    async def delete_entities(self, group: str, delete: List[str]):
+        entities_group = await self.get_stored_entities_group(group)
+        if entities_group is None:
+            return
+        for name in delete:
+            if name in entities_group.entities:
+                entity = entities_group.entities[name]
+                entity.deleted = True
+        await self.store_entities_group(group, entities_group)
+        # TODO: we should remove indexed entities here
+
+    async def delete_entities_group(self, group: str):
+        await self.delete_stored_entities_group(group)
+        await self.mark_entities_group_as_deleted(group)
 
     # Private API
 
@@ -126,7 +162,7 @@ class EntitiesManager:
         if (stored is None) and (indexed is None):
             # If an entitiesgroup appears without stored or indexed entities,
             # most probably the node is reporting a node subtype with no nodes
-            # or a wrongwentitiesgroup is being searched
+            # or a wrong entitiesgroup is being searched
             logger.warning(f"Suspicious entities group without entities: '{group}'")
             entities_group = EntitiesGroup()
         elif stored is not None and indexed is not None:
@@ -201,7 +237,7 @@ class EntitiesManager:
             return True
 
         indexed = await self.get_indexed_entities_group(group)
-        if indexed:
+        if indexed is not None:
             return True
 
         return False
@@ -231,34 +267,41 @@ class EntitiesManager:
             visited_groups.add(group)
 
         # indexed groups
+        indexed_groups = await self.get_indexed_entities_groups_names()
+        for group in indexed_groups:
+            if (exclude_deleted and group in deleted_groups) or group in visited_groups:
+                continue
+            yield group
+            visited_groups.add(group)
+
+    async def get_indexed_entities_groups_names(self) -> Set[str]:
         driver = await get_driver()
         cache = await get_cache()
         nodes_manager = NodesManager(driver=driver, cache=cache)
 
-        async def get_indexed_entities_group_names(
+        async def query_indexed_entities_group_names(
             node: Node, shard_id: str, node_id: str
         ) -> TypeList:
             return await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
 
         results = await nodes_manager.apply_for_all_shards(
-            self.kbid, get_indexed_entities_group_names, settings.relation_types_timeout
+            self.kbid,
+            query_indexed_entities_group_names,
+            settings.relation_types_timeout,
         )
         for result in results:
             if isinstance(result, Exception):
                 errors.capture_exception(result)
                 raise NodeError("Error while looking for relations types")
 
+        indexed_groups = set()
         for relation_types in results:
             for item in relation_types.list:
                 if item.with_type != RelationNode.NodeType.ENTITY:
                     continue
                 group = item.with_subtype
-                if (
-                    exclude_deleted and group in deleted_groups
-                ) or group in visited_groups:
-                    continue
-                yield group
-                visited_groups.add(group)
+                indexed_groups.add(group)
+        return indexed_groups
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
         key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
@@ -269,10 +312,6 @@ class EntitiesManager:
     async def is_entities_group_deleted(self, group: str):
         deleted_groups = await self.get_deleted_entities_groups()
         return group in deleted_groups
-
-    async def delete_entities_group(self, group: str):
-        await self.delete_stored_entities_group(group)
-        await self.mark_entities_group_as_deleted(group)
 
     async def delete_stored_entities_group(self, group: str):
         entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)

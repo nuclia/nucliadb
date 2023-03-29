@@ -218,7 +218,7 @@ async def test_pagination_resources(
     entities_manager = EntitiesManager(kb, txn)
     entities = EntitiesGroup()
     entities.entities["entity1"].value = "PERSON"
-    await entities_manager.set_entities_force("group1", entities)
+    await entities_manager.set_entities_group_force("group1", entities)
 
     # Add ontology
     labelset = LabelSet()
