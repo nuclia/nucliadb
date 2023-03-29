@@ -193,6 +193,31 @@ pub struct GetLabelsRequest {
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewEntitiesGroupRequest {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(string, tag="2")]
+    pub group: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="3")]
+    pub entities: ::core::option::Option<super::knowledgebox::EntitiesGroup>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewEntitiesGroupResponse {
+    #[prost(enumeration="new_entities_group_response::Status", tag="1")]
+    pub status: i32,
+}
+/// Nested message and enum types in `NewEntitiesGroupResponse`.
+pub mod new_entities_group_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        Error = 1,
+        KbNotFound = 2,
+        AlreadyExists = 3,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetEntitiesRequest {
     #[prost(message, optional, tag="1")]
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
@@ -200,6 +225,38 @@ pub struct SetEntitiesRequest {
     pub group: ::prost::alloc::string::String,
     #[prost(message, optional, tag="3")]
     pub entities: ::core::option::Option<super::knowledgebox::EntitiesGroup>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateEntitiesGroupRequest {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(string, tag="2")]
+    pub group: ::prost::alloc::string::String,
+    /// entity_id: Entity
+    #[prost(map="string, message", tag="3")]
+    pub add: ::std::collections::HashMap<::prost::alloc::string::String, super::knowledgebox::Entity>,
+    /// entity_id: Entity
+    #[prost(map="string, message", tag="4")]
+    pub update: ::std::collections::HashMap<::prost::alloc::string::String, super::knowledgebox::Entity>,
+    /// entity_id
+    #[prost(string, repeated, tag="5")]
+    pub delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdateEntitiesGroupResponse {
+    #[prost(enumeration="update_entities_group_response::Status", tag="1")]
+    pub status: i32,
+}
+/// Nested message and enum types in `UpdateEntitiesGroupResponse`.
+pub mod update_entities_group_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        Error = 1,
+        KbNotFound = 2,
+        EntitiesGroupNotFound = 3,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListEntitiesGroupsRequest {

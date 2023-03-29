@@ -26,16 +26,29 @@ from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
+    NewEntitiesGroupRequest,
+    NewEntitiesGroupResponse,
     OpStatusWriter,
     SetEntitiesRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
+    UpdateEntitiesGroupRequest,
+    UpdateEntitiesGroupResponse,
 )
 from starlette.requests import Request
 
+from nucliadb.models.responses import (
+    HTTPConflict,
+    HTTPInternalServerError,
+    HTTPNotFound,
+)
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
-from nucliadb_models.entities import EntitiesGroup
+from nucliadb_models.entities import (
+    CreateEntitiesGroupPayload,
+    EntitiesGroup,
+    UpdateEntitiesGroupPayload,
+)
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -51,6 +64,7 @@ from nucliadb_utils.utilities import get_ingest
     name="Set Knowledge Box Entities",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
+    deprecated=True,
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
@@ -83,6 +97,100 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
     elif status.status == OpStatusWriter.Status.ERROR:
         raise HTTPException(
             status_code=500, detail="Error on settings entities on a Knowledge box"
+        )
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/entitiesgroups",
+    status_code=200,
+    name="Create Knowledge Box Entities Group",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-operation_order": 1},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def create_entities_group(
+    request: Request, kbid: str, item: CreateEntitiesGroupPayload
+):
+    ingest = get_ingest()
+
+    pbrequest: NewEntitiesGroupRequest = NewEntitiesGroupRequest()
+    pbrequest.kb.uuid = kbid
+    pbrequest.group = item.group
+    pbrequest.entities.custom = True
+    if item.title:
+        pbrequest.entities.title = item.title
+    if item.color:
+        pbrequest.entities.color = item.color
+
+    for key, entity in item.entities.items():
+        entitypb = pbrequest.entities.entities[key]
+        entitypb.value = entity.value
+        entitypb.merged = entity.merged
+        entitypb.deleted = False
+        entitypb.represents.extend(entity.represents)
+
+    set_info_on_span({"nuclia.kbid": kbid})
+
+    status: NewEntitiesGroupResponse = await ingest.NewEntitiesGroup(pbrequest)  # type: ignore
+    if status.status == NewEntitiesGroupResponse.Status.OK:
+        return
+    elif status.status == NewEntitiesGroupResponse.Status.KB_NOT_FOUND:
+        return HTTPNotFound(detail="Knowledge Box does not exist")
+    elif status.status == NewEntitiesGroupResponse.Status.ALREADY_EXISTS:
+        return HTTPConflict(
+            detail=f"Entities group {item.group} already exists in this Knowledge box",
+        )
+    elif status.status == NewEntitiesGroupResponse.Status.ERROR:
+        return HTTPInternalServerError(
+            detail="Error on settings entities on a Knowledge box"
+        )
+
+
+@api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
+    status_code=200,
+    name="Update Knowledge Box Entities Group",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-operation_order": 2},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def update_entities_group(
+    request: Request, kbid: str, group: str, item: UpdateEntitiesGroupPayload
+):
+    ingest = get_ingest()
+
+    pbrequest: UpdateEntitiesGroupRequest = UpdateEntitiesGroupRequest()
+    pbrequest.kb.uuid = kbid
+    pbrequest.group = group
+
+    for name, entity in item.add.items():
+        entitypb = pbrequest.add[name]
+        entitypb.value = entity.value
+        entitypb.merged = entity.merged
+        entitypb.represents.extend(entity.represents)
+
+    for name, entity in item.update.items():
+        entitypb = pbrequest.update[name]
+        entitypb.value = entity.value
+        entitypb.merged = entity.merged
+        entitypb.represents.extend(entity.represents)
+
+    pbrequest.delete.extend(item.delete)
+
+    set_info_on_span({"nuclia.kbid": kbid})
+
+    status: UpdateEntitiesGroupResponse = await ingest.UpdateEntitiesGroup(pbrequest)  # type: ignore
+    if status.status == UpdateEntitiesGroupResponse.Status.OK:
+        return
+    elif status.status == UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND:
+        return HTTPNotFound(detail="Knowledge Box does not exist")
+    elif status.status == UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND:
+        return HTTPNotFound(detail="Entities group does not exist")
+    elif status.status == UpdateEntitiesGroupResponse.Status.ERROR:
+        return HTTPInternalServerError(
+            detail="Error on settings entities on a Knowledge box"
         )
 
 

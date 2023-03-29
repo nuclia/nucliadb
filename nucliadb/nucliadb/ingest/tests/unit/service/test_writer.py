@@ -517,7 +517,7 @@ class TestWriterServicer:
         ):
             resp = await writer.SetEntities(request)
 
-        entities_manager.set_entities.assert_called_once_with(
+        entities_manager.set_entities_group.assert_called_once_with(
             request.group, request.entities
         )
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
@@ -540,7 +540,7 @@ class TestWriterServicer:
         writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
 
         entities_manager = AsyncMock()
-        entities_manager.set_entities.side_effect = Exception("error")
+        entities_manager.set_entities_group.side_effect = Exception("error")
         with patch(
             "nucliadb.ingest.service.writer.EntitiesManager",
             return_value=entities_manager,
@@ -563,7 +563,7 @@ class TestWriterServicer:
         ):
             resp = await writer.DelEntities(request)
 
-        entities_manager.del_entities.assert_called_once_with(request.group)
+        entities_manager.delete_entities_group.assert_called_once_with(request.group)
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
 
     async def test_DelEntities_missing(self, writer: WriterServicer):
@@ -584,7 +584,7 @@ class TestWriterServicer:
         writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
 
         entities_manager = AsyncMock()
-        entities_manager.del_entities.side_effect = Exception("error")
+        entities_manager.delete_entities_group.side_effect = Exception("error")
         with patch(
             "nucliadb.ingest.service.writer.EntitiesManager",
             return_value=entities_manager,

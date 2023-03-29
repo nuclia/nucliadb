@@ -17,44 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from fastapi.responses import JSONResponse
 
 
-class NodeClusterSmall(Exception):
+class Response(JSONResponse):
     pass
 
 
-class KnowledgeBoxConflict(Exception):
-    pass
+class HTTPNotFound(Response):
+    status_code = 404
+
+    def __init__(self, detail: str):
+        super().__init__(content=detail, status_code=self.status_code)
 
 
-class ShardNotFound(Exception):
-    pass
+class HTTPConflict(Response):
+    status_code = 409
+
+    def __init__(self, detail: str):
+        super().__init__(content=detail, status_code=self.status_code)
 
 
-class KnowledgeBoxNotFound(Exception):
-    pass
+class HTTPInternalServerError(Response):
+    status_code = 500
 
-
-class NodesUnsync(Exception):
-    pass
-
-
-class NodeError(Exception):
-    pass
-
-
-class DeadletteredError(Exception):
-    pass
-
-
-class ReallyStopPulling(Exception):
-    pass
-
-
-class SequenceOrderViolation(Exception):
-    def __init__(self, last_seqid: int):
-        self.last_seqid = last_seqid
-
-
-class AlreadyExists(Exception):
-    pass
+    def __init__(self, detail: str):
+        super().__init__(content=detail, status_code=self.status_code)
