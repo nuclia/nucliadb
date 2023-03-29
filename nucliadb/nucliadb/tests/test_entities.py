@@ -280,7 +280,7 @@ async def test_update_entities_group(
     update = UpdateEntitiesGroupPayload(
         add={"seal": Entity(value="seal")},
         update={"dog": Entity(value="updated-dog")},
-        delete=["domestic-cat"],
+        delete=["domestic-cat", "dolphin"],
     )
     resp = await update_entities_group(nucliadb_writer, kbid, "ANIMALS", update)
     assert resp.status_code == 200
@@ -293,7 +293,6 @@ async def test_update_entities_group(
         "bird",
         "cat",
         "dog",
-        "dolphin",
         "seal",
     }
     assert body["entities"]["dog"]["value"] == "updated-dog"

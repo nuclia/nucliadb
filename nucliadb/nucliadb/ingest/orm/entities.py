@@ -140,14 +140,19 @@ class EntitiesManager:
         await self.index_entities_group(group, entitiesgroup)
 
     async def delete_entities(self, group: str, delete: List[str]):
-        entities_group = await self.get_stored_entities_group(group)
-        if entities_group is None:
+        stored = await self.get_stored_entities_group(group)
+        indexed = await self.get_indexed_entities_group(group)
+
+        if stored is None and indexed is None:
             return
+
+        stored = stored or EntitiesGroup()
+        indexed = indexed or EntitiesGroup()
         for name in delete:
-            if name in entities_group.entities:
-                entity = entities_group.entities[name]
+            if name in stored.entities or name in indexed.entities:
+                entity = stored.entities[name]
                 entity.deleted = True
-        await self.store_entities_group(group, entities_group)
+        await self.store_entities_group(group, stored)
         # TODO: we should remove indexed entities here
 
     async def delete_entities_group(self, group: str):
@@ -345,14 +350,9 @@ class EntitiesManager:
         `indexed` share entities. That's also true for common fields.
 
         """
-        merged_entities = dict(indexed.entities)
-
-        for name, entity in stored.entities.items():
-            # remove entities marked as deleted, as they not exists from the user point of view
-            if entity.deleted:
-                merged_entities.pop(name, None)
-            else:
-                merged_entities[name] = entity
+        merged_entities: Dict[str, Entity] = {}
+        merged_entities.update(indexed.entities)
+        merged_entities.update(stored.entities)
 
         merged = EntitiesGroup(
             entities=merged_entities,
