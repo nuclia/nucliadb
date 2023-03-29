@@ -57,16 +57,18 @@ class EntitiesGroup(BaseModel):
         cls: Type[_T],
         message: knowledgebox_pb2.EntitiesGroup,
     ) -> _T:
-        entitiesgroup = MessageToDict(
+        entities_group = MessageToDict(
             message,
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
+        entities_group["entities"] = {}
+
         for name, entity in message.entities.items():
             if not entity.deleted:
-                entitiesgroup["entities"][name] = Entity.from_message(entity)
+                entities_group["entities"][name] = Entity.from_message(entity)
 
-        return cls(**entitiesgroup)
+        return cls(**entities_group)
 
     @classmethod
     def from_summary_message(
