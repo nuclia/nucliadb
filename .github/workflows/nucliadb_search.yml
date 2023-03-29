@@ -88,15 +88,7 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb/requirements-sources.txt
-          pip install -r nucliadb/requirements.txt
-          pip install -e nucliadb
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/search
+        run: make -C nucliadb/ install-dev
 
       - uses: dorny/paths-filter@v2
         id: filter

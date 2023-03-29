@@ -20,7 +20,6 @@
 import logging
 
 import pkg_resources
-import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
@@ -32,7 +31,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
-from starlette.responses import HTMLResponse, PlainTextResponse
+from starlette.responses import HTMLResponse
 from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb.ingest.orm import NODES
@@ -121,11 +120,6 @@ async def homepage(request: Request) -> HTMLResponse:
     return HTMLResponse("NucliaDB Search Service")
 
 
-async def metrics(request: Request) -> PlainTextResponse:
-    output = prometheus_client.exposition.generate_latest()
-    return PlainTextResponse(output.decode("utf8"))
-
-
 async def chitchat_members(request: Request) -> JSONResponse:
     return JSONResponse(
         [
@@ -158,7 +152,6 @@ async def ready(request: Request) -> JSONResponse:
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/metrics", metrics)
 application.add_route("/chitchat/members", chitchat_members)
 application.add_route("/health/alive", alive)
 application.add_route("/health/ready", ready)

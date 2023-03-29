@@ -79,6 +79,8 @@ spec:
         - name: grpc-sidecar
           containerPort: {{ .Values.serving.grpc_sidecar }}
           protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         resources:
 {{ toYaml .Values.resources.sidecar | indent 10 }}
         volumeMounts:

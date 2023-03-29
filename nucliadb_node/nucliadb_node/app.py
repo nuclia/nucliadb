@@ -20,13 +20,15 @@
 
 import asyncio
 import logging
-import signal
 import sys
 import uuid
-from asyncio import tasks
-from typing import Callable, List
 
 import pkg_resources
+from nucliadb_telemetry import errors
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_utils.fastapi.run import serve_metrics
+from nucliadb_utils.run import run_until_exit
+from nucliadb_utils.utilities import get_ff
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
@@ -36,25 +38,10 @@ from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import running_settings, settings
 from nucliadb_node.writer import Writer
-from nucliadb_telemetry import errors
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
 
-class App:
-    writer: Writer
-    reader: Reader
-    worker: Worker
-    finalizers: List[Callable]
-
-    def __init__(self):
-        self.finalizers = []
-
-
-async def main() -> App:
-    writer = Writer(settings.writer_listen_address)
-    reader = Reader(settings.reader_listen_address)
-
-    if settings.force_host_id is None:
+async def start_worker(writer: Writer, reader: Reader) -> Worker:
+    if settings.force_host_id is None:  # pragma: no cover
         node = None
         i = 0
         while node is None and i < 20:
@@ -73,63 +60,47 @@ async def main() -> App:
     if node is None:
         raise Exception("No Key defined")
 
+    worker = Worker(writer=writer, reader=reader, node=node)
+    await worker.initialize()
+
+    return worker
+
+
+async def main():
+    writer = Writer(settings.writer_listen_address)
+    reader = Reader(settings.reader_listen_address)
+    worker = await start_worker(writer, reader)
+
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
 
-    logger.info(f"Node ID : {node}")
-
-    worker = Worker(writer=writer, reader=reader, node=node)
-    await worker.initialize()
+    logger.info(f"Node ID : {worker.node}")
 
     grpc_finalizer = await start_grpc(writer=writer, reader=reader)
 
     logger.info(f"======= Node sidecar started ======")
 
-    app = App()
-    app.worker = worker
-    app.writer = writer
-    app.reader = reader
+    metrics_server = await serve_metrics()
 
-    # Using ensure_future as Signal handlers
-    # cannot handle couroutines as callbacks
-    def stop_pulling():
-        logger.info("Received signal to stop pulling!")
-        asyncio.ensure_future(worker.finalize())
+    finalizers = [
+        grpc_finalizer,
+        worker.finalize,
+        metrics_server.shutdown,
+        writer.close,
+        reader.close,
+    ]
 
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGUSR1, stop_pulling)
+    if get_ff().enabled("nucliadb_node_sync_fs", default=False):
+        from nucliadb_node import write_sync
 
-    app.finalizers = [grpc_finalizer, worker.finalize]
+        finalizers.append(write_sync.start)
 
-    return app
-
-
-def _cancel_all_tasks(loop):
-    to_cancel = tasks.all_tasks(loop)
-    if not to_cancel:
-        return
-
-    for task in to_cancel:
-        task.cancel()
-
-    loop.run_until_complete(tasks.gather(*to_cancel, return_exceptions=True))
-
-    for task in to_cancel:
-        if task.cancelled():
-            continue
-        if task.exception() is not None:
-            loop.call_exception_handler(
-                {
-                    "message": "unhandled exception during asyncio.run() shutdown",
-                    "exception": task.exception(),
-                    "task": task,
-                }
-            )
+    await run_until_exit(finalizers)
 
 
-def run():
+def run():  # pragma: no cover
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb_node").version)
 
     logging.basicConfig(
@@ -142,29 +113,4 @@ def run():
     logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
     logging.getLogger("asyncio").setLevel(logging.ERROR)
 
-    if asyncio._get_running_loop() is not None:
-        raise RuntimeError("cannot be called from a running event loop")
-
-    loop = asyncio.new_event_loop()
-    app = None
-    try:
-        asyncio.set_event_loop(loop)
-        if running_settings.debug is not None:
-            loop.set_debug(running_settings.debug)
-        app = loop.run_until_complete(main())
-
-        loop.run_forever()
-    finally:
-        try:
-            if app is not None:
-                for finalizer in app.finalizers:
-                    if asyncio.iscoroutinefunction(finalizer):
-                        loop.run_until_complete(finalizer())
-                    else:
-                        finalizer()
-            _cancel_all_tasks(loop)
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.run_until_complete(loop.shutdown_default_executor())
-        finally:
-            asyncio.set_event_loop(None)
-            loop.close()
+    asyncio.run(main())

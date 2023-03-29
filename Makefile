@@ -60,21 +60,18 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_node
 	isort --profile black nucliadb_telemetry
 	isort --profile black nucliadb_dataset
 	isort --profile black nucliadb_client
 	isort --profile black nucliadb_sdk
 	isort --profile black nucliadb_models
 
-	black nucliadb_node
 	black nucliadb_telemetry
 	black nucliadb_dataset
 	black nucliadb_client
 	black nucliadb_sdk
 	black nucliadb_models
 
-	flake8  --config nucliadb_node/setup.cfg nucliadb_node/nucliadb_node
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
 	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
@@ -82,11 +79,13 @@ python-code-lint:
 	flake8  --config nucliadb_models/setup.cfg nucliadb_models/nucliadb_models
 
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
-	MYPYPATH=./mypy_stubs mypy nucliadb_node
 	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
 	MYPYPATH=./mypy_stubs mypy nucliadb_client
 	MYPYPATH=./mypy_stubs mypy nucliadb_models
 	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
+
+	make -C nucliadb_node/ format
+	make -C nucliadb_node/ lint
 
 	make -C nucliadb_utils/ format
 	make -C nucliadb_utils/ lint

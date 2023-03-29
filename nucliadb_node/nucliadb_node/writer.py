@@ -30,10 +30,10 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
-
-from nucliadb_node import SERVICE_NAME  # type: ignore
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry
+
+from nucliadb_node import SERVICE_NAME  # type: ignore
 
 
 class Writer:
@@ -66,3 +66,6 @@ class Writer:
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()
         return await self.stub.ListShards(pb)  # type: ignore
+
+    async def close(self):
+        await self.channel.close()

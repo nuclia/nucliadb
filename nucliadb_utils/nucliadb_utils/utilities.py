@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, List, Optional
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb_utils import logger
+from nucliadb_utils import featureflagging, logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -65,6 +65,7 @@ class Utility(str, Enum):
     STORAGE = "storage"
     TRAIN = "train"
     TRAIN_SERVER = "train_server"
+    FF = "ff"
 
 
 def get_utility(ident: Utility):
@@ -270,3 +271,11 @@ async def stop_audit_utility():
     if audit_utility:
         await audit_utility.finalize()
         clean_utility(Utility.AUDIT)
+
+
+def get_ff() -> featureflagging.FlagService:
+    val = get_utility(Utility.FF)
+    if val is None:
+        val = featureflagging.FlagService()
+        set_utility(Utility.FF, val)
+    return val

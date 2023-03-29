@@ -123,3 +123,23 @@ class TestCounter:
         assert (
             counter.counter.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 1.0
         )
+
+
+class TestHistogram:
+    def test_histo(self):
+        histo = metrics.Histogram("my_histo")
+        histo.observe(5)
+
+        assert [
+            s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "5.0"
+        ][0].value == 1.0
+
+    def test_histo_with_labels(self):
+        histo = metrics.Histogram(
+            "my_histo2", labelnames=["foo", "bar"], buckets=[1, 2, 3]
+        )
+        histo.observe(1, labels={"foo": "baz", "bar": "qux"})
+
+        assert [
+            s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"
+        ][0].value == 1.0

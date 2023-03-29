@@ -88,3 +88,5 @@ tracing:
 
 telemetry:
   enabled: True
+
+flag_settings_url: null

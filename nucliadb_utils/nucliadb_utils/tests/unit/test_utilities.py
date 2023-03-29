@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb_utils import utilities
+from nucliadb_utils import featureflagging, utilities
 
 
 @pytest.fixture(autouse=True)
@@ -133,3 +133,9 @@ async def test_stop_audit_utility():
         await utilities.stop_audit_utility()
 
         assert "audit" not in utilities.MAIN
+
+
+def test_get_ff():
+    ff = utilities.get_ff()
+    assert ff is not None
+    assert isinstance(ff, featureflagging.FlagService)

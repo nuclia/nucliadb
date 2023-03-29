@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pkg_resources
-import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
@@ -26,7 +25,7 @@ from opentelemetry.propagators.b3 import B3MultiFormat
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import HTMLResponse, PlainTextResponse
+from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
@@ -38,6 +37,7 @@ from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi import metrics
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -97,14 +97,9 @@ async def homepage(request):
     return HTMLResponse("NucliaDB One Service")
 
 
-async def metrics(request):
-    output = prometheus_client.exposition.generate_latest()
-    return PlainTextResponse(output.decode("utf8"))
-
-
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/metrics", metrics)
+application.add_route("/metrics", metrics.metrics)
 
 
 # Enable forwarding of B3 headers to responses and external requests
