@@ -405,6 +405,7 @@ class ChatRequest(BaseModel):
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
     range_modification_end: Optional[datetime] = None
+    show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
     shards: List[str] = []

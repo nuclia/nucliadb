@@ -110,9 +110,17 @@ async def chat_post_knowledgebox(
         SearchOptions.VECTOR,
     ]
     find_request.query = new_query
+    find_request.fields = item.fields
     find_request.filters = item.filters
     find_request.field_type_filter = item.field_type_filter
-    find_request.fields = item.fields
+    find_request.min_score = item.min_score
+    find_request.range_creation_start = item.range_creation_start
+    find_request.range_creation_end = item.range_creation_end
+    find_request.range_modification_start = item.range_modification_start
+    find_request.range_modification_end = item.range_modification_end
+    find_request.show = item.show
+    find_request.extracted = item.extracted
+    find_request.shards = item.shards
 
     results = await find(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
