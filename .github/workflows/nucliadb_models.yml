@@ -12,6 +12,9 @@ jobs:
   pre-checks:
     name: NucliaDBModelsTests
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     strategy:
       matrix:
         python-version: [3.9]

@@ -35,6 +35,9 @@ jobs:
   tests:
     name: NucliaDBUtilsTests
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     strategy:
       matrix:
