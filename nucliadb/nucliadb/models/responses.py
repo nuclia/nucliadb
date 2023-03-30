@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 
 class HTTPResponse(JSONResponse):
     def __init__(self, detail: str):
-        super().__init__(content=detail, status_code=self.status_code)
+        super().__init__(content={"detail": detail}, status_code=self.status_code)
 
 
 class HTTPNotFound(HTTPResponse):

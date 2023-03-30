@@ -291,6 +291,7 @@ async def test_resource_search_by_slug(search_api, test_resource_deterministic_i
         invalid_slug_url = f"/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/idonotexist"
         resp = await client.get(f"{invalid_slug_url}/search?query=foo")
         assert resp.status_code == 404
+
         assert resp.json()["detail"] == "Resource does not exist"
 
 
