@@ -70,7 +70,7 @@ Trying NucliaDB is super easy! You can extend your knowledge with the
 following readings:
 
 - [Quick start!](https://docs.nuclia.dev/docs/nucliadb/intro)
-- Join forces with Nuclia to run [NucliaDB with unlimited power](docs/getting-started/limitless-nucliadb-with-nuclia.md)
+- [Connect local NucliaDB with Nuclia Cloud](docs/tutorials/local-db-cloud.md)
 - Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/nucliadb/basics) section
 - Dive deeper with our [tutorials](docs/tutorials),
   [reference](docs/reference) or [internal](docs/internal)

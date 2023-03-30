@@ -1,4 +1,4 @@
-# Limitless NucliaDB with Nuclia
+# Connecting Local NucliaDB with Nuclia Cloud
 
 NucliaDB is a perfect place to store embeddings (vectors) extracted
 from your information and search for it. But information extraction is
