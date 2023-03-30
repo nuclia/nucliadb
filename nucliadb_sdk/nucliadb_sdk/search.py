@@ -54,6 +54,8 @@ class SearchResult:
                 resource = self.client.get_resource(fts.rid)
                 if fts.field_type == "t":
                     text = resource.data.texts[fts.field].value.body
+                else:
+                    text = None
                 classifications = [
                     classification.label
                     for classification in resource.usermetadata.classifications
