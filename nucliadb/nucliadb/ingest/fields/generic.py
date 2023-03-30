@@ -28,7 +28,6 @@ class Generic(Field):
     type: str = "a"
 
     async def set_value(self, payload: str):
-        breakpoint()
         if self.id not in VALID_GLOBAL:
             raise AttributeError(self.id)
 
