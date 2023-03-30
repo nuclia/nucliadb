@@ -21,7 +21,7 @@ from datetime import datetime
 from time import time
 from typing import List, Optional
 
-from fastapi import Body, Header, HTTPException, Query, Request, Response
+from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -29,6 +29,7 @@ from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
+from nucliadb.search.search.utils import parse_sort_options
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -38,9 +39,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
-    SearchRequest,
     SortField,
-    SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
@@ -265,49 +264,3 @@ async def find(
 
     search_results.shards = queried_shards
     return search_results
-
-
-def parse_sort_options(item: SearchRequest) -> SortOptions:
-    if is_empty_query(item):
-        if item.sort is None:
-            sort_options = SortOptions(
-                field=SortField.CREATED,
-                order=SortOrder.DESC,
-                limit=None,
-            )
-        elif not is_valid_index_sort_field(item.sort.field):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
-                ),
-            )
-        else:
-            sort_options = item.sort
-    else:
-        if item.sort is None:
-            sort_options = SortOptions(
-                field=SortField.SCORE,
-                order=SortOrder.DESC,
-                limit=None,
-            )
-        elif not is_valid_index_sort_field(item.sort.field) and item.sort.limit is None:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
-            )
-        else:
-            sort_options = item.sort
-
-    return sort_options
-
-
-def is_empty_query(request: SearchRequest) -> bool:
-    return len(request.query) == 0 and (
-        request.advanced_query is None or len(request.advanced_query) == 0
-    )
-
-
-def is_valid_index_sort_field(field: SortField) -> bool:
-    return SortFieldMap[field] is not None

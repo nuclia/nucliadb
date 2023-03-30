@@ -162,17 +162,12 @@ async def fetch_find_metadata(
 
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
-            if result_paragraph.rid not in find_resources:
-                find_resource = FindResource(id=result_paragraph.rid, fields={})
-                find_resources[result_paragraph.rid] = find_resource
-            else:
-                find_resource = find_resources[result_paragraph.rid]
-
-            if result_paragraph.field not in find_resource.fields:
-                find_field = FindField(paragraphs={})
-                find_resource.fields[result_paragraph.field] = find_field
-            else:
-                find_field = find_resource.fields[result_paragraph.field]
+            find_resource = find_resources.setdefault(
+                result_paragraph.rid, FindResource(id=result_paragraph.id, fields={})
+            )
+            find_field = find_resource.fields.setdefault(
+                result_paragraph.field, FindField(paragraphs={})
+            )
 
             if result_paragraph.paragraph.id in find_field.paragraphs:
                 # Its a multiple match, push the score
