@@ -19,11 +19,12 @@
 #
 from datetime import datetime
 from time import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
@@ -45,6 +46,7 @@ from nucliadb_models.search import (
     SortOrderMap,
 )
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_audit
 
 SEARCH_EXAMPLES = {
@@ -121,7 +123,7 @@ async def search_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     item = SearchRequest(
         query=query,
         advanced_query=advanced_query,
@@ -152,9 +154,12 @@ async def search_knowledgebox(
         with_status=with_status,
         with_synonyms=with_synonyms,
     )
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    try:
+        return await search(
+            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        )
+    except LimitsExceededError as exc:
+        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
 
 @api.get(
@@ -232,11 +237,13 @@ async def search_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    # We need the nodes/shards that are connected to the KB
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+    try:
+        return await search(
+            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        )
+    except LimitsExceededError as exc:
+        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
 
 async def search(
