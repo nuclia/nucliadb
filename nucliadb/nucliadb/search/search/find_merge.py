@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -146,6 +146,19 @@ async def set_resource_metadata_value(
         max_operations.release()
 
 
+class Orderer:
+    def __init__(self):
+        self.items = []
+        self.count = 0
+
+    def add(self, key: Any, score: float):
+        self.items.append((score, self.count, key))
+        self.count += 1
+
+    def __iter__(self):
+        return sorted(self.items)
+
+
 async def fetch_find_metadata(
     find_resources: Dict[str, FindResource],
     result_paragraphs: List[TempFindParagraph],
@@ -156,9 +169,10 @@ async def fetch_find_metadata(
     highlight: bool = False,
     ematches: List[str] = [],
 ):
-    resources = []
+    resources = set()
     operations = []
     max_operations = asyncio.Semaphore(10)
+    orderer = Orderer()
 
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
@@ -180,6 +194,15 @@ async def fetch_find_metadata(
                     result_paragraph.paragraph.id
                 ] = result_paragraph.paragraph
 
+            orderer.add(
+                key=(
+                    result_paragraph.id,
+                    result_paragraph.field,
+                    result_paragraph.paragraph.id,
+                ),
+                score=find_field.paragraphs[result_paragraph.paragraph.id].score,
+            )
+
             operations.append(
                 set_text_value(
                     kbid=kbid,
@@ -189,9 +212,12 @@ async def fetch_find_metadata(
                     max_operations=max_operations,
                 )
             )
-            resources.append(result_paragraph.rid)
+            resources.add(result_paragraph.rid)
 
-    for resource in set(resources):
+    for order, (rid, field_id, paragraph_id) in enumerate(orderer):
+        find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
+
+    for resource in resources:
         operations.append(
             set_resource_metadata_value(
                 kbid=kbid,

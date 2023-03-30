@@ -53,3 +53,27 @@ async def test_find(
             "start_seconds": [0],
             "end_seconds": [10],
         }
+
+
+@pytest.mark.asyncio
+@pytest.mark.flaky(reruns=5)
+async def test_find_order(
+    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+) -> None:
+    kbid = multiple_search_resource
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/find?query=own+text",
+        )
+        assert resp.status_code == 200
+
+        data = resp.json()
+
+        assert data["total"] == 20
+
+        for resource in data["resources"].values():
+            for field in resource["fields"].values():
+                paragraphs = field["paragraphs"]
+                orders = {paragraph["order"] for paragraph in paragraphs.values()}
+                assert orders == set(range(len(paragraphs)))

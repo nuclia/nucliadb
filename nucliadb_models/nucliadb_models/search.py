@@ -437,6 +437,7 @@ class FindTextPosition(BaseModel):
 class FindParagraph(BaseModel):
     score: float
     score_type: SCORE_TYPE
+    order: int = Field(0, ge=0)
     text: str
     id: str
     labels: Optional[List[str]] = []
