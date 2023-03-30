@@ -18,7 +18,7 @@
 <h3 align="center">The database for data scientists and machine learning experts working with HuggingFace and other data pipelines platforms.</h3>
 
 <h4 align="center">
-  <a href="https://docs.nuclia.dev/docs/nucliadb/intro">Quickstart</a> |
+  <a href="https://docs.nuclia.dev/docs/nucliadb/intro">DB Quickstart</a> |
   <a href="https://docs.nuclia.dev/docs/intro">Nuclia Docs</a> |
   <a href="docs/">NuclicDB Developer docs</a> |
   <a href="https://discord.gg/AgevjFJUvk">Chat</a>
