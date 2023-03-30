@@ -68,7 +68,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
-from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_ingest,
@@ -738,6 +738,8 @@ async def store_file_on_nuclia_db(
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_processing_info(writer, processing_info)

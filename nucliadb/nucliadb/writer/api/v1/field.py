@@ -50,7 +50,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
     get_cache,
     get_partitioning,
@@ -162,6 +162,8 @@ async def add_resource_field_text(
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -199,6 +201,8 @@ async def add_resource_field_link(
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -236,6 +240,8 @@ async def add_resource_field_keywordset(
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -273,6 +279,8 @@ async def add_resource_field_datetime(
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -310,6 +318,8 @@ async def add_resource_field_layout(
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -349,6 +359,8 @@ async def add_resource_field_conversation(
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -392,6 +404,8 @@ async def add_resource_field_file(
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -456,6 +470,8 @@ async def append_messages_to_conversation_field(
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_processing_info(writer, processing_info)
@@ -523,6 +539,8 @@ async def append_blocks_to_layout_field(
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_processing_info(writer, processing_info)
@@ -595,7 +613,7 @@ async def reprocess_file_field(
     field_id: str,
     x_nucliadb_user: str = X_NUCLIADB_USER,
     x_file_password: Optional[str] = X_FILE_PASSWORD,
-):
+) -> ResourceUpdated:
     transaction = get_transaction()
     processing = get_processing()
     partitioning = get_partitioning()
@@ -642,6 +660,8 @@ async def reprocess_file_field(
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
 
     writer = BrokerMessage()
     writer.kbid = kbid
