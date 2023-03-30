@@ -18,12 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from fastapi import Header, HTTPException, Query, Request, Response
+from fastapi import Header, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
+from nucliadb.models.responses import HTTPNotFound
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction
@@ -87,11 +88,11 @@ async def search(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = Query(False),
     shards: List[str] = Query(default=[]),
-) -> ResourceSearchResults:
+) -> Union[ResourceSearchResults, HTTPNotFound]:
     if not rid:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
         if rid is None:
-            raise HTTPException(status_code=404, detail="Resource does not exist")
+            return HTTPNotFound("Resource does not exist")
 
     # We need to query all nodes
     pb_query = await paragraph_query_to_pb(

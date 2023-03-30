@@ -17,29 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi.responses import JSONResponse
-
-
-class HTTPResponse(JSONResponse):
-    def __init__(self, detail: str):
-        super().__init__(content=detail, status_code=self.status_code)
-
-
-class HTTPNotFound(HTTPResponse):
-    status_code = 404
-
-
-class HTTPConflict(HTTPResponse):
-    status_code = 409
-
-
-class HTTPUnprocessableEntity(HTTPResponse):
-    status_code = 422
-
-
-class HTTPInternalServerError(HTTPResponse):
-    status_code = 500
-
-
-class HTTPServiceUnavailableError(HTTPResponse):
-    status_code = 500
+class SearchConfigValidationError(Exception):
+    def __init__(self, message: str):
+        self.message = message

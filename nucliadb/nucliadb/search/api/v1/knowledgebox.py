@@ -19,9 +19,9 @@
 #
 import asyncio
 import json
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from fastapi import HTTPException, Query, Request
+from fastapi import Query, Request
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -30,6 +30,12 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
+from nucliadb.models.responses import (
+    HTTPInternalServerError,
+    HTTPNotFound,
+    HTTPResponse,
+    HTTPServiceUnavailableError,
+)
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
@@ -55,14 +61,15 @@ from nucliadb_utils.utilities import get_cache
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
+async def knowledgebox_shards(
+    request: Request, kbid: str
+) -> Union[KnowledgeboxShards, HTTPNotFound]:
     nodemanager = get_nodes()
     try:
         shards: Shards = await nodemanager.get_shards_by_kbid_inner(kbid)
     except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
+        return HTTPNotFound(
+            "The knowledgebox or its shards configuration is missing",
         )
     return KnowledgeboxShards.from_message(shards)
 
@@ -82,7 +89,7 @@ async def knowledgebox_counters(
     kbid: str,
     vectorset: str = Query(None),
     debug: bool = Query(False),
-) -> KnowledgeboxCounters:
+) -> Union[KnowledgeboxCounters, HTTPResponse]:
     cache = await get_cache()
 
     if cache is not None:
@@ -100,10 +107,7 @@ async def knowledgebox_counters(
     try:
         shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
+        return HTTPNotFound("The knowledgebox or its shards configuration is missing")
 
     ops = []
     queried_shards = []
@@ -111,9 +115,8 @@ async def knowledgebox_counters(
         try:
             node, shard_id, node_id = nodemanager.choose_node(shard_object)
         except KeyError:
-            raise HTTPException(
-                status_code=500,
-                detail="Couldn't retrieve counters right now, node not found",
+            return HTTPInternalServerError(
+                "Couldn't retrieve counters right now, node not found",
             )
         else:
             if shard_id is not None:
@@ -125,9 +128,8 @@ async def knowledgebox_counters(
     if not ops:
         await abort_transaction()
         logger.info(f"No node found for any of this resources shards {kbid}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"No node found for any of this resources shards {kbid}",
+        return HTTPNotFound(
+            f"No node found for any of this resources shards {kbid}",
         )
 
     try:
@@ -138,15 +140,15 @@ async def knowledgebox_counters(
     except asyncio.TimeoutError as exc:
         errors.capture_exception(exc)
         await abort_transaction()
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
+        return HTTPServiceUnavailableError("Data query took too long")
     except AioRpcError as exc:
         if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
+            return HTTPServiceUnavailableError("Search backend not available")
         else:
             raise exc
 
     if results is None:
-        raise HTTPException(status_code=503, detail=f"No shards found")
+        return HTTPServiceUnavailableError("No shards found")
 
     field_count = 0
     paragraph_count = 0
@@ -156,9 +158,7 @@ async def knowledgebox_counters(
         if isinstance(shard, Exception):
             errors.capture_exception(shard)
             await abort_transaction()
-            raise HTTPException(
-                status_code=500, detail=f"Error while geting shard data"
-            )
+            return HTTPInternalServerError("Error while geting shard data")
 
         field_count += shard.resources
         paragraph_count += shard.paragraphs
@@ -176,9 +176,7 @@ async def knowledgebox_counters(
             resource_count += 1
     except Exception as exc:
         errors.capture_exception(exc)
-        raise HTTPException(
-            status_code=500, detail="Couldn't retrieve counters right now"
-        )
+        return HTTPInternalServerError("Couldn't retrieve counters right now")
     finally:
         await txn.abort()
 

@@ -19,11 +19,13 @@
 #
 from datetime import datetime
 from time import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from fastapi import Body, Header, HTTPException, Query, Request, Response
+from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.models.responses import HTTPUnprocessableEntity
+from nucliadb.search.api.v1.exceptions import SearchConfigValidationError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
@@ -121,7 +123,7 @@ async def search_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> Union[KnowledgeboxSearchResults, HTTPUnprocessableEntity]:
     item = SearchRequest(
         query=query,
         advanced_query=advanced_query,
@@ -152,9 +154,12 @@ async def search_knowledgebox(
         with_status=with_status,
         with_synonyms=with_synonyms,
     )
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    try:
+        return await search(
+            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        )
+    except SearchConfigValidationError as error:
+        return HTTPUnprocessableEntity(error.message)
 
 
 @api.get(
@@ -185,7 +190,7 @@ async def catalog(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> Union[KnowledgeboxSearchResults, HTTPUnprocessableEntity]:
     sort = None
     if sort_field:
         sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -202,15 +207,18 @@ async def catalog(
         shards=shards,
         with_status=with_status,
     )
-    return await search(
-        response,
-        kbid,
-        item,
-        x_ndb_client,
-        x_nucliadb_user,
-        x_forwarded_for,
-        do_audit=False,
-    )
+    try:
+        return await search(
+            response,
+            kbid,
+            item,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            do_audit=False,
+        )
+    except SearchConfigValidationError as error:
+        return HTTPUnprocessableEntity(error.message)
 
 
 @api.post(
@@ -232,11 +240,14 @@ async def search_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> Union[KnowledgeboxSearchResults, HTTPUnprocessableEntity]:
     # We need the nodes/shards that are connected to the KB
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+    try:
+        return await search(
+            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        )
+    except SearchConfigValidationError as error:
+        return HTTPUnprocessableEntity(error.message)
 
 
 async def search(
@@ -333,12 +344,9 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 limit=None,
             )
         elif not is_valid_index_sort_field(item.sort.field):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
-                ),
+            raise SearchConfigValidationError(
+                f"Empty query can only be sorted by '{SortField.CREATED}' or"
+                f" '{SortField.MODIFIED}' and sort limit won't be applied"
             )
         else:
             sort_options = item.sort
@@ -350,9 +358,8 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 limit=None,
             )
         elif not is_valid_index_sort_field(item.sort.field) and item.sort.limit is None:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
+            raise SearchConfigValidationError(
+                f"Sort by '{item.sort.field}' requires setting a sort limit",
             )
         else:
             sort_options = item.sort

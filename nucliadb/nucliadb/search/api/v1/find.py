@@ -19,11 +19,13 @@
 #
 from datetime import datetime
 from time import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from fastapi import Body, Header, HTTPException, Query, Request, Response
+from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.models.responses import HTTPUnprocessableEntity
+from nucliadb.search.api.v1.exceptions import SearchConfigValidationError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
@@ -121,7 +123,7 @@ async def find_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxFindResults:
+) -> Union[KnowledgeboxFindResults, HTTPUnprocessableEntity]:
     item = FindRequest(
         query=query,
         advanced_query=advanced_query,
@@ -176,7 +178,7 @@ async def find_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxFindResults:
+) -> Union[KnowledgeboxFindResults, HTTPUnprocessableEntity]:
     # We need the nodes/shards that are connected to the KB
     return await find(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -191,11 +193,14 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-) -> KnowledgeboxFindResults:
+) -> Union[KnowledgeboxFindResults, HTTPUnprocessableEntity]:
     audit = get_audit()
     start_time = time()
 
-    sort_options = parse_sort_options(item)
+    try:
+        sort_options = parse_sort_options(item)
+    except SearchConfigValidationError as error:
+        return HTTPUnprocessableEntity(error.message)
 
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
@@ -268,6 +273,13 @@ async def find(
 
 
 def parse_sort_options(item: SearchRequest) -> SortOptions:
+    """
+    EXCACT copy of parse_sort_options from search.py
+    I'm assuming this is on purpose because these implementations will diverge
+    and not touch.
+
+    Check with Ramon if this is the case.
+    """
     if is_empty_query(item):
         if item.sort is None:
             sort_options = SortOptions(
@@ -276,12 +288,9 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 limit=None,
             )
         elif not is_valid_index_sort_field(item.sort.field):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
-                ),
+            raise SearchConfigValidationError(
+                f"Empty query can only be sorted by '{SortField.CREATED}' or"
+                f" '{SortField.MODIFIED}' and sort limit won't be applied"
             )
         else:
             sort_options = item.sort
@@ -293,9 +302,8 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 limit=None,
             )
         elif not is_valid_index_sort_field(item.sort.field) and item.sort.limit is None:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
+            raise SearchConfigValidationError(
+                f"Sort by '{item.sort.field}' requires setting a sort limit"
             )
         else:
             sort_options = item.sort
