@@ -54,8 +54,13 @@ class SearchResult:
                 resource = self.client.get_resource(fts.rid)
                 if fts.field_type == "t":
                     text = resource.data.texts[fts.field].value.body
+                elif fts.field_type == "f":
+                    filename = resource.data.files[fts.field].value.file.filename
+                    text = f"File: {filename}"
                 else:
-                    text = None
+                    # unsupported field type
+                    continue
+
                 classifications = [
                     classification.label
                     for classification in resource.usermetadata.classifications
