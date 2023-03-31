@@ -28,7 +28,10 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
+    ChatRequest,
+    FindRequest,
     KnowledgeboxCounters,
+    KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     SearchRequest,
 )
@@ -47,6 +50,8 @@ CREATE_VECTORSET = "/vectorset/{vectorset}"
 VECTORSETS = "/vectorsets"
 COUNTER = "/counters"
 SEARCH_URL = "/search"
+FIND_URL = "/find"
+CHAT_URL = "/chat"
 LABELS_URL = "/labelsets"
 ENTITIES_URL = "/entitiesgroups"
 DOWNLOAD_URL = "/{uri}"
@@ -363,6 +368,42 @@ class NucliaDBClient:
         )
         if response.status_code == 200:
             return KnowledgeboxSearchResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def find(self, request: FindRequest):
+        url = FIND_URL
+        response: httpx.Response = self.search_session.post(url, content=request.json())
+        if response.status_code == 200:
+            return KnowledgeboxFindResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    async def async_find(self, request: FindRequest):
+        url = FIND_URL
+        response: httpx.Response = await self.async_search_session.post(
+            url, content=request.json()
+        )
+        if response.status_code == 200:
+            return KnowledgeboxFindResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def chat(self, request: ChatRequest):
+        url = CHAT_URL
+        response: httpx.Response = self.search_session.post(url, content=request.json())
+        if response.status_code == 200:
+            return KnowledgeboxSearchResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    async def async_chat(self, request: ChatRequest):
+        url = CHAT_URL
+        response: httpx.Response = await self.async_search_session.post(
+            url, content=request.json()
+        )
+        if response.status_code == 200:
+            return KnowledgeboxFindResults.parse_raw(response.content)
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 

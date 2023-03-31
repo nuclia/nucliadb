@@ -33,6 +33,7 @@ from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
+    FindRequest,
     KnowledgeboxSearchResults,
     SearchOptions,
     SearchRequest,
@@ -41,6 +42,7 @@ from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
+from nucliadb_sdk.find import FindResult
 from nucliadb_sdk.labels import DEFAULT_LABELSET, Label, Labels, LabelSet, LabelType
 from nucliadb_sdk.resource import (
     create_resource,
@@ -310,6 +312,19 @@ class KnowledgeBox:
         )
         assert resp.status_code == 200
 
+    def find(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ):
+        result = self.client.find(
+            self.build_find_request(text, filter, vector, vectorset, min_score)
+        )
+        return FindResult(result, self.client)
+
     def search(
         self,
         text: Optional[str] = None,
@@ -335,6 +350,76 @@ class KnowledgeBox:
             self.build_search_request(text, filter, vector, vectorset, min_score)
         )
         return SearchResult(result, self.client)
+
+    async def async_find(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ):
+        result = await self.client.async_find(
+            self.build_find_request(text, filter, vector, vectorset, min_score)
+        )
+        return FindResult(result, self.client)
+
+    async def async_chat(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ):
+        result = await self.client.async_search(
+            self.build_search_request(text, filter, vector, vectorset, min_score)
+        )
+        return SearchResult(result, self.client)
+
+    def build_find_request(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ) -> SearchRequest:
+        args: Dict[str, Any] = {"features": []}
+        if filter is not None:
+            new_filter: List[Label] = []
+            for fil in filter:
+                if isinstance(fil, str):
+                    if len(fil.split("/")) == 1:
+                        lset = DEFAULT_LABELSET
+                        lab = fil
+                    else:
+                        lset, lab = fil.split("/")
+                    new_filter.append(Label(label=lab, labelset=lset))
+                else:
+                    new_filter.append(fil)
+            filter_list = [f"/l/{label.labelset}/{label.label}" for label in new_filter]
+            args["filters"] = filter_list
+
+        if text is not None:
+            args["query"] = text
+            args["features"].append(SearchOptions.DOCUMENT)
+            args["features"].append(SearchOptions.PARAGRAPH)
+
+        if vector is not None and vectorset is not None:
+            vector = convert_vector(vector)
+
+            args["vector"] = vector
+            args["vectorset"] = vectorset
+            args["features"].append(SearchOptions.VECTOR)
+
+        if len(args["features"]) == 0:
+            args["features"].append(SearchOptions.DOCUMENT)
+            args["features"].append(SearchOptions.PARAGRAPH)
+
+        args["min_score"] = min_score
+        request = FindRequest(**args)
+        return request
 
     def build_search_request(
         self,
