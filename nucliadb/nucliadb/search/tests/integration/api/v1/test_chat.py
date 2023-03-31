@@ -17,17 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
+
+import pytest
+
+from nucliadb.search.api.v1.router import KB_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils.exceptions import LimitsExceededError
 
 
-class SendToProcessError(Exception):
-    pass
+@pytest.fixture(scope="function")
+def chat_with_limits_exceeded_error():
+    with mock.patch(
+        "nucliadb.search.api.v1.chat.chat",
+        side_effect=LimitsExceededError(402, "over the quota"),
+    ):
+        yield
 
 
-class LimitsExceededError(Exception):
-    def __init__(self, status_code: int, detail: str):
-        self.status_code = status_code
-        self.detail = detail
-
-
-class ShardsNotFound(Exception):
-    pass
+@pytest.mark.asyncio()
+async def test_chat_handles_limits_exceeded_error(
+    search_api, knowledgebox_ingest, chat_with_limits_exceeded_error
+):
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        kb = knowledgebox_ingest
+        resp = await client.post(f"/{KB_PREFIX}/{kb}/chat", json={})
+        assert resp.status_code == 402
+        assert resp.json() == "over the quota"

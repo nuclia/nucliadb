@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 
 import nucliadb_models as models
 from nucliadb_models.resource import QueueType
+from nucliadb_telemetry import metrics
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage
@@ -40,6 +41,15 @@ if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
 else:
     SourceValue = int
+
+processing_observer = metrics.Observer(
+    "processing_engine",
+    labels={"type": ""},
+    error_mappings={
+        "over_limits": LimitsExceededError,
+        "processing_api_error": SendToProcessError,
+    },
+)
 
 
 class Source(SourceValue, Enum):  # type: ignore
@@ -206,6 +216,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
+    @processing_observer.wrap({"type": "file_field_upload"})
     async def convert_filefield_to_str(self, file: models.FileField) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
@@ -219,9 +230,15 @@ class ProcessingEngine:
         with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
-            assert resp.status == 200
-            jwttoken = await resp.text()
-        return jwttoken
+            if resp.status == 200:
+                jwttoken = await resp.text()
+                return jwttoken
+            elif resp.status != 402:
+                data = await resp.json()
+                raise LimitsExceededError(resp.status, data["detail"])
+            else:
+                text = await resp.text()
+                raise Exception(f"STATUS: {resp.status} - {text}")
 
     def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
         if self.nuclia_jwt_key is None:
@@ -247,6 +264,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
+    @processing_observer.wrap({"type": "file_field_upload_internal"})
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
     ) -> str:
@@ -278,11 +296,15 @@ class ProcessingEngine:
             ) as resp:
                 if resp.status == 200:
                     jwttoken = await resp.text()
+                elif resp.status == 402:
+                    data = await resp.json()
+                    raise LimitsExceededError(resp.status, data["detail"])
                 else:
                     text = await resp.text()
                     raise Exception(f"STATUS: {resp.status} - {text}")
         return jwttoken
 
+    @processing_observer.wrap({"type": "cloud_file_upload"})
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
         if self.onprem is False:
             # Upload the file to processing upload
@@ -307,6 +329,9 @@ class ProcessingEngine:
             ) as resp:
                 if resp.status == 200:
                     jwttoken = await resp.text()
+                elif resp.status == 402:
+                    data = await resp.json()
+                    raise LimitsExceededError(resp.status, data["detail"])
                 else:
                     text = await resp.text()
                     raise Exception(f"STATUS: {resp.status} - {text}")
@@ -325,41 +350,40 @@ class ProcessingEngine:
                 seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
             )
 
-        headers = {"CONTENT-TYPE": "application/json"}
-        if self.onprem is False:
-            # Upload the payload
-            item.partition = partition
-            resp = await self.session.post(
-                url=f"{self.nuclia_internal_push}", data=item.json(), headers=headers
-            )
+        op_type = "process_external" if self.onprem else "process_internal"
+        with processing_observer({"type": op_type}):
+            headers = {"CONTENT-TYPE": "application/json"}
+            if self.onprem is False:
+                # Upload the payload
+                item.partition = partition
+                resp = await self.session.post(
+                    url=f"{self.nuclia_internal_push}",
+                    data=item.json(),
+                    headers=headers,
+                )
+            else:
+                headers.update(
+                    {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+                )
+                # Upload the payload
+                resp = await self.session.post(
+                    url=self.nuclia_external_push + "?partition=" + str(partition),
+                    data=item.json(),
+                    headers=headers,
+                )
             if resp.status == 200:
                 data = await resp.json()
                 seqid = data.get("seqid")
                 account_seq = data.get("account_seq")
                 queue_type = data.get("queue")
-            elif resp.status == 402:
+            elif resp.status in (402, 413):
+                # 402 -> account limits exceeded
+                # 413 -> payload size exceeded
                 data = await resp.json()
-                raise LimitsExceededError(data["detail"])
+                raise LimitsExceededError(resp.status, data["detail"])
             else:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")
-        else:
-            headers.update({"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"})
-            # Upload the payload
-            resp = await self.session.post(
-                url=self.nuclia_external_push + "?partition=" + str(partition),
-                data=item.json(),
-                headers=headers,
-            )
-            if resp.status == 200:
-                data = await resp.json()
-                seqid = data.get("seqid")
-                account_seq = data.get("account_seq")
-                queue_type = data.get("queue")
-            elif resp.status == 402:
-                data = await resp.json()
-                raise LimitsExceededError(data["detail"])
-            else:
-                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
+
         logger.info(
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
                 ingest seqid: {seqid}, partition: {partition}"

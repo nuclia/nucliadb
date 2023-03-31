@@ -24,18 +24,23 @@ class Response(JSONResponse):
     pass
 
 
-class HTTPNotFound(Response):
+class HTTPClientError(Response):
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(status_code=status_code, content=detail)
+
+
+class HTTPNotFound(HTTPClientError):
     status_code = 404
 
     def __init__(self, detail: str):
-        super().__init__(content=detail, status_code=self.status_code)
+        super().__init__(status_code=self.status_code, detail=detail)
 
 
-class HTTPConflict(Response):
+class HTTPConflict(HTTPClientError):
     status_code = 409
 
     def __init__(self, detail: str):
-        super().__init__(content=detail, status_code=self.status_code)
+        super().__init__(status_code=self.status_code, detail=detail)
 
 
 class HTTPInternalServerError(Response):

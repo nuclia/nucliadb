@@ -448,7 +448,7 @@ async def patch(
                 wait_on_commit=x_synchronous,
             )
         except LimitsExceededError as exc:
-            raise HTTPException(status_code=402, detail=str(exc))
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
         headers["NDB-Seq"] = f"{seqid}"
     else:
@@ -587,7 +587,7 @@ async def upload(
             wait_on_commit=x_synchronous,
         )
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=402, detail=str(exc))
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
     return ResourceFileUploaded(seqid=seqid, uuid=rid, field_id=valid_field)
 
@@ -737,7 +737,7 @@ async def store_file_on_nuclia_db(
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=402, detail=str(exc))
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except SendToProcessError:
         raise HTTPException(status_code=500, detail="Error while sending to process")
 

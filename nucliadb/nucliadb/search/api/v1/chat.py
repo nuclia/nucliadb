@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, Union
 
 from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
@@ -44,6 +45,7 @@ from nucliadb_models.search import (
     SearchOptions,
 )
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.exceptions import LimitsExceededError
 
 END_OF_STREAM = "_END_"
 
@@ -75,7 +77,23 @@ async def chat_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> StreamingResponse:
+) -> Union[StreamingResponse, HTTPClientError]:
+    try:
+        return await chat(
+            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        )
+    except LimitsExceededError as exc:
+        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+
+
+async def chat(
+    response: Response,
+    kbid: str,
+    item: ChatRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+):
     predict = get_predict()
 
     if item.context is not None and len(item.context) > 0:

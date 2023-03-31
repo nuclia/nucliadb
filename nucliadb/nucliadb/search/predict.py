@@ -25,6 +25,8 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
 from nucliadb_models.search import ChatModel, FeedbackRequest
+from nucliadb_telemetry import metrics
+from nucliadb_utils.exceptions import LimitsExceededError
 
 
 class SendToPredictError(Exception):
@@ -51,6 +53,17 @@ CHAT = "/chat"
 FEEDBACK = "/feedback"
 
 
+predict_observer = metrics.Observer(
+    "predict_engine",
+    labels={"type": ""},
+    error_mappings={
+        "over_limits": LimitsExceededError,
+        "error": SendToPredictError,
+        "empty_vectors": PredictVectorMissing,
+    },
+)
+
+
 class PredictEngine:
     def __init__(
         self,
@@ -70,8 +83,8 @@ class PredictEngine:
         self.zone = zone
         self.onprem = onprem
         self.dummy = dummy
-        # TODO: Should we accumulate sentences requested,
-        # or is this only for testing purposes?
+        # TODO: self.calls is only for testing purposes.
+        # It should be removed
         self.calls: List[str] = []
 
     async def initialize(self):
@@ -80,6 +93,16 @@ class PredictEngine:
     async def finalize(self):
         await self.session.close()
 
+    async def check_response(self, resp, expected: int = 200) -> None:
+        if resp.status == expected:
+            return
+        if resp.status == 402:
+            data = await resp.json()
+            raise LimitsExceededError(402, data["detail"])
+        else:
+            raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+
+    @predict_observer.wrap({"type": "feedback"})
     async def send_feedback(
         self,
         kbid: str,
@@ -100,8 +123,6 @@ class PredictEngine:
                 json=data,
                 headers={"X-STF-KBID": kbid},
             )
-            if resp.status != 204:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
             if self.nuclia_service_account is None:
                 logger.warning(
@@ -115,14 +136,12 @@ class PredictEngine:
                 json=data,
                 headers=headers,
             )
-            if resp.status != 204:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        await self.check_response(resp, expected=204)
 
+    @predict_observer.wrap({"type": "chat"})
     async def chat_query(
         self, kbid: str, item: ChatModel
     ) -> Tuple[str, AsyncIterator[bytes]]:
-        # If token is offered
-
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.post(
@@ -130,8 +149,6 @@ class PredictEngine:
                 json=item.dict(),
                 headers={"X-STF-KBID": kbid},
             )
-            if resp.status != 200:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
             if self.nuclia_service_account is None:
                 error = "Nuclia Service account is not defined so could not retrieve vectors for the query"
@@ -144,13 +161,12 @@ class PredictEngine:
                 json=item.dict(),
                 headers=headers,
             )
-            if resp.status != 200:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        await self.check_response(resp, expected=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
         return ident, resp.content.iter_any()
 
+    @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
-        # If token is offered
         if self.dummy:
             self.calls.append(sentence)
             return Q
@@ -161,10 +177,6 @@ class PredictEngine:
                 url=f"{self.cluster_url}{PRIVATE_PREDICT}{SENTENCE}?text={sentence}",
                 headers={"X-STF-KBID": kbid},
             )
-            if resp.status == 200:
-                data = await resp.json()
-            else:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
             if self.nuclia_service_account is None:
                 logger.warning(
@@ -177,14 +189,13 @@ class PredictEngine:
                 url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
                 headers=headers,
             )
-            if resp.status == 200:
-                data = await resp.json()
-            else:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        await self.check_response(resp, expected=200)
+        data = await resp.json()
         if len(data["data"]) == 0:
             raise PredictVectorMissing()
         return data["data"]
 
+    @predict_observer.wrap({"type": "entities"})
     async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
         # If token is offered
         if self.dummy:
@@ -197,10 +208,6 @@ class PredictEngine:
                 url=f"{self.cluster_url}{PRIVATE_PREDICT}{TOKENS}?text={sentence}",
                 headers={"X-STF-KBID": kbid},
             )
-            if resp.status == 200:
-                data = await resp.json()
-            else:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
             if self.nuclia_service_account is None:
                 logger.warning(
@@ -213,10 +220,8 @@ class PredictEngine:
                 url=f"{self.public_url}{PUBLIC_PREDICT}{TOKENS}?text={sentence}",
                 headers=headers,
             )
-            if resp.status == 200:
-                data = await resp.json()
-            else:
-                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        await self.check_response(resp, expected=200)
+        data = await resp.json()
 
         result = []
         for token in data["tokens"]:

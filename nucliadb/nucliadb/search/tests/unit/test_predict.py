@@ -22,6 +22,8 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from nucliadb.search.predict import PredictEngine, SendToPredictError
+from nucliadb_models.search import ChatModel, FeedbackRequest, FeedbackTasks
+from nucliadb_utils.exceptions import LimitsExceededError
 
 
 @pytest.mark.asyncio
@@ -184,3 +186,48 @@ async def test_detect_entities_error(error_session, onprem):
     pe.session = error_session
     with pytest.raises(SendToPredictError):
         await pe.detect_entities("kbid", "some sentence")
+
+
+@pytest.fixture(scope="function")
+def session_limits_exceeded():
+    session = AsyncMock()
+    resp = Mock(status=402)
+    resp.json = AsyncMock(return_value={"detail": "limits exceeded"})
+    resp.read = AsyncMock(return_value="something went wrong")
+    session.post.return_value = resp
+    session.get.return_value = resp
+    return session
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "method,args",
+    [
+        ("convert_sentence_to_vector", ["kbid", "sentence"]),
+        ("detect_entities", ["kbid", "sentence"]),
+        ("chat_query", ["kbid", ChatModel(question="foo", user_id="bar")]),
+        (
+            "send_feedback",
+            [
+                "kbid",
+                FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT),
+                "",
+                "",
+                "",
+            ],
+        ),
+    ],
+)
+async def test_predict_engine_handles_limits_exceeded_error(
+    session_limits_exceeded, method, args
+):
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        "service-account",
+        onprem=True,
+        dummy=False,
+    )
+    pe.session = session_limits_exceeded
+    with pytest.raises(LimitsExceededError):
+        await pe.__getattribute__(method)(*args)
