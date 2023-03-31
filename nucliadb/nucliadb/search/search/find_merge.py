@@ -148,17 +148,14 @@ async def set_resource_metadata_value(
 
 class Orderer:
     def __init__(self):
-        self.count = 0
         self.boosted_items = []
         self.items = []
 
     def add(self, key: Any):
         self.items.append(key)
-        self.count += 1
 
     def add_boosted(self, key: Any):
         self.boosted_items.append(key)
-        self.count += 1
 
     def sorted_by_insertion(self) -> Iterator[Any]:
         for key in self.boosted_items:
