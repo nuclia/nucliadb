@@ -72,8 +72,11 @@ async def test_find_order(
 
         assert data["total"] == 20
 
+        paragraph_count = 0
+        orders = set()
         for resource in data["resources"].values():
             for field in resource["fields"].values():
                 paragraphs = field["paragraphs"]
-                orders = {paragraph["order"] for paragraph in paragraphs.values()}
-                assert orders == set(range(len(paragraphs)))
+                orders.update({paragraph["order"] for paragraph in paragraphs.values()})
+                paragraph_count += len(paragraphs)
+        assert orders == set(range(paragraph_count))
