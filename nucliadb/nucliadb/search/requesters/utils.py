@@ -185,7 +185,7 @@ async def node_query(
         if isinstance(result, Exception):
             errors.capture_exception(result)
             await abort_transaction()
-            logger.exception("Error while querying shard data", exc_info=True)
+            logger.exception("Error while querying shard data", exc_info=result)
             raise HTTPException(
                 status_code=500, detail=f"Error while querying shard data"
             )

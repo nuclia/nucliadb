@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -146,6 +146,24 @@ async def set_resource_metadata_value(
         max_operations.release()
 
 
+class Orderer:
+    def __init__(self):
+        self.boosted_items = []
+        self.items = []
+
+    def add(self, key: Any):
+        self.items.append(key)
+
+    def add_boosted(self, key: Any):
+        self.boosted_items.append(key)
+
+    def sorted_by_insertion(self) -> Iterator[Any]:
+        for key in self.boosted_items:
+            yield key
+        for key in self.items:
+            yield key
+
+
 async def fetch_find_metadata(
     find_resources: Dict[str, FindResource],
     result_paragraphs: List[TempFindParagraph],
@@ -156,23 +174,19 @@ async def fetch_find_metadata(
     highlight: bool = False,
     ematches: List[str] = [],
 ):
-    resources = []
+    resources = set()
     operations = []
     max_operations = asyncio.Semaphore(10)
+    orderer = Orderer()
 
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
-            if result_paragraph.rid not in find_resources:
-                find_resource = FindResource(id=result_paragraph.rid, fields={})
-                find_resources[result_paragraph.rid] = find_resource
-            else:
-                find_resource = find_resources[result_paragraph.rid]
-
-            if result_paragraph.field not in find_resource.fields:
-                find_field = FindField(paragraphs={})
-                find_resource.fields[result_paragraph.field] = find_field
-            else:
-                find_field = find_resource.fields[result_paragraph.field]
+            find_resource = find_resources.setdefault(
+                result_paragraph.rid, FindResource(id=result_paragraph.id, fields={})
+            )
+            find_field = find_resource.fields.setdefault(
+                result_paragraph.field, FindField(paragraphs={})
+            )
 
             if result_paragraph.paragraph.id in find_field.paragraphs:
                 # Its a multiple match, push the score
@@ -180,10 +194,24 @@ async def fetch_find_metadata(
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
                 ].score_type = SCORE_TYPE.BOTH
+                orderer.add_boosted(
+                    (
+                        result_paragraph.rid,
+                        result_paragraph.field,
+                        result_paragraph.paragraph.id,
+                    )
+                )
             else:
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
                 ] = result_paragraph.paragraph
+                orderer.add(
+                    (
+                        result_paragraph.rid,
+                        result_paragraph.field,
+                        result_paragraph.paragraph.id,
+                    )
+                )
 
             operations.append(
                 set_text_value(
@@ -194,9 +222,14 @@ async def fetch_find_metadata(
                     max_operations=max_operations,
                 )
             )
-            resources.append(result_paragraph.rid)
+            resources.add(result_paragraph.rid)
 
-    for resource in set(resources):
+    for order, (rid, field_id, paragraph_id) in enumerate(
+        orderer.sorted_by_insertion()
+    ):
+        find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
+
+    for resource in resources:
         operations.append(
             set_resource_metadata_value(
                 kbid=kbid,
