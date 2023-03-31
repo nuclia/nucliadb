@@ -79,7 +79,7 @@ class IndexingUtility:
             options["servers"] = self.nats_servers
 
         self.nc = await nats.connect(**options)
-        self.js = get_traced_jetstream(self.nc, service_name)
+        self.js = get_traced_jetstream(self.nc, service_name or "nucalidb_indexing")
 
     async def finalize(self):
         if self.nc:
