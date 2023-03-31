@@ -21,6 +21,7 @@ import asyncio
 import math
 import os
 from typing import Callable
+from unittest import mock
 
 import pytest
 from httpx import AsyncClient
@@ -36,6 +37,7 @@ from nucliadb.ingest.tests.vectors import Q
 from nucliadb.ingest.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.keys import KB_SHARDS
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
@@ -317,3 +319,27 @@ async def test_search_with_duplicates(search_api, knowledgebox_ingest):
 
         resp = await client.get(f"/{KB_PREFIX}/{kb}/search?with_duplicates=False")
         assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+def search_with_limits_exceeded_error():
+    with mock.patch(
+        "nucliadb.search.api.v1.search.search",
+        side_effect=LimitsExceededError(402, "over the quota"),
+    ):
+        yield
+
+
+@pytest.mark.asyncio()
+async def test_search_handles_limits_exceeded_error(
+    search_api, knowledgebox_ingest, search_with_limits_exceeded_error
+):
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        kb = knowledgebox_ingest
+        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
+        assert resp.status_code == 402
+        assert resp.json() == "over the quota"
+
+        resp = await client.post(f"/{KB_PREFIX}/{kb}/search", json={})
+        assert resp.status_code == 402
+        assert resp.json() == "over the quota"

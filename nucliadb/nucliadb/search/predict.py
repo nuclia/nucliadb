@@ -25,6 +25,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
 from nucliadb_models.search import ChatModel, FeedbackRequest
+from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
@@ -50,6 +51,17 @@ SENTENCE = "/sentence"
 TOKENS = "/tokens"
 CHAT = "/chat"
 FEEDBACK = "/feedback"
+
+
+predict_observer = metrics.Observer(
+    "predict_api",
+    labels={"type": ""},
+    error_mappings={
+        "over_limits": LimitsExceededError,
+        "error": SendToPredictError,
+        "empty_vectors": PredictVectorMissing,
+    },
+)
 
 
 class PredictEngine:
@@ -90,6 +102,7 @@ class PredictEngine:
         else:
             raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
+    @predict_observer.wrap({"type": "feedback"})
     async def send_feedback(
         self,
         kbid: str,
@@ -125,6 +138,7 @@ class PredictEngine:
             )
         await self.check_response(resp, expected=204)
 
+    @predict_observer.wrap({"type": "chat"})
     async def chat_query(
         self, kbid: str, item: ChatModel
     ) -> Tuple[str, AsyncIterator[bytes]]:
@@ -151,6 +165,7 @@ class PredictEngine:
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
         return ident, resp.content.iter_any()
 
+    @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         if self.dummy:
             self.calls.append(sentence)
@@ -180,6 +195,7 @@ class PredictEngine:
             raise PredictVectorMissing()
         return data["data"]
 
+    @predict_observer.wrap({"type": "entities"})
     async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
         # If token is offered
         if self.dummy:
