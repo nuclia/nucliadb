@@ -36,6 +36,9 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.indexing import IndexingUtility
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
 from nucliadb_utils.run import run_until_exit
 from nucliadb_utils.settings import (
     indexing_settings,
@@ -107,6 +110,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
+        AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
 
     chitchat = await start_chitchat(SERVICE_NAME)
 
