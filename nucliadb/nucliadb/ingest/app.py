@@ -23,6 +23,9 @@ import sys
 from typing import Awaitable, Callable, Optional, Union
 
 import pkg_resources
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
@@ -107,6 +110,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
+        AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
 
     chitchat = await start_chitchat(SERVICE_NAME)
 
