@@ -58,7 +58,7 @@ predict_observer = metrics.Observer(
     labels={"type": ""},
     error_mappings={
         "over_limits": LimitsExceededError,
-        "error": SendToPredictError,
+        "predict_api_error": SendToPredictError,
         "empty_vectors": PredictVectorMissing,
     },
 )
