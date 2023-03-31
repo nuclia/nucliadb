@@ -52,7 +52,25 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 
-subscriber_observer = metrics.Observer("message_processor")
+subscriber_observer = metrics.Observer(
+    "message_processor",
+    buckets=[
+        0.01,
+        0.05,
+        0.1,
+        0.5,
+        1.0,
+        2.5,
+        5.0,
+        7.5,
+        10.0,
+        15.0,
+        30.0,
+        600.0,
+        1200.0,
+        float("inf"),
+    ],
+)
 
 
 class Worker:
