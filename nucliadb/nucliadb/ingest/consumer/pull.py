@@ -30,7 +30,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     ReallyStopPulling,
