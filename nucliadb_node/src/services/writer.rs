@@ -217,7 +217,7 @@ impl ShardWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn stop(&mut self) {
+    pub fn stop(&self) {
         info!("Stopping shard {}...", { &self.id });
         let texts = self.text_writer.clone();
         let paragraphs = self.paragraph_writer.clone();
@@ -266,7 +266,7 @@ impl ShardWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+    pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
@@ -335,7 +335,7 @@ impl ShardWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn remove_resource(&mut self, resource: &ResourceId) -> NodeResult<()> {
+    pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
