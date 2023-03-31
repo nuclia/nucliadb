@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -148,20 +148,23 @@ async def set_resource_metadata_value(
 
 class Orderer:
     def __init__(self):
-        self.items = []
         self.count = 0
-        self.boosted_index = 0
+        self.boosted_items = []
+        self.items = []
 
-    def add(self, key: Any, boosted: bool = False):
-        if boosted:
-            self.items.insert(self.boosted_index, key)
-            self.boosted_index += 1
-        else:
-            self.items.append(key)
+    def add(self, key: Any):
+        self.items.append(key)
         self.count += 1
 
-    def __iter__(self):
-        return (key for key in self.items)
+    def add_boosted(self, key: Any):
+        self.boosted_items.append(key)
+        self.count += 1
+
+    def sorted_by_insertion(self) -> Iterator[Any]:
+        for key in self.boosted_items:
+            yield key
+        for key in self.items:
+            yield key
 
 
 async def fetch_find_metadata(
@@ -194,24 +197,23 @@ async def fetch_find_metadata(
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
                 ].score_type = SCORE_TYPE.BOTH
-                orderer.add(
-                    key=(
+                orderer.add_boosted(
+                    (
                         result_paragraph.id,
                         result_paragraph.field,
                         result_paragraph.paragraph.id,
-                    ),
-                    boosted=True,
+                    )
                 )
             else:
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
                 ] = result_paragraph.paragraph
                 orderer.add(
-                    key=(
+                    (
                         result_paragraph.id,
                         result_paragraph.field,
                         result_paragraph.paragraph.id,
-                    ),
+                    )
                 )
 
             operations.append(
@@ -225,7 +227,9 @@ async def fetch_find_metadata(
             )
             resources.add(result_paragraph.rid)
 
-    for order, (rid, field_id, paragraph_id) in enumerate(orderer):
+    for order, (rid, field_id, paragraph_id) in enumerate(
+        orderer.sorted_by_insertion()
+    ):
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
 
     for resource in resources:

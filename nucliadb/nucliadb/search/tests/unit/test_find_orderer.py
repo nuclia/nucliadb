@@ -40,10 +40,10 @@ def test_orderer():
     for i, (key, score) in enumerate(items.items()):
         if i in boosted:
             boosted_items.append(key)
-            orderer.add(key, boosted=True)
+            orderer.add_boosted(key)
         else:
             regular_items.append(key)
             orderer.add(key)
 
-    sorted_items = list(orderer)
+    sorted_items = list(orderer.sorted_by_insertion())
     assert sorted_items == boosted_items + regular_items
