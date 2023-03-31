@@ -219,9 +219,15 @@ class ProcessingEngine:
         with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
-            assert resp.status == 200
-            jwttoken = await resp.text()
-        return jwttoken
+            try:
+                assert resp.status == 200
+                jwttoken = await resp.text()
+                return jwttoken
+            except AssertionError:
+                if resp.status != 402:
+                    raise
+                data = await resp.json()
+                raise LimitsExceededError(resp.status, data["detail"])
 
     def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
         if self.nuclia_jwt_key is None:
@@ -278,6 +284,9 @@ class ProcessingEngine:
             ) as resp:
                 if resp.status == 200:
                     jwttoken = await resp.text()
+                elif resp.status == 402:
+                    data = await resp.json()
+                    raise LimitsExceededError(resp.status, data["detail"])
                 else:
                     text = await resp.text()
                     raise Exception(f"STATUS: {resp.status} - {text}")
@@ -307,6 +316,9 @@ class ProcessingEngine:
             ) as resp:
                 if resp.status == 200:
                     jwttoken = await resp.text()
+                elif resp.status == 402:
+                    data = await resp.json()
+                    raise LimitsExceededError(resp.status, data["detail"])
                 else:
                     text = await resp.text()
                     raise Exception(f"STATUS: {resp.status} - {text}")
