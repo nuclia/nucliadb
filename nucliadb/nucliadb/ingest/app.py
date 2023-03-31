@@ -102,7 +102,7 @@ async def stop_indexing_utility():
         clean_utility(Utility.INDEXING)
 
 
-async def initialize() -> list[Callable[[], Awaitable[None]]]:
+async def initialize() -> list[Callable[[], Awaitable[None]]]:  # pragma: no cover
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
@@ -128,7 +128,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     return finalizers
 
 
-async def main_consumer():
+async def main_consumer():  # pragma: no cover
     finalizers = await initialize()
 
     grpc_finalizer = await start_grpc(SERVICE_NAME)
@@ -137,13 +137,13 @@ async def main_consumer():
     await run_until_exit([grpc_finalizer, consumer_finalizer] + finalizers)
 
 
-async def main_orm_grpc():
+async def main_orm_grpc():  # pragma: no cover
     finalizers = await initialize()
     grpc_finalizer = await start_grpc(SERVICE_NAME)
     await run_until_exit([grpc_finalizer] + finalizers)
 
 
-def setup_configuration():
+def setup_configuration():  # pragma: no cover
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)-18s | %(levelname)-7s | %(name)-16s | %(message)s",
@@ -175,7 +175,7 @@ def setup_configuration():
         raise RuntimeError("cannot be called from a running event loop")
 
 
-def run_consumer() -> None:
+def run_consumer() -> None:  # pragma: no cover
     """
     Run the consumer + GRPC ingest service
     """
@@ -183,7 +183,7 @@ def run_consumer() -> None:
     asyncio.run(main_consumer())
 
 
-def run_orm_grpc() -> None:
+def run_orm_grpc() -> None:  # pragma: no cover
     """
     Run the ingest GRPC service
     """
