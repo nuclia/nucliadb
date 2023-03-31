@@ -160,7 +160,7 @@ class PullWorker:
                 pass
 
             if self.nc is not None:
-                self.js = get_traced_jetstream(self.js, SERVICE_NAME)
+                self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
 
                 last_seqid = await self.processor.driver.last_seqid(self.partition)
                 if last_seqid is None:
