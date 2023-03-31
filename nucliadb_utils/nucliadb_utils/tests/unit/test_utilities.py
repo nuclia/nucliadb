@@ -119,7 +119,7 @@ async def test_start_audit_utility():
     with patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()), patch(
         "nucliadb_utils.utilities.StreamAuditStorage", return_value=AsyncMock()
     ):
-        await utilities.start_audit_utility()
+        await utilities.start_audit_utility("service")
 
         assert "audit" in utilities.MAIN
 
@@ -129,7 +129,7 @@ async def test_stop_audit_utility():
     with patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()), patch(
         "nucliadb_utils.utilities.StreamAuditStorage", return_value=AsyncMock()
     ):
-        await utilities.start_audit_utility()
+        await utilities.start_audit_utility("service")
         await utilities.stop_audit_utility()
 
         assert "audit" not in utilities.MAIN
