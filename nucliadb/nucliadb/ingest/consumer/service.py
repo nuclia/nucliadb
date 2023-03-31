@@ -28,8 +28,8 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb_utils.settings import (
     nuclia_settings,
-    transaction_settings,
     running_settings,
+    transaction_settings,
 )
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
