@@ -46,7 +46,7 @@ class StreamAuditStorage(AuditStorage):
         partitions: int,
         seed: int,
         nats_creds: Optional[str] = None,
-        service: str = "nucliadb.cache",
+        service: str = "nucliadb.audit",
     ):
         self.nats_servers = nats_servers
         self.nats_creds = nats_creds
@@ -90,7 +90,7 @@ class StreamAuditStorage(AuditStorage):
 
         self.nc = await nats.connect(**options)
 
-        self.js = get_traced_jetstream(self.nc)
+        self.js = get_traced_jetstream(self.nc, self.service)
         self.task = asyncio.create_task(self.run())
         self.initialized = True
 

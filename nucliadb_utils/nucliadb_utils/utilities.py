@@ -245,7 +245,7 @@ def get_audit() -> Optional[AuditStorage]:
     return get_utility(Utility.AUDIT)
 
 
-async def start_audit_utility():
+async def start_audit_utility(service: str):
     audit_utility = None
     if audit_settings.audit_driver == "basic":
         audit_utility = BasicAuditStorage()
@@ -257,6 +257,7 @@ async def start_audit_utility():
             nats_target=audit_settings.audit_jetstream_target,
             partitions=audit_settings.audit_partitions,
             seed=audit_settings.audit_hash_seed,
+            service=service,
         )
         logger.info(
             f"Configuring stream audit log {audit_settings.audit_jetstream_target}"

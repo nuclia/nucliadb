@@ -76,7 +76,7 @@ class NatsPubsub(PubSubDriver):
         if self.nc is None:
             raise AttributeError("NC not initialized")
         if self._jetstream is None:
-            self._jetstream = get_traced_jetstream(self.nc, "pubsub")
+            self._jetstream = get_traced_jetstream(self.nc, "nucliadb_pubsub")
         return self._jetstream
 
     @property
