@@ -49,7 +49,7 @@ from nucliadb_utils.utilities import get_transaction
 consumer_observer = metrics.Observer(
     "message_processor",
     labels={"source": ""},
-    buckets=(
+    buckets=[
         0.01,
         0.025,
         0.05,
@@ -64,7 +64,7 @@ consumer_observer = metrics.Observer(
         60.0,
         120.0,
         float("inf"),
-    ),
+    ],
 )
 
 
