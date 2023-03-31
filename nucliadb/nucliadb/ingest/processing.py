@@ -47,7 +47,7 @@ processing_observer = metrics.Observer(
     labels={"type": ""},
     error_mappings={
         "over_limits": LimitsExceededError,
-        "error": SendToProcessError,
+        "processing_api_error": SendToProcessError,
     },
 )
 
@@ -230,15 +230,15 @@ class ProcessingEngine:
         with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
-            try:
-                assert resp.status == 200
+            if resp.status == 200:
                 jwttoken = await resp.text()
                 return jwttoken
-            except AssertionError:
-                if resp.status != 402:
-                    raise
+            elif resp.status != 402:
                 data = await resp.json()
                 raise LimitsExceededError(resp.status, data["detail"])
+            else:
+                text = await resp.text()
+                raise Exception(f"STATUS: {resp.status} - {text}")
 
     def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
         if self.nuclia_jwt_key is None:
@@ -377,6 +377,8 @@ class ProcessingEngine:
                 account_seq = data.get("account_seq")
                 queue_type = data.get("queue")
             elif resp.status in (402, 413):
+                # 402 -> account limits exceeded
+                # 413 -> payload size exceeded
                 data = await resp.json()
                 raise LimitsExceededError(resp.status, data["detail"])
             else:
