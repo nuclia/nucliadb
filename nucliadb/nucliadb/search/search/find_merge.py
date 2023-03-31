@@ -150,13 +150,18 @@ class Orderer:
     def __init__(self):
         self.items = []
         self.count = 0
+        self.boosted_index = 0
 
-    def add(self, key: Any, score: float):
-        self.items.append((score, self.count, key))
+    def add(self, key: Any, boosted: bool = False):
+        if boosted:
+            self.items.insert(self.boosted_index, key)
+            self.boosted_index += 1
+        else:
+            self.items.append(key)
         self.count += 1
 
     def __iter__(self):
-        return sorted(self.items)
+        return (key for key in self.items)
 
 
 async def fetch_find_metadata(
@@ -189,19 +194,25 @@ async def fetch_find_metadata(
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
                 ].score_type = SCORE_TYPE.BOTH
+                orderer.add(
+                    key=(
+                        result_paragraph.id,
+                        result_paragraph.field,
+                        result_paragraph.paragraph.id,
+                    ),
+                    boosted=True,
+                )
             else:
                 find_field.paragraphs[
                     result_paragraph.paragraph.id
                 ] = result_paragraph.paragraph
-
-            orderer.add(
-                key=(
-                    result_paragraph.id,
-                    result_paragraph.field,
-                    result_paragraph.paragraph.id,
-                ),
-                score=find_field.paragraphs[result_paragraph.paragraph.id].score,
-            )
+                orderer.add(
+                    key=(
+                        result_paragraph.id,
+                        result_paragraph.field,
+                        result_paragraph.paragraph.id,
+                    ),
+                )
 
             operations.append(
                 set_text_value(
