@@ -102,7 +102,7 @@ async def stop_indexing_utility():
         clean_utility(Utility.INDEXING)
 
 
-async def initialize() -> list[Callable[[], Awaitable[None]]]:  # pragma: no cover
+async def initialize() -> list[Callable[[], Awaitable[None]]]:
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
@@ -128,13 +128,18 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:  # pragma: no cov
     return finalizers
 
 
-async def main_consumer():  # pragma: no cover
+async def initialize_consumer_and_grpc() -> list[Callable[[], Awaitable[None]]]:
     finalizers = await initialize()
 
     grpc_finalizer = await start_grpc(SERVICE_NAME)
     consumer_finalizer = await start_consumer(SERVICE_NAME)
 
-    await run_until_exit([grpc_finalizer, consumer_finalizer] + finalizers)
+    return [grpc_finalizer, consumer_finalizer] + finalizers
+
+
+async def main_consumer():  # pragma: no cover
+    finalizers = await initialize_consumer_and_grpc()
+    await run_until_exit(finalizers)
 
 
 async def main_orm_grpc():  # pragma: no cover
