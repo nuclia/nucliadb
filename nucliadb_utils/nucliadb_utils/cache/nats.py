@@ -36,6 +36,7 @@ from nats.js.manager import JetStreamManager
 
 from nucliadb_utils import logger
 from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
+from nucliadb_utils.nats import get_traced_jetstream
 
 
 async def wait_for_it(future: asyncio.Future, msg):
@@ -75,7 +76,7 @@ class NatsPubsub(PubSubDriver):
         if self.nc is None:
             raise AttributeError("NC not initialized")
         if self._jetstream is None:
-            self._jetstream = self.nc.jetstream()
+            self._jetstream = get_traced_jetstream(self.nc, "pubsub")
         return self._jetstream
 
     @property

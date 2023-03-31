@@ -27,7 +27,6 @@ from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
-from nats.js import JetStreamContext
 from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
 from nucliadb_protos.nodewriter_pb2 import (
@@ -37,8 +36,7 @@ from nucliadb_protos.nodewriter_pb2 import (
     TypeMessage,
 )
 from nucliadb_telemetry import errors, metrics
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
-from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
@@ -152,9 +150,7 @@ class Worker:
             options["servers"] = indexing_settings.index_jetstream_servers
 
         self.nc = await nats.connect(**options)
-        self.js = maybe_configure_tracing(
-            self.nc.jetstream(), f"{SERVICE_NAME}_js_worker"
-        )
+        self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
         logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
         await self.subscribe()
 
@@ -363,9 +359,7 @@ class IndexedPublisher:
         if len(self.servers) > 0:
             options["servers"] = self.servers
         self.nc = await nats.connect(**options)
-        self.js = maybe_configure_tracing(
-            self.nc.jetstream(), f"{SERVICE_NAME}_js_publisher"
-        )
+        self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
         await self.create_stream_if_not_exists()
 
     async def create_stream_if_not_exists(self):
@@ -417,11 +411,3 @@ class IndexedPublisher:
         await self.js.publish(subject, indexedpb.SerializeToString())
         logger.info(f"Published to indexed stream {subject}")
         return
-
-
-def maybe_configure_tracing(jetstream: JetStreamContext, name: str):
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:  # pragma: no cover
-        return JetStreamContextTelemetry(jetstream, name, tracer_provider)
-    logger.warning("Telemetry is not set!")
-    return jetstream

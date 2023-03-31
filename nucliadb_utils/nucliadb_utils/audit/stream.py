@@ -30,6 +30,7 @@ from opentelemetry.trace import get_current_span
 
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
+from nucliadb_utils.nats import get_traced_jetstream
 
 
 class StreamAuditStorage(AuditStorage):
@@ -45,6 +46,7 @@ class StreamAuditStorage(AuditStorage):
         partitions: int,
         seed: int,
         nats_creds: Optional[str] = None,
+        service: str = "nucliadb.cache",
     ):
         self.nats_servers = nats_servers
         self.nats_creds = nats_creds
@@ -53,6 +55,7 @@ class StreamAuditStorage(AuditStorage):
         self.seed = seed
         self.lock = asyncio.Lock()
         self.queue = asyncio.Queue()
+        self.service = service
 
     def get_partition(self, kbid: str):
         return mmh3.hash(kbid, self.seed, signed=False) % self.partitions
@@ -87,7 +90,7 @@ class StreamAuditStorage(AuditStorage):
 
         self.nc = await nats.connect(**options)
 
-        self.js = self.nc.jetstream()
+        self.js = get_traced_jetstream(self.nc)
         self.task = asyncio.create_task(self.run())
         self.initialized = True
 

@@ -33,7 +33,7 @@ async def initialize() -> None:
         await init_telemetry(tracer_provider)
 
     await start_ingest(SERVICE_NAME)
-    await start_audit_utility()
+    await start_audit_utility(SERVICE_NAME)
     logging.basicConfig(
         level=logging.INFO,
         format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",

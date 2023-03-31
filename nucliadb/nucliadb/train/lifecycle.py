@@ -45,7 +45,7 @@ async def initialize() -> None:
     await start_chitchat(SERVICE_NAME)
     await start_nodes_manager()
     await start_train_grpc(SERVICE_NAME)
-    await start_audit_utility()
+    await start_audit_utility(SERVICE_NAME)
 
     logging.basicConfig(
         level=logging.INFO,
