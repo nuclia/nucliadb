@@ -54,15 +54,9 @@ class SearchResult:
                 resource = self.client.get_resource(fts.rid)
                 if fts.field_type == "t":
                     text = resource.data.texts[fts.field].value.body
-<<<<<<< Updated upstream
                 # elif fts.field_type == "f":
                 #     filename = resource.data.files[fts.field].value.file.filename
                 #     text = f"File: {filename}"
-=======
-                elif fts.field_type == "f":
-                    filename = resource.data.files[fts.field].value.file.filename
-                    text = f"File: {filename}"
->>>>>>> Stashed changes
                 else:
                     # unsupported field type
                     continue
