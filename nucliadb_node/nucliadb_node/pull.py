@@ -210,6 +210,7 @@ class Worker:
 
     async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain: Resource = await self.storage.get_indexing(pb)
+        brain.shard_id = brain.resource.shard_id = pb.shard
         is_shadow_shard = self.ssm.exists(pb.shard)
         logger.info(
             f"Added [shadow={is_shadow_shard}] {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
@@ -235,10 +236,6 @@ class Worker:
         logger.info(f"...done")
         return status
 
-    async def cleanup_storage(self, pb: IndexMessage):
-        if pb.typemessage == TypeMessage.CREATION:
-            await self.storage.delete_indexing(pb)
-
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
@@ -263,7 +260,7 @@ class Worker:
 
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
-                    logger.error(f"Shard does not exit {pb.shard}")
+                    logger.error(f"Shard does not exist {pb.shard}")
                 else:
                     event_id = errors.capture_exception(grpc_error)
                     logger.error(
@@ -286,7 +283,6 @@ class Worker:
             self.store_seqid(seqid)
             await msg.ack()
             self.event.set()
-            await self.cleanup_storage(pb)
             await self.publisher.indexed(pb)
         except Exception as e:  # pragma: no cover
             errors.capture_exception(e)

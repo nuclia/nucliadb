@@ -46,6 +46,9 @@ class Counter(google.protobuf.message.Message):
     RESOURCES_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     resources: builtins.int
+    """right now, resources is returning a value
+    that represents number of fields, not number of resources
+    """
     paragraphs: builtins.int
     def __init__(
         self,

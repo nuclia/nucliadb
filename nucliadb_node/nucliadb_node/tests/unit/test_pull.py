@@ -24,7 +24,7 @@ import nats as natslib
 import pytest
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
-from nucliadb_node.pull import IndexedPublisher, Worker
+from nucliadb_node.pull import IndexedPublisher
 
 
 class NatsConnectionTest:
@@ -140,24 +140,3 @@ class TestIndexedPublisher:
         publisher.js = None
         with pytest.raises(RuntimeError):
             await publisher.indexed(index_message)
-
-
-class TestWorker:
-    @pytest.mark.asyncio
-    async def test_cleanup_storage_only_cleansup_on_set_resource(self):
-        worker = Worker(Mock(), Mock(), "node")
-        worker.storage = AsyncMock()
-
-        pb_delete = IndexMessage()
-        pb_delete.typemessage = TypeMessage.DELETION
-
-        await worker.cleanup_storage(pb_delete)
-
-        worker.storage.delete_indexing.assert_not_awaited()
-
-        pb_create = IndexMessage()
-        pb_create.typemessage = TypeMessage.CREATION
-
-        await worker.cleanup_storage(pb_create)
-
-        worker.storage.delete_indexing.assert_awaited_once_with(pb_create)

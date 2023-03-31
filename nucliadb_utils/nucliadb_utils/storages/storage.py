@@ -22,7 +22,17 @@ from __future__ import annotations
 import abc
 import hashlib
 from io import BytesIO
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, Tuple, Type
+from typing import (
+    Any,
+    AsyncGenerator,
+    AsyncIterator,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
@@ -41,7 +51,8 @@ KB_CONVERSATION_FIELD = "kbs/{kbid}/r/{uuid}/f/c/{field}/{ident}/{count}"
 STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
 
 DEADLETTER = "deadletter/{partition}/{seqid}/{seq}"
-INDEXING = "index/{node}/{shard}/{txid}"
+OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
+INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 
 
 class StorageField:
@@ -140,25 +151,37 @@ class Storage:
         key = DEADLETTER.format(seqid=seqid, seq=seq, partition=partition)
         await self.uploadbytes(self.deadletter_bucket, key, message.SerializeToString())
 
+    def get_indexing_storage_key(
+        self, *, kb: str, logical_shard: str, resource_uid: str, txid: Union[int, str]
+    ):
+        return INDEXING_KEY.format(
+            kb=kb, shard=logical_shard, resource=resource_uid, txid=txid
+        )
+
     async def indexing(
         self,
         message: BrainResource,
-        node: str,
-        shard: str,
         txid: int,
         partition: Optional[str],
+        kb: str,
+        logical_shard: str,
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
         if txid < 0:
             txid = 0
-        key = INDEXING.format(node=node, shard=shard, txid=txid)
+
+        key = self.get_indexing_storage_key(
+            kb=kb,
+            logical_shard=logical_shard,
+            resource_uid=message.resource.uuid,
+            txid=txid,
+        )
         await self.uploadbytes(self.indexing_bucket, key, message.SerializeToString())
         response = IndexMessage()
-        response.node = node
-        response.shard = shard
         response.txid = txid
         response.typemessage = TypeMessage.CREATION
+        response.storage_key = key
         if partition:
             response.partition = partition
         return response
@@ -166,24 +189,28 @@ class Storage:
     async def reindexing(
         self,
         message: BrainResource,
-        node: str,
-        shard: str,
         reindex_id: str,
         partition: Optional[str],
+        kb: str,
+        logical_shard: str,
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
-        key = INDEXING.format(node=node, shard=shard, txid=reindex_id)
+        key = self.get_indexing_storage_key(
+            kb=kb,
+            logical_shard=logical_shard,
+            resource_uid=message.resource.uuid,
+            txid=reindex_id,
+        )
         logger.info("Starting to serialize message")
         message_serialized = message.SerializeToString()
         logger.info("Starting to upload bytes")
         await self.uploadbytes(self.indexing_bucket, key, message_serialized)
         logger.info("Finished to upload bytes")
         response = IndexMessage()
-        response.node = node
-        response.shard = shard
         response.reindex_id = reindex_id
         response.typemessage = TypeMessage.CREATION
+        response.storage_key = key
         if partition:
             response.partition = partition
         return response
@@ -191,14 +218,21 @@ class Storage:
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
         if self.indexing_bucket is None:
             raise AttributeError()
-        if payload.txid == 0:
-            key = INDEXING.format(
-                node=payload.node, shard=payload.shard, txid=payload.reindex_id
-            )
+        if payload.storage_key:
+            key = payload.storage_key
         else:
-            key = INDEXING.format(
-                node=payload.node, shard=payload.shard, txid=payload.txid
-            )
+            # b/w compatibility
+            if payload.txid == 0:
+                key = OLD_INDEXING_KEY.format(
+                    node=payload.node,
+                    shard=payload.shard,
+                    txid=payload.reindex_id,
+                )
+            else:
+                key = OLD_INDEXING_KEY.format(
+                    node=payload.node, shard=payload.shard, txid=payload.txid
+                )
+
         bytes_buffer = await self.downloadbytes(self.indexing_bucket, key)
         if bytes_buffer.getbuffer().nbytes == 0:
             raise KeyError()
@@ -207,18 +241,29 @@ class Storage:
         bytes_buffer.flush()
         return pb
 
-    async def delete_indexing(self, payload: IndexMessage):
+    async def delete_indexing(
+        self,
+        resource_uid: str,
+        txid: int,
+        kb: str,
+        logical_shard: str,
+    ):
         if self.indexing_bucket is None:
             raise AttributeError()
 
-        if payload.txid == 0 and payload.reindex_id != "":
-            # Deleting a reindexing payload
-            txid = payload.reindex_id
-        else:
-            txid = str(payload.txid)
+        # write out empty data but use the .deleted suffix
+        # so we know by the key that it was deleted
+        key = (
+            self.get_indexing_storage_key(
+                kb=kb,
+                logical_shard=logical_shard,
+                resource_uid=resource_uid,
+                txid=txid,
+            )
+            + ".deleted"
+        )
 
-        key = INDEXING.format(node=payload.node, shard=payload.shard, txid=txid)
-        await self.delete_upload(key, self.indexing_bucket)
+        await self.uploadbytes(self.indexing_bucket, key, b"")
 
     def needs_move(self, file: CloudFile, kbid: str) -> bool:
         # The cloudfile is valid for our environment

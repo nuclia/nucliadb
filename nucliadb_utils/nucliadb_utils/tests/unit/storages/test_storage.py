@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
+from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 
@@ -87,20 +88,20 @@ class TestStorage:
 
     @pytest.mark.asyncio
     async def test_indexing(self, storage: StorageTest):
-        msg = BrainResource()
-        await storage.indexing(msg, "node", "shard", 1, "1")
+        msg = BrainResource(resource=ResourceID(uuid="uuid"))
+        await storage.indexing(msg, 1, "1", "kb", "shard")
 
         storage.uploadbytes.assert_called_once_with(
-            "indexing_bucket", "index/node/shard/1", msg.SerializeToString()
+            "indexing_bucket", "index/kb/shard/uuid/1", msg.SerializeToString()
         )
 
     @pytest.mark.asyncio
     async def test_reindexing(self, storage: StorageTest):
-        msg = BrainResource()
-        await storage.reindexing(msg, "node", "shard", "reindex_id", "1")
+        msg = BrainResource(resource=ResourceID(uuid="uuid"))
+        await storage.reindexing(msg, "reindex_id", "1", "kb", "shard")
 
         storage.uploadbytes.assert_called_once_with(
-            "indexing_bucket", "index/node/shard/reindex_id", msg.SerializeToString()
+            "indexing_bucket", "index/kb/shard/uuid/reindex_id", msg.SerializeToString()
         )
 
     @pytest.mark.asyncio
@@ -112,14 +113,25 @@ class TestStorage:
         assert isinstance(await storage.get_indexing(im), BrainResource)
 
     @pytest.mark.asyncio
-    async def test_delete_indexing(self, storage: StorageTest):
+    async def test_get_indexing_storage_key(self, storage: StorageTest):
         im = IndexMessage()
         im.node = "node"
         im.shard = "shard"
         im.txid = 0
-        await storage.delete_indexing(im)
+        im.storage_key = "index/kb/uuid/1"
+        assert isinstance(await storage.get_indexing(im), BrainResource)
 
-        storage.delete_upload.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_delete_indexing(self, storage: StorageTest):
+        im = IndexMessage()
+        im.node = "node"
+        im.txid = 0
+        im.storage_key = "index/kb/uuid/1"
+        await storage.delete_indexing(
+            resource_uid="resource_uid", txid=1, kb="kb", logical_shard="logical_shard"
+        )
+
+        storage.uploadbytes.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_download_pb(self, storage: StorageTest):
@@ -137,13 +149,18 @@ class TestStorage:
         im = IndexMessage(node="node", shard="shard", txid=0)
 
         with pytest.raises(AttributeError):
-            await storage.indexing(msg, "node", "shard", 1, "1")
+            await storage.indexing(msg, 1, "1", "kb", "shard")
 
         with pytest.raises(AttributeError):
-            await storage.reindexing(msg, "node", "shard", "reindex_id", "1")
+            await storage.reindexing(msg, "reindex_id", "1", "kb", "shard")
 
         with pytest.raises(AttributeError):
             await storage.get_indexing(im)
 
         with pytest.raises(AttributeError):
-            await storage.delete_indexing(im)
+            await storage.delete_indexing(
+                resource_uid="resource_uid",
+                txid=1,
+                kb="kb",
+                logical_shard="logical_shard",
+            )
