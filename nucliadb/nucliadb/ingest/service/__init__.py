@@ -29,21 +29,21 @@ from nucliadb_protos import writer_pb2_grpc
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
-# Removed: ingest  should work when NODES are not all defined
-# async def health_check(health_servicer):
-#     while True:
-#         if len(NODES) == 0 and settings.driver != DriverConfig.local:
-#             await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
-#         else:
-#             await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
-#         try:
-#             await asyncio.sleep(1)
-#         except (
-#             asyncio.CancelledError,
-#             asyncio.TimeoutError,
-#             KeyboardInterrupt,
-#         ):
-#             return
+
+async def health_check(health_servicer):
+    while True:
+        if len(NODES) == 0 and settings.driver != DriverConfig.local:
+            await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
+        else:
+            await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+        try:
+            await asyncio.sleep(1)
+        except (
+            asyncio.CancelledError,
+            asyncio.TimeoutError,
+            KeyboardInterrupt,
+        ):
+            return
 
 
 async def start_grpc(service_name: Optional[str] = None):
@@ -75,7 +75,10 @@ async def start_grpc(service_name: Optional[str] = None):
         f"======= Ingest GRPC serving on http://0.0.0.0:{settings.grpc_port}/ ======"
     )
 
+    health_task = asyncio.create_task(health_check(health_servicer))
+
     async def finalizer():
+        health_task.cancel()
         await servicer.finalize()
         await server.stop(grace=False)
 
