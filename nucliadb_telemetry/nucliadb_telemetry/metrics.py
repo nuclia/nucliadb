@@ -157,6 +157,29 @@ class Counter:
             self.counter.inc()
 
 
+class Histogram:
+    def __init__(
+        self,
+        name: str,
+        *,
+        labelnames: Optional[list[str]] = None,
+        buckets: Optional[list[float]] = None,
+    ):
+        self.labelnames = labelnames or []
+        kwargs = {}
+        if buckets is not None:
+            kwargs["buckets"] = buckets
+        self.histo = prometheus_client.Histogram(
+            name, f"Counter for {name}.", labelnames=self.labelnames, **kwargs  # type: ignore
+        )
+
+    def observe(self, value: float, labels: Optional[dict[str, str]] = None):
+        if labels is not None:
+            self.histo.labels(**labels).observe(value)
+        else:
+            self.histo.observe(value)
+
+
 __all__ = (
     "Observer",
     "ObserverRecorder",
@@ -164,4 +187,5 @@ __all__ = (
     "ERROR",
     "Counter",
     "Gauge",
+    "Histogram",
 )

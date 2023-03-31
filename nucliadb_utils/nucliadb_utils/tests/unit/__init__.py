@@ -16,18 +16,3 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-import asyncio
-
-from nucliadb.ingest.metrics.service import MetricsService
-from nucliadb.ingest.settings import settings
-
-
-async def start_metrics():
-    metrics = MetricsService(
-        host=settings.inner_metrics_host, port=settings.inner_metrics_port
-    )
-
-    asyncio.create_task(metrics.start(), name="Metrics")
-
-    return metrics.stop

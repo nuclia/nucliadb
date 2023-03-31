@@ -22,6 +22,7 @@ import os
 import sys
 
 import click
+from fastapi import FastAPI
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
@@ -32,7 +33,7 @@ from nucliadb_utils.settings_running import running_settings
 STARTUP_FAILURE = 3
 
 
-def run_fastapi_with_metrics(application):  # pragma: no cover
+def metrics_app() -> tuple[Server, Config]:
     loop_setup = "auto"
     log_level = running_settings.log_level.lower()
     if log_level == "warn":
@@ -55,6 +56,22 @@ def run_fastapi_with_metrics(application):  # pragma: no cover
         timeout_keep_alive=5,
     )
     metrics_server = Server(config=metrics_config)
+    return metrics_server, metrics_config
+
+
+async def serve_metrics() -> Server:
+    server, config = metrics_app()
+    await start_server(server, config)
+    return server
+
+
+def run_fastapi_with_metrics(application: FastAPI) -> None:
+    loop_setup = "auto"
+    log_level = running_settings.log_level.lower()
+    if log_level == "warn":
+        log_level = "warning"
+
+    metrics_server, metrics_config = metrics_app()
 
     config = Config(
         application,
@@ -75,50 +92,43 @@ def run_fastapi_with_metrics(application):  # pragma: no cover
     server = Server(config=config)
 
     server.config.setup_event_loop()
-    asyncio.run(
-        serve(
-            main_server=server,
-            main_config=config,
-            metrics_server=metrics_server,
-            metrics_config=metrics_config,
-        )
-    )
+
+    async def serve_both():
+        await start_server(metrics_server, metrics_config)
+        await run_server_forever(server, config)
+        await metrics_server.shutdown()
+
+    asyncio.run(serve_both())
 
     if not metrics_server.started or not server.started:
         sys.exit(STARTUP_FAILURE)
 
 
-async def serve(
-    main_server: Server,
-    main_config: Config,
-    metrics_server: Server,
-    metrics_config: Config,
-):  # pragma: no cover
+async def start_server(server: Server, config: Config):
+    """
+    Abstracted out of Server.serve to allow running multiple servers
+    and not trounce on signal handlers.
+    """
+    if not config.loaded:
+        config.load()
+
+    server.lifespan = config.lifespan_class(config)
+
+    await server.startup()
+
+
+async def run_server_forever(server: Server, config: Config):
+    await start_server(server, config)
     process_id = os.getpid()
 
-    if not main_config.loaded:
-        main_config.load()
-
-    if not metrics_config.loaded:
-        metrics_config.load()
-
-    main_server.lifespan = main_config.lifespan_class(main_config)
-    metrics_server.lifespan = metrics_config.lifespan_class(metrics_config)
-
-    main_server.install_signal_handlers()
+    server.install_signal_handlers()
 
     message = "Started server process [%d]"
     color_message = "Started server process [" + click.style("%d", fg="cyan") + "]"
     logger.info(message, process_id, extra={"color_message": color_message})
 
-    await main_server.startup()
-    await metrics_server.startup()
-    if main_server.should_exit:
+    if server.should_exit:
         return
-    await main_server.main_loop()
-    await main_server.shutdown()
-    await metrics_server.shutdown()
 
-    message = "Finished server process [%d]"
-    color_message = "Finished server process [" + click.style("%d", fg="cyan") + "]"
-    logger.info(message, process_id, extra={"color_message": color_message})
+    await server.main_loop()
+    await server.shutdown()

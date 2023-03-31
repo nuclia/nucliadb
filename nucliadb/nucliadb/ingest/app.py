@@ -19,10 +19,8 @@
 #
 import asyncio
 import logging
-import signal
 import sys
-from asyncio import tasks
-from typing import Callable, List, Optional, Union
+from typing import Awaitable, Callable, Optional, Union
 
 import pkg_resources
 from opentelemetry.propagate import set_global_textmap
@@ -31,13 +29,14 @@ from opentelemetry.propagators.b3 import B3MultiFormat
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.chitchat import start_chitchat
 from nucliadb.ingest.consumer import start_consumer
-from nucliadb.ingest.metrics import start_metrics
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.run import run_until_exit
 from nucliadb_utils.settings import (
     indexing_settings,
     running_settings,
@@ -103,7 +102,7 @@ async def stop_indexing_utility():
         clean_utility(Utility.INDEXING)
 
 
-async def main() -> List[Callable]:
+async def initialize() -> list[Callable[[], Awaitable[None]]]:
     set_logging()
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:  # pragma: no cover
@@ -117,11 +116,11 @@ async def main() -> List[Callable]:
     await start_audit_utility()
     grpc_finalizer = await start_grpc(SERVICE_NAME)
     consumer_finalizer = await start_consumer(SERVICE_NAME)
-    metrics_finalizer = await start_metrics()
+    metrics_server = await serve_metrics()
 
     finalizers = [
         grpc_finalizer,
-        metrics_finalizer,
+        metrics_server.shutdown,
         consumer_finalizer,
         stop_transaction_utility,
         stop_indexing_utility,
@@ -131,39 +130,12 @@ async def main() -> List[Callable]:
     if chitchat is not None:
         finalizers.append(chitchat.close)
 
-    # Using ensure_future as Signal handlers
-    # cannot handle couroutines as callbacks
-    def stop_pulling():
-        logger.info("Received signal to stop pulling!")
-        asyncio.ensure_future(consumer_finalizer())
-
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGUSR1, stop_pulling)
-
     return finalizers
 
 
-def _cancel_all_tasks(loop):
-    to_cancel = tasks.all_tasks(loop)
-    if not to_cancel:
-        return
-
-    for task in to_cancel:
-        task.cancel()
-
-    loop.run_until_complete(tasks.gather(*to_cancel, return_exceptions=True))
-
-    for task in to_cancel:
-        if task.cancelled():
-            continue
-        if task.exception() is not None:
-            loop.call_exception_handler(
-                {
-                    "message": "unhandled exception during asyncio.run() shutdown",
-                    "exception": task.exception(),
-                    "task": task,
-                }
-            )
+async def main():
+    finalizers = await initialize()
+    await run_until_exit(finalizers)
 
 
 def set_logging():
@@ -199,33 +171,4 @@ def run() -> None:
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")
 
-    loop = asyncio.new_event_loop()
-    finalizers: List[Callable] = []
-    try:
-        asyncio.set_event_loop(loop)
-        if running_settings.debug is not None:
-            loop.set_debug(running_settings.debug)
-        finalizers.extend(loop.run_until_complete(main()))
-
-        if settings.monitor is True:
-            import aiomonitor  # type: ignore
-
-            with aiomonitor.start_monitor(
-                loop=loop, host="0.0.0.0", port=settings.monitor_port
-            ):
-                loop.run_forever()
-        else:
-            loop.run_forever()
-    finally:
-        try:
-            for finalizer in finalizers:
-                if asyncio.iscoroutinefunction(finalizer):
-                    loop.run_until_complete(finalizer())
-                else:
-                    finalizer()
-            _cancel_all_tasks(loop)
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.run_until_complete(loop.shutdown_default_executor())
-        finally:
-            asyncio.set_event_loop(None)
-            loop.close()
+    asyncio.run(main())

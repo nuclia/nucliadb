@@ -26,36 +26,36 @@ import pytest
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexedMessage, IndexMessage, TypeMessage
+from nucliadb_utils.utilities import get_storage
 
 from nucliadb_node import SERVICE_NAME, shadow_shards
-from nucliadb_node.app import App
+from nucliadb_node.pull import Worker
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.shadow_shards import OperationCode
-from nucliadb_utils.utilities import get_storage
 
 TEST_PARTITION = "111"
 
 
 @pytest.mark.asyncio
-async def test_indexing(sidecar: App, shard: str):
+async def test_indexing(worker, shard: str, reader):
     node = settings.force_host_id
 
     resource = resource_payload(shard)
     index = await create_indexing_message(resource, shard, node)
-    await send_indexing_message(sidecar, index, node)  # type: ignore
+    await send_indexing_message(worker, index, node)  # type: ignore
 
     sipb = ShardId()
     sipb.id = shard
 
-    pbshard: Optional[Shard] = await sidecar.reader.get_shard(sipb)
+    pbshard: Optional[Shard] = await reader.get_shard(sipb)
     if pbshard is not None and pbshard.resources > 0:
         processed = True
     else:
         processed = False
 
-    while processed is False:
+    while processed is False:  # pragma: no cover
         await asyncio.sleep(0.1)
-        pbshard = await sidecar.reader.get_shard(sipb)
+        pbshard = await reader.get_shard(sipb)
         if pbshard is not None and pbshard.resources > 0:
             processed = True
         else:
@@ -71,33 +71,33 @@ async def test_indexing(sidecar: App, shard: str):
 
 
 @pytest.mark.asyncio
-async def test_indexing_not_found(sidecar: App):
+async def test_indexing_not_found(worker, reader):
     node = settings.force_host_id
     shard = "fake-shard"
 
     resource = resource_payload(shard)
     index = await create_indexing_message(resource, shard, node)
-    await send_indexing_message(sidecar, index, node)  # type: ignore
+    await send_indexing_message(worker, index, node)  # type: ignore
 
     sipb = ShardId()
     sipb.id = shard
 
     with pytest.raises(AioRpcError):
-        await sidecar.reader.get_shard(sipb)
+        await reader.get_shard(sipb)
 
 
 @pytest.mark.asyncio
-async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str):
+async def test_indexing_shadow_shard(data_path, worker, shadow_shard: str):
     node_id = settings.force_host_id
 
     # Add a set resource operation
     pb = resource_payload(shadow_shard)
     setpb = await create_indexing_message(pb, shadow_shard, node_id)
-    await send_indexing_message(sidecar, setpb, node_id)  # type: ignore
+    await send_indexing_message(worker, setpb, node_id)  # type: ignore
 
     # Add a delete operation
     deletepb = delete_indexing_message("bar", shadow_shard, node_id)  # type: ignore
-    await send_indexing_message(sidecar, deletepb, node_id)  # type: ignore
+    await send_indexing_message(worker, deletepb, node_id)  # type: ignore
 
     # Check that they were stored in a shadow shard
     ssm = shadow_shards.get_manager()
@@ -125,15 +125,13 @@ async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str)
 
 
 @pytest.mark.asyncio
-async def test_indexing_publishes_to_sidecar_index_stream(
-    sidecar: App, shard: str, natsd
-):
+async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
     node_id = settings.force_host_id
     assert node_id
 
     indexpb = await create_indexing_message(resource_payload(shard), shard, node_id)
 
-    await send_indexing_message(sidecar, indexpb, node_id)  # type: ignore
+    await send_indexing_message(worker, indexpb, node_id)  # type: ignore
 
     msg = await get_indexed_message(natsd)
 
@@ -186,10 +184,10 @@ async def create_indexing_message(resource: Resource, shard: str, node) -> Index
     return index
 
 
-async def send_indexing_message(sidecar: App, index: IndexMessage, node: str):
+async def send_indexing_message(worker: Worker, index: IndexMessage, node: str):
     # Push on stream
     assert indexing_settings.index_jetstream_target is not None
-    await sidecar.worker.js.publish(
+    await worker.js.publish(
         indexing_settings.index_jetstream_target.format(node=node),
         index.SerializeToString(),
     )
@@ -218,7 +216,7 @@ async def get_indexed_message(natsd):
     msg = None
     try:
         msg = await asyncio.wait_for(future, 1)
-    except TimeoutError:
+    except TimeoutError:  # pragma: no cover
         pass
     finally:
         await nc.flush()

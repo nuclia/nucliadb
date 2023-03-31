@@ -17,19 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
+from nucliadb_protos import nodesidecar_pb2_grpc
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.utils import get_telemetry
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.reader import Reader  # type: ignore
 from nucliadb_node.servicer import SidecarServicer
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
-from nucliadb_protos import nodesidecar_pb2_grpc
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry
 
 
 async def start_grpc(writer: Writer, reader: Reader):
@@ -52,8 +51,8 @@ async def start_grpc(writer: Writer, reader: Reader):
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     await server.start()
 
-    def finalizer():
-        asyncio.create_task(servicer.finalize())
-        asyncio.create_task(server.stop(grace=False))
+    async def finalizer():
+        await servicer.finalize()
+        await server.stop(grace=False)
 
     return finalizer

@@ -8,3 +8,4 @@ grpcio-testing>=1.44.0
 grpcio-reflection>=1.44.0
 opentelemetry-propagator-b3==1.11.1
 nucliadb-telemetry>=1.5.0
+watchdog>=2.3.1

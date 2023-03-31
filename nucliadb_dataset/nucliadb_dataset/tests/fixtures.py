@@ -155,7 +155,7 @@ class S3(BaseImage):
         try:
             response = requests.get(f"http://{self.host}:{self.get_port()}")
             return response.status_code == 404
-        except:  # noqa
+        except Exception:  # pragma: no cover
             return False
 
 

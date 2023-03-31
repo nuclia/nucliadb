@@ -19,7 +19,7 @@
 #
 import asyncio
 
-from nucliadb.ingest.app import main as initialize_ingest
+from nucliadb.ingest.app import initialize as initialize_ingest
 from nucliadb.reader.lifecycle import finalize as finalize_reader
 from nucliadb.reader.lifecycle import initialize as initialize_reader
 from nucliadb.search.lifecycle import finalize as finalize_search

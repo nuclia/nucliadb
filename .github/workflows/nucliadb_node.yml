@@ -70,13 +70,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb_node/ install-dev
+
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb_node --config=nucliadb_node/setup.cfg
-          isort -c --profile black nucliadb_node/
-          black --check --verbose nucliadb_node
+        run: make -C nucliadb_node/ lint
 
   licenses:
     name: Check Licenses
@@ -169,20 +166,12 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb_node/requirements-sources.txt
-          pip install -r nucliadb_node/requirements.txt
-          pip install -e nucliadb_node
+        run: make -C nucliadb_node/ install-dev
 
       - name: Install rust binding for testing
         run: |
           maturin build -m nucliadb_node/binding/Cargo.toml
           pip install target/wheels/*_x86_64.whl
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_node/
 
       - uses: dorny/paths-filter@v2
         id: filter

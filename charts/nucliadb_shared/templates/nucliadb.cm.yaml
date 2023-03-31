@@ -93,3 +93,7 @@ data:
 {{- if not .Values.telemetry.enabled }}
   NUCLIADB_DISABLE_TELEMETRY: "True"
 {{- end }}
+
+{{- if .Values.flag_settings_url }}
+  FLAG_SETTINGS_URL: "{{ .Values.flag_settings_url }}"
+{{- end }}

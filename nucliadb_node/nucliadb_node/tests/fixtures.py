@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import os
 import tempfile
 import time
@@ -36,8 +35,12 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_node import shadow_shards
-from nucliadb_node.app import App, main
+from nucliadb_node.app import start_worker
+from nucliadb_node.pull import Worker
+from nucliadb_node.reader import Reader
+from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
+from nucliadb_node.writer import Writer
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -102,7 +105,7 @@ class nucliadbNodeReader(BaseImage):
         try:
             result = stub.Check(pb)
             return result.status == 1
-        except:  # noqa
+        except Exception:  # pragma: no cover
             return False
 
 
@@ -127,7 +130,7 @@ class nucliadbNodeWriter(BaseImage):
         try:
             result = stub.Check(pb)
             return result.status == 1
-        except:  # noqa
+        except Exception:  # pragma: no cover
             return False
 
 
@@ -159,9 +162,8 @@ def node_single():
             try:
                 docker_client.containers.get(container.container_obj.id)
             except docker.errors.NotFound:
-                print("REMOVED")
                 break
-            time.sleep(2)
+            time.sleep(2)  # pragma: no cover
 
     volume_node.remove()
 
@@ -174,31 +176,54 @@ async def writer_stub(node_single):
 
 
 @pytest.fixture(scope="function")
-async def sidecar(
-    node_single, writer_stub: NodeWriterStub, gcs_storage, natsd, data_path: str
-) -> AsyncIterable[App]:
-    settings.force_host_id = "node1"
-    settings.data_path = data_path
-    indexing_settings.index_jetstream_servers = [natsd]
-    app = await main()
-
-    yield app
-
-    # Cleanup all shards to be ready for following tests
-    shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
-    for shard in shards.ids:
-        deleted = await writer_stub.DeleteShard(shard)  # type: ignore
-        assert shard == deleted
-
-    for finalizer in app.finalizers:
-        if asyncio.iscoroutinefunction(finalizer):
-            await finalizer()
-        else:
-            finalizer()
+async def reader() -> AsyncIterable[Reader]:
+    reader = Reader(settings.reader_listen_address)
+    yield reader
+    await reader.close()
 
 
 @pytest.fixture(scope="function")
-async def sidecar_stub(sidecar):
+async def writer() -> AsyncIterable[Writer]:
+    writer = Writer(settings.writer_listen_address)
+    yield writer
+    await writer.close()
+
+
+@pytest.fixture(scope="function")
+async def grpc_server(reader, writer):
+    grpc_finalizer = await start_grpc(writer=writer, reader=reader)
+    yield
+    await grpc_finalizer()
+
+
+@pytest.fixture(scope="function")
+async def worker(
+    node_single,
+    writer_stub: NodeWriterStub,
+    gcs_storage,
+    natsd,
+    data_path: str,
+    reader,
+    writer,
+    grpc_server,
+) -> AsyncIterable[Worker]:
+    settings.force_host_id = "node1"
+    settings.data_path = data_path
+    indexing_settings.index_jetstream_servers = [natsd]
+
+    worker = await start_worker(writer, reader)
+    yield worker
+
+    # Cleanup all shards to be ready for following tests
+    shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
+    for shard in shards.ids:  # pragma: no cover
+        await writer_stub.DeleteShard(shard)  # type: ignore
+
+    await worker.finalize()
+
+
+@pytest.fixture(scope="function")
+async def sidecar_stub(worker):
     channel = aio.insecure_channel(settings.sidecar_listen_address)
     stub = NodeSidecarStub(channel)
     yield stub
@@ -225,7 +250,7 @@ def data_path():
 
         if previous is None:
             os.environ.pop("DATA_PATH")
-        else:
+        else:  # pragma: no cover
             os.environ["DATA_PATH"] = previous
 
 

@@ -36,11 +36,6 @@ from nucliadb_protos.nodewriter_pb2 import (
     OpStatus,
     TypeMessage,
 )
-
-from nucliadb_node import SERVICE_NAME, logger, shadow_shards
-from nucliadb_node.reader import Reader
-from nucliadb_node.settings import indexing_settings, settings
-from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
@@ -52,10 +47,16 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 
+from nucliadb_node import SERVICE_NAME, logger, shadow_shards
+from nucliadb_node.reader import Reader
+from nucliadb_node.settings import indexing_settings, settings
+from nucliadb_node.writer import Writer
+
 subscriber_observer = metrics.Observer(
     "message_processor",
     buckets=[
         0.01,
+        0.025,
         0.05,
         0.1,
         0.5,
@@ -64,10 +65,9 @@ subscriber_observer = metrics.Observer(
         5.0,
         7.5,
         10.0,
-        15.0,
         30.0,
-        600.0,
-        1200.0,
+        60.0,
+        120.0,
         float("inf"),
     ],
 )
@@ -111,6 +111,7 @@ class Worker:
             clean_utility(Utility.TRANSACTION)
 
         await self.publisher.finalize()
+        await self.storage.finalize()
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -173,6 +174,12 @@ class Worker:
             pass
 
     async def garbage(self) -> None:
+        try:
+            await self._garbage()
+        except (asyncio.CancelledError, RuntimeError):  # pragma: no cover
+            return
+
+    async def _garbage(self) -> None:
         while True:
             await self.event.wait()
             await asyncio.sleep(10)
@@ -285,7 +292,7 @@ class Worker:
             self.event.set()
             await self.cleanup_storage(pb)
             await self.publisher.indexed(pb)
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             errors.capture_exception(e)
             logger.error(
                 f"An error on subscription_worker. Check sentry for more details."
