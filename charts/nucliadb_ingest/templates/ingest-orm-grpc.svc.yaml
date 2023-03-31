@@ -11,9 +11,9 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app: ingest
+    app: ingest-orm-grpc
   ports:
-    - name: ingest-orm-grpc
+    - name: grpc-ingest
       port: {{ .Values.serving.grpc }}
       protocol: TCP
       appProtocol: grpc
