@@ -195,15 +195,6 @@ class PullWorker:
             await self.nc.close()
 
     async def subscription_worker(self, msg: Msg):
-        while len(NODES) == 0:
-            logger.warning(
-                "Waiting for nodes to be discovered through chitchat before processing any messages"
-            )
-            # use in_progress instead of a nak since a nak can put the
-            # message behind another message and ordering matters
-            await msg.in_progress()
-            await asyncio.sleep(1)
-
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])
