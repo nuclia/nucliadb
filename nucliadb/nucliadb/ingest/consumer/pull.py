@@ -37,12 +37,11 @@ from nucliadb.ingest.orm.exceptions import (
 )
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors, metrics
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
-from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
+from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction
 
@@ -161,15 +160,7 @@ class PullWorker:
                 pass
 
             if self.nc is not None:
-                jetstream = self.nc.jetstream()
-
-                tracer_provider = get_telemetry(SERVICE_NAME)
-                if tracer_provider is not None:  # pragma: no cover
-                    self.js = JetStreamContextTelemetry(
-                        jetstream, f"{SERVICE_NAME}_worker", tracer_provider
-                    )
-                else:
-                    self.js = jetstream
+                self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
 
                 last_seqid = await self.processor.driver.last_seqid(self.partition)
                 if last_seqid is None:

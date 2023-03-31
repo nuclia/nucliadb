@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -245,8 +245,8 @@ def get_audit() -> Optional[AuditStorage]:
     return get_utility(Utility.AUDIT)
 
 
-async def start_audit_utility():
-    audit_utility = None
+async def start_audit_utility(service: str):
+    audit_utility: Optional[AuditStorage] = None
     if audit_settings.audit_driver == "basic":
         audit_utility = BasicAuditStorage()
         logger.info("Configuring basic audit log")
@@ -254,9 +254,10 @@ async def start_audit_utility():
         audit_utility = StreamAuditStorage(
             nats_creds=audit_settings.audit_jetstream_auth,
             nats_servers=audit_settings.audit_jetstream_servers,
-            nats_target=audit_settings.audit_jetstream_target,
+            nats_target=cast(str, audit_settings.audit_jetstream_target),
             partitions=audit_settings.audit_partitions,
             seed=audit_settings.audit_hash_seed,
+            service=service,
         )
         logger.info(
             f"Configuring stream audit log {audit_settings.audit_jetstream_target}"

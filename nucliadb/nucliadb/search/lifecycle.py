@@ -71,7 +71,7 @@ async def initialize() -> None:
     )
 
     logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
-    await start_audit_utility()
+    await start_audit_utility(SERVICE_NAME)
 
 
 async def finalize() -> None:

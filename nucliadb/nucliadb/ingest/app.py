@@ -116,7 +116,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
 
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)
-    await start_audit_utility()
+    await start_audit_utility(SERVICE_NAME)
     metrics_server = await serve_metrics()
 
     finalizers = [
