@@ -46,7 +46,26 @@ from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction
 
-consumer_observer = metrics.Observer("message_processor", labels={"source": ""})
+consumer_observer = metrics.Observer(
+    "message_processor",
+    labels={"source": ""},
+    buckets=[
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.5,
+        1.0,
+        2.5,
+        5.0,
+        7.5,
+        10.0,
+        30.0,
+        60.0,
+        120.0,
+        float("inf"),
+    ],
+)
 
 
 class PullWorker:
