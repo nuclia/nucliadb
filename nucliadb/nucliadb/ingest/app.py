@@ -23,6 +23,9 @@ import sys
 from typing import Awaitable, Callable, Optional, Union
 
 import pkg_resources
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
@@ -36,9 +39,6 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.indexing import IndexingUtility
-from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
-    AioHttpClientInstrumentor,
-)
 from nucliadb_utils.run import run_until_exit
 from nucliadb_utils.settings import (
     indexing_settings,
