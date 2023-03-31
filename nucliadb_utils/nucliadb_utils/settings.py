@@ -98,7 +98,7 @@ nuclia_settings = NucliaSettings()
 
 
 class NucliaDBSettings(BaseSettings):
-    nucliadb_ingest: Optional[str] = "ingest.nucliadb.svc.cluster.local:4242"
+    nucliadb_ingest: Optional[str] = "ingest-orm-grpc.nucliadb.svc.cluster.local:4242"
 
 
 nucliadb_settings = NucliaDBSettings()

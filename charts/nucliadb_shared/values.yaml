@@ -48,7 +48,7 @@ nuclia:
   nuclia_partitions: 1
 
 nucliadb:
-  ingest: ingest:4242
+  ingest: ingest-orm-grpc:8030
   node_writer_port: 10001
   node_reader_port: 10000
   node_sidecar_port: 10002
