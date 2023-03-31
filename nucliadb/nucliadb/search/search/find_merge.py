@@ -199,7 +199,7 @@ async def fetch_find_metadata(
                 ].score_type = SCORE_TYPE.BOTH
                 orderer.add_boosted(
                     (
-                        result_paragraph.id,
+                        result_paragraph.rid,
                         result_paragraph.field,
                         result_paragraph.paragraph.id,
                     )
@@ -210,7 +210,7 @@ async def fetch_find_metadata(
                 ] = result_paragraph.paragraph
                 orderer.add(
                     (
-                        result_paragraph.id,
+                        result_paragraph.rid,
                         result_paragraph.field,
                         result_paragraph.paragraph.id,
                     )
