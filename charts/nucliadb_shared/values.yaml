@@ -1,7 +1,7 @@
 # NucliaDB Settings
 
 running:
-  debug: False
+  debug: True
   log_level: DEBUG
   running_environment: local
   logging_integration: False
