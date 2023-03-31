@@ -32,7 +32,7 @@ def get_traced_jetstream(nc: NATS, service_name: str) -> JetStreamContext:
     tracer_provider = get_telemetry(service_name)
 
     if tracer_provider is not None and jetstream is not None:  # pragma: no cover
-        logger.info("Configuring transaction queue with telemetry")
+        logger.info(f"Configuring {service_name} jetstream with telemetry")
         jetstream = JetStreamContextTelemetry(
             jetstream, f"{service_name}_transaction", tracer_provider
         )
