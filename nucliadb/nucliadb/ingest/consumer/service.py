@@ -23,9 +23,14 @@ from typing import Dict, List, Optional
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.pull import PullWorker
 from nucliadb.ingest.maindb.driver import Driver
+from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
-from nucliadb_utils.settings import nuclia_settings, transaction_settings
+from nucliadb_utils.settings import (
+    nuclia_settings,
+    running_settings,
+    transaction_settings,
+)
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
@@ -116,6 +121,15 @@ class ConsumerService:
         logger.info(
             f"Ingest txn from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
         )
+
+        while len(NODES) == 0 and running_settings.running_environment not in (
+            "local",
+            "test",
+        ):
+            logger.warning(
+                "Initializion delayed 1s to receive some Nodes on the cluster"
+            )
+            await asyncio.sleep(1)
 
         for partition in self.partitions:
             self.pull_workers[partition] = PullWorker(
