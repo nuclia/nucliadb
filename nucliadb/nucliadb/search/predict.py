@@ -54,7 +54,7 @@ FEEDBACK = "/feedback"
 
 
 predict_observer = metrics.Observer(
-    "predict_api",
+    "predict_engine",
     labels={"type": ""},
     error_mappings={
         "over_limits": LimitsExceededError,

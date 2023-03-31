@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 
 import nucliadb_models as models
 from nucliadb_models.resource import QueueType
+from nucliadb_telemetry import metrics
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage
@@ -40,6 +41,15 @@ if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
 else:
     SourceValue = int
+
+processing_observer = metrics.Observer(
+    "processing_engine",
+    labels={"type": ""},
+    error_mappings={
+        "over_limits": LimitsExceededError,
+        "error": SendToProcessError,
+    },
+)
 
 
 class Source(SourceValue, Enum):  # type: ignore
@@ -206,6 +216,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
+    @processing_observer.wrap({"type": "file_field_upload"})
     async def convert_filefield_to_str(self, file: models.FileField) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
@@ -253,6 +264,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
+    @processing_observer.wrap({"type": "file_field_upload_internal"})
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
     ) -> str:
@@ -292,6 +304,7 @@ class ProcessingEngine:
                     raise Exception(f"STATUS: {resp.status} - {text}")
         return jwttoken
 
+    @processing_observer.wrap({"type": "cloud_file_upload"})
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
         if self.onprem is False:
             # Upload the file to processing upload
@@ -337,31 +350,37 @@ class ProcessingEngine:
                 seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
             )
 
-        headers = {"CONTENT-TYPE": "application/json"}
-        if self.onprem is False:
-            # Upload the payload
-            item.partition = partition
-            resp = await self.session.post(
-                url=f"{self.nuclia_internal_push}", data=item.json(), headers=headers
-            )
-        else:
-            headers.update({"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"})
-            # Upload the payload
-            resp = await self.session.post(
-                url=self.nuclia_external_push + "?partition=" + str(partition),
-                data=item.json(),
-                headers=headers,
-            )
-        if resp.status == 200:
-            data = await resp.json()
-            seqid = data.get("seqid")
-            account_seq = data.get("account_seq")
-            queue_type = data.get("queue")
-        elif resp.status in (402, 413):
-            data = await resp.json()
-            raise LimitsExceededError(resp.status, data["detail"])
-        else:
-            raise SendToProcessError(f"{resp.status}: {await resp.text()}")
+        op_type = "process_external" if self.onprem else "process_internal"
+        with processing_observer({"type": op_type}):
+            headers = {"CONTENT-TYPE": "application/json"}
+            if self.onprem is False:
+                # Upload the payload
+                item.partition = partition
+                resp = await self.session.post(
+                    url=f"{self.nuclia_internal_push}",
+                    data=item.json(),
+                    headers=headers,
+                )
+            else:
+                headers.update(
+                    {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+                )
+                # Upload the payload
+                resp = await self.session.post(
+                    url=self.nuclia_external_push + "?partition=" + str(partition),
+                    data=item.json(),
+                    headers=headers,
+                )
+            if resp.status == 200:
+                data = await resp.json()
+                seqid = data.get("seqid")
+                account_seq = data.get("account_seq")
+                queue_type = data.get("queue")
+            elif resp.status in (402, 413):
+                data = await resp.json()
+                raise LimitsExceededError(resp.status, data["detail"])
+            else:
+                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
 
         logger.info(
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
