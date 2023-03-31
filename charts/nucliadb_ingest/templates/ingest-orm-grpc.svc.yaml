@@ -1,0 +1,23 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: ingest-orm-grpc
+  labels:
+    app: ingest-orm-grpc
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: ingest-orm-grpc
+  ports:
+    - name: grpc-ingest
+      port: {{ .Values.serving.grpc }}
+      protocol: TCP
+      appProtocol: grpc
+    - name: cluster-monitor
+      port: {{ .Values.chitchat.cluster_manager.port }}
+      protocol: TCP
+      appProtocol: tcp

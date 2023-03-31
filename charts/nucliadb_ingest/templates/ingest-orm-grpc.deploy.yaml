@@ -1,60 +1,47 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
-  name: ingest
+  name: ingest-orm-grpc
   labels:
-    app: ingest
-    app.kubernetes.io/name: ingest
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app: ingest-orm-grpc
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.ingest_orm_grpc_replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
-  podManagementPolicy: OrderedReady
-  updateStrategy:
-    type: RollingUpdate
-  serviceName: ingest-headless
   selector:
     matchLabels:
-      app: ingest
-      app.kubernetes.io/name: ingest
-      app.kubernetes.io/instance: {{ .Release.Name }}
-      app.kubernetes.io/managed-by: {{ .Release.Service }}
+      app: ingest-orm-grpc
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      name: ingest
+      name: ingest-orm-grpc
       annotations:
         traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.monitor }},{{.Values.serving.metricsPort }}"
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
       labels:
-        app: ingest
-        app.kubernetes.io/name: ingest
-        app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app: ingest-orm-grpc
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
     spec:
-      nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:
 {{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
       affinity:
 {{ toYaml .Values.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
       containers:
-      - name: ingest
-        securityContext:
-          privileged: true
+      - name: ingest-orm-grpc
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
@@ -71,7 +58,9 @@ spec:
           periodSeconds: 20
           timeoutSeconds: 5
           failureThreshold: 3
-        command: ["ndb_ingest"]
+        command: [
+          "ndb_ingest_orm_grpc"
+        ]
         envFrom:
         - configMapRef:
             name: nucliadb-config
@@ -82,10 +71,8 @@ spec:
           containerPort: {{ .Values.serving.grpc }}
         - containerPort: {{ .Values.serving.monitor }}
         - containerPort: {{ .Values.serving.metricsPort }}
-        - name: cluster-monitor
-          containerPort: {{ .Values.chitchat.cluster_manager.port }}
         resources:
-{{ toYaml .Values.resources | indent 10 }}
+{{ toYaml .Values.ingest_orm_grpc_resources | indent 10 }}
 {{- if .Values.nats.secretName }}
         volumeMounts:
           - name: nats-creds

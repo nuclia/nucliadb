@@ -55,7 +55,8 @@ setup(
         "console_scripts": [
             "nucliadb = nucliadb.run:run",
             "nucliadb_purge = nucliadb.purge:purge",
-            "ndb_ingest = nucliadb.ingest.app:run",
+            "ndb_ingest = nucliadb.ingest.app:run_consumer",
+            "ndb_ingest_orm_grpc = nucliadb.ingest.app:run_orm_grpc",
             "ndb_purge = nucliadb.ingest.purge:run",
             "nucliadb_one = nucliadb.one:run",
             "extract-openapi-reader = nucliadb.reader.openapi:command_extract_openapi",
