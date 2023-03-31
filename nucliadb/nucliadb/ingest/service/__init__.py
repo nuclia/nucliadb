@@ -73,6 +73,7 @@ async def start_grpc(service_name: Optional[str] = None):
     writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     await server.start()
+
     logger.info(
         f"======= Ingest GRPC serving on http://0.0.0.0:{settings.grpc_port}/ ======"
     )

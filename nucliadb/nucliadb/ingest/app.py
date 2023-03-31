@@ -103,7 +103,6 @@ async def stop_indexing_utility():
 
 
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
-    set_logging()
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:  # pragma: no cover
         set_global_textmap(B3MultiFormat())
@@ -114,14 +113,10 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)
     await start_audit_utility()
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
-    consumer_finalizer = await start_consumer(SERVICE_NAME)
     metrics_server = await serve_metrics()
 
     finalizers = [
-        grpc_finalizer,
         metrics_server.shutdown,
-        consumer_finalizer,
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
@@ -133,12 +128,22 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     return finalizers
 
 
-async def main():
+async def main_consumer():
     finalizers = await initialize()
-    await run_until_exit(finalizers)
+
+    grpc_finalizer = await start_grpc(SERVICE_NAME)
+    consumer_finalizer = await start_consumer(SERVICE_NAME)
+
+    await run_until_exit([grpc_finalizer, consumer_finalizer] + finalizers)
 
 
-def set_logging():
+async def main_orm_grpc():
+    finalizers = await initialize()
+    grpc_finalizer = await start_grpc(SERVICE_NAME)
+    await run_until_exit([grpc_finalizer] + finalizers)
+
+
+def setup_configuration():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)-18s | %(levelname)-7s | %(name)-16s | %(message)s",
@@ -164,11 +169,23 @@ def set_logging():
 
     assign_partitions(settings)
 
-
-def run() -> None:
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")
 
-    asyncio.run(main())
+
+def run_consumer() -> None:
+    """
+    Run the consumer + GRPC ingest service
+    """
+    setup_configuration()
+    asyncio.run(main_consumer())
+
+
+def run_orm_grpc() -> None:
+    """
+    Run the ingest GRPC service
+    """
+    setup_configuration()
+    asyncio.run(main_orm_grpc())
