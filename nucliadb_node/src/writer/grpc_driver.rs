@@ -213,8 +213,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             id: resource.shard_id.clone(),
         };
         self.load_shard(&shard_id).await;
-        let mut writer = self.inner.write().await;
-        let result = writer.set_resource(&shard_id, &resource);
+
+        let inner = self.inner.read().await;
+        let result = inner.set_resource(&shard_id, &resource);
         match result.transpose() {
             Some(Ok(mut status)) => {
                 info!("Set resource ends correctly");
@@ -256,8 +257,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
         self.load_shard(shard_id).await;
-        let mut writer = self.inner.write().await;
-        match writer.delete_relation_nodes(shard_id, &request).transpose() {
+
+        let inner = self.inner.read().await;
+        match inner.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
                 info!("Delete relations ends correctly");
                 status.status = 0;
@@ -283,8 +285,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
         self.load_shard(&shard_id).await;
-        let mut writer = self.inner.write().await;
-        match writer.join_relations_graph(&shard_id, &graph).transpose() {
+
+        let inner = self.inner.read().await;
+        match inner.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(mut status)) => {
                 info!("Join graph ends correctly");
                 status.status = 0;
@@ -313,11 +316,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
-
         self.load_shard(&shard_id).await;
-        let mut writer = self.inner.write().await;
-        let result = writer.remove_resource(&shard_id, &resource);
 
+        let inner = self.inner.read().await;
+        let result = inner.remove_resource(&shard_id, &resource);
         match result.transpose() {
             Some(Ok(mut status)) => {
                 info!("Remove resource ends correctly");
@@ -358,8 +360,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.id.as_ref().and_then(|i| i.shard.clone()).unwrap();
         self.load_shard(&shard_id).await;
-        let mut writer = self.inner.write().await;
-        match writer.add_vectorset(&request).transpose() {
+
+        let inner = self.inner.read().await;
+        match inner.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
                 info!("add_vector_set ends correctly");
                 status.status = 0;
@@ -386,8 +389,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
         self.load_shard(shard_id).await;
-        let mut writer = self.inner.write().await;
-        match writer.remove_vectorset(shard_id, &request).transpose() {
+
+        let inner = self.inner.read().await;
+        match inner.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
                 info!("remove_vector_set ends correctly");
                 status.status = 0;
@@ -546,9 +550,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.into_inner();
         info!("Running garbage collection at {}", shard_id.id);
         self.load_shard(&shard_id).await;
-        let mut writer = self.inner.write().await;
-        let result = writer.gc(&shard_id);
-        std::mem::drop(writer);
+
+        let inner = self.inner.read().await;
+        let result = inner.gc(&shard_id);
+        std::mem::drop(inner);
         match result.transpose() {
             Some(Ok(_)) => {
                 info!("Garbage collection at {} was successful", shard_id.id);

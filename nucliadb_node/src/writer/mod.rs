@@ -55,10 +55,10 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn shutdown(&mut self) {
-        for (shard_id, shard) in self.cache.iter_mut() {
+    pub fn shutdown(&self) {
+        for (shard_id, shard) in self.cache.iter() {
             info!("Stopping shard {}", shard_id);
-            ShardWriterService::stop(shard);
+            shard.stop();
         }
     }
 
@@ -160,11 +160,11 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn set_resource(
-        &mut self,
+        &self,
         shard_id: &ShardId,
         resource: &Resource,
     ) -> NodeResult<Option<OpStatus>> {
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
 
@@ -173,14 +173,14 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(&mut self, request: &NewVectorSetRequest) -> NodeResult<Option<OpStatus>> {
+    pub fn add_vectorset(&self, request: &NewVectorSetRequest) -> NodeResult<Option<OpStatus>> {
         let Some(setid) = &request.id else {
             return Err(node_error!("missing vectorset id"));
         };
         let Some(shard_id) = &setid.shard else {
             return Err(node_error!("missing shard id"));
         };
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         shard.add_vectorset(setid, request.similarity())?;
@@ -189,11 +189,11 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn remove_vectorset(
-        &mut self,
+        &self,
         shard_id: &ShardId,
         setid: &VectorSetId,
     ) -> NodeResult<Option<OpStatus>> {
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         shard.remove_vectorset(setid)?;
@@ -202,11 +202,11 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn join_relations_graph(
-        &mut self,
+        &self,
         shard_id: &ShardId,
         graph: &JoinGraph,
     ) -> NodeResult<Option<OpStatus>> {
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         shard.join_relations_graph(graph)?;
@@ -215,11 +215,11 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn delete_relation_nodes(
-        &mut self,
+        &self,
         shard_id: &ShardId,
         request: &DeleteGraphNodes,
     ) -> NodeResult<Option<OpStatus>> {
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         shard.delete_relation_nodes(request)?;
@@ -228,11 +228,11 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn remove_resource(
-        &mut self,
+        &self,
         shard_id: &ShardId,
         resource: &ResourceId,
     ) -> NodeResult<Option<OpStatus>> {
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         shard.remove_resource(resource)?;
@@ -240,8 +240,8 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn gc(&mut self, shard_id: &ShardId) -> NodeResult<Option<()>> {
-        let Some(shard) = self.get_mut_shard(shard_id) else {
+    pub fn gc(&self, shard_id: &ShardId) -> NodeResult<Option<()>> {
+        let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         Ok(Some(shard.gc()?))
