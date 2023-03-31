@@ -70,7 +70,8 @@ spec:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}
         - containerPort: {{ .Values.serving.monitor }}
-        - containerPort: {{ .Values.serving.metricsPort }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         resources:
 {{ toYaml .Values.ingest_orm_grpc_resources | indent 10 }}
 {{- if .Values.nats.secretName }}
