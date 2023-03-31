@@ -390,9 +390,10 @@ async def find_merge_results(
 
     get_resource_cache(clear=True)
 
-    result_paragraphs, next_page = await merge_paragraphs_vectors(
+    result_paragraphs, merged_next_page = await merge_paragraphs_vectors(
         paragraphs, vectors, count, page, min_score
     )
+    next_page = next_page or merged_next_page
 
     api_results = KnowledgeboxFindResults(
         resources={},
