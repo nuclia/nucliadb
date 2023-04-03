@@ -42,9 +42,6 @@ class DriverConfig(str, Enum):
 class Settings(BaseSettings):
     grpc_port: int = 8030
 
-    inner_metrics_host: str = "0.0.0.0"
-    inner_metrics_port: int = 8081
-
     # allowing defaults is not ideal
     # TODO: implement settings without defaults
     driver: DriverConfig = DriverConfig.redis
