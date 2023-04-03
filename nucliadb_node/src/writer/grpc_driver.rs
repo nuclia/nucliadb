@@ -592,13 +592,12 @@ mod tests {
         let node_writer = NodeWriterGRPCDriver::from(NodeWriterService::new());
         std::fs::create_dir_all(env::shards_path())?;
 
-        let _ = tokio::spawn(async move {
+        tokio::spawn(async move {
             let node_writer_server = NodeWriterServer::new(node_writer);
             Server::builder()
                 .add_service(node_writer_server)
                 .serve(address)
-                .await?;
-            Result::<_, anyhow::Error>::Ok(())
+                .await
         });
         Ok(())
     }

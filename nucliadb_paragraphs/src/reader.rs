@@ -405,7 +405,6 @@ impl Iterator for BatchProducer {
 
             let labels = doc
                 .get_all(self.facet_field)
-                .into_iter()
                 .flat_map(|x| x.as_facet())
                 .map(|x| x.to_path_string())
                 .filter(|x| x.starts_with("/l/"))

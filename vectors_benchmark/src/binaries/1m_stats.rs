@@ -34,10 +34,7 @@ impl SearchRequest for Request {
 }
 
 fn label_set(batch_id: usize) -> Vec<String> {
-    (0..NO_LABELS)
-        .into_iter()
-        .map(|l| format!("L{batch_id}_{l}"))
-        .collect()
+    (0..NO_LABELS).map(|l| format!("L{batch_id}_{l}")).collect()
 }
 
 fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {

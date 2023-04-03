@@ -321,7 +321,6 @@ mod test {
                 let key = Uuid::new_v4().to_string();
                 let labels = LabelDictionary::new(vec![]);
                 let vector = (0..self.dimension)
-                    .into_iter()
                     .map(|_| random::<f32>())
                     .collect::<Vec<_>>();
                 elems.push(Elem::new(key, vector, labels, None));

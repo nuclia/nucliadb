@@ -305,7 +305,6 @@ impl TextReaderService {
 
                     let labels = doc
                         .get_all(self.schema.facets)
-                        .into_iter()
                         .map(|x| x.as_facet().unwrap().to_path_string())
                         .filter(|x| x.starts_with("/l/"))
                         .collect_vec();
@@ -372,7 +371,6 @@ impl TextReaderService {
 
                     let labels = doc
                         .get_all(self.schema.facets)
-                        .into_iter()
                         .flat_map(|x| x.as_facet())
                         .map(|x| x.to_path_string())
                         .filter(|x| x.starts_with("/l/"))
@@ -564,7 +562,6 @@ impl Iterator for BatchProducer {
 
             let labels = doc
                 .get_all(self.facet_field)
-                .into_iter()
                 .flat_map(|x| x.as_facet())
                 .map(|x| x.to_path_string())
                 .filter(|x| x.starts_with("/l/"))
