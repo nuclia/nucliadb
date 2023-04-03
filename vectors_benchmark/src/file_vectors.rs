@@ -47,7 +47,6 @@ where Contents: Read
             Ok(_) => {
                 let dim = u32::from_le_bytes(buf) as usize;
                 let vector = (0..dim)
-                    .into_iter()
                     .map(|_| {
                         self.reader.read_exact(&mut buf).unwrap();
                         f32::from_le_bytes(buf)

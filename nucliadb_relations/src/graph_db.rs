@@ -78,7 +78,6 @@ fn decode_connexion(elements: &str) -> (Entity, Entity, Entity) {
         .strip_suffix(')')
         .unwrap()
         .split(',')
-        .into_iter()
         .map(|v| Uuid::parse_str(v).unwrap())
         .collect();
     (Entity(uuids[0]), Entity(uuids[1]), Entity(uuids[2]))
