@@ -159,7 +159,6 @@ mod tests {
                 .await?;
 
             let received_files = fs::read_dir(destination_dir.path().join(dir_name))?
-                .into_iter()
                 .filter_map(|entry| entry.ok().map(|e| e.path()))
                 .collect::<Vec<_>>();
 
