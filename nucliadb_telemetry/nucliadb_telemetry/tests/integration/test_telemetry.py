@@ -23,6 +23,7 @@ import json
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_telemetry import grpc_metrics
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.telemetry import Greeter
 
@@ -66,7 +67,6 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
         greeter.messages[0].headers["x-b3-traceid"]
         == "f13dc5318bf3bef64a0a5ea607db93a1"
     )
-
     assert len(greeter.messages) == 4
 
     expected_spans = 19
@@ -93,3 +93,6 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
 
     assert len(resp.json()["data"][0]["spans"]) == expected_spans
     assert len(resp.json()["data"][0]["processes"]) == 3
+
+    assert grpc_metrics.grpc_client_observer.histogram.collect()[0].samples
+    assert grpc_metrics.grpc_server_observer.histogram.collect()[0].samples

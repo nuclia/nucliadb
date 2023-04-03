@@ -36,7 +36,7 @@ from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
 from opentelemetry.trace.status import Status, StatusCode  # type: ignore
 
-from nucliadb_telemetry import logger
+from nucliadb_telemetry import grpc_metrics, logger
 from nucliadb_telemetry.common import set_span_exception
 
 
@@ -333,7 +333,22 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
         return call
 
 
-class OpenTelemetryGRPC:
+def get_client_interceptors(service_name: str, tracer_provider: TracerProvider):
+    tracer = tracer_provider.get_tracer(f"{service_name}_grpc_client")
+    return [
+        UnaryUnaryClientInterceptor(tracer),
+        UnaryStreamClientInterceptor(tracer),
+        StreamUnaryClientInterceptor(tracer),
+        StreamStreamClientInterceptor(tracer),
+    ]
+
+
+def get_server_interceptors(service_name: str, tracer_provider: TracerProvider):
+    tracer = tracer_provider.get_tracer(f"{service_name}_grpc_server")
+    return [OpenTelemetryServerInterceptor(tracer)]
+
+
+class GRPCTelemetry:
     initialized: bool = False
 
     def __init__(self, service_name: str, tracer_provider: TracerProvider):
@@ -346,34 +361,24 @@ class OpenTelemetryGRPC:
         max_send_message: int = 100,
         credentials: Optional[ChannelCredentials] = None,
     ):
-        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_client")
         options = [
             ("grpc.max_receive_message_length", max_send_message * 1024 * 1024),
             ("grpc.max_send_message_length", max_send_message * 1024 * 1024),
         ]
+        interceptors = (
+            get_client_interceptors(self.service_name, self.tracer_provider)
+            + grpc_metrics.CLIENT_INTERCEPTORS
+        )
         if credentials is not None:
             channel = aio.secure_channel(
                 server_addr,
                 options=options,
                 credentials=credentials,
-                interceptors=[
-                    UnaryUnaryClientInterceptor(tracer=tracer),
-                    UnaryStreamClientInterceptor(tracer=tracer),
-                    StreamStreamClientInterceptor(tracer=tracer),
-                    StreamUnaryClientInterceptor(tracer=tracer),
-                ],
+                interceptors=interceptors,
             )
-
         else:
             channel = aio.insecure_channel(
-                server_addr,
-                options=options,
-                interceptors=[
-                    UnaryUnaryClientInterceptor(tracer=tracer),
-                    UnaryStreamClientInterceptor(tracer=tracer),
-                    StreamStreamClientInterceptor(tracer=tracer),
-                    StreamUnaryClientInterceptor(tracer=tracer),
-                ],
+                server_addr, options=options, interceptors=interceptors
             )
         return channel
 
@@ -383,8 +388,10 @@ class OpenTelemetryGRPC:
         max_receive_message: int = 100,
         interceptors: Optional[List[aio.ServerInterceptor]] = None,
     ):
-        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_server")
-        _interceptors = [OpenTelemetryServerInterceptor(tracer=tracer)]
+        _interceptors = (
+            get_server_interceptors(self.service_name, self.tracer_provider)
+            + grpc_metrics.SERVER_INTERCEPTORS
+        )
         if interceptors is not None:
             _interceptors.extend(interceptors)
         options = [
@@ -397,3 +404,6 @@ class OpenTelemetryGRPC:
             options=options,
         )
         return server
+
+
+OpenTelemetryGRPC = GRPCTelemetry  # b/w compat import
