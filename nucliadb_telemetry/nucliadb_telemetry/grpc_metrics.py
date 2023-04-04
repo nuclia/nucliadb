@@ -82,9 +82,6 @@ class MetricsServerInterceptor(aio.ServerInterceptor):
 
             return wrapper
 
-        if "grpc.health.v1.Health" in handler_call_details.method:  # type: ignore
-            return handler
-
         return wrap_server_method_handler(wrapper, handler)
 
 
