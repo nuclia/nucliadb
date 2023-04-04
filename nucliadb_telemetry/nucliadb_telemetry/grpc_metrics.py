@@ -121,11 +121,6 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
 
 
 class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
-    """Interceptor used for testing if the interceptor is being called"""
-
-    def __init__(self, tracer):
-        self.tracer = tracer
-
     async def intercept_stream_stream(
         self, continuation, client_call_details: ClientCallDetails, request_iterator
     ):
@@ -139,11 +134,6 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
 
 
 class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
-    """Interceptor used for testing if the interceptor is being called"""
-
-    def __init__(self, tracer):
-        self.tracer = tracer
-
     async def intercept_stream_unary(
         self, continuation, client_call_details: ClientCallDetails, request_iterator
     ):
