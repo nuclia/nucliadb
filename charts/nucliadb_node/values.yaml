@@ -31,6 +31,9 @@ resources:
   #  requests:
   #    cpu: "100m"
 
+serviceMonitor:
+  enabled: false
+
 serving:
   chitchat_port: 4444
   grpc_reader: 10000
