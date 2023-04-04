@@ -30,6 +30,7 @@ else:
 
 OK = "ok"
 ERROR = "error"
+INF = float("inf")
 
 
 class Observer:

@@ -26,8 +26,30 @@ from grpc.experimental import wrap_server_method_handler  # type: ignore
 
 from nucliadb_telemetry import metrics
 
-grpc_client_observer = metrics.Observer("grpc_client_op", labels={"method": ""})
-grpc_server_observer = metrics.Observer("grpc_server_op", labels={"method": ""})
+histo_buckets = [
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    2.5,
+    5.0,
+    10.0,
+    30.0,
+    60.0,
+    metrics.INF,
+]
+grpc_client_observer = metrics.Observer(
+    "grpc_client_op", labels={"method": ""}, buckets=histo_buckets
+)
+grpc_server_observer = metrics.Observer(
+    "grpc_server_op", labels={"method": ""}, buckets=histo_buckets
+)
 
 
 class MetricsServerInterceptor(aio.ServerInterceptor):
@@ -78,6 +100,7 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
     ):
         metric = grpc_client_observer(labels={"method": client_call_details.method})
         metric.start()
+
         call = await continuation(client_call_details, request)
         call.add_done_callback(functools.partial(finish_metric_grpc, metric))
 
@@ -89,11 +112,54 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
         self, continuation, client_call_details: ClientCallDetails, request_iterator
     ):
         metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric.start()
+
         call = await continuation(client_call_details, request_iterator)
         call.add_done_callback(functools.partial(finish_metric_grpc, metric))
 
         return call
 
 
-CLIENT_INTERCEPTORS = [UnaryUnaryClientInterceptor(), StreamUnaryClientInterceptor()]
+class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
+    """Interceptor used for testing if the interceptor is being called"""
+
+    def __init__(self, tracer):
+        self.tracer = tracer
+
+    async def intercept_stream_stream(
+        self, continuation, client_call_details: ClientCallDetails, request_iterator
+    ):
+        metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric.start()
+
+        call = await continuation(client_call_details, request_iterator)
+        call.add_done_callback(functools.partial(finish_metric_grpc, metric))
+
+        return call
+
+
+class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
+    """Interceptor used for testing if the interceptor is being called"""
+
+    def __init__(self, tracer):
+        self.tracer = tracer
+
+    async def intercept_stream_unary(
+        self, continuation, client_call_details: ClientCallDetails, request_iterator
+    ):
+        metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric.start()
+
+        call = await continuation(client_call_details, request_iterator)
+        call.add_done_callback(functools.partial(finish_metric_grpc, metric))
+
+        return call
+
+
+CLIENT_INTERCEPTORS = [
+    UnaryUnaryClientInterceptor(),
+    StreamUnaryClientInterceptor(),
+    StreamStreamClientInterceptor(),
+    StreamUnaryClientInterceptor(),
+]
 SERVER_INTERCEPTORS = [MetricsServerInterceptor()]
