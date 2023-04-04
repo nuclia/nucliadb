@@ -8,6 +8,10 @@ install-dev:
 	pip install -r ../test-requirements.txt
 	pip install -r ../code-requirements.txt
 	pip install -r requirements.txt
+# utils dep required for test fixtures for nats
+# NEEDS TO BE DECOUPLED EVENTUALLY
+	pip install -e ../nucliadb_protos/python
+	pip install -e ../nucliadb_utils
 	pip install -e .
 
 .PHONY: format
