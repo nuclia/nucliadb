@@ -107,14 +107,14 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
         return call
 
 
-class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
-    async def intercept_stream_unary(
-        self, continuation, client_call_details: ClientCallDetails, request_iterator
+class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
+    async def intercept_unary_stream(
+        self, continuation, client_call_details: ClientCallDetails, request
     ):
         metric = grpc_client_observer(labels={"method": client_call_details.method})
         metric.start()
 
-        call = await continuation(client_call_details, request_iterator)
+        call = await continuation(client_call_details, request)
         call.add_done_callback(functools.partial(finish_metric_grpc, metric))
 
         return call
@@ -158,7 +158,7 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
 
 CLIENT_INTERCEPTORS = [
     UnaryUnaryClientInterceptor(),
-    StreamUnaryClientInterceptor(),
+    UnaryStreamClientInterceptor(),
     StreamStreamClientInterceptor(),
     StreamUnaryClientInterceptor(),
 ]
