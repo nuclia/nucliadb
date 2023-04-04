@@ -94,5 +94,5 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
     assert len(resp.json()["data"][0]["spans"]) == expected_spans
     assert len(resp.json()["data"][0]["processes"]) == 3
 
-    assert grpc_metrics.grpc_client_observer.histogram.collect()[0].samples
-    assert grpc_metrics.grpc_server_observer.histogram.collect()[0].samples
+    assert grpc_metrics.grpc_client_observer.histogram.collect()[0].samples  # type: ignore
+    assert grpc_metrics.grpc_server_observer.histogram.collect()[0].samples  # type: ignore
