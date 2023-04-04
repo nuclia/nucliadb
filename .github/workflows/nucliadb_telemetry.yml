@@ -34,12 +34,11 @@ jobs:
 
       - name: Install package
         run: |
-          pip install -r code-requirements.txt
+          make -C nucliadb_telemetry/ install-dev
+
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_telemetry --config=nucliadb_telemetry/setup.cfg
-          isort -c --profile black nucliadb_telemetry/
-          black --check --verbose nucliadb_telemetry
+          make -C nucliadb_telemetry/ lint
 
   # Job to run tests
   tests:
@@ -60,18 +59,8 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        # utils dep required for test fixtures for nats
-        # NEEDS TO BE DECOUPLED EVENTUALLY
         run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb_telemetry/requirements.txt
-          pip install -e nucliadb_telemetry
-          pip install -e nucliadb_protos/python
-          pip install -e nucliadb_utils
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_telemetry/
+          make -C nucliadb_telemetry/ install-dev
 
       - name: Run tests
         run: |

@@ -34,7 +34,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_telemetry.fastapi import instrument_app
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry, NatsClientTelemetry
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.grpc import (
@@ -104,7 +104,7 @@ async def set_telemetry_settings(jaeger_server: Jaeger):
 async def telemetry_grpc(set_telemetry_settings):
     tracer_provider = get_telemetry("GRPC_SERVICE")
     await init_telemetry(tracer_provider)
-    util = OpenTelemetryGRPC("test_telemetry", tracer_provider)
+    util = GRPCTelemetry("test_telemetry", tracer_provider)
     yield util
 
 
@@ -294,7 +294,7 @@ async def greeter_streaming(set_telemetry_settings, natsd: str):
 
 @pytest.fixture(scope="function")
 async def grpc_service(
-    telemetry_grpc: OpenTelemetryGRPC,
+    telemetry_grpc: GRPCTelemetry,
     greeter: Greeter,
     greeter_streaming: GreeterStreaming,
 ):
@@ -311,7 +311,7 @@ async def grpc_service(
 
 @pytest.fixture(scope="function")
 async def http_service(
-    set_telemetry_settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service: int
+    set_telemetry_settings, telemetry_grpc: GRPCTelemetry, grpc_service: int
 ):
     tracer_provider = get_telemetry("HTTP_SERVICE")
     await init_telemetry(tracer_provider)

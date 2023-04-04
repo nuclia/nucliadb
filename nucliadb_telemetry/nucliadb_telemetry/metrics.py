@@ -30,6 +30,7 @@ else:
 
 OK = "ok"
 ERROR = "error"
+INF = float("inf")
 
 
 class Observer:
@@ -98,8 +99,25 @@ class ObserverRecorder:
         else:
             self.labels = observer.labels
 
+    def set_status(self, status: str):
+        self.labels["status"] = status
+
+    def start(self):
+        self.start = time.monotonic()
+
+    def end(self):
+        finished = time.monotonic()
+        status = self.labels.pop("status", OK)
+
+        if len(self.labels) > 0:
+            self.observer.histogram.labels(**self.labels).observe(finished - self.start)
+        else:
+            self.observer.histogram.observe(finished - self.start)
+
+        self.observer.counter.labels(status=status, **self.labels).inc()
+
     def __enter__(self):
-        self.start = time.time()
+        self.start()
         return self
 
     def __exit__(
@@ -108,22 +126,15 @@ class ObserverRecorder:
         exc_value: Optional[Exception],
         traceback: Optional[StackSummary],
     ):
-        finished = time.time()
-        status = OK
-
-        if len(self.labels) > 0:
-            self.observer.histogram.labels(**self.labels).observe(finished - self.start)
-        else:
-            self.observer.histogram.observe(finished - self.start)
-
         if exc_type is not None:
             status = ERROR
             for error_label, error_type in self.observer.error_mappings.items():
                 if issubclass(exc_type, error_type):
                     status = error_label
                     break
+            self.set_status(status)
 
-        self.observer.counter.labels(status=status, **self.labels).inc()
+        self.end()
 
 
 class Gauge:

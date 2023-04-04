@@ -31,7 +31,7 @@ On GRPC Server you should add:
 
 ```python
     tracer_provider = get_telemetry("GRPC_SERVER_SERVICE")
-    telemetry_grpc = OpenTelemetryGRPC("GRPC_CLIENT_SERVICE", tracer_provider)
+    telemetry_grpc = GRPCTelemetry("GRPC_CLIENT_SERVICE", tracer_provider)
     if not tracer_provider.initialized:
         await init_telemetry(tracer_provider)
 
@@ -48,7 +48,7 @@ On GRPC Client you should add:
 
 ```python
     tracer_provider = get_telemetry("GRPC_CLIENT_SERVICE")
-    telemetry_grpc = OpenTelemetryGRPC("GRPC_CLIENT_SERVICE", tracer_provider)
+    telemetry_grpc = GRPCTelemetry("GRPC_CLIENT_SERVICE", tracer_provider)
     if not tracer_provider.initialized:
         await init_telemetry(tracer_provider)
 
