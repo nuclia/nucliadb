@@ -64,6 +64,7 @@ consumer_observer = metrics.Observer(
         120.0,
         float("inf"),
     ],
+    error_mappings={"deadlettered": DeadletteredError, "shardnotfound": ShardsNotFound},
 )
 
 
