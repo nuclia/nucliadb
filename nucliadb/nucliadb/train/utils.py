@@ -26,8 +26,8 @@ from nucliadb.ingest.utils import get_driver
 from nucliadb.train.nodes import TrainNodesManager  # type: ignore
 from nucliadb.train.settings import settings
 from nucliadb_protos import train_pb2_grpc
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import setup_telemetry
+from nucliadb_utils.grpc import get_traced_grpc_server
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -45,14 +45,8 @@ async def start_train_grpc(service_name: Optional[str] = None):
 
     aio.init_grpc_aio()
 
-    tracer_provider = get_telemetry(service_name)
-
-    if tracer_provider is not None:  # pragma: no cover
-        await init_telemetry(tracer_provider)
-        otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
-        server = otgrpc.init_server()
-    else:
-        server = aio.server()
+    await setup_telemetry(service_name or "train")
+    server = get_traced_grpc_server(service_name or "train")
 
     from nucliadb.train.servicer import TrainServicer
 

@@ -28,8 +28,8 @@ from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_protos import writer_pb2_grpc
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import setup_telemetry
+from nucliadb_utils.grpc import get_traced_grpc_server
 
 
 async def health_check(health_servicer):
@@ -51,19 +51,11 @@ async def health_check(health_servicer):
 async def start_grpc(service_name: Optional[str] = None):
     aio.init_grpc_aio()
 
-    tracer_provider = get_telemetry(service_name)
-    if tracer_provider is not None:  # pragma: no cover
-        await init_telemetry(tracer_provider)
-        otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
-        server = otgrpc.init_server()
-    else:
-        options = [
-            (
-                "grpc.max_receive_message_length",
-                settings.max_receive_message_length * 1024 * 1024,
-            ),
-        ]
-        server = aio.server(options=options)
+    await setup_telemetry(service_name or "ingest")
+    server = get_traced_grpc_server(
+        service_name or "ingest",
+        max_receive_message=settings.max_receive_message_length,
+    )
 
     servicer = WriterServicer()
     await servicer.initialize()

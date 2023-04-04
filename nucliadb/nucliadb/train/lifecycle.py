@@ -20,9 +20,6 @@
 import logging
 import sys
 
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
-
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.chitchat import start_chitchat, stop_chitchat
 from nucliadb.train.utils import (
@@ -31,16 +28,13 @@ from nucliadb.train.utils import (
     stop_nodes_manager,
     stop_train_grpc,
 )
-from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
 
 
 async def initialize() -> None:
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider:
-        set_global_textmap(B3MultiFormat())
-        await init_telemetry(tracer_provider)
+    await setup_telemetry(SERVICE_NAME)
 
     await start_chitchat(SERVICE_NAME)
     await start_nodes_manager()

@@ -26,7 +26,7 @@ from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.tus import finalize as storage_finalize
 from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb.writer.utilities import get_processing
-from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -39,9 +39,7 @@ from nucliadb_utils.utilities import Utility, get_transaction, set_utility
 
 
 async def initialize():
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider:
-        await init_telemetry(tracer_provider)
+    await setup_telemetry(SERVICE_NAME)
 
     await start_ingest(SERVICE_NAME)
 

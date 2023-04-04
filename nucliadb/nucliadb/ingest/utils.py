@@ -19,14 +19,12 @@
 #
 from typing import Optional
 
-from grpc import aio
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.chitchat import ChitchatNucliaDB  # type: ignore
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.settings import settings
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -110,14 +108,9 @@ async def start_ingest(service_name: Optional[str] = None):
     if nucliadb_settings.nucliadb_ingest is not None:
         # Its distributed lets create a GRPC client
         # We want Jaeger telemetry enabled
-        provider = get_telemetry(service_name)
-
-        if provider is not None:
-            await init_telemetry(provider)
-            otgrpc = OpenTelemetryGRPC(f"{service_name}_ingest", provider)
-            channel = otgrpc.init_client(nucliadb_settings.nucliadb_ingest)
-        else:
-            channel = aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
+        channel = get_traced_grpc_channel(
+            nucliadb_settings.nucliadb_ingest, service_name or "ingest"
+        )
         set_utility(Utility.CHANNEL, channel)
         set_utility(Utility.INGEST, WriterStub(channel))
     else:

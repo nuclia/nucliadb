@@ -23,11 +23,6 @@ import sys
 from typing import Awaitable, Callable, Optional, Union
 
 import pkg_resources
-from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
-    AioHttpClientInstrumentor,
-)
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
 
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.chitchat import start_chitchat
@@ -36,7 +31,7 @@ from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.run import run_until_exit
@@ -106,11 +101,7 @@ async def stop_indexing_utility():
 
 
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:  # pragma: no cover
-        set_global_textmap(B3MultiFormat())
-        await init_telemetry(tracer_provider)  # To start asyncio task
-        AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
+    await setup_telemetry(SERVICE_NAME)
 
     chitchat = await start_chitchat(SERVICE_NAME)
 

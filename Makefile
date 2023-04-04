@@ -60,25 +60,21 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_telemetry
 	isort --profile black nucliadb_dataset
 	isort --profile black nucliadb_client
 	isort --profile black nucliadb_sdk
 	isort --profile black nucliadb_models
 
-	black nucliadb_telemetry
 	black nucliadb_dataset
 	black nucliadb_client
 	black nucliadb_sdk
 	black nucliadb_models
 
-	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
 	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
 	flake8  --config nucliadb_sdk/setup.cfg nucliadb_sdk/nucliadb_sdk
 	flake8  --config nucliadb_models/setup.cfg nucliadb_models/nucliadb_models
 
-	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
 	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
 	MYPYPATH=./mypy_stubs mypy nucliadb_client
 	MYPYPATH=./mypy_stubs mypy nucliadb_models
@@ -92,6 +88,9 @@ python-code-lint:
 
 	make -C nucliadb/ format
 	make -C nucliadb/ lint
+
+	make -C nucliadb_telemetry/ format
+	make -C nucliadb_telemetry/ lint
 
 rust-code-lint:
 	cargo +nightly fmt -p nucliadb_node
