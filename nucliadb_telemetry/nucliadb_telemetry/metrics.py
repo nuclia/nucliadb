@@ -103,10 +103,10 @@ class ObserverRecorder:
         self.labels["status"] = status
 
     def start(self):
-        self.start = time.time()
+        self.start = time.monotonic()
 
     def end(self):
-        finished = time.time()
+        finished = time.monotonic()
         status = self.labels.pop("status", OK)
 
         if len(self.labels) > 0:
