@@ -21,6 +21,8 @@ import asyncio
 import os
 from typing import Dict, Optional, Sequence, Union
 
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
 from opentelemetry.sdk.resources import Resource  # type: ignore
 from opentelemetry.trace import get_current_span
@@ -105,6 +107,25 @@ async def init_telemetry(tracer_provider: Optional[AsyncTracerProvider] = None):
     # add to the tracer
     await tracer_provider.async_add_span_processor(span_processor)
     tracer_provider.initialized = True
+
+
+async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
+    """
+    Setup telemetry for a service if it is enabled
+    """
+    tracer_provider = get_telemetry(service_name)
+    if tracer_provider is not None:  # pragma: no cover
+        await init_telemetry(tracer_provider)
+        set_global_textmap(B3MultiFormat())
+        try:
+            from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+                AioHttpClientInstrumentor,
+            )
+
+            AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
+        except ImportError:
+            pass
+    return tracer_provider
 
 
 def set_info_on_span(
