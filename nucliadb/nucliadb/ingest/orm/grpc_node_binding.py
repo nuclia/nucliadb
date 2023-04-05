@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncIterator
@@ -55,6 +56,7 @@ from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 
 from nucliadb.ingest.settings import settings
 
+logger = logging.getLogger(__name__)
 try:
     from nucliadb_node_binding import NodeReader  # type: ignore
     from nucliadb_node_binding import NodeWriter  # type: ignore
@@ -70,15 +72,31 @@ class LocalReaderWrapper:
         self.reader = NodeReader.new()
         self.executor = ThreadPoolExecutor(settings.local_reader_threads)
 
-    async def Search(self, request: SearchRequest) -> SearchResponse:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            self.executor, self.reader.search, request.SerializeToString()
-        )
-        pb_bytes = bytes(result)
-        pb = SearchResponse()
-        pb.ParseFromString(pb_bytes)
-        return pb
+    async def Search(
+        self, request: SearchRequest, retry: bool = False
+    ) -> SearchResponse:
+        try:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                self.executor, self.reader.search, request.SerializeToString()
+            )
+            pb_bytes = bytes(result)
+            pb = SearchResponse()
+            pb.ParseFromString(pb_bytes)
+            return pb
+        except TypeError as exc:
+            if "IO error" not in str(exc):
+                # ignore any other error
+                raise
+
+            # try some mitigations...
+            logger.error(f"TypeError in Search: {request}", exc_info=True)
+            if not retry:
+                # reinit?
+                self.reader = NodeReader.new()
+                return await self.Search(request, retry=True)
+            else:
+                raise
 
     async def ParagraphSearch(
         self, request: ParagraphSearchRequest

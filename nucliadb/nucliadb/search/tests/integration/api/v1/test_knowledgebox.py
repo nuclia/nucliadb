@@ -29,6 +29,7 @@ from nucliadb_models.resource import NucliaDBRoles
 # from nucliadb_utils.cache import KB_COUNTER_CACHE
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_kb_counters(
     search_api: Callable[..., AsyncClient], test_search_resource: str

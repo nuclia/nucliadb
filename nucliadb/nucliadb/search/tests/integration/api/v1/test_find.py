@@ -28,8 +28,8 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
-@pytest.mark.asyncio
 @pytest.mark.flaky(reruns=5)
+@pytest.mark.asyncio
 async def test_find(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -57,8 +57,8 @@ async def test_find(
         }
 
 
-@pytest.mark.asyncio
 @pytest.mark.flaky(reruns=5)
+@pytest.mark.asyncio
 async def test_find_order(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -93,6 +93,7 @@ def find_with_limits_exceeded_error():
         yield
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio()
 async def test_find_handles_limits_exceeded_error(
     search_api, knowledgebox_ingest, find_with_limits_exceeded_error

@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -62,6 +63,8 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
@@ -182,7 +185,7 @@ async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     await driver.initialize()
     if driver.redis is not None:
         await driver.redis.flushall()
-        print(f"Redis driver ready at {url}")
+        logging.info(f"Redis driver ready at {url}")
         yield driver
     await driver.finalize()
     settings.driver_redis_url = None
