@@ -99,17 +99,16 @@ async def chat(
     if item.context is not None and len(item.context) > 0:
         # There is context lets do a query
         req = ChatModel(
-            question="Given the context, which question should be done to answer: "
-            + item.query,
+            question=item.query,
             context=item.context,
             user_id=x_nucliadb_user,
             retrieval=False,
         )
-        req.system = "You help creating new queries based on context"
 
         new_query_elements = []
-        _, generator = await predict.chat_query(kbid, req)
+        _, generator = await predict.rephrase_query(kbid, req)
         async for new_query_data in generator:
+            new_query = ""
             new_query_elements.append(new_query_data)
 
         new_query = (b"".join(new_query_elements)).decode()

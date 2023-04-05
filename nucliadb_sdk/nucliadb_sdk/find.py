@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
+from typing import Iterator
 
 from nucliadb_models.search import (
     FindField,
