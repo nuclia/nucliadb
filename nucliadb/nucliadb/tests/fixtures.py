@@ -102,7 +102,9 @@ async def nucliadb(dummy_processing, telemetry_disabled):
         )
         config_nucliadb(settings)
         server = await run_async_nucliadb(settings)
+
         yield settings
+
         reset_config()
         clear_global_cache()
         await server.shutdown()

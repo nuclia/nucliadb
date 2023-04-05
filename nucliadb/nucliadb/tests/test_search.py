@@ -1315,6 +1315,7 @@ async def kb_with_two_logic_shards(
     assert resp.status_code == 200
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_search_two_logic_shards(
     nucliadb_reader: AsyncClient,

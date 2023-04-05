@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import logging
 import time
 
 import docker  # type: ignore
@@ -25,11 +26,15 @@ import pytest
 from grpc import insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
+from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.settings import running_settings
+
+logger = logging.getLogger(__name__)
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -50,6 +55,7 @@ images.settings["nucliadb_node_reader"] = {
             "/usr/local/bin/node_reader",
         ],
         "ports": {"4445": None},
+        "mem_limit": "2g",  # default is 1g, need to override
     },
 }
 
@@ -72,6 +78,7 @@ images.settings["nucliadb_node_writer"] = {
             "/usr/local/bin/node_writer",
         ],
         "ports": {"4446": None},
+        "mem_limit": "2g",  # default is 1g, need to override
     },
 }
 
@@ -248,156 +255,222 @@ nucliadb_node_2_writer = nucliadbNodeWriter()
 nucliadb_node_2_sidecar = nucliadbNodeSidecar()
 
 
-@pytest.fixture(scope="function", autouse=False)
-def node(natsd: str, gcs: str):
-    running_settings.log_level = "DEBUG"
-    docker_client = docker.from_env(version=BaseImage.docker_version)
-    docker_platform_name = docker_client.api.version()["Platform"]["Name"].upper()
-    if (
-        "DESKTOP" in docker_platform_name
-        # newer versions use community
-        or "DOCKER ENGINE - COMMUNITY" == docker_platform_name
-    ):
-        # Valid when using Docker desktop
-        docker_internal_host = "host.docker.internal"
-    else:
-        # Valid when using github actions
-        docker_internal_host = "172.17.0.1"
+class _NodeRunner:
+    def __init__(self, natsd, gcs):
+        self.docker_client = docker.from_env(version=BaseImage.docker_version)
+        self.natsd = natsd
+        self.gcs = gcs
+        self.data = {}
 
-    volume_node_1 = docker_client.volumes.create(driver="local")
-    volume_node_2 = docker_client.volumes.create(driver="local")
+    def start(self):
+        running_settings.log_level = "DEBUG"
+        docker_platform_name = self.docker_client.api.version()["Platform"][
+            "Name"
+        ].upper()
+        if (
+            "DESKTOP" in docker_platform_name
+            # newer versions use community
+            or "DOCKER ENGINE - COMMUNITY" == docker_platform_name
+        ):
+            # Valid when using Docker desktop
+            docker_internal_host = "host.docker.internal"
+        else:
+            # Valid when using github actions
+            docker_internal_host = "172.17.0.1"
 
-    settings.chitchat_binding_host = "0.0.0.0"
-    settings.chitchat_binding_port = free_port()
-    settings.chitchat_enabled = True
+        self.volume_node_1 = self.docker_client.volumes.create(driver="local")
+        self.volume_node_2 = self.docker_client.volumes.create(driver="local")
 
-    images.settings["nucliadb_cluster_manager"]["env"][
-        "MONITOR_ADDR"
-    ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
-    images.settings["nucliadb_cluster_manager"]["env"]["UPDATE_INTERVAL"] = "1s"
+        settings.chitchat_binding_host = "0.0.0.0"
+        settings.chitchat_binding_port = free_port()
+        settings.chitchat_enabled = True
 
-    cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
+        images.settings["nucliadb_cluster_manager"]["env"][
+            "MONITOR_ADDR"
+        ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
+        images.settings["nucliadb_cluster_manager"]["env"]["UPDATE_INTERVAL"] = "1s"
 
-    cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
-    cluster_mgr_real_host = get_container_host(nucliadb_cluster_mgr.container_obj)
+        cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
 
-    images.settings["nucliadb_node_writer"]["env"][
-        "SEED_NODES"
-    ] = f"{cluster_mgr_real_host}:4444"
-    writer1_host, writer1_port = nucliadb_node_1_writer.run(volume_node_1)
+        cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
+        cluster_mgr_real_host = get_container_host(nucliadb_cluster_mgr.container_obj)
 
-    writer2_host, writer2_port = nucliadb_node_2_writer.run(volume_node_2)
-    reader1_host, reader1_port = nucliadb_node_1_reader.run(volume_node_1)
+        images.settings["nucliadb_node_writer"]["env"][
+            "SEED_NODES"
+        ] = f"{cluster_mgr_real_host}:4444"
+        writer1_host, writer1_port = nucliadb_node_1_writer.run(self.volume_node_1)
 
-    reader2_host, reader2_port = nucliadb_node_2_reader.run(volume_node_2)
+        writer2_host, writer2_port = nucliadb_node_2_writer.run(self.volume_node_2)
+        reader1_host, reader1_port = nucliadb_node_1_reader.run(self.volume_node_1)
 
-    natsd_server = natsd.replace("localhost", docker_internal_host)
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "INDEX_JETSTREAM_SERVERS"
-    ] = f'["{natsd_server}"]'
-    gcs_server = gcs.replace("localhost", docker_internal_host)
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_BUCKET"] = "test"
-    images.settings["nucliadb_node_sidecar"]["env"]["FILE_BACKEND"] = "gcs"
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_INDEXING_BUCKET"] = "indexing"
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "GCS_DEADLETTER_BUCKET"
-    ] = "deadletter"
+        reader2_host, reader2_port = nucliadb_node_2_reader.run(self.volume_node_2)
 
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "READER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{reader1_port}"
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "WRITER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{writer1_port}"
+        natsd_server = self.natsd.replace("localhost", docker_internal_host)
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "INDEX_JETSTREAM_SERVERS"
+        ] = f'["{natsd_server}"]'
+        gcs_server = self.gcs.replace("localhost", docker_internal_host)
+        images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server
+        images.settings["nucliadb_node_sidecar"]["env"]["GCS_BUCKET"] = "test"
+        images.settings["nucliadb_node_sidecar"]["env"]["FILE_BACKEND"] = "gcs"
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "GCS_INDEXING_BUCKET"
+        ] = "indexing"
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "GCS_DEADLETTER_BUCKET"
+        ] = "deadletter"
 
-    sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(volume_node_1)
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "READER_LISTEN_ADDRESS"
+        ] = f"{docker_internal_host}:{reader1_port}"
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "WRITER_LISTEN_ADDRESS"
+        ] = f"{docker_internal_host}:{writer1_port}"
 
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "READER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{reader2_port}"
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "WRITER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{writer2_port}"
+        sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(self.volume_node_1)
 
-    sidecar2_host, sidecar2_port = nucliadb_node_2_sidecar.run(volume_node_2)
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "READER_LISTEN_ADDRESS"
+        ] = f"{docker_internal_host}:{reader2_port}"
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "WRITER_LISTEN_ADDRESS"
+        ] = f"{docker_internal_host}:{writer2_port}"
 
-    writer1_internal_host = get_container_host(nucliadb_node_1_writer.container_obj)
-    writer2_internal_host = get_container_host(nucliadb_node_2_writer.container_obj)
+        sidecar2_host, sidecar2_port = nucliadb_node_2_sidecar.run(self.volume_node_2)
 
-    settings.writer_port_map = {
-        writer1_internal_host: writer1_port,
-        writer2_internal_host: writer2_port,
-    }
-    settings.reader_port_map = {
-        writer1_internal_host: reader1_port,
-        writer2_internal_host: reader2_port,
-    }
-    settings.sidecar_port_map = {
-        writer1_internal_host: sidecar1_port,
-        writer2_internal_host: sidecar2_port,
-    }
+        writer1_internal_host = get_container_host(nucliadb_node_1_writer.container_obj)
+        writer2_internal_host = get_container_host(nucliadb_node_2_writer.container_obj)
 
-    settings.node_writer_port = None  # type: ignore
-    settings.node_reader_port = None  # type: ignore
-    settings.node_sidecar_port = None  # type: ignore
+        self.data.update(
+            {
+                "writer1_internal_host": writer1_internal_host,
+                "writer2_internal_host": writer2_internal_host,
+                "writer1": {
+                    "host": writer1_host,
+                    "port": writer1_port,
+                },
+                "chitchat": {
+                    "host": cluster_mgr_host,
+                    "port": cluster_mgr_port,
+                },
+                "writer2": {
+                    "host": writer2_host,
+                    "port": writer2_port,
+                },
+                "reader1": {
+                    "host": reader1_host,
+                    "port": reader1_port,
+                },
+                "reader2": {
+                    "host": reader2_host,
+                    "port": reader2_port,
+                },
+                "sidecar1": {
+                    "host": sidecar1_host,
+                    "port": sidecar1_port,
+                },
+                "sidecar2": {
+                    "host": sidecar2_host,
+                    "port": sidecar2_port,
+                },
+            }
+        )
+        return self.data
 
-    DATA = {
-        "writer1": {
-            "host": writer1_host,
-            "port": writer1_port,
-        },
-        "chitchat": {
-            "host": cluster_mgr_host,
-            "port": cluster_mgr_port,
-        },
-        "writer2": {
-            "host": writer2_host,
-            "port": writer2_port,
-        },
-        "reader1": {
-            "host": reader1_host,
-            "port": reader1_port,
-        },
-        "reader2": {
-            "host": reader2_host,
-            "port": reader2_port,
-        },
-        "sidecar1": {
-            "host": sidecar1_host,
-            "port": sidecar1_port,
-        },
-        "sidecar2": {
-            "host": sidecar2_host,
-            "port": sidecar2_port,
-        },
-    }
-    yield DATA
+    def stop(self):
+        nucliadb_node_1_reader.stop()
+        nucliadb_node_1_writer.stop()
+        nucliadb_node_1_sidecar.stop()
+        nucliadb_node_2_writer.stop()
+        nucliadb_node_2_reader.stop()
+        nucliadb_node_2_sidecar.stop()
+        nucliadb_cluster_mgr.stop()
 
-    nucliadb_node_1_reader.stop()
-    nucliadb_node_1_writer.stop()
-    nucliadb_node_1_sidecar.stop()
-    nucliadb_node_2_writer.stop()
-    nucliadb_node_2_reader.stop()
-    nucliadb_node_2_sidecar.stop()
-    nucliadb_cluster_mgr.stop()
+        for container in (
+            nucliadb_node_1_reader,
+            nucliadb_node_1_writer,
+            nucliadb_node_2_reader,
+            nucliadb_node_2_writer,
+            nucliadb_node_2_sidecar,
+            nucliadb_node_2_sidecar,
+            nucliadb_cluster_mgr,
+        ):
+            for i in range(5):
+                try:
+                    self.docker_client.containers.get(container.container_obj.id)  # type: ignore
+                except docker.errors.NotFound:
+                    break
+                time.sleep(2)
 
-    for container in (
-        nucliadb_node_1_reader,
-        nucliadb_node_1_writer,
-        nucliadb_node_2_reader,
-        nucliadb_node_2_writer,
-        nucliadb_node_2_sidecar,
-        nucliadb_node_2_sidecar,
-        nucliadb_cluster_mgr,
-    ):
-        for i in range(5):
-            try:
-                docker_client.containers.get(container.container_obj.id)  # type: ignore
-            except docker.errors.NotFound:
-                print("REMOVED")
-                break
-            time.sleep(2)
+        self.volume_node_1.remove()
+        self.volume_node_2.remove()
 
-    volume_node_1.remove()
-    volume_node_2.remove()
+    def restart(self):
+        self.stop()
+        return self.start()
+
+    def setup_env(self):
+        # reset on every test run in case something touches it
+        settings.writer_port_map = {
+            self.data["writer1_internal_host"]: self.data["writer1"]["port"],
+            self.data["writer2_internal_host"]: self.data["writer2"]["port"],
+        }
+        settings.reader_port_map = {
+            self.data["writer1_internal_host"]: self.data["reader1"]["port"],
+            self.data["writer2_internal_host"]: self.data["reader2"]["port"],
+        }
+        settings.sidecar_port_map = {
+            self.data["writer1_internal_host"]: self.data["sidecar1"]["port"],
+            self.data["writer2_internal_host"]: self.data["sidecar2"]["port"],
+        }
+
+        settings.node_writer_port = None  # type: ignore
+        settings.node_reader_port = None  # type: ignore
+        settings.node_sidecar_port = None  # type: ignore
+
+
+@pytest.fixture(scope="session", autouse=False)
+def _node_runner(natsd: str, gcs: str):
+    yield _NodeRunner(natsd, gcs)
+
+
+@pytest.fixture(scope="session", autouse=False)
+def _node(natsd: str, gcs: str, _node_runner: _NodeRunner):
+    yield _node_runner.start()
+
+    _node_runner.stop()
+
+
+@pytest.fixture(scope="function")
+def node(_node, _node_runner: _NodeRunner, request):
+    # clean up all shard data before each test
+    channel1 = insecure_channel(
+        f"{_node['writer1']['host']}:{_node['writer1']['port']}"
+    )
+    channel2 = insecure_channel(
+        f"{_node['writer2']['host']}:{_node['writer2']['port']}"
+    )
+    writer1 = NodeWriterStub(channel1)
+    writer2 = NodeWriterStub(channel2)
+
+    logger.debug("cleaning up shards data")
+
+    for shard in writer1.ListShards(EmptyQuery()).ids:
+        writer1.DeleteShard(ShardId(id=shard.id))
+
+    for shard in writer2.ListShards(EmptyQuery()).ids:
+        writer2.DeleteShard(ShardId(id=shard.id))
+
+    channel1.close()
+    channel2.close()
+
+    _node_runner.setup_env()
+
+    yield _node
+
+    _test_failed_statuses = getattr(request.node, "_test_failed_statuses", {})
+    if len(_test_failed_statuses) > 0 and any(_test_failed_statuses.values()):
+        logger.warning(
+            "Test failed with rerun, restarting node in case it's related to a node crash"
+        )
+        _node_runner.restart()

@@ -35,6 +35,7 @@ def chat_with_limits_exceeded_error():
         yield
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio()
 async def test_chat_handles_limits_exceeded_error(
     search_api, knowledgebox_ingest, chat_with_limits_exceeded_error

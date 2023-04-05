@@ -90,8 +90,8 @@ class Settings(BaseSettings):
         600  # max number of shard replicas a single node will manage
     )
 
-    local_reader_threads = 5
-    local_writer_threads = 5
+    local_reader_threads: int = 5
+    local_writer_threads: int = 5
 
     max_receive_message_length: int = 4
 
