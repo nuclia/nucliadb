@@ -253,9 +253,8 @@ async def find(
             min_score=item.min_score,
             highlight=item.highlight,
         )
-    except Exception:
+    finally:
         await abort_transaction()
-        raise
 
     response.status_code = 206 if incomplete_results else 200
 
