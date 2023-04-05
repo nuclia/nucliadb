@@ -239,20 +239,23 @@ async def find(
     )
 
     # We need to merge
-    search_results = await find_merge_results(
-        results,
-        count=item.page_size,
-        page=item.page_number,
-        kbid=kbid,
-        show=item.show,
-        field_type_filter=item.field_type_filter,
-        extracted=item.extracted,
-        sort=sort_options,
-        requested_relations=pb_query.relation_subgraph,
-        min_score=item.min_score,
-        highlight=item.highlight,
-    )
-    await abort_transaction()
+    try:
+        search_results = await find_merge_results(
+            results,
+            count=item.page_size,
+            page=item.page_number,
+            kbid=kbid,
+            show=item.show,
+            field_type_filter=item.field_type_filter,
+            extracted=item.extracted,
+            sort=sort_options,
+            requested_relations=pb_query.relation_subgraph,
+            min_score=item.min_score,
+            highlight=item.highlight,
+        )
+    except Exception:
+        await abort_transaction()
+        raise
 
     response.status_code = 206 if incomplete_results else 200
 
