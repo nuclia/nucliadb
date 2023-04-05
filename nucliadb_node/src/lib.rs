@@ -20,7 +20,9 @@
 // NucliaDB Node component
 
 // #![warn(missing_docs)]
-#![allow(clippy::bool_assert_comparison)]
+
+
+mod metrics;
 
 /// Shard metadata, defined at the moment of creation.
 mod shard_metadata;
