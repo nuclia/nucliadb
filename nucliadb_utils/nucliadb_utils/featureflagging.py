@@ -32,7 +32,7 @@ class Settings(pydantic.BaseSettings):
 
 
 DEFAULT_FLAG_DATA = {
-    "nucliadb_node_sync_fs": {"rollout": 0, "variants": {"environment": ["stashify"]}},
+    "nucliadb_node_sync_fs": {"rollout": 0, "variants": {"environment": ["stage"]}},
 }
 
 
