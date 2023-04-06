@@ -27,6 +27,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxID,
     KnowledgeBoxResponseStatus,
 )
+from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from pydantic import BaseModel
@@ -41,7 +42,7 @@ from nucliadb.ingest.orm.exceptions import (
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard, ShardCounter
-from nucliadb.ingest.orm.utils import get_node_klass
+from nucliadb.ingest.orm.utils import get_node_klass, set_basic
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_utils.audit.audit import AuditStorage
@@ -367,9 +368,9 @@ class Processor:
         uuid = await self.get_resource_uuid(kb, messages[0])
         resource: Optional[Resource] = None
         handled_exception = None
-        origin_txn = seqid
         counter = None
         created = False
+        shard: Optional[Shard] = None
 
         try:
             for message in messages:
@@ -389,7 +390,6 @@ class Processor:
 
             if resource and resource.modified:
                 shard_id = await kb.get_resource_shard_id(uuid)
-                shard: Optional[Shard] = None
                 node_klass = get_node_klass()
 
                 if shard_id is not None:
@@ -407,22 +407,7 @@ class Processor:
                         )
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
-                if shard is not None:
-                    counter = await shard.add_resource(
-                        resource.indexer.brain, seqid, partition=partition, kb=kbid
-                    )
-                    if (
-                        counter is not None
-                        and counter.fields > settings.max_shard_fields
-                    ):
-                        # shard is full, create a new one so next resource
-                        # is placed on a new shard
-                        similarity = await kb.get_similarity()
-                        shard = await node_klass.create_shard_by_kbid(
-                            txn, kbid, similarity=similarity
-                        )
-
-                else:
+                if shard is None:
                     raise AttributeError("Shard is not available")
 
                 await txn.commit(partition, seqid)
@@ -433,18 +418,29 @@ class Processor:
                 await resource.set_slug()
                 await txn.commit(resource=False)
 
-                await self.notify_commit(partition, origin_txn, multi, kbid, uuid)
+                await self.notify_commit(partition, seqid, multi, kbid, uuid)
+
+                counter = await shard.add_resource(
+                    resource.indexer.brain, seqid, partition=partition
+                )
+                if counter is not None and counter.fields > settings.max_shard_fields:
+                    # shard is full, create a new one so next resource
+                    # is placed on a new shard
+                    similarity = await kb.get_similarity()
+                    shard = await node_klass.create_shard_by_kbid(
+                        txn, kbid, similarity=similarity
+                    )
 
             elif resource and resource.modified is False:
                 await txn.abort()
-                await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
+                await self.notify_abort(partition, seqid, multi, kbid, uuid)
                 logger.warning(f"This message did not modify the resource")
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. The exception will be reraised at the end of the function
             # and then handled by the top caller, so errors can be handled in the same place.
             await self.deadletter(messages, partition, seqid)
-            await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
+            await self.notify_abort(partition, seqid, multi, kbid, uuid)
             handled_exception = exc
         finally:
             if resource is not None:
@@ -458,6 +454,7 @@ class Processor:
             if seqid == -1:
                 raise handled_exception
             else:
+                await self._mark_resource_error(resource, partition, seqid, shard)
                 raise DeadletteredError() from handled_exception
 
         return TxnResult(
@@ -466,6 +463,41 @@ class Processor:
             else TxnAction.RESOURCE_MODIFIED,
             counter=counter,
         )
+
+    async def _mark_resource_error(
+        self,
+        resource: Optional[Resource],
+        partition: str,
+        seqid: int,
+        shard: Optional[Shard],
+    ) -> None:
+        """
+        Unhandled error processing, try to mark resource as error
+        """
+        if shard is None:
+            logger.warning(
+                "Unable to mark resource as error, shard is None. "
+                "This should not happen so you did something special to get here."
+            )
+            return
+        if resource is None or resource.basic is None:
+            logger.info(
+                f"Skip when resource does not even have basic metadata: {resource}"
+            )
+            return
+        txn = None
+        try:
+            resource.txn = txn = await self.driver.begin()
+            resource.basic.metadata.status = PBMetadata.Status.ERROR
+            await set_basic(txn, resource.kb.kbid, resource.uuid, resource.basic)
+            await txn.commit(resource=False)
+
+            await shard.add_resource(resource.indexer.brain, seqid, partition=partition)
+        except Exception:
+            logger.warning("Error while marking resource as error", exc_info=True)
+        finally:
+            if txn is not None and txn.open:
+                await txn.abort()
 
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         return await self.txn([message], seqid, partition)
