@@ -19,15 +19,11 @@
 #
 import pkg_resources
 from fastapi import FastAPI
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
-from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb.one.lifecycle import finalize, initialize
 from nucliadb.reader import API_PREFIX
@@ -36,6 +32,7 @@ from nucliadb.search.api.v1.router import api as api_search_v1
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi import metrics
 from nucliadb_utils.fastapi.openapi import extend_openapi
@@ -49,7 +46,6 @@ middleware = [
         allow_methods=["*"],
         allow_headers=["*"],
     ),
-    Middleware(PrometheusMiddleware),
     Middleware(
         AuthenticationMiddleware,
         backend=STFAuthenticationBackend(),
@@ -101,8 +97,4 @@ async def homepage(request):
 application.add_route("/", homepage)
 application.add_route("/metrics", metrics.metrics)
 
-
-# Enable forwarding of B3 headers to responses and external requests
-# to both inner applications
-set_global_textmap(B3MultiFormat())
-FastAPIInstrumentor.instrument_app(application)
+instrument_app(application, excluded_urls=["/"], metrics=True)

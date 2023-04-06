@@ -35,7 +35,7 @@ import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import metrics
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import setup_telemetry
 from opentelemetry.instrumentation.aiohttp_client import create_trace_config
 
 from nucliadb_utils import logger
@@ -463,12 +463,11 @@ class GCSStorage(Storage):
         return self._credentials.token
 
     @storage_ops_observer.wrap({"type": "initialize"})
-    async def initialize(self, service_name: Optional[str] = "GCS_SERVICE"):
+    async def initialize(self, service_name: Optional[str] = None):
         loop = asyncio.get_event_loop()
 
-        tracer_provider = get_telemetry(service_name)
+        tracer_provider = await setup_telemetry(service_name or "GCS_SERVICE")
         if tracer_provider:  # pragma: no cover
-            await init_telemetry(tracer_provider)
             logger.info("Initializing Telemetry on GCS Driver")
             self.session = aiohttp.ClientSession(
                 loop=loop,
