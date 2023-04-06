@@ -150,6 +150,7 @@ async def grpc_servicer(redis, transaction_utility, gcs_storage, fake_node):
 @pytest.fixture(scope="function")
 async def local_driver() -> AsyncIterator[Driver]:
     path = mkdtemp()
+    settings.driver = DriverConfig.local
     settings.driver_local_url = path
     driver: Driver = LocalDriver(url=path)
     await driver.initialize()
@@ -166,7 +167,7 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
         url = "localhost:2379"
     else:
         url = f"{tikvd[0]}:{tikvd[2]}"
-    settings.driver = "tikv"
+    settings.driver = DriverConfig.tikv
     settings.driver_tikv_url = [url]
 
     driver: Driver = TiKVDriver(url=[url])
