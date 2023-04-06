@@ -35,8 +35,7 @@ import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import metrics
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
-from opentelemetry.instrumentation.aiohttp_client import create_trace_config
+from nucliadb_telemetry.utils import setup_telemetry
 
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -464,28 +463,11 @@ class GCSStorage(Storage):
         return self._credentials.token
 
     @storage_ops_observer.wrap({"type": "initialize"})
-    async def initialize(self, service_name: Optional[str] = "GCS_SERVICE"):
+    async def initialize(self, service_name: Optional[str] = None):
         loop = asyncio.get_event_loop()
 
-        tracer_provider = get_telemetry(service_name)
-        if tracer_provider:  # pragma: no cover
-            await init_telemetry(tracer_provider)
-            logger.info("Initializing Telemetry on GCS Driver")
-            self.session = aiohttp.ClientSession(
-                loop=loop,
-                trace_configs=[
-                    create_trace_config(
-                        # Remove all query params from the URL attribute on the span.
-                        url_filter=strip_query_params,
-                        tracer_provider=tracer_provider,
-                    )
-                ],
-            )
-        else:
-            logger.info("Initializing GCS Driver without Telemetry")
-            self.session = aiohttp.ClientSession(
-                loop=loop,
-            )
+        await setup_telemetry(service_name or "GCS_SERVICE")
+        self.session = aiohttp.ClientSession(loop=loop)
 
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":

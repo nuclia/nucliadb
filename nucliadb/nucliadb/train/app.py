@@ -20,17 +20,11 @@
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
-    AioHttpClientInstrumentor,
-)
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
-from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb.train import API_PREFIX, SERVICE_NAME
 from nucliadb.train.api.v1.router import api
@@ -50,7 +44,6 @@ middleware = [
         allow_methods=["*"],
         allow_headers=["*"],
     ),
-    Middleware(PrometheusMiddleware),
     Middleware(
         AuthenticationMiddleware,
         backend=STFAuthenticationBackend(),
@@ -115,9 +108,9 @@ async def homepage(request: Request) -> HTMLResponse:
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
 
-# Enable forwarding of B3 headers to responses and external requests
-# to both inner applications
-tracer_provider = get_telemetry(SERVICE_NAME)
-set_global_textmap(B3MultiFormat())
-instrument_app(application, tracer_provider=tracer_provider, excluded_urls=["/"])
-AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
+instrument_app(
+    application,
+    tracer_provider=get_telemetry(SERVICE_NAME),
+    excluded_urls=["/"],
+    metrics=True,
+)

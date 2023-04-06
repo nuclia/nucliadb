@@ -20,14 +20,12 @@
 import asyncio
 from typing import Optional
 
-from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import OpStatus
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from nucliadb_node import SERVICE_NAME  # type: ignore
 
@@ -40,14 +38,7 @@ class Reader:
 
     def __init__(self, grpc_reader_address: str):
         self.lock = asyncio.Lock()
-        tracer_provider = get_telemetry(SERVICE_NAME)
-        if tracer_provider is not None:  # pragma: no cover
-            telemetry_grpc = OpenTelemetryGRPC(
-                f"{SERVICE_NAME}_grpc_reader", tracer_provider
-            )
-            self.channel = telemetry_grpc.init_client(grpc_reader_address)
-        else:
-            self.channel = aio.insecure_channel(grpc_reader_address)
+        self.channel = get_traced_grpc_channel(grpc_reader_address, SERVICE_NAME)
         self.stub = NodeReaderStub(self.channel)
 
     async def get_shard(self, pb: ShardId) -> Optional[Shard]:

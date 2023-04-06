@@ -27,7 +27,7 @@ from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.chitchat import start_chitchat, stop_chitchat
 from nucliadb.search.predict import PredictEngine
-from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
     Utility,
@@ -43,9 +43,8 @@ from nucliadb_utils.utilities import (
 
 async def initialize() -> None:
     ingest_logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider:
-        await init_telemetry(tracer_provider)
+
+    await setup_telemetry(SERVICE_NAME)
 
     await start_ingest(SERVICE_NAME)
     predict_util = PredictEngine(

@@ -27,7 +27,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
 
 
@@ -37,7 +37,6 @@ async def test_create_knowledgebox(
 ):
     tracer_provider = get_telemetry("GCS_SERVICE")
     assert tracer_provider is not None
-    await init_telemetry(tracer_provider)
 
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     pb_prefix = knowledgebox_pb2.KnowledgeBoxPrefix(prefix="")
@@ -88,6 +87,7 @@ async def test_create_knowledgebox(
             await asyncio.sleep(2)
         else:
             break
+
     assert len(resp.json()["data"]) == expected_spans
 
 

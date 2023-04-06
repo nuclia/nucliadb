@@ -25,12 +25,10 @@ import uuid
 
 import pkg_resources
 from nucliadb_telemetry import errors
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
 from nucliadb_utils.utilities import get_ff
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
@@ -71,10 +69,7 @@ async def main():
     reader = Reader(settings.reader_listen_address)
     worker = await start_worker(writer, reader)
 
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:  # pragma: no cover
-        set_global_textmap(B3MultiFormat())
-        await init_telemetry(tracer_provider)  # To start asyncio task
+    await setup_telemetry(SERVICE_NAME)
 
     logger.info(f"Node ID : {worker.node}")
 

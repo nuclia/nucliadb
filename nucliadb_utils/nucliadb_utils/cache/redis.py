@@ -20,33 +20,14 @@
 import asyncio
 from typing import Dict, Optional
 
-import prometheus_client  # type: ignore
+from nucliadb_telemetry import metrics
 from redis import asyncio as aioredis
 from redis.asyncio.client import PubSub
 
-from nucliadb_utils import metrics
 from nucliadb_utils.cache.exceptions import GroupNotSupported, NoPubsubConfigured
 from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 
-REDIS_OPS = prometheus_client.Counter(
-    "guillotina_cache_redis_ops_total",
-    "Total count of ops by type of operation and the error if there was.",
-    labelnames=["type", "error"],
-)
-REDIS_OPS_PROCESSING_TIME = prometheus_client.Histogram(
-    "guillotina_cache_redis_ops_processing_time_seconds",
-    "Histogram of operations processing time by type (in seconds)",
-    labelnames=["type"],
-)
-
-
-class watch(metrics.watch):
-    def __init__(self, operation: str):
-        super().__init__(
-            counter=REDIS_OPS,
-            histogram=REDIS_OPS_PROCESSING_TIME,
-            labels={"type": operation},
-        )
+redis_observer = metrics.Observer("redis_pubsub", labels={"type": ""})
 
 
 class RedisPubsub(PubSubDriver):
@@ -79,7 +60,7 @@ class RedisPubsub(PubSubDriver):
         if self.driver is None:
             raise NoPubsubConfigured()
 
-        with watch("publish"):
+        with redis_observer(labels={"type": "publish"}):
             await self.driver.publish(key, value)
 
     async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
