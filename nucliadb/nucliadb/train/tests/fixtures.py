@@ -242,12 +242,12 @@ def free_port() -> int:
 
 
 @pytest.fixture(scope="function")
-def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
+def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
     from nucliadb.train.settings import settings
     from nucliadb_utils.settings import running_settings, storage_settings
 
     running_settings.debug = False
-    print(f"Redis ready at {redis_driver.url}")
+    print(f"Redis ready at {maindb_driver.url}")
 
     old_file_backend = storage_settings.file_backend
     old_gcs_endpoint_url = storage_settings.gcs_endpoint_url

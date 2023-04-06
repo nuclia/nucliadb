@@ -49,35 +49,11 @@ def test_chunker():
     assert iterations == 0
 
 
-@pytest.fixture(scope="function")
-def tikv_driver_configured(tikv_driver):
-    from nucliadb.ingest.settings import settings
-    from nucliadb_utils.store import MAIN
-
-    prev_driver = settings.driver
-    settings.driver = "tikv"
-    settings.driver_tikv_url = tikv_driver.url
-    MAIN["driver"] = tikv_driver_configured
-
-    yield
-
-    settings.driver = prev_driver
-    MAIN.pop("driver", None)
-
-
-@pytest.fixture(scope="function")
-async def tikv_txn(tikv_driver):
-    txn = await tikv_driver.begin()
-    yield txn
-    await txn.abort()
-
-
 @pytest.mark.asyncio
 async def test_knowledgebox_delete_all_kb_keys(
     gcs_storage,
     cache,
     fake_node,
-    tikv_driver_configured,
     tikv_driver,
     knowledgebox_ingest: str,
 ):

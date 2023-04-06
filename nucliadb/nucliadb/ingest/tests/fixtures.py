@@ -56,6 +56,7 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
+from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -68,16 +69,16 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def processor(redis_driver, gcs_storage, cache, audit):
-    proc = Processor(redis_driver, gcs_storage, audit, cache, partition="1")
+async def processor(maindb_driver, gcs_storage, cache, audit):
+    proc = Processor(maindb_driver, gcs_storage, audit, cache, partition="1")
     await proc.initialize()
     yield proc
     await proc.finalize()
 
 
 @pytest.fixture(scope="function")
-async def stream_processor(redis_driver, gcs_storage, cache, stream_audit):
-    proc = Processor(redis_driver, gcs_storage, stream_audit, cache, partition="1")
+async def stream_processor(maindb_driver, gcs_storage, cache, stream_audit):
+    proc = Processor(maindb_driver, gcs_storage, stream_audit, cache, partition="1")
     await proc.initialize()
     yield proc
     await proc.finalize()
@@ -154,8 +155,9 @@ async def local_driver() -> AsyncIterator[Driver]:
     await driver.initialize()
     yield driver
     await driver.finalize()
-    settings.driver_local_url = None
     rmtree(path)
+    settings.driver_local_url = None
+    MAIN.pop("driver", None)
 
 
 @pytest.fixture(scope="function")
@@ -164,36 +166,51 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
         url = "localhost:2379"
     else:
         url = f"{tikvd[0]}:{tikvd[2]}"
+    settings.driver = "tikv"
     settings.driver_tikv_url = [url]
+
     driver: Driver = TiKVDriver(url=[url])
     await driver.initialize()
+
     yield driver
+
     txn = await driver.begin()
     async for key in txn.keys(""):
         await txn.delete(key)
     await txn.commit(resource=False)
     await driver.finalize()
     settings.driver_tikv_url = []
+    MAIN.pop("driver", None)
 
 
 @pytest.fixture(scope="function")
 async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     url = f"redis://{redis[0]}:{redis[1]}"
-    settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
     settings.driver = DriverConfig.redis
+    settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
+
     driver = RedisDriver(url=url)
     await driver.initialize()
-    if driver.redis is not None:
-        await driver.redis.flushall()
-        logging.info(f"Redis driver ready at {url}")
-        yield driver
+
+    assert driver.redis is not None
+    await driver.redis.flushall()
+    logging.info(f"Redis driver ready at {url}")
+
+    yield driver
+
     await driver.finalize()
     settings.driver_redis_url = None
+    MAIN.pop("driver", None)
 
 
 @pytest.fixture(scope="function")
-async def txn(redis_driver):
-    txn = await redis_driver.begin()
+async def maindb_driver(redis_driver):
+    yield redis_driver
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver):
+    txn = await maindb_driver.begin()
     yield txn
     await txn.abort()
 
