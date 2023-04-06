@@ -391,14 +391,16 @@ class Node(AbstractNode):
             members.append(member)
         return members
 
-    def _get_service_address(self, port_map: Dict[int, int]) -> str:
+    def _get_service_address(
+        self, port_map: Dict[str, int], port: Optional[int]
+    ) -> str:
         hostname = self.address.split(":")[0]
-        if settings.node_sidecar_port is None:
+        if port is None:
             # For testing proposes we need to be able to have a writing port
-            sidecar_port = port_map[hostname]
-            grpc_address = f"localhost:{sidecar_port}"
+            port = port_map[hostname]
+            grpc_address = f"localhost:{port}"
         else:
-            grpc_address = f"{hostname}:{settings.node_sidecar_port}"
+            grpc_address = f"{hostname}:{port}"
         return grpc_address
 
     @property
@@ -408,7 +410,9 @@ class Node(AbstractNode):
             and self.address not in SIDECAR_CONNECTIONS
             and self.dummy is False
         ):
-            grpc_address = self._get_service_address(settings.sidecar_port_map)
+            grpc_address = self._get_service_address(
+                settings.sidecar_port_map, settings.node_sidecar_port
+            )
             channel = get_traced_grpc_channel(
                 grpc_address, SERVICE_NAME, variant="_sidecar"
             )
@@ -430,7 +434,9 @@ class Node(AbstractNode):
             and self.address not in WRITE_CONNECTIONS
             and self.dummy is False
         ):
-            grpc_address = self._get_service_address(settings.writer_port_map)
+            grpc_address = self._get_service_address(
+                settings.writer_port_map, settings.node_writer_port
+            )
             channel = get_traced_grpc_channel(
                 grpc_address, SERVICE_NAME, variant="_writer"
             )
@@ -452,7 +458,9 @@ class Node(AbstractNode):
             and self.address not in READ_CONNECTIONS
             and self.dummy is False
         ):
-            grpc_address = self._get_service_address(settings.reader_port_map)
+            grpc_address = self._get_service_address(
+                settings.reader_port_map, settings.node_reader_port
+            )
             channel = get_traced_grpc_channel(
                 grpc_address, SERVICE_NAME, variant="_reader"
             )
