@@ -77,6 +77,11 @@ spec:
             name: nucliadb-config
         - configMapRef:
             name: {{ .Release.Name }}-config
+        env:
+          - name: VERSION
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['version']
         ports:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}

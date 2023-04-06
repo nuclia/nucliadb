@@ -20,7 +20,7 @@ import asyncio
 import time
 from functools import wraps
 from typing import TYPE_CHECKING, Optional, Type, Union
-
+import os
 import prometheus_client
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -31,6 +31,10 @@ else:
 OK = "ok"
 ERROR = "error"
 INF = float("inf")
+
+_STATUS_METRIC = "status"
+_VERSION_METRIC = "version"
+_VERSION_ENV_VAR_NAME = "VERSION"
 
 
 class Observer:
@@ -48,13 +52,16 @@ class Observer:
         assert (
             # managed by us, do not allow user to specify
             labels is None
-            or "status" not in labels
+            or (_STATUS_METRIC not in labels and _VERSION_METRIC not in labels)
         )
+
+        if _VERSION_ENV_VAR_NAME in os.environ:
+            self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
 
         self.counter = prometheus_client.Counter(
             f"{name}_count",
             f"Number of times {name} was called.",
-            labelnames=tuple(self.labels.keys()) + ("status",),
+            labelnames=tuple(self.labels.keys()) + (_STATUS_METRIC,),
         )
         hist_kwargs = {}
         if buckets is not None:
@@ -100,14 +107,14 @@ class ObserverRecorder:
             self.labels = observer.labels
 
     def set_status(self, status: str):
-        self.labels["status"] = status
+        self.labels[_STATUS_METRIC] = status
 
     def start(self):
         self.start = time.monotonic()
 
     def end(self):
         finished = time.monotonic()
-        status = self.labels.pop("status", OK)
+        status = self.labels.pop(_STATUS_METRIC, OK)
 
         if len(self.labels) > 0:
             self.observer.histogram.labels(**self.labels).observe(finished - self.start)

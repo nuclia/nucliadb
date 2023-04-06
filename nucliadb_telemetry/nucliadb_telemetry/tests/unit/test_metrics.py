@@ -22,8 +22,6 @@ import pytest
 
 from nucliadb_telemetry import metrics
 
-pytestmark = pytest.mark.asyncio
-
 
 class TestObserver:
     @pytest.fixture(autouse=True)
@@ -88,6 +86,21 @@ class TestObserver:
         await my_func()
 
         histogram.observe.assert_called_once()
+        counter.labels().inc.assert_called_once()
+
+    def test_observer_with_env(self, histogram, counter, monkeypatch):
+        monkeypatch.setenv("VERSION", "1.0.0")
+        observer = metrics.Observer(
+            "my_metric", buckets=[1, 2, 3], labels={"foo": "bar"}
+        )
+        with observer(labels={"foo": "baz"}):
+            pass
+
+        histogram.labels.assert_called_once_with(foo="baz", version="1.0.0")
+        histogram.labels().observe.assert_called_once()
+        counter.labels.assert_called_once_with(
+            status=metrics.OK, foo="baz", version="1.0.0"
+        )
         counter.labels().inc.assert_called_once()
 
 
