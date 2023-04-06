@@ -80,9 +80,9 @@ class Settings(BaseSettings):
     node_sidecar_port: int = 10002
 
     # Only for testing proposes
-    writer_port_map: Dict[int, int] = {}
-    reader_port_map: Dict[int, int] = {}
-    sidecar_port_map: Dict[int, int] = {}
+    writer_port_map: Dict[str, int] = {}
+    reader_port_map: Dict[str, int] = {}
+    sidecar_port_map: Dict[str, int] = {}
 
     # Node limits
     max_shard_fields: int = 200000  # max number of fields to target per shard
