@@ -37,7 +37,6 @@ async def test_create_knowledgebox(
 ):
     tracer_provider = get_telemetry("GCS_SERVICE")
     assert tracer_provider is not None
-    await init_telemetry(tracer_provider)
 
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     pb_prefix = knowledgebox_pb2.KnowledgeBoxPrefix(prefix="")
@@ -88,6 +87,7 @@ async def test_create_knowledgebox(
             await asyncio.sleep(2)
         else:
             break
+
     assert len(resp.json()["data"]) == expected_spans
 
 
