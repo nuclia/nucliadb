@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import functools
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Union
 
 import grpc
 from grpc import ClientCallDetails, aio  # type: ignore
@@ -91,11 +91,19 @@ def finish_metric_grpc(metric: metrics.ObserverRecorder, result):
     metric.end()
 
 
+def _to_str(v: Union[str, bytes]) -> str:
+    if isinstance(v, str):
+        return v
+    return v.decode("utf-8")
+
+
 class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
     async def intercept_unary_unary(
         self, continuation, client_call_details: ClientCallDetails, request
     ):
-        metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric = grpc_client_observer(
+            labels={"method": _to_str(client_call_details.method)}
+        )
         metric.start()
 
         call = await continuation(client_call_details, request)
@@ -108,7 +116,9 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(
         self, continuation, client_call_details: ClientCallDetails, request
     ):
-        metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric = grpc_client_observer(
+            labels={"method": _to_str(client_call_details.method)}
+        )
         metric.start()
 
         call = await continuation(client_call_details, request)
@@ -121,7 +131,9 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(
         self, continuation, client_call_details: ClientCallDetails, request_iterator
     ):
-        metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric = grpc_client_observer(
+            labels={"method": _to_str(client_call_details.method)}
+        )
         metric.start()
 
         call = await continuation(client_call_details, request_iterator)
@@ -134,7 +146,9 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
     async def intercept_stream_unary(
         self, continuation, client_call_details: ClientCallDetails, request_iterator
     ):
-        metric = grpc_client_observer(labels={"method": client_call_details.method})
+        metric = grpc_client_observer(
+            labels={"method": _to_str(client_call_details.method)}
+        )
         metric.start()
 
         call = await continuation(client_call_details, request_iterator)
