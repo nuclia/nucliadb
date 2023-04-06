@@ -44,7 +44,6 @@ nucliadb-models
 
 tikv-client>=0.0.3
 
-starlette-prometheus>=0.9.0
 prometheus-client>=0.12.0
 
 opentelemetry-instrumentation-aiohttp-client>=0.30b1
