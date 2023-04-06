@@ -137,6 +137,7 @@ class GCSStorageField(StorageField):
                 data = await resp.json()
                 assert data["resource"]["name"] == destination_uri
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(self, headers=None):
         if headers is None:
