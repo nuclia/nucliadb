@@ -34,6 +34,7 @@ import google.auth.transport.requests  # type: ignore
 import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_telemetry import metrics
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from opentelemetry.instrumentation.aiohttp_client import create_trace_config
 
@@ -46,6 +47,8 @@ from nucliadb_utils.storages.exceptions import (
     ResumableUploadGone,
 )
 from nucliadb_utils.storages.storage import Storage, StorageField
+
+storage_ops_observer = metrics.Observer("gcs_ops", labels={"type": ""})
 
 
 def strip_query_params(url: yarl.URL) -> str:
@@ -100,6 +103,7 @@ class GCSStorageField(StorageField):
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @storage_ops_observer.wrap({"type": "copy"})
     async def copy(
         self,
         origin_uri: str,
@@ -133,6 +137,7 @@ class GCSStorageField(StorageField):
                 data = await resp.json()
                 assert data["resource"]["name"] == destination_uri
 
+    @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(self, headers=None):
         if headers is None:
             headers = {}
@@ -183,6 +188,7 @@ class GCSStorageField(StorageField):
             yield chunk
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @storage_ops_observer.wrap({"type": "start_upload"})
     async def start(self, cf: CloudFile) -> CloudFile:
         """Init an upload.
 
@@ -267,6 +273,7 @@ class GCSStorageField(StorageField):
         max_tries=4,
         jitter=backoff.random_jitter,
     )
+    @storage_ops_observer.wrap({"type": "append_data"})
     async def _append(self, cf: CloudFile, data: bytes):
         if self.field is None:
             raise AttributeError()
@@ -350,6 +357,7 @@ class GCSStorageField(StorageField):
         self.field.ClearField("parts")
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @storage_ops_observer.wrap({"type": "exists"})
     async def exists(self) -> Optional[Dict[str, str]]:
         """
         Existence can be checked either with a CloudFile data in the field attribute
@@ -454,6 +462,7 @@ class GCSStorage(Storage):
             self._creation_access_token = datetime.now()
         return self._credentials.token
 
+    @storage_ops_observer.wrap({"type": "initialize"})
     async def initialize(self, service_name: Optional[str] = "GCS_SERVICE"):
         loop = asyncio.get_event_loop()
 
@@ -504,6 +513,7 @@ class GCSStorage(Storage):
         return {"AUTHORIZATION": f"Bearer {token}"}
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @storage_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
         if self.session is None:
             raise AttributeError()
@@ -530,6 +540,7 @@ class GCSStorage(Storage):
         else:
             raise AttributeError("No valid uri")
 
+    @storage_ops_observer.wrap({"type": "check_bucket_exists"})
     async def check_exists(self, bucket_name: str):
         if self.session is None:
             raise AttributeError()
@@ -560,6 +571,7 @@ class GCSStorage(Storage):
             labels["kbid"] = kbid.lower()
         await self._create_bucket(url, headers, bucket_name, labels)
 
+    @storage_ops_observer.wrap({"type": "create_bucket"})
     async def _create_bucket(self, url, headers, bucket_name, labels):
         async with self.session.post(
             url,
@@ -605,6 +617,7 @@ class GCSStorage(Storage):
             logger.exception(f"Could not create bucket {kbid}", exc_info=e)
         return created
 
+    @storage_ops_observer.wrap({"type": "schedule_delete"})
     async def schedule_delete_kb(self, kbid: str):
         if self.session is None:
             raise AttributeError()
@@ -633,6 +646,7 @@ class GCSStorage(Storage):
             deleted = True
         return deleted
 
+    @storage_ops_observer.wrap({"type": "delete"})
     async def delete_kb(self, kbid: str):
         if self.session is None:
             raise AttributeError()
