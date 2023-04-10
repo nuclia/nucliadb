@@ -81,7 +81,7 @@ from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
     get_storage,
-    get_transaction,
+    get_transaction_utility,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -112,7 +112,7 @@ async def create_resource(
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ):
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 
@@ -232,7 +232,7 @@ async def modify_resource(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 
@@ -316,7 +316,7 @@ async def reprocess_resource(
     rslug: Optional[str] = None,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 
@@ -395,7 +395,7 @@ async def delete_resource(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ):
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)

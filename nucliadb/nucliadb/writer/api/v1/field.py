@@ -55,7 +55,7 @@ from nucliadb_utils.utilities import (
     get_cache,
     get_partitioning,
     get_storage,
-    get_transaction,
+    get_transaction_utility,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -117,7 +117,7 @@ async def finish_field_put(
     wait_on_commit: bool,
 ) -> int:
     # Create processing message
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
 
     processing_info = await processing.send_to_process(toprocess, partition)
@@ -435,7 +435,7 @@ async def append_messages_to_conversation_field(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 
@@ -505,7 +505,7 @@ async def append_blocks_to_layout_field(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 
@@ -574,7 +574,7 @@ async def delete_resource_field(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ):
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
@@ -614,7 +614,7 @@ async def reprocess_file_field(
     x_nucliadb_user: str = X_NUCLIADB_USER,
     x_file_password: Optional[str] = X_FILE_PASSWORD,
 ) -> ResourceUpdated:
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     partitioning = get_partitioning()
 

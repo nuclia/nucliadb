@@ -32,7 +32,7 @@ from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction
+from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction_utility
 
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
@@ -121,7 +121,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(1)
@@ -183,7 +183,7 @@ async def test_knowledgebox_file_upload_root(
             assert resp.status_code == 201
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     assert transaction.js is not None
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -244,7 +244,7 @@ async def test_knowledgebox_file_upload_root_headers(
             assert resp.status_code == 201
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     assert transaction.js is not None
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -337,7 +337,7 @@ async def test_knowledgebox_file_tus_upload_field(
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(2)
@@ -390,7 +390,7 @@ async def test_knowledgebox_file_upload_field_headers(
             assert resp.status_code == 201
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(2)
@@ -513,7 +513,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(2)
@@ -576,7 +576,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
             assert resp.status_code == 201
 
     processing = get_processing()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(2)

@@ -40,17 +40,16 @@ class NodesManager:
 
     async def get_shards_by_kbid_inner(self, kbid: str) -> PBShards:
         key = KB_SHARDS.format(kbid=kbid)
-        txn = await self.driver.begin()
-        payload = await txn.get(key)
-        await txn.abort()
-        if payload is None:
-            # could be None because /shards doesn't exist, or beacause the whole KB does not exist.
-            # In any case, this should not happen
-            raise ShardsNotFound(kbid)
+        async with self.driver.transaction() as txn:
+            payload = await txn.get(key)
+            if payload is None:
+                # could be None because /shards doesn't exist, or beacause the whole KB does not exist.
+                # In any case, this should not happen
+                raise ShardsNotFound(kbid)
 
-        pb = PBShards()
-        pb.ParseFromString(payload)
-        return pb
+            pb = PBShards()
+            pb.ParseFromString(payload)
+            return pb
 
     async def get_shards_by_kbid(self, kbid: str) -> List[ShardObject]:
         shards = await self.get_shards_by_kbid_inner(kbid)

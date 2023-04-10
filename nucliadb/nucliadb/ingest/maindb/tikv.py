@@ -50,6 +50,9 @@ class TiKVTransaction(Transaction):
         self.open = True
 
     async def abort(self):
+        if not self.open:
+            return
+
         with tikv_observer({"type": "rollback"}):
             await self.txn.rollback()
         self.open = False

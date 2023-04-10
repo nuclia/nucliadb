@@ -600,7 +600,7 @@ class TestWriterServicer:
         with patch(
             "nucliadb.ingest.service.writer.get_partitioning"
         ) as get_partitioning, patch(
-            "nucliadb.ingest.service.writer.get_transaction",
+            "nucliadb.ingest.service.writer.get_transaction_utility",
             MagicMock(return_value=txn),
         ):
             resp = await writer.Index(request)

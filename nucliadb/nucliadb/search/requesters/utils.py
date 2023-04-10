@@ -36,8 +36,8 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
+from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
-from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.shards import (
     query_paragraph_shard,
     query_shard,

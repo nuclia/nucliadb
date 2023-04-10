@@ -27,7 +27,6 @@ from fastapi_versioning import version
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.utils import parse_sort_options
@@ -239,22 +238,19 @@ async def find(
     )
 
     # We need to merge
-    try:
-        search_results = await find_merge_results(
-            results,
-            count=item.page_size,
-            page=item.page_number,
-            kbid=kbid,
-            show=item.show,
-            field_type_filter=item.field_type_filter,
-            extracted=item.extracted,
-            sort=sort_options,
-            requested_relations=pb_query.relation_subgraph,
-            min_score=item.min_score,
-            highlight=item.highlight,
-        )
-    finally:
-        await abort_transaction()
+    search_results = await find_merge_results(
+        results,
+        count=item.page_size,
+        page=item.page_number,
+        kbid=kbid,
+        show=item.show,
+        field_type_filter=item.field_type_filter,
+        extracted=item.extracted,
+        sort=sort_options,
+        requested_relations=pb_query.relation_subgraph,
+        min_score=item.min_score,
+        highlight=item.highlight,
+    )
 
     response.status_code = 206 if incomplete_results else 200
 

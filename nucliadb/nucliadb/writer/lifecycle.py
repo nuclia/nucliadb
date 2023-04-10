@@ -35,7 +35,7 @@ from nucliadb_utils.settings import (
     transaction_settings,
 )
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
-from nucliadb_utils.utilities import Utility, get_transaction, set_utility
+from nucliadb_utils.utilities import Utility, get_transaction_utility, set_utility
 
 
 async def initialize():
@@ -88,7 +88,7 @@ async def initialize():
 
 
 async def finalize():
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     if transaction is not None:
         await transaction.finalize()
 

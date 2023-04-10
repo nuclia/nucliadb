@@ -43,7 +43,7 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_transaction
+from nucliadb_utils.utilities import get_transaction_utility
 
 consumer_observer = metrics.Observer(
     "message_processor",
@@ -363,7 +363,7 @@ class PullWorker:
                             )
                             async with self.lock:
                                 try:
-                                    transaction_utility = get_transaction()
+                                    transaction_utility = get_transaction_utility()
                                     if transaction_utility is None:
                                         raise Exception(
                                             "No transaction utility defined"

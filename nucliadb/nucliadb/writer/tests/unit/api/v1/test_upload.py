@@ -48,7 +48,7 @@ def processing_mock():
 
 @pytest.fixture(scope="function")
 def transaction_mock():
-    with mock.patch(f"{UPLOAD_PACKAGE}.get_transaction") as transaction_mock:
+    with mock.patch(f"{UPLOAD_PACKAGE}.get_transaction_utility") as transaction_mock:
         transaction = mock.AsyncMock()
         transaction_mock.return_value = transaction
         yield transaction

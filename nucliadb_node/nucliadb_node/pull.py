@@ -42,7 +42,7 @@ from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
     get_storage,
-    get_transaction,
+    get_transaction_utility,
 )
 
 from nucliadb_node import SERVICE_NAME, logger, shadow_shards
@@ -103,7 +103,7 @@ class Worker:
 
         await self.subscriber_finalize()
 
-        transaction_utility = get_transaction()
+        transaction_utility = get_transaction_utility()
         if transaction_utility:
             await transaction_utility.finalize()
             clean_utility(Utility.TRANSACTION)
