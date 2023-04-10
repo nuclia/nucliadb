@@ -63,6 +63,7 @@ def create_resource(
     create_payload.origin = Origin(source=Origin.Source.PYSDK)
     if key is not None:
         create_payload.slug = SlugString(key)
+        create_payload.slug.validate(key)
     if icon is not None:
         create_payload.icon = icon
     else:
