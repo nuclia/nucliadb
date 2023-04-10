@@ -27,4 +27,4 @@ class FieldIdString(pydantic.ConstrainedStr):
 
 
 class SlugString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[a-z0-9:_-]+$")
+    regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
