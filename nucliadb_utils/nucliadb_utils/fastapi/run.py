@@ -28,7 +28,7 @@ from uvicorn.server import Server  # type: ignore
 
 from nucliadb_utils import logger
 from nucliadb_utils.fastapi.metrics import application_metrics
-from nucliadb_utils.settings_running import running_settings
+from nucliadb_utils.settings import running_settings
 
 STARTUP_FAILURE = 3
 
