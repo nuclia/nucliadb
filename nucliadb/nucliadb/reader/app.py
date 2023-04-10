@@ -26,7 +26,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.reader import API_PREFIX, SERVICE_NAME
+from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import finalize, initialize
 from nucliadb_telemetry import errors
