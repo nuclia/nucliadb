@@ -26,5 +26,20 @@ class FieldIdString(pydantic.ConstrainedStr):
     regex = re.compile(r"^[^/]+$")
 
 
+class InvalidSlugError(pydantic.errors.PydanticValueError):
+    code = "str.slug"
+    msg_template = (
+        "Invalid slug: '{value}'. Slug must be a string with only "
+        "letters, numbers, underscores, colons and dashes."
+    )
+
+
 class SlugString(pydantic.ConstrainedStr):
     regex = re.compile(r"^[a-z0-9:_-]+$")
+
+    @classmethod
+    def validate(cls, value: str) -> str:
+        try:
+            return super().validate(value)
+        except pydantic.errors.StrRegexError:
+            raise InvalidSlugError(value=value)
