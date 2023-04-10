@@ -18,12 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
+from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.app import application
-from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.utils import get_telemetry
-
-from nucliadb.writer import SERVICE_NAME
+from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
 
 
 def run():

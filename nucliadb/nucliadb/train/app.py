@@ -30,7 +30,6 @@ from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import finalize, initialize
 from nucliadb_telemetry import errors
-
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
