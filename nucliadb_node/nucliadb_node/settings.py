@@ -19,8 +19,8 @@
 #
 from typing import List, Optional
 
-from pydantic import BaseSettings
 from nucliadb_utils.settings import IndexingSettings
+from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
