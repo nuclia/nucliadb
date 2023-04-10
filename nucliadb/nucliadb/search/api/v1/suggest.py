@@ -24,7 +24,7 @@ from typing import List, Optional
 from fastapi import Header, Query, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.ingest.txn_utils import abort_transaction  # type: ignore
+from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_suggest_results
