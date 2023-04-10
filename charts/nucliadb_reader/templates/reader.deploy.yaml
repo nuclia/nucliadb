@@ -70,6 +70,11 @@ spec:
             name: nucliadb-config
         - configMapRef:
             name: reader-config
+        env:
+          - name: VERSION
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['version']
         ports:
         - name: http-reader
           containerPort: {{ .Values.serving.port }}

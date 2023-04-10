@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import asyncio
+import os
 import time
 from functools import wraps
 from typing import TYPE_CHECKING, Optional, Type, Union
@@ -31,6 +32,10 @@ else:
 OK = "ok"
 ERROR = "error"
 INF = float("inf")
+
+_STATUS_METRIC = "status"
+_VERSION_METRIC = "version"
+_VERSION_ENV_VAR_NAME = "VERSION"
 
 
 class Observer:
@@ -48,13 +53,16 @@ class Observer:
         assert (
             # managed by us, do not allow user to specify
             labels is None
-            or "status" not in labels
+            or (_STATUS_METRIC not in labels and _VERSION_METRIC not in labels)
         )
+
+        if _VERSION_ENV_VAR_NAME in os.environ:
+            self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
 
         self.counter = prometheus_client.Counter(
             f"{name}_count",
             f"Number of times {name} was called.",
-            labelnames=tuple(self.labels.keys()) + ("status",),
+            labelnames=tuple(self.labels.keys()) + (_STATUS_METRIC,),
         )
         hist_kwargs = {}
         if buckets is not None:
@@ -100,14 +108,14 @@ class ObserverRecorder:
             self.labels = observer.labels
 
     def set_status(self, status: str):
-        self.labels["status"] = status
+        self.labels[_STATUS_METRIC] = status
 
     def start(self):
         self.start = time.monotonic()
 
     def end(self):
         finished = time.monotonic()
-        status = self.labels.pop("status", OK)
+        status = self.labels.pop(_STATUS_METRIC, OK)
 
         if len(self.labels) > 0:
             self.observer.histogram.labels(**self.labels).observe(finished - self.start)
@@ -138,32 +146,44 @@ class ObserverRecorder:
 
 
 class Gauge:
-    def __init__(self, name: str, *, labelnames: Optional[list[str]] = None):
-        self.labelnames = labelnames or []
+    def __init__(self, name: str, *, labels: Optional[dict[str, str]] = None):
+        self.labels = labels or {}
+        if _VERSION_ENV_VAR_NAME in os.environ:
+            self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
+
         self.gauge = prometheus_client.Gauge(
-            name, f"Gauge for {name}.", labelnames=self.labelnames
+            name, f"Gauge for {name}.", labelnames=tuple(self.labels.keys())
         )
 
     def set(self, value: Union[float, int], labels: Optional[dict[str, str]] = None):
-        if labels is not None:
-            self.gauge.labels(**labels).set(value)
+        merged_labels = self.labels.copy()
+        merged_labels.update(labels or {})
+
+        if len(merged_labels) > 0:
+            self.gauge.labels(**merged_labels).set(value)
         else:
             self.gauge.set(value)
 
     def remove(self, labels: dict[str, str]):
-        self.gauge.remove(*[labels[k] for k in self.labelnames])
+        self.gauge.remove(*[labels[k] for k in self.labels.keys()])
 
 
 class Counter:
-    def __init__(self, name: str, *, labelnames: Optional[list[str]] = None):
-        self.labelnames = labelnames or []
+    def __init__(self, name: str, *, labels: Optional[dict[str, str]] = None):
+        self.labels = labels or {}
+        if _VERSION_ENV_VAR_NAME in os.environ:
+            self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
+
         self.counter = prometheus_client.Counter(
-            name, f"Counter for {name}.", labelnames=self.labelnames
+            name, f"Counter for {name}.", labelnames=tuple(self.labels.keys())
         )
 
     def inc(self, labels: Optional[dict[str, str]] = None):
-        if labels is not None:
-            self.counter.labels(**labels).inc()
+        merged_labels = self.labels.copy()
+        merged_labels.update(labels or {})
+
+        if len(merged_labels) > 0:
+            self.counter.labels(**merged_labels).inc()
         else:
             self.counter.inc()
 
@@ -173,20 +193,25 @@ class Histogram:
         self,
         name: str,
         *,
-        labelnames: Optional[list[str]] = None,
+        labels: Optional[dict[str, str]] = None,
         buckets: Optional[list[float]] = None,
     ):
-        self.labelnames = labelnames or []
+        self.labels = labels or {}
+        if _VERSION_ENV_VAR_NAME in os.environ:
+            self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
+
         kwargs = {}
         if buckets is not None:
             kwargs["buckets"] = buckets
         self.histo = prometheus_client.Histogram(
-            name, f"Counter for {name}.", labelnames=self.labelnames, **kwargs  # type: ignore
+            name, f"Counter for {name}.", labelnames=tuple(self.labels.keys()), **kwargs  # type: ignore
         )
 
     def observe(self, value: float, labels: Optional[dict[str, str]] = None):
-        if labels is not None:
-            self.histo.labels(**labels).observe(value)
+        merged_labels = self.labels.copy()
+        merged_labels.update(labels or {})
+        if len(merged_labels) > 0:
+            self.histo.labels(**merged_labels).observe(value)
         else:
             self.histo.observe(value)
 
