@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import (
 
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.serialize import serialize
-from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
+from nucliadb.ingest.txn_utils import abort_transaction, get_transaction  # type: ignore
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.fetch import (
     get_resource_cache,

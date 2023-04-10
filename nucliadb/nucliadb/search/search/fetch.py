@@ -31,7 +31,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import serialize
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.ingest.txn_utils import get_transaction  # type: ignore
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource

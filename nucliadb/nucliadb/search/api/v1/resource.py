@@ -24,7 +24,7 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
-from nucliadb.ingest.txn_utils import abort_transaction
+from nucliadb.ingest.txn_utils import abort_transaction  # type: ignore
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_paragraphs_results

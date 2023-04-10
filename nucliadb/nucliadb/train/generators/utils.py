@@ -23,7 +23,7 @@ from typing import Dict, Optional
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.txn_utils import get_transaction
+from nucliadb.ingest.txn_utils import get_transaction  # type: ignore
 from nucliadb.train import SERVICE_NAME
 from nucliadb_utils.utilities import get_cache, get_storage
 
