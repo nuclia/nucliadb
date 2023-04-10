@@ -63,7 +63,7 @@ spec:
           timeoutSeconds: 10
           periodSeconds: 20
         command: [
-          "writer-metrics"
+          "nucliadb-writer"
         ]
         envFrom:
         - configMapRef:

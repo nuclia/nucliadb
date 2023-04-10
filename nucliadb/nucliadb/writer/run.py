@@ -20,7 +20,18 @@
 
 from nucliadb.writer.app import application
 from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
+from nucliadb_telemetry.fastapi import instrument_app
+from nucliadb_telemetry.utils import get_telemetry
+
+from nucliadb.writer import SERVICE_NAME
 
 
-def run_with_metrics():
+def run():
+    instrument_app(
+        application,
+        tracer_provider=get_telemetry(SERVICE_NAME),
+        excluded_urls=["/"],
+        metrics=True,
+    )
+
     run_fastapi_with_metrics(application)

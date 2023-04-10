@@ -61,7 +61,7 @@ spec:
           timeoutSeconds: 10
           periodSeconds: 20
         command: [
-          "ndb_train"
+          "nucliadb-train"
         ]
         envFrom:
         - configMapRef:

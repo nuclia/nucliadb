@@ -53,20 +53,27 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
+            # Service commands
+            # Standalone
             "nucliadb = nucliadb.run:run",
-            "nucliadb_purge = nucliadb.purge:purge",
-            "ndb_ingest = nucliadb.ingest.app:run_consumer",
-            "ndb_ingest_orm_grpc = nucliadb.ingest.app:run_orm_grpc",
-            "ndb_purge = nucliadb.ingest.purge:run",
-            "nucliadb_one = nucliadb.one:run",
-            "extract-openapi-reader = nucliadb.reader.openapi:command_extract_openapi",
-            "reader-metrics = nucliadb.reader.run:run_with_metrics",
-            "extract-openapi-search = nucliadb.search.openapi:command_extract_openapi",
-            "search-metrics = nucliadb.search.run:run_with_metrics",
-            "extract-openapi-writer = nucliadb.writer.openapi:command_extract_openapi",
-            "writer-metrics = nucliadb.writer.run:run_with_metrics",
-            "ndb_train = nucliadb.train.run:run_with_metrics",
-            "nuclia_dataset_upload = nucliadb.train.upload:run",
+            # Ingest
+            "nucliadb-ingest = nucliadb.ingest.app:run_consumer",
+            "nucliadb-ingest-orm-grpc = nucliadb.ingest.app:run_orm_grpc",
+            # Reader
+            "nucliadb-reader = nucliadb.reader.run:run",
+            # Writer
+            "nucliadb-writer = nucliadb.writer.run:run",
+            # Search
+            "nucliadb-search = nucliadb.search.run:run",
+            # Train
+            "nucliadb-train = nucliadb.train.run:run",
+            # utilities
+            "nucliadb-purge = nucliadb.purge:purge",
+            "nucliadb-ingest-purge = nucliadb.ingest.purge:run",
+            "nucliadb-extract-openapi-reader = nucliadb.reader.openapi:command_extract_openapi",
+            "nucliadb-extract-openapi-search = nucliadb.search.openapi:command_extract_openapi",
+            "nucliadb-extract-openapi-writer = nucliadb.writer.openapi:command_extract_openapi",
+            "nucliadb-dataset-upload = nucliadb.train.upload:run",
         ]
     },
     project_urls={
