@@ -25,7 +25,7 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.utils import get_driver
 
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
-txn_lock: ContextVar[asyncio.Lock] = ContextVar("txn_lock", default=asyncio.Lock())
+txn_lock: ContextVar[Optional[asyncio.Lock]] = ContextVar("txn_lock", default=None)
 
 
 def _get_transaction_lock() -> asyncio.Lock:
