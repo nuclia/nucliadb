@@ -19,7 +19,7 @@
 #
 from typing import Optional
 
-from nucliadb_utils.settings import IndexingSettings
+from nucliadb_utils import settings as utils_settings
 from pydantic import BaseSettings
 
 
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-class IndexingSettings(IndexingSettings):
+class IndexingSettings(utils_settings.IndexingSettings):
     indexed_jetstream_target: str = "indexed.{partition}"
     indexed_jetstream_stream: str = "indexed"
 
