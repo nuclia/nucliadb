@@ -20,6 +20,7 @@
 from typing import List, Optional
 
 from pydantic import BaseSettings
+from nucliadb_utils.settings import IndexingSettings
 
 
 class Settings(BaseSettings):
@@ -36,13 +37,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-class IndexingSettings(BaseSettings):
-    index_jetstream_target: Optional[str] = "node.{node}"
-    index_jetstream_group: Optional[str] = "node-{node}"
-    index_jetstream_stream: Optional[str] = "node"
-    index_jetstream_servers: List[str] = []
-    index_jetstream_auth: Optional[str] = None
-
+class IndexingSettings(IndexingSettings):
     indexed_jetstream_target: str = "indexed.{partition}"
     indexed_jetstream_stream: str = "indexed"
 

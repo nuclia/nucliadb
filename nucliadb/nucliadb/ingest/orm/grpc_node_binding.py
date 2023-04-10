@@ -250,7 +250,7 @@ class LocalWriterWrapper:
 
     def __init__(self):
         self.writer = NodeWriter.new()
-        self.executor = ThreadPoolExecutor(settings.local_reader_threads)
+        self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
     async def GetShard(self, request: ShardId) -> ShardId:
         loop = asyncio.get_running_loop()

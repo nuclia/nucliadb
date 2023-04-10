@@ -17,18 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional
-
-from pydantic import BaseSettings
+from nucliadb.ingest.settings import DriverSettings
 
 
-class Settings(BaseSettings):
-    driver: str = "redis"  # redis | tikv
-    driver_redis_url: Optional[str] = None
-    driver_tikv_url: Optional[List[str]] = []
-
-    nodes_load_ingest: bool = False
-
+class Settings(DriverSettings):
     search_timeout: float = 10.0
 
 

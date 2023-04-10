@@ -17,10 +17,6 @@ data:
   LOG_LEVEL: "DEBUG"
 {{- end }}
   ACTIVITY_LOG_LEVEL: {{ .Values.running.activity_log_level }}
-{{- if .Values.config.monitor }}
-  MONITOR: "True"
-{{- end }}
-  MONITOR_PORT: {{ .Values.serving.monitor | quote }}
   SENTRY_URL: {{ .Values.running.sentry_url }}
 
   INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}

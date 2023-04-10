@@ -2,7 +2,6 @@
 config:
   pull_time: 100
   node_replicas: 2
-  monitor: False
 
 affinity: {}
 nodeSelector: {}
@@ -24,7 +23,6 @@ resources: {}
 
 serving:
   grpc: 8030
-  monitor: 50101
   metricsPort: 8081
 serviceMonitor:
   enabled: false
