@@ -25,7 +25,7 @@ from typing import Awaitable, Callable, Optional, Union
 import pkg_resources
 
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
-from nucliadb.ingest.chitchat import start_chitchat
+from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.ingest.consumer import start_consumer
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
@@ -115,6 +115,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
+        stop_chitchat,
     ]
 
     if chitchat is not None:

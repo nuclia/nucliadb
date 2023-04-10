@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nucliadb.ingest.utils import get_driver, settings
+from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.store import MAIN
 
 
@@ -76,5 +77,5 @@ async def test_get_driver_local():
 async def test_get_driver_error():
     with patch.object(settings, "driver", "pg"), patch.object(
         settings, "driver_pg_url", None
-    ), pytest.raises(AttributeError):
+    ), pytest.raises(ConfigurationError):
         await get_driver()

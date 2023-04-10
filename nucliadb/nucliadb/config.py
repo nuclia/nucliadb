@@ -18,41 +18,61 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
+import logging
 import os
 
 from nucliadb.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 def config_standalone_driver(nucliadb_args: Settings):
-    from nucliadb.ingest.settings import DriverConfig
+    from nucliadb.ingest.settings import DriverConfig, DriverSettings
     from nucliadb.ingest.settings import settings as ingest_settings
-    from nucliadb_utils.settings import storage_settings
+    from nucliadb_utils.settings import (
+        FileBackendConfig,
+        StorageSettings,
+        storage_settings,
+    )
 
-    if nucliadb_args.driver == DriverConfig.local:
-        ingest_settings.driver = DriverConfig.local
-        ingest_settings.driver_local_url = nucliadb_args.maindb
-        if not os.path.isdir(nucliadb_args.maindb):
-            os.makedirs(nucliadb_args.maindb, exist_ok=True)
-    elif nucliadb_args.driver == DriverConfig.redis:
-        ingest_settings.driver = DriverConfig.redis
-        ingest_settings.driver_redis_url = nucliadb_args.maindb
-    elif nucliadb_args.driver == DriverConfig.pg:
-        ingest_settings.driver = DriverConfig.pg
-        storage_settings.file_backend = "pg"
-        ingest_settings.driver_pg_url = (
-            storage_settings.driver_pg_url
-        ) = nucliadb_args.maindb
+    # update global settings with arg values
+    for fieldname in DriverSettings.__fields__.keys():
+        setattr(ingest_settings, fieldname, getattr(nucliadb_args, fieldname))
+    for fieldname in StorageSettings.__fields__.keys():
+        setattr(storage_settings, fieldname, getattr(nucliadb_args, fieldname))
 
-    if nucliadb_args.driver != DriverConfig.pg:
-        storage_settings.file_backend = "local"
+    if ingest_settings.driver == DriverConfig.NOT_SET:
+        # no driver specified, for standalone, we force defaulting to local here
+        ingest_settings.driver = DriverConfig.LOCAL
 
-        if not os.path.isdir(nucliadb_args.blob):
-            os.makedirs(nucliadb_args.blob, exist_ok=True)
-        storage_settings.local_files = nucliadb_args.blob
+    if (
+        ingest_settings.driver == DriverConfig.LOCAL
+        and ingest_settings.driver_local_url is None
+    ):
+        # also provide default path for local driver when none provided
+        ingest_settings.driver_local_url = "./data/main"
 
-    os.environ["DATA_PATH"] = nucliadb_args.node
-    if not os.path.isdir(nucliadb_args.node):
-        os.makedirs(nucliadb_args.node, exist_ok=True)
+    if storage_settings.file_backend == FileBackendConfig.NOT_SET:
+        # no driver specified, for standalone, we try to automate some settings here
+        storage_settings.file_backend = FileBackendConfig.LOCAL
+
+    if (
+        storage_settings.file_backend == FileBackendConfig.LOCAL
+        and storage_settings.local_files is None
+    ):
+        storage_settings.local_files = "./data/blob"
+
+    if ingest_settings.driver_local_url is not None and not os.path.isdir(
+        ingest_settings.driver_local_url
+    ):
+        os.makedirs(ingest_settings.driver_local_url, exist_ok=True)
+
+    # need to force inject this to env var
+    if "DATA_PATH" not in os.environ:
+        os.environ["DATA_PATH"] = nucliadb_args.data_path
+
+    if not os.path.isdir(nucliadb_args.data_path):
+        os.makedirs(nucliadb_args.data_path, exist_ok=True)
 
 
 def config_nucliadb(nucliadb_args: Settings):
@@ -91,24 +111,20 @@ def config_nucliadb(nucliadb_args: Settings):
     cache_settings.cache_enabled = False
     writer_settings.dm_enabled = False
 
-    running_settings.log_level = nucliadb_args.log.upper()
-    running_settings.activity_log_level = nucliadb_args.log.upper()
-    train_settings.grpc_port = nucliadb_args.train
-    ingest_settings.grpc_port = nucliadb_args.grpc
+    running_settings.log_level = nucliadb_args.log_level.upper()
+    running_settings.activity_log_level = nucliadb_args.log_level.upper()
+    train_settings.grpc_port = nucliadb_args.train_grpc_port
+    ingest_settings.grpc_port = nucliadb_args.ingest_grpc_port
 
     config_standalone_driver(nucliadb_args)
 
-    if nucliadb_args.key is None:
-        if os.environ.get("NUA_API_KEY"):
-            nuclia_settings.nuclia_service_account = os.environ.get("NUA_API_KEY")
-            nuclia_settings.disable_send_to_process = False
-            ingest_settings.pull_time = 60
-
-        else:
-            ingest_settings.pull_time = 0
-            nuclia_settings.disable_send_to_process = True
+    if nucliadb_args.nua_api_key:
+        nuclia_settings.nuclia_service_account = nucliadb_args.nua_api_key
+        nuclia_settings.disable_send_to_process = False
+        ingest_settings.pull_time = 60
     else:
-        nuclia_settings.nuclia_service_account = nucliadb_args.key
+        ingest_settings.pull_time = 0
+        nuclia_settings.disable_send_to_process = True
 
     if nucliadb_args.zone is not None:
         nuclia_settings.nuclia_zone = nucliadb_args.zone

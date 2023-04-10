@@ -1,5 +1,25 @@
-# NucliaDB Reader Settings
+# -----
+# NucliaDB Train Settings
+# -----
 
+# Image settings
+imagePullPolicy: IfNotPresent
+containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
+image: IMAGE_TO_REPLACE
+image_other: cluster_manager:main
+
+# Component settings
+# ---
+# These settings are controlled through environment variables
+# all kubernetes oriented settings are controlled through
+# other values.
+# HOWEVER, we are in a transition period where we allow
+# both until all component settings are removed from
+# settings not mapped directly through env
+env:
+  EXAMPLE: "VALUE"
+
+# Kubernetes settings
 affinity: {}
 nodeSelector: {}
 tolerations: []
@@ -7,10 +27,6 @@ topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
-imagePullPolicy: IfNotPresent
-containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
-image: IMAGE_TO_REPLACE
-image_other: cluster_manager:main
 resources: {}
 #  limits:
 #    memory: "600Mi"

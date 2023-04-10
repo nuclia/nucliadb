@@ -34,7 +34,7 @@ from nucliadb_utils.grpc import get_traced_grpc_server
 
 async def health_check(health_servicer):
     while True:
-        if len(NODES) == 0 and settings.driver != DriverConfig.local:
+        if len(NODES) == 0 and settings.driver != DriverConfig.LOCAL:
             await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
         else:
             await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)

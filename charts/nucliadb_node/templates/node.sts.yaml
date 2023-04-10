@@ -81,6 +81,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
+        {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+        {{- end }}
         ports:
         - name: grpc-sidecar
           containerPort: {{ .Values.serving.grpc_sidecar }}
@@ -122,6 +126,10 @@ spec:
         env:
           - name: METRICS_HTTP_PORT
             value: "3032"
+          {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+          {{- end }}
         ports:
         - name: grpc-writer
           containerPort: {{ .Values.serving.grpc_writer }}
@@ -161,6 +169,10 @@ spec:
         env:
           - name: METRICS_HTTP_PORT
             value: "3031"
+        {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+        {{- end }}
         ports:
         - name: grpc-reader
           containerPort: {{ .Values.serving.grpc_reader }}

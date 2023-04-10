@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import BaseSettings, Field
@@ -49,8 +50,25 @@ class HTTPSettings(BaseSettings):
 http_settings = HTTPSettings()
 
 
+class FileBackendConfig(str, Enum):
+    GCS = "gcs"
+    S3 = "s3"
+    PG = "pg"
+    LOCAL = "local"
+    NOT_SET = "notset"  # setting not provided
+
+    @classmethod
+    def _missing_(cls, value):
+        """
+        allow case insensitive enum values
+        """
+        for member in cls:
+            if member.value == value.lower():
+                return member
+
+
 class StorageSettings(BaseSettings):
-    file_backend: str = "gcs"  # gcs | s3 | pg | local
+    file_backend: FileBackendConfig = FileBackendConfig.NOT_SET
 
     gcs_base64_creds: Optional[str] = None
     gcs_bucket: Optional[str] = None

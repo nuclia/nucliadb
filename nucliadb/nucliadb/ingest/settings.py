@@ -20,14 +20,15 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
 
 
 class DriverConfig(str, Enum):
-    redis = "redis"
-    tikv = "tikv"
-    pg = "pg"
-    local = "local"
+    REDIS = "redis"
+    TIKV = "tikv"
+    PG = "pg"
+    LOCAL = "local"
+    NOT_SET = "notset"  # setting not provided
 
     @classmethod
     def _missing_(cls, value):
@@ -40,15 +41,11 @@ class DriverConfig(str, Enum):
 
 
 class DriverSettings(BaseSettings):
-    # allowing defaults is not ideal
-    # TODO: implement settings without defaults
-    driver: DriverConfig = DriverConfig.redis
+    driver: DriverConfig = Field(DriverConfig.NOT_SET, description="Storage driver")
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
     driver_local_url: Optional[str] = None
     driver_pg_url: Optional[str] = None
-
-    nodes_load_ingest: bool = False
 
 
 class Settings(DriverSettings):
@@ -98,6 +95,8 @@ class Settings(DriverSettings):
     # Search query timeouts
     relation_search_timeout: float = 10.0
     relation_types_timeout: float = 10.0
+
+    nodes_load_ingest: bool = False
 
 
 settings = Settings()

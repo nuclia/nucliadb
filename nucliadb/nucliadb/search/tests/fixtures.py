@@ -51,6 +51,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
+        FileBackendConfig,
         nuclia_settings,
         nucliadb_settings,
         running_settings,
@@ -59,7 +60,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
 
     extended_storage_settings.gcs_indexing_bucket = "indexing"

@@ -31,7 +31,12 @@ from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.settings import nuclia_settings, nucliadb_settings, storage_settings
+from nucliadb_utils.settings import (
+    FileBackendConfig,
+    nuclia_settings,
+    nucliadb_settings,
+    storage_settings,
+)
 
 
 @pytest.fixture(scope="function")
@@ -81,7 +86,7 @@ async def writer_api(
 @pytest.fixture(scope="function")
 async def gcs_storage_writer(gcs):
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
 
 
