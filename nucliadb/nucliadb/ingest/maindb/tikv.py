@@ -166,8 +166,7 @@ class TiKVDriver(Driver):
     async def begin(self) -> TiKVTransaction:
         if self.tikv is None:
             raise AttributeError()
-        tikvtxn = await self.tikv.begin(pessimistic=False)
-        return TiKVTransaction(tikvtxn, driver=self)
+        return TiKVTransaction(await self.tikv.begin(pessimistic=False), driver=self)
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
