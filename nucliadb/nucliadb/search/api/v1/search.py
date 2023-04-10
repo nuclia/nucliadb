@@ -24,10 +24,10 @@ from typing import List, Optional, Union
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.ingest.txn_utils import abort_transaction  # type: ignore
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.utils import parse_sort_options

@@ -233,7 +233,7 @@ async def finalize_utilities():
         clean_utility(util)
 
 
-def get_transaction() -> TransactionUtility:
+def get_transaction_utility() -> TransactionUtility:
     return get_utility(Utility.TRANSACTION)
 
 

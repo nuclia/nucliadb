@@ -45,7 +45,7 @@ from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
     get_indexing,
-    get_transaction,
+    get_transaction_utility,
     set_utility,
     start_audit_utility,
     stop_audit_utility,
@@ -87,7 +87,7 @@ async def start_indexing_utility(service_name: Optional[str] = None):
 
 
 async def stop_transaction_utility():
-    transaction_utility = get_transaction()
+    transaction_utility = get_transaction_utility()
     if transaction_utility:
         await transaction_utility.finalize()
         clean_utility(Utility.TRANSACTION)

@@ -74,7 +74,7 @@ from nucliadb_utils.utilities import (
     get_ingest,
     get_partitioning,
     get_storage,
-    get_transaction,
+    get_transaction_utility,
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -660,7 +660,7 @@ async def store_file_on_nuclia_db(
     # File is on NucliaDB Storage at path
 
     partitioning = get_partitioning()
-    transaction = get_transaction()
+    transaction = get_transaction_utility()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
 

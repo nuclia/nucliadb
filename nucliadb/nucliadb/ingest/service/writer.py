@@ -117,7 +117,7 @@ from nucliadb_utils.utilities import (
     get_cache,
     get_partitioning,
     get_storage,
-    get_transaction,
+    get_transaction_utility,
 )
 
 
@@ -727,7 +727,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
         resobj = ResourceORM(txn, storage, kbobj, request.rid)
         bm = await resobj.generate_broker_message()
-        transaction = get_transaction()
+        transaction = get_transaction_utility()
         partitioning = get_partitioning()
         partition = partitioning.generate_partition(request.kbid, request.rid)
         await transaction.commit(bm, partition)

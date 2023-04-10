@@ -21,18 +21,15 @@
 from contextvars import ContextVar
 from typing import Dict, Optional
 
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.utils import get_driver
+from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.train import SERVICE_NAME
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
-
-txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 
 
 def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
@@ -41,15 +38,6 @@ def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
         value = {}
         rcache.set(value)
     return value
-
-
-async def get_transaction() -> Transaction:
-    transaction: Optional[Transaction] = txn.get()
-    if transaction is None:
-        driver = await get_driver()
-        transaction = await driver.begin()
-        txn.set(transaction)
-    return transaction
 
 
 async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:

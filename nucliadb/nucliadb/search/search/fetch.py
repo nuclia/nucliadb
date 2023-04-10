@@ -27,12 +27,11 @@ from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
 
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import serialize
-from nucliadb.ingest.utils import get_driver
+from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -42,7 +41,6 @@ from nucliadb_utils.utilities import get_cache, get_storage
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
-txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 
 RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)
 
@@ -55,21 +53,6 @@ def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
         value = {}
         rcache.set(value)
     return value
-
-
-async def get_transaction() -> Transaction:
-    transaction: Optional[Transaction] = txn.get()
-    if transaction is None:
-        driver = await get_driver()
-        transaction = await driver.begin()
-        txn.set(transaction)
-    return transaction
-
-
-async def abort_transaction() -> None:
-    transaction: Optional[Transaction] = txn.get()
-    if transaction is not None:
-        await transaction.abort()
 
 
 async def fetch_resources(

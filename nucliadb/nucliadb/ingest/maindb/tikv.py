@@ -50,6 +50,9 @@ class TiKVTransaction(Transaction):
         self.open = True
 
     async def abort(self):
+        if not self.open:
+            return
+
         with tikv_observer({"type": "rollback"}):
             await self.txn.rollback()
         self.open = False
@@ -163,7 +166,8 @@ class TiKVDriver(Driver):
     async def begin(self) -> TiKVTransaction:
         if self.tikv is None:
             raise AttributeError()
-        return TiKVTransaction(await self.tikv.begin(pessimistic=False), driver=self)
+        tikvtxn = await self.tikv.begin(pessimistic=False)
+        return TiKVTransaction(tikvtxn, driver=self)
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True

@@ -30,9 +30,9 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
+from nucliadb.ingest.txn_utils import abort_transaction  # type: ignore
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_driver, get_nodes
