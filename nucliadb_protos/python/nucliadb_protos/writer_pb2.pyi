@@ -1508,6 +1508,7 @@ class Shards(google.protobuf.message.Message):
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     kbid: builtins.str
     actual: builtins.int
+    """current shard that resources index to"""
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,

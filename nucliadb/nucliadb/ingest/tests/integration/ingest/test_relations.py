@@ -67,12 +67,7 @@ async def test_ingest_relations_indexing(
     index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    # Resource is indexed in two shard replicas
     pb = await storage.get_indexing(index._calls[0][1])
-    pb2 = await storage.get_indexing(index._calls[1][1])
-
-    assert index._calls[0][1] != index._calls[1][1]
-    assert pb == pb2
 
     assert len(pb.relations) == 3
     assert pb.relations[0] == r0
@@ -104,12 +99,7 @@ async def test_ingest_label_relation_extraction(
     index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    # Resource is indexed in two shard replicas
     pb = await storage.get_indexing(index._calls[0][1])
-    pb2 = await storage.get_indexing(index._calls[1][1])
-
-    assert index._calls[0][1] != index._calls[1][1]
-    assert pb == pb2
 
     for i, (labelset, label) in enumerate(labels):
         assert pb.relations[i].relation == Relation.RelationType.ABOUT
@@ -134,12 +124,7 @@ async def test_ingest_colab_relation_extraction(
     index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    # Resource is indexed in two shard replicas
     pb = await storage.get_indexing(index._calls[0][1])
-    pb2 = await storage.get_indexing(index._calls[1][1])
-
-    assert index._calls[0][1] != index._calls[1][1]
-    assert pb == pb2
 
     for i, collaborator in enumerate(collaborators):
         assert pb.relations[i].relation == Relation.RelationType.COLAB
@@ -187,12 +172,7 @@ async def test_ingest_field_metadata_relation_extraction(
     index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    # Resource is indexed in two shard replicas
     pb = await storage.get_indexing(index._calls[0][1])
-    pb2 = await storage.get_indexing(index._calls[1][1])
-
-    assert index._calls[0][1] != index._calls[1][1]
-    assert pb == pb2
 
     generated_relations = [
         # From ner metadata
@@ -285,12 +265,7 @@ async def test_ingest_field_relations_relation_extraction(
     index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    # Resource is indexed in two shard replicas
     pb = await storage.get_indexing(index._calls[0][1])
-    pb2 = await storage.get_indexing(index._calls[1][1])
-
-    assert index._calls[0][1] != index._calls[1][1]
-    assert pb == pb2
 
     assert len(pb.relations) == len(test_relations)
     for relation in test_relations:

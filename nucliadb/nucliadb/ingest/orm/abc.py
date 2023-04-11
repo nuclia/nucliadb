@@ -63,7 +63,7 @@ class AbstractShard(metaclass=ABCMeta):
 
     @abstractmethod
     async def delete_resource(
-        self, uuid: str, txid: int, partition: str
+        self, uuid: str, txid: int, partition: str, kb: str
     ):  # pragma: no cover
         pass
 
@@ -73,6 +73,7 @@ class AbstractShard(metaclass=ABCMeta):
         resource: PBBrainResource,
         txid: int,
         partition: str,
+        kb: str,
         reindex_id: Optional[str] = None,
     ) -> Optional[ShardCounter]:  # pragma: no cover
         pass
