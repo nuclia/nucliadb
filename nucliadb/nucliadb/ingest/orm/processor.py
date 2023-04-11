@@ -407,7 +407,21 @@ class Processor:
                         )
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
-                if shard is None:
+                if shard is not None:
+                    counter = await shard.add_resource(
+                        resource.indexer.brain, seqid, partition=partition, kb=kbid
+                    )
+                    if (
+                        counter is not None
+                        and counter.fields > settings.max_shard_fields
+                    ):
+                        # shard is full, create a new one so next resource
+                        # is placed on a new shard
+                        similarity = await kb.get_similarity()
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
+                else:
                     raise AttributeError("Shard is not available")
 
                 await txn.commit(partition, seqid)
@@ -419,17 +433,6 @@ class Processor:
                 await txn.commit(resource=False)
 
                 await self.notify_commit(partition, seqid, multi, kbid, uuid)
-
-                counter = await shard.add_resource(
-                    resource.indexer.brain, seqid, partition=partition, kb=kbid
-                )
-                if counter is not None and counter.fields > settings.max_shard_fields:
-                    # shard is full, create a new one so next resource
-                    # is placed on a new shard
-                    similarity = await kb.get_similarity()
-                    shard = await node_klass.create_shard_by_kbid(
-                        txn, kbid, similarity=similarity
-                    )
 
             elif resource and resource.modified is False:
                 await txn.abort()
