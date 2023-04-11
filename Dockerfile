@@ -11,7 +11,7 @@ RUN pip install nucliadb-node-binding>=0.7.5
 
 RUN mkdir -p /usr/src/app
 
-RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop
+RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop asyncpg
 
 
 RUN curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.1/grpc_health_probe-linux-amd64 && \
