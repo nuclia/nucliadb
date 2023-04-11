@@ -71,7 +71,7 @@ spec:
           periodSeconds: 20
           timeoutSeconds: 5
           failureThreshold: 3
-        command: ["ndb_ingest"]
+        command: ["nucliadb-ingest"]
         envFrom:
         - configMapRef:
             name: nucliadb-config

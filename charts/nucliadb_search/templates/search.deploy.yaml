@@ -63,7 +63,7 @@ spec:
           timeoutSeconds: 10
           periodSeconds: 20
         command: [
-          "search-metrics"
+          "nucliadb-search"
         ]
         envFrom:
         - configMapRef:

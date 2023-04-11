@@ -22,7 +22,7 @@ from unittest.mock import patch
 import pytest
 
 from nucliadb.search.app import application
-from nucliadb.search.run import run_with_metrics
+from nucliadb.search.run import run
 
 
 @pytest.fixture(scope="function")
@@ -32,6 +32,6 @@ def run_fastapi_with_metrics():
 
 
 def test_run_with_metrics(run_fastapi_with_metrics):
-    run_with_metrics()
+    run()
 
     run_fastapi_with_metrics.assert_called_once_with(application)

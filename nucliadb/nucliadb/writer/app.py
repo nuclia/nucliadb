@@ -26,12 +26,10 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.writer import API_PREFIX, SERVICE_NAME
+from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import finalize, initialize
 from nucliadb_telemetry import errors
-from nucliadb_telemetry.fastapi import instrument_app
-from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -105,10 +103,3 @@ async def homepage(request):
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-
-instrument_app(
-    application,
-    tracer_provider=get_telemetry(SERVICE_NAME),
-    excluded_urls=["/"],
-    metrics=True,
-)
