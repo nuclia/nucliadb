@@ -421,7 +421,7 @@ class Processor:
                 await self.notify_commit(partition, seqid, multi, kbid, uuid)
 
                 counter = await shard.add_resource(
-                    resource.indexer.brain, seqid, partition=partition
+                    resource.indexer.brain, seqid, partition=partition, kb=kbid
                 )
                 if counter is not None and counter.fields > settings.max_shard_fields:
                     # shard is full, create a new one so next resource
@@ -454,7 +454,7 @@ class Processor:
             if seqid == -1:
                 raise handled_exception
             else:
-                await self._mark_resource_error(resource, partition, seqid, shard)
+                await self._mark_resource_error(resource, partition, seqid, shard, kbid)
                 raise DeadletteredError() from handled_exception
 
         return TxnResult(
@@ -470,6 +470,7 @@ class Processor:
         partition: str,
         seqid: int,
         shard: Optional[Shard],
+        kbid: str,
     ) -> None:
         """
         Unhandled error processing, try to mark resource as error
@@ -492,7 +493,9 @@ class Processor:
             await set_basic(txn, resource.kb.kbid, resource.uuid, resource.basic)
             await txn.commit(resource=False)
 
-            await shard.add_resource(resource.indexer.brain, seqid, partition=partition)
+            await shard.add_resource(
+                resource.indexer.brain, seqid, partition=partition, kb=kbid
+            )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
         finally:
