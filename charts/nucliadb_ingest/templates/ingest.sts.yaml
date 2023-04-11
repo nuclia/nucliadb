@@ -28,7 +28,7 @@ spec:
     metadata:
       name: ingest
       annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.monitor }},{{.Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }}"
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
@@ -85,7 +85,6 @@ spec:
         ports:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}
-        - containerPort: {{ .Values.serving.monitor }}
         - name: metrics
           containerPort: {{ .Values.serving.metricsPort }}
         - name: cluster-monitor

@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional
+from typing import Optional
 
+from nucliadb_utils import settings as utils_settings
 from pydantic import BaseSettings
 
 
@@ -36,13 +37,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-class IndexingSettings(BaseSettings):
-    index_jetstream_target: Optional[str] = "node.{node}"
-    index_jetstream_group: Optional[str] = "node-{node}"
-    index_jetstream_stream: Optional[str] = "node"
-    index_jetstream_servers: List[str] = []
-    index_jetstream_auth: Optional[str] = None
-
+class IndexingSettings(utils_settings.IndexingSettings):
     indexed_jetstream_target: str = "indexed.{partition}"
     indexed_jetstream_stream: str = "indexed"
 

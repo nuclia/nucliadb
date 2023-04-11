@@ -39,9 +39,7 @@ class DriverConfig(str, Enum):
                 return member
 
 
-class Settings(BaseSettings):
-    grpc_port: int = 8030
-
+class DriverSettings(BaseSettings):
     # allowing defaults is not ideal
     # TODO: implement settings without defaults
     driver: DriverConfig = DriverConfig.redis
@@ -49,6 +47,12 @@ class Settings(BaseSettings):
     driver_tikv_url: Optional[List[str]] = []
     driver_local_url: Optional[str] = None
     driver_pg_url: Optional[str] = None
+
+    nodes_load_ingest: bool = False
+
+
+class Settings(DriverSettings):
+    grpc_port: int = 8030
 
     partitions: List[str] = ["1"]
 
@@ -65,13 +69,9 @@ class Settings(BaseSettings):
     chitchat_binding_host: str = "0.0.0.0"
     chitchat_binding_port: int = 31337
     chitchat_enabled: bool = True
-    chitchat_sock_path = "/tmp/rust_python.sock"  # TODO discuss default value
 
     # chitchat_peers_addr: List[str] = ["localhost:3001"] # TODO is it seed list?
     # swim_host_key: str = "ingest.key" # TODO: ask if it's swim specific keys?
-
-    monitor: bool = False
-    monitor_port: int = 50101
 
     logging_config: Optional[str] = None
 

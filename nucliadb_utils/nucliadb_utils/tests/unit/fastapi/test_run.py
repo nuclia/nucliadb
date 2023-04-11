@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from uvicorn.server import Server  # type: ignore
 
 from nucliadb_utils.fastapi import run
-from nucliadb_utils.settings_running import running_settings
+from nucliadb_utils.settings import running_settings
 
 pytestmark = pytest.mark.asyncio
 

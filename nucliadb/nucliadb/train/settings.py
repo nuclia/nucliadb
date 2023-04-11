@@ -17,12 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional
+from typing import Optional
 
-from pydantic import BaseSettings
+from nucliadb.ingest.settings import DriverSettings
 
 
-class Settings(BaseSettings):
+class Settings(DriverSettings):
     grpc_port: int = 8031
     train_grpc_address: Optional[str] = None
 
@@ -36,12 +36,6 @@ class Settings(BaseSettings):
     internal_search_api: str = (
         "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/search"
     )
-
-    driver: str = "redis"  # redis | tikv
-    driver_redis_url: Optional[str] = None
-    driver_tikv_url: Optional[List[str]] = []
-    driver_local_url: Optional[str] = None
-    nodes_load_ingest: bool = False
 
 
 settings = Settings()
