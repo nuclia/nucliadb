@@ -19,18 +19,24 @@
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
 from pydantic.class_validators import root_validator
 
 
 class RunningSettings(BaseSettings):
     debug: bool = True
     sentry_url: Optional[str] = None
-    running_environment: str = "local"
+    running_environment: str = Field(
+        "local", env=["environment", "running_environment"]
+    )
     logging_integration: bool = False
     log_level: str = "DEBUG"
     activity_log_level: str = "INFO"
     chitchat_level: str = "INFO"
+    metrics_port: int = 3030
+    metrics_host: str = "0.0.0.0"
+    serving_port: int = 8080
+    serving_host: str = "0.0.0.0"
 
 
 running_settings = RunningSettings()
