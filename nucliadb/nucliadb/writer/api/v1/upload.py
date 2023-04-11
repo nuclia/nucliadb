@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import mimetypes
 import pickle
 import uuid
 from datetime import datetime
@@ -216,21 +217,19 @@ async def post(
     if request.headers.get("x-http-method-override") == "PATCH":
         return await patch(request, upload_id)
 
+    if "filename" not in metadata:
+        metadata["filename"] = uuid.uuid4().hex
+
     # We need a content_type value set
     # - content-type set by the user in tus-metadata will take precedence
     # - content-type of the request, only when uploading a field into a resource
-    # - otherwise, we'll set it to a generic binary content type
-    # We don't use the request content type, as for kb uploads it will be json,
-    # containing a resource definition
-    request_content_type = (
-        request.headers.get("content-type", "application/octet-stream")
-        if item is None
-        else "application/octet-stream"
-    )
+    # - otherwise, we'll try to guess it from the filename or set it to a generic binary content type
+    request_content_type = None
+    if item is None:
+        request_content_type = request.headers.get("content-type")
+    if not request_content_type:
+        request_content_type = guess_content_type(metadata["filename"])
     metadata.setdefault("content_type", request_content_type)
-
-    if "filename" not in metadata:
-        metadata["filename"] = uuid.uuid4().hex
 
     metadata["implies_resource_creation"] = implies_resource_creation
 
@@ -526,15 +525,17 @@ async def upload(
 
     await dm.start(request)
 
-    # We need a content_type value set
-    # - content-type set by the user in the upload request header
-    # - if not set, we'll set it to a generic binary content type
-    content_type = request.headers.get("content-type", "application/octet-stream")
-
     if x_filename and len(x_filename):
         filename = maybe_b64decode(x_filename[0])
     else:
         filename = uuid.uuid4().hex
+
+    # We need a content_type value set
+    # - content-type set by the user in the upload request header takes precedence.
+    # - if not set, we will try to guess it from the filename and default to a generic binary content type otherwise
+    content_type = request.headers.get("content-type")
+    if not content_type:
+        content_type = guess_content_type(filename)
 
     metadata = {"content_type": content_type, "filename": filename}
 
@@ -754,3 +755,8 @@ def maybe_b64decode(some_string: str) -> str:
     except ValueError:
         # not b64encoded
         return some_string
+
+
+def guess_content_type(filename: str) -> str:
+    guessed, _ = mimetypes.guess_type(filename)
+    return guessed or "application/octet-stream"
