@@ -41,7 +41,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.exceptions import InvalidCloudFile
+from nucliadb_utils.storages.exceptions import IndexDataNotFound, InvalidCloudFile
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
@@ -235,7 +235,7 @@ class Storage:
 
         bytes_buffer = await self.downloadbytes(self.indexing_bucket, key)
         if bytes_buffer.getbuffer().nbytes == 0:
-            raise KeyError()
+            raise IndexDataNotFound(f'Indexing data not found for key "{key}"')
         pb = BrainResource()
         pb.ParseFromString(bytes_buffer.read())
         bytes_buffer.flush()

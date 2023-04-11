@@ -118,7 +118,6 @@ async def test_indexing_shadow_shard(data_path, worker, shadow_shard: str):
 
     await asyncio.sleep(1)
 
-    # Check that indexing messages have been deleted from storage
     assert await storage.get_indexing(setpb) is not None
 
 

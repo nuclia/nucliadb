@@ -37,6 +37,7 @@ from nucliadb_protos.nodewriter_pb2 import (
 )
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
@@ -268,7 +269,9 @@ class Worker:
                     )
                     raise grpc_error
 
-            except KeyError as storage_error:
+            except IndexDataNotFound as storage_error:
+                # This should never happen now.
+                # Remove this block in the future once we're confident it's not needed.
                 errors.capture_exception(storage_error)
                 logger.warning(
                     "Error retrieving the indexing payload we do not block as that means its already deleted"

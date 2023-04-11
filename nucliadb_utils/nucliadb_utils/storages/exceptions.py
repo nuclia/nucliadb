@@ -64,3 +64,9 @@ class CouldNotCopyNotFound(Exception):
             "Google: \n "
             f"{text}"
         )
+
+
+class IndexDataNotFound(Exception):
+    """
+    Raised when the index data is not found in storage
+    """
