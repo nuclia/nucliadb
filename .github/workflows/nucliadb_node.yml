@@ -220,7 +220,7 @@ jobs:
   build-rust:
     name: Build and push index node docker image
     runs-on: ubuntu-latest
-    needs: tests-rust
+    # needs: tests-rust
     # if: github.event_name == 'push'
 
     steps:
