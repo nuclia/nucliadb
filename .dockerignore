@@ -11,10 +11,11 @@
 .license*
 .mypy_cache
 .pre-commit-config.yaml
-.pytest_cache
+.pytest_cache/*
 CODE_OF_CONDUCT.md
 CODE_STYLE_PYTHON.md
 Dockerfile*
+Makefile
 LICENSE*
 README*
 __pycache__
@@ -28,4 +29,5 @@ lib
 logs
 nats-server
 nucliadb_writer/nats-server
-target
+target/*
+tests/*
