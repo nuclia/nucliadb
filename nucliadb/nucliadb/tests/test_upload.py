@@ -64,3 +64,36 @@ async def test_upload(
     resp = await nucliadb_reader.get(download_uri)
     assert resp.status_code == 200
     assert base64.b64decode(resp.content) == content
+
+
+@pytest.mark.asyncio
+async def test_upload_guesses_content_type(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    filename = "testfile.txt"
+    content = b"Test for /upload endpoint"
+    content_type = "text/plain"
+    # Upload the file without specifying the content type
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/{UPLOAD}",
+        headers={
+            "X-Filename": base64.b64encode(filename.encode()).decode("utf-8"),
+            "X-Synchronous": "true",
+        },
+        content=base64.b64encode(content),
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    rid = body["uuid"]
+    field_id = body["field_id"]
+
+    # Test that the content type is correctly guessed from the filename
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["value"]["file"]["filename"] == filename
+    assert body["value"]["file"]["content_type"] == content_type
