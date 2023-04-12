@@ -23,7 +23,7 @@ import pytest
 from fastapi.requests import Request
 
 from nucliadb.ingest.processing import ProcessingInfo, Source
-from nucliadb.writer.api.v1.upload import store_file_on_nuclia_db
+from nucliadb.writer.api.v1.upload import guess_content_type, store_file_on_nuclia_db
 from nucliadb_models.resource import QueueType
 
 UPLOAD_PACKAGE = "nucliadb.writer.api.v1.upload"
@@ -75,3 +75,16 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
     transaction_mock.commit.assert_awaited_once()
     writer_bm = transaction_mock.commit.call_args[0][0]
     assert not writer_bm.files[field].password
+
+
+@pytest.mark.parametrize(
+    "filename,content_type",
+    [
+        ("foo.png", "image/png"),
+        ("foo.pdf", "application/pdf"),
+        ("someuuidwithoutextension", "application/octet-stream"),
+        ("", "application/octet-stream"),
+    ],
+)
+def test_guess_content_type(filename, content_type):
+    assert guess_content_type(filename) == content_type
