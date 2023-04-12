@@ -61,7 +61,7 @@ def run():
         )
         nucliadb_args = parser.parse_typed_args(arg_munge())
 
-    config_nucliadb(nucliadb_args)
+    config_nucliadb(nucliadb_args, standalone=True)
     run_nucliadb(nucliadb_args)
 
 
@@ -101,5 +101,5 @@ async def run_async_nucliadb(nucliadb_args: Settings):
 
 if __name__ == "__main__":
     nucliadb_args = Settings()
-    config_nucliadb(nucliadb_args)
+    config_nucliadb(nucliadb_args, standalone=True)
     run_nucliadb(nucliadb_args)

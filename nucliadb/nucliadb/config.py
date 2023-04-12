@@ -24,6 +24,10 @@ from nucliadb.settings import Settings
 
 
 def config_standalone_driver(nucliadb_args: Settings):
+    """
+    Standalone nucliadb configuration forces us to
+    use some specific settings.
+    """
     from nucliadb.ingest.settings import DriverConfig
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.settings import storage_settings
@@ -55,12 +59,7 @@ def config_standalone_driver(nucliadb_args: Settings):
         os.makedirs(nucliadb_args.node, exist_ok=True)
 
 
-def config_nucliadb(nucliadb_args: Settings):
-    """
-    Standalone nucliadb configuration forces us to
-    use some specific settings.
-    """
-
+def config_nucliadb(nucliadb_args: Settings, standalone: bool = False):
     from nucliadb.ingest.orm import NODE_CLUSTER
     from nucliadb.ingest.orm.local_node import LocalNode
     from nucliadb.ingest.settings import settings as ingest_settings
@@ -96,7 +95,8 @@ def config_nucliadb(nucliadb_args: Settings):
     train_settings.grpc_port = nucliadb_args.train
     ingest_settings.grpc_port = nucliadb_args.grpc
 
-    config_standalone_driver(nucliadb_args)
+    if standalone:
+        config_standalone_driver(nucliadb_args)
 
     if nucliadb_args.key is None:
         if os.environ.get("NUA_API_KEY"):

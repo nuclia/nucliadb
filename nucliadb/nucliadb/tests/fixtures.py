@@ -100,7 +100,7 @@ async def nucliadb(dummy_processing, telemetry_disabled):
             train=free_port(),
             log="INFO",
         )
-        config_nucliadb(settings)
+        config_nucliadb(settings, standalone=True)
         server = await run_async_nucliadb(settings)
 
         yield settings

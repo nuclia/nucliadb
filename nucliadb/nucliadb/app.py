@@ -21,6 +21,6 @@ from nucliadb.config import config_nucliadb
 from nucliadb.settings import Settings
 
 nucliadb_args = Settings()
-config_nucliadb(nucliadb_args)
+config_nucliadb(nucliadb_args, standalone=True)
 
 from nucliadb.one.app import application  # noqa
