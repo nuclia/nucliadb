@@ -120,7 +120,7 @@ jobs:
           args: -p nucliadb_node --tests
 
   tests-rust:
-    name: Tests
+    name: Rust tests
     runs-on: ubuntu-latest
     needs: [clippy-rust, format-rust, licenses]
 
@@ -136,6 +136,7 @@ jobs:
           args: --workspace --all-features
 
   tests-python:
+    name: Python tests
     runs-on: ubuntu-latest
     needs: [pre-checks-python, licenses]
 
