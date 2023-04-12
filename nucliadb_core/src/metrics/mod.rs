@@ -46,6 +46,12 @@ pub struct PrometheusMetrics {
     request_time_metric: request_time::RequestTimeMetric,
 }
 
+impl Default for PrometheusMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Metrics for PrometheusMetrics {
     fn record_request_time(
         &self,

@@ -34,6 +34,7 @@ use nucliadb_core::tracing::{self, *};
 use crate::env;
 use crate::services::reader::ShardReaderService;
 
+#[derive(Default)]
 pub struct NodeReaderService {
     pub cache: HashMap<String, ShardReaderService>,
 }
@@ -42,8 +43,7 @@ impl NodeReaderService {
     pub fn new() -> NodeReaderService {
         // We shallow the error if the threadpool was already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
-        let cache = HashMap::new();
-        Self { cache }
+        Self::default()
     }
 
     /// Stop all shards on memory
