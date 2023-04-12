@@ -119,6 +119,22 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: -p nucliadb_node --tests
 
+  prebuild-tests-rust:
+    name: Prebuild rust tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: Swatinem/rust-cache@v2
+        shared-key: "test_prebuild"
+
+      - uses: actions-rs/cargo@v1
+        name: cargo prebuild tests
+        with:
+          command: build
+          args: --profile test
+
   tests-rust:
     name: Rust tests
     runs-on: ubuntu-latest
@@ -128,6 +144,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v2
+        shared-key: "test_prebuild"
 
       - uses: actions-rs/cargo@v1
         name: cargo test
