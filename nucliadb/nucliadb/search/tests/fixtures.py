@@ -48,7 +48,7 @@ def free_port() -> int:
 
 
 @pytest.fixture(scope="function")
-def test_settings_search(gcs, redis, node):  # type: ignore
+def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
@@ -74,8 +74,7 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     running_settings.debug = False
 
     ingest_settings.pull_time = 0
-    ingest_settings.driver = "redis"
-    ingest_settings.driver_redis_url = url
+
     ingest_settings.nuclia_partitions = 1
 
     nuclia_settings.dummy_processing = True
