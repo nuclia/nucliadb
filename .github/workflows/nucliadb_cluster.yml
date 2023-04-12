@@ -94,6 +94,7 @@ jobs:
     name: Build image and push
     runs-on: ubuntu-latest
     needs: tests-rust
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
@@ -127,16 +128,13 @@ jobs:
       # PUSH workflows contine with deploy activities
 
       - name: Docker - Tag
-        if: github.event_name == 'push'
         run: |-
           docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.branch }}
 
       - name: Docker - Push sha
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }}
 
       - name: Docker - Push latest
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.branch }}

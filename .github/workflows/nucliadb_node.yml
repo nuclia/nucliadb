@@ -196,9 +196,10 @@ jobs:
           flags: node-sidecar
 
   build-rust:
-    name: Build image and push
+    name: Build and push index node docker image
     runs-on: ubuntu-latest
     needs: tests-rust
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
@@ -232,24 +233,22 @@ jobs:
       # PUSH workflows contine with deploy activities
 
       - name: Docker - Tag
-        if: github.event_name == 'push'
         run: |-
           docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.branch }}
 
       - name: Docker - Push sha
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }}
 
       - name: Docker - Push latest
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.branch }}
 
   build-python:
-    name: Build image and push
+    name: Build and push sidecar docker image
     runs-on: ubuntu-latest
     needs: tests-python
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
@@ -271,31 +270,25 @@ jobs:
       # PUSH workflows contine with deploy activities
 
       - name: Setup gcloud CLI
-        if: github.event_name == 'push'
         uses: google-github-actions/auth@v0
         with:
           credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
       - name: "Set up Cloud SDK"
-        if: github.event_name == 'push'
         uses: "google-github-actions/setup-gcloud@v0"
 
       - name: Configure Docker
-        if: github.event_name == 'push'
         run: gcloud auth configure-docker --quiet
 
       - name: Docker - Tag
-        if: github.event_name == 'push'
         run: |-
           docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.branch }}
 
       - name: Docker - Push sha
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }}
 
       - name: Docker - Push latest
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.branch }}
 
