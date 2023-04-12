@@ -255,6 +255,8 @@ jobs:
           load: true
           tags: |
             ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE}}:${{ steps.env-vars.outputs.short_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # - name: Docker - Build
       #   run: |-
