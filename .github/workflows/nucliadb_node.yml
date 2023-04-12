@@ -139,7 +139,7 @@ jobs:
   tests-rust:
     name: Rust tests
     runs-on: ubuntu-latest
-    needs: [clippy-rust, format-rust, licenses]
+    needs: [clippy-rust, format-rust, licenses, prebuild-tests-rust]
 
     steps:
       - uses: actions/checkout@v3
