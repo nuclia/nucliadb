@@ -133,7 +133,7 @@ jobs:
         name: cargo test
         with:
           command: test
-          args: --workspace --all-features --no-fail-fast
+          args: --workspace --all-features
 
   tests-python:
     runs-on: ubuntu-latest

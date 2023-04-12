@@ -88,7 +88,7 @@ jobs:
         name: cargo test
         with:
           command: test
-          args: --all-features --no-fail-fast -p nucliadb_cluster -- --test-threads=1
+          args: --all-features -p nucliadb_cluster -- --test-threads=1
 
   build-rust:
     name: Build image and push
