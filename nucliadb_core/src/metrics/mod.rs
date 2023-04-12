@@ -18,9 +18,10 @@
 
 use std::fmt::Debug;
 
-use nucliadb_core::{tracing, NodeResult};
 use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
+
+use crate::{tracing, NodeResult};
 // metrics
 // Every metric must be define in its own module, which must fulfill the following requirements:
 // - The name of the module must be the name of the name of the metric.
@@ -32,7 +33,7 @@ use prometheus_client::registry::Registry;
 // - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
 pub mod request_time;
 
-pub trait RecordMetrics {
+pub trait Metrics: Send + Sync {
     fn record_request_time(
         &self,
         metric: request_time::RequestTimeKey,
@@ -45,7 +46,7 @@ pub struct PrometheusMetrics {
     request_time_metric: request_time::RequestTimeMetric,
 }
 
-impl RecordMetrics for PrometheusMetrics {
+impl Metrics for PrometheusMetrics {
     fn record_request_time(
         &self,
         metric: request_time::RequestTimeKey,
@@ -82,12 +83,22 @@ impl ConsoleLogMetrics {
         tracing::debug!("{metric:?} : {value:?}")
     }
 }
-impl RecordMetrics for ConsoleLogMetrics {
+impl Metrics for ConsoleLogMetrics {
     fn record_request_time(
         &self,
         metric: request_time::RequestTimeKey,
         value: request_time::RequestTimeValue,
     ) {
         self.record(metric, value)
+    }
+}
+
+pub struct NoMetrics;
+impl Metrics for NoMetrics {
+    fn record_request_time(
+        &self,
+        _: request_time::RequestTimeKey,
+        _: request_time::RequestTimeValue,
+    ) {
     }
 }

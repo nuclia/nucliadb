@@ -36,9 +36,7 @@ type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Reader Node starting...");
     let _guard = init_telemetry()?;
-
     let start_bootstrap = Instant::now();
-
     let mut node_reader_service = NodeReaderService::new();
 
     std::fs::create_dir_all(env::shards_path())?;

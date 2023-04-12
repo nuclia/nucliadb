@@ -31,10 +31,14 @@ use crate::env;
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
 
-pub struct NodeReaderGRPCDriver(RwLock<NodeReaderService>);
+pub struct NodeReaderGRPCDriver {
+    inner: RwLock<NodeReaderService>,
+}
 impl From<NodeReaderService> for NodeReaderGRPCDriver {
     fn from(node: NodeReaderService) -> NodeReaderGRPCDriver {
-        NodeReaderGRPCDriver(RwLock::new(node))
+        NodeReaderGRPCDriver {
+            inner: RwLock::new(node),
+        }
     }
 }
 impl NodeReaderGRPCDriver {
@@ -44,7 +48,7 @@ impl NodeReaderGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
         if env::lazy_loading() {
-            let mut writer = self.0.write().await;
+            let mut writer = self.inner.write().await;
             writer.load_shard(id);
         }
     }
@@ -95,7 +99,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         let shard_id = ShardId { id: shard_id.id };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.paragraph_iterator(&shard_id, request).transpose() {
             Some(Ok(response)) => {
                 info!("Stream created correctly");
@@ -124,7 +128,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         let shard_id = ShardId { id: shard_id.id };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.document_iterator(&shard_id, request).transpose() {
             Some(Ok(response)) => {
                 info!("Document stream created correctly");
@@ -149,10 +153,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let request = request.into_inner();
-        let shard_id = request.shard_id.as_ref().unwrap();
+        let shard_id = &request.shard_id.clone().unwrap();
         self.shard_loading(shard_id).await;
-        let reader = self.0.read().await;
-        match reader.get_shard(shard_id).map(|s| s.get_info(&request)) {
+        let reader = self.inner.read().await;
+        match reader.get_info(shard_id, request).transpose() {
             Some(Ok(shard)) => {
                 info!("Get shard ends {}:{}", file!(), line!());
                 Ok(tonic::Response::new(shard))
@@ -175,7 +179,7 @@ impl NodeReader for NodeReaderGRPCDriver {
     ) -> Result<tonic::Response<ShardList>, tonic::Status> {
         info!("Get shards starts");
         self.instrument(&request);
-        self.0
+        self.inner
             .read()
             .await
             .get_shards()
@@ -195,7 +199,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             id: vector_request.id.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.vector_search(&shard_id, vector_request).transpose() {
             Some(Ok(response)) => {
                 info!("Vector search ended correctly");
@@ -224,7 +228,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             id: relation_request.shard_id.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader
             .relation_search(&shard_id, relation_request)
             .transpose()
@@ -256,7 +260,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             id: search_request.shard.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.search(&shard_id, search_request).transpose() {
             Some(Ok(response)) => {
                 info!("Document search ended correctly");
@@ -285,7 +289,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             id: suggest_request.shard.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.suggest(&shard_id, suggest_request).transpose() {
             Some(Ok(response)) => {
                 info!("Suggest ended correctly");
@@ -315,7 +319,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             id: document_request.id.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader
             .document_search(&shard_id, document_request)
             .transpose()
@@ -347,7 +351,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             id: paragraph_request.id.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader
             .paragraph_search(&shard_id, paragraph_request)
             .transpose()
@@ -376,7 +380,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.document_ids(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
@@ -396,7 +400,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.paragraph_ids(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
@@ -416,7 +420,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.vector_ids(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
@@ -435,7 +439,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.relation_ids(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
@@ -455,7 +459,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.relation_edges(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::not_found(format!("{e:?} in {shard_id:?}",))),
@@ -475,7 +479,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.relation_types(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::not_found(format!("{e:?} in {shard_id:?}",))),

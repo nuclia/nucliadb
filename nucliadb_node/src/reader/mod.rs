@@ -23,10 +23,10 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest, SuggestRequest,
-    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, IdCollection,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse,
+    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest,
+    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
@@ -34,24 +34,16 @@ use nucliadb_core::tracing::{self, *};
 use crate::env;
 use crate::services::reader::ShardReaderService;
 
-#[derive(Debug)]
 pub struct NodeReaderService {
     pub cache: HashMap<String, ShardReaderService>,
-}
-
-impl Default for NodeReaderService {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl NodeReaderService {
     pub fn new() -> NodeReaderService {
         // We shallow the error if the threadpool was already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
-        Self {
-            cache: HashMap::new(),
-        }
+        let cache = HashMap::new();
+        Self { cache }
     }
 
     /// Stop all shards on memory
@@ -153,6 +145,7 @@ impl NodeReaderService {
         let suggest_response = shard.suggest(request)?;
         Ok(Some(suggest_response))
     }
+
     #[tracing::instrument(skip_all)]
     pub fn search(
         &self,
@@ -280,5 +273,17 @@ impl NodeReaderService {
             return Ok(None);
         };
         Ok(Some(shard.get_relations_types()?))
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn get_info(
+        &self,
+        shard_id: &ShardId,
+        request: GetShardRequest,
+    ) -> NodeResult<Option<ShardPB>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.get_info(&request).map(Some)
     }
 }
