@@ -112,7 +112,7 @@ class PullWorker:
         self.onprem = onprem
         self.service_name = service_name
         self.idle_heartbeat = 5 * 1_000_000_000
-        self.ack_wait = 60.0
+        self.ack_wait = 10 * 60
         self.nc = None
         self.js = None
         self.initialized = False
