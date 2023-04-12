@@ -39,6 +39,8 @@ pub struct IndexMessage {
     pub reindex_id: ::prost::alloc::string::String,
     #[prost(string, optional, tag="7")]
     pub partition: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, tag="8")]
+    pub storage_key: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexedMessage {

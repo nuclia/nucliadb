@@ -116,6 +116,7 @@ class IndexMessage(google.protobuf.message.Message):
     TYPEMESSAGE_FIELD_NUMBER: builtins.int
     REINDEX_ID_FIELD_NUMBER: builtins.int
     PARTITION_FIELD_NUMBER: builtins.int
+    STORAGE_KEY_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
     txid: builtins.int
@@ -123,6 +124,7 @@ class IndexMessage(google.protobuf.message.Message):
     typemessage: global___TypeMessage.ValueType
     reindex_id: builtins.str
     partition: builtins.str
+    storage_key: builtins.str
     def __init__(
         self,
         *,
@@ -133,9 +135,10 @@ class IndexMessage(google.protobuf.message.Message):
         typemessage: global___TypeMessage.ValueType = ...,
         reindex_id: builtins.str = ...,
         partition: builtins.str | None = ...,
+        storage_key: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "partition", b"partition"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_partition", b"_partition"]) -> typing_extensions.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage

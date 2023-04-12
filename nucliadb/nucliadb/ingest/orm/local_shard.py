@@ -38,7 +38,7 @@ class LocalShard(AbstractShard):
         self.sharduuid = sharduuid
         self.node = node
 
-    async def delete_resource(self, uuid: str, txid: int, partition: str):
+    async def delete_resource(self, uuid: str, txid: int, partition: str, kb: str):
         req = ResourceID()
         req.uuid = uuid
 
@@ -51,6 +51,7 @@ class LocalShard(AbstractShard):
         resource: PBBrainResource,
         txid: int,
         partition: str,
+        kb: str,
         reindex_id: Optional[str] = None,
     ) -> Optional[ShardCounter]:
         for shardreplica in self.shard.replicas:

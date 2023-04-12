@@ -59,8 +59,13 @@ class Shard(AbstractShard):
                 result.append((shadow_replica.shard.id, shadow_replica.node))
         return result
 
-    async def delete_resource(self, uuid: str, txid: int, partition: str):
+    async def delete_resource(self, uuid: str, txid: int, partition: str, kb: str):
         indexing = get_indexing()
+        storage = await get_storage(service_name=SERVICE_NAME)
+
+        await storage.delete_indexing(
+            resource_uid=uuid, txid=txid, kb=kb, logical_shard=self.sharduuid
+        )
 
         for replica_id, node_id in self.indexing_replicas():
             indexpb: IndexMessage = IndexMessage()
@@ -77,6 +82,7 @@ class Shard(AbstractShard):
         resource: PBBrainResource,
         txid: int,
         partition: str,
+        kb: str,
         reindex_id: Optional[str] = None,
     ) -> Optional[ShardCounter]:
         if txid == -1 and reindex_id is None:
@@ -89,20 +95,20 @@ class Shard(AbstractShard):
 
         indexpb: IndexMessage
 
+        if reindex_id is not None:
+            indexpb = await storage.reindexing(
+                resource, reindex_id, partition, kb=kb, logical_shard=self.sharduuid
+            )
+        else:
+            indexpb = await storage.indexing(
+                resource, txid, partition, kb=kb, logical_shard=self.sharduuid
+            )
+
         shard_counter: Optional[ShardCounter] = None
         for replica_id, node_id in self.indexing_replicas():
-            resource.shard_id = resource.resource.shard_id = replica_id
-            if reindex_id is not None:
-                indexpb = await storage.reindexing(
-                    resource, node_id, replica_id, reindex_id, partition
-                )
-            else:
-                indexpb = await storage.indexing(
-                    resource, node_id, replica_id, txid, partition
-                )
-
+            indexpb.node = node_id
+            indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
-
             try:
                 counter: Counter = await NODES[node_id].sidecar.GetCount(ShardId(id=replica_id))  # type: ignore
                 shard_counter = ShardCounter(

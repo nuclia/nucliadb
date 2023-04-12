@@ -41,7 +41,7 @@ async def test_indexing(worker, shard: str, reader):
     node = settings.force_host_id
 
     resource = resource_payload(shard)
-    index = await create_indexing_message(resource, shard, node)
+    index = await create_indexing_message(resource, "kb", shard, node)  # type: ignore
     await send_indexing_message(worker, index, node)  # type: ignore
 
     sipb = ShardId()
@@ -66,8 +66,8 @@ async def test_indexing(worker, shard: str, reader):
     await asyncio.sleep(0.1)
 
     storage = await get_storage(service_name=SERVICE_NAME)
-    with pytest.raises(KeyError):
-        await storage.get_indexing(index)
+    # should still work because we leave it around now
+    assert await storage.get_indexing(index) is not None
 
 
 @pytest.mark.asyncio
@@ -76,7 +76,7 @@ async def test_indexing_not_found(worker, reader):
     shard = "fake-shard"
 
     resource = resource_payload(shard)
-    index = await create_indexing_message(resource, shard, node)
+    index = await create_indexing_message(resource, "kb", shard, node)
     await send_indexing_message(worker, index, node)  # type: ignore
 
     sipb = ShardId()
@@ -88,11 +88,12 @@ async def test_indexing_not_found(worker, reader):
 
 @pytest.mark.asyncio
 async def test_indexing_shadow_shard(data_path, worker, shadow_shard: str):
+    storage = await get_storage(service_name=SERVICE_NAME)
     node_id = settings.force_host_id
 
     # Add a set resource operation
     pb = resource_payload(shadow_shard)
-    setpb = await create_indexing_message(pb, shadow_shard, node_id)
+    setpb = await create_indexing_message(pb, "kb", shadow_shard, node_id)  # type: ignore
     await send_indexing_message(worker, setpb, node_id)  # type: ignore
 
     # Add a delete operation
@@ -117,11 +118,7 @@ async def test_indexing_shadow_shard(data_path, worker, shadow_shard: str):
 
     await asyncio.sleep(1)
 
-    # Check that indexing messages have been deleted from storage
-    storage = await get_storage(service_name=SERVICE_NAME)
-    for indexpb in (setpb, deletepb):
-        with pytest.raises(KeyError):
-            await storage.get_indexing(indexpb)
+    assert await storage.get_indexing(setpb) is not None
 
 
 @pytest.mark.asyncio
@@ -129,7 +126,9 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
     node_id = settings.force_host_id
     assert node_id
 
-    indexpb = await create_indexing_message(resource_payload(shard), shard, node_id)
+    indexpb = await create_indexing_message(
+        resource_payload(shard), "kb", shard, node_id
+    )
 
     await send_indexing_message(worker, indexpb, node_id)  # type: ignore
 
@@ -176,11 +175,15 @@ def delete_indexing_message(uuid: str, shard: str, node_id: str):
     return deletepb
 
 
-async def create_indexing_message(resource: Resource, shard: str, node) -> IndexMessage:
+async def create_indexing_message(
+    resource: Resource, kb: str, shard: str, node: str
+) -> IndexMessage:
     storage = await get_storage(service_name=SERVICE_NAME)
     index: IndexMessage = await storage.indexing(
-        resource, node, shard, txid=1, partition=TEST_PARTITION
+        resource, txid=1, partition=TEST_PARTITION, kb=kb, logical_shard=shard
     )
+    index.node = node
+    index.shard = shard
     return index
 
 
