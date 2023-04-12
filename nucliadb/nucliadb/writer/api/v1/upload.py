@@ -758,9 +758,6 @@ def maybe_b64decode(some_string: str) -> str:
 
 
 def guess_content_type(filename: str) -> str:
-    default_ct = "application/octet-stream"
-    try:
-        guessed_ct, _ = mimetypes.guess_type(filename)
-    except TypeError:
-        guessed_ct = None
-    return guessed_ct or default_ct
+    default = "application/octet-stream"
+    guessed, _ = mimetypes.guess_type(filename)
+    return guessed or default

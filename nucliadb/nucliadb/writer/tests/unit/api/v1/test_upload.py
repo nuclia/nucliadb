@@ -84,7 +84,6 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
         ("foo.pdf", "application/pdf"),
         ("someuuidwithoutextension", "application/octet-stream"),
         ("", "application/octet-stream"),
-        (None, "application/octet-stream"),
     ],
 )
 def test_guess_content_type(filename, content_type):
