@@ -254,7 +254,7 @@ jobs:
           file: Dockerfile.node
           load: true
           tags: |
-            $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{steps.env-vars.outputs.short_sha }}
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE}}:${{ steps.env-vars.outputs.short_sha }}
 
       # - name: Docker - Build
       #   run: |-
