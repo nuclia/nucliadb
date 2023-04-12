@@ -119,6 +119,11 @@ def parse_basic_modify(
             bm.basic.fieldmetadata.append(userfieldmetadata)
 
     if item.usermetadata is not None:
+        # user metadata like labels need to be applied to all
+        # paragraphs in a resource and that means this message should
+        # force reindexing everything
+        bm.reindex = True
+
         # protobuferrs repeated fields don't support assignment
         # will allways be a clean basic
         bm.basic.usermetadata.classifications.extend(

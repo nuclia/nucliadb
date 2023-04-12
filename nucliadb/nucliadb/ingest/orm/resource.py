@@ -135,6 +135,9 @@ class Resource:
             self._indexer = ResourceBrain(rid=self.uuid)
         return self._indexer
 
+    def replace_indexer(self, indexer: ResourceBrain):
+        self._indexer = indexer
+
     async def set_slug(self):
         basic = await self.get_basic()
         new_key = KB_RESOURCE_SLUG.format(kbid=self.kb.kbid, slug=basic.slug)

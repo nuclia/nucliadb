@@ -388,6 +388,10 @@ class Processor:
                 await resource.compute_global_tags(resource.indexer)
 
             if resource and resource.modified:
+                if message.reindex:
+                    # when reindexing, let's just generate full new index message
+                    resource.replace_indexer(await resource.generate_index_message())
+
                 shard_id = await kb.get_resource_shard_id(uuid)
                 shard: Optional[Shard] = None
                 node_klass = get_node_klass()

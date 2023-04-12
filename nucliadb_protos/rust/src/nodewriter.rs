@@ -27,6 +27,7 @@ pub mod op_status {
 pub struct IndexMessage {
     #[prost(string, tag="1")]
     pub node: ::prost::alloc::string::String,
+    /// physical shard message is for
     #[prost(string, tag="2")]
     pub shard: ::prost::alloc::string::String,
     #[prost(uint64, tag="3")]
