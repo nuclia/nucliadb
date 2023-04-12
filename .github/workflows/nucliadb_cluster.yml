@@ -54,7 +54,7 @@ jobs:
           components: rustfmt
           override: true
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: rustfmt
         run: cargo +nightly fmt -p nucliadb_cluster -- --check
@@ -67,7 +67,7 @@ jobs:
 
       - run: rustup component add clippy
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: actions-rs/clippy-check@v1
         with:
@@ -82,7 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: actions-rs/cargo@v1
         name: cargo test
