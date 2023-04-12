@@ -1,9 +1,11 @@
-from nucliadb.ingest.utils import get_driver
-from nucliadb_protos.noderesources_pb2 import Shard
-from nucliadb_protos.nodereader_pb2 import GetShardRequest
 import asyncio
+
+from nucliadb_protos.nodereader_pb2 import GetShardRequest
+from nucliadb_protos.noderesources_pb2 import Shard
+
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.utils import get_driver
 
 
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
@@ -38,7 +40,6 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
 
     assert all(checks.values())
     return knowledgebox_ingest
-
 
 
 async def inject_message(

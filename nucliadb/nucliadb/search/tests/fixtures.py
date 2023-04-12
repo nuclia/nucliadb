@@ -25,18 +25,14 @@ from typing import Dict, List, Optional
 
 import pytest
 from httpx import AsyncClient
-
-
 from redis import asyncio as aioredis
 from starlette.routing import Mount
 
 from nucliadb.ingest.cache import clear_ingest_cache
-
 from nucliadb.ingest.tests.fixtures import broker_resource
-
 from nucliadb.search import API_PREFIX
+from nucliadb.search.tests.utils import inject_message, wait_for_shard
 from nucliadb_utils.utilities import clear_global_cache
-from nucliadb.search.tests.utils import wait_for_shard, inject_message
 
 
 def free_port() -> int:

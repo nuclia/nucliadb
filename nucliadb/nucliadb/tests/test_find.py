@@ -1,26 +1,8 @@
 import asyncio
-import math
-from datetime import datetime
-from unittest.mock import AsyncMock, Mock
 
-import nats
 import pytest
 from httpx import AsyncClient
-from nats.aio.client import Client
-from nats.js import JetStreamContext
-from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
-from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-
-from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.ingest.tests.vectors import V1
-from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
-from nucliadb.search.search.query import pre_process_query
-from nucliadb.tests.utils import broker_resource, inject_message
-from nucliadb_protos import resources_pb2 as rpb
-from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.utilities import Utility, clean_utility, get_audit, set_utility
 
 
 @pytest.mark.asyncio

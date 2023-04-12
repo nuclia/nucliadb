@@ -135,7 +135,7 @@ class Resource:
             self._indexer = ResourceBrain(rid=self.uuid)
         return self._indexer
 
-    def replace_indexer(self, indexer: ResourceBrain):
+    def replace_indexer(self, indexer: ResourceBrain) -> None:
         self._indexer = indexer
 
     async def set_slug(self):
