@@ -23,6 +23,8 @@ use std::fs;
 use std::time::*;
 
 use itertools::Itertools;
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
@@ -111,7 +113,7 @@ impl FieldReader for TextReaderService {
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
+            debug!("{id:?} - Ending at: {v} ms");
         }
         Ok(count)
     }
@@ -122,13 +124,22 @@ impl ReaderChild for TextReaderService {
     type Response = DocumentSearchResponse;
     #[tracing::instrument(skip_all)]
     fn stop(&self) -> NodeResult<()> {
-        info!("Stopping Reader Text Service");
+        debug!("Stopping Reader Text Service");
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        info!("Document search at {}:{}", line!(), file!());
-        Ok(self.do_search(request)?)
+        const NAME: &str = "search";
+        let time = SystemTime::now();
+
+        let result = self.do_search(request);
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        metrics.record_request_time(metric, took);
+
+        Ok(result?)
     }
     #[tracing::instrument(skip_all)]
     fn reload(&self) {
@@ -136,6 +147,9 @@ impl ReaderChild for TextReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
+        const NAME: &str = "stored_ids";
+        let time = SystemTime::now();
+
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -145,6 +159,12 @@ impl ReaderChild for TextReaderService {
                 .and_then(|i| i.as_text().map(String::from)) else { continue };
             keys.push(key);
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(keys)
     }
 }
@@ -418,7 +438,7 @@ impl TextReaderService {
         let time = SystemTime::now();
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: starts at {v} ms");
+            debug!("{id:?} - Creating query: starts at {v} ms");
         }
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
@@ -451,15 +471,15 @@ impl TextReaderService {
             facet_collector.add_facet(Facet::from(facet));
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: ends at {v} ms");
+            debug!("{id:?} - Creating query: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: starts at {v} ms");
+            debug!("{id:?} - Searching: starts at {v} ms");
         }
         let searcher = self.reader.searcher();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: ends at {v} ms");
+            debug!("{id:?} - Searching: ends at {v} ms");
         }
         match maybe_order {
             _ if request.only_faceted => {
@@ -538,10 +558,10 @@ impl Iterator for BatchProducer {
     fn next(&mut self) -> Option<Self::Item> {
         let time = SystemTime::now();
         if self.offset >= self.total {
-            info!("No more batches available");
+            debug!("No more batches available");
             return None;
         }
-        info!("Producing a new batch with offset: {}", self.offset);
+        debug!("Producing a new batch with offset: {}", self.offset);
         let top_docs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
         let top_docs = self.searcher.search(&self.query, &top_docs).unwrap();
         let mut items = vec![];
@@ -574,7 +594,7 @@ impl Iterator for BatchProducer {
         }
         self.offset += Self::BATCH;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("New batch created, took {v} ms");
+            debug!("New batch created, took {v} ms");
         }
         Some(items)
     }

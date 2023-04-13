@@ -22,6 +22,8 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -53,83 +55,101 @@ impl FieldWriter for TextWriterService {}
 impl WriterChild for TextWriterService {
     #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> NodeResult<()> {
-        info!("Stopping Text Service");
+        debug!("Stopping Text Service");
         Ok(())
     }
 
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let id: Option<String> = None;
+        const NAME: &str = "count";
         let time = SystemTime::now();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Count starting at {v} ms");
-        }
+
+        let id: Option<String> = None;
         let reader = self.index.reader()?;
         let searcher = reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
-        }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        metrics.record_request_time(metric, took);
+        debug!("{id:?} - Ending at {took}");
+
         Ok(count)
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        let id = Some(&resource.shard_id);
+        const NAME: &str = "set_resource";
         let time = SystemTime::now();
+
+        let id = Some(&resource.shard_id);
         let resource_id = resource.resource.as_ref().unwrap();
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Delete existing uuid: starts at {v} ms");
+            debug!("{id:?} - Delete existing uuid: starts at {v} ms");
         }
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Delete existing uuid: ends at {v} ms");
+            debug!("{id:?} - Delete existing uuid: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Indexing document: starts at {v} ms");
+            debug!("{id:?} - Indexing document: starts at {v} ms");
         }
         if resource.status != ResourceStatus::Delete as i32 {
             self.index_document(resource);
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Indexing document: starts at {v} ms");
+            debug!("{id:?} - Indexing document: starts at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Commit: starts at {v} ms");
+            debug!("{id:?} - Commit: starts at {v} ms");
         }
         self.writer.commit()?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Commit: ends at {v} ms");
+            debug!("{id:?} - Commit: ends at {v} ms");
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        metrics.record_request_time(metric, took);
+        debug!("{id:?} - Ending at {took}");
 
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
-        let id = Some(&resource_id.shard_id);
+        const NAME: &str = "delete_resource";
         let time = SystemTime::now();
+        let id = Some(&resource_id.shard_id);
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Delete existing uuid: starts at {v} ms");
+            debug!("{id:?} - Delete existing uuid: starts at {v} ms");
         }
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Delete existing uuid: ends at {v} ms");
+            debug!("{id:?} - Delete existing uuid: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Commit: starts at {v} ms");
+            debug!("{id:?} - Commit: starts at {v} ms");
         }
         self.writer.commit()?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Commit: ends at {v} ms");
+            debug!("{id:?} - Commit: ends at {v} ms");
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        metrics.record_request_time(metric, took);
+        debug!("{id:?} - Ending at {took}");
 
         Ok(())
     }
