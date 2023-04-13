@@ -142,12 +142,6 @@ def test_get_ff():
     assert isinstance(ff, featureflagging.FlagService)
 
 
-def test_get_ff():
-    ff = utilities.get_ff()
-    assert ff is not None
-    assert isinstance(ff, featureflagging.FlagService)
-
-
 def test_has_feature():
     ff = MagicMock()
     headers = {
