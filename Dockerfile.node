@@ -80,7 +80,7 @@ RUN apt-get -y update \
                           lmdb-utils \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=base /bin/grpc_health_probe /bin/grpc_health_probe
+COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
 
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer

@@ -1,4 +1,4 @@
-FROM rust:bullseye as base
+FROM rust:bullseye
 
 LABEL maintainer="info@nuclia.com"
 LABEL org.opencontainers.image.vendor="Nuclia Inc."
