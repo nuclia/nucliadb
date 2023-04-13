@@ -90,7 +90,7 @@ async def main():
     if get_ff().enabled("nucliadb_node_sync_fs", default=False):
         from nucliadb_node import write_sync
 
-        finalizers.append(write_sync.start)
+        finalizers.append(write_sync.start())
 
     await run_until_exit(finalizers)
 
