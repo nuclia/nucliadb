@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(env::shutdown_delay()).await;
     metrics_task.abort();
     let _ = metrics_task.await;
-    
+
     Ok(())
 }
 
