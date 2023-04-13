@@ -34,6 +34,7 @@ pub struct State {
 }
 impl State {
     pub fn new(at: PathBuf) -> State {
+        let _a = 10;
         State {
             location: at,
             indexes: HashSet::default(),
