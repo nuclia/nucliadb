@@ -17,8 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
+
+import nucliadb_contributor_assets  # type: ignore
 import pkg_resources
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -96,5 +100,15 @@ async def homepage(request):
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
 application.add_route("/metrics", metrics.metrics)
+
+# mount contributor app assets
+application.mount(
+    "/contributor",
+    StaticFiles(
+        directory=os.path.dirname(nucliadb_contributor_assets.__file__), html=True
+    ),
+    name="static",
+)
+
 
 instrument_app(application, excluded_urls=["/"], metrics=True)
