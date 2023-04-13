@@ -291,7 +291,7 @@ impl ReaderChild for ParagraphReaderService {
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs(NAME.to_string());
         metrics.record_request_time(metric, took);
-        
+
         Ok(keys)
     }
 }

@@ -69,7 +69,7 @@ impl WriterChild for ParagraphWriterService {
         const NAME: &str = "count";
         let time = SystemTime::now();
         let id: Option<String> = None;
-        
+
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Count starting at {v} ms");
         }
