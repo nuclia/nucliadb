@@ -49,178 +49,212 @@ env:
   API_VERSION: 1
   COMPONENT: nucliadb-node
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  IMAGE_NAME_BASE_NODE: basenode
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
 
 jobs:
-  pre-checks-python:
+  # pre-checks-python:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: [3.9]
+
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v3
+
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v3.1.0
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #         cache: "pip"
+
+  #     - name: Install package
+  #       run: make -C nucliadb_node/ install-dev
+
+  #     - name: Run pre-checks
+  #       run: make -C nucliadb_node/ lint
+
+  # licenses:
+  #   name: Check Licenses
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: EmbarkStudios/cargo-deny-action@v1
+  #       name: cargo deny
+  #       with:
+  #         log-level: warn
+  #         command: check licenses
+
+  # format-rust:
+  #   name: Rust code Format
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #         profile: minimal
+  #         components: rustfmt
+  #         override: true
+
+  #     - uses: Swatinem/rust-cache@v2
+
+  #     - name: rustfmt
+  #       run: cargo +nightly fmt -p nucliadb_node -- --check
+
+  # clippy-rust:
+  #   name: Clippy lint
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - run: rustup component add clippy
+
+  #     - uses: Swatinem/rust-cache@v2
+
+  #     - uses: actions-rs/clippy-check@v1
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         args: -p nucliadb_node --tests
+
+  # # A cached build while checking lints will speed up tests, as dependencies
+  # # will be compiled and cached
+  # prebuild-tests-rust:
+  #   name: Prebuild rust tests
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         shared-key: "test_prebuild"
+
+  #     - uses: actions-rs/cargo@v1
+  #       name: cargo prebuild tests
+  #       with:
+  #         command: build
+  #         args: --profile test
+
+  # tests-rust:
+  #   name: Rust tests
+  #   runs-on: ubuntu-latest
+  #   needs: [clippy-rust, format-rust, licenses, prebuild-tests-rust]
+
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         shared-key: "test_prebuild"
+
+  #     - uses: actions-rs/cargo@v1
+  #       name: cargo test
+  #       with:
+  #         command: test
+  #         args: --workspace --all-features
+
+  # tests-python:
+  #   name: Python tests
+  #   runs-on: ubuntu-latest
+  #   needs: [pre-checks-python, licenses]
+
+  #   strategy:
+  #     matrix:
+  #       python-version: [3.9]
+
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v3
+
+  #     # Setup gcloud CLI
+  #     - uses: google-github-actions/auth@v0
+  #       with:
+  #         credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+  #     - name: "Set up Cloud SDK"
+  #       uses: "google-github-actions/setup-gcloud@v0"
+
+  #     # setup docker, as we need to pull the node image to run the tests
+  #     - name: Configure Docker
+  #       run: gcloud auth configure-docker --quiet
+
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v3.1.0
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #         cache: "pip"
+
+  #     - name: Install the package
+  #       run: make -C nucliadb_node/ install-dev
+
+  #     - name: Install rust binding for testing
+  #       run: |
+  #         maturin build -m nucliadb_node/binding/Cargo.toml
+  #         pip install target/wheels/*_x86_64.whl
+
+  #     - uses: dorny/paths-filter@v2
+  #       id: filter
+  #       with:
+  #         filters: |
+  #           node_modified:
+  #             - 'nucliadb_node/src/**'
+
+  #     - name: Build local Node for testing
+  #       if: steps.filter.outputs.node_modified == 'true'
+  #       run: |
+  #         docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
+  #     - name: Run tests
+  #       run: |
+  #         pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
+
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         file: ./coverage.xml
+  #         flags: node-sidecar
+
+  build-base-rust:
+    name: Build and push base image
+    id: changes
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.9]
+    # needs: tests-rust
+    # TODO: uncomment
+    # if: github.event_name == 'push'
 
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v3.1.0
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install package
-        run: make -C nucliadb_node/ install-dev
-
-      - name: Run pre-checks
-        run: make -C nucliadb_node/ lint
-
-  licenses:
-    name: Check Licenses
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: EmbarkStudios/cargo-deny-action@v1
-        name: cargo deny
-        with:
-          log-level: warn
-          command: check licenses
-
-  format-rust:
-    name: Rust code Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          components: rustfmt
-          override: true
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: rustfmt
-        run: cargo +nightly fmt -p nucliadb_node -- --check
-
-  clippy-rust:
-    name: Clippy lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - run: rustup component add clippy
-
-      - uses: Swatinem/rust-cache@v2
-
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -p nucliadb_node --tests
-
-  # A cached build while checking lints will speed up tests, as dependencies
-  # will be compiled and cached
-  prebuild-tests-rust:
-    name: Prebuild rust tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "test_prebuild"
-
-      - uses: actions-rs/cargo@v1
-        name: cargo prebuild tests
-        with:
-          command: build
-          args: --profile test
-
-  tests-rust:
-    name: Rust tests
-    runs-on: ubuntu-latest
-    needs: [clippy-rust, format-rust, licenses, prebuild-tests-rust]
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "test_prebuild"
-
-      - uses: actions-rs/cargo@v1
-        name: cargo test
-        with:
-          command: test
-          args: --workspace --all-features
-
-  tests-python:
-    name: Python tests
-    runs-on: ubuntu-latest
-    needs: [pre-checks-python, licenses]
-
-    strategy:
-      matrix:
-        python-version: [3.9]
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      # Setup gcloud CLI
-      - uses: google-github-actions/auth@v0
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v0"
-
-      # setup docker, as we need to pull the node image to run the tests
-      - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
-
-      - name: Setup Python
-        uses: actions/setup-python@v3.1.0
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install the package
-        run: make -C nucliadb_node/ install-dev
-
-      - name: Install rust binding for testing
-        run: |
-          maturin build -m nucliadb_node/binding/Cargo.toml
-          pip install target/wheels/*_x86_64.whl
-
-      - uses: dorny/paths-filter@v2
-        id: filter
+      - name: Check if dockerfile have changed
+        uses: dorny/paths-filter@v2
         with:
           filters: |
-            node_modified:
-              - 'nucliadb_node/src/**'
+            basenode_dockerfile:
+              - 'Dockerfile.basenode'
 
-      - name: Build local Node for testing
-        if: steps.filter.outputs.node_modified == 'true'
-        run: |
-          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
-
-      - name: Run tests
-        run: |
-          pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+      - if: steps.changes.outputs.basenode_dockerfile == 'true'
+        name: Build base node docker image
+        uses: docker/build-push-action@v4
         with:
-          file: ./coverage.xml
-          flags: node-sidecar
+          context: .
+          file: Dockerfile.basenode
+          platforms: linux/amd64
+          # TODO: push true
+          load: true
+          push: false
+          cache-from: type=gha
+          # As basenode is stable and won't change ofter, we only need cache for
+          # the resulting image, not intermediate layers.
+          cache-to: type=gha,mode=min
+          tags: |
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_BASE_NODE}}:latest
 
   build-rust:
     name: Build and push index node docker image
     runs-on: ubuntu-latest
-    needs: tests-rust
+    needs: build-base-rust
     if: github.event_name == 'push'
 
 
