@@ -54,7 +54,7 @@ async def nucliadb_api(
 
     # Little hack to raise exeptions from VersionedFastApi
     for route in application.routes:
-        if isinstance(route, Mount) and not isinstance(route, StaticFiles):
+        if isinstance(route, Mount) and not isinstance(route.app, StaticFiles):
             route.app.middleware_stack.handler = handler  # type: ignore
 
     await application.router.startup()
