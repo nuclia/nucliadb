@@ -23,6 +23,7 @@ from enum import Enum
 from typing import List, Optional
 
 import pytest
+from fastapi.staticfiles import StaticFiles
 from httpx import AsyncClient
 from redis import asyncio as aioredis
 from starlette.routing import Mount
@@ -53,7 +54,7 @@ async def nucliadb_api(
 
     # Little hack to raise exeptions from VersionedFastApi
     for route in application.routes:
-        if isinstance(route, Mount):
+        if isinstance(route, Mount) and not isinstance(route, StaticFiles):
             route.app.middleware_stack.handler = handler  # type: ignore
 
     await application.router.startup()
