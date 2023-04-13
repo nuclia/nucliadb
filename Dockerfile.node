@@ -1,20 +1,70 @@
-FROM eu.gcr.io/stashify-218417/basenode:latest AS builder
+FROM eu.gcr.io/stashify-218417/basenode:latest as planner
+
+# XXX As COPY copies the contents of a directory and not the directory itself,
+# we use multiple COPY commands to avoid including Pyhton sources. Ideally, we
+# should have a single COPY command getting all Rust code.
+COPY Cargo.toml \
+    Cargo.lock \
+    rust-toolchain.toml \
+    /nucliadb/
+COPY nucliadb_cluster /nucliadb/nucliadb_cluster
+COPY nucliadb_core /nucliadb/nucliadb_core
+COPY nucliadb_ftp /nucliadb/nucliadb_ftp
+COPY nucliadb_node /nucliadb/nucliadb_node
+COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_protos /nucliadb/nucliadb_protos
+COPY nucliadb_relations /nucliadb/nucliadb_relations
+COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
+COPY nucliadb_texts /nucliadb/nucliadb_texts
+COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY vectors_benchmark /nucliadb/vectors_benchmark
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+# --------------------------------------------------------------------
+
+FROM eu.gcr.io/stashify-218417/basenode:latest as builder
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 
-COPY . /nucliadb
+COPY --from=planner /nucliadb/recipe.json recipe.json
 
-WORKDIR /nucliadb
+# Build dependencies (this is the cached docker layer)
+RUN cargo chef cook \
+     --recipe-path recipe.json \
+     --features $CARGO_FEATURES \
+     $(test "$CARGO_PROFILE" = "release" && echo "--release")
 
+# XXX same as above
+COPY Cargo.toml \
+    Cargo.lock \
+    rust-toolchain.toml \
+    /nucliadb/
+COPY nucliadb_cluster /nucliadb/nucliadb_cluster
+COPY nucliadb_core /nucliadb/nucliadb_core
+COPY nucliadb_ftp /nucliadb/nucliadb_ftp
+COPY nucliadb_node /nucliadb/nucliadb_node
+COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_protos /nucliadb/nucliadb_protos
+COPY nucliadb_relations /nucliadb/nucliadb_relations
+COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
+COPY nucliadb_texts /nucliadb/nucliadb_texts
+COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY vectors_benchmark /nucliadb/vectors_benchmark
+
+# Build application (only run when sources are modified)
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && cargo build \
-    --features $CARGO_FEATURES -p nucliadb_node \
-    $(test "$CARGO_PROFILE" = "release" && echo "--release") \
-    && echo "Copying binaries to /nucliadb/bin" \
+        --features $CARGO_FEATURES \
+        -p nucliadb_node \
+        $(test "$CARGO_PROFILE" = "release" && echo "--release") \
+    && echo "Moving binaries to /nucliadb/bin" \
     && mkdir -p /nucliadb/bin \
-    && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /nucliadb/bin \;
+    && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /nucliadb/bin \; \
+    && cargo clean
 
+# --------------------------------------------------------------------
 
 FROM debian:bullseye-slim AS nucliadb
 
@@ -24,28 +74,16 @@ ENV DATA_PATH=data
 ENV RUST_LOG=nucliadb_node=DEBUG
 ENV RUST_BACKTRACE=1
 
-
 RUN apt-get -y update \
     && apt-get -y install ca-certificates curl \
-    libpq5  \
-    libssl1.1 \
-    lmdb-utils \
+                          libssl1.1 \
+                          lmdb-utils \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=base /bin/grpc_health_probe /bin/grpc_health_probe
 
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer
-
-RUN set -eux; \
-    dpkgArch="$(dpkg --print-architecture)"; \
-    case "${dpkgArch##*-}" in \
-    amd64) probeArch='amd64'; probeSha256='8d104fb997c9a5146a15a9c9f1fd45afa9d2dd995e185aeb96a19263fbd55b8a' ;; \
-    arm64) probeArch='arm64'; probeSha256='6a74ac6eebb173987dd4a68fa99b74b2e1bdd3e0c7cf634c0d823595fbb28609' ;; \
-    i386) probeArch='386'; probeSha256='eaed3339e273116d2c44a271d7245da1999b28a0c0bdf1d7b3aa75917712dc1a' ;; \
-    *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
-    esac; \
-    curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.17/grpc_health_probe-linux-${probeArch}; \
-    echo "${probeSha256} /bin/grpc_health_probe" | sha256sum -c -; \
-    chmod +x /bin/grpc_health_probe
 
 COPY nucliadb_node/entrypoint.sh /
 RUN chmod 750 /entrypoint.sh

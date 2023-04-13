@@ -96,7 +96,7 @@ async def get_driver() -> Driver:
     if driver is not None and not driver.initialized:
         await driver.initialize()
     elif driver is None:
-        raise AttributeError()
+        raise AttributeError("No driver defined on settings")
     return driver
 
 

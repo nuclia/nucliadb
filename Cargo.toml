@@ -1,13 +1,16 @@
 [workspace]
 
 members = [
-  "nucliadb_telemetry",
-  "nucliadb_protos/rust",
   "nucliadb_cluster",
-  "nucliadb_node",
-  "nucliadb_node/binding",
   "nucliadb_core",
   "nucliadb_ftp",
+  "nucliadb_node",
+  "nucliadb_node/binding",
+  "nucliadb_paragraphs",
+  "nucliadb_protos/rust",
+  "nucliadb_relations",
+  "nucliadb_telemetry",
+  "nucliadb_texts",
+  "nucliadb_vectors",
   "vectors_benchmark",
-  "nucliadb_ftp",
 ]
