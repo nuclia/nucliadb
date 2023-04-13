@@ -97,7 +97,7 @@ class Worker:
             auth=indexing_settings.index_jetstream_auth,
             servers=indexing_settings.index_jetstream_servers,
         )
-        self.last_seqid = self.load_seqid()
+        self.load_seqid()
 
     async def finalize(self):
         if self.gc_task:
@@ -202,15 +202,15 @@ class Worker:
             seqfile.write(str(seqid))
         self.last_seqid = seqid
 
-    def load_seqid(self) -> int:
+    def load_seqid(self):
         if settings.data_path is None:
             raise Exception("We need a DATA_PATH env")
         try:
             with open(f"{settings.data_path}/seqid", "r") as seqfile:
-                return int(seqfile.read())
+                self.last_seqid = int(seqfile.read())
         except FileNotFoundError:
             # First time the consumer is started
-            return 1
+            self.last_seqid = 1
 
     async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain: Resource = await self.storage.get_indexing(pb)
