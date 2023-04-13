@@ -19,7 +19,7 @@
 #
 import os
 
-import nucliadb_contributor_assets
+import nucliadb_contributor_assets  # type: ignore
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
