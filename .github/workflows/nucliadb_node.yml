@@ -234,6 +234,11 @@ jobs:
             basenode_dockerfile:
               - 'Dockerfile.basenode'
 
+      # We need to setup buildx to be able to cache with gha
+      - if: steps.changes.outputs.basenode_dockerfile == 'true'
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - if: steps.changes.outputs.basenode_dockerfile == 'true'
         name: Build base node docker image
         uses: docker/build-push-action@v4
