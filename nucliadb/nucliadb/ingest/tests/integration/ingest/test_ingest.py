@@ -17,15 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.ingest.orm.exceptions import DeadletteredError
 import base64
 import traceback
-from unittest.mock import patch
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from unittest.mock import patch
 from uuid import uuid4
-from nucliadb.ingest.orm.processor import Processor
+
 import nats
 import pytest
 from nats.aio.client import Client
@@ -43,14 +42,16 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     FileExtractedData,
     LargeComputedMetadataWrapper,
-    Origin,
-    Paragraph,
 )
+from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
+from nucliadb_protos.resources_pb2 import Origin, Paragraph
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest import SERVICE_NAME
+from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import Storage
@@ -663,7 +664,7 @@ async def test_ingest_txn_missing_kb(
 
 @pytest.mark.asyncio
 async def test_ingest_autocommit_deadletter_marks_resource(
-    kbid: str, processor: Processor
+    kbid: str, processor: Processor, txn, gcs_storage, cache
 ):
     rid = str(uuid.uuid4())
     message = make_message(kbid, rid)
@@ -675,5 +676,8 @@ async def test_ingest_autocommit_deadletter_marks_resource(
         mock_notify.side_effect = Exception("test")
         await processor.process(message=message, seqid=1)
 
-    index = get_indexing()
-    storage = await get_storage(service_name=SERVICE_NAME)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    resource = await kb_obj.get(message.uuid)
+
+    mock_notify.assert_called_once()
+    assert resource.basic.metadata.status == PBMetadata.Status.ERROR
