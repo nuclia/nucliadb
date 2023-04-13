@@ -119,6 +119,7 @@ class IndexMessage(google.protobuf.message.Message):
     STORAGE_KEY_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
+    """physical shard message is for"""
     txid: builtins.int
     resource: builtins.str
     typemessage: global___TypeMessage.ValueType

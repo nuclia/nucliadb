@@ -114,6 +114,9 @@ message BrokerMessage {
     int64 account_seq = 34;
 
     repeated resources.UserVectorsWrapper user_vectors = 35;
+
+    // If true, force reindex all paragraphs in a resource
+    bool reindex = 36;
 }
 
 message WriterStatusResponse {

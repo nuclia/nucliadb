@@ -25,13 +25,16 @@ import json
 from typing import Dict, List, Optional, Union
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
+from nucliadb.ingest.orm.node import ClusterMember, Node, NodeType, chitchat_update_node
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import Utility, set_utility
 
 
 async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
+    if settings.nodes_load_ingest:  # pragma: no cover
+        await Node.load_active_nodes()
+
     if settings.chitchat_enabled is False:
         logger.info(f"Chitchat not enabled - {service_name}")
         return None
