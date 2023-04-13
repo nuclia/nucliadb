@@ -680,4 +680,4 @@ async def test_ingest_autocommit_deadletter_marks_resource(
     resource = await kb_obj.get(message.uuid)
 
     mock_notify.assert_called_once()
-    assert resource.basic.metadata.status == PBMetadata.Status.ERROR
+    assert resource.basic.metadata.status == PBMetadata.Status.ERROR  # type: ignore
