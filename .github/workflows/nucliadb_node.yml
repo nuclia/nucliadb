@@ -220,7 +220,6 @@ jobs:
 
   build-base-rust:
     name: Build and push base image
-    id: changes
     runs-on: ubuntu-latest
     # needs: tests-rust
     # TODO: uncomment
@@ -228,6 +227,7 @@ jobs:
 
     steps:
       - name: Check if dockerfile have changed
+        id: changes
         uses: dorny/paths-filter@v2
         with:
           filters: |
