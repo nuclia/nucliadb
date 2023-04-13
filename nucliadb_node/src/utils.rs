@@ -19,11 +19,16 @@
 //
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use http::Uri;
-use nucliadb_core::tracing::Level;
+use nucliadb_core::metrics::Metrics;
+use nucliadb_core::tracing::{self, Level};
+use nucliadb_core::{context, NodeResult};
 use opentelemetry::propagation::Extractor;
+use reqwest::redirect::Policy;
+use reqwest::Client;
 use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
@@ -82,4 +87,43 @@ pub fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
         .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
         .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
         .collect()
+}
+
+// Metrics utils
+pub struct HttpMetricsClient {
+    metrics: Arc<dyn Metrics>,
+    client: Client,
+    endpoint: String,
+}
+impl HttpMetricsClient {
+    async fn send(&self) -> NodeResult<()> {
+        let _ = self
+            .client
+            .post(&self.endpoint)
+            .json(&self.metrics.collect()?)
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub fn try_new(endpoint: String) -> NodeResult<Self> {
+        let metrics = context::get_metrics();
+        let client = Client::builder()
+            .redirect(Policy::limited(3))
+            .timeout(Duration::from_secs(10))
+            .build()?;
+        Ok(HttpMetricsClient {
+            client,
+            endpoint,
+            metrics,
+        })
+    }
+
+    pub async fn run(self) {
+        loop {
+            sleep(Duration::from_secs(1)).await;
+            let Err(err) = self.send().await else { continue };
+            tracing::error!("Could not send metrics {err:?}");
+        }
+    }
 }

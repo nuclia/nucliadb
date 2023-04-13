@@ -2034,6 +2034,7 @@ dependencies = [
  "portpicker",
  "rand 0.8.5",
  "regex",
+ "reqwest",
  "sentry",
  "sentry-tracing",
  "serde",
