@@ -226,6 +226,9 @@ jobs:
     # if: github.event_name == 'push'
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Check if dockerfile have changed
         id: changes
         uses: dorny/paths-filter@v2
@@ -233,6 +236,22 @@ jobs:
           filters: |
             basenode_dockerfile:
               - 'Dockerfile.basenode'
+
+      # As base image is on a private registry, we need to authenticate 1st to
+      # be able to download that image
+      - if: steps.changes.outputs.basenode_dockerfile == 'true'
+        name: Setup gcloud CLI
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - if: steps.changes.outputs.basenode_dockerfile == 'true'
+        name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v0"
+
+      - if: steps.changes.outputs.basenode_dockerfile == 'true'
+        name: Configure Docker
+        run: gcloud auth configure-docker --quiet
 
       # We need to setup buildx to be able to cache with gha
       - if: steps.changes.outputs.basenode_dockerfile == 'true'
@@ -275,7 +294,8 @@ jobs:
           echo "::set-output name=short_sha::$HASH"
           echo "::set-output name=branch::$BRANCH"
 
-      # As base image is on a private registry, we need to authenticate 1st to be able to download that image
+      # As base image is on a private registry, we need to authenticate 1st to
+      # be able to download that image
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
         with:
