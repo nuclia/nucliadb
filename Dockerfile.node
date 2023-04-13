@@ -31,7 +31,9 @@ RUN rustup component add rustfmt \
 
 FROM base as planner
 
-# Copy rust source code (don't copy python sources)
+# XXX As COPY copies the contents of a directory and not the directory itself,
+# we use multiple COPY commands to avoid including Pyhton sources. Ideally, we
+# should have a single COPY command getting all Rust code.
 COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
@@ -65,7 +67,7 @@ RUN cargo chef cook \
      --features $CARGO_FEATURES \
      $(test "$CARGO_PROFILE" = "release" && echo "--release")
 
-# Copy rust source code (don't copy python sources)
+# XXX same as above
 COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
