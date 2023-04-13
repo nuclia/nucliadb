@@ -41,7 +41,7 @@ nucliadb-telemetry>=1.8.0
 nucliadb-utils[storages,fastapi,cache]
 nucliadb-protos
 nucliadb-models
-nucliadb-contributor-assets^=1.0.0
+nucliadb-contributor-assets~=1.0.0
 
 tikv-client>=0.0.3
 
