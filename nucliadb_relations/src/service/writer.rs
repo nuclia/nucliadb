@@ -21,6 +21,8 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
@@ -48,7 +50,7 @@ impl RelationsWriterService {
             }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms")
+            debug!("{id:?} - Ending at {v} ms")
         }
         Ok(())
     }
@@ -56,8 +58,10 @@ impl RelationsWriterService {
 impl RelationWriter for RelationsWriterService {
     #[tracing::instrument(skip_all)]
     fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> NodeResult<()> {
-        let id = graph.shard_id.as_ref().map(|s| &s.id);
+        const NAME: &str = "delete_nodes";
         let time = SystemTime::now();
+
+        let id = graph.shard_id.as_ref().map(|s| &s.id);
         let mut writer = self.index.start_writing()?;
         for node in graph.nodes.iter() {
             let name = node.value.clone();
@@ -67,19 +71,26 @@ impl RelationWriter for RelationsWriterService {
                 self.delete_node(&mut writer, id)?;
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms")
-        }
-        Ok(writer.commit(&mut self.wmode)?)
+        let result = Ok(writer.commit(&mut self.wmode)?);
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        metrics.record_request_time(metric, took);
+        debug!("{id:?} - Ending at {took} ms");
+
+        result
     }
     #[tracing::instrument(skip_all)]
     fn join_graph(&mut self, graph: &JoinGraph) -> NodeResult<()> {
+        const NAME: &str = "join_graph";
         let time = SystemTime::now();
-        let mut writer = self.index.start_writing()?;
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Creating nodes: starts {v} ms");
+            debug!("Creating nodes: starts {v} ms");
         }
+
+        let mut writer = self.index.start_writing()?;
         let nodes: HashMap<_, _> = graph
             .nodes
             .iter()
@@ -95,13 +106,14 @@ impl RelationWriter for RelationsWriterService {
             })
             .map(|(&key, value, xtype, subtype)| (key, IoNode::user_node(value, xtype, subtype)))
             .collect();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Creating nodes: ends {v} ms");
-        }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Populating the graph: starts {v} ms");
+            debug!("Creating nodes: ends {v} ms");
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            debug!("Populating the graph: starts {v} ms");
+        }
+
         let ubehaviour = || Err(InnerErr::UBehaviour);
         for protos_edge in graph.edges.iter() {
             let from = nodes.get(&protos_edge.source).map_or_else(ubehaviour, Ok)?;
@@ -111,14 +123,22 @@ impl RelationWriter for RelationsWriterService {
             let metadata = protos_edge.metadata.clone().map(IoEdgeMetadata::from);
             writer.connect(&self.wmode, from, to, &edge, metadata.as_ref())?;
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Populating the graph: ends {v} ms");
-        }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Ending at {v} ms")
+            debug!("Populating the graph: ends {v} ms");
         }
-        Ok(writer.commit(&mut self.wmode)?)
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            debug!("Ending at {v} ms")
+        }
+
+        let result = Ok(writer.commit(&mut self.wmode)?);
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        metrics.record_request_time(metric, took);
+
+        result
     }
 }
 impl std::fmt::Debug for RelationsWriterService {
@@ -130,45 +150,63 @@ impl std::fmt::Debug for RelationsWriterService {
 impl WriterChild for RelationsWriterService {
     #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> NodeResult<()> {
-        info!("Stopping relation writer Service");
+        debug!("Stopping relation writer Service");
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
+        const NAME: &str = "count";
         let time = SystemTime::now();
+
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Count starting at {v} ms");
+            debug!("Count starting at {v} ms");
         }
         let count = self
             .index
             .start_reading()
             .and_then(|reader| reader.no_nodes())?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Ending at {v} ms")
+            debug!("Ending at {v} ms")
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(count as usize)
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> NodeResult<()> {
-        let id = Some(&x.shard_id);
+        const NAME: &str = "delete_resource";
         let time = SystemTime::now();
+
+        let id = Some(&x.shard_id);
         let node = IoNode::new(x.uuid.clone(), dictionary::ENTITY.to_string(), None);
         let mut writer = self.index.start_writing()?;
         if let Some(id) = writer.get_node_id(node.hash())? {
             self.delete_node(&mut writer, id)?;
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms")
+            debug!("{id:?} - Ending at {v} ms")
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        let id = Some(&resource.shard_id);
+        const NAME: &str = "set_resource";
         let time = SystemTime::now();
+
+        let id = Some(&resource.shard_id);
         if resource.status != ResourceStatus::Delete as i32 {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Populating the graph: starts {v} ms");
+                debug!("{id:?} - Populating the graph: starts {v} ms");
             }
             let iter = resource
                 .relations
@@ -197,12 +235,18 @@ impl WriterChild for RelationsWriterService {
             }
             writer.commit(&mut self.wmode)?;
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Populating the graph: ends {v} ms");
+                debug!("{id:?} - Populating the graph: ends {v} ms");
             }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms")
+            debug!("{id:?} - Ending at {v} ms")
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(())
     }
     fn garbage_collection(&mut self) -> NodeResult<()> {
