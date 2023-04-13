@@ -93,8 +93,8 @@ python-code-lint:
 	make -C nucliadb_telemetry/ lint
 
 rust-code-lint:
-	cargo +nightly fmt -p nucliadb_node
-	cargo clippy -p nucliadb_node --tests
+	cargo +nightly fmt
+	cargo +nightly clippy --tests
 
 
 test-rust:
