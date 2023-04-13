@@ -56,7 +56,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM base as builder
 
 ARG CARGO_FEATURES=release-feature-set
-ARG CARGO_PROFILE=debug
+ARG CARGO_PROFILE=release
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
