@@ -24,9 +24,8 @@ RUN set -eux; \
     chmod +x /bin/grpc_health_probe
 
 # Required by tonic
-RUN rustup component add rustfmt
-
-RUN cargo install cargo-chef
+RUN rustup component add rustfmt \
+    && cargo install cargo-chef
 
 # --------------------------------------------------------------------
 
