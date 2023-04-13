@@ -165,5 +165,6 @@ class TestSubsciptionWorker:
         msg = self.get_msg(seqid=9)
         await worker.subscription_worker(msg)
 
+        # The message is acked and ignored
         msg.ack.assert_awaited_once()
         worker.set_resource.assert_not_awaited()
