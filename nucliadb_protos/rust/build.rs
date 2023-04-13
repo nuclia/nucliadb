@@ -32,20 +32,18 @@ fn main() -> Result<()> {
 
     let mut prost_config = prost_build::Config::default();
 
-    prost_config
-        .out_dir("src")
-        .compile_protos(
-            &[
-                "nucliadb_protos/utils.proto",
-                "nucliadb_protos/knowledgebox.proto",
-                "nucliadb_protos/resources.proto",
-                "nucliadb_protos/noderesources.proto",
-                "nucliadb_protos/writer.proto",
-                "nucliadb_protos/nodewriter.proto",
-                "nucliadb_protos/nodereader.proto",
-            ],
-            &["../../"],
-        )?;
+    prost_config.out_dir("src").compile_protos(
+        &[
+            "nucliadb_protos/utils.proto",
+            "nucliadb_protos/knowledgebox.proto",
+            "nucliadb_protos/resources.proto",
+            "nucliadb_protos/noderesources.proto",
+            "nucliadb_protos/writer.proto",
+            "nucliadb_protos/nodewriter.proto",
+            "nucliadb_protos/nodereader.proto",
+        ],
+        &["../../"],
+    )?;
 
     tonic_build::configure()
         .build_server(true)
