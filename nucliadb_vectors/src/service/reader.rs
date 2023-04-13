@@ -20,6 +20,8 @@
 use std::fmt::Debug;
 use std::time::SystemTime;
 
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
@@ -60,29 +62,38 @@ impl Debug for VectorReaderService {
 impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
+        const NAME: &str = "count";
         let time = SystemTime::now();
+
         let indexet_slock = self.indexset.get_slock()?;
         if vectorset.is_empty() {
-            info!("Id for the vectorset is empty");
+            debug!("Id for the vectorset is empty");
             let index_slock = self.index.get_slock()?;
             let no_nodes = self.index.no_nodes(&index_slock);
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("Ending at {v} ms")
-            }
+            std::mem::drop(index_slock);
+
+            let metrics = context::get_metrics();
+            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+            let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+            metrics.record_request_time(metric, took);
+            debug!("Ending at {took} ms");
+
             Ok(no_nodes)
         } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-            info!("Counting nodes for {vectorset}");
+            debug!("Counting nodes for {vectorset}");
             let lock = index.get_slock()?;
             let no_nodes = index.no_nodes(&lock);
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("Ending at {v} ms")
-            }
+            std::mem::drop(lock);
+
+            let metrics = context::get_metrics();
+            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+            let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+            metrics.record_request_time(metric, took);
+            debug!("Ending at {took} ms");
+
             Ok(no_nodes)
         } else {
-            info!("There was not a set called {vectorset}");
-            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("Ending at {v} ms")
-            }
+            debug!("There was not a set called {vectorset}");
             Ok(0)
         }
     }
@@ -91,13 +102,15 @@ impl ReaderChild for VectorReaderService {
     type Request = VectorSearchRequest;
     type Response = VectorSearchResponse;
     fn stop(&self) -> NodeResult<()> {
-        info!("Stopping vector reader Service");
+        debug!("Stopping vector reader Service");
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        let id = Some(&request.id);
+        const NAME: &str = "search";
         let time = SystemTime::now();
+
+        let id = Some(&request.id);
         let offset = request.result_per_page * request.page_number;
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
@@ -113,34 +126,34 @@ impl ReaderChild for VectorReaderService {
             .for_each(|c| formula.extend(c));
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: starts at {v} ms");
+            debug!("{id:?} - Searching: starts at {v} ms");
         }
         let result = if request.vector_set.is_empty() {
-            info!("{id:?} - No vectorset specified, searching in the main index");
+            debug!("{id:?} - No vectorset specified, searching in the main index");
             self.index.search(&search_request, &index_slock)?
         } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
-            info!(
+            debug!(
                 "{id:?} - vectorset specified and found, searching on {}",
                 request.vector_set
             );
             let lock = index.get_slock()?;
             index.search(&search_request, &lock)?
         } else {
-            info!(
+            debug!(
                 "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
                 request.vector_set
             );
             vec![]
         };
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: ends at {v} ms");
+            debug!("{id:?} - Searching: ends at {v} ms");
         }
 
         std::mem::drop(indexet_slock);
         std::mem::drop(index_slock);
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating results: starts at {v} ms");
+            debug!("{id:?} - Creating results: starts at {v} ms");
         }
         let documents = result
             .into_iter()
@@ -150,11 +163,15 @@ impl ReaderChild for VectorReaderService {
             .flat_map(DocumentScored::try_from)
             .collect::<Vec<_>>();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating results: ends at {v} ms");
+            debug!("{id:?} - Creating results: ends at {v} ms");
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms")
-        }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        metrics.record_request_time(metric, took);
+        debug!("{id:?} - Ending at {took} ms");
+
         Ok(VectorSearchResponse {
             documents,
             page_number: request.page_number,
@@ -167,7 +184,7 @@ impl ReaderChild for VectorReaderService {
         let lock = self.index.get_slock().unwrap();
         let result = self.index.get_keys(&lock)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("Ending at {v} ms")
+            debug!("Ending at {v} ms")
         }
         Ok(result)
     }
