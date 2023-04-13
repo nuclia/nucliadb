@@ -82,6 +82,7 @@ RETRIABLE_EXCEPTIONS = (
     aiohttp.client_exceptions.ClientPayloadError,
     aiohttp.client_exceptions.ClientConnectorError,
     aiohttp.client_exceptions.ClientOSError,
+    aiohttp.client_exceptions.ServerConnectionError,
     CouldNotCreateBucket,
 )
 
