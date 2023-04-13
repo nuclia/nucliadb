@@ -34,6 +34,7 @@ use crate::{tracing, NodeResult};
 pub mod request_time;
 
 pub trait Metrics: Send + Sync {
+    fn collect(&self) -> NodeResult<String>;
     fn record_request_time(
         &self,
         metric: request_time::RequestTimeKey,
@@ -53,6 +54,11 @@ impl Default for PrometheusMetrics {
 }
 
 impl Metrics for PrometheusMetrics {
+    fn collect(&self) -> NodeResult<String> {
+        let mut buf = String::new();
+        encoding::text::encode(&mut buf, &self.registry)?;
+        Ok(buf)
+    }
     fn record_request_time(
         &self,
         metric: request_time::RequestTimeKey,
@@ -76,11 +82,6 @@ impl PrometheusMetrics {
             request_time_metric,
         }
     }
-    pub fn collect_metrics(&self) -> NodeResult<String> {
-        let mut buf = String::new();
-        encoding::text::encode(&mut buf, &self.registry)?;
-        Ok(buf)
-    }
 }
 
 pub struct ConsoleLogMetrics;
@@ -90,6 +91,9 @@ impl ConsoleLogMetrics {
     }
 }
 impl Metrics for ConsoleLogMetrics {
+    fn collect(&self) -> NodeResult<String> {
+        Ok(Default::default())
+    }
     fn record_request_time(
         &self,
         metric: request_time::RequestTimeKey,
@@ -101,6 +105,9 @@ impl Metrics for ConsoleLogMetrics {
 
 pub struct NoMetrics;
 impl Metrics for NoMetrics {
+    fn collect(&self) -> NodeResult<String> {
+        Ok(Default::default())
+    }
     fn record_request_time(
         &self,
         _: request_time::RequestTimeKey,
