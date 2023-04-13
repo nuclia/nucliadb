@@ -22,9 +22,10 @@ from unittest.mock import AsyncMock, Mock
 
 import nats as natslib
 import pytest
+from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
-from nucliadb_node.pull import IndexedPublisher
+from nucliadb_node.pull import IndexedPublisher, Worker
 
 
 class NatsConnectionTest:
@@ -140,3 +141,29 @@ class TestIndexedPublisher:
         publisher.js = None
         with pytest.raises(RuntimeError):
             await publisher.indexed(index_message)
+
+
+class TestSubsciptionWorker:
+    @pytest.fixture(scope="function")
+    def worker(self):
+        writer = AsyncMock()
+        reader = AsyncMock()
+        worker = Worker(writer, reader, "node")
+        worker.set_resource = AsyncMock()
+        yield worker
+
+    def get_msg(self, seqid):
+        client = AsyncMock()
+        reply = f"foo.bar.ba.blan.ca.{seqid}.bar"
+        msg = Msg(client, "subject", reply)
+        msg.ack = AsyncMock()
+        return msg
+
+    @pytest.mark.asyncio
+    async def test_discards_old_messages(self, worker):
+        worker.last_seqid = 10
+        msg = self.get_msg(seqid=9)
+        await worker.subscription_worker(msg)
+
+        msg.ack.assert_awaited_once()
+        worker.set_resource.assert_not_awaited()
