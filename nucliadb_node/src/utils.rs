@@ -25,8 +25,9 @@ use std::time::Duration;
 use http::Uri;
 use nucliadb_core::metrics::Metrics;
 use nucliadb_core::tracing::{self, Level};
-use nucliadb_core::{context, NodeResult};
+use nucliadb_core::{context, node_error, NodeResult};
 use opentelemetry::propagation::Extractor;
+use portpicker::pick_unused_port;
 use reqwest::redirect::Policy;
 use reqwest::Client;
 use tokio::net;
@@ -106,8 +107,19 @@ impl HttpMetricsClient {
         Ok(())
     }
 
-    pub fn try_new(endpoint: String) -> NodeResult<Self> {
+    pub fn try_new() -> NodeResult<Self> {
+        let Some(port) = pick_unused_port() else {
+            return Err(node_error!("No free ports"));
+        };
+
         let metrics = context::get_metrics();
+        let address = format!("127.0.0.1:{}", port);
+        let endpoint = Uri::builder()
+            .scheme("http")
+            .authority(address)
+            .path_and_query("/metrics")
+            .build()?
+            .to_string();
         let client = Client::builder()
             .redirect(Policy::limited(3))
             .timeout(Duration::from_secs(10))

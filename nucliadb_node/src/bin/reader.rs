@@ -26,6 +26,7 @@ use nucliadb_node::env;
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
+use nucliadb_node::utils::HttpMetricsClient;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
@@ -45,18 +46,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let grpc_driver = NodeReaderGRPCDriver::from(node_reader_service);
+    let metrics_client = HttpMetricsClient::try_new()?;
 
     tokio::spawn(start_grpc_service(grpc_driver));
-
+    let metrics_task = tokio::spawn(metrics_client.run());
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
     wait_for_sigkill().await?;
-
     info!("Shutting down NucliaDB Reader Node...");
     // wait some time to handle latest gRPC calls
     tokio::time::sleep(env::shutdown_delay()).await;
-
+    metrics_task.abort();
+    let _ = metrics_task.await;
+    
     Ok(())
 }
 
