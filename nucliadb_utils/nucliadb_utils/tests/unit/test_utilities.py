@@ -136,8 +136,8 @@ async def test_stop_audit_utility():
         assert "audit" not in utilities.MAIN
 
 
-def test_get_ff():
-    ff = utilities.get_ff()
+def test_get_feature_flags():
+    ff = utilities.get_feature_flags()
     assert ff is not None
     assert isinstance(ff, featureflagging.FlagService)
 
@@ -149,7 +149,7 @@ def test_has_feature():
         utilities.X_ACCOUNT_HEADER: "account",
         utilities.X_ACCOUNT_TYPE_HEADER: "account-type",
     }
-    with patch("nucliadb_utils.utilities.get_ff", return_value=ff):
+    with patch("nucliadb_utils.utilities.get_feature_flags", return_value=ff):
         ff.enabled.return_value = True
         assert utilities.has_feature("test", default=False, headers=headers)
 

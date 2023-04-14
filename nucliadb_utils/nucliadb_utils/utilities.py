@@ -66,7 +66,7 @@ class Utility(str, Enum):
     STORAGE = "storage"
     TRAIN = "train"
     TRAIN_SERVER = "train_server"
-    FF = "ff"
+    FEATURE_FLAGS = "feature_flags"
 
 
 def get_utility(ident: Utility):
@@ -275,11 +275,11 @@ async def stop_audit_utility():
         clean_utility(Utility.AUDIT)
 
 
-def get_ff() -> featureflagging.FlagService:
-    val = get_utility(Utility.FF)
+def get_feature_flags() -> featureflagging.FlagService:
+    val = get_utility(Utility.FEATURE_FLAGS)
     if val is None:
         val = featureflagging.FlagService()
-        set_utility(Utility.FF, val)
+        set_utility(Utility.FEATURE_FLAGS, val)
     return val
 
 
@@ -307,4 +307,4 @@ def has_feature(
             ).hexdigest()
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
-    return get_ff().enabled(name, default=default, context=context)
+    return get_feature_flags().enabled(name, default=default, context=context)
