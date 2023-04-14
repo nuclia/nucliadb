@@ -123,7 +123,7 @@ pub struct BrokerMessage {
     pub account_seq: i64,
     #[prost(message, repeated, tag="35")]
     pub user_vectors: ::prost::alloc::vec::Vec<super::resources::UserVectorsWrapper>,
-    /// If true, force reindex all paragraphs in a resource
+    /// If true, reindex all text
     #[prost(bool, tag="36")]
     pub reindex: bool,
 }
