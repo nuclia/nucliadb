@@ -54,7 +54,7 @@ jobs:
           components: rustfmt
           override: true
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: rustfmt
         run: cargo +nightly fmt -p nucliadb_cluster -- --check
@@ -67,7 +67,7 @@ jobs:
 
       - run: rustup component add clippy
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: actions-rs/clippy-check@v1
         with:
@@ -82,18 +82,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - uses: actions-rs/cargo@v1
         name: cargo test
         with:
           command: test
-          args: --all-features --no-fail-fast -p nucliadb_cluster -- --test-threads=1
+          args: --all-features -p nucliadb_cluster -- --test-threads=1
 
   build-rust:
     name: Build image and push
     runs-on: ubuntu-latest
     needs: tests-rust
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
@@ -127,16 +128,13 @@ jobs:
       # PUSH workflows contine with deploy activities
 
       - name: Docker - Tag
-        if: github.event_name == 'push'
         run: |-
           docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.branch }}
 
       - name: Docker - Push sha
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }}
 
       - name: Docker - Push latest
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.branch }}
