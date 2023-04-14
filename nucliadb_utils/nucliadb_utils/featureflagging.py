@@ -31,9 +31,7 @@ class Settings(pydantic.BaseSettings):
     flag_settings_url: Optional[str]
 
 
-DEFAULT_FLAG_DATA = {
-    "nucliadb_node_sync_fs": {"rollout": 0, "variants": {"environment": ["stage"]}},
-}
+DEFAULT_FLAG_DATA = {}
 
 
 class FlagService:
