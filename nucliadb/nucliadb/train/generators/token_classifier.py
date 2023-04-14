@@ -172,15 +172,15 @@ async def get_field_text(
 
 def compute_segments(field_text: str, ners: POSITION_DICT, start: int, end: int):
     segments = []
-    for position, ner in ners.items():
-        if position[0] < start or position[1] > end:
+    for ner_position, ner in ners.items():
+        if ner_position[0] < start or ner_position[1] > end:
             continue
 
-        relative_start = position[0] - start
-        relative_end = position[1] - start
-        first_part = field_text[:relative_start]
-        ner_part = field_text[relative_start:relative_end]
-        second_part = field_text[relative_end:]
+        relative_ner_start = ner_position[0] - start
+        relative_ner_end = ner_position[1] - start
+        first_part = field_text[:relative_ner_start]
+        ner_part = field_text[relative_ner_start:relative_ner_end]
+        second_part = field_text[relative_ner_end:]
         for part in first_part.split():
             segments.append((part, "O"))
         ner_parts = ner_part.split()
@@ -191,7 +191,7 @@ def compute_segments(field_text: str, ners: POSITION_DICT, start: int, end: int)
                 first = False
             else:
                 segments.append((part, f"I-{ner[0]}"))
-        start = relative_end
+        start = relative_ner_end
         field_text = second_part
 
     for part in field_text.split():
@@ -236,7 +236,6 @@ async def generate_token_classification_payloads(
             field_type,
             cast(List[str], trainset.filter.labels),
         )
-        breakpoint()
         for split, text in split_text.items():
             ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
             paragraphs = split_paragaphs.get(split, [])
