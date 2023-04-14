@@ -43,7 +43,7 @@ async def test_run_server_forever():
 def test_metrics_app():
     server, config = run.metrics_app()
 
-    assert len([r for r in config.app.routes if r.name == "metrics"]) == 1
+    assert len([r for r in config.app.routes if r.name == "metrics_endpoint"]) == 1
     assert isinstance(server, Server)
 
     assert config.host == running_settings.metrics_host
