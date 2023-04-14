@@ -55,8 +55,14 @@ impl Default for PrometheusMetrics {
 
 impl Metrics for PrometheusMetrics {
     fn collect(&self) -> NodeResult<String> {
+        // Collecting metrics.
         let mut buf = String::new();
         encoding::text::encode(&mut buf, &self.registry)?;
+
+        // Cleaning the already collected metrics.
+        // This should be done for every metric.
+        self.request_time_metric.clear();
+
         Ok(buf)
     }
     fn record_request_time(
