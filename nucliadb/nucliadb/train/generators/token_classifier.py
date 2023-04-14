@@ -191,7 +191,7 @@ def compute_segments(field_text: str, ners: POSITION_DICT, start: int, end: int)
                 first = False
             else:
                 segments.append((part, f"I-{ner[0]}"))
-        start = relative_ner_end
+        start += relative_ner_end
         field_text = second_part
 
     for part in field_text.split():
