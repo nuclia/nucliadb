@@ -17,14 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import tempfile
 from unittest import mock
 from unittest.mock import AsyncMock, Mock
 
 import nats as natslib
 import pytest
+from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
-from nucliadb_node.pull import IndexedPublisher
+from nucliadb_node.pull import IndexedPublisher, Worker
+from nucliadb_node.settings import settings
 
 
 class NatsConnectionTest:
@@ -140,3 +143,38 @@ class TestIndexedPublisher:
         publisher.js = None
         with pytest.raises(RuntimeError):
             await publisher.indexed(index_message)
+
+
+class TestSubsciptionWorker:
+    @pytest.fixture(scope="function")
+    def settings(self):
+        previous = settings.data_path
+        with tempfile.TemporaryDirectory() as td:
+            settings.data_path = str(td)
+            yield
+        settings.data_path = previous
+
+    @pytest.fixture(scope="function")
+    def worker(self, settings):
+        writer = AsyncMock()
+        reader = AsyncMock()
+        worker = Worker(writer, reader, "node")
+        worker.store_seqid = Mock()
+        yield worker
+
+    def get_msg(self, seqid):
+        client = AsyncMock()
+        reply = f"foo.bar.ba.blan.ca.{seqid}.bar"
+        msg = Msg(client, "subject", reply)
+        msg.ack = AsyncMock()
+        return msg
+
+    @pytest.mark.asyncio
+    async def test_discards_old_messages(self, worker):
+        worker.last_seqid = 10
+        msg = self.get_msg(seqid=9)
+        await worker.subscription_worker(msg)
+
+        # The message is acked and ignored
+        msg.ack.assert_awaited_once()
+        worker.store_seqid.assert_not_called()

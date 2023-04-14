@@ -97,6 +97,7 @@ class Worker:
             auth=indexing_settings.index_jetstream_auth,
             servers=indexing_settings.index_jetstream_servers,
         )
+        self.load_seqid()
 
     async def finalize(self):
         if self.gc_task:
@@ -199,15 +200,17 @@ class Worker:
             raise Exception("We need a DATA_PATH env")
         with open(f"{settings.data_path}/seqid", "w+") as seqfile:
             seqfile.write(str(seqid))
+        self.last_seqid = seqid
 
-    def load_seqid(self) -> Optional[int]:
+    def load_seqid(self):
         if settings.data_path is None:
             raise Exception("We need a DATA_PATH env")
         try:
             with open(f"{settings.data_path}/seqid", "r") as seqfile:
-                return int(seqfile.read())
+                self.last_seqid = int(seqfile.read())
         except FileNotFoundError:
-            return None
+            # First time the consumer is started
+            self.last_seqid = None
 
     async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain: Resource = await self.storage.get_indexing(pb)
@@ -245,8 +248,14 @@ class Worker:
         logger.info(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
-        self.event.clear()
+        if self.last_seqid and self.last_seqid >= seqid:
+            logger.warning(
+                f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
+            )
+            await msg.ack()
+            return
 
+        self.event.clear()
         status: Optional[OpStatus] = None
         async with self.lock:
             try:
@@ -295,11 +304,7 @@ class Worker:
             raise e
 
     async def subscribe(self):
-        last_seqid = self.load_seqid()
-        logger.info(f"Last seqid {last_seqid}")
-        if last_seqid is None:
-            last_seqid = 1
-
+        logger.info(f"Last seqid {self.last_seqid}")
         try:
             await self.js.stream_info(indexing_settings.index_jetstream_stream)
         except StreamNotFoundError:
@@ -318,7 +323,7 @@ class Worker:
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
-                opt_start_seq=last_seqid,
+                opt_start_seq=self.last_seqid or 1,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_deliver=10000,
                 max_ack_pending=1,
