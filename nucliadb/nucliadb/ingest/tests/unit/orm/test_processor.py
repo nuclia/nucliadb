@@ -25,9 +25,14 @@ from nucliadb.ingest.orm.processor import Processor
 
 
 @pytest.fixture()
-def driver():
+def txn():
+    yield AsyncMock()
+
+
+@pytest.fixture()
+def driver(txn):
     mock = MagicMock()
-    mock.begin = AsyncMock()
+    mock.transaction.return_value.__aenter__.return_value = txn
     yield mock
 
 
@@ -46,13 +51,12 @@ def resource():
     yield MagicMock()
 
 
-async def test_mark_resource_error(processor: Processor, driver, shard, resource):
+async def test_mark_resource_error(processor: Processor, txn, shard, resource):
     with patch("nucliadb.ingest.orm.processor.set_basic") as set_basic:
         await processor._mark_resource_error(
             resource, partition="partition", seqid=1, shard=shard, kbid="kbid"
         )
 
-    txn = driver.begin.return_value
     txn.commit.assert_called_once()
     set_basic.assert_called_once_with(
         txn, resource.kb.kbid, resource.uuid, resource.basic
@@ -64,7 +68,7 @@ async def test_mark_resource_error(processor: Processor, driver, shard, resource
 
 
 async def test_mark_resource_error_handle_error(
-    processor: Processor, shard, resource, driver
+    processor: Processor, shard, resource, txn
 ):
     with patch("nucliadb.ingest.orm.processor.set_basic") as set_basic:
         set_basic.side_effect = Exception("test")
@@ -72,9 +76,7 @@ async def test_mark_resource_error_handle_error(
             resource, partition="partition", seqid=1, shard=shard, kbid="kbid"
         )
 
-    txn = driver.begin.return_value
     txn.commit.assert_not_called()
-    txn.abort.assert_called_once()
 
 
 async def test_mark_resource_error_skip_no_shard(
@@ -84,7 +86,7 @@ async def test_mark_resource_error_skip_no_shard(
         resource, partition="partition", seqid=1, shard=None, kbid="kbid"
     )
 
-    driver.begin.assert_not_called()
+    driver.transaction.assert_not_called()
 
 
 async def test_mark_resource_error_skip_no_resource(
@@ -94,4 +96,4 @@ async def test_mark_resource_error_skip_no_resource(
         None, partition="partition", seqid=1, shard=shard, kbid="kbid"
     )
 
-    driver.begin.assert_not_called()
+    driver.transaction.assert_not_called()

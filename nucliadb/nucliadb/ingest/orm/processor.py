@@ -491,19 +491,16 @@ class Processor:
             return
         txn = None
         try:
-            resource.txn = txn = await self.driver.begin()
-            resource.basic.metadata.status = PBMetadata.Status.ERROR
-            await set_basic(txn, resource.kb.kbid, resource.uuid, resource.basic)
-            await txn.commit(resource=False)
+            async with self.driver.transaction() as txn:
+                resource.basic.metadata.status = PBMetadata.Status.ERROR
+                await set_basic(txn, resource.kb.kbid, resource.uuid, resource.basic)
+                await txn.commit(resource=False)
 
             await shard.add_resource(
                 resource.indexer.brain, seqid, partition=partition, kb=kbid
             )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
-        finally:
-            if txn is not None and txn.open:
-                await txn.abort()
 
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         return await self.txn([message], seqid, partition)
