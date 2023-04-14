@@ -210,7 +210,7 @@ class Worker:
                 self.last_seqid = int(seqfile.read())
         except FileNotFoundError:
             # First time the consumer is started
-            self.last_seqid = 1
+            self.last_seqid = None
 
     async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain: Resource = await self.storage.get_indexing(pb)
@@ -248,7 +248,7 @@ class Worker:
         logger.info(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
-        if self.last_seqid <= seqid:
+        if self.last_seqid and self.last_seqid >= seqid:
             logger.warning(
                 f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
             )
@@ -305,7 +305,6 @@ class Worker:
 
     async def subscribe(self):
         logger.info(f"Last seqid {self.last_seqid}")
-
         try:
             await self.js.stream_info(indexing_settings.index_jetstream_stream)
         except StreamNotFoundError:
@@ -324,7 +323,7 @@ class Worker:
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
-                opt_start_seq=self.last_seqid,
+                opt_start_seq=self.last_seqid or 1,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_deliver=10000,
                 max_ack_pending=1,

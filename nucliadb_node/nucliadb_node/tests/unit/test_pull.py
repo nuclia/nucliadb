@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import tempfile
 from unittest import mock
 from unittest.mock import AsyncMock, Mock
 
@@ -26,6 +27,7 @@ from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
 from nucliadb_node.pull import IndexedPublisher, Worker
+from nucliadb_node.settings import settings
 
 
 class NatsConnectionTest:
@@ -145,11 +147,19 @@ class TestIndexedPublisher:
 
 class TestSubsciptionWorker:
     @pytest.fixture(scope="function")
-    def worker(self):
+    def settings(self):
+        previous = settings.data_path
+        with tempfile.TemporaryDirectory() as td:
+            settings.data_path = str(td)
+            yield
+        settings.data_path = previous
+
+    @pytest.fixture(scope="function")
+    def worker(self, settings):
         writer = AsyncMock()
         reader = AsyncMock()
         worker = Worker(writer, reader, "node")
-        worker.set_resource = AsyncMock()
+        worker.store_seqid = Mock()
         yield worker
 
     def get_msg(self, seqid):
@@ -167,4 +177,4 @@ class TestSubsciptionWorker:
 
         # The message is acked and ignored
         msg.ack.assert_awaited_once()
-        worker.set_resource.assert_not_awaited()
+        worker.store_seqid.assert_not_called()
