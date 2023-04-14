@@ -18,38 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import time
-from typing import Callable, Iterable, List, Optional, Tuple
-from urllib.parse import urlparse
+from typing import Optional, Tuple
 
-import prometheus_client  # type: ignore
-from fastapi import FastAPI
-from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware  # type: ignore
-from opentelemetry.instrumentation.fastapi import _get_route_details  # type: ignore
-from opentelemetry.trace import Span  # type: ignore
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import Response
 from starlette.routing import Match, Mount, Route
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 from starlette.types import ASGIApp, Scope
-
-try:
-    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-except ImportError:  # pragma: no cover
-    SentryAsgiMiddleware = None  # type: ignore
-
-
-async def metrics_endpoint(request):
-    output = prometheus_client.exposition.generate_latest()
-    return PlainTextResponse(
-        output.decode("utf8"), headers={"Content-Type": CONTENT_TYPE_LATEST}
-    )
-
-
-application_metrics = FastAPI(title="Metrics")  # type: ignore
-application_metrics.add_route("/metrics", metrics_endpoint)
-
 
 try:
     from starlette_prometheus.middleware import (
@@ -161,47 +138,3 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
     def _is_path_filtered(self, is_handled_path: bool) -> bool:
         return self.filter_unhandled_paths and not is_handled_path
-
-
-class ExcludeList:
-
-    """Class to exclude certain paths (given as a list of regexes) from tracing requests"""
-
-    def __init__(self, excluded_urls: Iterable[str]):
-        self._excluded_urls = excluded_urls
-
-    def url_disabled(self, url: str) -> bool:
-        return bool(self._excluded_urls and urlparse(url).path in self._excluded_urls)
-
-
-_ServerRequestHookT = Optional[Callable[[Span, dict], None]]
-_ClientRequestHookT = Optional[Callable[[Span, dict], None]]
-_ClientResponseHookT = Optional[Callable[[Span, dict], None]]
-
-
-def instrument_app(
-    app: FastAPI,
-    excluded_urls: List[str],
-    server_request_hook: _ServerRequestHookT = None,
-    client_request_hook: _ClientRequestHookT = None,
-    client_response_hook: _ClientResponseHookT = None,
-    tracer_provider=None,
-    metrics=False,
-):
-    if metrics:
-        # b/w compat
-        app.add_middleware(PrometheusMiddleware)
-    if SentryAsgiMiddleware is not None:
-        app.add_middleware(SentryAsgiMiddleware)
-
-    excluded_urls_obj = ExcludeList(excluded_urls)
-
-    app.add_middleware(
-        OpenTelemetryMiddleware,
-        excluded_urls=excluded_urls_obj,
-        default_span_details=_get_route_details,
-        server_request_hook=server_request_hook,
-        client_request_hook=client_request_hook,
-        client_response_hook=client_response_hook,
-        tracer_provider=tracer_provider,
-    )
