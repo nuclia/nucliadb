@@ -217,7 +217,6 @@ async def generate_token_classification_payloads(
     node: Node,
     shard_replica_id: str,
 ) -> AsyncIterator[TokenClassificationBatch]:
-    # Query how many paragraphs has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     for entitygroup in trainset.filter.labels:
@@ -237,7 +236,7 @@ async def generate_token_classification_payloads(
             field_type,
             cast(List[str], trainset.filter.labels),
         )
-
+        breakpoint()
         for split, text in split_text.items():
             ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
             paragraphs = split_paragaphs.get(split, [])
