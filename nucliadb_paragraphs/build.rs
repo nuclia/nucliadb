@@ -40,16 +40,23 @@ fn main() -> io::Result<()> {
         .flatten_ok::<Vec<String>, io::Error>()
         .collect::<Result<Vec<_>, _>>()?;
 
-    fs::write(
-        Path::new("./src/stop_words.rs"),
-        format!(
-            "pub fn is_stop_word(x:&str) -> bool {{\n {} \n}}",
-            stop_words
-                .into_iter()
-                .map(|word| format!(r#"x == "{word}""#))
-                .join("\n|| ")
-        ),
-    )?;
+    let mut contents = String::new();
+    contents.push_str("pub fn is_stop_word(x: &str) -> bool {\n");
+    contents.push_str(&format!(
+        r#"    x == "{}""#,
+        stop_words
+            .first()
+            .expect("Empty stop words file not allowed")
+    ));
+    contents.extend(
+        stop_words
+            .into_iter()
+            .skip(1)
+            .map(|word| format!("\n        || x == \"{word}\"")),
+    );
+    contents.push_str("\n}\n");
+
+    fs::write(Path::new("./src/stop_words.rs"), contents)?;
 
     Ok(())
 }

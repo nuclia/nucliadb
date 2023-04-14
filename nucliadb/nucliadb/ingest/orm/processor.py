@@ -35,6 +35,7 @@ from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
+    KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
     SequenceOrderViolation,
 )
@@ -643,6 +644,8 @@ class Processor:
                     raise Exception("Failed to create KB")
                 await txn.commit(resource=False)
                 return uuid
+            except KnowledgeBoxConflict:
+                raise
             except Exception as e:
                 errors.capture_exception(e)
                 raise e
