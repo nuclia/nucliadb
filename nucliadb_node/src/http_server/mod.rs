@@ -17,31 +17,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
+mod metrics_service;
 
-/// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
+use std::net::SocketAddr;
 
-pub mod node_metadata;
+use axum::routing::get;
+use axum::Router;
 
-pub mod services;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
-pub mod utils;
-
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// Node's http service
-pub mod http_server;
+pub async fn run_http_server(addr: SocketAddr) {
+    // Add routes to services
+    let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
+    axum_server::bind(addr)
+        // Services will be added here
+        .serve(metrics.into_make_service())
+        .await
+        .expect("Error starting the http server");
+}

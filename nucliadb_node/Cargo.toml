@@ -24,6 +24,9 @@ name = "node_writer"
 path = "src/bin/writer.rs"
 
 [dependencies]
+axum = "0.6.15"
+axum-server = "0.4.7"
+
 tonic = "0.7"
 tonic-health = "0.6"
 async-std = "1.10.0"
