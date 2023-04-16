@@ -1,3 +1,4 @@
+-e ./nucliadb_client
 pytest-docker-fixtures
 types-python-dateutil
 docker

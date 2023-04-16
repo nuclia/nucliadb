@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 import os
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,18 +28,27 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Tuple,
     Union,
 )
 
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.labels import Label as NDBLabel
-from nucliadb_models.resource import Resource
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
+    ChatOptions,
+    ChatRequest,
     FindRequest,
+    KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
+    Message,
+    Relations,
+    ResourceProperties,
     SearchOptions,
     SearchRequest,
 )
+from nucliadb_models.text import TextFormat
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.entities import Entities
@@ -148,6 +159,7 @@ class KnowledgeBox:
         key: Optional[str] = None,
         binary: Optional[File] = None,
         text: Optional[str] = None,
+        format: Optional[TextFormat] = None,
         labels: Optional[Labels] = None,
         entities: Optional[Entities] = None,
         vectors: Optional[Vectors] = None,
@@ -170,6 +182,7 @@ class KnowledgeBox:
             create_payload = create_resource(
                 key=key,
                 text=text,
+                format=format,
                 binary=binary,
                 labels=labels,
                 entities=entities,
@@ -184,6 +197,7 @@ class KnowledgeBox:
 
             update_payload = update_resource(
                 text=text,
+                format=format,
                 binary=binary,
                 labels=labels,
                 entities=entities,
@@ -200,6 +214,7 @@ class KnowledgeBox:
         key: Optional[str] = None,
         binary: Optional[Union[File, str]] = None,
         text: Optional[str] = None,
+        format: Optional[TextFormat] = None,
         labels: Optional[Labels] = None,
         entities: Optional[Entities] = None,
         vectors: Optional[
@@ -224,6 +239,7 @@ class KnowledgeBox:
             create_payload = create_resource(
                 key=key,
                 text=text,
+                format=format,
                 binary=binary,
                 labels=labels,
                 entities=entities,
@@ -237,6 +253,7 @@ class KnowledgeBox:
             assert resource is not None
             update_payload = update_resource(
                 text=text,
+                format=format,
                 binary=binary,
                 labels=labels,
                 entities=entities,
@@ -312,19 +329,6 @@ class KnowledgeBox:
         )
         assert resp.status_code == 200
 
-    def find(
-        self,
-        text: Optional[str] = None,
-        filter: Optional[List[Union[Label, str]]] = None,
-        vector: Optional[Union[ndarray, List[float]]] = None,
-        vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.0,
-    ):
-        result = self.client.find(
-            self.build_find_request(text, filter, vector, vectorset, min_score)
-        )
-        return FindResult(result, self.client)
-
     def search(
         self,
         text: Optional[str] = None,
@@ -351,6 +355,19 @@ class KnowledgeBox:
         )
         return SearchResult(result, self.client)
 
+    def find(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ):
+        result = self.client.find(
+            self.build_find_request(text, filter, vector, vectorset, min_score)
+        )
+        return FindResult(result, self.client)
+
     async def async_find(
         self,
         text: Optional[str] = None,
@@ -364,18 +381,74 @@ class KnowledgeBox:
         )
         return FindResult(result, self.client)
 
-    async def async_chat(
+    def chat(
         self,
-        text: Optional[str] = None,
+        text: str,
+        context: Optional[List[Message]] = None,
         filter: Optional[List[Union[Label, str]]] = None,
-        vector: Optional[Union[ndarray, List[float]]] = None,
-        vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.0,
-    ):
-        result = await self.client.async_search(
-            self.build_search_request(text, filter, vector, vectorset, min_score)
-        )
-        return SearchResult(result, self.client)
+    ) -> Tuple[KnowledgeboxFindResults, str, Optional[Relations]]:
+        response = self.client.chat(self.build_chat_request(text, filter))
+        header = response.raw.read(4, decode_content=True)
+        payload_size = int.from_bytes(header, byteorder="big", signed=False)
+        data = response.raw.read(payload_size)
+        find_result = KnowledgeboxFindResults.parse_raw(base64.b64decode(data))
+        data = response.raw.read(decode_content=True)
+        answer, relations_payload = data.split(b"_END_")
+
+        relations_result = None
+        if len(relations_payload) > 0:
+            relations_result = Relations.parse_raw(base64.b64decode(relations_payload))
+
+        return find_result, answer, relations_result
+
+    def build_chat_request(
+        self,
+        text: str,
+        filter: Optional[List[Union[Label, str]]] = None,
+        min_score: Optional[float] = 0.70,
+        show: List[ResourceProperties] = [ResourceProperties.BASIC],
+        field_type_filter: List[FieldTypeName] = list(FieldTypeName),
+        extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName),
+        context: Optional[List[Message]] = None,
+        fields: List[str] = [],
+        range_creation_start: Optional[datetime] = None,
+        range_creation_end: Optional[datetime] = None,
+        range_modification_start: Optional[datetime] = None,
+        range_modification_end: Optional[datetime] = None,
+    ) -> ChatRequest:
+        args: Dict[str, Any] = {
+            "features": [ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS]
+        }
+        args["query"] = text
+
+        if filter is not None:
+            new_filter: List[Label] = []
+            for fil in filter:
+                if isinstance(fil, str):
+                    if len(fil.split("/")) == 1:
+                        lset = DEFAULT_LABELSET
+                        lab = fil
+                    else:
+                        lset, lab = fil.split("/")
+                    new_filter.append(Label(label=lab, labelset=lset))
+                else:
+                    new_filter.append(fil)
+            filter_list = [f"/l/{label.labelset}/{label.label}" for label in new_filter]
+            args["filters"] = filter_list
+
+        args["min_score"] = min_score
+        args["fields"] = fields
+        args["context"] = context
+        args["extracted"] = extracted
+        args["field_type_filter"] = field_type_filter
+        args["show"] = show
+        args["range_creation_start"] = range_creation_start
+        args["range_creation_end"] = range_creation_end
+        args["range_modification_start"] = range_modification_start
+        args["range_modification_end"] = range_modification_end
+
+        request = ChatRequest(**args)
+        return request
 
     def build_find_request(
         self,
@@ -384,7 +457,7 @@ class KnowledgeBox:
         vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
-    ) -> SearchRequest:
+    ) -> FindRequest:
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
             new_filter: List[Label] = []

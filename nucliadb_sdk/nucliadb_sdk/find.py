@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Dict, Iterator
 
 from nucliadb_models.search import (
     FindField,
@@ -46,15 +46,19 @@ class FindResult:
         self.client = client
 
     def __iter__(self) -> Iterator[Paragraph]:
-        for rid, resource in self.inner_find_results.resources.items():
+        for rid, resource in self.resources.items():
             for field_id, field in resource.fields.items():
                 for paragraph_id, paragraph in field.paragraphs.items():
                     yield Paragraph(paragraph=paragraph, field=field, resource=resource)
+
+    @property
+    def total(self) -> int:
+        return self.inner_find_results.total
 
     @property
     def relations(self):
         return self.inner_find_results.relations
 
     @property
-    def resources(self):
+    def resources(self) -> Dict[str, FindResource]:
         return self.inner_find_results.resources
