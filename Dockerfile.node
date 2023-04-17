@@ -27,7 +27,7 @@ FROM eu.gcr.io/stashify-218417/basenode:latest as builder
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
-ENV RUSTFLAGS=--cfg=prometheus_metrics
+ENV RUSTFLAGS="--cfg prometheus_metrics"
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
@@ -69,7 +69,6 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
 
 FROM debian:bullseye-slim AS nucliadb
 
-ENV RUSTFLAGS="--cfg prometheus_metrics"
 ENV VECTORS_DIMENSION=768
 ENV VECTORS_DISTANCE=cosine
 ENV DATA_PATH=data
