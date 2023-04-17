@@ -47,6 +47,7 @@ DUMMY_RELATION_NODE = [
 ]
 
 DUMMY_REPHRASE_QUERY = "This is a rephrased query"
+DUMMY_LEARNING_ID = "00"
 
 
 PUBLIC_PREDICT = "/api/v1/predict"
@@ -195,7 +196,7 @@ class PredictEngine:
                 for i in [b"valid ", b"answer ", b" to"]:
                     yield i
 
-            return ("00", generate())
+            return (DUMMY_LEARNING_ID, generate())
 
         if self.onprem is False:
             # Upload the payload
