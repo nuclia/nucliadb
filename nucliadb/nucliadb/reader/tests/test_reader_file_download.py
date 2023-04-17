@@ -93,11 +93,11 @@ async def test_resource_download_field_file(
         assert resp.json()["detail"]["reason"] == "rangeNotSupported"
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field?inline=true",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
             headers={"range": "bytes=0-"},
         )
         assert resp.status_code == 206
-        assert resp.headers["Content-Disposition"] == "inline"
+        assert resp.headers["Content-Disposition"]
 
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 
@@ -242,3 +242,23 @@ def test_parse_media_range(range_request, filesize, start, end, range_size, exce
     else:
         with pytest.raises(exception):
             parse_media_range(range_request, filesize)
+
+
+@pytest.mark.asyncio
+async def test_resource_download_field_file_content_disposition(
+    reader_api: Callable[..., AsyncClient], test_resource: Resource
+) -> None:
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rid = rsc.uuid
+    field_id = "file1"
+    download_url = f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        # Defaults to attachment
+        resp = await client.get(download_url)
+        assert resp.status_code == 200
+        assert resp.headers["Content-Disposition"].startswith("attachment; filename=")
+
+        resp = await client.get(f"{download_url}?inline=true")
+        assert resp.status_code == 200
+        assert resp.headers["Content-Disposition"] == "inline"
