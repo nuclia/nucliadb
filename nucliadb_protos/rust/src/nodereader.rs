@@ -513,14 +513,14 @@ pub struct StreamRequest {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExactMatchCountRequest {
+pub struct TextCountRequest {
     #[prost(string, tag="1")]
     pub shard: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub body: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExactMatchCountResponse {
+pub struct TextCountResponse {
     #[prost(uint64, tag="1")]
     pub count: u64,
 }

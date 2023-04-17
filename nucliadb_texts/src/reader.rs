@@ -26,15 +26,15 @@ use itertools::Itertools;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
-    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse,
-    ExactMatchCountRequest, ExactMatchCountResponse, FacetResult, FacetResults, OrderBy,
-    ResourceId, ResultScore, StreamRequest,
+    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
+    FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest, TextCountRequest,
+    TextCountResponse,
 };
 use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{
     Collector, Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
-use tantivy::query::{AllQuery, PhraseQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
@@ -106,33 +106,25 @@ impl FieldReader for TextReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let id: Option<String> = None;
-        let time = SystemTime::now();
-        let searcher = self.reader.searcher();
-        let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
-        }
-        Ok(count)
+        self.count_matches(&Default::default())
+            .map(|r| r.count as usize)
     }
-    fn exact_match_count(
-        &self,
-        request: &ExactMatchCountRequest,
-    ) -> NodeResult<ExactMatchCountResponse> {
+    fn count_matches(&self, request: &TextCountRequest) -> NodeResult<TextCountResponse> {
         let id: Option<String> = None;
         let time = SystemTime::now();
-        let terms = request
-            .body
-            .split_whitespace()
-            .map(|i| Term::from_field_text(self.schema.text, i))
-            .collect::<Vec<_>>();
-        let query = PhraseQuery::new(terms);
+        let query = request.body.trim();
+        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let searcher = self.reader.searcher();
-        let count = searcher.search(&query, &Count).map_or(0, |i| i as u64);
+        let count = if query.is_empty() {
+            searcher.search(&AllQuery, &Count).map_or(0, |i| i as u64)
+        } else {
+            let query = parser.parse_query(query)?;
+            searcher.search(&query, &Count).map_or(0, |i| i as u64)
+        };
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
+            info!("{id:?} -Ending at {v} ms");
         }
-        Ok(ExactMatchCountResponse { count })
+        Ok(TextCountResponse { count })
     }
 }
 
@@ -671,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_exact_match_count() -> NodeResult<()> {
+    fn test_query_count() -> NodeResult<()> {
         let dir = TempDir::new().unwrap();
         let fsc = TextConfig {
             path: dir.path().join("texts"),
@@ -682,25 +674,25 @@ mod tests {
         let _ = field_writer_service.set_resource(&resource1);
         let field_reader_service = TextReaderService::start(&fsc).unwrap();
 
-        let request = ExactMatchCountRequest {
+        let request = TextCountRequest {
             shard: "shard1".to_string(),
-            body: "this is the".into(),
+            body: "\"this is the\"".into(),
         };
-        let result = field_reader_service.exact_match_count(&request)?;
+        let result = field_reader_service.count_matches(&request)?;
         assert_eq!(result.count, 2);
 
-        let request = ExactMatchCountRequest {
+        let request = TextCountRequest {
             shard: "shard1".to_string(),
-            body: "wanted make".into(),
+            body: "\"wanted make\"".into(),
         };
-        let result = field_reader_service.exact_match_count(&request)?;
+        let result = field_reader_service.count_matches(&request)?;
         assert_eq!(result.count, 0);
 
-        let request = ExactMatchCountRequest {
+        let request = TextCountRequest {
             shard: "shard1".to_string(),
-            body: "wanted to make".into(),
+            body: "\"wanted to make\"".into(),
         };
-        let result = field_reader_service.exact_match_count(&request)?;
+        let result = field_reader_service.count_matches(&request)?;
         assert_eq!(result.count, 1);
 
         Ok(())

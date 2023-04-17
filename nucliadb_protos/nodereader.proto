@@ -401,12 +401,12 @@ message StreamRequest {
     noderesources.ShardId shard_id = 3;
 }
 
-message ExactMatchCountRequest {
+message TextCountRequest {
     string shard = 1;
     string body = 2;
 }
 
-message ExactMatchCountResponse {
+message TextCountResponse  {
     uint64 count = 1;
 }
 

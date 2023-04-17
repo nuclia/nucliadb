@@ -48,11 +48,8 @@ pub trait FieldReader:
     ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
 {
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
+    fn count_matches(&self, request: &TextCountRequest) -> NodeResult<TextCountResponse>;
     fn count(&self) -> NodeResult<usize>;
-    fn exact_match_count(
-        &self,
-        request: &ExactMatchCountRequest,
-    ) -> NodeResult<ExactMatchCountResponse>;
 }
 
 pub trait FieldWriter: WriterChild {}

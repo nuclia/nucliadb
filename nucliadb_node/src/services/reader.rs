@@ -28,8 +28,8 @@ use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
-    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
-    VectorSearchResponse,
+    StreamRequest, SuggestRequest, SuggestResponse, TextCountRequest, TextCountResponse, TypeList,
+    VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
@@ -541,6 +541,14 @@ impl ShardReaderService {
         run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {
             self.relation_reader.search(&search_request)
         })
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn exact_match_count(
+        &self,
+        request: ExactMatchCountRequest,
+    ) -> NodeResult<ExactMatchCountResponse> {
+        self.text_reader.exact_match_count(&request)
     }
 
     #[tracing::instrument(skip_all)]
