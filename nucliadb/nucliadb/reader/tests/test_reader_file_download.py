@@ -252,7 +252,9 @@ async def test_resource_download_field_file_content_disposition(
     kbid = rsc.kb.kbid
     rid = rsc.uuid
     field_id = "file1"
-    download_url = f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
+    download_url = (
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
+    )
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         # Defaults to attachment
         resp = await client.get(download_url)
