@@ -107,7 +107,7 @@ def get_dm() -> FileDataMangaer:  # type: ignore
     global FDM
     if FDM is None:
         if writer_settings.dm_enabled:
-            FDM: FileDataMangaer = RedisFileDataManager(
+            FDM = RedisFileDataManager(
                 f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
             )
         else:
