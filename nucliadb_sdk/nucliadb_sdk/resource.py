@@ -28,7 +28,7 @@ from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import Origin, TokenSplit, UserFieldMetadata, UserMetadata
 from nucliadb_models.resource import Resource
-from nucliadb_models.text import TextField
+from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.vectors import UserVector, UserVectorWrapper, VectorSet, VectorSets
 from nucliadb_models.writer import (
@@ -52,6 +52,7 @@ logger = logging.getLogger("nucliadb_sdk")
 def create_resource(
     key: Optional[str] = None,
     text: Optional[str] = None,
+    format: Optional[TextFormat] = None,
     binary: Optional[Union[File, str]] = None,
     labels: Optional[Labels] = None,
     entities: Optional[Entities] = None,
@@ -70,7 +71,11 @@ def create_resource(
         create_payload.icon = GENERIC_MIME_TYPE
     main_field = None
     if text is not None:
-        create_payload.texts[FieldIdString("text")] = TextField(body=text)
+        if format is None:
+            format = TextFormat.PLAIN
+        create_payload.texts[FieldIdString("text")] = TextField(
+            body=text, format=format
+        )
         main_field = FieldID(field_type=FieldID.FieldType.TEXT, field="text")
     if binary is not None:
         if isinstance(binary, str):
@@ -176,6 +181,7 @@ def create_resource(
 def update_resource(
     resource: Resource,
     text: Optional[str] = None,
+    format: Optional[TextFormat] = None,
     binary: Optional[Union[File, str]] = None,
     labels: Optional[Labels] = None,
     entities: Optional[Entities] = None,
@@ -186,7 +192,11 @@ def update_resource(
 
     main_field = None
     if text is not None:
-        upload_payload.texts[FieldIdString("text")] = TextField(body=text)
+        if format is None:
+            format = TextFormat.PLAIN
+        upload_payload.texts[FieldIdString("text")] = TextField(
+            body=text, format=format
+        )
         main_field = FieldID(field_type=FieldID.FieldType.TEXT, field="text")
     if binary is not None:
         if isinstance(binary, str):

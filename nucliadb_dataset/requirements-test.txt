@@ -1,3 +1,4 @@
+-e ./nucliadb_client
 types-urllib3
 types-requests
 requests_mock

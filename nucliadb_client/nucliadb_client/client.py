@@ -244,8 +244,8 @@ class NucliaDBClient:
         self.writer_stub_async = WriterStub(channel)
         self.writer_channel_async = channel
 
-    def finish_async_grpc(self):
+    async def finish_async_grpc(self):
         if self.writer_stub_async is None:
             logger.warning("Writer does not exist")
         self.writer_stub_async = None
-        self.writer_channel_async.close()
+        await self.writer_channel_async.close()
