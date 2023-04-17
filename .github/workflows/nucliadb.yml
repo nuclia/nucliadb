@@ -185,7 +185,7 @@ jobs:
           push: true
           tags: nuclia/nucliadb:latest
           cache-from: type=registry,ref=nuclia/nucliadb:buildcache
-          cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
+          # cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
 
       - name: Get release version
         id: version_step
@@ -202,7 +202,7 @@ jobs:
           push: true
           tags: nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
           cache-from: type=registry,ref=nuclia/nucliadb:buildcache
-          cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
+          # cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
 
   push-dev:
     name: Build dev image and push
