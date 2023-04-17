@@ -93,11 +93,11 @@ async def test_resource_download_field_file(
         assert resp.json()["detail"]["reason"] == "rangeNotSupported"
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field?inline=true",
             headers={"range": "bytes=0-"},
         )
         assert resp.status_code == 206
-        assert resp.headers["Content-Disposition"]
+        assert resp.headers["Content-Disposition"] == "inline"
 
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 

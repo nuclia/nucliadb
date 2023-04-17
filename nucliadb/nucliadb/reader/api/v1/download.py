@@ -100,6 +100,7 @@ async def download_field_file(
     field_id: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
+    inline: bool = False,
 ) -> Response:
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
@@ -107,7 +108,7 @@ async def download_field_file(
 
     sf = storage.file_field(kbid, rid, field_id)
 
-    return await download_api(sf, request.headers)
+    return await download_api(sf, request.headers, inline=inline)
 
 
 @api.get(
@@ -173,7 +174,7 @@ async def download_field_conversation(
     return await download_api(sf, request.headers)
 
 
-async def download_api(sf: StorageField, headers: Headers):
+async def download_api(sf: StorageField, headers: Headers, inline: bool = False):
     metadata = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")
@@ -183,10 +184,11 @@ async def download_api(sf: StorageField, headers: Headers):
     filename = metadata.get("FILENAME", "file")
     status_code = 200
 
+    content_disposition = "inline" if inline else f'attachment; filename="{filename}"'
     extra_headers = {
         "Accept-Ranges": "bytes",
         "Content-Type": content_type,
-        "Content-Disposition": '{}; filename="{}"'.format("attachment", filename),
+        "Content-Disposition": content_disposition,
     }
     download_headers = {}
     if "range" in headers and file_size > -1:
