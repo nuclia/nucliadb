@@ -27,9 +27,9 @@ use axum::Router;
 
 use crate::env::metrics_http_port;
 
-pub async fn run_http_metrics_server() {
+pub async fn run_http_metrics_server(default_port: u16) {
     // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port()));
+    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(default_port)));
     let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
     axum_server::bind(addr)
         // Services will be added here

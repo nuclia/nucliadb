@@ -21,11 +21,11 @@ spec:
   - targetPort: {{ .Values.serving.metricsPort }}
     interval: 10s
     path: /metrics
-  # writer
+  # reader
   - targetPort: 3031
     interval: 10s
     path: /metrics
-  # reader
+  # writer
   - targetPort: 3032
     interval: 10s
     path: /metrics

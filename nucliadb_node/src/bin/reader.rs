@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let grpc_driver = NodeReaderGRPCDriver::from(node_reader_service);
     let _grpc_task = tokio::spawn(start_grpc_service(grpc_driver));
-    let metrics_task = tokio::spawn(run_http_metrics_server());
+    let metrics_task = tokio::spawn(run_http_metrics_server(3031));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");

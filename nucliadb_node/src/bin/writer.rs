@@ -106,7 +106,7 @@ async fn main() -> NodeResult<()> {
     ));
     let update_task = tokio::spawn(update_node_state(update_handle, update_receiver));
     let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
-    let metrics_task = tokio::spawn(run_http_metrics_server());
+    let metrics_task = tokio::spawn(run_http_metrics_server(3032));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
