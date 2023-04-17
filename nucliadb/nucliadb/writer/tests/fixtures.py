@@ -74,8 +74,8 @@ async def writer_api(
     processing = get_processing()
     processing.calls = []
 
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
+    await driver.close(close_connection_pool=True)
 
 
 @pytest.fixture(scope="function")

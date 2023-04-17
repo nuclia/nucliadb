@@ -23,7 +23,7 @@ import asyncio
 import hashlib
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -69,15 +69,15 @@ class Utility(str, Enum):
     FEATURE_FLAGS = "feature_flags"
 
 
-def get_utility(ident: Utility):
+def get_utility(ident: Union[Utility, str]):
     return MAIN.get(ident)
 
 
-def set_utility(ident: Utility, util: Any):
+def set_utility(ident: Union[Utility, str], util: Any):
     MAIN[ident] = util
 
 
-def clean_utility(ident: Utility):
+def clean_utility(ident: Union[Utility, str]):
     if ident in MAIN:
         del MAIN[ident]
 

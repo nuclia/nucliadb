@@ -65,6 +65,7 @@ class ChitchatNucliaDB:
 
     async def finalize(self):
         self.chitchat_update_srv.close()
+        await self.chitchat_update_srv.wait_closed()
         self.task.cancel()
 
     async def start(self):

@@ -114,8 +114,8 @@ async def search_api(
     count = 0
     while len(NODES) < 2:
         print("awaiting cluster nodes - search fixtures.py")
-        await asyncio.sleep(4)
-        if count == 10:
+        await asyncio.sleep(1)
+        if count == 40:
             raise Exception("No cluster")
         count += 1
 
@@ -149,8 +149,8 @@ async def search_api(
     await application.router.shutdown()
     # Make sure nodes can sync
     await asyncio.sleep(1)
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
+    await driver.close(close_connection_pool=True)
     clear_ingest_cache()
     clear_global_cache()
     for node in NODES.values():
