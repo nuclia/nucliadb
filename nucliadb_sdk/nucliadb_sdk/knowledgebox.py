@@ -366,7 +366,7 @@ class KnowledgeBox:
         result = self.client.find(
             self.build_find_request(text, filter, vector, vectorset, min_score)
         )
-        return FindResult(result, self.client)
+        return FindResult(result)
 
     async def async_find(
         self,
@@ -379,14 +379,14 @@ class KnowledgeBox:
         result = await self.client.async_find(
             self.build_find_request(text, filter, vector, vectorset, min_score)
         )
-        return FindResult(result, self.client)
+        return FindResult(result)
 
     def chat(
         self,
         text: str,
         context: Optional[List[Message]] = None,
         filter: Optional[List[Union[Label, str]]] = None,
-    ) -> Tuple[KnowledgeboxFindResults, str, Optional[Relations]]:
+    ) -> Tuple[KnowledgeboxFindResults, str, Optional[Relations], Optional[str]]:
         response = self.client.chat(self.build_chat_request(text, filter))
         header = response.raw.read(4, decode_content=True)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
@@ -395,11 +395,12 @@ class KnowledgeBox:
         data = response.raw.read(decode_content=True)
         answer, relations_payload = data.split(b"_END_")
 
+        learning_id = response.headers.get("NUCLIA-LEARNING-ID")
         relations_result = None
         if len(relations_payload) > 0:
             relations_result = Relations.parse_raw(base64.b64decode(relations_payload))
 
-        return find_result, answer, relations_result
+        return find_result, answer, relations_result, learning_id
 
     def build_chat_request(
         self,

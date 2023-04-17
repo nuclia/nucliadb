@@ -87,7 +87,6 @@ class NucliaDBClient:
     ):
         self.api_key = api_key
         self.environment = environment
-        # self.url = url
 
         internal_hosts_set = all((writer_host, reader_host, search_host, train_host))
         url_set = bool(url)

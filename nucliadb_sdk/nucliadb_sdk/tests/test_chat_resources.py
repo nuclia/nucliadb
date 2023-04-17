@@ -21,9 +21,10 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
 def test_chat_resource(docs_fixture: KnowledgeBox):
-    find_result, answer, relations_result = docs_fixture.chat(
+    find_result, answer, relations_result, learning_id = docs_fixture.chat(
         text="Nuclia loves Semantic Search"
     )
+    assert learning_id == "00"
     assert answer == b"valid answer  to"
     assert len(find_result.resources) == 9
     assert relations_result

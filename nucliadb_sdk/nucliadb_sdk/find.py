@@ -26,7 +26,6 @@ from nucliadb_models.search import (
     FindResource,
     KnowledgeboxFindResults,
 )
-from nucliadb_sdk.client import NucliaDBClient
 
 
 @dataclass
@@ -39,11 +38,8 @@ class Paragraph:
 class FindResult:
     inner_find_results: KnowledgeboxFindResults
 
-    def __init__(
-        self, inner_find_results: KnowledgeboxFindResults, client: NucliaDBClient
-    ):
+    def __init__(self, inner_find_results: KnowledgeboxFindResults):
         self.inner_find_results = inner_find_results
-        self.client = client
 
     def __iter__(self) -> Iterator[Paragraph]:
         for rid, resource in self.resources.items():

@@ -108,7 +108,6 @@ async def chat(
         new_query_elements = []
         _, generator = await predict.rephrase_query(kbid, req)
         async for new_query_data in generator:
-            new_query = ""
             new_query_elements.append(new_query_data)
 
         new_query = (b"".join(new_query_elements)).decode()
