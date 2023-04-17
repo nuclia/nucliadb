@@ -72,7 +72,6 @@ def run_fastapi_with_metrics(application: FastAPI) -> None:
         log_level = "warning"
 
     metrics_server, metrics_config = metrics_app()
-
     config = Config(
         application,
         host=running_settings.serving_host,
