@@ -28,7 +28,6 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
-from nucliadb_utils.utilities import get_ff
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
@@ -86,11 +85,6 @@ async def main():
         writer.close,
         reader.close,
     ]
-
-    if get_ff().enabled("nucliadb_node_sync_fs", default=False):
-        from nucliadb_node import write_sync
-
-        finalizers.append(write_sync.start)
 
     await run_until_exit(finalizers)
 

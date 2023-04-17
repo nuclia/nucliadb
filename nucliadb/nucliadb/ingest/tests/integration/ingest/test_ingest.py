@@ -22,6 +22,7 @@ import traceback
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from unittest.mock import patch
 from uuid import uuid4
 
 import nats
@@ -41,14 +42,16 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     FileExtractedData,
     LargeComputedMetadataWrapper,
-    Origin,
-    Paragraph,
 )
+from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
+from nucliadb_protos.resources_pb2 import Origin, Paragraph
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest import SERVICE_NAME
+from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import Storage
@@ -59,8 +62,8 @@ EXAMPLE_VECTOR = base64.b64decode(
 )
 
 
-@pytest.mark.asyncio
-async def test_ingest_messages_autocommit(
+@pytest.fixture()
+def kbid(
     local_files,
     gcs_storage: Storage,
     txn,
@@ -69,9 +72,14 @@ async def test_ingest_messages_autocommit(
     processor,
     knowledgebox_ingest,
 ):
+    yield knowledgebox_ingest
+
+
+@pytest.mark.asyncio
+async def test_ingest_messages_autocommit(kbid: str, processor):
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox_ingest,
+        kbid=kbid,
         uuid=rid,
         slug="slug1",
         type=BrokerMessage.AUTOCOMMIT,
@@ -168,20 +176,14 @@ async def test_ingest_messages_autocommit(
 
 @pytest.mark.asyncio
 async def test_ingest_error_message(
-    local_files,
-    gcs_storage: Storage,
-    txn,
-    cache,
-    fake_node,
-    processor,
-    knowledgebox_ingest,
+    kbid: str, gcs_storage: Storage, txn, cache, processor
 ):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
         data = base64.b64decode(f.read())
     message0: BrokerMessage = BrokerMessage()
     message0.ParseFromString(data)
-    message0.kbid = knowledgebox_ingest
+    message0.kbid = kbid
     message0.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message0, seqid=1)
 
@@ -190,12 +192,12 @@ async def test_ingest_error_message(
         data = base64.b64decode(f.read())
     message1: BrokerMessage = BrokerMessage()
     message1.ParseFromString(data)
-    message1.kbid = knowledgebox_ingest
+    message1.kbid = kbid
     message1.ClearField("field_vectors")
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=2)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
     r = await kb_obj.get(message1.uuid)
     assert r is not None
     field_obj = await r.get_field("wikipedia_ml", TEXT)
@@ -658,3 +660,24 @@ async def test_ingest_txn_missing_kb(
         ), f"Processing should not fail due to a missing Knowledgebox:\n\n{str(traceback.format_exc())}"
 
     await txn.abort()
+
+
+@pytest.mark.asyncio
+async def test_ingest_autocommit_deadletter_marks_resource(
+    kbid: str, processor: Processor, txn, gcs_storage, cache
+):
+    rid = str(uuid.uuid4())
+    message = make_message(kbid, rid)
+
+    with patch.object(processor, "notify_commit") as mock_notify, pytest.raises(
+        DeadletteredError
+    ):
+        # cause an error to force deadletter handling
+        mock_notify.side_effect = Exception("test")
+        await processor.process(message=message, seqid=1)
+
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    resource = await kb_obj.get(message.uuid)
+
+    mock_notify.assert_called_once()
+    assert resource.basic.metadata.status == PBMetadata.Status.ERROR  # type: ignore

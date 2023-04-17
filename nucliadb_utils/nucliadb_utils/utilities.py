@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, cast
@@ -65,7 +66,7 @@ class Utility(str, Enum):
     STORAGE = "storage"
     TRAIN = "train"
     TRAIN_SERVER = "train_server"
-    FF = "ff"
+    FEATURE_FLAGS = "feature_flags"
 
 
 def get_utility(ident: Utility):
@@ -274,9 +275,36 @@ async def stop_audit_utility():
         clean_utility(Utility.AUDIT)
 
 
-def get_ff() -> featureflagging.FlagService:
-    val = get_utility(Utility.FF)
+def get_feature_flags() -> featureflagging.FlagService:
+    val = get_utility(Utility.FEATURE_FLAGS)
     if val is None:
         val = featureflagging.FlagService()
-        set_utility(Utility.FF, val)
+        set_utility(Utility.FEATURE_FLAGS, val)
     return val
+
+
+X_USER_HEADER = "X-NUCLIADB-USER"
+X_ACCOUNT_HEADER = "X-NUCLIADB-ACCOUNT"
+X_ACCOUNT_TYPE_HEADER = "X-NUCLIADB-ACCOUNT-TYPE"
+
+
+def has_feature(
+    name: str,
+    default: bool = False,
+    context: Optional[dict[str, str]] = None,
+    headers: Optional[dict[str, str]] = None,
+) -> bool:
+    if context is None:
+        context = {}
+    if headers is not None:
+        if X_USER_HEADER in headers:
+            context["user_id_md5"] = hashlib.md5(
+                headers[X_USER_HEADER].encode("utf-8")
+            ).hexdigest()
+        if X_ACCOUNT_HEADER in headers:
+            context["account_id_md5"] = hashlib.md5(
+                headers[X_ACCOUNT_HEADER].encode()
+            ).hexdigest()
+        if X_ACCOUNT_TYPE_HEADER in headers:
+            context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
+    return get_feature_flags().enabled(name, default=default, context=context)

@@ -36,9 +36,8 @@ from nucliadb.search.api.v1.router import api as api_search_v1
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry import errors
-from nucliadb_telemetry.fastapi import instrument_app
+from nucliadb_telemetry.fastapi import instrument_app, metrics_endpoint
 from nucliadb_utils.authentication import STFAuthenticationBackend
-from nucliadb_utils.fastapi import metrics
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -99,7 +98,7 @@ async def homepage(request):
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/metrics", metrics.metrics)
+application.add_route("/metrics", metrics_endpoint)
 
 # mount contributor app assets
 application.mount(

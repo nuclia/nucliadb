@@ -392,6 +392,12 @@ class ChatModel(BaseModel):
     context: List[Message] = []
 
 
+class RephraseModel(BaseModel):
+    question: str
+    context: List[Message] = []
+    user_id: str
+
+
 class ChatRequest(BaseModel):
     query: str = ""
     fields: List[str] = []

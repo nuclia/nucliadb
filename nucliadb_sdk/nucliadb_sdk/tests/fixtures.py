@@ -17,7 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import os
+from dataclasses import dataclass
+from typing import Optional
 from uuid import uuid4
 
 import pytest
@@ -25,6 +28,7 @@ import requests
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
+from nucliadb_client.client import NucliaDBClient as GRPCNucliaDBClient
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
@@ -34,9 +38,16 @@ images.settings["nucliadb"] = {
     "version": "latest",
     "env": {
         "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "dummy_processing": "True",
         "max_receive_message_length": "40",
+        "TEST_SENTENCE_ENCODER": "multilingual-2023-02-21",
+        "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
     },
 }
+
+NUCLIA_DOCS_dataset = (
+    "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia.export"
+)
 
 
 class NucliaDB(BaseImage):
@@ -91,3 +102,50 @@ def knowledgebox(nucliadb):
         f"{api_path}/kb/{kbid}", headers={"X-NUCLIADB-ROLES": f"MANAGER"}
     )
     assert response.status_code == 200
+
+
+@dataclass
+class SDKFixture:
+    host: str
+    port: int
+    grpc: int
+    container: Optional[NucliaDB] = None
+
+
+async def init_fixture(
+    nucliadb: SDKFixture,
+    dataset_slug: str,
+    dataset_location: str,
+):
+    client = GRPCNucliaDBClient(
+        host=nucliadb.host, grpc=nucliadb.grpc, http=nucliadb.port, train=0
+    )
+    client.init_async_grpc()
+    kbid = await client.import_kb(slug=dataset_slug, location=dataset_location)
+    await client.finish_async_grpc()
+    return kbid
+
+
+@pytest.fixture(scope="session")
+def nucliadb_imported():
+    ndb = NucliaDB()
+    host, port = ndb.run()
+    network = ndb.container_obj.attrs["NetworkSettings"]
+
+    if os.environ.get("TESTING", "") == "jenkins":
+        grpc = 8060
+    else:
+        service_port = "8060/tcp"
+        grpc = network["Ports"][service_port][0]["HostPort"]
+    yield SDKFixture(host=host, port=port, grpc=grpc, container=ndb.container_obj)
+    ndb.stop()
+
+
+@pytest.fixture(scope="session")
+def docs_fixture(nucliadb_imported: SDKFixture):
+    kbid = asyncio.run(init_fixture(nucliadb_imported, "docs", NUCLIA_DOCS_dataset))
+    client = NucliaDBClient(
+        environment=Environment.OSS,
+        url=f"http://{nucliadb_imported.host}:{nucliadb_imported.port}/api/v1/kb/{kbid}",
+    )
+    return KnowledgeBox(client)

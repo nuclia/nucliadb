@@ -17,17 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import prometheus_client  # type: ignore
-from fastapi import FastAPI
-from starlette.responses import PlainTextResponse
-
-from nucliadb_utils.settings import running_settings
+from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
-async def metrics(request):
-    output = prometheus_client.exposition.generate_latest()
-    return PlainTextResponse(output.decode("utf8"))
-
-
-application_metrics = FastAPI(title="NucliaDB Metrics API", debug=running_settings.debug)  # type: ignore
-application_metrics.add_route("/metrics", metrics)
+def test_chat_resource(docs_fixture: KnowledgeBox):
+    find_result, answer, relations_result, learning_id = docs_fixture.chat(
+        text="Nuclia loves Semantic Search"
+    )
+    assert learning_id == "00"
+    assert answer == b"valid answer  to"
+    assert len(find_result.resources) == 9
+    assert relations_result
+    assert len(relations_result.entities["Nuclia"].related_to) == 18

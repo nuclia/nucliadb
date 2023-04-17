@@ -28,7 +28,10 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
+    ChatRequest,
+    FindRequest,
     KnowledgeboxCounters,
+    KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     SearchRequest,
 )
@@ -47,6 +50,8 @@ CREATE_VECTORSET = "/vectorset/{vectorset}"
 VECTORSETS = "/vectorsets"
 COUNTER = "/counters"
 SEARCH_URL = "/search"
+FIND_URL = "/find"
+CHAT_URL = "/chat"
 LABELS_URL = "/labelsets"
 ENTITIES_URL = "/entitiesgroups"
 DOWNLOAD_URL = "/{uri}"
@@ -66,7 +71,8 @@ class NucliaDBClient:
     api_key: Optional[str]
     environment: Environment
     session: httpx.Client
-    url: Optional[str]
+    url: str
+    search_url: str
 
     def __init__(
         self,
@@ -81,18 +87,16 @@ class NucliaDBClient:
     ):
         self.api_key = api_key
         self.environment = environment
-        self.url = url
 
         internal_hosts_set = all((writer_host, reader_host, search_host, train_host))
         url_set = bool(url)
 
-        if not (url_set or internal_hosts_set):
-            raise AttributeError("Either url or nucliadb services hosts must be set")
-
-        if url_set:
+        if url_set and url is not None:
             self.url = url
-        elif internal_hosts_set:
+        elif internal_hosts_set and writer_host is not None:
             self.url = writer_host
+        else:
+            raise AttributeError("Either url or nucliadb services hosts must be set")
 
         if environment == Environment.CLOUD and api_key is not None:
             reader_headers = {
@@ -100,6 +104,7 @@ class NucliaDBClient:
             }
             writer_headers = {
                 "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
+                "X-SYNCHRONOUS": "True",
             }
         elif environment == Environment.CLOUD and api_key is None:
             raise AttributeError("On Cloud you need to provide API Key")
@@ -109,6 +114,7 @@ class NucliaDBClient:
             }
             writer_headers = {
                 "X-NUCLIADB-ROLES": f"WRITER",
+                "X-SYNCHRONOUS": "True",
             }
 
         self.reader_session = httpx.Client(
@@ -119,6 +125,12 @@ class NucliaDBClient:
         )
         self.stream_session = requests.Session()
         self.stream_session.headers.update(reader_headers)
+        if search_host is None and url is None:
+            raise AttributeError("Either search_url or url needs to not be None")
+        elif search_host is not None:
+            self.search_url = search_host
+        elif url is not None:
+            self.search_url = url
         self.writer_session = httpx.Client(
             headers=writer_headers, base_url=writer_host or url  # type: ignore
         )
@@ -126,10 +138,10 @@ class NucliaDBClient:
             headers=writer_headers, base_url=writer_host or url  # type: ignore
         )
         self.search_session = httpx.Client(
-            headers=reader_headers, base_url=search_host or url  # type: ignore
+            headers=reader_headers, base_url=self.search_url  # type: ignore
         )
         self.async_search_session = httpx.AsyncClient(
-            headers=reader_headers, base_url=search_host or url  # type: ignore
+            headers=reader_headers, base_url=self.search_url  # type: ignore
         )
         self.train_session = httpx.Client(
             headers=reader_headers, base_url=train_host or url  # type: ignore
@@ -300,7 +312,9 @@ class NucliaDBClient:
 
     def update_resource(self, id: str, payload: UpdateResourcePayload):
         url = RESOURCE_PATH.format(rid=id)
-        response: httpx.Response = self.writer_session.post(url, content=payload.json())
+        response: httpx.Response = self.writer_session.patch(
+            url, content=payload.json()
+        )
         if response.status_code == 200:
             return
         else:
@@ -363,6 +377,36 @@ class NucliaDBClient:
         )
         if response.status_code == 200:
             return KnowledgeboxSearchResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def find(self, request: FindRequest):
+        url = FIND_URL
+
+        response: httpx.Response = self.search_session.post(url, content=request.json())
+        if response.status_code == 200:
+            return KnowledgeboxFindResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    async def async_find(self, request: FindRequest):
+        url = FIND_URL
+        response: httpx.Response = await self.async_search_session.post(
+            url, content=request.json()
+        )
+        if response.status_code == 200:
+            return KnowledgeboxFindResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def chat(self, request: ChatRequest):
+        url = f"{self.search_url}{CHAT_URL}"
+        response: requests.Response = self.stream_session.post(
+            url, data=request.json(), stream=True
+        )
+        response
+        if response.status_code == 200:
+            return response
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 

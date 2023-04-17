@@ -16,34 +16,4 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-import enum
-from typing import Optional
-
-from pydantic import BaseSettings
-
-
-class TelemetrySettings(BaseSettings):
-    jaeger_agent_host: str = "localhost"
-    jaeger_agent_port: int = 6831
-    jaeger_enabled: bool = False
-    jaeger_query_port: int = 16686
-    jaeger_query_host: str = "jaeger.observability.svc.cluster.local"
-
-
-telemetry_settings = TelemetrySettings()
-
-
-class LogLevel(enum.Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    FATAL = "FATAL"
-    CRITICAL = "CRITICAL"
-
-
-class LogSettings(BaseSettings):
-    debug: bool = False
-    log_level: LogLevel = LogLevel.WARNING
-    logger_levels: Optional[dict[str, LogLevel]] = None
+#

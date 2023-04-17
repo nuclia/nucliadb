@@ -23,11 +23,11 @@ import sys
 
 import click
 from fastapi import FastAPI
+from nucliadb_telemetry.fastapi import application_metrics
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
 from nucliadb_utils import logger
-from nucliadb_utils.fastapi.metrics import application_metrics
 from nucliadb_utils.settings import running_settings
 
 STARTUP_FAILURE = 3
@@ -72,7 +72,6 @@ def run_fastapi_with_metrics(application: FastAPI) -> None:
         log_level = "warning"
 
     metrics_server, metrics_config = metrics_app()
-
     config = Config(
         application,
         host=running_settings.serving_host,

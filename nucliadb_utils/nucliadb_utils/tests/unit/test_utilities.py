@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, patch
+import hashlib
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -135,7 +136,29 @@ async def test_stop_audit_utility():
         assert "audit" not in utilities.MAIN
 
 
-def test_get_ff():
-    ff = utilities.get_ff()
+def test_get_feature_flags():
+    ff = utilities.get_feature_flags()
     assert ff is not None
     assert isinstance(ff, featureflagging.FlagService)
+
+
+def test_has_feature():
+    ff = MagicMock()
+    headers = {
+        utilities.X_USER_HEADER: "user",
+        utilities.X_ACCOUNT_HEADER: "account",
+        utilities.X_ACCOUNT_TYPE_HEADER: "account-type",
+    }
+    with patch("nucliadb_utils.utilities.get_feature_flags", return_value=ff):
+        ff.enabled.return_value = True
+        assert utilities.has_feature("test", default=False, headers=headers)
+
+        ff.enabled.assert_called_once_with(
+            "test",
+            default=False,
+            context={
+                "user_id_md5": hashlib.md5(b"user").hexdigest(),
+                "account_id_md5": hashlib.md5(b"account").hexdigest(),
+                "account_type": "account-type",
+            },
+        )
