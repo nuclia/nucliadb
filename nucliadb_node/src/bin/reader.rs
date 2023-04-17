@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let grpc_driver = NodeReaderGRPCDriver::from(node_reader_service);
-    let metrics_addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let metrics_addr = SocketAddr::from(([0, 0, 0, 0], 3030));
     let _grpc_task = tokio::spawn(start_grpc_service(grpc_driver));
     let metrics_task = tokio::spawn(run_http_server(metrics_addr));
 

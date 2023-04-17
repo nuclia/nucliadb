@@ -38,7 +38,6 @@ fn create_metrics() -> Arc<dyn Metrics> {
 
 #[cfg(not(any(prometheus_metrics, log_metrics)))]
 fn create_metrics() -> Arc<dyn Metrics> {
-    println!("NONE");
     Arc::new(metrics::NoMetrics)
 }
 
