@@ -28,8 +28,8 @@ use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
-    StreamRequest, SuggestRequest, SuggestResponse, TextCountRequest, TextCountResponse, TypeList,
-    VectorSearchRequest, VectorSearchResponse,
+    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
@@ -544,11 +544,8 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn exact_match_count(
-        &self,
-        request: ExactMatchCountRequest,
-    ) -> NodeResult<ExactMatchCountResponse> {
-        self.text_reader.exact_match_count(&request)
+    pub fn text_count_with_query(&self, query: &str) -> NodeResult<usize> {
+        self.text_reader.count_matches(query)
     }
 
     #[tracing::instrument(skip_all)]

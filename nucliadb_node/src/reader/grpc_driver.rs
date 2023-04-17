@@ -367,6 +367,28 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    async fn document_exact_match_count(
+        &self,
+        request: tonic::Request<DocumentExactMatchRequest>,
+    ) -> Result<tonic::Response<DocumentExactMatchReponse>, tonic::Status> {
+        self.instrument(&request);
+        info!("{:?}: gRPC get_shard", request);
+        let request = request.into_inner();
+        let shard_id = ShardId {
+            id: request.shard.clone(),
+        };
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        let response = reader.document_exact_match_count(&shard_id, request);
+        match response.transpose() {
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
+        }
+    }
     #[tracing::instrument(skip_all)]
     async fn document_ids(
         &self,

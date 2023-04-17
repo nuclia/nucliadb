@@ -27,8 +27,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
-    FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest, TextCountRequest,
-    TextCountResponse,
+    FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
 };
 use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{
@@ -106,25 +105,24 @@ impl FieldReader for TextReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        self.count_matches(&Default::default())
-            .map(|r| r.count as usize)
+        self.count_matches("")
     }
-    fn count_matches(&self, request: &TextCountRequest) -> NodeResult<TextCountResponse> {
+    fn count_matches(&self, query: &str) -> NodeResult<usize> {
         let id: Option<String> = None;
         let time = SystemTime::now();
-        let query = request.body.trim();
+        let query = query.trim();
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let searcher = self.reader.searcher();
         let count = if query.is_empty() {
-            searcher.search(&AllQuery, &Count).map_or(0, |i| i as u64)
+            searcher.search(&AllQuery, &Count)?
         } else {
             let query = parser.parse_query(query)?;
-            searcher.search(&query, &Count).map_or(0, |i| i as u64)
+            searcher.search(&query, &Count)?
         };
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} -Ending at {v} ms");
         }
-        Ok(TextCountResponse { count })
+        Ok(count)
     }
 }
 
@@ -674,26 +672,17 @@ mod tests {
         let _ = field_writer_service.set_resource(&resource1);
         let field_reader_service = TextReaderService::start(&fsc).unwrap();
 
-        let request = TextCountRequest {
-            shard: "shard1".to_string(),
-            body: "\"this is the\"".into(),
-        };
-        let result = field_reader_service.count_matches(&request)?;
-        assert_eq!(result.count, 2);
+        let request = "\"this is the\"";
+        let count = field_reader_service.count_matches(request)?;
+        assert_eq!(count, 2);
 
-        let request = TextCountRequest {
-            shard: "shard1".to_string(),
-            body: "\"wanted make\"".into(),
-        };
-        let result = field_reader_service.count_matches(&request)?;
-        assert_eq!(result.count, 0);
+        let request = "\"wanted make\"";
+        let count = field_reader_service.count_matches(request)?;
+        assert_eq!(count, 0);
 
-        let request = TextCountRequest {
-            shard: "shard1".to_string(),
-            body: "\"wanted to make\"".into(),
-        };
-        let result = field_reader_service.count_matches(&request)?;
-        assert_eq!(result.count, 1);
+        let request = "\"wanted to make\"";
+        let count = field_reader_service.count_matches(request)?;
+        assert_eq!(count, 1);
 
         Ok(())
     }

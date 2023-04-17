@@ -47,6 +47,11 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.FromString,
                 )
+        self.document_exact_match_count = channel.unary_unary(
+                '/nodereader.NodeReader/document_exact_match_count',
+                request_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentExactMatchRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentExactMatchReponse.FromString,
+                )
         self.DocumentIds = channel.unary_unary(
                 '/nodereader.NodeReader/DocumentIds',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
@@ -135,6 +140,12 @@ class NodeReaderServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def RelationSearch(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def document_exact_match_count(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -233,6 +244,11 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.RelationSearch,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.SerializeToString,
+            ),
+            'document_exact_match_count': grpc.unary_unary_rpc_method_handler(
+                    servicer.document_exact_match_count,
+                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentExactMatchRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentExactMatchReponse.SerializeToString,
             ),
             'DocumentIds': grpc.unary_unary_rpc_method_handler(
                     servicer.DocumentIds,
@@ -395,6 +411,23 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/RelationSearch',
             nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def document_exact_match_count(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/document_exact_match_count',
+            nucliadb__protos_dot_nodereader__pb2.DocumentExactMatchRequest.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.DocumentExactMatchReponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

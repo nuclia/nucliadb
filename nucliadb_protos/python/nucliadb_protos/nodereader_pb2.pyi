@@ -1246,7 +1246,7 @@ class StreamRequest(google.protobuf.message.Message):
 global___StreamRequest = StreamRequest
 
 @typing_extensions.final
-class TextCountRequest(google.protobuf.message.Message):
+class DocumentExactMatchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SHARD_FIELD_NUMBER: builtins.int
@@ -1261,10 +1261,10 @@ class TextCountRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "shard", b"shard"]) -> None: ...
 
-global___TextCountRequest = TextCountRequest
+global___DocumentExactMatchRequest = DocumentExactMatchRequest
 
 @typing_extensions.final
-class TextCountResponse(google.protobuf.message.Message):
+class DocumentExactMatchReponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     COUNT_FIELD_NUMBER: builtins.int
@@ -1276,4 +1276,4 @@ class TextCountResponse(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["count", b"count"]) -> None: ...
 
-global___TextCountResponse = TextCountResponse
+global___DocumentExactMatchReponse = DocumentExactMatchReponse

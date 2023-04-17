@@ -78,6 +78,10 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         nucliadb_protos.nodereader_pb2.RelationSearchResponse,
     ]
+    document_exact_match_count: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.DocumentExactMatchRequest,
+        nucliadb_protos.nodereader_pb2.DocumentExactMatchReponse,
+    ]
     DocumentIds: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodereader_pb2.IdCollection,
@@ -159,6 +163,12 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.RelationSearchResponse: ...
+    @abc.abstractmethod
+    def document_exact_match_count(
+        self,
+        request: nucliadb_protos.nodereader_pb2.DocumentExactMatchRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.DocumentExactMatchReponse: ...
     @abc.abstractmethod
     def DocumentIds(
         self,

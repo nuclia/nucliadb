@@ -23,7 +23,8 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
+    DocumentExactMatchReponse, DocumentExactMatchRequest, DocumentSearchRequest,
+    DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
     ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
     SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest, SuggestRequest,
     SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
@@ -235,6 +236,21 @@ impl NodeReaderService {
         let search_response = shard.document_search(request)?;
         Ok(Some(search_response))
     }
+
+    #[tracing::instrument(skip_all)]
+    pub fn document_exact_match_count(
+        &self,
+        shard_id: &ShardId,
+        request: DocumentExactMatchRequest,
+    ) -> NodeResult<Option<DocumentExactMatchReponse>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+        let query = format!("\"{}\"", request.body);
+        let count = shard.text_count_with_query(&query)? as u64;
+        Ok(Some(DocumentExactMatchReponse { count }))
+    }
+
     #[tracing::instrument(skip_all)]
     pub fn document_ids(&self, shard_id: &ShardId) -> NodeResult<Option<IdCollection>> {
         let Some(shard) = self.get_shard(shard_id) else {

@@ -401,12 +401,12 @@ message StreamRequest {
     noderesources.ShardId shard_id = 3;
 }
 
-message TextCountRequest {
+message DocumentExactMatchRequest {
     string shard = 1;
     string body = 2;
 }
 
-message TextCountResponse  {
+message DocumentExactMatchReponse  {
     uint64 count = 1;
 }
 
@@ -421,6 +421,7 @@ service NodeReader {
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
     rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
+    rpc document_exact_match_count(DocumentExactMatchRequest) returns (DocumentExactMatchReponse) {}
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}

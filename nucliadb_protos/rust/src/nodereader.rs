@@ -513,14 +513,14 @@ pub struct StreamRequest {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TextCountRequest {
+pub struct DocumentExactMatchRequest {
     #[prost(string, tag="1")]
     pub shard: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub body: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TextCountResponse {
+pub struct DocumentExactMatchReponse {
     #[prost(uint64, tag="1")]
     pub count: u64,
 }
@@ -702,6 +702,25 @@ pub mod node_reader_client {
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/nodereader.NodeReader/RelationSearch",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn document_exact_match_count(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DocumentExactMatchRequest>,
+        ) -> Result<tonic::Response<super::DocumentExactMatchReponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/document_exact_match_count",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -938,6 +957,10 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::RelationSearchRequest>,
         ) -> Result<tonic::Response<super::RelationSearchResponse>, tonic::Status>;
+        async fn document_exact_match_count(
+            &self,
+            request: tonic::Request<super::DocumentExactMatchRequest>,
+        ) -> Result<tonic::Response<super::DocumentExactMatchReponse>, tonic::Status>;
         async fn document_ids(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
@@ -1267,6 +1290,46 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = RelationSearchSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/document_exact_match_count" => {
+                    #[allow(non_camel_case_types)]
+                    struct document_exact_match_countSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::UnaryService<super::DocumentExactMatchRequest>
+                    for document_exact_match_countSvc<T> {
+                        type Response = super::DocumentExactMatchReponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DocumentExactMatchRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).document_exact_match_count(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = document_exact_match_countSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
