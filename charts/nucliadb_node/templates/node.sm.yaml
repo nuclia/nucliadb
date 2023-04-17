@@ -17,7 +17,16 @@ spec:
     matchLabels:
       app: node
   endpoints:
+  # node sidecar metrics
   - targetPort: {{ .Values.serving.metricsPort }}
+    interval: 10s
+    path: /metrics
+  # writer
+  - targetPort: 3031
+    interval: 10s
+    path: /metrics
+  # reader
+  - targetPort: 3032
     interval: 10s
     path: /metrics
 {{- end }}

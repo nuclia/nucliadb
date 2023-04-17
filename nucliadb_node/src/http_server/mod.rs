@@ -25,8 +25,11 @@ use std::net::SocketAddr;
 use axum::routing::get;
 use axum::Router;
 
-pub async fn run_http_server(addr: SocketAddr) {
+use crate::env::metrics_http_port;
+
+pub async fn run_http_metrics_server() {
     // Add routes to services
+    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port()));
     let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
     axum_server::bind(addr)
         // Services will be added here
