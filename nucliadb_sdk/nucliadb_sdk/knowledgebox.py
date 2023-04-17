@@ -163,6 +163,8 @@ class KnowledgeBox:
         labels: Optional[Labels] = None,
         entities: Optional[Entities] = None,
         vectors: Optional[Vectors] = None,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
     ):
         resource: Optional[Resource] = None
 
@@ -188,6 +190,8 @@ class KnowledgeBox:
                 entities=entities,
                 vectors=vectors,
                 vectorsets=self.vectorsets,
+                title=title,
+                summary=summary,
             )
             resp = await self.client.async_create_resource(create_payload)
             rid = resp.uuid
@@ -204,6 +208,8 @@ class KnowledgeBox:
                 vectors=vectors,
                 resource=resource,
                 vectorsets=self.vectorsets,
+                title=title,
+                summary=summary,
             )
             rid = resource.id
             await self.client.async_update_resource(rid, update_payload)
@@ -220,6 +226,8 @@ class KnowledgeBox:
         vectors: Optional[
             Union[Vectors, Dict[str, Union[ndarray, List[float]]]]
         ] = None,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
     ) -> str:
         resource: Optional[Resource] = None
 
@@ -245,6 +253,8 @@ class KnowledgeBox:
                 entities=entities,
                 vectors=vectors,
                 vectorsets=self.vectorsets,
+                title=title,
+                summary=summary,
             )
             resp = self.client.create_resource(create_payload)
             rid = resp.uuid
@@ -260,6 +270,8 @@ class KnowledgeBox:
                 vectors=vectors,
                 resource=resource,
                 vectorsets=self.vectorsets,
+                title=title,
+                summary=summary,
             )
             rid = resource.id
             self.client.update_resource(rid, update_payload)

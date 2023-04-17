@@ -312,7 +312,9 @@ class NucliaDBClient:
 
     def update_resource(self, id: str, payload: UpdateResourcePayload):
         url = RESOURCE_PATH.format(rid=id)
-        response: httpx.Response = self.writer_session.post(url, content=payload.json())
+        response: httpx.Response = self.writer_session.patch(
+            url, content=payload.json()
+        )
         if response.status_code == 200:
             return
         else:
