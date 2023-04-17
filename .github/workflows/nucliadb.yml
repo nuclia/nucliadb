@@ -184,8 +184,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: nuclia/nucliadb:latest
-          cache-from: type=registry,ref=nuclia/nucliadb:buildcache
-          cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
       - name: Get release version
         id: version_step
@@ -201,8 +201,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
-          cache-from: type=registry,ref=nuclia/nucliadb:buildcache
-          cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
   push-dev:
     name: Build dev image and push
