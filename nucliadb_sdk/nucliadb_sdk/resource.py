@@ -58,8 +58,10 @@ def create_resource(
     vectors: Optional[Union[Vectors, Dict[str, Union[ndarray, List[float]]]]] = None,
     vectorsets: Optional[VectorSets] = None,
     icon: Optional[str] = None,
+    title: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> CreateResourcePayload:
-    create_payload = CreateResourcePayload()
+    create_payload = CreateResourcePayload(title=title, summary=summary)
     create_payload.origin = Origin(source=Origin.Source.PYSDK)
     if key is not None:
         create_payload.slug = SlugString(key)
@@ -181,8 +183,10 @@ def update_resource(
     entities: Optional[Entities] = None,
     vectors: Optional[Union[Vectors, Dict[str, Union[ndarray, List[float]]]]] = None,
     vectorsets: Optional[VectorSets] = None,
+    title: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> UpdateResourcePayload:
-    upload_payload = UpdateResourcePayload()
+    upload_payload = UpdateResourcePayload(title=title, summary=summary)
 
     main_field = None
     if text is not None:
