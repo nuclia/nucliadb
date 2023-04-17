@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import mrflagly
 import pydantic
@@ -31,9 +31,7 @@ class Settings(pydantic.BaseSettings):
     flag_settings_url: Optional[str]
 
 
-DEFAULT_FLAG_DATA = {
-    "nucliadb_node_sync_fs": {"rollout": 0, "variants": {"environment": ["stage"]}},
-}
+DEFAULT_FLAG_DATA: dict[str, Any] = {}
 
 
 class FlagService:
