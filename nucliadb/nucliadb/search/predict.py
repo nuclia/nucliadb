@@ -169,7 +169,7 @@ class PredictEngine:
             )
         else:
             if self.nuclia_service_account is None:
-                error = "Nuclia Service account is not defined so could not retrieve vectors for the query"
+                error = "Nuclia Service account is not defined so could not rephrase query"
                 logger.warning(error)
                 raise SendToPredictError(error)
             # Upload the payload
