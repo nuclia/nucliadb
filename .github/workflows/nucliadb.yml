@@ -185,7 +185,7 @@ jobs:
           push: true
           tags: nuclia/nucliadb:latest
           cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-to: type=gha,mode=max
 
       - name: Get release version
         id: version_step
@@ -202,7 +202,7 @@ jobs:
           push: true
           tags: nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
           cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-to: type=gha,mode=max
 
   push-dev:
     name: Build dev image and push
