@@ -512,6 +512,18 @@ pub struct StreamRequest {
     #[prost(message, optional, tag="3")]
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ExactMatchCountRequest {
+    #[prost(string, tag="1")]
+    pub shard: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub body: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ExactMatchCountResponse {
+    #[prost(uint64, tag="1")]
+    pub count: u64,
+}
 /// Generated client implementations.
 pub mod node_reader_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]

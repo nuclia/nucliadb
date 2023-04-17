@@ -26,14 +26,15 @@ use itertools::Itertools;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
-    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
-    FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
+    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse,
+    ExactMatchCountRequest, ExactMatchCountResponse, FacetResult, FacetResults, OrderBy,
+    ResourceId, ResultScore, StreamRequest,
 };
 use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{
     Collector, Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
-use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, PhraseQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
@@ -103,7 +104,6 @@ impl FieldReader for TextReaderService {
         };
         Ok(DocumentIterator::new(producer.flatten()))
     }
-
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
@@ -114,6 +114,25 @@ impl FieldReader for TextReaderService {
             info!("{id:?} - Ending at: {v} ms");
         }
         Ok(count)
+    }
+    fn exact_match_count(
+        &self,
+        request: &ExactMatchCountRequest,
+    ) -> NodeResult<ExactMatchCountResponse> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
+        let terms = request
+            .body
+            .split_whitespace()
+            .map(|i| Term::from_field_text(self.schema.text, i))
+            .collect::<Vec<_>>();
+        let query = PhraseQuery::new(terms);
+        let searcher = self.reader.searcher();
+        let count = searcher.search(&query, &Count).map_or(0, |i| i as u64);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        Ok(ExactMatchCountResponse { count })
     }
 }
 
@@ -649,6 +668,42 @@ mod tests {
             vectors_to_delete: HashMap::default(),
             shard_id,
         }
+    }
+
+    #[test]
+    fn test_exact_match_count() -> NodeResult<()> {
+        let dir = TempDir::new().unwrap();
+        let fsc = TextConfig {
+            path: dir.path().join("texts"),
+        };
+
+        let mut field_writer_service = TextWriterService::start(&fsc).unwrap();
+        let resource1 = create_resource("shard1".to_string());
+        let _ = field_writer_service.set_resource(&resource1);
+        let field_reader_service = TextReaderService::start(&fsc).unwrap();
+
+        let request = ExactMatchCountRequest {
+            shard: "shard1".to_string(),
+            body: "this is the".into(),
+        };
+        let result = field_reader_service.exact_match_count(&request)?;
+        assert_eq!(result.count, 2);
+
+        let request = ExactMatchCountRequest {
+            shard: "shard1".to_string(),
+            body: "wanted make".into(),
+        };
+        let result = field_reader_service.exact_match_count(&request)?;
+        assert_eq!(result.count, 0);
+
+        let request = ExactMatchCountRequest {
+            shard: "shard1".to_string(),
+            body: "wanted to make".into(),
+        };
+        let result = field_reader_service.exact_match_count(&request)?;
+        assert_eq!(result.count, 1);
+
+        Ok(())
     }
 
     #[test]

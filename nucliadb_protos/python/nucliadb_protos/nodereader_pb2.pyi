@@ -1244,3 +1244,36 @@ class StreamRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["filter", b"filter", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
 
 global___StreamRequest = StreamRequest
+
+@typing_extensions.final
+class ExactMatchCountRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_FIELD_NUMBER: builtins.int
+    BODY_FIELD_NUMBER: builtins.int
+    shard: builtins.str
+    body: builtins.str
+    def __init__(
+        self,
+        *,
+        shard: builtins.str = ...,
+        body: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "shard", b"shard"]) -> None: ...
+
+global___ExactMatchCountRequest = ExactMatchCountRequest
+
+@typing_extensions.final
+class ExactMatchCountResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COUNT_FIELD_NUMBER: builtins.int
+    count: builtins.int
+    def __init__(
+        self,
+        *,
+        count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["count", b"count"]) -> None: ...
+
+global___ExactMatchCountResponse = ExactMatchCountResponse

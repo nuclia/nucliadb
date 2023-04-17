@@ -401,6 +401,16 @@ message StreamRequest {
     noderesources.ShardId shard_id = 3;
 }
 
+message ExactMatchCountRequest {
+    string shard = 1;
+    string body = 2;
+}
+
+message ExactMatchCountResponse {
+    uint64 count = 1;
+}
+
+
 // Implemented at nucliadb_object_storage
 
 service NodeReader {
