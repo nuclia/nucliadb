@@ -154,7 +154,7 @@ class PredictEngine:
             )
         await self.check_response(resp, expected=204)
 
-    @predict_observer.wrap({"type": "chat"})
+    @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
         if self.dummy:
             self.calls.append(item)
