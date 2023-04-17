@@ -95,7 +95,6 @@ impl ShardReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
-        const NAME: &str = "reader/get_info";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -122,7 +121,7 @@ impl ShardReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("reader/get_info".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(Shard {
@@ -172,7 +171,6 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
-        const NAME: &str = "reader/new";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -226,7 +224,7 @@ impl ShardReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("reader/new".to_string());
         metrics.record_request_time(metric, took);
         Ok(ShardReaderService {
             id,
@@ -246,7 +244,6 @@ impl ShardReaderService {
     /// Stop the service
     #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
-        const NAME: &str = "reader/stop";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -295,7 +292,7 @@ impl ShardReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("reader/stop".to_string());
         metrics.record_request_time(metric, took);
 
         debug!("Shard stopped {}...", { &self.id });
@@ -330,7 +327,6 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
-        const NAME: &str = "reader/suggest";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -377,7 +373,7 @@ impl ShardReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("reader/suggest".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(SuggestResponse {
@@ -394,7 +390,6 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        const NAME: &str = "reader/search";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -508,7 +503,7 @@ impl ShardReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("reader/search".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(SearchResponse {

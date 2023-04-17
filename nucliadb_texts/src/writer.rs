@@ -61,7 +61,6 @@ impl WriterChild for TextWriterService {
 
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        const NAME: &str = "count";
         let time = SystemTime::now();
 
         let id: Option<String> = None;
@@ -71,7 +70,7 @@ impl WriterChild for TextWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        let metric = request_time::RequestTimeKey::texts("count".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took}");
 
@@ -79,7 +78,6 @@ impl WriterChild for TextWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        const NAME: &str = "set_resource";
         let time = SystemTime::now();
 
         let id = Some(&resource.shard_id);
@@ -115,7 +113,7 @@ impl WriterChild for TextWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        let metric = request_time::RequestTimeKey::texts("set_resource".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took}");
 
@@ -123,7 +121,6 @@ impl WriterChild for TextWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
-        const NAME: &str = "delete_resource";
         let time = SystemTime::now();
         let id = Some(&resource_id.shard_id);
 
@@ -147,7 +144,7 @@ impl WriterChild for TextWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        let metric = request_time::RequestTimeKey::texts("delete_resource".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took}");
 

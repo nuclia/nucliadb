@@ -62,7 +62,6 @@ impl Debug for VectorReaderService {
 impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
-        const NAME: &str = "count";
         let time = SystemTime::now();
 
         let indexet_slock = self.indexset.get_slock()?;
@@ -74,7 +73,7 @@ impl VectorReader for VectorReaderService {
 
             let metrics = context::get_metrics();
             let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+            let metric = request_time::RequestTimeKey::vectors("count".to_string());
             metrics.record_request_time(metric, took);
             debug!("Ending at {took} ms");
 
@@ -87,7 +86,7 @@ impl VectorReader for VectorReaderService {
 
             let metrics = context::get_metrics();
             let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+            let metric = request_time::RequestTimeKey::vectors("count".to_string());
             metrics.record_request_time(metric, took);
             debug!("Ending at {took} ms");
 
@@ -107,7 +106,6 @@ impl ReaderChild for VectorReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        const NAME: &str = "search";
         let time = SystemTime::now();
 
         let id = Some(&request.id);
@@ -168,7 +166,7 @@ impl ReaderChild for VectorReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("search".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 

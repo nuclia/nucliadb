@@ -54,7 +54,6 @@ impl Debug for VectorWriterService {
 impl VectorWriter for VectorWriterService {
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
-        const NAME: &str = "list_vectorsets";
         let time = SystemTime::now();
 
         let id: Option<String> = None;
@@ -64,7 +63,7 @@ impl VectorWriter for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("list_vectorsets".to_string());
         metrics.record_request_time(metric, took);
 
         debug!("{id:?} - Ending at {took} ms");
@@ -76,7 +75,6 @@ impl VectorWriter for VectorWriterService {
         setid: &VectorSetId,
         similarity: VectorSimilarity,
     ) -> NodeResult<()> {
-        const NAME: &str = "add_vectorset";
         let time = SystemTime::now();
 
         let id = setid.shard.as_ref().map(|s| &s.id);
@@ -90,7 +88,7 @@ impl VectorWriter for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("add_vectorset".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
 
@@ -98,7 +96,6 @@ impl VectorWriter for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()> {
-        const NAME: &str = "remove_vectorset";
         let time = SystemTime::now();
 
         let id = setid.shard.as_ref().map(|s| &s.id);
@@ -110,7 +107,7 @@ impl VectorWriter for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("remove_vectorset".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
 
@@ -125,7 +122,6 @@ impl WriterChild for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        const NAME: &str = "count";
         let time = SystemTime::now();
 
         let id: Option<String> = None;
@@ -135,7 +131,7 @@ impl WriterChild for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("count".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
@@ -143,7 +139,6 @@ impl WriterChild for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
-        const NAME: &str = "delete_resource";
         let time = SystemTime::now();
 
         let id = Some(&resource_id.shard_id);
@@ -154,7 +149,7 @@ impl WriterChild for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("delete_resource".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
@@ -162,7 +157,6 @@ impl WriterChild for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        const NAME: &str = "set_resource";
         let time = SystemTime::now();
 
         let id = resource.resource.as_ref().map(|i| &i.shard_id);
@@ -309,7 +303,7 @@ impl WriterChild for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("set_resource".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
@@ -317,7 +311,6 @@ impl WriterChild for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
-        const NAME: &str = "garbage_collection";
         let time = SystemTime::now();
 
         self.collect_garbage_for(&self.index)?;
@@ -333,7 +326,7 @@ impl WriterChild for VectorWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors(NAME.to_string());
+        let metric = request_time::RequestTimeKey::vectors("garbage_collection".to_string());
         metrics.record_request_time(metric, took);
         debug!("Garbage collection {took} ms");
 

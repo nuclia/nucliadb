@@ -129,14 +129,13 @@ impl ReaderChild for TextReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        const NAME: &str = "search";
         let time = SystemTime::now();
 
         let result = self.do_search(request);
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        let metric = request_time::RequestTimeKey::texts("search".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(result?)
@@ -147,7 +146,6 @@ impl ReaderChild for TextReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        const NAME: &str = "stored_ids";
         let time = SystemTime::now();
 
         let mut keys = vec![];
@@ -162,7 +160,7 @@ impl ReaderChild for TextReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts(NAME.to_string());
+        let metric = request_time::RequestTimeKey::texts("stored_ids".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(keys)

@@ -221,7 +221,6 @@ impl RelationsReaderService {
 impl RelationReader for RelationsReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        const NAME: &str = "count";
         let time = SystemTime::now();
 
         let result = Ok(self
@@ -232,14 +231,13 @@ impl RelationReader for RelationsReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("count".to_string());
         metrics.record_request_time(metric, took);
 
         result
     }
     #[tracing::instrument(skip_all)]
     fn get_edges(&self) -> NodeResult<EdgeList> {
-        const NAME: &str = "get_edges";
         let time = SystemTime::now();
 
         let id: Option<String> = None;
@@ -268,14 +266,13 @@ impl RelationReader for RelationsReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("get_edges".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(EdgeList { list: edges })
     }
     #[tracing::instrument(skip_all)]
     fn get_node_types(&self) -> NodeResult<TypeList> {
-        const NAME: &str = "get_node_types";
         let time = SystemTime::now();
 
         let id: Option<String> = None;
@@ -304,7 +301,7 @@ impl RelationReader for RelationsReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("get_node_types".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(TypeList { list: types })
@@ -321,7 +318,6 @@ impl ReaderChild for RelationsReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        const NAME: &str = "search";
         let time = SystemTime::now();
 
         let result = Ok(RelationSearchResponse {
@@ -331,14 +327,13 @@ impl ReaderChild for RelationsReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("search".to_string());
         metrics.record_request_time(metric, took);
 
         result
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        const NAME: &str = "stored_ids";
         let time = SystemTime::now();
 
         let reader = self.index.start_reading()?;
@@ -351,7 +346,7 @@ impl ReaderChild for RelationsReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("stored_ids".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(ids)

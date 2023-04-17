@@ -169,7 +169,6 @@ impl ShardWriterService {
         path: &Path,
         request: &NewShardRequest,
     ) -> NodeResult<ShardWriterService> {
-        const NAME: &str = "writer/new";
         let time = SystemTime::now();
 
         std::fs::create_dir_all(path)?;
@@ -198,14 +197,13 @@ impl ShardWriterService {
         let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("writer/new".to_string());
         metrics.record_request_time(metric, took);
 
         result
     }
 
     pub fn open(id: String, path: &Path) -> NodeResult<ShardWriterService> {
-        const NAME: &str = "writer/open";
         let time = SystemTime::now();
 
         let metadata_path = path.join(METADATA_FILE);
@@ -230,7 +228,7 @@ impl ShardWriterService {
         let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("writer/open".to_string());
         metrics.record_request_time(metric, took);
 
         result
@@ -239,7 +237,6 @@ impl ShardWriterService {
     #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
         debug!("Stopping shard {}...", { &self.id });
-        const NAME: &str = "writer/stop";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -288,7 +285,7 @@ impl ShardWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("writer/stop".to_string());
         metrics.record_request_time(metric, took);
 
         debug!("Shard stopped {}...", { &self.id });
@@ -296,7 +293,6 @@ impl ShardWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
-        const NAME: &str = "writer/set_resource";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -362,7 +358,7 @@ impl ShardWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("writer/set_resource".to_string());
         metrics.record_request_time(metric, took);
 
         text_result?;
@@ -373,7 +369,6 @@ impl ShardWriterService {
     }
     #[tracing::instrument(skip_all)]
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
-        const NAME: &str = "writer/remove_resource";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -424,7 +419,7 @@ impl ShardWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("writer/remove_resource".to_string());
         metrics.record_request_time(metric, took);
 
         text_result?;
@@ -436,7 +431,6 @@ impl ShardWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
-        const NAME: &str = "writer/get_opstatus";
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -462,7 +456,7 @@ impl ShardWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard(NAME.to_string());
+        let metric = request_time::RequestTimeKey::shard("writer/get_opstatus".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(OpStatus {

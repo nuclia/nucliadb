@@ -60,8 +60,8 @@ impl RequestTimeKey {
 }
 
 pub(super) type RequestTimeMetric = Family<RequestTimeKey, Histogram>;
-const BUCKETS: [f64; 11] = [
-    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+const BUCKETS: [f64; 12] = [
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 2.5, 5.0, 10.0, 30.0, 60.0,
 ];
 
 pub(super) fn register_request_time(registry: &mut Registry) -> RequestTimeMetric {

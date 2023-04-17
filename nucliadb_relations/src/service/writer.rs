@@ -58,7 +58,6 @@ impl RelationsWriterService {
 impl RelationWriter for RelationsWriterService {
     #[tracing::instrument(skip_all)]
     fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> NodeResult<()> {
-        const NAME: &str = "delete_nodes";
         let time = SystemTime::now();
 
         let id = graph.shard_id.as_ref().map(|s| &s.id);
@@ -75,7 +74,7 @@ impl RelationWriter for RelationsWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("delete_nodes".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
@@ -83,7 +82,6 @@ impl RelationWriter for RelationsWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn join_graph(&mut self, graph: &JoinGraph) -> NodeResult<()> {
-        const NAME: &str = "join_graph";
         let time = SystemTime::now();
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -135,7 +133,7 @@ impl RelationWriter for RelationsWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("join_graph".to_string());
         metrics.record_request_time(metric, took);
 
         result
@@ -155,7 +153,6 @@ impl WriterChild for RelationsWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        const NAME: &str = "count";
         let time = SystemTime::now();
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -171,14 +168,13 @@ impl WriterChild for RelationsWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("count".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(count as usize)
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> NodeResult<()> {
-        const NAME: &str = "delete_resource";
         let time = SystemTime::now();
 
         let id = Some(&x.shard_id);
@@ -193,14 +189,13 @@ impl WriterChild for RelationsWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("delete_resource".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        const NAME: &str = "set_resource";
         let time = SystemTime::now();
 
         let id = Some(&resource.shard_id);
@@ -244,7 +239,7 @@ impl WriterChild for RelationsWriterService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations(NAME.to_string());
+        let metric = request_time::RequestTimeKey::relations("set_resource".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(())

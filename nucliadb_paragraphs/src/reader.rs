@@ -68,7 +68,6 @@ impl Debug for ParagraphReaderService {
 impl ParagraphReader for ParagraphReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        const NAME: &str = "count";
         let time = SystemTime::now();
 
         let id: Option<String> = None;
@@ -80,14 +79,13 @@ impl ParagraphReader for ParagraphReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs(NAME.to_string());
+        let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(count)
     }
     #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response> {
-        const NAME: &str = "suggest";
         let time = SystemTime::now();
         let id = Some(&request.shard);
 
@@ -132,7 +130,7 @@ impl ParagraphReader for ParagraphReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs(NAME.to_string());
+        let metric = request_time::RequestTimeKey::paragraphs("suggest".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -169,7 +167,6 @@ impl ReaderChild for ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        const NAME: &str = "search";
         let time = SystemTime::now();
         let id = Some(&request.id);
 
@@ -263,7 +260,7 @@ impl ReaderChild for ParagraphReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs(NAME.to_string());
+        let metric = request_time::RequestTimeKey::paragraphs("search".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(response)
@@ -274,7 +271,6 @@ impl ReaderChild for ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        const NAME: &str = "stored_ids";
         let time = SystemTime::now();
 
         let mut keys = vec![];
@@ -289,7 +285,7 @@ impl ReaderChild for ParagraphReaderService {
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs(NAME.to_string());
+        let metric = request_time::RequestTimeKey::paragraphs("stored_ids".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(keys)
