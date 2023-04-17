@@ -31,7 +31,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --find-interpreter
+          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --interpreter ${{ matrix.python }}
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v3
@@ -55,7 +55,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --find-interpreter
+          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --interpreter ${{ matrix.python }}
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -77,7 +77,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --find-interpreter --universal2
+          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --interpreter ${{ matrix.python }} --universal2
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
