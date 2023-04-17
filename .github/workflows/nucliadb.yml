@@ -185,6 +185,7 @@ jobs:
           push: true
           tags: nuclia/nucliadb:latest
           cache-from: type=registry,ref=nuclia/nucliadb:buildcache
+          # dockerhub might be giving us issues with build cache
           # cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
 
       - name: Get release version
@@ -202,6 +203,7 @@ jobs:
           push: true
           tags: nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
           cache-from: type=registry,ref=nuclia/nucliadb:buildcache
+          # dockerhub might be giving us issues with build cache
           # cache-to: type=registry,ref=nuclia/nucliadb:buildcache,mode=max
 
   push-dev:
