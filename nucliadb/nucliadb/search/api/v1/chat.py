@@ -95,7 +95,7 @@ async def chat(
     x_forwarded_for: str,
 ):
     predict = get_predict()
-    breakpoint()
+
     if item.context is not None and len(item.context) > 0:
         # There is context lets do a query
         req = ChatModel(
