@@ -1,6 +1,12 @@
 name: Release NucliaDB Node
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_node_release.yml"
+      - "nucliadb_node/binding/Cargo.toml"
   push:
     branches:
       - main
@@ -116,6 +122,7 @@ jobs:
   release:
     needs: [build]
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
 
     steps:
       - uses: actions/checkout@v3
