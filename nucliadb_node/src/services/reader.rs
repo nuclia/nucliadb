@@ -20,6 +20,8 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -93,11 +95,14 @@ impl ShardReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         self.reload_policy(true);
         let paragraphs = self.paragraph_reader.clone();
         let vectors = self.vector_reader.clone();
         let texts = self.text_reader.clone();
-        let span = tracing::Span::current();
+
         let info = info_span!(parent: &span, "text count");
         let text_task = || run_with_telemetry(info, move || texts.count());
         let info = info_span!(parent: &span, "paragraph count");
@@ -113,6 +118,11 @@ impl ShardReaderService {
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
         });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("reader/get_info".to_string());
+        metrics.record_request_time(metric, took);
 
         Ok(Shard {
             metadata: Some(self.metadata.clone().into()),
@@ -161,6 +171,9 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         let metadata = ShardMetadata::open(&shard_path.join(METADATA_FILE))?;
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
@@ -185,7 +198,6 @@ impl ShardReaderService {
         let vector_task = || Some(versions.get_vectors_reader(&vsc));
         let relation_task = || Some(versions.get_relations_reader(&rsc));
 
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text open");
         let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph open");
@@ -205,12 +217,15 @@ impl ShardReaderService {
             s.spawn(|_| vector_result = vector_task());
             s.spawn(|_| relation_result = relation_task());
         });
-
         let fields = text_result.transpose()?;
         let paragraphs = paragraph_result.transpose()?;
         let vectors = vector_result.transpose()?;
         let relations = relation_result.transpose()?;
 
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("reader/new".to_string());
+        metrics.record_request_time(metric, took);
         Ok(ShardReaderService {
             id,
             metadata,
@@ -229,7 +244,10 @@ impl ShardReaderService {
     /// Stop the service
     #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
-        info!("Stopping shard {}...", { &self.id });
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
+        debug!("Stopping shard {}...", { &self.id });
         let fields = self.text_reader.clone();
         let paragraphs = self.paragraph_reader.clone();
         let vectors = self.vector_reader.clone();
@@ -240,7 +258,6 @@ impl ShardReaderService {
         let vector_task = move || vectors.stop();
         let relation_task = move || relations.stop();
 
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text stop");
         let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph stop");
@@ -260,7 +277,6 @@ impl ShardReaderService {
             s.spawn(|_| vector_result = vector_task());
             s.spawn(|_| relation_result = relation_task());
         });
-
         if let Err(e) = text_result {
             error!("Error stopping the Field reader service: {}", e);
         }
@@ -273,7 +289,13 @@ impl ShardReaderService {
         if let Err(e) = relation_result {
             error!("Error stopping the Relation reader service: {}", e);
         }
-        info!("Shard stopped {}...", { &self.id });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("reader/stop".to_string());
+        metrics.record_request_time(metric, took);
+
+        debug!("Shard stopped {}...", { &self.id });
     }
 
     /// Return a list of queries to suggest from the original
@@ -305,7 +327,8 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
-        // Search for entities related to the query.
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
 
         let relations_reader_service = self.relation_reader.clone();
         let paragraph_reader_service = self.paragraph_reader.clone();
@@ -325,7 +348,7 @@ impl ShardReaderService {
 
         let relation_task = move || relations.collect::<Vec<_>>();
         let paragraph_task = move || paragraph_reader_service.suggest(&request);
-        let span = tracing::Span::current();
+
         let info = info_span!(parent: &span, "relations suggest");
         let relation_task = || run_with_telemetry(info, relation_task);
         let info = info_span!(parent: &span, "paragraph suggest");
@@ -348,6 +371,11 @@ impl ShardReaderService {
             })
             .collect::<Vec<String>>();
 
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("reader/suggest".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(SuggestResponse {
             query: rparagraph.query,
             total: rparagraph.total,
@@ -362,6 +390,9 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         self.reload_policy(search_request.reload);
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
@@ -449,7 +480,6 @@ impl ShardReaderService {
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || Some(relation_reader_service.search(&relation_request));
 
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text search");
         let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph search");
@@ -470,23 +500,17 @@ impl ShardReaderService {
             s.spawn(|_| rvector = vector_task());
             s.spawn(|_| rrelation = relation_task());
         });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("reader/search".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(SearchResponse {
             document: rtext.transpose()?,
             paragraph: rparagraph.transpose()?,
             vector: rvector.transpose()?,
             relation: rrelation.transpose()?,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn paragraph_search(
-        &self,
-        search_request: ParagraphSearchRequest,
-    ) -> NodeResult<ParagraphSearchResponse> {
-        self.reload_policy(search_request.reload);
-        let span = tracing::Span::current();
-        run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-            self.paragraph_reader.search(&search_request)
         })
     }
 
@@ -509,12 +533,24 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
+    pub fn paragraph_search(
+        &self,
+        search_request: ParagraphSearchRequest,
+    ) -> NodeResult<ParagraphSearchResponse> {
+        let span = tracing::Span::current();
+        self.reload_policy(search_request.reload);
+        run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
+            self.paragraph_reader.search(&search_request)
+        })
+    }
+
+    #[tracing::instrument(skip_all)]
     pub fn document_search(
         &self,
         search_request: DocumentSearchRequest,
     ) -> NodeResult<DocumentSearchResponse> {
-        self.reload_policy(search_request.reload);
         let span = tracing::Span::current();
+        self.reload_policy(search_request.reload);
         run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
             self.text_reader.search(&search_request)
         })
@@ -525,8 +561,8 @@ impl ShardReaderService {
         &self,
         search_request: VectorSearchRequest,
     ) -> NodeResult<VectorSearchResponse> {
-        self.reload_policy(search_request.reload);
         let span = tracing::Span::current();
+        self.reload_policy(search_request.reload);
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
             self.vector_reader.search(&search_request)
         })
@@ -536,8 +572,8 @@ impl ShardReaderService {
         &self,
         search_request: RelationSearchRequest,
     ) -> NodeResult<RelationSearchResponse> {
-        self.reload_policy(search_request.reload);
         let span = tracing::Span::current();
+        self.reload_policy(search_request.reload);
         run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {
             self.relation_reader.search(&search_request)
         })

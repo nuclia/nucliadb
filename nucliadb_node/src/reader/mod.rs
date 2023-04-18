@@ -23,10 +23,10 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest, SuggestRequest,
-    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, IdCollection,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse,
+    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest,
+    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
@@ -34,31 +34,23 @@ use nucliadb_core::tracing::{self, *};
 use crate::env;
 use crate::services::reader::ShardReaderService;
 
-#[derive(Debug)]
+#[derive(Default)]
 pub struct NodeReaderService {
     pub cache: HashMap<String, ShardReaderService>,
-}
-
-impl Default for NodeReaderService {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl NodeReaderService {
     pub fn new() -> NodeReaderService {
         // We shallow the error if the threadpool was already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
-        Self {
-            cache: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Stop all shards on memory
     #[tracing::instrument(skip_all)]
     pub fn shutdown(&mut self) {
         for (shard_id, shard) in &mut self.cache {
-            info!("Stopping shard {}", shard_id);
+            debug!("Stopping shard {}", shard_id);
             ShardReaderService::stop(shard);
         }
     }
@@ -69,7 +61,7 @@ impl NodeReaderService {
         Ok(std::fs::read_dir(shards_path)?.flatten().map(|entry| {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            info!("Opening {shard_path:?}");
+            debug!("Opening {shard_path:?}");
             ShardReaderService::new(file_name, &shard_path)
         }))
     }
@@ -78,7 +70,7 @@ impl NodeReaderService {
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> NodeResult<()> {
         let shards_path = env::shards_path();
-        info!("Recovering shards from {shards_path:?}...");
+        debug!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
@@ -86,7 +78,7 @@ impl NodeReaderService {
             match ShardReaderService::new(file_name.clone(), &shard_path) {
                 Err(err) => error!("Loading {shard_path:?} raised {err}"),
                 Ok(shard) => {
-                    info!("Shard loaded: {shard_path:?}");
+                    debug!("Shard loaded: {shard_path:?}");
                     self.cache.insert(file_name, shard);
                 }
             }
@@ -100,7 +92,7 @@ impl NodeReaderService {
         let shard_path = env::shards_path_id(&shard_id.id);
 
         if self.cache.contains_key(&shard_id.id) {
-            info!("Shard {shard_path:?} is already on memory");
+            debug!("Shard {shard_path:?} is already on memory");
             return;
         }
         if !shard_path.is_dir() {
@@ -112,7 +104,7 @@ impl NodeReaderService {
             return;
         };
         self.cache.insert(shard_id.id.clone(), shard);
-        info!("{shard_path:?}: Shard loaded");
+        debug!("{shard_path:?}: Shard loaded");
     }
 
     #[tracing::instrument(skip_all)]
@@ -153,6 +145,7 @@ impl NodeReaderService {
         let suggest_response = shard.suggest(request)?;
         Ok(Some(suggest_response))
     }
+
     #[tracing::instrument(skip_all)]
     pub fn search(
         &self,
@@ -280,5 +273,17 @@ impl NodeReaderService {
             return Ok(None);
         };
         Ok(Some(shard.get_relations_types()?))
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn get_info(
+        &self,
+        shard_id: &ShardId,
+        request: GetShardRequest,
+    ) -> NodeResult<Option<ShardPB>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.get_info(&request).map(Some)
     }
 }

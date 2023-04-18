@@ -279,3 +279,17 @@ pub fn shutdown_delay() -> Duration {
 
     duration
 }
+
+pub fn metrics_http_port(default: u16) -> u16 {
+    match env::var("METRICS_HTTP_PORT") {
+        Ok(http_port) => {
+            if let Ok(port) = http_port.parse() {
+                port
+            } else {
+                error!("METRICS_HTTP_PORT defined incorrectly. Defaulting to {default}");
+                default
+            }
+        }
+        Err(_) => default,
+    }
+}

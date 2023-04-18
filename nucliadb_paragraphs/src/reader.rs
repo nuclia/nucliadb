@@ -23,6 +23,8 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
@@ -66,22 +68,29 @@ impl Debug for ParagraphReaderService {
 impl ParagraphReader for ParagraphReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let id: Option<String> = None;
         let time = SystemTime::now();
+
+        let id: Option<String> = None;
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
+            debug!("{id:?} - Ending at: {v} ms");
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(count)
     }
     #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response> {
-        let id = Some(&request.shard);
         let time = SystemTime::now();
+        let id = Some(&request.shard);
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: starts at {v} ms");
+            debug!("{id:?} - Creating query: starts at {v} ms");
         }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
@@ -89,22 +98,22 @@ impl ParagraphReader for ParagraphReaderService {
         let (original, termc, fuzzied) =
             suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: ends at {v} ms");
+            debug!("{id:?} - Creating query: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: starts at {v} ms");
+            debug!("{id:?} - Searching: starts at {v} ms");
         }
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(no_results);
         let mut results = searcher.search(&original, &topdocs).unwrap();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: ends at {v} ms");
+            debug!("{id:?} - Searching: ends at {v} ms");
         }
 
         if results.is_empty() {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Trying fuzzy: starts at {v} ms");
+                debug!("{id:?} - Trying fuzzy: starts at {v} ms");
             }
             let topdocs = TopDocs::with_limit(no_results);
             match searcher.search(&fuzzied, &topdocs) {
@@ -112,13 +121,18 @@ impl ParagraphReader for ParagraphReaderService {
                 Err(err) => error!("{err:?} during suggest"),
             }
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Trying fuzzy: ends at {v} ms");
+                debug!("{id:?} - Trying fuzzy: ends at {v} ms");
             }
         }
-
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
+            debug!("{id:?} - Ending at: {v} ms");
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::paragraphs("suggest".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
             facets_count: None,
             facets: vec![],
@@ -148,16 +162,16 @@ impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
     fn stop(&self) -> NodeResult<()> {
-        info!("Stopping Paragraph Reader Service");
+        debug!("Stopping Paragraph Reader Service");
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        let id = Some(&request.id);
         let time = SystemTime::now();
+        let id = Some(&request.id);
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: starts at {v} ms");
+            debug!("{id:?} - Creating query: starts at {v} ms");
         }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
@@ -172,11 +186,11 @@ impl ReaderChild for ParagraphReaderService {
             .collect();
         let text = self.adapt_text(&parser, &request.body);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: ends at {v} ms");
+            debug!("{id:?} - Creating query: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: starts at {v} ms");
+            debug!("{id:?} - Searching: starts at {v} ms");
         }
         let advanced = request
             .advanced_query
@@ -202,12 +216,12 @@ impl ReaderChild for ParagraphReaderService {
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: ends at {v} ms");
+            debug!("{id:?} - Searching: ends at {v} ms");
         }
 
         if response.results.is_empty() {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Applying fuzzy: starts at {v} ms");
+                debug!("{id:?} - Applying fuzzy: starts at {v} ms");
             }
             searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
@@ -224,12 +238,12 @@ impl ReaderChild for ParagraphReaderService {
             response.total = response.results.len() as i32;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Applying fuzzy: ends at {v} ms");
+                debug!("{id:?} - Applying fuzzy: ends at {v} ms");
             }
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Producing results: starts at {v} ms");
+            debug!("{id:?} - Producing results: starts at {v} ms");
         }
         let total = response.results.len() as f32;
         response.results.iter_mut().enumerate().for_each(|(i, r)| {
@@ -238,12 +252,17 @@ impl ReaderChild for ParagraphReaderService {
             }
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Producing results: starts at {v} ms");
+            debug!("{id:?} - Producing results: starts at {v} ms");
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            debug!("{id:?} - Ending at: {v} ms");
         }
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at: {v} ms");
-        }
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::paragraphs("search".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(response)
     }
     #[tracing::instrument(skip_all)]
@@ -252,6 +271,8 @@ impl ReaderChild for ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
+        let time = SystemTime::now();
+
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -261,6 +282,12 @@ impl ReaderChild for ParagraphReaderService {
                 .and_then(|i| i.as_text().map(String::from)) else { continue };
             keys.push(key);
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::paragraphs("stored_ids".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(keys)
     }
 }
@@ -387,10 +414,10 @@ impl Iterator for BatchProducer {
     fn next(&mut self) -> Option<Self::Item> {
         let time = SystemTime::now();
         if self.offset >= self.total {
-            info!("No more batches available");
+            debug!("No more batches available");
             return None;
         }
-        info!("Producing a new batch with offset: {}", self.offset);
+        debug!("Producing a new batch with offset: {}", self.offset);
 
         let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
         let top_docs = self.searcher.search(&self.query, &topdocs).unwrap();
@@ -413,7 +440,7 @@ impl Iterator for BatchProducer {
         }
         self.offset += Self::BATCH;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("New batch created, took {v} ms");
+            debug!("New batch created, took {v} ms");
         }
         Some(items)
     }

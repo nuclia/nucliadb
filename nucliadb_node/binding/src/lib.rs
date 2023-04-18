@@ -126,13 +126,9 @@ impl NodeReader {
 
     pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let request = GetShardRequest::decode(&mut Cursor::new(shard_id)).unwrap();
-        let shard_id = request.shard_id.as_ref().unwrap();
+        let shard_id = &request.shard_id.clone().unwrap();
         self.reader.load_shard(shard_id);
-        let response = self
-            .reader
-            .get_shard(shard_id)
-            .map(|s| s.get_info(&request));
-        match response {
+        match self.reader.get_info(shard_id, request).transpose() {
             Some(Ok(shard)) => Ok(PyList::new(py, shard.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),

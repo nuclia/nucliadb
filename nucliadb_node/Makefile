@@ -25,3 +25,8 @@ test:
 .PHONY: test-cov
 test-cov:
 	pytest -rfE --cov=nucliadb_node --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb_node
+
+.PHONY: build
+build:
+	export RUSTFLAGS="--cfg=prometheus_metrics"
+	cargo build

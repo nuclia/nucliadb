@@ -50,8 +50,15 @@ from nucliadb_models.search import (
     TempFindParagraph,
     TextPosition,
 )
+from nucliadb_telemetry import metrics
+from nucliadb_utils.utilities import has_feature
 
 from .metrics import merge_observer
+
+FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
+    "nucliadb_find_fetch_operations",
+    buckets=[1, 5, 10, 20, 30, 40, 50, 60, 80, 100, 200],
+)
 
 
 async def get_text_find_paragraph(
@@ -177,7 +184,11 @@ async def fetch_find_metadata(
 ):
     resources = set()
     operations = []
-    max_operations = asyncio.Semaphore(10)
+    if has_feature("nucliadb_find_merge_parallelisation"):
+        max_operations = asyncio.Semaphore(100)
+    else:
+        max_operations = asyncio.Semaphore(10)
+
     orderer = Orderer()
 
     for result_paragraph in result_paragraphs:
@@ -242,6 +253,8 @@ async def fetch_find_metadata(
                 max_operations=max_operations,
             )
         )
+
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
     if len(operations) > 0:
         await asyncio.wait(operations)  # type: ignore
 
