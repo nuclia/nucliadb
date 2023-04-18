@@ -32,9 +32,7 @@ use nucliadb_core::protos::{
     FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
 };
 use nucliadb_core::tracing::{self, *};
-use tantivy::collector::{
-    Collector, Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
-};
+use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
@@ -489,13 +487,9 @@ impl TextReaderService {
                 })
             }
             Some(order_by) => {
-                let mut multicollector = MultiCollector::new();
-                let facet_handler = multicollector.add_collector(facet_collector);
                 let topdocs_collector = self.custom_order_collector(order_by, extra_result, offset);
-                let topdocs_handler = multicollector.add_collector(topdocs_collector);
-                let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                let facets_count = facet_handler.extract(&mut multi_fruit);
-                let top_docs = topdocs_handler.extract(&mut multi_fruit);
+                let multicollector = &(facet_collector, topdocs_collector);
+                let (facets_count, top_docs) = searcher.search(&query, multicollector)?;
                 let result = self.convert_int_order(
                     SearchResponse {
                         facets_count,
@@ -511,13 +505,9 @@ impl TextReaderService {
                 Ok(result)
             }
             None => {
-                let mut multicollector = MultiCollector::new();
-                let facet_handler = multicollector.add_collector(facet_collector);
                 let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(offset);
-                let topdocs_handler = multicollector.add_collector(topdocs_collector);
-                let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                let facets_count = facet_handler.extract(&mut multi_fruit);
-                let top_docs = topdocs_handler.extract(&mut multi_fruit);
+                let multicollector = &(facet_collector, topdocs_collector);
+                let (facets_count, top_docs) = searcher.search(&query, multicollector)?;
                 let result = self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
