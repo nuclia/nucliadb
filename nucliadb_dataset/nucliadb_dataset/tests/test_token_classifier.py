@@ -102,7 +102,8 @@ def test_token_classification_with_multiple_labels(
         partitions = dataset.get_partitions()
         assert len(partitions) == 1
 
-        time.sleep(0.5)
+        # TODO: remove after ticket sc-4488 is fixed
+        time.sleep(1)
 
         filename = dataset.read_partition(partitions[0])
 
