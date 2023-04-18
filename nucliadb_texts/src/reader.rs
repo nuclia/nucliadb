@@ -72,6 +72,7 @@ pub struct SearchResponse<'a, S> {
     pub order_by: Option<OrderBy>,
     pub page_number: i32,
     pub results_per_page: i32,
+    pub total: usize,
 }
 
 pub struct TextReaderService {
@@ -289,15 +290,10 @@ impl TextReaderService {
         response: SearchResponse<u64>,
         searcher: &Searcher,
     ) -> DocumentSearchResponse {
-        let mut total = response.top_docs.len();
-        let next_page: bool;
-        if total > response.results_per_page as usize {
-            next_page = true;
-            total = response.results_per_page as usize;
-        } else {
-            next_page = false;
-        }
-        let mut results = Vec::with_capacity(total);
+        let total = response.total as i32;
+        let retrieved_results = (response.page_number + 1) * response.results_per_page;
+        let next_page = total > retrieved_results;
+        let mut results = Vec::with_capacity(response.top_docs.len());
         for (id, (_, doc_address)) in response.top_docs.into_iter().enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
@@ -355,16 +351,18 @@ impl TextReaderService {
         response: SearchResponse<f32>,
         searcher: &Searcher,
     ) -> DocumentSearchResponse {
-        let mut total = response.top_docs.len();
-        let next_page: bool;
-        if total > response.results_per_page as usize {
-            next_page = true;
-            total = response.results_per_page as usize;
-        } else {
-            next_page = false;
-        }
-        let mut results = Vec::with_capacity(total);
-        for (id, (score, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
+        let total = response.total as i32;
+        let retrieved_results = (response.page_number + 1) * response.results_per_page;
+        let next_page = total > retrieved_results;
+        let results_per_page = response.results_per_page as usize;
+        let result_stream = response
+            .top_docs
+            .into_iter()
+            .take(results_per_page)
+            .enumerate();
+        
+        let mut results = Vec::with_capacity(results_per_page);
+        for (id, (score, doc_address)) in result_stream {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = Some(ResultScore {
@@ -406,9 +404,9 @@ impl TextReaderService {
 
         let facets = produce_facets(response.facets, response.facets_count);
         DocumentSearchResponse {
-            total: total as i32,
             results,
             facets,
+            total: response.total as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
@@ -488,13 +486,14 @@ impl TextReaderService {
             }
             Some(order_by) => {
                 let topdocs_collector = self.custom_order_collector(order_by, extra_result, offset);
-                let multicollector = &(facet_collector, topdocs_collector);
-                let (facets_count, top_docs) = searcher.search(&query, multicollector)?;
+                let multicollector = &(facet_collector, topdocs_collector, Count);
+                let (facets_count, top_docs, total) = searcher.search(&query, multicollector)?;
                 let result = self.convert_int_order(
                     SearchResponse {
                         facets_count,
                         facets,
                         top_docs,
+                        total,
                         query: &text,
                         order_by: request.order.clone(),
                         page_number: request.page_number,
@@ -506,13 +505,14 @@ impl TextReaderService {
             }
             None => {
                 let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(offset);
-                let multicollector = &(facet_collector, topdocs_collector);
-                let (facets_count, top_docs) = searcher.search(&query, multicollector)?;
+                let multicollector = &(facet_collector, topdocs_collector, Count);
+                let (facets_count, top_docs, total) = searcher.search(&query, multicollector)?;
                 let result = self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
                         facets,
                         top_docs,
+                        total,
                         query: &text,
                         order_by: request.order.clone(),
                         page_number: request.page_number,
