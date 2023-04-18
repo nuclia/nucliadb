@@ -1,6 +1,12 @@
 name: Release NucliaDB Node
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_node_release.yml"
+      - "nucliadb_node/binding/Cargo.toml"
   push:
     branches:
       - main
@@ -22,7 +28,7 @@ jobs:
             platform: linux
           - os: windows
             ls: dir
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           # - os: windows
           #   ls: dir
           #   target: i686
@@ -30,7 +36,7 @@ jobs:
           #   interpreter: 3.7 3.8 3.9 3.10
           - os: macos
             target: aarch64
-            interpreter: 3.7 3.8 3.9 3.10
+            interpreter: 3.7 3.8 3.9 3.10 3.11
           # - os: ubuntu
           #   platform: linux
           #   target: i686
@@ -44,7 +50,7 @@ jobs:
           #   platform: linux
           #   target: armv7
           #   container: messense/manylinux_2_24-cross:armv7
-          #   interpreter: 3.7 3.8 3.9 3.10
+          #   interpreter: 3.7 3.8 3.9 3.10 3.11
           # musllinux
           - os: ubuntu
             platform: linux
@@ -85,7 +91,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.7 3.8 3.9 3.10 pypy3.7 pypy3.8 pypy3.9' }}
+          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9' }}
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
@@ -116,6 +122,7 @@ jobs:
   release:
     needs: [build]
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
 
     steps:
       - uses: actions/checkout@v3
