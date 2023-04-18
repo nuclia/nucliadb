@@ -7,8 +7,8 @@ WORKDIR /nucliadb
 
 RUN apt-get -y update \
     && apt-get -y install ca-certificates \
-                          cmake \
-                          libssl-dev \
+    cmake \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -59,13 +59,15 @@ FROM base as builder
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 
+ENV RUSTFLAGS="--cfg prometheus_metrics"
+
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
 # Build dependencies (this is the cached docker layer)
 RUN cargo chef cook \
-     --recipe-path recipe.json \
-     --features $CARGO_FEATURES \
-     $(test "$CARGO_PROFILE" = "release" && echo "--release")
+    --recipe-path recipe.json \
+    --features $CARGO_FEATURES \
+    $(test "$CARGO_PROFILE" = "release" && echo "--release")
 
 # XXX same as above
 COPY Cargo.toml \
@@ -87,9 +89,9 @@ COPY vectors_benchmark /nucliadb/vectors_benchmark
 # Build application (only run when sources are modified)
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && cargo build \
-        --features $CARGO_FEATURES \
-        -p nucliadb_node \
-        $(test "$CARGO_PROFILE" = "release" && echo "--release") \
+    --features $CARGO_FEATURES \
+    -p nucliadb_node \
+    $(test "$CARGO_PROFILE" = "release" && echo "--release") \
     && echo "Moving binaries to /nucliadb/bin" \
     && mkdir -p /nucliadb/bin \
     && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /nucliadb/bin \; \
@@ -107,8 +109,8 @@ ENV RUST_BACKTRACE=1
 
 RUN apt-get -y update \
     && apt-get -y install ca-certificates curl \
-                          libssl1.1 \
-                          lmdb-utils \
+    libssl1.1 \
+    lmdb-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=base /bin/grpc_health_probe /bin/grpc_health_probe
