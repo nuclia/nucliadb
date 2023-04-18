@@ -23,6 +23,7 @@ use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
+use nucliadb_node::http_server::run_http_metrics_server;
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
@@ -36,9 +37,7 @@ type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Reader Node starting...");
     let _guard = init_telemetry()?;
-
     let start_bootstrap = Instant::now();
-
     let mut node_reader_service = NodeReaderService::new();
 
     std::fs::create_dir_all(env::shards_path())?;
@@ -47,17 +46,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let grpc_driver = NodeReaderGRPCDriver::from(node_reader_service);
-
-    tokio::spawn(start_grpc_service(grpc_driver));
+    let _grpc_task = tokio::spawn(start_grpc_service(grpc_driver));
+    let metrics_task = tokio::spawn(run_http_metrics_server(3031));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
     wait_for_sigkill().await?;
-
     info!("Shutting down NucliaDB Reader Node...");
     // wait some time to handle latest gRPC calls
     tokio::time::sleep(env::shutdown_delay()).await;
+    metrics_task.abort();
+    let _ = metrics_task.await;
 
     Ok(())
 }

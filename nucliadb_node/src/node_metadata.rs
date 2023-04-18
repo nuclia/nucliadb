@@ -113,11 +113,11 @@ impl NodeMetadata {
 
     pub fn load_or_create(path: &Path) -> NodeResult<Self> {
         if !path.exists() {
-            info!("Node metadata file does not exist.");
+            debug!("Node metadata file does not exist.");
 
             let node_metadata = Self::create(path).unwrap_or_else(|e| {
                 warn!("Cannot create metadata file '{}': {e}", path.display());
-                info!("Create default metadata file '{}'", path.display());
+                debug!("Create default metadata file '{}'", path.display());
 
                 Self::default()
             });
@@ -130,7 +130,7 @@ impl NodeMetadata {
     }
 
     pub fn save(&self, path: &Path) -> NodeResult<()> {
-        info!("Saving node metadata file '{}'", path.display());
+        debug!("Saving node metadata file '{}'", path.display());
         let file = File::create(path)?;
         let mut writer = BufWriter::new(file);
         serde_json::to_writer(&mut writer, &self)?;
@@ -138,14 +138,14 @@ impl NodeMetadata {
     }
 
     pub fn load(path: &Path) -> NodeResult<Self> {
-        info!("Loading node metadata file '{}'", path.display());
+        debug!("Loading node metadata file '{}'", path.display());
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         Ok(serde_json::from_reader(reader)?)
     }
 
     pub fn create(path: &Path) -> NodeResult<Self> {
-        info!("Creating node metadata file '{}'", path.display());
+        debug!("Creating node metadata file '{}'", path.display());
         let reader = NodeReaderService::new();
         let mut node_metadata = NodeMetadata::default();
         for shard in reader.iter_shards()?.flatten() {

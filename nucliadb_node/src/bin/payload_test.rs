@@ -42,9 +42,7 @@ fn main() -> anyhow::Result<()> {
         assert!(res.is_some());
         println!("Resource added: {:?}", res.unwrap());
         let info = reader
-            .get_shard(&shard_id)
-            .unwrap()
-            .get_info(&GetShardRequest::default())
+            .get_info(&shard_id, GetShardRequest::default())?
             .unwrap();
         println!("Sentences {}", info.sentences);
         println!("Paragraphs {}", info.paragraphs);

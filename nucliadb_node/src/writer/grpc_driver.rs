@@ -103,7 +103,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     async fn get_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         self.instrument(&request);
 
-        info!("{:?}: gRPC get_shard", request);
+        debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.load_shard(&shard_id).await;
         let reader = self.inner.read().await;
@@ -111,7 +111,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         std::mem::drop(reader);
         match result {
             true => {
-                info!("{:?}: Ready readed", shard_id);
+                debug!("{:?}: Ready readed", shard_id);
                 Ok(tonic::Response::new(shard_id))
             }
             false => {
@@ -128,7 +128,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<ShardCreated>, Status> {
         self.instrument(&request);
 
-        info!("Creating new shard");
+        debug!("Creating new shard");
         let request = request.into_inner();
         send_telemetry_event(TelemetryEvent::Create).await;
         let mut writer = self.inner.write().await;
@@ -147,7 +147,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         self.instrument(&request);
 
-        info!("gRPC delete_shard {:?}", request);
+        debug!("gRPC delete_shard {:?}", request);
         send_telemetry_event(TelemetryEvent::Delete).await;
         // Deletion does not require for the shard
         // to be loaded.
@@ -176,7 +176,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<ShardCleaned>, Status> {
         self.instrument(&request);
 
-        info!("gRPC delete_shard {:?}", request);
+        debug!("gRPC delete_shard {:?}", request);
 
         // Deletion and upgrade do not require for the shard
         // to be loaded.
@@ -218,7 +218,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let result = inner.set_resource(&shard_id, &resource);
         match result.transpose() {
             Some(Ok(mut status)) => {
-                info!("Set resource ends correctly");
+                debug!("Set resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
 
@@ -261,7 +261,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let inner = self.inner.read().await;
         match inner.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
-                info!("Delete relations ends correctly");
+                debug!("Delete relations ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
@@ -289,7 +289,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let inner = self.inner.read().await;
         match inner.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(mut status)) => {
-                info!("Join graph ends correctly");
+                debug!("Join graph ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
@@ -322,7 +322,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let result = inner.remove_resource(&shard_id, &resource);
         match result.transpose() {
             Some(Ok(mut status)) => {
-                info!("Remove resource ends correctly");
+                debug!("Remove resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
 
@@ -364,7 +364,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let inner = self.inner.read().await;
         match inner.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
-                info!("add_vector_set ends correctly");
+                debug!("add_vector_set ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
@@ -393,7 +393,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let inner = self.inner.read().await;
         match inner.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
-                info!("remove_vector_set ends correctly");
+                debug!("remove_vector_set ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
@@ -419,7 +419,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let reader = self.inner.read().await;
         match reader.list_vectorsets(&shard_id).transpose() {
             Some(Ok(list)) => {
-                info!("list_vectorset ends correctly");
+                debug!("list_vectorset ends correctly");
                 let list = VectorSetList {
                     shard: Some(shard_id),
                     vectorset: list,
@@ -466,7 +466,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .await
         {
             Ok(_) => {
-                info!(
+                debug!(
                     "Shard {} moved to {} successfully",
                     shard_id.id, request.address
                 );
@@ -509,7 +509,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .await
         {
             Ok(_) => {
-                info!("Shard {} received successfully", shard_id.id);
+                debug!("Shard {} received successfully", shard_id.id);
 
                 Ok(tonic::Response::new(EmptyResponse {}))
             }
@@ -548,7 +548,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
-        info!("Running garbage collection at {}", shard_id.id);
+        debug!("Running garbage collection at {}", shard_id.id);
         self.load_shard(&shard_id).await;
 
         let inner = self.inner.read().await;
@@ -556,17 +556,17 @@ impl NodeWriter for NodeWriterGRPCDriver {
         std::mem::drop(inner);
         match result.transpose() {
             Some(Ok(_)) => {
-                info!("Garbage collection at {} was successful", shard_id.id);
+                debug!("Garbage collection at {} was successful", shard_id.id);
                 let resp = EmptyResponse {};
                 Ok(tonic::Response::new(resp))
             }
             Some(Err(_)) => {
-                info!("Garbage collection at {} raised an error", shard_id.id);
+                debug!("Garbage collection at {} raised an error", shard_id.id);
                 let resp = EmptyResponse {};
                 Ok(tonic::Response::new(resp))
             }
             None => {
-                info!("{} was not found", shard_id.id);
+                debug!("{} was not found", shard_id.id);
                 let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }

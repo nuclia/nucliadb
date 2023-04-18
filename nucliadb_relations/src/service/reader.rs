@@ -22,6 +22,8 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
+use nucliadb_core::context;
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::{self, *};
@@ -60,7 +62,7 @@ impl RelationsReaderService {
         let mut edge_filters = HashSet::with_capacity(bfs_request.edge_filters.len());
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} -  Creating entry points: starts {v} ms");
+            debug!("{id:?} -  Creating entry points: starts {v} ms");
         }
         for node in bfs_request.entry_points.iter() {
             let name = node.value.clone();
@@ -75,11 +77,11 @@ impl RelationsReaderService {
             }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} -  Creating entry points: ends {v} ms");
+            debug!("{id:?} -  Creating entry points: ends {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - adding query type filters: starts {v} ms");
+            debug!("{id:?} - adding query type filters: starts {v} ms");
         }
         bfs_request.node_filters.iter().for_each(|filter| {
             let node_type = filter.node_type();
@@ -100,11 +102,11 @@ impl RelationsReaderService {
             edge_filters.insert(type_info);
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - adding query type filters: ends {v} ms");
+            debug!("{id:?} - adding query type filters: ends {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running the search: starts {v} ms");
+            debug!("{id:?} - running the search: starts {v} ms");
         }
         let guide = GrpcGuide {
             node_filters,
@@ -136,11 +138,11 @@ impl RelationsReaderService {
             subgraph.push(relation);
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running the search: ends {v} ms");
+            debug!("{id:?} - running the search: ends {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms");
+            debug!("{id:?} - Ending at {v} ms");
         }
         Ok(Some(EntitiesSubgraphResponse {
             relations: subgraph,
@@ -162,18 +164,18 @@ impl RelationsReaderService {
         let reader = self.index.start_reading()?;
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running prefix search: starts {v} ms");
+            debug!("{id:?} - running prefix search: starts {v} ms");
         }
         let prefixes = reader
             .prefix_search(&self.rmode, prefix)?
             .into_iter()
             .flat_map(|key| reader.get_node_id(&key).ok().flatten());
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running prefix search: ends {v} ms");
+            debug!("{id:?} - running prefix search: ends {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - generating results: starts {v} ms");
+            debug!("{id:?} - generating results: starts {v} ms");
         }
 
         let mut node_filters = HashSet::new();
@@ -205,11 +207,11 @@ impl RelationsReaderService {
                 })
             });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - generating results: ends {v} ms");
+            debug!("{id:?} - generating results: ends {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms");
+            debug!("{id:?} - Ending at {v} ms");
         }
         Ok(Some(RelationPrefixSearchResponse {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
@@ -219,16 +221,26 @@ impl RelationsReaderService {
 impl RelationReader for RelationsReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        Ok(self
+        let time = SystemTime::now();
+
+        let result = Ok(self
             .index
             .start_reading()
             .and_then(|reader| reader.no_nodes())
-            .map(|v| v as usize)?)
+            .map(|v| v as usize)?);
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations("count".to_string());
+        metrics.record_request_time(metric, took);
+
+        result
     }
     #[tracing::instrument(skip_all)]
     fn get_edges(&self) -> NodeResult<EdgeList> {
-        let id: Option<String> = None;
         let time = SystemTime::now();
+
+        let id: Option<String> = None;
         let reader = self.index.start_reading()?;
         let iter = reader.iter_edge_ids()?;
         let mut edges = Vec::new();
@@ -249,14 +261,21 @@ impl RelationReader for RelationsReaderService {
             }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms");
+            debug!("{id:?} - Ending at {v} ms");
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations("get_edges".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(EdgeList { list: edges })
     }
     #[tracing::instrument(skip_all)]
     fn get_node_types(&self) -> NodeResult<TypeList> {
-        let id: Option<String> = None;
         let time = SystemTime::now();
+
+        let id: Option<String> = None;
         let mut found = HashSet::new();
         let mut types = Vec::new();
         let reader = self.index.start_reading()?;
@@ -277,8 +296,14 @@ impl RelationReader for RelationsReaderService {
             }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms");
+            debug!("{id:?} - Ending at {v} ms");
         }
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations("get_node_types".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(TypeList { list: types })
     }
 }
@@ -288,18 +313,29 @@ impl ReaderChild for RelationsReaderService {
     type Response = RelationSearchResponse;
     #[tracing::instrument(skip_all)]
     fn stop(&self) -> NodeResult<()> {
-        info!("Stopping relation reader Service");
+        debug!("Stopping relation reader Service");
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        Ok(RelationSearchResponse {
+        let time = SystemTime::now();
+
+        let result = Ok(RelationSearchResponse {
             subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,
-        })
+        });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations("search".to_string());
+        metrics.record_request_time(metric, took);
+
+        result
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
+        let time = SystemTime::now();
+
         let reader = self.index.start_reading()?;
         let ids = reader
             .iter_node_ids()?
@@ -307,6 +343,12 @@ impl ReaderChild for RelationsReaderService {
             .filter_map(|id| reader.get_node(id).ok())
             .map(|s| format!("{s:?}"))
             .collect();
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::relations("stored_ids".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(ids)
     }
     #[tracing::instrument(skip_all)]

@@ -17,7 +17,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
+use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -26,8 +28,8 @@ use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, NewShardRequest, OpStatus, Resource, ResourceId, VectorSetId,
     VectorSimilarity,
 };
-use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::{context, thread};
 
 use super::shard_disk_structure::*;
 use crate::services::versions::Versions;
@@ -167,6 +169,8 @@ impl ShardWriterService {
         path: &Path,
         request: &NewShardRequest,
     ) -> NodeResult<ShardWriterService> {
+        let time = SystemTime::now();
+
         std::fs::create_dir_all(path)?;
         let metadata_path = path.join(METADATA_FILE);
         let similarity = request.similarity();
@@ -190,10 +194,18 @@ impl ShardWriterService {
         };
 
         metadata.serialize(&metadata_path)?;
-        ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("writer/new".to_string());
+        metrics.record_request_time(metric, took);
+
+        result
     }
 
     pub fn open(id: String, path: &Path) -> NodeResult<ShardWriterService> {
+        let time = SystemTime::now();
+
         let metadata_path = path.join(METADATA_FILE);
         let metadata = ShardMetadata::open(&metadata_path)?;
         let tsc = TextConfig {
@@ -213,12 +225,21 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
         };
-        ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("writer/open".to_string());
+        metrics.record_request_time(metric, took);
+
+        result
     }
 
     #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
-        info!("Stopping shard {}...", { &self.id });
+        debug!("Stopping shard {}...", { &self.id });
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         let texts = self.text_writer.clone();
         let paragraphs = self.paragraph_writer.clone();
         let vectors = self.vector_writer.clone();
@@ -229,7 +250,6 @@ impl ShardWriterService {
         let vector_task = move || vector_write(&vectors).stop();
         let relation_task = move || relation_write(&relations).stop();
 
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text stop");
         let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph stop");
@@ -262,52 +282,60 @@ impl ShardWriterService {
         if let Err(e) = relation_result {
             error!("Error stopping the Relation writer service: {}", e);
         }
-        info!("Shard stopped {}...", { &self.id });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("writer/stop".to_string());
+        metrics.record_request_time(metric, took);
+
+        debug!("Shard stopped {}...", { &self.id });
     }
 
     #[tracing::instrument(skip_all)]
     pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
-            info!("Field service starts set_resource");
+            debug!("Field service starts set_resource");
             let mut writer = text_write(&text_writer_service);
             let result = writer.set_resource(&field_resource);
-            info!("Field service ends set_resource");
+            debug!("Field service ends set_resource");
             result
         };
 
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer.clone();
         let paragraph_task = move || {
-            info!("Paragraph service starts set_resource");
+            debug!("Paragraph service starts set_resource");
             let mut writer = paragraph_write(&paragraph_writer_service);
             let result = writer.set_resource(&paragraph_resource);
-            info!("Paragraph service ends set_resource");
+            debug!("Paragraph service ends set_resource");
             result
         };
 
         let vector_writer_service = self.vector_writer.clone();
         let vector_resource = resource.clone();
         let vector_task = move || {
-            info!("Vector service starts set_resource");
+            debug!("Vector service starts set_resource");
             let mut writer = vector_write(&vector_writer_service);
             let result = writer.set_resource(&vector_resource);
-            info!("Vector service ends set_resource");
+            debug!("Vector service ends set_resource");
             result
         };
 
         let relation_writer_service = self.relation_writer.clone();
         let relation_resource = resource.clone();
         let relation_task = move || {
-            info!("Relation service starts set_resource");
+            debug!("Relation service starts set_resource");
             let mut writer = relation_write(&relation_writer_service);
             let result = writer.set_resource(&relation_resource);
-            info!("Relation service ends set_resource");
+            debug!("Relation service ends set_resource");
             result
         };
 
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text set_resource");
         let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph set_resource");
@@ -328,6 +356,11 @@ impl ShardWriterService {
             s.spawn(|_| relation_result = relation_task());
         });
 
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("writer/set_resource".to_string());
+        metrics.record_request_time(metric, took);
+
         text_result?;
         paragraph_result?;
         vector_result?;
@@ -336,6 +369,9 @@ impl ShardWriterService {
     }
     #[tracing::instrument(skip_all)]
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
@@ -361,7 +397,6 @@ impl ShardWriterService {
             writer.delete_resource(&relation_resource)
         };
 
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text remove");
         let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph remove");
@@ -381,6 +416,12 @@ impl ShardWriterService {
             s.spawn(|_| vector_result = vector_task());
             s.spawn(|_| relation_result = relation_task());
         });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("writer/remove_resource".to_string());
+        metrics.record_request_time(metric, took);
+
         text_result?;
         paragraph_result?;
         vector_result?;
@@ -390,10 +431,12 @@ impl ShardWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
+        let span = tracing::Span::current();
+        let time = SystemTime::now();
+
         let paragraphs = self.paragraph_writer.clone();
         let vectors = self.vector_writer.clone();
         let texts = self.text_writer.clone();
-        let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text count");
         let text_task = || run_with_telemetry(info, move || text_read(&texts).count());
         let info = info_span!(parent: &span, "paragraph count");
@@ -410,6 +453,12 @@ impl ShardWriterService {
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
         });
+
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::shard("writer/get_opstatus".to_string());
+        metrics.record_request_time(metric, took);
+
         Ok(OpStatus {
             shard_id: self.id.clone(),
             count: text_result? as u64,

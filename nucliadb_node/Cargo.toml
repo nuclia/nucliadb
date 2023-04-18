@@ -24,6 +24,9 @@ name = "node_writer"
 path = "src/bin/writer.rs"
 
 [dependencies]
+axum = "0.6.15"
+axum-server = "0.4.7"
+
 tonic = "0.7"
 tonic-health = "0.6"
 async-std = "1.10.0"
@@ -52,6 +55,8 @@ http = "0.2"
 thiserror = "1"
 opentelemetry = { version = "0.17", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.17.2"
+reqwest = "0.11.16"
+
 # Test dependencies
 tempfile = "3.2.0"
 regex = "1.5.5"

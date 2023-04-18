@@ -119,6 +119,9 @@ spec:
             name: node-config
         - configMapRef:
             name: nucliadb-config
+        env:
+          name: METRICS_HTTP_PORT
+          value: "3032"
         ports:
         - name: grpc-writer
           containerPort: {{ .Values.serving.grpc_writer }}
@@ -126,6 +129,8 @@ spec:
         - name: chitchat 
           containerPort: {{ .Values.serving.chitchat_port }}
           protocol: UDP
+        - name: metrics
+          containerPort: 3032
         resources:
 {{ toYaml .Values.resources.writer | indent 10 }}
         volumeMounts:
@@ -153,10 +158,15 @@ spec:
             name: node-config
         - configMapRef:
             name: nucliadb-config
+        env:
+          name: METRICS_HTTP_PORT
+          value: "3031"
         ports:
         - name: grpc-reader
           containerPort: {{ .Values.serving.grpc_reader }}
           protocol: TCP
+        - name: metrics
+          containerPort: 3031
         resources:
 {{ toYaml .Values.resources.reader | indent 10 }}
         volumeMounts:

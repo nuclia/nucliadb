@@ -13,35 +13,34 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Affero General Public License for more details.
-//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
+use std::sync::Arc;
 
-/// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
+use lazy_static::lazy_static;
 
-pub mod node_metadata;
+use crate::metrics::{self, Metrics};
 
-pub mod services;
+lazy_static! {
+    static ref METRICS: Arc<dyn Metrics> = create_metrics();
+}
 
-/// Global configuration enviromental variables
-pub mod env;
+#[cfg(prometheus_metrics)]
+fn create_metrics() -> Arc<dyn Metrics> {
+    Arc::new(metrics::PrometheusMetrics::new())
+}
 
-/// GRPC reading service
-pub mod reader;
+#[cfg(log_metrics)]
+fn create_metrics() -> Arc<dyn Metrics> {
+    Arc::new(metrics::ConsoleLogMetrics)
+}
 
-/// Utilities
-pub mod utils;
+#[cfg(not(any(prometheus_metrics, log_metrics)))]
+fn create_metrics() -> Arc<dyn Metrics> {
+    Arc::new(metrics::NoMetrics)
+}
 
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// Node's http service
-pub mod http_server;
+pub fn get_metrics() -> Arc<dyn Metrics> {
+    METRICS.clone()
+}

@@ -57,7 +57,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn shutdown(&self) {
         for (shard_id, shard) in self.cache.iter() {
-            info!("Stopping shard {}", shard_id);
+            debug!("Stopping shard {}", shard_id);
             shard.stop();
         }
     }
@@ -65,7 +65,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> NodeResult<()> {
         let shards_path = env::shards_path();
-        info!("Recovering shards from {shards_path:?}...");
+        debug!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
@@ -75,7 +75,7 @@ impl NodeWriterService {
                 continue;
             };
             self.cache.insert(file_name, shard);
-            info!("Shard loaded: {shard_path:?}");
+            debug!("Shard loaded: {shard_path:?}");
         }
         Ok(())
     }
@@ -85,7 +85,7 @@ impl NodeWriterService {
         let shard_name = shard_id.id.clone();
         let shard_path = env::shards_path_id(&shard_id.id);
         if self.cache.contains_key(&shard_id.id) {
-            info!("Shard {shard_path:?} is already on memory");
+            debug!("Shard {shard_path:?} is already on memory");
             return;
         }
         if !shard_path.is_dir() {
@@ -97,7 +97,7 @@ impl NodeWriterService {
             return;
         };
         self.cache.insert(shard_id.id.clone(), shard);
-        info!("{shard_path:?}: Shard loaded");
+        debug!("{shard_path:?}: Shard loaded");
     }
     #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardWriterService> {
@@ -135,7 +135,7 @@ impl NodeWriterService {
 
         let shard_path = env::shards_path_id(&shard_id.id);
         if shard_path.exists() {
-            info!("Deleting {:?}", shard_path);
+            debug!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
         }
 
