@@ -67,10 +67,10 @@ spec:
         livenessProbe:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-          initialDelaySeconds: 10
-          periodSeconds: 20
+          initialDelaySeconds: 30
+          periodSeconds: 30
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 10
         command: ["nucliadb-ingest"]
         envFrom:
         - configMapRef:
