@@ -69,7 +69,7 @@ def instrument_app(
 ):
     if metrics:
         # b/w compat
-        app.add_middleware(PrometheusMiddleware)
+        app.add_middleware(PrometheusMiddleware, filter_unhandled_paths=True)
     if SentryAsgiMiddleware is not None:
         app.add_middleware(SentryAsgiMiddleware)
 
