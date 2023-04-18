@@ -105,17 +105,7 @@ async def chat(
             retrieval=False,
         )
 
-        new_query_elements = []
-        _, generator = await predict.rephrase_query(kbid, req)
-        async for new_query_data in generator:
-            new_query_elements.append(new_query_data)
-
-        new_query = (b"".join(new_query_elements)).decode()
-        possible_new_query = new_query.split('"')
-        if len(possible_new_query) == 5:
-            # The possible answer may have the format of : Question to answer: "XXXXX" is "YYYYY"
-            new_query = possible_new_query[3]
-
+        new_query = await predict.rephrase_query(kbid, req)
     else:
         new_query = item.query
 
