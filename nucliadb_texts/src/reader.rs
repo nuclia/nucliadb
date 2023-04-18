@@ -335,7 +335,7 @@ impl TextReaderService {
 
         let facets = produce_facets(response.facets, response.facets_count);
         DocumentSearchResponse {
-            total: total as i32,
+            total,
             results,
             facets,
             page_number: response.page_number,
@@ -360,7 +360,7 @@ impl TextReaderService {
             .into_iter()
             .take(results_per_page)
             .enumerate();
-        
+
         let mut results = Vec::with_capacity(results_per_page);
         for (id, (score, doc_address)) in result_stream {
             match searcher.doc(doc_address) {
