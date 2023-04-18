@@ -31,7 +31,7 @@ use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
-use nucliadb_node::http_server::run_http_metrics_server;
+use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
@@ -106,7 +106,9 @@ async fn main() -> NodeResult<()> {
     ));
     let update_task = tokio::spawn(update_node_state(update_handle, update_receiver));
     let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
-    let metrics_task = tokio::spawn(run_http_metrics_server(3032));
+    let metrics_task = tokio::spawn(run_http_metrics_server(MetricsServerOptions {
+        default_http_port: 3032,
+    }));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");

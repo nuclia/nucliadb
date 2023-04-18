@@ -42,5 +42,5 @@ fn create_metrics() -> Arc<dyn Metrics> {
 }
 
 pub fn get_metrics() -> Arc<dyn Metrics> {
-    METRICS.clone()
+    Arc::clone(&METRICS)
 }
