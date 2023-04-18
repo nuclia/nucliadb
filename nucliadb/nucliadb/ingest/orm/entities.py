@@ -38,7 +38,6 @@ from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
-from nucliadb.ingest import logger
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.maindb.keys import (
     KB_DELETED_ENTITIES_GROUPS,
@@ -161,15 +160,12 @@ class EntitiesManager:
 
     # Private API
 
-    async def get_entities_group_inner(self, group: str) -> EntitiesGroup:
+    async def get_entities_group_inner(self, group: str) -> Optional[EntitiesGroup]:
         stored = await self.get_stored_entities_group(group)
         indexed = await self.get_indexed_entities_group(group)
-        if (stored is None) and (indexed is None):
-            # If an entitiesgroup appears without stored or indexed entities,
-            # most probably the node is reporting a node subtype with no nodes
-            # or a wrong entitiesgroup is being searched
-            logger.warning(f"Suspicious entities group without entities: '{group}'")
-            entities_group = EntitiesGroup()
+        if stored is None and indexed is None:
+            # Entity group does not exist
+            return None
         elif stored is not None and indexed is not None:
             entities_group = self.merge_entities_groups(indexed, stored)
         else:
@@ -252,6 +248,8 @@ class EntitiesManager:
     ) -> AsyncGenerator[Tuple[str, EntitiesGroup], None]:
         async for group in self.iterate_entities_groups_names(exclude_deleted):
             eg = await self.get_entities_group_inner(group)
+            if eg is None:
+                continue
             yield group, eg
 
     async def iterate_entities_groups_names(
