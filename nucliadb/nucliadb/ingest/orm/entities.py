@@ -248,6 +248,8 @@ class EntitiesManager:
     ) -> AsyncGenerator[Tuple[str, EntitiesGroup], None]:
         async for group in self.iterate_entities_groups_names(exclude_deleted):
             eg = await self.get_entities_group_inner(group)
+            if eg is None:
+                continue
             yield group, eg
 
     async def iterate_entities_groups_names(
