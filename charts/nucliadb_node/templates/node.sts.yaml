@@ -120,8 +120,8 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          name: METRICS_HTTP_PORT
-          value: "3032"
+          - name: METRICS_HTTP_PORT
+            value: "3032"
         ports:
         - name: grpc-writer
           containerPort: {{ .Values.serving.grpc_writer }}
@@ -159,8 +159,8 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          name: METRICS_HTTP_PORT
-          value: "3031"
+          - name: METRICS_HTTP_PORT
+            value: "3031"
         ports:
         - name: grpc-reader
           containerPort: {{ .Values.serving.grpc_reader }}
