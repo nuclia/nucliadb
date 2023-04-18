@@ -235,6 +235,11 @@ async def test_get_entities_groups(
     body = resp.json()
     assert animals == body
 
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/I-DO-NOT-EXIST")
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["detail"] == "Entities group 'I-DO-NOT-EXIST' does not exist"
+
 
 async def test_list_entities_groups(
     nucliadb_reader: AsyncClient,
