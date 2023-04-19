@@ -136,10 +136,15 @@ def test_logger_with_formatter_and_active_span(caplog):
     logger.propagate = False
 
     span = MagicMock()
-    span.get_span_context.return_value = MagicMock(trace_id=1, span_id=2)
+    span.get_span_context.return_value = MagicMock(
+        # make sure to give potential very large numbers to make sure they are
+        # serializable
+        trace_id=9999999999999999999999,
+        span_id=9999999999999999999999,
+    )
     with patch("nucliadb_telemetry.logs.trace.get_current_span", return_value=span):
         logger.error("foobar")
 
     assert len(outputted_records) == 1
-    assert outputted_records[0]["trace_id"] == 1
-    assert outputted_records[0]["span_id"] == 2
+    assert outputted_records[0]["trace_id"] == "9999999999999999999999"
+    assert outputted_records[0]["span_id"] == "9999999999999999999999"
