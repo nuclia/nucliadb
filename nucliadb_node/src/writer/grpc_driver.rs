@@ -51,6 +51,7 @@ pub enum NodeWriterEvent {
 }
 
 pub struct NodeWriterGRPCDriver {
+    lazy_loading: bool,
     inner: RwLock<NodeWriterService>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
 }
@@ -58,6 +59,7 @@ pub struct NodeWriterGRPCDriver {
 impl From<NodeWriterService> for NodeWriterGRPCDriver {
     fn from(node: NodeWriterService) -> NodeWriterGRPCDriver {
         NodeWriterGRPCDriver {
+            lazy_loading: env::lazy_loading(),
             inner: RwLock::new(node),
             sender: None,
         }
@@ -76,7 +78,7 @@ impl NodeWriterGRPCDriver {
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
     async fn load_shard(&self, id: &ShardId) {
-        if env::lazy_loading() {
+        if self.lazy_loading {
             let mut writer = self.inner.write().await;
             writer.load_shard(id);
         }
