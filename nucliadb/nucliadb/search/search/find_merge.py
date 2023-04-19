@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Dict, Iterator, List, Tuple, cast
+from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
