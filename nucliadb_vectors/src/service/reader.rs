@@ -31,7 +31,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
-use crate::formula::{AtomClause, Formula};
+use crate::formula::{AtomClause, CompoundClause, Formula};
 use crate::indexset::IndexSet;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
@@ -115,6 +115,7 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
+        let key_filters = request.keys.iter().cloned().map(AtomClause::key_prefix);
         let mut formula = Formula::new();
         request
             .tags
@@ -122,6 +123,9 @@ impl ReaderChild for VectorReaderService {
             .cloned()
             .map(AtomClause::label)
             .for_each(|c| formula.extend(c));
+        if key_filters.len() > 0 {
+            formula.extend(CompoundClause::new(1, key_filters.collect()));
+        }
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
@@ -343,6 +347,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: true,
+            ..Default::default()
         };
         let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 4);
@@ -356,6 +361,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = reader.search(&request).unwrap();
         let no_nodes = reader.count("").unwrap();

@@ -59,10 +59,16 @@ pub struct CompoundClause {
     labels: Vec<AtomClause>,
 }
 impl CompoundClause {
+    pub fn is_empty(&self) -> bool {
+        self.labels.is_empty()
+    }
     pub fn new(threshold: usize, labels: Vec<AtomClause>) -> CompoundClause {
         CompoundClause { threshold, labels }
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
+        if self.is_empty() {
+            return true;
+        }
         let number_of_subqueries = self.labels.len();
         let mut threshold = self.threshold;
         let mut i = 0;

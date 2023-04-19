@@ -479,7 +479,7 @@ class BrokerMessage(google.protobuf.message.Message):
     @property
     def user_vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.UserVectorsWrapper]: ...
     reindex: builtins.bool
-    """If true, reindex all text"""
+    """If true, force reindex all paragraphs in a resource"""
     def __init__(
         self,
         *,
