@@ -106,7 +106,7 @@ venv:  ## Initializes an environment
 	pyenv local nucliadb
 
 install: ## Install dependencies (on the active environment)
-	pip install --upgrade pip
+	pip install --upgrade "pip<23.1"
 	pip install Cython==0.29.24
 	pip install grpcio-tools
 	pip install -r code-requirements.txt
