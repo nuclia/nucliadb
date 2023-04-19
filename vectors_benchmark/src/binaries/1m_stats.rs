@@ -68,7 +68,7 @@ fn main() {
             .enumerate()
             .map(|(i, q)| (i.to_string(), q))
             .collect();
-        possible_tag.push(LabelClause::new(labels[0].clone()));
+        possible_tag.push(AtomClause::label(labels[0].clone()));
         let now = SystemTime::now();
         add_batch(&mut writer, elems, labels);
         stats.writing_time += now.elapsed().unwrap().as_millis();

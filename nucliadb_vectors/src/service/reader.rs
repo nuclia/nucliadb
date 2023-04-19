@@ -31,7 +31,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
-use crate::formula::{Formula, LabelClause};
+use crate::formula::{AtomClause, Formula};
 use crate::indexset::IndexSet;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
@@ -120,7 +120,7 @@ impl ReaderChild for VectorReaderService {
             .tags
             .iter()
             .cloned()
-            .map(LabelClause::new)
+            .map(AtomClause::label)
             .for_each(|c| formula.extend(c));
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
