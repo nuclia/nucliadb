@@ -55,6 +55,7 @@ jobs:
 
       - name: Install the package
         run: |
+          pip install --upgrade "pip<23.1"
           pip install -r test-requirements.txt
           pip install -r nucliadb_sdk/requirements-sources.txt
           pip install -r nucliadb_sdk/requirements.txt
