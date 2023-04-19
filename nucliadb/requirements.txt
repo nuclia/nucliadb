@@ -45,13 +45,6 @@ nucliadb-contributor-assets~=1.0.0
 
 tikv-client>=0.0.3
 
-prometheus-client>=0.12.0
-
-opentelemetry-instrumentation-aiohttp-client>=0.30b1
-opentelemetry-semantic-conventions>=0.30b1
-opentelemetry-instrumentation-fastapi>=0.30b1
-opentelemetry-propagator-b3
-
 # improve dependency resolution
 multidict>=6.0.4
 deprecated>=1.2.12
