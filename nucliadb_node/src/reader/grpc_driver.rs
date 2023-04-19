@@ -32,11 +32,13 @@ use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
 
 pub struct NodeReaderGRPCDriver {
+    lazy_loading: bool,
     inner: RwLock<NodeReaderService>,
 }
 impl From<NodeReaderService> for NodeReaderGRPCDriver {
     fn from(node: NodeReaderService) -> NodeReaderGRPCDriver {
         NodeReaderGRPCDriver {
+            lazy_loading: env::lazy_loading(),
             inner: RwLock::new(node),
         }
     }
@@ -47,7 +49,7 @@ impl NodeReaderGRPCDriver {
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
-        if env::lazy_loading() {
+        if self.lazy_loading {
             let mut writer = self.inner.write().await;
             writer.load_shard(id);
         }

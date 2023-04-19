@@ -164,6 +164,8 @@ async def update_entities_group(
     pbrequest: UpdateEntitiesGroupRequest = UpdateEntitiesGroupRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.group = group
+    pbrequest.title = item.title or ""
+    pbrequest.color = item.color or ""
 
     for name, entity in item.add.items():
         entitypb = pbrequest.add[name]

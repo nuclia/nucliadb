@@ -54,7 +54,9 @@ jobs:
           cache: "pip"
 
       - name: Install the package
+        ## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
         run: |
+          pip install --upgrade "pip<23.1"
           pip install -r test-requirements.txt
           pip install -r nucliadb_client/requirements-test.txt
           pip install -r nucliadb_client/requirements-source.txt
