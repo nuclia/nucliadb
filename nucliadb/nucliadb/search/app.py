@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -38,10 +36,6 @@ from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
-
-logging.getLogger("nucliadb_chitchat").setLevel(
-    logging.getLevelName(running_settings.chitchat_level.upper())
-)
 
 middleware = [
     Middleware(

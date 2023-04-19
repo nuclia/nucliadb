@@ -18,28 +18,24 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import logging
-import sys
 from typing import Awaitable, Callable, Optional, Union
 
 import pkg_resources
 
-from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
+from nucliadb.ingest import SERVICE_NAME
+from nucliadb.ingest.chitchat import start_chitchat
 from nucliadb.ingest.consumer import start_consumer
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.run import run_until_exit
-from nucliadb_utils.settings import (
-    indexing_settings,
-    running_settings,
-    transaction_settings,
-)
+from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
@@ -145,28 +141,7 @@ async def main_orm_grpc():  # pragma: no cover
 
 
 def setup_configuration():  # pragma: no cover
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)-18s | %(levelname)-7s | %(name)-16s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
-    )
-
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
-
-    logger_activity.setLevel(
-        logging.getLevelName(running_settings.activity_log_level.upper())
-    )
-    logging.getLogger("nucliadb_chitchat").setLevel(
-        logging.getLevelName(running_settings.chitchat_level.upper())
-    )
-
-    logging.getLogger("asyncio").setLevel(logging.ERROR)
-
-    if settings.logging_config:
-        logging.config.fileConfig(
-            settings.logging_config, disable_existing_loggers=True
-        )
+    setup_logging()
 
     assign_partitions(settings)
 

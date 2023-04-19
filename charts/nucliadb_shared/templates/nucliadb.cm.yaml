@@ -13,7 +13,6 @@ data:
   DEBUG: "True"
 {{- end }}
   RUNNING_ENVIRONMENT: {{ .Values.running.running_environment }}
-  LOGGING_INTEGRATION: {{ .Values.running.logging_integration | quote }}
   LOG_LEVEL: {{ .Values.running.log_level }}
   CORS: {{ toJson .Values.http.cors | quote }}
   FILE_BACKEND: {{ .Values.storage.file_backend }}

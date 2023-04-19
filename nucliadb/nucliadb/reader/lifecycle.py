@@ -17,13 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-import sys
-
 from nucliadb.ingest.utils import start_ingest, stop_ingest
-from nucliadb.reader import SERVICE_NAME, logger
+from nucliadb.reader import SERVICE_NAME
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
-from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
 
 
@@ -32,14 +28,6 @@ async def initialize() -> None:
 
     await start_ingest(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
-    )
-
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
 
 
 async def finalize() -> None:

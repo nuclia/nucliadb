@@ -93,7 +93,6 @@ def config_nucliadb(nucliadb_args: Settings):
         indexing_settings,
         nuclia_settings,
         nucliadb_settings,
-        running_settings,
         transaction_settings,
     )
 
@@ -111,8 +110,6 @@ def config_nucliadb(nucliadb_args: Settings):
     cache_settings.cache_enabled = False
     writer_settings.dm_enabled = False
 
-    running_settings.log_level = nucliadb_args.log_level.upper()
-    running_settings.activity_log_level = nucliadb_args.log_level.upper()
     train_settings.grpc_port = nucliadb_args.train_grpc_port
     ingest_settings.grpc_port = nucliadb_args.ingest_grpc_port
 

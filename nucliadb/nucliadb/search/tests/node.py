@@ -263,7 +263,6 @@ class _NodeRunner:
         self.data = {}
 
     def start(self):
-        running_settings.log_level = "DEBUG"
         docker_platform_name = self.docker_client.api.version()["Platform"][
             "Name"
         ].upper()

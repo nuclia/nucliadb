@@ -75,20 +75,15 @@ class ErrorHandlingSettings(pydantic.BaseSettings):
     environment: str = pydantic.Field(
         "local", env=["environment", "running_environment"]
     )
-    logging_integration: bool = False
 
 
 def setup_error_handling(version: str) -> None:
     settings = ErrorHandlingSettings()
 
     if settings.sentry_url:
-        enabled_integrations: list[Any] = []
-
-        if settings.logging_integration:
-            sentry_logging = LoggingIntegration(
-                level=logging.CRITICAL, event_level=logging.CRITICAL
-            )
-            enabled_integrations.append(sentry_logging)
+        enabled_integrations: list[Any] = [
+            LoggingIntegration(level=logging.CRITICAL, event_level=logging.CRITICAL)
+        ]
 
         sentry_sdk.init(
             release=version,

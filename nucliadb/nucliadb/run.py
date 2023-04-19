@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
 import os
 
 import pydantic_argparse
@@ -25,7 +24,6 @@ import uvicorn  # type: ignore
 from fastapi.staticfiles import StaticFiles
 
 from nucliadb.config import config_nucliadb
-from nucliadb.logging import log_config
 from nucliadb.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -48,7 +46,6 @@ def run():
 
 def run_nucliadb(nucliadb_args: Settings):
     from nucliadb.one.app import application
-    from nucliadb_utils.settings import running_settings
 
     path = os.path.dirname(__file__) + "/static"
     application.mount("/widget", StaticFiles(directory=path, html=True), name="widget")
@@ -59,8 +56,7 @@ def run_nucliadb(nucliadb_args: Settings):
         application,
         host="0.0.0.0",
         port=nucliadb_args.http_port,
-        log_config=log_config,
-        log_level=logging.getLevelName(running_settings.log_level),
+        log_config=None,
         debug=True,
         reload=False,
     )
@@ -68,14 +64,8 @@ def run_nucliadb(nucliadb_args: Settings):
 
 async def run_async_nucliadb(nucliadb_args: Settings):
     from nucliadb.one.app import application
-    from nucliadb_utils.settings import running_settings
 
-    config = uvicorn.Config(
-        application,
-        port=nucliadb_args.http_port,
-        log_level=logging.getLevelName(running_settings.log_level),
-        log_config=log_config,
-    )
+    config = uvicorn.Config(application, port=nucliadb_args.http_port, log_config=None)
     server = uvicorn.Server(config)
     config.load()
     server.lifespan = config.lifespan_class(config)
