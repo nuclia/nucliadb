@@ -77,7 +77,7 @@ def test_logger_with_formatter(caplog):
     assert len(outputted_records) == 3
 
 
-def test_logger_with_formatter(caplog):
+def test_logger_with_access_formatter(caplog):
     logger = logging.getLogger("test.logger")
     formatter = logs.UvicornAccessFormatter()
 
