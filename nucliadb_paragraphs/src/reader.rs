@@ -1064,6 +1064,7 @@ mod tests {
             shard_id: None,
             filter: None,
             reload: false,
+            ..Default::default()
         };
         let iter = paragraph_reader_service.iterator(&request).unwrap();
         let count = iter.count();

@@ -691,7 +691,6 @@ mod tests {
 
         let filter = Filter {
             tags: vec!["/l/mylabel2".to_string()],
-            ..Default::default()
         };
 
         let faceted = Faceted {
@@ -834,6 +833,7 @@ mod tests {
             shard_id: None,
             filter: None,
             reload: false,
+            ..Default::default()
         };
         let iter = field_reader_service.iterator(&request).unwrap();
         let count = iter.count();

@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_core::protos::filter::Conjunction;
+use nucliadb_core::protos::stream_filter::Conjunction;
 use tantivy::query::Occur;
 
 pub fn conjunction_to_occur(conjunction: Conjunction) -> Occur {

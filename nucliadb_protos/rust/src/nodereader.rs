@@ -2,11 +2,16 @@
 pub struct Filter {
     #[prost(string, repeated, tag="1")]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(enumeration="filter::Conjunction", tag="2")]
-    pub conjunction: i32,
 }
-/// Nested message and enum types in `Filter`.
-pub mod filter {
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StreamFilter {
+    #[prost(enumeration="stream_filter::Conjunction", tag="1")]
+    pub conjunction: i32,
+    #[prost(string, repeated, tag="2")]
+    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+/// Nested message and enum types in `StreamFilter`.
+pub mod stream_filter {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Conjunction {
@@ -517,12 +522,15 @@ pub struct DocumentItem {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StreamRequest {
+    #[deprecated]
     #[prost(message, optional, tag="1")]
-    pub filter: ::core::option::Option<Filter>,
+    pub filter_deprecated: ::core::option::Option<Filter>,
     #[prost(bool, tag="2")]
     pub reload: bool,
     #[prost(message, optional, tag="3")]
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
+    #[prost(message, optional, tag="4")]
+    pub filter: ::core::option::Option<StreamFilter>,
 }
 /// Generated client implementations.
 pub mod node_reader_client {
