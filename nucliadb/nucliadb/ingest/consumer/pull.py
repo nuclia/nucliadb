@@ -24,6 +24,7 @@ from typing import List, Optional
 import aiohttp
 import nats
 from aiohttp.client_exceptions import ClientConnectorError
+from aiohttp.web import Response
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -123,21 +124,24 @@ class PullWorker:
         self.processor = Processor(driver, storage, audit, cache, partition)
 
     async def disconnected_cb(self):
-        logger.info("Got disconnected from NATS!")
+        logger.info(
+            f"PullWorker[partition={self.partition}]: Got disconnected from NATS!"
+        )
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect.
         logger.info(
-            "Got reconnected to NATS {url}".format(url=self.nc.connected_url.netloc)
+            f"PullWorker[partition={self.partition}]: Got reconnected to NATS {self.nc.connected_url.netloc}"
         )
 
     async def error_cb(self, e):
-        logger.error(
-            "There was an error on consumer ingest worker: {}".format(e), exc_info=True
-        )
+        msg = f"PullWorker[partition={self.partition}]: There was an error on consumer: {e}"
+        logger.error(msg, exc_info=True)
 
     async def closed_cb(self):
-        logger.info("Connection is closed on NATS")
+        logger.info(
+            f"PullWorker[partition={self.partition}]: Connection is closed on NATS"
+        )
 
     async def initialize(self):
         await self.processor.initialize()
@@ -208,7 +212,7 @@ class PullWorker:
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])
-        logger.debug(
+        logger.info(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
         message_source = "<msg source not set>"
@@ -227,7 +231,7 @@ class PullWorker:
                     time = ""
 
                 logger.debug(
-                    f"Received {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} at {time}"
+                    f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
                 )
 
                 try:
@@ -358,6 +362,7 @@ class PullWorker:
                             continue
 
                         if data.get("status") == "ok":
+                            check_proxy_telemetry_headers(resp)
                             logger.info(
                                 f"Message received from proxy, partition: {self.partition}"
                             )
@@ -426,3 +431,27 @@ class PullWorker:
                 except Exception:
                     logger.exception("Gathering changes")
                     await asyncio.sleep(self.pull_time)
+
+
+class TelemetryHeadersMissing(Exception):
+    pass
+
+
+def check_proxy_telemetry_headers(resp: Response):
+    try:
+        expected = [
+            "x-b3-traceid",
+            "x-b3-spanid",
+            "x-b3-sampled",
+        ]
+        missing = []
+        for header in expected:
+            if header not in resp.headers:
+                missing.append(header)
+        if len(missing) > 0:
+            raise TelemetryHeadersMissing(
+                f"Missing headers {missing} in proxy response"
+            )
+    except TelemetryHeadersMissing as e:
+        errors.capture_exception(e)
+        logger.warning("Some telemetry headers not found in proxy response")
