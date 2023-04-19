@@ -1,12 +1,15 @@
 .PHONY: install-dev
 install-dev:
+	pip -V
 	pip install --upgrade pip
+	pip -V
 	pip install -r ../test-requirements.txt
 	pip install -r ../code-requirements.txt
 	cd .. && pip install -r nucliadb/requirements-sources.txt
 	pip install -r requirements.txt
 	pip install -r requirements-test.txt
 	pip install -e .
+	pip -V
 
 .PHONY: format
 format:
