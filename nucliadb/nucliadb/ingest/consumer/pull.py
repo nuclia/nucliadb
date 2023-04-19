@@ -436,7 +436,7 @@ class TelemetryHeadersMissing(Exception):
     pass
 
 
-def check_proxy_telemetry_headers(resp):
+def check_proxy_telemetry_headers(resp: aiohttp.web.Response):
     try:
         expected = [
             "x-b3-traceid",
