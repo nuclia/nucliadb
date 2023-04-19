@@ -361,6 +361,7 @@ class PullWorker:
                             continue
 
                         if data.get("status") == "ok":
+                            check_proxy_telemetry_headers(resp)
                             logger.info(
                                 f"Message received from proxy, partition: {self.partition}"
                             )
@@ -429,3 +430,27 @@ class PullWorker:
                 except Exception:
                     logger.exception("Gathering changes")
                     await asyncio.sleep(self.pull_time)
+
+
+class TelemetryHeadersMissing(Exception):
+    pass
+
+
+def check_proxy_telemetry_headers(resp):
+    try:
+        expected = [
+            "x-b3-traceid",
+            "x-b3-spanid",
+            "x-b3-sampled",
+        ]
+        missing = []
+        for header in expected:
+            if header not in resp.headers:
+                missing.append(header)
+        if len(missing) > 0:
+            raise TelemetryHeadersMissing(
+                f"Missing headers {missing} in proxy response"
+            )
+    except TelemetryHeadersMissing as e:
+        errors.capture_exception(e)
+        logger.warning("Some telemetry headers not found in proxy response")
