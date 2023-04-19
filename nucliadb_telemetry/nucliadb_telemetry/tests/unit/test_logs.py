@@ -78,7 +78,7 @@ def test_logger_with_formatter(caplog):
 
 
 def test_logger_with_access_formatter(caplog):
-    logger = logging.getLogger("test.logger")
+    logger = logging.getLogger("test.logger2")
     formatter = logs.UvicornAccessFormatter()
 
     outputted_records = []
@@ -117,7 +117,7 @@ def test_logger_with_access_formatter(caplog):
 
 
 def test_logger_with_formatter_and_active_span(caplog):
-    logger = logging.getLogger("test.logger2")
+    logger = logging.getLogger("test.logger3")
     formatter = logs.JSONFormatter()
 
     outputted_records = []
