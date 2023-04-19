@@ -111,7 +111,7 @@ class EntitiesManager:
         intact. Use `delete_entities` to delete them instead.
 
         """
-        if not self.entities_group_exists(group):
+        if not await self.entities_group_exists(group):
             raise EntitiesGroupNotFound(f"Entities group '{group}' doesn't exist")
 
         entities_group = await self.get_stored_entities_group(group)
