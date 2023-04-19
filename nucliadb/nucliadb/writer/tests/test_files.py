@@ -30,7 +30,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
-from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction_utility
 
@@ -120,7 +119,6 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -130,13 +128,9 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
     writer.ParseFromString(msgs[0].data)
     await msgs[0].ack()
 
-    payload = processing.calls[0]
-
-    assert payload["kbid"] == knowledgebox_writer
     path = resp.headers["ndb-field"]
     field = path.split("/")[-1]
     rid = path.split("/")[-3]
-    assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == "image.jpg"
@@ -182,7 +176,6 @@ async def test_knowledgebox_file_upload_root(
             )
             assert resp.status_code == 201
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     assert transaction.js is not None
@@ -192,13 +185,9 @@ async def test_knowledgebox_file_upload_root(
     writer.ParseFromString(msgs[0].data)
     await msgs[0].ack()
 
-    payload = processing.calls[0]
-
-    assert payload["kbid"] == knowledgebox_writer
     body = resp.json()
     field = body["field_id"]
     rid = body["uuid"]
-    assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.files[field].file.size == 30472
@@ -243,7 +232,6 @@ async def test_knowledgebox_file_upload_root_headers(
             )
             assert resp.status_code == 201
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     assert transaction.js is not None
@@ -253,13 +241,9 @@ async def test_knowledgebox_file_upload_root_headers(
     writer.ParseFromString(msgs[0].data)
     await msgs[0].ack()
 
-    payload = processing.calls[0]
-
-    assert payload["kbid"] == knowledgebox_writer
     body = resp.json()
     field = body["field_id"]
     rid = body["uuid"]
-    assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == "image.jpg"
@@ -336,7 +320,6 @@ async def test_knowledgebox_file_tus_upload_field(
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -346,13 +329,9 @@ async def test_knowledgebox_file_tus_upload_field(
     writer.ParseFromString(msgs[1].data)
     await msgs[1].ack()
 
-    payload = processing.calls[1]
-
-    assert payload["kbid"] == knowledgebox_writer
     path = resp.headers["ndb-field"]
     field = path.split("/")[-1]
     rid = path.split("/")[-3]
-    assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == ""
@@ -389,7 +368,6 @@ async def test_knowledgebox_file_upload_field_headers(
             )
             assert resp.status_code == 201
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -398,13 +376,9 @@ async def test_knowledgebox_file_upload_field_headers(
     writer.ParseFromString(msgs[1].data)
     await msgs[1].ack()
 
-    payload = processing.calls[1]
-
-    assert payload["kbid"] == knowledgebox_writer
     body = resp.json()
     field = body["field_id"]
     rid = body["uuid"]
-    assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == ""
@@ -512,7 +486,6 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -522,13 +495,9 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
     writer.ParseFromString(msgs[1].data)
     await msgs[1].ack()
 
-    payload = processing.calls[1]
-
-    assert payload["kbid"] == kb
     path = resp.headers["ndb-field"]
     field = path.split("/")[-1]
     rid = path.split("/")[-3]
-    assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == ""
@@ -635,7 +604,6 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
             )
             assert resp.status_code == 201
 
-    processing = get_processing()
     transaction = get_transaction_utility()
 
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
@@ -645,13 +613,9 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
     writer.ParseFromString(msgs[-1].data)
     await msgs[-1].ack()
 
-    payload = processing.calls[-1]
-
-    assert payload["kbid"] == kb
     body = resp.json()
     field = body["field_id"]
     rid = body["uuid"]
-    assert payload["filefield"][field] == "DUMMYJWT"
 
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"

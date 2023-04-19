@@ -29,7 +29,6 @@ from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
-from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import (
     FileBackendConfig,
@@ -76,8 +75,6 @@ async def writer_api(
     yield make_client_fixture
     await application.router.shutdown()
     clear_storage()
-    processing = get_processing()
-    processing.calls = []
 
     await driver.flushall()
     await driver.close(close_connection_pool=True)

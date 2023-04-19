@@ -35,7 +35,9 @@ from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import Utility, set_utility
 
 if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
@@ -101,6 +103,64 @@ class PushResponse(BaseModel):
     seqid: Optional[int] = None
 
 
+DUMMY_JWT = "DUMMYJWT"
+
+
+async def start_processing_engine():
+    if nuclia_settings.dummy_processing:
+        processing_engine = DummyProcessingEngine()
+    else:
+        processing_engine = ProcessingEngine(
+            nuclia_service_account=nuclia_settings.nuclia_service_account,
+            nuclia_zone=nuclia_settings.nuclia_zone,
+            onprem=nuclia_settings.onprem,
+            nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
+            nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
+            nuclia_public_url=nuclia_settings.nuclia_public_url,
+            driver=storage_settings.file_backend,
+            days_to_keep=storage_settings.upload_token_expiration,
+        )
+    await processing_engine.initialize()
+    set_utility(Utility.PROCESSING, processing_engine)
+
+
+class DummyProcessingEngine:
+    def __init__(self):
+        self.calls: List[List[Any]] = []
+
+    async def initialize(self):
+        pass
+
+    async def finalize(self):
+        pass
+
+    async def convert_filefield_to_str(self, file: models.FileField) -> str:
+        self.calls.append([file])
+        return DUMMY_JWT
+
+    def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
+        self.calls.append([file_field])
+        return DUMMY_JWT
+
+    async def convert_internal_filefield_to_str(
+        self, file: FieldFilePB, storage: Storage
+    ) -> str:
+        self.calls.append([file, storage])
+        return DUMMY_JWT
+
+    async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
+        self.calls.append([cf, storage])
+        return DUMMY_JWT
+
+    async def send_to_process(
+        self, item: PushPayload, partition: int
+    ) -> ProcessingInfo:
+        self.calls.append([item, partition])
+        return ProcessingInfo(
+            seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
+        )
+
+
 class ProcessingEngine:
     def __init__(
         self,
@@ -112,10 +172,7 @@ class ProcessingEngine:
         nuclia_jwt_key: Optional[str] = None,
         days_to_keep: int = 3,
         driver: str = "gcs",
-        dummy: bool = False,
-        disable_send_to_process: bool = False,
     ):
-        self.disable_send_to_process = disable_send_to_process
         self.nuclia_service_account = nuclia_service_account
         self.nuclia_zone = nuclia_zone
         if nuclia_public_url is not None:
@@ -156,11 +213,6 @@ class ProcessingEngine:
             logger.error(f"Not valid driver to processing, fallback to local: {driver}")
             self.driver = 2
         self._exit_stack = AsyncExitStack()
-
-        # For dummy utility
-        self.dummy = dummy
-        self.calls: List[Dict[str, Any]] = []
-        self.uploads: List[Dict[str, str]] = []
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
@@ -229,13 +281,13 @@ class ProcessingEngine:
         headers["CONTENT_TYPE"] = file.file.content_type
         headers["CONTENT-LENGTH"] = str(len(file.file.payload))  # type: ignore
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
-        with self.session.post(
+        async with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
             if resp.status == 200:
                 jwttoken = await resp.text()
                 return jwttoken
-            elif resp.status != 402:
+            elif resp.status == 402:
                 data = await resp.json()
                 raise LimitsExceededError(resp.status, data["detail"])
             else:
@@ -274,8 +326,6 @@ class ProcessingEngine:
         if self.onprem is False:
             # Upload the file to processing upload
             jwttoken = self.generate_file_token_from_fieldfile(file)
-        elif self.disable_send_to_process:
-            return ""
         else:
             headers = {}
             headers["X-PASSWORD"] = file.password
@@ -288,9 +338,6 @@ class ProcessingEngine:
             if file.file.size:
                 headers["CONTENT-LENGTH"] = str(file.file.size)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
-            if self.dummy:
-                self.uploads.append(headers)
-                return "DUMMYJWT"
 
             iterator = storage.downloadbytescf_iterator(file.file)
             async with self.session.post(
@@ -311,8 +358,6 @@ class ProcessingEngine:
         if self.onprem is False:
             # Upload the file to processing upload
             jwttoken = self.generate_file_token_from_cloudfile(cf)
-        elif self.disable_send_to_process:
-            return ""
         else:
             headers = {}
             headers["X-FILENAME"] = base64.b64encode(cf.filename.encode()).decode()
@@ -321,12 +366,9 @@ class ProcessingEngine:
             if cf.size:
                 headers["CONTENT-LENGTH"] = str(cf.size)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
-            if self.dummy:
-                self.uploads.append(headers)
-                return "DUMMYJWT"
 
             iterator = storage.downloadbytescf_iterator(cf)
-            with self.session.post(
+            async with self.session.post(
                 self.nuclia_upload_url, data=iterator, headers=headers
             ) as resp:
                 if resp.status == 200:
@@ -343,15 +385,6 @@ class ProcessingEngine:
     async def send_to_process(
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:
-        if self.disable_send_to_process:
-            return ProcessingInfo(seqid=0, account_seq=0, queue=QueueType.SHARED)
-
-        if self.dummy:
-            self.calls.append(item.dict())
-            return ProcessingInfo(
-                seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
-            )
-
         op_type = "process_external" if self.onprem else "process_internal"
         with processing_observer({"type": op_type}):
             headers = {"CONTENT-TYPE": "application/json"}

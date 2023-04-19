@@ -117,11 +117,11 @@ def config_nucliadb(nucliadb_args: Settings):
 
     if nucliadb_args.nua_api_key:
         nuclia_settings.nuclia_service_account = nucliadb_args.nua_api_key
-        nuclia_settings.disable_send_to_process = False
         ingest_settings.pull_time = 60
     else:
         ingest_settings.pull_time = 0
-        nuclia_settings.disable_send_to_process = True
+        nuclia_settings.dummy_processing = True
+        nuclia_settings.dummy_predict = True
 
     if nucliadb_args.zone is not None:
         nuclia_settings.nuclia_zone = nucliadb_args.zone

@@ -38,11 +38,11 @@ logger = logging.getLogger(__name__)
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
     "version": "main",
-    "command": "bash -c 'node_reader & node_writer'",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
+        "NODE_TYPE": "Io",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
         "LAZY_LOADING": "true",
@@ -65,6 +65,7 @@ images.settings["nucliadb_node_writer"] = {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
+        "NODE_TYPE": "Io",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "CHITCHAT_PORT": "4444",
         "NUCLIADB_DISABLE_TELEMETRY": "True",

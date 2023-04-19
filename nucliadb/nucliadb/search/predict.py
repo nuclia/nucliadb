@@ -19,7 +19,7 @@
 #
 import json
 import os
-from typing import AsyncIterator, Dict, List, Optional, Tuple, Union
+from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 import aiohttp
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -29,6 +29,8 @@ from nucliadb.search import logger
 from nucliadb_models.search import ChatModel, FeedbackRequest, RephraseModel
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.settings import nuclia_settings
+from nucliadb_utils.utilities import Utility, set_utility
 
 
 class SendToPredictError(Exception):
@@ -70,6 +72,22 @@ predict_observer = metrics.Observer(
 )
 
 
+async def start_predict_engine():
+    if nuclia_settings.dummy_predict:
+        predict_util = DummyPredictEngine()
+    else:
+        breakpoint()
+        predict_util = PredictEngine(
+            nuclia_settings.nuclia_inner_predict_url,
+            nuclia_settings.nuclia_public_url,
+            nuclia_settings.nuclia_service_account,
+            nuclia_settings.nuclia_zone,
+            nuclia_settings.onprem,
+        )
+    await predict_util.initialize()
+    set_utility(Utility.PREDICT, predict_util)
+
+
 def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNode]:
     result = []
     for token in data["tokens"]:
@@ -81,6 +99,60 @@ def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNod
     return result
 
 
+class DummyPredictEngine:
+    def __init__(self):
+        self.calls = []
+
+    async def initialize(self):
+        pass
+
+    async def finalize(self):
+        pass
+
+    async def send_feedback(
+        self,
+        kbid: str,
+        item: FeedbackRequest,
+        x_nucliadb_user: str,
+        x_ndb_client: str,
+        x_forwarded_for: str,
+    ):
+        self.calls.append(item)
+        return
+
+    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
+        self.calls.append(item)
+        return DUMMY_REPHRASE_QUERY
+
+    async def chat_query(
+        self, kbid: str, item: ChatModel
+    ) -> Tuple[str, AsyncIterator[bytes]]:
+        self.calls.append(item)
+
+        async def generate():
+            for i in [b"valid ", b"answer ", b" to"]:
+                yield i
+
+        return (DUMMY_LEARNING_ID, generate())
+
+    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
+        self.calls.append(sentence)
+        if (
+            os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
+        ):  # pragma: no cover
+            return Qm2023
+        else:
+            return Q
+
+    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+        self.calls.append(sentence)
+        dummy_data = os.environ.get("TEST_RELATIONS", None)
+        if dummy_data is not None:  # pragma: no cover
+            return convert_relations(json.loads(dummy_data))
+        else:
+            return DUMMY_RELATION_NODE
+
+
 class PredictEngine:
     def __init__(
         self,
@@ -89,7 +161,6 @@ class PredictEngine:
         nuclia_service_account: Optional[str] = None,
         zone: Optional[str] = None,
         onprem: bool = False,
-        dummy: bool = False,
     ):
         self.nuclia_service_account = nuclia_service_account
         self.cluster_url = cluster_url
@@ -99,10 +170,6 @@ class PredictEngine:
             self.public_url = None
         self.zone = zone
         self.onprem = onprem
-        self.dummy = dummy
-        # TODO: self.calls is only for testing purposes.
-        # It should be removed
-        self.calls: List[Union[str, ChatModel, RephraseModel]] = []
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
@@ -143,9 +210,9 @@ class PredictEngine:
         else:
             if self.nuclia_service_account is None:
                 logger.warning(
-                    "Nuclia Service account is not defined so could not retrieve vectors for the query"
+                    "Nuclia Service account is not defined so could not send the feedback"
                 )
-                return []
+                return
             # Upload the payload
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.post(
@@ -157,10 +224,6 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
-        if self.dummy:
-            self.calls.append(item)
-            return DUMMY_REPHRASE_QUERY
-
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.post(
@@ -189,15 +252,6 @@ class PredictEngine:
     async def chat_query(
         self, kbid: str, item: ChatModel
     ) -> Tuple[str, AsyncIterator[bytes]]:
-        if self.dummy:
-            self.calls.append(item)
-
-            async def generate():
-                for i in [b"valid ", b"answer ", b" to"]:
-                    yield i
-
-            return (DUMMY_LEARNING_ID, generate())
-
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.post(
@@ -223,13 +277,6 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
-        if self.dummy:
-            self.calls.append(sentence)
-            if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":
-                return Qm2023
-            else:
-                return Q
-
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.get(
@@ -256,15 +303,6 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "entities"})
     async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
-        # If token is offered
-        if self.dummy:
-            self.calls.append(sentence)
-            dummy_data = os.environ.get("TEST_RELATIONS", None)
-            if dummy_data is not None:
-                return convert_relations(json.loads(dummy_data))
-            else:
-                return DUMMY_RELATION_NODE
-
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.get(
@@ -272,7 +310,7 @@ class PredictEngine:
                 headers={"X-STF-KBID": kbid},
             )
         else:
-            if self.nuclia_service_account is None:
+            if self.nuclia_service_account is None:  # pragma: no cover
                 logger.warning(
                     "Nuclia Service account is not defined so could not retrieve entities from the query"
                 )

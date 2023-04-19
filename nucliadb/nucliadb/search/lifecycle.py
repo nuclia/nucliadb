@@ -22,10 +22,10 @@ from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.utils import get_driver  # type: ignore
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
-from nucliadb.search.predict import PredictEngine
+from nucliadb.search.search import paragraphs
+from nucliadb.search.predict import start_predict_engine
 from nucliadb.search.search import paragraphs
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
-from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -42,16 +42,8 @@ async def initialize() -> None:
     await setup_telemetry(SERVICE_NAME)
 
     await start_ingest(SERVICE_NAME)
-    predict_util = PredictEngine(
-        nuclia_settings.nuclia_inner_predict_url,
-        nuclia_settings.nuclia_public_url,
-        nuclia_settings.nuclia_service_account,
-        nuclia_settings.nuclia_zone,
-        nuclia_settings.onprem,
-        nuclia_settings.dummy_processing,
-    )
-    await predict_util.initialize()
-    set_utility(Utility.PREDICT, predict_util)
+    await start_predict_engine()
+
     driver = await get_driver()
     cache = await get_cache()
     set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))
