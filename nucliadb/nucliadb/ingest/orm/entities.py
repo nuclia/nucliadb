@@ -107,9 +107,12 @@ class EntitiesManager:
         intact. Use `delete_entities` to delete them instead.
 
         """
+        if not self.entities_group_exists(group):
+            raise KeyError(f"Entities group '{group}' doesn't exist")
+
         entities_group = await self.get_stored_entities_group(group)
         if entities_group is None:
-            raise KeyError(f"Entities group '{group}' doesn't exist")
+            entities_group = EntitiesGroup()
 
         for name, entity in entities.items():
             entities_group.entities[name].CopyFrom(entity)
@@ -189,7 +192,7 @@ class EntitiesManager:
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
         payload = await self.txn.get(key)
-        if payload is None:
+        if not payload:
             return None
 
         eg = EntitiesGroup()
@@ -240,7 +243,7 @@ class EntitiesManager:
         deleted: Set[str] = set()
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
-        if payload is not None:
+        if payload:
             deg = DeletedEntitiesGroups()
             deg.ParseFromString(payload)
             deleted.update(deg.entities_groups)
@@ -338,7 +341,7 @@ class EntitiesManager:
         deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(deleted_groups_key)
         deg = DeletedEntitiesGroups()
-        if payload is not None:
+        if payload:
             deg.ParseFromString(payload)
         if group not in deg.entities_groups:
             deg.entities_groups.append(group)
@@ -347,7 +350,7 @@ class EntitiesManager:
     async def unmark_entities_group_as_deleted(self, group: str):
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
-        if payload is None:
+        if not payload:
             return
         deg = DeletedEntitiesGroups()
         deg.ParseFromString(payload)
