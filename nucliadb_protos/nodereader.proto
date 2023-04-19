@@ -8,6 +8,13 @@ import public "nucliadb_protos/utils.proto";
 
 message Filter {
     repeated string tags = 1;
+
+    enum Conjunction {
+        AND = 0;
+        OR = 1;
+        NOT = 2;
+    }
+    Conjunction conjunction = 2;
 }
 
 message Faceted {

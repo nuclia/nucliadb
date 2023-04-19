@@ -2,6 +2,18 @@
 pub struct Filter {
     #[prost(string, repeated, tag="1")]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(enumeration="filter::Conjunction", tag="2")]
+    pub conjunction: i32,
+}
+/// Nested message and enum types in `Filter`.
+pub mod filter {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Conjunction {
+        And = 0,
+        Or = 1,
+        Not = 2,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Faceted {

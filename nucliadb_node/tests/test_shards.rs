@@ -28,9 +28,6 @@ use tonic::Request;
 #[tokio::test]
 async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = node_writer().await;
-    const KB0: &str = "KB0";
-    const KB1: &str = "KB1";
-    const KB2: &str = "KB2";
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest::default()))
         .await?;

@@ -691,6 +691,7 @@ mod tests {
 
         let filter = Filter {
             tags: vec!["/l/mylabel2".to_string()],
+            ..Default::default()
         };
 
         let faceted = Faceted {

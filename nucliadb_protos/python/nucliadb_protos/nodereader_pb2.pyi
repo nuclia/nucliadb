@@ -67,15 +67,33 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _Conjunction:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _ConjunctionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Filter._Conjunction.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        AND: Filter._Conjunction.ValueType  # 0
+        OR: Filter._Conjunction.ValueType  # 1
+        NOT: Filter._Conjunction.ValueType  # 2
+
+    class Conjunction(_Conjunction, metaclass=_ConjunctionEnumTypeWrapper): ...
+    AND: Filter.Conjunction.ValueType  # 0
+    OR: Filter.Conjunction.ValueType  # 1
+    NOT: Filter.Conjunction.ValueType  # 2
+
     TAGS_FIELD_NUMBER: builtins.int
+    CONJUNCTION_FIELD_NUMBER: builtins.int
     @property
     def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    conjunction: global___Filter.Conjunction.ValueType
     def __init__(
         self,
         *,
         tags: collections.abc.Iterable[builtins.str] | None = ...,
+        conjunction: global___Filter.Conjunction.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["conjunction", b"conjunction", "tags", b"tags"]) -> None: ...
 
 global___Filter = Filter
 
