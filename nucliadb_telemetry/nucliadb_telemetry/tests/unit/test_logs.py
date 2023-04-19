@@ -77,8 +77,47 @@ def test_logger_with_formatter(caplog):
     assert len(outputted_records) == 3
 
 
-def test_logger_with_formatter_and_active_span(caplog):
+def test_logger_with_access_formatter(caplog):
     logger = logging.getLogger("test.logger2")
+    formatter = logs.UvicornAccessFormatter()
+
+    outputted_records = []
+
+    class Handler(logging.Handler):
+        def emit(self, record):
+            msg = self.format(record)
+            data = orjson.loads(msg)
+            outputted_records.append(data)
+
+    handler = Handler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    logger.setLevel(logging.ERROR)
+    logger.propagate = False
+
+    logger.error(
+        '%s - "%s %s HTTP/%s" %d',
+        "client_addr",
+        "method",
+        "full_path",
+        "http_version",
+        200,
+    )
+
+    assert len(outputted_records) == 1
+
+    assert outputted_records[0]["httpRequest"] == {
+        "requestMethod": "method",
+        "requestUrl": "full_path",
+        "status": 200,
+        "remoteIp": "client_addr",
+        "protocol": "http_version",
+    }
+
+
+def test_logger_with_formatter_and_active_span(caplog):
+    logger = logging.getLogger("test.logger3")
     formatter = logs.JSONFormatter()
 
     outputted_records = []

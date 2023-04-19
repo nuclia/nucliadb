@@ -121,7 +121,7 @@ class JSONFormatter(logging.Formatter):
         }
 
 
-class UvicornAccessFormatter(logging.Formatter):
+class UvicornAccessFormatter(JSONFormatter):
     def format(self, record: logging.LogRecord) -> str:
         recordcopy = copy(record)
         (

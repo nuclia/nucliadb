@@ -76,6 +76,7 @@ class TestObserver:
         histogram.observe.assert_called_once()
         counter.labels().inc.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_async_decorator(self, histogram, counter):
         observer = metrics.Observer("my_metric")
 
