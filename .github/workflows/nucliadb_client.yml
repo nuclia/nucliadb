@@ -55,6 +55,7 @@ jobs:
 
       - name: Install the package
         run: |
+          pip install --upgrade pip
           pip install -r test-requirements.txt
           pip install -r nucliadb_client/requirements-test.txt
           pip install -r nucliadb_client/requirements-source.txt

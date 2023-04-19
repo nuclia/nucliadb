@@ -1,5 +1,6 @@
 .PHONY: install-dev
 install-dev:
+	pip install --upgrade pip
 	pip install -r ../test-requirements.txt
 	pip install -r ../code-requirements.txt
 	cd .. && pip install -r nucliadb_utils/requirements-sources.txt

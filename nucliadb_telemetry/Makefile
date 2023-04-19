@@ -5,6 +5,7 @@ protos:
 
 .PHONY: install-dev
 install-dev:
+	pip install --upgrade pip
 	pip install -r ../test-requirements.txt
 	pip install -r ../code-requirements.txt
 	pip install -r requirements.txt
