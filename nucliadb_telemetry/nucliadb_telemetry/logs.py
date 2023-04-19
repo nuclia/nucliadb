@@ -28,7 +28,7 @@ import pydantic
 from opentelemetry import trace
 from opentelemetry.trace.span import INVALID_SPAN
 
-from nucliadb_telemetry.settings import LogSettings
+from nucliadb_telemetry.settings import LogLevel, LogSettings
 
 try:
     from uvicorn.logging import AccessFormatter  # type: ignore
@@ -105,8 +105,8 @@ class JSONFormatter(logging.Formatter):
             span_context = current_span.get_span_context()
             # for us, this is opentelemetry trace_id/span_id
             # GCP has logging.googleapis.com/spanId but it's for it's own cloud tracing system
-            data["trace_id"] = span_context.trace_id
-            data["span_id"] = span_context.span_id
+            data["trace_id"] = str(span_context.trace_id)
+            data["span_id"] = str(span_context.span_id)
 
         if hasattr(record, "stack_info"):
             data["stack_info"] = record.stack_info
@@ -156,7 +156,9 @@ def setup_logging() -> None:
     if settings.logger_levels is None:
         settings.logger_levels = {}
     if _ACCESS_LOGGER_NAME not in settings.logger_levels:
-        settings.logger_levels[_ACCESS_LOGGER_NAME] = settings.log_level
+        settings.logger_levels[
+            _ACCESS_LOGGER_NAME
+        ] = LogLevel.INFO  # always have INFO here so we get access logs
 
     formatter = JSONFormatter()
     access_formatter = UvicornAccessFormatter()
