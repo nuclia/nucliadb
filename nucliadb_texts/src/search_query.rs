@@ -27,7 +27,7 @@ use tantivy::Term;
 
 use crate::schema::TextSchema;
 
-pub fn streaming_query(schema: &TextSchema, request: &StreamRequest) -> Box<dyn Query> {
+pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> Box<dyn Query> {
     let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
     queries.push((Occur::Must, Box::new(AllQuery)));
     request
