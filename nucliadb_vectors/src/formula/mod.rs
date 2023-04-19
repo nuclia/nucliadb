@@ -59,14 +59,22 @@ pub struct CompoundClause {
     labels: Vec<AtomClause>,
 }
 impl CompoundClause {
+    pub fn len(&self) -> usize {
+        self.labels.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.labels.is_empty()
+    }
     pub fn new(threshold: usize, labels: Vec<AtomClause>) -> CompoundClause {
         CompoundClause { threshold, labels }
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        let number_of_subqueries = self.labels.len();
+        if self.is_empty() {
+            return true;
+        }
         let mut threshold = self.threshold;
         let mut i = 0;
-        while threshold > 0 && i <= number_of_subqueries {
+        while threshold > 0 && i < self.len() {
             let is_valid = self.labels[i].run(x, retriever);
             threshold -= is_valid as usize;
             i += 1;
@@ -179,5 +187,15 @@ mod tests {
         ];
         formula.extend(CompoundClause::new(1, inner));
         assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        let inner = vec![AtomClause::key_prefix("/This/is".to_string())];
+        formula.extend(CompoundClause::new(1, inner));
+        assert!(formula.run(ADDRESS, &retriever));
+        let mut formula = Formula::new();
+
+        let inner = vec![AtomClause::key_prefix("/This/is/not".to_string())];
+        formula.extend(CompoundClause::new(1, inner));
+        assert!(!formula.run(ADDRESS, &retriever));
     }
 }
