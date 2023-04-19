@@ -190,6 +190,9 @@ message UpdateEntitiesGroupRequest {
 
     // entity_id
     repeated string delete = 5;
+
+    string title = 6;
+    string color = 7;
 }
 
 message UpdateEntitiesGroupResponse {

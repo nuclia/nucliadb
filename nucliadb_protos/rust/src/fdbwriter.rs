@@ -244,6 +244,10 @@ pub struct UpdateEntitiesGroupRequest {
     /// entity_id
     #[prost(string, repeated, tag="5")]
     pub delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag="6")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag="7")]
+    pub color: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateEntitiesGroupResponse {

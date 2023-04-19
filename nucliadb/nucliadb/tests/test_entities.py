@@ -303,6 +303,56 @@ async def test_update_entities_group(
     assert body["entities"]["dog"]["value"] == "updated-dog"
 
 
+async def test_update_indexed_entities_group(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+    processing_entities,
+):
+    kbid = knowledgebox
+
+    update = UpdateEntitiesGroupPayload(
+        add={"seal": Entity(value="seal")},
+        update={"dolphin": Entity(value="updated-dolphin")},
+        delete=["cat"],
+    )
+    resp = await update_entities_group(nucliadb_writer, kbid, "ANIMALS", update)
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["entities"].keys() == {
+        "dolphin",
+        "seal",
+    }
+    assert body["entities"]["dolphin"]["value"] == "updated-dolphin"
+
+
+async def test_update_entities_group_metadata(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+    entities,
+):
+    kbid = knowledgebox
+
+    update = UpdateEntitiesGroupPayload(
+        title="Updated Animals",
+        color="red",
+    )
+    resp = await update_entities_group(nucliadb_writer, kbid, "ANIMALS", update)
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["title"] == "Updated Animals"
+    assert body["color"] == "red"
+
+
 async def test_delete_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

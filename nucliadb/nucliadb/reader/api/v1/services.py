@@ -92,7 +92,9 @@ async def get_all_entities(kbid: str):
             status_code=500, detail="Error while getting entities groups"
         )
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting Knowledge box entities"
+        )
 
 
 async def list_entities_groups(kbid: str):
@@ -115,7 +117,9 @@ async def list_entities_groups(kbid: str):
             status_code=500, detail="Error while listing entities groups"
         )
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on listing Knowledge box entities"
+        )
 
 
 @api.get(
@@ -147,7 +151,9 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
             status_code=404, detail=f"Entities group '{group}' does not exist"
         )
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting entities group on a Knowledge box"
+        )
 
 
 @api.get(
@@ -181,7 +187,9 @@ async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
     elif kbobj.status == GetLabelsResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting Knowledge box labels"
+        )
 
 
 @api.get(
@@ -213,7 +221,9 @@ async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
     elif kbobj.status == GetLabelSetResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting labelset on a Knowledge box"
+        )
 
 
 @api.get(

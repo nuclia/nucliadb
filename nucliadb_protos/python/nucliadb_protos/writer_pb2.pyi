@@ -479,7 +479,7 @@ class BrokerMessage(google.protobuf.message.Message):
     @property
     def user_vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.UserVectorsWrapper]: ...
     reindex: builtins.bool
-    """If true, reindex all text"""
+    """If true, force reindex all paragraphs in a resource"""
     def __init__(
         self,
         *,
@@ -793,6 +793,8 @@ class UpdateEntitiesGroupRequest(google.protobuf.message.Message):
     ADD_FIELD_NUMBER: builtins.int
     UPDATE_FIELD_NUMBER: builtins.int
     DELETE_FIELD_NUMBER: builtins.int
+    TITLE_FIELD_NUMBER: builtins.int
+    COLOR_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     group: builtins.str
@@ -805,6 +807,8 @@ class UpdateEntitiesGroupRequest(google.protobuf.message.Message):
     @property
     def delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """entity_id"""
+    title: builtins.str
+    color: builtins.str
     def __init__(
         self,
         *,
@@ -813,9 +817,11 @@ class UpdateEntitiesGroupRequest(google.protobuf.message.Message):
         add: collections.abc.Mapping[builtins.str, nucliadb_protos.knowledgebox_pb2.Entity] | None = ...,
         update: collections.abc.Mapping[builtins.str, nucliadb_protos.knowledgebox_pb2.Entity] | None = ...,
         delete: collections.abc.Iterable[builtins.str] | None = ...,
+        title: builtins.str = ...,
+        color: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["kb", b"kb"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["add", b"add", "delete", b"delete", "group", b"group", "kb", b"kb", "update", b"update"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["add", b"add", "color", b"color", "delete", b"delete", "group", b"group", "kb", b"kb", "title", b"title", "update", b"update"]) -> None: ...
 
 global___UpdateEntitiesGroupRequest = UpdateEntitiesGroupRequest
 
