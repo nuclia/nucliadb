@@ -19,6 +19,14 @@
 #
 
 
+class AlreadyExists(Exception):
+    pass
+
+
+class NotFound(Exception):
+    pass
+
+
 class NodeClusterSmall(Exception):
     pass
 
@@ -27,11 +35,11 @@ class KnowledgeBoxConflict(Exception):
     pass
 
 
-class ShardNotFound(Exception):
+class ShardNotFound(NotFound):
     pass
 
 
-class KnowledgeBoxNotFound(Exception):
+class KnowledgeBoxNotFound(NotFound):
     pass
 
 
@@ -56,5 +64,5 @@ class SequenceOrderViolation(Exception):
         self.last_seqid = last_seqid
 
 
-class AlreadyExists(Exception):
+class EntitiesGroupNotFound(NotFound):
     pass

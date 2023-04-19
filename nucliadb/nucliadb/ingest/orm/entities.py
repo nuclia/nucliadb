@@ -44,7 +44,11 @@ from nucliadb.ingest.maindb.keys import (
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
 )
-from nucliadb.ingest.orm.exceptions import AlreadyExists, NodeError
+from nucliadb.ingest.orm.exceptions import (
+    AlreadyExists,
+    EntitiesGroupNotFound,
+    NodeError,
+)
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.nodes_manager import NodesManager
@@ -108,7 +112,7 @@ class EntitiesManager:
 
         """
         if not self.entities_group_exists(group):
-            raise KeyError(f"Entities group '{group}' doesn't exist")
+            raise EntitiesGroupNotFound(f"Entities group '{group}' doesn't exist")
 
         entities_group = await self.get_stored_entities_group(group)
         if entities_group is None:
