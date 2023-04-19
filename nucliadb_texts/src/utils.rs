@@ -18,8 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod reader;
-mod schema;
-mod search_query;
-pub mod utils;
-pub mod writer;
+use nucliadb_core::protos::filter::Conjunction;
+use tantivy::query::Occur;
+
+pub fn conjunction_to_occur(conjunction: Conjunction) -> Occur {
+    match conjunction {
+        Conjunction::And => Occur::Must,
+        Conjunction::Or => Occur::Should,
+        Conjunction::Not => Occur::MustNot,
+    }
+}

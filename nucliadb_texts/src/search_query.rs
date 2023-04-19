@@ -20,28 +20,26 @@
 // use std::convert::TryFrom;
 // use std::time::SystemTime;
 
-use nucliadb_core::protos::{DocumentSearchRequest, StreamRequest};
+use nucliadb_core::protos::filter::Conjunction;
+use nucliadb_core::protos::{DocumentSearchRequest, Filter, StreamRequest};
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
 use crate::schema::TextSchema;
+use crate::utils::conjunction_to_occur;
 
 pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> Box<dyn Query> {
     let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
     queries.push((Occur::Must, Box::new(AllQuery)));
-    request
-        .filter
-        .iter()
-        .flat_map(|f| f.tags.iter())
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            queries.push((Occur::Should, Box::new(facet_term_query)));
-        });
+
+    if let Some(ref filter) = request.filter {
+        queries.extend(create_filter_queries(schema, filter))
+    }
+
     Box::new(BooleanQuery::new(queries))
 }
+
 pub fn create_query(
     parser: &QueryParser,
     search: &DocumentSearchRequest,
@@ -70,17 +68,9 @@ pub fn create_query(
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    // Add filter
-    search
-        .filter
-        .iter()
-        .flat_map(|f| f.tags.iter())
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            queries.push((Occur::Must, Box::new(facet_term_query)));
-        });
+    if let Some(ref filter) = search.filter {
+        queries.extend(create_filter_queries(schema, filter));
+    }
 
     // Status filters
     if let Some(status) = search.with_status.map(|status| status as u64) {
@@ -98,5 +88,107 @@ pub fn create_query(
         queries.pop().unwrap().1
     } else {
         Box::new(BooleanQuery::new(queries))
+    }
+}
+
+fn create_filter_queries(schema: &TextSchema, filter: &Filter) -> Vec<(Occur, Box<dyn Query>)> {
+    let mut queries = vec![];
+
+    let conjunction =
+        conjunction_to_occur(Conjunction::from_i32(filter.conjunction).unwrap_or(Conjunction::And));
+
+    filter
+        .tags
+        .iter()
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query: Box<dyn Query> =
+                Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
+            queries.push((conjunction, facet_term_query))
+        });
+
+    queries
+}
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_query_per_tag() {
+        let schema = TextSchema::new();
+
+        let filter = Filter::default();
+        let queries = create_filter_queries(&schema, &filter);
+        assert!(queries.is_empty());
+
+        let filter = Filter {
+            tags: vec!["/A".to_string(); 10],
+            ..Default::default()
+        };
+        let queries = create_filter_queries(&schema, &filter);
+        assert_eq!(queries.len(), 10);
+    }
+
+    #[test]
+    fn test_default_filter_queries_creation() {
+        let schema = TextSchema::new();
+        let filter = Filter {
+            tags: vec!["/A".to_string(), "/B".to_string()],
+            ..Default::default()
+        };
+
+        let queries = create_filter_queries(&schema, &filter);
+        assert_eq!(queries.len(), 2);
+        for (occur, _query) in queries.iter() {
+            assert_eq!(*occur, Occur::Must);
+        }
+    }
+
+    #[test]
+    fn test_AND_filter_queries_creation() {
+        let schema = TextSchema::new();
+        let filter = Filter {
+            tags: vec!["/A".to_string(), "/B".to_string()],
+            conjunction: Conjunction::And.into(),
+        };
+
+        let queries = create_filter_queries(&schema, &filter);
+        assert_eq!(queries.len(), 2);
+        for (occur, _query) in queries.iter() {
+            assert_eq!(*occur, Occur::Must);
+        }
+    }
+
+    #[test]
+    fn test_OR_filter_queries_creation() {
+        let schema = TextSchema::new();
+        let filter = Filter {
+            tags: vec!["/A".to_string(), "/B".to_string()],
+            conjunction: Conjunction::Or.into(),
+        };
+
+        let queries = create_filter_queries(&schema, &filter);
+        assert_eq!(queries.len(), 2);
+        for (occur, _query) in queries.iter() {
+            assert_eq!(*occur, Occur::Should);
+        }
+    }
+
+    #[test]
+    fn test_NOT_filter_queries_creation() {
+        let schema = TextSchema::new();
+        let filter = Filter {
+            tags: vec!["/A".to_string(), "/B".to_string()],
+            conjunction: Conjunction::Not.into(),
+        };
+
+        let queries = create_filter_queries(&schema, &filter);
+        assert_eq!(queries.len(), 2);
+        for (occur, _query) in queries.iter() {
+            assert_eq!(*occur, Occur::MustNot);
+        }
     }
 }
