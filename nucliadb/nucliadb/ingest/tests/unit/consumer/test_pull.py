@@ -42,7 +42,7 @@ def test_check_proxy_telemetry_headers_ok(errors):
     errors.capture_exception.assert_not_called()
 
 
-def test_check_proxy_telemetry_headers_sends_sentry_event(errors):
+def test_check_proxy_telemetry_headers_missing(errors):
     resp = Response(headers={"x-b3-sampled": "baz"})
     check_proxy_telemetry_headers(resp)
 
