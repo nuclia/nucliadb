@@ -539,6 +539,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             entities_manager = EntitiesManager(kbobj, txn)
 
             try:
+                await entities_manager.set_entities_group_metadata(
+                    request.group,
+                    title=request.title,
+                    color=request.color,
+                )
                 updates = {**request.add, **request.update}
                 await entities_manager.update_entities(request.group, updates)
                 await entities_manager.delete_entities(request.group, request.delete)  # type: ignore

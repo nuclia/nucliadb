@@ -138,6 +138,20 @@ class EntitiesManager:
         await self.store_entities_group(group, entitiesgroup)
         await self.index_entities_group(group, entitiesgroup)
 
+    async def set_entities_group_metadata(
+        self, group: str, *, title: Optional[str] = None, color: Optional[str] = None
+    ):
+        entities_group = await self.get_stored_entities_group(group)
+        if entities_group is None:
+            entities_group = EntitiesGroup()
+
+        if title:
+            entities_group.title = title
+        if color:
+            entities_group.color = color
+
+        await self.store_entities_group(group, entities_group)
+
     async def delete_entities(self, group: str, delete: List[str]):
         stored = await self.get_stored_entities_group(group)
         indexed = await self.get_indexed_entities_group(group)

@@ -96,6 +96,9 @@ class CreateEntitiesGroupPayload(BaseModel):
 
 
 class UpdateEntitiesGroupPayload(BaseModel):
-    add: Dict[str, Entity]
-    update: Dict[str, Entity]
-    delete: List[str]
+    title: Optional[str] = None
+    color: Optional[str] = None
+
+    add: Dict[str, Entity] = {}
+    update: Dict[str, Entity] = {}
+    delete: List[str] = []
