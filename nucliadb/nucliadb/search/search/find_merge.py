@@ -51,7 +51,6 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_telemetry import metrics
-from nucliadb_utils.utilities import has_feature
 
 from .metrics import merge_observer
 
@@ -106,7 +105,7 @@ async def set_text_value(
     result_paragraph: TempFindParagraph,
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
-    ematches: List[str] = [],
+    ematches: Optional[List[str]] = None,
 ):
     # TODO: Improve
     await max_operations.acquire()
@@ -180,14 +179,11 @@ async def fetch_find_metadata(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     highlight: bool = False,
-    ematches: List[str] = [],
+    ematches: Optional[List[str]] = None,
 ):
     resources = set()
     operations = []
-    if has_feature("nucliadb_find_merge_parallelisation"):
-        max_operations = asyncio.Semaphore(100)
-    else:
-        max_operations = asyncio.Semaphore(10)
+    max_operations = asyncio.Semaphore(50)
 
     orderer = Orderer()
 

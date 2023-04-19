@@ -31,12 +31,7 @@ class Settings(pydantic.BaseSettings):
     flag_settings_url: Optional[str]
 
 
-DEFAULT_FLAG_DATA: dict[str, Any] = {
-    "nucliadb_find_merge_parallelisation": {
-        "rollout": 0,
-        "variants": {"environment": ["stage"]},
-    }
-}
+DEFAULT_FLAG_DATA: dict[str, Any] = {}
 
 
 class FlagService:

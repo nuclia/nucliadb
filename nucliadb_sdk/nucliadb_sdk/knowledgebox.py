@@ -423,7 +423,7 @@ class KnowledgeBox:
         field_type_filter: List[FieldTypeName] = list(FieldTypeName),
         extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName),
         context: Optional[List[Message]] = None,
-        fields: List[str] = [],
+        fields: Optional[List[str]] = None,
         range_creation_start: Optional[datetime] = None,
         range_creation_end: Optional[datetime] = None,
         range_modification_start: Optional[datetime] = None,
@@ -450,7 +450,7 @@ class KnowledgeBox:
             args["filters"] = filter_list
 
         args["min_score"] = min_score
-        args["fields"] = fields
+        args["fields"] = fields or []
         args["context"] = context
         args["extracted"] = extracted
         args["field_type_filter"] = field_type_filter

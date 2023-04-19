@@ -468,7 +468,7 @@ def download_all_partitions(
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
     path: Optional[str] = None,
     knowledgebox: Optional[KnowledgeBox] = None,
-    labels: List[str] = [],
+    labels: Optional[List[str]] = None,
 ):
     if knowledgebox is None and slug is not None:
         knowledgebox = get_kb(slug, nucliadb_base_url)
