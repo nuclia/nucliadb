@@ -183,7 +183,7 @@ class PredictEngine:
                 headers=headers,
             )
         await self.check_response(resp, expected=200)
-        return await resp.read()
+        return await resp.text()
 
     @predict_observer.wrap({"type": "chat"})
     async def chat_query(
