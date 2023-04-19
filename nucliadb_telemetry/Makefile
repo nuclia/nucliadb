@@ -5,6 +5,7 @@ protos:
 
 .PHONY: install-dev
 install-dev:
+## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
 	pip install --upgrade "pip<23.1"
 	pip install -r ../test-requirements.txt
 	pip install -r ../code-requirements.txt

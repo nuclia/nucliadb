@@ -106,6 +106,7 @@ venv:  ## Initializes an environment
 	pyenv local nucliadb
 
 install: ## Install dependencies (on the active environment)
+## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
 	pip install --upgrade "pip<23.1"
 	pip install Cython==0.29.24
 	pip install grpcio-tools
