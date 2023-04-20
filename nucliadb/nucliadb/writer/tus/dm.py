@@ -115,9 +115,24 @@ class FileDataMangaer:
         return self._data.get(name, default)
 
 
-class RedisFileDataManager(FileDataMangaer):
+class RedisFileDataManagerFactory:
+    """
+    Allow sharing a single redis pool between multiple data managers.
+    """
+
     def __init__(self, redis_url: str):
         self.redis = aioredis.from_url(redis_url)
+
+    def __call__(self):
+        return RedisFileDataManager(self.redis)
+
+    async def finalize(self):
+        await self.redis.close(close_connection_pool=True)
+
+
+class RedisFileDataManager(FileDataMangaer):
+    def __init__(self, redis: aioredis.Redis):
+        self.redis = redis
 
     async def load(self, key):
         # preload data

@@ -546,6 +546,66 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
 
 @pytest.mark.asyncio
+async def test_multiple_tus_file_upload_tries(
+    writer_api, knowledgebox_writer, resource
+):
+    kb = knowledgebox_writer
+    rslug = "resource1"
+
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        headers = {
+            "tus-resumable": "1.0.0",
+            "content-type": "image/jpg",
+            "upload-defer-length": "1",
+        }
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        url = resp.headers["location"]
+
+        # Check that we are using the slug for the whole file upload
+        assert f"{RSLUG_PREFIX}/{rslug}" in url
+        resp = await client.patch(
+            url,
+            data=b"x" * 10000,
+            headers={
+                "upload-offset": "0",
+                "content-length": "10000",
+                "upload-length": "10000",
+            },
+        )
+        assert resp.status_code == 200
+
+        assert resp.headers["Tus-Upload-Finished"] == "1"
+
+        # next one should work as well
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        url = resp.headers["location"]
+
+        # Check that we are using the slug for the whole file upload
+        assert f"{RSLUG_PREFIX}/{rslug}" in url
+        resp = await client.patch(
+            url,
+            data=b"x" * 10000,
+            headers={
+                "upload-offset": "0",
+                "content-length": "10000",
+                "upload-length": "10000",
+            },
+        )
+        assert resp.status_code == 200
+
+        assert resp.headers["Tus-Upload-Finished"] == "1"
+
+
+@pytest.mark.asyncio
 async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
     kb = knowledgebox_writer
     rslug = "myslug"
