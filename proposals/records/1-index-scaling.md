@@ -9,6 +9,7 @@ same core concepts of the database engine in place while still allowing us to sc
 
 *Goals*:
 - Allow us to dynamically scale reads/writes to real load, not shard size or count
+  - Potential scaling points: CPU contention on IndexNodeReader, IndexNodeWriter write contention, active memory usage
 - Iterative design
 
 *Known cons to approach*
@@ -143,11 +144,16 @@ Phase 1 will focus on an approach with limited impact on the existing implementa
 - Existing IndexNodes and architecture will stay in place
 - New IndexCoordinator component provided
 - New IndexNodes deployed seperately from existing nodes
+- Reindex all existing shards into new coordinator nodes
 - Validate indexing, search approach, feature flag for test accounts
 
 ### Phase 2: Cutover
 
 Once phase 1 is validated, cut over new scheme.
+
+Keep both running for some time to finish validation.
+
+Finally, remove old node implementation.
 
 ### Phase 3: Statistics
 
@@ -161,12 +167,16 @@ The final phase will be putting the parts together for being able to rebalance s
 
 This will allow us to scale if we're read heavy on certain shards as well as scale down underutilized shards.
 
+Proposed initial rebalance decision metrics:
+- CPU load on IndexNodeReaders by shard
+- Shard write contention
+
 ## Key metrics
 
 - Coordinator search proxy performance
+- Coordinator consumer lag
 - Index time
-- Replica write contention
-- Write lag
+- Replica write contention: how long writing to a shard is blocked by another node write operation
 
 
 ## Success Criteria
