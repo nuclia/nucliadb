@@ -33,9 +33,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, *};
 use search_query::{search_query, suggest_query};
-use tantivy::collector::{
-    Collector, Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs,
-};
+use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
@@ -214,7 +212,7 @@ impl ReaderChild for ParagraphReaderService {
             text: &text,
             only_faceted: request.only_faceted,
         };
-        let mut response = searcher.do_search(termc.clone(), original, self);
+        let mut response = searcher.do_search(termc.clone(), original, self)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
         }
@@ -224,7 +222,7 @@ impl ReaderChild for ParagraphReaderService {
                 debug!("{id:?} - Applying fuzzy: starts at {v} ms");
             }
             searcher.results -= response.results.len();
-            let fuzzied = searcher.do_search(termc, fuzzied, self);
+            let fuzzied = searcher.do_search(termc, fuzzied, self)?;
             let filter = response
                 .results
                 .iter()
@@ -485,7 +483,7 @@ impl<'a> Searcher<'a> {
         termc: SharedTermC,
         query: Box<dyn Query>,
         service: &ParagraphReaderService,
-    ) -> ParagraphSearchResponse {
+    ) -> NodeResult<ParagraphSearchResponse> {
         let searcher = service.reader.searcher();
         let facet_collector = self.facets.iter().fold(
             FacetCollector::for_field(service.schema.facets),
@@ -497,19 +495,20 @@ impl<'a> Searcher<'a> {
         if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
-            ParagraphSearchResponse::from(SearchFacetsResponse {
+            Ok(ParagraphSearchResponse::from(SearchFacetsResponse {
                 text_service: service,
                 facets_count: Some(facets_count),
                 facets: self.facets.to_vec(),
-            })
+            }))
         } else if self.facets.is_empty() {
             // Only query no facets
             let extra_result = self.results + 1;
             match self.request.order.clone() {
                 Some(order) => {
-                    let collector = self.custom_order_collector(order, extra_result, self.offset);
-                    let top_docs = searcher.search(&query, &collector).unwrap();
-                    ParagraphSearchResponse::from(SearchIntResponse {
+                    let custom_collector =
+                        self.custom_order_collector(order, extra_result, self.offset);
+                    let top_docs = searcher.search(&query, &custom_collector)?;
+                    Ok(ParagraphSearchResponse::from(SearchIntResponse {
                         facets_count: None,
                         facets: self.facets.to_vec(),
                         top_docs,
@@ -518,12 +517,13 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
                 None => {
-                    let topdocs = TopDocs::with_limit(extra_result).and_offset(self.offset);
-                    let top_docs = searcher.search(&query, &topdocs).unwrap();
-                    ParagraphSearchResponse::from(SearchBm25Response {
+                    let topdocs_collector =
+                        TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let top_docs = searcher.search(&query, &topdocs_collector)?;
+                    Ok(ParagraphSearchResponse::from(SearchBm25Response {
                         facets_count: None,
                         facets: self.facets.to_vec(),
                         top_docs,
@@ -532,7 +532,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
             }
         } else {
@@ -542,13 +542,9 @@ impl<'a> Searcher<'a> {
                 Some(order) => {
                     let custom_collector =
                         self.custom_order_collector(order, extra_result, self.offset);
-                    let mut multicollector = MultiCollector::new();
-                    let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(custom_collector);
-                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                    let facets_count = facet_handler.extract(&mut multi_fruit);
-                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                    ParagraphSearchResponse::from(SearchIntResponse {
+                    let multicollector = &(facet_collector, custom_collector);
+                    let (facets_count, top_docs) = searcher.search(&query, multicollector)?;
+                    Ok(ParagraphSearchResponse::from(SearchIntResponse {
                         facets_count: Some(facets_count),
                         facets: self.facets.to_vec(),
                         top_docs,
@@ -557,17 +553,14 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
                 None => {
-                    let topdocs = TopDocs::with_limit(extra_result).and_offset(self.offset);
-                    let mut multicollector = MultiCollector::new();
-                    let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(topdocs);
-                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                    let facets_count = facet_handler.extract(&mut multi_fruit);
-                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                    ParagraphSearchResponse::from(SearchBm25Response {
+                    let topdocs_collector =
+                        TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let multicollector = &(facet_collector, topdocs_collector);
+                    let (facets_count, top_docs) = searcher.search(&query, multicollector)?;
+                    Ok(ParagraphSearchResponse::from(SearchBm25Response {
                         facets_count: Some(facets_count),
                         facets: self.facets.to_vec(),
                         top_docs,
@@ -576,7 +569,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
             }
         }
