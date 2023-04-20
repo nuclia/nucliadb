@@ -23,8 +23,8 @@ from typing import Optional
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus.dm import (
     FileDataMangaer,
-    RedisFileDataManagerFactory,
     RedisFileDataManager,
+    RedisFileDataManagerFactory,
 )
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
