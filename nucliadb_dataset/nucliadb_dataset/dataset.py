@@ -168,7 +168,7 @@ class NucliaDBDataset(NucliaDataset):
             raise AttributeError("Trainset or task needs to be defined")
 
         if trainset is None:
-            raise AttributeError("Trainset cloud not be defined")
+            raise AttributeError("Trainset could not be defined")
 
         self.trainset = trainset
         self.client = client

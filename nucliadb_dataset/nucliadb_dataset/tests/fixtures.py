@@ -55,6 +55,7 @@ def upload_data_field_classification(knowledgebox: KnowledgeBox):
 @pytest.fixture(scope="function")
 def upload_data_token_classification(knowledgebox: KnowledgeBox):
     knowledgebox.set_entities("PERSON", ["Ramon", "Carmen Iniesta", "Eudald Camprubi"])
+    knowledgebox.set_entities("ANIMAL", ["lion", "tiger", "cheetah"])
     knowledgebox.upload(
         "doc1",
         text="Ramon This is my lovely text",
@@ -66,6 +67,15 @@ def upload_data_token_classification(knowledgebox: KnowledgeBox):
         entities=[
             Entity(type="PERSON", value="Carmen Iniesta", positions=[(0, 14)]),
             Entity(type="PERSON", value="Eudald Camprubi", positions=[(46, 61)]),
+        ],
+    )
+    knowledgebox.upload(
+        "doc3",
+        text="Which is the fastest animal, a lion, a tiger or a cheetah?",
+        entities=[
+            Entity(type="ANIMAL", value="lion", positions=[(31, 35)]),
+            Entity(type="ANIMAL", value="tiger", positions=[(39, 44)]),
+            Entity(type="ANIMAL", value="cheetah", positions=[(50, 57)]),
         ],
     )
 

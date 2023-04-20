@@ -101,7 +101,7 @@ impl FieldReader for TextReaderService {
             uuid_field: self.schema.uuid,
             facet_field: self.schema.facets,
             searcher: self.reader.searcher(),
-            query: search_query::streaming_query(&self.schema, request),
+            query: search_query::create_streaming_query(&self.schema, request),
         };
         Ok(DocumentIterator::new(producer.flatten()))
     }
@@ -833,6 +833,7 @@ mod tests {
             shard_id: None,
             filter: None,
             reload: false,
+            ..Default::default()
         };
         let iter = field_reader_service.iterator(&request).unwrap();
         let count = iter.count();
