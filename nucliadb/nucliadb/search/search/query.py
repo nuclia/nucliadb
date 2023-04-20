@@ -36,9 +36,9 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
-    Sort,
     SortFieldMap,
     SortOptions,
+    SortOrder,
     SortOrderMap,
     SuggestOptions,
 )
@@ -219,7 +219,7 @@ async def paragraph_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     sort: Optional[str] = None,
-    sort_ord: int = Sort.DESC.value,
+    sort_ord: str = SortOrder.DESC.value,
     reload: bool = False,
     with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:
