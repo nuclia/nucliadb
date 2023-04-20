@@ -348,9 +348,13 @@ class KnowledgeBox:
         vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
+        page_number: Optional[int] = None,
+        page_size: Optional[int] = None,
     ):
         result = self.client.search(
-            self.build_search_request(text, filter, vector, vectorset, min_score)
+            self.build_search_request(
+                text, filter, vector, vectorset, min_score, page_number, page_size
+            )
         )
         return SearchResult(result, self.client)
 
@@ -514,6 +518,8 @@ class KnowledgeBox:
         vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
+        page_number: Optional[int] = None,
+        page_size: Optional[int] = None,
     ) -> SearchRequest:
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -546,6 +552,11 @@ class KnowledgeBox:
         if len(args["features"]) == 0:
             args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
+
+        if page_number is not None:
+            args["page_number"] = page_number
+        if page_size is not None:
+            args["page_size"] = page_size
 
         args["min_score"] = min_score
         request = SearchRequest(**args)
