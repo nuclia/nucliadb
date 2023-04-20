@@ -247,7 +247,7 @@ def test_update_existing_resource(knowledgebox: KnowledgeBox):
     resource1_updated = knowledgebox[resource_id]
     resource1_updated.title = "common man"
     resource1_updated.summary = "I'm not Ramon"
-    resource1_updated.data.texts["text"] = TextFieldData(
+    resource1_updated.data.texts["text"] = TextFieldData(  # type: ignore
         value=FieldText(
             body="Really, I'm not Ramon",
             format=TextFormat.PLAIN,
@@ -256,7 +256,7 @@ def test_update_existing_resource(knowledgebox: KnowledgeBox):
         extracted=None,
         error=None,
     )
-    resource1_updated.usermetadata.classifications = [
+    resource1_updated.usermetadata.classifications = [  # type: ignore
         UserClassification(
             labelset="labelset", label="negative", cancelled_by_user=False
         )

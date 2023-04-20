@@ -19,11 +19,9 @@
 
 from typing import Any, Dict
 
-import pytest
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer  # type: ignore
 
 from nucliadb_sdk import Entity, File, KnowledgeBox
-from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.labels import Label
 from nucliadb_sdk.search import ScoreType
 

@@ -20,7 +20,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 from nucliadb_models.search import KnowledgeboxSearchResults
 from nucliadb_sdk.client import NucliaDBClient
@@ -61,7 +61,7 @@ class SearchResult:
         field: str,
         score: float,
         score_type: ScoreType,
-    ) -> SearchResource:
+    ) -> Optional[SearchResource]:
         resource = self.client.get_resource(rid)
         if field_type == "t":
             text = resource.data.texts[field].value.body
@@ -75,13 +75,13 @@ class SearchResult:
             text = f"Link: {uri}"
         else:
             logger.warning(f"Unsupported field type: {field_type} on field {field}")
-            return
+            return None
 
         classifications = [
             classification.label
             for classification in resource.usermetadata.classifications
         ]
-        yield SearchResource(
+        return SearchResource(
             text=text,
             field=field,
             field_type=field_type,
