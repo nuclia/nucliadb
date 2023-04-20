@@ -267,7 +267,11 @@ def test_search_resource(knowledgebox: KnowledgeBox):
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
     resources = knowledgebox.search(
-        vector=vector_q, vectorset="all-MiniLM-L6-v2", min_score=0.70
+        vector=vector_q,
+        vectorset="all-MiniLM-L6-v2",
+        min_score=0.70,
+        page_number=0,
+        page_size=20,
     )
     assert len(resources.sentences.results) == 20
 
