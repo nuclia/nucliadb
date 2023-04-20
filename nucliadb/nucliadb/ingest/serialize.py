@@ -40,6 +40,7 @@ from nucliadb_models.resource import (
     ExtractedDataTypeName,
     FileFieldData,
     FileFieldExtractedData,
+    GenericFieldData,
     KeywordsetFieldData,
     KeywordsetFieldExtractedData,
     LayoutFieldData,
@@ -217,6 +218,7 @@ async def serialize(
                 continue
 
             include_value = ResourceProperties.VALUES in show
+            value = None
             if include_value:
                 value = await field.get_value()
 
@@ -243,8 +245,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.FILE:
+            elif field_type_name is FieldTypeName.FILE:
                 if resource.data.files is None:
                     resource.data.files = {}
                 if field.id not in resource.data.files:
@@ -269,8 +270,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.LINK:
+            elif field_type_name is FieldTypeName.LINK:
                 if resource.data.links is None:
                     resource.data.links = {}
                 if field.id not in resource.data.links:
@@ -295,8 +295,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.LAYOUT:
+            elif field_type_name is FieldTypeName.LAYOUT:
                 if resource.data.layouts is None:
                     resource.data.layouts = {}
                 if field.id not in resource.data.layouts:
@@ -321,8 +320,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.CONVERSATION:
+            elif field_type_name is FieldTypeName.CONVERSATION:
                 if resource.data.conversations is None:
                     resource.data.conversations = {}
                 if field.id not in resource.data.conversations:
@@ -348,8 +346,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.DATETIME:
+            elif field_type_name is FieldTypeName.DATETIME:
                 if resource.data.datetimes is None:
                     resource.data.datetimes = {}
                 if field.id not in resource.data.datetimes:
@@ -374,8 +371,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.KEYWORDSET:
+            elif field_type_name is FieldTypeName.KEYWORDSET:
                 if resource.data.keywordsets is None:
                     resource.data.keywordsets = {field.id: KeywordsetFieldData()}
                 if field.id not in resource.data.keywordsets:
@@ -399,6 +395,23 @@ async def serialize(
                         resource.data.keywordsets[field.id].extracted,
                         field_type_name,
                         extracted,
+                    )
+            elif field_type_name is FieldTypeName.GENERIC:
+                if resource.data.generics is None:
+                    resource.data.generics = {}
+                if field.id not in resource.data.generics:
+                    resource.data.generics[field.id] = GenericFieldData()
+                if include_value:
+                    resource.data.generics[field.id].value = value
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.generics[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
+                if include_extracted_data:
+                    resource.data.generics[field.id].extracted = TextFieldExtractedData(
+                        text=resource.data.generics[field.id].value
                     )
     await txn.abort()
     return resource

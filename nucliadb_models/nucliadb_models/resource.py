@@ -229,6 +229,12 @@ class DatetimeFieldData(BaseModel):
     error: Optional[Error]
 
 
+class GenericFieldData(BaseModel):
+    value: Optional[str]
+    extracted: Optional[TextFieldExtractedData]
+    error: Optional[Error]
+
+
 class ResourceData(BaseModel):
     texts: Optional[Dict[str, TextFieldData]]
     files: Optional[Dict[str, FileFieldData]]
@@ -237,6 +243,7 @@ class ResourceData(BaseModel):
     conversations: Optional[Dict[str, ConversationFieldData]]
     keywordsets: Optional[Dict[str, KeywordsetFieldData]]
     datetimes: Optional[Dict[str, DatetimeFieldData]]
+    generics: Optional[Dict[str, GenericFieldData]]
 
 
 class QueueType(str, Enum):  # type: ignore

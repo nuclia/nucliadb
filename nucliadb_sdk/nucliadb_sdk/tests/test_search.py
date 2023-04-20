@@ -20,10 +20,12 @@
 from typing import Any, Dict
 
 import pytest
+from sentence_transformers import SentenceTransformer
 
+from nucliadb_sdk import Entity, File, KnowledgeBox
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.labels import Label
-from nucliadb_sdk.vectors import Vector
+from nucliadb_sdk.search import ScoreType
 
 DATA: Dict[str, Any] = {
     "text": [
@@ -266,17 +268,89 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert resources.fulltext.total == 9 * 2
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
-    resources = knowledgebox.search(
+    results = knowledgebox.search(
         vector=vector_q,
         vectorset="all-MiniLM-L6-v2",
         min_score=0.70,
         page_number=0,
         page_size=20,
     )
-    assert len(resources.sentences.results) == 20
+    assert len(results.sentences.results) == 20
 
 
-def _test_search_resource_simple_label(knowledgebox: KnowledgeBox):
+def test_standard_examples(knowledgebox: KnowledgeBox):
+    encoder = SentenceTransformer("all-MiniLM-L6-v2")
+    knowledgebox.upload(
+        title="Happy dog",
+        binary=File(data=b"Happy dog file data", filename="data.txt"),
+        text="I'm Sierra, a very happy dog",
+        labels=["emotion/positive"],
+        entities=[Entity(type="NAME", value="Sierra", positions=[(4, 9)])],
+        vectors={
+            "all-MiniLM-L6-v2": encoder.encode(["I'm Sierra, a very happy dog"])[0]
+        },
+    )
+
+    sentences = [
+        ("Day 1", "She's having a terrible day", "emotion/negative"),
+        ("Day 2", "what a delighful day", "emotion/positive"),
+        ("Day 3", "Dog in catalan is gos", "emotion/neutral"),
+        ("Day 4", "he is heartbroken", "emotion/negative"),
+        ("Day 5", "He said that the race is quite tough", "emotion/neutral"),
+        ("Day 6", "love is tough", "emotion/negative"),
+    ]
+    for title, sentence, label in sentences:
+        knowledgebox.upload(
+            title=title,
+            text=sentence,
+            labels=[label],
+            vectors={"all-MiniLM-L6-v2": encoder.encode([sentence])[0]},
+        )
+
+    # test semantic search
+    results = list(
+        knowledgebox.search(
+            vector=encoder.encode(["To be in love"])[0],
+            vectorset="all-MiniLM-L6-v2",
+            min_score=0.25,
+        )
+    )
+    assert len(results) == 2
+    assert results[0].text == "love is tough"
+    assert results[0].labels == ["negative"]
+    assert results[0].score_type == ScoreType.COSINE
+    assert results[1].text == "he is heartbroken"
+    assert results[1].labels == ["negative"]
+    assert results[0].score_type == ScoreType.COSINE
+
+    # full text search results
+    results = list(knowledgebox.search(text="dog"))
+    assert len(results) == 3
+    assert results[0].text == "Happy dog"
+    assert results[0].labels == ["positive"]
+    assert results[0].score_type == ScoreType.BM25
+    assert results[1].text == "Dog in catalan is gos"
+    assert results[1].labels == ["neutral"]
+    assert results[1].score_type == ScoreType.BM25
+    assert results[2].text == "I'm Sierra, a very happy dog"
+    assert results[2].labels == ["positive"]
+    assert results[2].score_type == ScoreType.BM25
+
+    # test filter
+    results = list(knowledgebox.search(filter=["emotion/positive"]))
+
+    assert len(results) == 4
+    assert set([r.text for r in results]) == set(
+        [
+            "what a delighful day",
+            "Happy dog",
+            "I'm Sierra, a very happy dog",
+            "Day 2",
+        ]
+    )
+
+
+def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
     # Lets create a bunch of resources
 
     text: str
@@ -293,8 +367,8 @@ def _test_search_resource_simple_label(knowledgebox: KnowledgeBox):
     assert len(knowledgebox) == 50
     labels = knowledgebox.get_uploaded_labels()
 
-    assert labels["default"].count == 50
-    assert labels["default"].labels["0"] == 9
+    assert labels["default"].count == 100
+    assert labels["default"].labels["0"] == 18
 
     resources = knowledgebox.search(text="love")
     assert resources.fulltext.total == 5
@@ -304,47 +378,6 @@ def _test_search_resource_simple_label(knowledgebox: KnowledgeBox):
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
     resources = knowledgebox.search(
-        vector=vector_q,
-        vectorset="all-MiniLM-L6-v2",
-    )
-
-
-@pytest.mark.asyncio
-async def _test_search_resource_async(knowledgebox: KnowledgeBox):
-    knowledgebox.new_vectorset("all-MiniLM-L6-v2", 4)
-
-    text: str
-    for index, text in enumerate(DATA["text"]):
-        if index == 50:
-            break
-        label = DATA["label"][index]
-        await knowledgebox.async_upload(
-            text=text,
-            labels=[Label(label=str(label), labelset="emoji")],
-            vectors=[
-                Vector(
-                    value=[1.0, 2.0, 3.0, 2.0],
-                    vectorset="all-MiniLM-L6-v2",
-                )
-            ],
-        )
-
-    assert len(knowledgebox) == 50
-    labels = await knowledgebox.async_get_uploaded_labels()
-
-    assert labels["emoji"].count == 50
-    assert labels["emoji"].labels["0"] == 9
-
-    resources = await knowledgebox.async_search(text="love")
-    assert resources.fulltext.total == 5
-    assert len(resources.resources) == 5
-
-    resources = await knowledgebox.async_search(
-        filter=[Label(labelset="emoji", label="12")]
-    )
-
-    vector_q = [1.0, 2.0, 3.0, 2.0]
-    resources = await knowledgebox.async_search(
         vector=vector_q,
         vectorset="all-MiniLM-L6-v2",
     )
