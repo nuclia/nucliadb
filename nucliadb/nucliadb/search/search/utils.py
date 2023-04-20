@@ -19,13 +19,12 @@
 #
 from fastapi import HTTPException
 
-from nucliadb_models.search import (
-    SearchRequest,
-    SortField,
-    SortFieldMap,
-    SortOptions,
-    SortOrder,
-)
+from nucliadb_models.search import SearchRequest, SortField, SortOptions, SortOrder
+
+INDEX_SORTABLE_FIELDS = [
+    SortField.CREATED,
+    SortField.MODIFIED,
+]
 
 
 def parse_sort_options(item: SearchRequest) -> SortOptions:
@@ -36,7 +35,7 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 order=SortOrder.DESC,
                 limit=None,
             )
-        elif not is_valid_index_sort_field(item.sort.field):
+        elif item.sort.field not in INDEX_SORTABLE_FIELDS:
             raise HTTPException(
                 status_code=422,
                 detail=(
@@ -53,7 +52,7 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 order=SortOrder.DESC,
                 limit=None,
             )
-        elif not is_valid_index_sort_field(item.sort.field) and item.sort.limit is None:
+        elif item.sort.field not in INDEX_SORTABLE_FIELDS and item.sort.limit is None:
             raise HTTPException(
                 status_code=422,
                 detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
@@ -68,7 +67,3 @@ def is_empty_query(request: SearchRequest) -> bool:
     return len(request.query) == 0 and (
         request.advanced_query is None or len(request.advanced_query) == 0
     )
-
-
-def is_valid_index_sort_field(field: SortField) -> bool:
-    return SortFieldMap[field] is not None
