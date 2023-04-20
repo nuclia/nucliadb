@@ -43,7 +43,6 @@ from nucliadb_models.search import (
     SortField,
     SortOptions,
     SortOrder,
-    SortOrderMap,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -275,7 +274,6 @@ async def search(
         filters=item.filters,
         faceted=item.faceted,
         sort=sort_options,
-        sort_ord=SortOrderMap[sort_options.order],
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
