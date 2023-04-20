@@ -229,7 +229,7 @@ async def serialize(
                     resource.data.texts[field.id] = TextFieldData()
                 if include_value:
                     resource.data.texts[field.id].value = models.FieldText.from_message(
-                        value
+                        value  # type: ignore
                     )
                 if include_errors:
                     error = await field.get_error()
@@ -252,7 +252,7 @@ async def serialize(
                     resource.data.files[field.id] = FileFieldData()
                 if include_value:
                     resource.data.files[field.id].value = models.FieldFile.from_message(
-                        value
+                        value  # type: ignore
                     )
 
                 if include_errors:
@@ -303,7 +303,9 @@ async def serialize(
                 if include_value:
                     resource.data.layouts[
                         field.id
-                    ].value = models.FieldLayout.from_message(value)
+                    ].value = models.FieldLayout.from_message(
+                        value  # type: ignore
+                    )
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
@@ -360,7 +362,9 @@ async def serialize(
                 if include_value:
                     resource.data.datetimes[
                         field.id
-                    ].value = models.FieldDatetime.from_message(value)
+                    ].value = models.FieldDatetime.from_message(
+                        value  # type: ignore
+                    )
                 if include_extracted_data:
                     resource.data.datetimes[
                         field.id
@@ -385,7 +389,9 @@ async def serialize(
                 if include_value:
                     resource.data.keywordsets[
                         field.id
-                    ].value = models.FieldKeywordset.from_message(value)
+                    ].value = models.FieldKeywordset.from_message(
+                        value  # type: ignore
+                    )
                 if include_extracted_data:
                     resource.data.keywordsets[
                         field.id
