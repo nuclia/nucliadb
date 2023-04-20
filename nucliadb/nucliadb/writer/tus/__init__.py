@@ -21,11 +21,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
-from nucliadb.writer.tus.dm import (
-    FileDataMangaer,
-    RedisFileDataManager,
-    RedisFileDataManagerFactory,
-)
+from nucliadb.writer.tus.dm import FileDataMangaer, RedisFileDataManagerFactory
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
