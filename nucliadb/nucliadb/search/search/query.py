@@ -39,6 +39,7 @@ from nucliadb_models.search import (
     Sort,
     SortFieldMap,
     SortOptions,
+    SortOrderMap,
     SuggestOptions,
 )
 
@@ -60,7 +61,6 @@ async def global_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     user_vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
@@ -108,7 +108,7 @@ async def global_query_to_pb(
         sort_field = SortFieldMap[sort.field]
         if sort_field is not None:
             request.order.sort_by = sort_field
-            request.order.type = sort_ord  # type: ignore
+            request.order.type = SortOrderMap[sort.order]  # type: ignore
 
         request.fields.extend(fields)
 
@@ -219,7 +219,7 @@ async def paragraph_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     sort: Optional[str] = None,
-    sort_ord: int = Sort.ASC.value,
+    sort_ord: int = Sort.DESC.value,
     reload: bool = False,
     with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:

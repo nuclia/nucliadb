@@ -182,7 +182,7 @@ async def catalog(
     faceted: List[str] = Query(default=[]),
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: int = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
+    sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
     shards: List[str] = Query([]),

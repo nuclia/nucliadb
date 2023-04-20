@@ -37,6 +37,7 @@ from nucliadb_models.search import (
     ResourceSearchResults,
     SearchOptions,
     SortField,
+    SortOrder,
 )
 from nucliadb_utils.authentication import requires_one
 
@@ -69,7 +70,8 @@ async def search(
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
-    sort: Optional[SortField] = None,
+    sort: Optional[SortField] = Query(default=None, alias="sort_field"),
+    sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = 0,
     page_size: int = 20,
     range_creation_start: Optional[datetime] = None,
@@ -109,6 +111,7 @@ async def search(
         range_modification_end,
         reload=reload,
         sort=sort.value if sort else None,
+        sort_ord=sort_order.value,
     )
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
