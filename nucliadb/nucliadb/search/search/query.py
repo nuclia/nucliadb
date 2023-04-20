@@ -249,7 +249,7 @@ async def paragraph_query_to_pb(
         if sort is not None:
             if sort.field in SortFieldMap:
                 request.order.sort_by = SortFieldMap[sort.field]
-            request.order.type = SortOrderMap[sort.order]
+            request.order.type = SortOrderMap[sort.order]  # type: ignore
 
         request.fields.extend(fields)
 
