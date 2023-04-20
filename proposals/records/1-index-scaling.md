@@ -8,7 +8,8 @@ same core concepts of the database engine in place while still allowing us to sc
 
 
 *Goals*:
-- Allow us to dynamically scale to load
+- Allow us to dynamically scale reads/writes to real load, not shard size or count
+- Iterative design
 
 *Known cons to approach*
 - reads/writes scaling are not decoupled
@@ -16,6 +17,7 @@ same core concepts of the database engine in place while still allowing us to sc
 *Unknowns*
 - Long term NucliaDB normal "usage"
 - How pricing changes over time affects usage
+- Proper shard size
 
 
 ## Definitions
