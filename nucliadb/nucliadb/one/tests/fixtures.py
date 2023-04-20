@@ -85,8 +85,9 @@ async def nucliadb_api(
     yield make_client_fixture
 
     await application.router.shutdown()
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
+    await driver.close(close_connection_pool=True)
+
     clear_ingest_cache()
     clear_global_cache()
     for node in NODES.values():

@@ -31,7 +31,13 @@ class Settings(pydantic.BaseSettings):
     flag_settings_url: Optional[str]
 
 
-DEFAULT_FLAG_DATA: dict[str, Any] = {}
+DEFAULT_FLAG_DATA: dict[str, Any] = {
+    # These are just defaults to use for local dev and tests
+    "nucliadb_seek_to_paragraph": {
+        "rollout": 0,
+        "variants": {"environment": ["stage"]},
+    },
+}
 
 
 class FlagService:

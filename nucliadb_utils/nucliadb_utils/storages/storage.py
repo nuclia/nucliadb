@@ -79,6 +79,13 @@ class StorageField:
     async def iter_data(self, headers=None):
         raise NotImplementedError()
 
+    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
+        """
+        Iterate through ranges of data
+        """
+        raise NotImplementedError()
+        yield b""  # pragma: no cover
+
     async def delete(self) -> bool:
         deleted = False
         if self.field is not None:

@@ -27,15 +27,10 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
-from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.fetch import (
-    get_resource_cache,
-    get_resource_from_cache,
-    highlight_paragraph,
-)
+from nucliadb.search import SERVICE_NAME
+from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -53,51 +48,12 @@ from nucliadb_models.search import (
 from nucliadb_telemetry import metrics
 
 from .metrics import merge_observer
+from .paragraphs import get_paragraph_text
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
     buckets=[1, 5, 10, 20, 30, 40, 50, 60, 80, 100, 200],
 )
-
-
-async def get_text_find_paragraph(
-    rid: str,
-    kbid: str,
-    field: str,
-    start: int,
-    end: int,
-    split: Optional[str] = None,
-    highlight: bool = False,
-    ematches: Optional[List[str]] = None,
-    matches: Optional[List[str]] = None,
-) -> str:
-    orm_resource = await get_resource_from_cache(kbid, rid)
-
-    if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
-        return ""
-
-    _, field_type, field = field.split("/")
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return ""
-
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
-
-    if highlight:
-        splitted_text = highlight_paragraph(
-            splitted_text, words=matches, ematches=ematches  # type: ignore
-        )
-    return splitted_text
 
 
 async def set_text_value(
@@ -112,9 +68,9 @@ async def set_text_value(
     try:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
-        result_paragraph.paragraph.text = await get_text_find_paragraph(
-            rid=result_paragraph.rid,
+        result_paragraph.paragraph.text = await get_paragraph_text(
             kbid=kbid,
+            rid=result_paragraph.rid,
             field=result_paragraph.field,
             start=result_paragraph.paragraph.position.start,
             end=result_paragraph.paragraph.position.end,

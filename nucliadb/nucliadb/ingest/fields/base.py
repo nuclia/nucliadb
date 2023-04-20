@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Type
 
@@ -45,12 +46,17 @@ from nucliadb_utils.storages.storage import Storage, StorageField
 
 KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 KB_RESOURCE_ERROR = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/error"
-FIELD_TEXT = "extracted_text"
-FIELD_VECTORS = "extracted_vectors"
-USER_FIELD_VECTORS = "user_vectors"
-FIELD_METADATA = "metadata"
-FIELD_LARGE_METADATA = "large_metadata"
+
 SUBFIELDFIELDS = ["l", "c"]
+
+
+class FieldTypes(str, enum.Enum):
+    FIELD_TEXT = "extracted_text"
+    FIELD_VECTORS = "extracted_vectors"
+    USER_FIELD_VECTORS = "user_vectors"
+    FIELD_METADATA = "metadata"
+    FIELD_LARGE_METADATA = "large_metadata"
+    THUMBNAIL = "thumbnail"
 
 
 class Field:
@@ -105,6 +111,11 @@ class Field:
     def storage(self) -> Storage:
         return self.resource.storage
 
+    def get_storage_field(self, field_type: FieldTypes) -> StorageField:
+        return self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, field_type.value
+        )
+
     async def db_get_value(self):
         if self.value is None:
             payload = await self.resource.txn.get(
@@ -144,9 +155,7 @@ class Field:
         await self.delete_metadata()
 
     async def delete_extracted_text(self) -> None:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_TEXT
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -154,18 +163,14 @@ class Field:
 
     async def delete_vectors(self) -> None:
         # Try delete vectors
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_VECTORS
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
             pass
 
     async def delete_metadata(self) -> None:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_METADATA
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -201,9 +206,7 @@ class Field:
                 actual_payload = None
         else:
             actual_payload = None
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_TEXT
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
 
         if actual_payload is None:
             # Its first extracted text
@@ -232,18 +235,14 @@ class Field:
 
     async def get_extracted_text(self, force=False) -> Optional[ExtractedText]:
         if self.extracted_text is None or force:
-            sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, FIELD_TEXT
-            )
+            sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
             payload = await self.storage.download_pb(sf, ExtractedText)
             if payload is not None:
                 self.extracted_text = payload
         return self.extracted_text
 
     async def get_extracted_text_cf(self) -> Optional[CloudFile]:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_TEXT
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
         if await sf.exists() is not None:
             return sf.build_cf()
         else:
@@ -262,9 +261,7 @@ class Field:
         else:
             actual_payload = None
 
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_VECTORS
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
         vo: Optional[VectorObject] = None
         replace_field: bool = True
         replace_splits = []
@@ -301,9 +298,7 @@ class Field:
 
     async def get_vectors(self, force=False) -> Optional[VectorObject]:
         if self.extracted_vectors is None or force:
-            sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, FIELD_VECTORS
-            )
+            sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors = payload
@@ -319,9 +314,7 @@ class Field:
         except KeyError:
             actual_payload = None
 
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, USER_FIELD_VECTORS
-        )
+        sf = self.get_storage_field(FieldTypes.USER_FIELD_VECTORS)
 
         vectors_to_delete: Dict[str, UserVectorsList] = {}
         if actual_payload is not None:
@@ -349,18 +342,14 @@ class Field:
 
     async def get_user_vectors(self, force=False) -> Optional[UserVectorSet]:
         if self.extracted_user_vectors is None or force:
-            sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, USER_FIELD_VECTORS
-            )
+            sf = self.get_storage_field(FieldTypes.USER_FIELD_VECTORS)
             payload = await self.storage.download_pb(sf, UserVectorSet)
             if payload is not None:
                 self.extracted_user_vectors = payload
         return self.extracted_user_vectors
 
     async def get_vectors_cf(self) -> Optional[CloudFile]:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_VECTORS
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_VECTORS)
         if await sf.exists() is not None:
             return sf.build_cf()
         else:
@@ -379,14 +368,10 @@ class Field:
         else:
             actual_payload = None
 
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_METADATA
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
 
         if self.storage.needs_move(payload.metadata.metadata.thumbnail, self.kbid):
-            sf_thumbnail: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, f"thumbnail"
-            )
+            sf_thumbnail = self.get_storage_field(FieldTypes.THUMBNAIL)
             cf: CloudFile = await self.storage.normalize_binary(
                 payload.metadata.metadata.thumbnail, sf_thumbnail
             )
@@ -395,9 +380,7 @@ class Field:
 
         for key, metadata in payload.metadata.split_metadata.items():
             if self.storage.needs_move(metadata.thumbnail, self.kbid):
-                sf_thumbnail_split: StorageField = self.storage.file_extracted(
-                    self.kbid, self.uuid, self.type, self.id, f"thumbnail"
-                )
+                sf_thumbnail_split = self.get_storage_field(FieldTypes.THUMBNAIL)
                 cf_split: CloudFile = await self.storage.normalize_binary(
                     metadata.thumbnail, sf_thumbnail_split
                 )
@@ -433,18 +416,14 @@ class Field:
         self, force: bool = False
     ) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
-            sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, FIELD_METADATA
-            )
+            sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
             payload = await self.storage.download_pb(sf, FieldComputedMetadata)
             if payload is not None:
                 self.computed_metadata = payload
         return self.computed_metadata
 
     async def get_field_metadata_cf(self) -> Optional[CloudFile]:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_METADATA
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
         if await sf.exists() is not None:
             return sf.build_cf()
         else:
@@ -461,9 +440,7 @@ class Field:
         else:
             actual_payload = None
 
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_LARGE_METADATA
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
 
         new_payload: Optional[LargeComputedMetadata] = None
         if payload.HasField("file"):
@@ -496,9 +473,7 @@ class Field:
         self, force: bool = False
     ) -> Optional[LargeComputedMetadata]:
         if self.large_computed_metadata is None or force:
-            sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, FIELD_LARGE_METADATA
-            )
+            sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
             payload = await self.storage.download_pb(
                 sf,
                 LargeComputedMetadata,
@@ -508,9 +483,7 @@ class Field:
         return self.large_computed_metadata
 
     async def get_large_field_metadata_cf(self) -> Optional[CloudFile]:
-        sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FIELD_LARGE_METADATA
-        )
+        sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
         if await sf.exists() is not None:
             return sf.build_cf()
         else:

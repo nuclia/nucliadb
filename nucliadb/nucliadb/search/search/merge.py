@@ -39,11 +39,7 @@ from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_labels_resource,
-    get_resource_cache,
-    get_resource_from_cache,
     get_seconds_paragraph,
-    get_text_paragraph,
-    get_text_sentence,
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationTypePbMap
@@ -72,7 +68,9 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 
+from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
+from .paragraphs import get_paragraph_text, get_text_sentence
 
 Bm25Score = Tuple[int, int]
 TimestampScore = datetime.datetime
@@ -207,8 +205,16 @@ async def merge_suggest_paragraph_results(
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[:10]:
         _, field_type, field = result.field.split("/")
-        text = await get_text_paragraph(
-            result, kbid, highlight=highlight, ematches=ematches  # type: ignore
+        text = await get_paragraph_text(
+            kbid=kbid,
+            rid=result.uuid,
+            field=result.field,
+            start=result.start,
+            end=result.end,
+            split=result.split,
+            highlight=highlight,
+            ematches=ematches,  # type: ignore
+            matches=result.matches,  # type: ignore
         )
         labels = await get_labels_paragraph(result, kbid)
         new_paragraph = Paragraph(
@@ -355,7 +361,17 @@ async def merge_paragraph_results(
     result_paragraph_list: List[Paragraph] = []
     for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
         _, field_type, field = result.field.split("/")
-        text = await get_text_paragraph(result, kbid, highlight, ematches)
+        text = await get_paragraph_text(
+            kbid=kbid,
+            rid=result.uuid,
+            field=result.field,
+            start=result.start,
+            end=result.end,
+            split=result.split,
+            highlight=highlight,
+            ematches=ematches,
+            matches=result.matches,  # type: ignore
+        )
         labels = await get_labels_paragraph(result, kbid)
         new_paragraph = Paragraph(
             score=result.score.bm25,

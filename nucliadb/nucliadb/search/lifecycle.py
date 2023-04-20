@@ -27,6 +27,7 @@ from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.chitchat import start_chitchat, stop_chitchat
 from nucliadb.search.predict import PredictEngine
+from nucliadb.search.search import paragraphs
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
@@ -61,6 +62,8 @@ async def initialize() -> None:
     cache = await get_cache()
     set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))
     await start_chitchat(SERVICE_NAME)
+
+    await paragraphs.initialize_cache()
 
     logging.basicConfig(
         level=logging.INFO,
