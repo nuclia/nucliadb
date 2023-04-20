@@ -212,7 +212,7 @@ async def paragraph_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
-    sort: SortOptions,
+    sort: Optional[SortOptions] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
@@ -246,9 +246,10 @@ async def paragraph_query_to_pb(
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
 
-        if sort.field in SortFieldMap:
-            request.order.sort_by = SortFieldMap[sort.field]
-        request.order.type = SortOrderMap[sort.order]
+        if sort is not None:
+            if sort.field in SortFieldMap:
+                request.order.sort_by = SortFieldMap[sort.field]
+            request.order.type = SortOrderMap[sort.order]
 
         request.fields.extend(fields)
 
