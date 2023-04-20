@@ -29,6 +29,7 @@ from nucliadb.search import SERVICE_NAME
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
+from nucliadb.search.search.utils import parse_sort_options
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -37,6 +38,8 @@ from nucliadb_models.search import (
     ResourceSearchResults,
     SearchOptions,
     SortField,
+    SortOptions,
+    SortOrder,
 )
 from nucliadb_utils.authentication import requires_one
 
@@ -69,7 +72,9 @@ async def search(
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
-    sort: Optional[SortField] = None,
+    sort: Optional[SortField] = Query(default=None, alias="sort_field"),
+    sort_order: SortOrder = Query(default=SortOrder.DESC),
+    sort_limit: Optional[int] = Query(default=None, gt=0),
     page_number: int = 0,
     page_size: int = 20,
     range_creation_start: Optional[datetime] = None,
@@ -93,7 +98,11 @@ async def search(
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
-    # We need to query all nodes
+    user_sort_options = (
+        SortOptions(field=sort, limit=sort_limit, order=sort_order) if sort else None
+    )
+    sort_options = parse_sort_options(query, sort=user_sort_options)
+
     pb_query = await paragraph_query_to_pb(
         [SearchOptions.PARAGRAPH],
         rid,
@@ -103,12 +112,12 @@ async def search(
         faceted,
         page_number,
         page_size,
+        sort_options,
         range_creation_start,
         range_creation_end,
         range_modification_start,
         range_modification_end,
         reload=reload,
-        sort=sort.value if sort else None,
     )
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(

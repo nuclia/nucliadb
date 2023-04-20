@@ -36,9 +36,9 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
-    Sort,
     SortFieldMap,
     SortOptions,
+    SortOrderMap,
     SuggestOptions,
 )
 
@@ -60,7 +60,6 @@ async def global_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     user_vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
@@ -105,10 +104,9 @@ async def global_query_to_pb(
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
 
-        sort_field = SortFieldMap[sort.field]
-        if sort_field is not None:
-            request.order.sort_by = sort_field
-            request.order.type = sort_ord  # type: ignore
+        if sort.field in SortFieldMap:
+            request.order.sort_by = SortFieldMap[sort.field]
+        request.order.type = SortOrderMap[sort.order]  # type: ignore
 
         request.fields.extend(fields)
 
@@ -214,12 +212,11 @@ async def paragraph_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
+    sort: SortOptions,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    sort: Optional[str] = None,
-    sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:
@@ -248,9 +245,11 @@ async def paragraph_query_to_pb(
         request.body = query
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
-        if sort:
-            request.order.field = sort
-            request.order.type = sort_ord  # type: ignore
+
+        if sort.field in SortFieldMap:
+            request.order.sort_by = SortFieldMap[sort.field]
+        request.order.type = SortOrderMap[sort.order]
+
         request.fields.extend(fields)
 
     return request

@@ -43,7 +43,6 @@ from nucliadb_models.search import (
     SortField,
     SortOptions,
     SortOrder,
-    SortOrderMap,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -182,7 +181,7 @@ async def catalog(
     faceted: List[str] = Query(default=[]),
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: int = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
+    sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
     shards: List[str] = Query([]),
@@ -191,15 +190,14 @@ async def catalog(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
-    sort = None
-    if sort_field:
-        sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
     item = SearchRequest(
         query=query,
         fields=["a/title"],
         faceted=faceted,
         filters=filters,
-        sort=sort,
+        sort=SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+        if sort_field is not None
+        else None,
         page_number=page_number,
         page_size=page_size,
         features=[SearchOptions.DOCUMENT],
@@ -258,7 +256,7 @@ async def search(
     audit = get_audit()
     start_time = time()
 
-    sort_options = parse_sort_options(item)
+    sort_options = parse_sort_options(item.query, item.advanced_query, item.sort)
 
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
@@ -275,7 +273,6 @@ async def search(
         filters=item.filters,
         faceted=item.faceted,
         sort=sort_options,
-        sort_ord=SortOrderMap[sort_options.order],
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
