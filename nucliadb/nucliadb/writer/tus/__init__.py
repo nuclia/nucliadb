@@ -40,7 +40,6 @@ class TusStorageDriver:
 
 
 DRIVER: Optional[TusStorageDriver] = None
-FDM: Optional[FileDataMangaer] = None
 
 
 async def initialize():
@@ -92,28 +91,23 @@ async def initialize():
 
 async def finalize():
     global DRIVER
-    global FDM
 
     if DRIVER is not None:
         await DRIVER.backend.finalize()
         DRIVER = None
 
-    if FDM is not None:
-        await FDM.finalize()
-        FDM = None
-
 
 def get_dm() -> FileDataMangaer:  # type: ignore
-    global FDM
-    if FDM is None:
-        if writer_settings.dm_enabled:
-            FDM = RedisFileDataManager(
-                f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
-            )
-        else:
-            FDM = FileDataMangaer()
+    if writer_settings.dm_enabled:
+        dm_driver: FileDataMangaer = RedisFileDataManager(
+            f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
+        )
+    else:
+        dm_driver = FileDataMangaer()
 
-    return FDM
+    if dm_driver is None:
+        raise AttributeError("DM Not configured")
+    return dm_driver
 
 
 def get_storage_manager() -> FileStorageManager:
@@ -126,7 +120,5 @@ def get_storage_manager() -> FileStorageManager:
 
 def clear_storage():
     global DRIVER
-    global FDM
 
     DRIVER = None
-    FDM = None
