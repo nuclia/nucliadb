@@ -1,11 +1,13 @@
 from unittest.mock import AsyncMock, patch
+
 import pytest
-from nucliadb.writer.tus.dm import (
-    RedisFileDataManagerFactory,
-    RedisFileDataManager,
-    FileDataMangaer,
-)
+
 from nucliadb.writer import tus
+from nucliadb.writer.tus.dm import (
+    FileDataMangaer,
+    RedisFileDataManager,
+    RedisFileDataManagerFactory,
+)
 
 
 @pytest.fixture()
