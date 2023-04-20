@@ -26,7 +26,7 @@ from nucliadb_protos.dataset_pb2 import (
     TokensClassification,
     TrainSet,
 )
-from nucliadb_protos.nodereader_pb2 import Filter, StreamRequest
+from nucliadb_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_REVERSE
@@ -221,7 +221,7 @@ async def generate_token_classification_payloads(
     request.shard_id.id = shard_replica_id
     for entitygroup in trainset.filter.labels:
         request.filter.tags.append(f"/e/{entitygroup}")
-        request.filter.conjunction = Filter.Conjunction.OR
+        request.filter.conjunction = StreamFilter.Conjunction.OR
     request.reload = True
     batch = TokenClassificationBatch()
     async for field_item in node.stream_get_fields(request):
