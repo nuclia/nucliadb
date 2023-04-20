@@ -417,7 +417,9 @@ async def serialize(
                         )
                 if include_extracted_data:
                     resource.data.generics[field.id].extracted = TextFieldExtractedData(
-                        text=resource.data.generics[field.id].value
+                        text=models.ExtractedText(
+                            text=resource.data.generics[field.id].value
+                        )
                     )
     await txn.abort()
     return resource
