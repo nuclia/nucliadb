@@ -34,11 +34,12 @@ from nucliadb_telemetry import logger
 from nucliadb_telemetry.common import set_span_exception
 
 
-def start_span_message_receiver(tracer: Tracer, msg: Msg):
+def start_span_message_receiver(tracer: Tracer, msg: Msg, name: str):
     attributes = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
         SpanAttributes.MESSAGING_MESSAGE_PAYLOAD_SIZE_BYTES: len(msg.data),
         SpanAttributes.MESSAGING_MESSAGE_ID: msg.reply,
+        SpanAttributes.MESSAGING_DESTINATION: msg.subject,
     }
 
     # add some attributes from the metadata
@@ -46,7 +47,7 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     token = attach(ctx)
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=f"Received from {msg.subject}",
+        name=name,
         kind=SpanKind.SERVER,
         attributes=attributes,
     )
@@ -54,14 +55,14 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     return span
 
 
-def start_span_message_publisher(tracer: Tracer, subject: str):
+def start_span_message_publisher(tracer: Tracer, subject: str, name: str):
     attributes = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
         SpanAttributes.MESSAGING_DESTINATION: subject,
     }
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=f"Published on {subject}",
+        name=name,
         kind=SpanKind.CLIENT,
         attributes=attributes,
     )
@@ -92,7 +93,9 @@ class JetStreamContextTelemetry:
                 await origin_cb(msg)
                 return
 
-            with start_span_message_receiver(tracer, msg) as span:
+            with start_span_message_receiver(
+                tracer, msg, "nats.jetstream.receive"
+            ) as span:
                 try:
                     await origin_cb(msg)
                 except Exception as error:
@@ -112,7 +115,9 @@ class JetStreamContextTelemetry:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_publisher")
         headers = {} if headers is None else headers
         inject(headers)
-        with start_span_message_publisher(tracer, subject) as span:
+        with start_span_message_publisher(
+            tracer, subject, "nats.jetstream.publish"
+        ) as span:
             try:
                 result = await self.js.publish(subject, body, headers=headers, **kwargs)
             except Exception as error:
@@ -152,7 +157,9 @@ class JetStreamContextTelemetry:
             logger.warning("Message received without headers, skipping span")
             return await cb(message)
 
-        with start_span_message_receiver(tracer, message) as span:
+        with start_span_message_receiver(
+            tracer, message, "nats.jetstream.receive"
+        ) as span:
             try:
                 return await cb(message)
             except Exception as error:
@@ -176,7 +183,7 @@ class NatsClientTelemetry:
                 await origin_cb(msg)
                 return
 
-            with start_span_message_receiver(tracer, msg) as span:
+            with start_span_message_receiver(tracer, msg, "nats.receive") as span:
                 try:
                     await origin_cb(msg)
                 except Exception as error:
@@ -197,7 +204,7 @@ class NatsClientTelemetry:
         headers = {} if headers is None else headers
         inject(headers)
 
-        with start_span_message_publisher(tracer, subject) as span:
+        with start_span_message_publisher(tracer, subject, "nats.publish") as span:
             try:
                 result = await self.nc.publish(subject, body, headers=headers, **kwargs)
             except Exception as error:
@@ -218,7 +225,7 @@ class NatsClientTelemetry:
         headers = {} if headers is None else headers
         inject(headers)
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
-        with start_span_message_publisher(tracer, subject) as span:
+        with start_span_message_publisher(tracer, subject, "nats.publish") as span:
             try:
                 result = await self.nc.request(
                     subject, payload, timeout, old_style, headers  # type: ignore
