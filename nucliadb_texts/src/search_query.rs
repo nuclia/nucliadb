@@ -27,7 +27,6 @@ use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
 use crate::schema::TextSchema;
-use crate::utils::conjunction_to_occur;
 
 pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> Box<dyn Query> {
     let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
@@ -106,8 +105,9 @@ fn create_stream_filter_queries(
 ) -> Vec<(Occur, Box<dyn Query>)> {
     let mut queries = vec![];
 
-    let conjunction =
-        conjunction_to_occur(Conjunction::from_i32(filter.conjunction).unwrap_or(Conjunction::And));
+    let conjunction = Conjunction::from_i32(filter.conjunction)
+        .unwrap_or(Conjunction::And)
+        .into_occur();
 
     filter
         .tags
@@ -121,6 +121,20 @@ fn create_stream_filter_queries(
         });
 
     queries
+}
+
+trait IntoOccur {
+    fn into_occur(self) -> Occur;
+}
+
+impl IntoOccur for Conjunction {
+    fn into_occur(self) -> Occur {
+        match self {
+            Conjunction::And => Occur::Must,
+            Conjunction::Or => Occur::Should,
+            Conjunction::Not => Occur::MustNot,
+        }
+    }
 }
 
 #[cfg(test)]

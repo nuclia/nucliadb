@@ -21,5 +21,4 @@
 pub mod reader;
 mod schema;
 mod search_query;
-pub mod utils;
 pub mod writer;

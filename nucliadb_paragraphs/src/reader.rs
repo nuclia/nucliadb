@@ -781,7 +781,6 @@ mod tests {
                 "/c/ool".to_string(),
                 "/e/mylabel".to_string(),
             ],
-            ..Default::default()
         };
 
         let faceted = Faceted {
