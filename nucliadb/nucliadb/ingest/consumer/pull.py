@@ -38,6 +38,7 @@ from nucliadb.ingest.orm.exceptions import (
 )
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
@@ -233,6 +234,7 @@ class PullWorker:
                 logger.debug(
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
                 )
+                set_info_on_span({"nuclia.kbid": pb.kbid, "nuclia.rid": pb.uuid})
 
                 try:
                     with consumer_observer(
