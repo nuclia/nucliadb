@@ -444,14 +444,10 @@ def check_proxy_telemetry_headers(resp: Response):
             "x-b3-spanid",
             "x-b3-sampled",
         ]
-        missing = []
-        for header in expected:
-            if header not in resp.headers:
-                missing.append(header)
+        missing = [header for header in expected if header not in resp.headers]
         if len(missing) > 0:
             raise TelemetryHeadersMissing(
                 f"Missing headers {missing} in proxy response"
             )
-    except TelemetryHeadersMissing as e:
-        errors.capture_exception(e)
+    except TelemetryHeadersMissing:
         logger.warning("Some telemetry headers not found in proxy response")

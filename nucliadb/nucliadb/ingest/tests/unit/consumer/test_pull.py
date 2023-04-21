@@ -21,10 +21,7 @@ from unittest import mock
 import pytest
 from aiohttp.web import Response
 
-from nucliadb.ingest.consumer.pull import (
-    TelemetryHeadersMissing,
-    check_proxy_telemetry_headers,
-)
+from nucliadb.ingest.consumer.pull import check_proxy_telemetry_headers
 
 
 @pytest.fixture(scope="function")
@@ -40,11 +37,3 @@ def test_check_proxy_telemetry_headers_ok(errors):
     check_proxy_telemetry_headers(resp)
 
     errors.capture_exception.assert_not_called()
-
-
-def test_check_proxy_telemetry_headers_missing(errors):
-    resp = Response(headers={"x-b3-sampled": "baz"})
-    check_proxy_telemetry_headers(resp)
-
-    errors.capture_exception.assert_called_once()
-    assert isinstance(errors.capture_exception.call_args[0][0], TelemetryHeadersMissing)
