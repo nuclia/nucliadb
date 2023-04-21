@@ -38,6 +38,7 @@ from nucliadb.ingest.orm.exceptions import (
 )
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
@@ -233,6 +234,7 @@ class PullWorker:
                 logger.debug(
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
                 )
+                set_info_on_span({"nuclia.kbid": pb.kbid, "nuclia.rid": pb.uuid})
 
                 try:
                     with consumer_observer(
@@ -444,14 +446,10 @@ def check_proxy_telemetry_headers(resp: Response):
             "x-b3-spanid",
             "x-b3-sampled",
         ]
-        missing = []
-        for header in expected:
-            if header not in resp.headers:
-                missing.append(header)
+        missing = [header for header in expected if header not in resp.headers]
         if len(missing) > 0:
             raise TelemetryHeadersMissing(
                 f"Missing headers {missing} in proxy response"
             )
-    except TelemetryHeadersMissing as e:
-        errors.capture_exception(e)
+    except TelemetryHeadersMissing:
         logger.warning("Some telemetry headers not found in proxy response")
