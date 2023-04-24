@@ -26,7 +26,11 @@ from nucliadb_models.conversation import (
     InputMessage,
     InputMessageContent,
 )
-from nucliadb_models.resource import Resource as ResponseResponse
+from nucliadb_models.resource import (
+    Resource as ResponseResponse,
+    ConversationFieldData,
+    FieldConversation,
+)
 
 
 @pytest.mark.asyncio
@@ -68,4 +72,8 @@ async def test_conversations(
     assert resp.status_code == 200
     res_resp = ResponseResponse.parse_obj(resp.json())
 
-    breakpoint()
+    assert res_resp.data.conversations["faq"] == ConversationFieldData(
+        value=FieldConversation(pages=1, size=200), extracted=None, error=None
+    )
+
+    # XXX Currently no way to get conversation pages through API
