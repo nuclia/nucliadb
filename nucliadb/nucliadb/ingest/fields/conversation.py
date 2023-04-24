@@ -28,7 +28,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/p/{field}/{page}"
+KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/p/{type}/{field}/{page}"
 KB_RESOURCE_FIELD_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
@@ -112,11 +112,8 @@ class Conversation(Field):
         if page is None and self.metadata is None:
             await self.db_get_metadata()
 
-        if page is None and self.metadata is not None:
-            page = self.metadata.pages
-
         try:
-            if page is not None:
+            if page is not None and page > 0:
                 pageobj = await self.db_get_value(page)
             else:
                 pageobj = None

@@ -24,6 +24,8 @@ The prefix for storing mutable data on nucliadb are:
       - `/f/f/{field}` PB Field File
       - `/f/c/{field}/` PB FieldConversation
         - `{page}` PB Conversation
+      - `/p/c/{field}/{page}` Conversation page objects
+        - `{page}` individual conversation entries
       - `/u/{type}/{field}` PB UserFieldMetadata
   - `/s/` Scan all resources
     - `{slug}` uuid Resource
