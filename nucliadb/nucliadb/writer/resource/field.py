@@ -404,6 +404,7 @@ async def parse_conversation_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
 
+    field_value = resources_pb2.Conversation()
     convs = models.PushConversation()
     for message in conversation_field.messages:
         cm = resources_pb2.Message()
@@ -452,5 +453,7 @@ async def parse_conversation_field(
         for to in message.to:
             processing_message.to.append(to)
         convs.messages.append(processing_message)
+        field_value.messages.append(cm)
 
     toprocess.conversationfield[key] = convs
+    writer.conversations[key].CopyFrom(field_value)

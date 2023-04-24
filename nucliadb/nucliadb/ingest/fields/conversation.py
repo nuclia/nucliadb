@@ -28,7 +28,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
+KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/p/{field}/{page}"
 KB_RESOURCE_FIELD_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
@@ -145,15 +145,14 @@ class Conversation(Field):
 
     async def db_get_value(self, page: int = 1):
         if self.value.get(page) is None:
-            payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD.format(
-                    kbid=self.kbid,
-                    uuid=self.uuid,
-                    type=self.type,
-                    field=self.id,
-                    page=page,
-                )
+            field_key = KB_RESOURCE_FIELD.format(
+                kbid=self.kbid,
+                uuid=self.uuid,
+                type=self.type,
+                field=self.id,
+                page=page,
             )
+            payload = await self.resource.txn.get(field_key)
             if payload:
                 self.value[page] = PBConversation()
                 self.value[page].ParseFromString(payload)
@@ -162,10 +161,11 @@ class Conversation(Field):
         return self.value[page]
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
+        field_key = KB_RESOURCE_FIELD.format(
+            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
+        )
         await self.resource.txn.set(
-            KB_RESOURCE_FIELD.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
-            ),
+            field_key,
             payload.SerializeToString(),
         )
         self.value[page] = payload
