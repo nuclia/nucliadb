@@ -37,7 +37,7 @@ from nucliadb_sdk.vectors import Vector
 def test_create_resource(knowledgebox: KnowledgeBox):
     assert knowledgebox.get("mykey1") is None
 
-    resource_id = knowledgebox.upload(
+    resource_id = knowledgebox.create_resource(
         key="mykey1",
         binary=File(data=b"asd", filename="data"),
         text="I'm Ramon",
@@ -70,7 +70,7 @@ def test_create_resource(knowledgebox: KnowledgeBox):
 def test_create_resource_dict(knowledgebox: KnowledgeBox):
     assert knowledgebox.get("mykey1") is None
 
-    resource_id = knowledgebox.upload(
+    resource_id = knowledgebox.create_resource(
         key="mykey1",
         binary=File(data=b"asd", filename="data"),
         text="I'm Ramon",
@@ -140,7 +140,7 @@ def test_dict_resource(knowledgebox: KnowledgeBox):
 
     knowledgebox.new_vectorset("base", 2)
 
-    resource_id = knowledgebox.upload(
+    resource_id = knowledgebox.create_resource(
         key="mykey1",
         binary=File(data=b"asd", filename="data"),
         text="I'm Ramon",
@@ -212,7 +212,7 @@ def test_update_existing_resource(knowledgebox: KnowledgeBox):
         ]
 
     # Validate upload updates fields
-    resource_id = knowledgebox.upload(
+    resource_id = knowledgebox.create_resource(
         key="mykey1",
         binary=File(data=b"asd", filename="data"),
         text="I'm Ramon",
@@ -222,8 +222,8 @@ def test_update_existing_resource(knowledgebox: KnowledgeBox):
     )
     resource1 = knowledgebox[resource_id]
 
-    knowledgebox.upload(
-        key="mykey1",
+    knowledgebox.update_resource(
+        resource1,
         title="common man",
         summary="I'm not Ramon",
         text="Really, I'm not Ramon",
@@ -235,7 +235,7 @@ def test_update_existing_resource(knowledgebox: KnowledgeBox):
     _validate(resource1, resource2)
 
     # Validate setattr updates fields
-    resource_id = knowledgebox.upload(
+    resource_id = knowledgebox.create_resource(
         key="mykey2",
         binary=File(data=b"asd", filename="data"),
         text="I'm Ramon",

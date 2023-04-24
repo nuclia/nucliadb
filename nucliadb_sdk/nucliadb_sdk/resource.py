@@ -49,7 +49,7 @@ else:
 logger = logging.getLogger("nucliadb_sdk")
 
 
-def create_resource(
+def build_create_resource_payload(
     key: Optional[str] = None,
     text: Optional[str] = None,
     format: Optional[TextFormat] = None,
@@ -180,7 +180,7 @@ def create_resource(
     return create_payload
 
 
-def update_resource(
+def build_update_resource_payload(
     resource: Resource,
     text: Optional[str] = None,
     format: Optional[TextFormat] = None,

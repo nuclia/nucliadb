@@ -23,7 +23,7 @@ from sentence_transformers import SentenceTransformer  # type: ignore
 
 from nucliadb_sdk import Entity, File, KnowledgeBox
 from nucliadb_sdk.labels import Label
-from nucliadb_sdk.search import ScoreType
+from nucliadb_sdk.search import ResultType, ScoreType
 
 DATA: Dict[str, Any] = {
     "text": [
@@ -241,7 +241,7 @@ def test_search_resource(knowledgebox: KnowledgeBox):
         if index == 50:
             break
         label = DATA["label"][index]
-        knowledgebox.upload(
+        knowledgebox.create_resource(
             text=text,
             labels=[f"emoji/{label}"],
             vectors={"all-MiniLM-L6-v2": [1.0, 2.0, 3.0, 2.0]},
@@ -278,7 +278,7 @@ def test_search_resource(knowledgebox: KnowledgeBox):
 
 def test_standard_examples(knowledgebox: KnowledgeBox):
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
-    knowledgebox.upload(
+    knowledgebox.create_resource(
         title="Happy dog",
         binary=File(data=b"Happy dog file data", filename="data.txt"),
         text="I'm Sierra, a very happy dog",
@@ -298,7 +298,7 @@ def test_standard_examples(knowledgebox: KnowledgeBox):
         ("Day 6", "love is tough", "emotion/negative"),
     ]
     for title, sentence, label in sentences:
-        knowledgebox.upload(
+        knowledgebox.create_resource(
             title=title,
             text=sentence,
             labels=[label],
@@ -323,21 +323,27 @@ def test_standard_examples(knowledgebox: KnowledgeBox):
 
     # full text search results
     results = list(knowledgebox.search(text="dog"))
-    assert len(results) == 3
+    assert len(results) == 4
     assert results[0].text == "Happy dog"
     assert results[0].labels == ["positive"]
     assert results[0].score_type == ScoreType.BM25
+    assert results[0].result_type == ResultType.FULLTEXT
     assert results[1].text == "Dog in catalan is gos"
     assert results[1].labels == ["neutral"]
     assert results[1].score_type == ScoreType.BM25
+    assert results[1].result_type == ResultType.FULLTEXT
     assert results[2].text == "I'm Sierra, a very happy dog"
     assert results[2].labels == ["positive"]
     assert results[2].score_type == ScoreType.BM25
+    assert results[2].result_type == ResultType.FULLTEXT
+    assert results[3].text == "Happy dog"
+    assert results[3].labels == ["positive"]
+    assert results[3].result_type == ResultType.PARAGRAPH
 
     # test filter
     results = list(knowledgebox.search(filter=["emotion/positive"]))
 
-    assert len(results) == 4
+    assert len(results) == 6
     assert set([r.text for r in results]) == set(
         [
             "what a delighful day",
@@ -356,7 +362,7 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
         if index == 50:
             break
         label = DATA["label"][index]
-        knowledgebox.upload(
+        knowledgebox.create_resource(
             text=text,
             labels=[str(label)],
             vectors={"all-MiniLM-L6-v2": [1.0, 2.0, 3.0, 2.0]},

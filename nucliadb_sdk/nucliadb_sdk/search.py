@@ -33,15 +33,22 @@ class ScoreType(str, Enum):
     COSINE = "COSINE"
 
 
+class ResultType(str, Enum):
+    FULLTEXT = "FULLTEXT"
+    SENTENCE = "SENTENCE"
+    PARAGRAPH = "PARAGRAPH"
+
+
 @dataclass
 class SearchResource:
     key: str
     text: str
     labels: List[str]
-    score: float
-    score_type: ScoreType
     field: str
     field_type: str
+    score: float
+    score_type: ScoreType
+    result_type: ResultType
 
 
 class SearchResult:
@@ -61,34 +68,38 @@ class SearchResult:
         field: str,
         score: float,
         score_type: ScoreType,
+        result_type: ResultType,
+        text: Optional[str],
     ) -> Optional[SearchResource]:
         resource = self.client.get_resource(rid)
-        if field_type == "t":
-            text = resource.data.texts[field].value.body
-        elif field_type == "a":
-            text = resource.data.generics[field].value
-        elif field_type == "f":
-            filename = resource.data.files[field].value.file.filename
-            text = f"File: {filename}"
-        elif field_type == "l":
-            uri = resource.data.links[field].value.uri
-            text = f"Link: {uri}"
-        else:
-            logger.warning(f"Unsupported field type: {field_type} on field {field}")
-            return None
+        if text is None:
+            # pull the text for a result if no text match provided
+            if field_type == "t":
+                text = resource.data.texts[field].value.body
+            elif field_type == "a":
+                text = resource.data.generics[field].value
+            elif field_type == "f":
+                filename = resource.data.files[field].value.file.filename
+                text = f"File: {filename}"
+            elif field_type == "l":
+                uri = resource.data.links[field].value.uri
+                text = f"Link: {uri}"
+            else:
+                logger.warning(f"Unsupported field type: {field_type} on field {field}")
 
         classifications = [
             classification.label
             for classification in resource.usermetadata.classifications
         ]
         return SearchResource(
-            text=text,
+            text=text,  # type: ignore
             field=field,
             field_type=field_type,
             labels=classifications,
             score=score,
             key=rid,
             score_type=score_type,
+            result_type=result_type,
         )
 
     def __iter__(self) -> Iterator[SearchResource]:
@@ -100,6 +111,8 @@ class SearchResult:
                     field=fts.field,
                     score=fts.score,
                     score_type=ScoreType.BM25,
+                    result_type=ResultType.FULLTEXT,
+                    text=None,
                 )
                 if result is not None:
                     yield result
@@ -112,6 +125,22 @@ class SearchResult:
                     field=sentence.field,
                     score=sentence.score,
                     score_type=ScoreType.COSINE,
+                    result_type=ResultType.SENTENCE,
+                    text=sentence.text,
+                )
+                if result is not None:
+                    yield result
+
+        if self.inner_search_results.paragraphs is not None:
+            for paragraph in self.inner_search_results.paragraphs.results:
+                result = self._get_result(
+                    rid=paragraph.rid,
+                    field_type=paragraph.field_type,
+                    field=paragraph.field,
+                    score=paragraph.score,
+                    score_type=ScoreType.COSINE,
+                    result_type=ResultType.PARAGRAPH,
+                    text=paragraph.text,
                 )
                 if result is not None:
                     yield result

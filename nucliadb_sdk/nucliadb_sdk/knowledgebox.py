@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import base64
 import os
 from datetime import datetime
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -56,9 +58,9 @@ from nucliadb_sdk.file import File
 from nucliadb_sdk.find import FindResult
 from nucliadb_sdk.labels import DEFAULT_LABELSET, Label, Labels, LabelSet, LabelType
 from nucliadb_sdk.resource import (
-    create_resource,
+    build_create_resource_payload,
+    build_update_resource_payload,
     from_resource_to_payload,
-    update_resource,
 )
 from nucliadb_sdk.search import SearchResult
 from nucliadb_sdk.vectors import Vectors, convert_vector
@@ -166,54 +168,26 @@ class KnowledgeBox:
         title: Optional[str] = None,
         summary: Optional[str] = None,
     ):
-        resource: Optional[Resource] = None
+        """
+        Backward compatible method for uploading a resource.
 
-        if key is None:
-            creating = True
-        else:
-            resource = await self.async_get(key)
-            if resource is None:
-                creating = True
-            else:
-                creating = False
-
-        if vectors is not None and self.vectorsets is None:
-            self.vectorsets = await self.client.async_get_vectorsets()
-
-        if creating:
-            create_payload = create_resource(
-                key=key,
+        Use the `create_resource` and `update_resource` methods instead.
+        """
+        return await asyncio.get_event_loop().run_in_executor(
+            None,
+            partial(
+                self.upload,
+                key,
+                binary=binary,
                 text=text,
                 format=format,
-                binary=binary,
                 labels=labels,
                 entities=entities,
                 vectors=vectors,
-                vectorsets=self.vectorsets,
                 title=title,
                 summary=summary,
-            )
-            resp = await self.client.async_create_resource(create_payload)
-            rid = resp.uuid
-
-        else:
-            assert resource is not None
-
-            update_payload = update_resource(
-                text=text,
-                format=format,
-                binary=binary,
-                labels=labels,
-                entities=entities,
-                vectors=vectors,
-                resource=resource,
-                vectorsets=self.vectorsets,
-                title=title,
-                summary=summary,
-            )
-            rid = resource.id
-            await self.client.async_update_resource(rid, update_payload)
-        return rid
+            ),
+        )
 
     def upload(
         self,
@@ -229,6 +203,11 @@ class KnowledgeBox:
         title: Optional[str] = None,
         summary: Optional[str] = None,
     ) -> str:
+        """
+        Backward compatible method for uploading a resource.
+
+        Use the `create_resource` and `update_resource` methods instead.
+        """
         resource: Optional[Resource] = None
 
         if key is None:
@@ -244,37 +223,93 @@ class KnowledgeBox:
             self.vectorsets = self.client.get_vectorsets()
 
         if creating:
-            create_payload = create_resource(
+            return self.create_resource(
                 key=key,
+                binary=binary,
                 text=text,
                 format=format,
-                binary=binary,
                 labels=labels,
                 entities=entities,
                 vectors=vectors,
-                vectorsets=self.vectorsets,
                 title=title,
                 summary=summary,
             )
-            resp = self.client.create_resource(create_payload)
-            rid = resp.uuid
-
         else:
-            assert resource is not None
-            update_payload = update_resource(
+            return self.update_resource(
+                resource=resource,  # type: ignore
+                binary=binary,
                 text=text,
                 format=format,
-                binary=binary,
                 labels=labels,
                 entities=entities,
                 vectors=vectors,
-                resource=resource,
-                vectorsets=self.vectorsets,
                 title=title,
                 summary=summary,
             )
-            rid = resource.id
-            self.client.update_resource(rid, update_payload)
+
+    def create_resource(
+        self,
+        key: Optional[str] = None,
+        binary: Optional[Union[File, str]] = None,
+        text: Optional[str] = None,
+        format: Optional[TextFormat] = None,
+        labels: Optional[Labels] = None,
+        entities: Optional[Entities] = None,
+        vectors: Optional[
+            Union[Vectors, Dict[str, Union[ndarray, List[float]]]]
+        ] = None,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> str:
+        if vectors is not None and self.vectorsets is None:
+            self.vectorsets = self.client.get_vectorsets()
+
+        create_payload = build_create_resource_payload(
+            key=key,
+            text=text,
+            format=format,
+            binary=binary,
+            labels=labels,
+            entities=entities,
+            vectors=vectors,
+            vectorsets=self.vectorsets,
+            title=title,
+            summary=summary,
+        )
+        resp = self.client.create_resource(create_payload)
+        return resp.uuid
+
+    def update_resource(
+        self,
+        resource: Resource,
+        binary: Optional[Union[File, str]] = None,
+        text: Optional[str] = None,
+        format: Optional[TextFormat] = None,
+        labels: Optional[Labels] = None,
+        entities: Optional[Entities] = None,
+        vectors: Optional[
+            Union[Vectors, Dict[str, Union[ndarray, List[float]]]]
+        ] = None,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> str:
+        if vectors is not None and self.vectorsets is None:
+            self.vectorsets = self.client.get_vectorsets()
+
+        update_payload = build_update_resource_payload(
+            resource=resource,
+            text=text,
+            format=format,
+            binary=binary,
+            labels=labels,
+            entities=entities,
+            vectors=vectors,
+            vectorsets=self.vectorsets,
+            title=title,
+            summary=summary,
+        )
+        rid = resource.id
+        self.client.update_resource(rid, update_payload)
         return rid
 
     def process_uploaded_labels_from_search(
