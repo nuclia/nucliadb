@@ -482,14 +482,12 @@ class Processor:
         counter = await shard.add_resource(
             resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
         )
-        if counter and counter.fields > settings.max_shard_fields:
+        if counter is not None and counter.fields > settings.max_shard_fields:
             # The current shard is full, create a new one so next resource
             # is placed on a new shard
             similarity = await kb.get_similarity()
-            shard = await node_klass.create_shard_by_kbid(
-                txn, kb.kbid, similarity=similarity
-            )
-        return counter, shard
+            await node_klass.create_shard_by_kbid(txn, kb.kbid, similarity=similarity)
+        return counter, shard  # type: ignore
 
     async def _mark_resource_error(
         self,
