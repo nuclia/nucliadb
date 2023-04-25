@@ -669,7 +669,7 @@ class Resource:
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
-            if maybe_update_basic_summary(self.basic, field_metadata.summary):
+            if maybe_update_basic_summary(self.basic, field_metadata.metadata.summary):
                 basic_modified = True
 
             field_obj = await self.get_field(
