@@ -387,50 +387,22 @@ class Processor:
             if resource is None:
                 raise NoResourceError()
 
+            # TODO: in case of reindex = True, shouldn't we do that after generate_index_message?
             await resource.compute_global_text()
             await resource.compute_global_tags(resource.indexer)
             if reindex:
-                # when reindexing, let's just generate full new index message
+                # When reindexing, let's just generate full new index message
                 resource.replace_indexer(await resource.generate_index_message())
 
             if resource.modified or reindex:
-                shard_id = await kb.get_resource_shard_id(uuid)
-                node_klass = get_node_klass()
-
-                if shard_id is not None:
-                    shard = await kb.get_resource_shard(shard_id, node_klass)
-
-                if shard is None:
-                    # It's a new resource, get current active shard to place
-                    # new resource on
-                    shard = await node_klass.get_current_active_shard(txn, kbid)
-                    if shard is None:
-                        # no shard available, create a new one
-                        similarity = await kb.get_similarity()
-                        shard = await node_klass.create_shard_by_kbid(
-                            txn, kbid, similarity=similarity
-                        )
-                    await kb.set_resource_shard_id(uuid, shard.sharduuid)
-
-                if shard is not None:
-                    counter = await shard.add_resource(
-                        resource.indexer.brain, seqid, partition=partition, kb=kbid
-                    )
-                    if (
-                        counter is not None
-                        and counter.fields > settings.max_shard_fields
-                    ):
-                        # shard is full, create a new one so next resource
-                        # is placed on a new shard
-                        similarity = await kb.get_similarity()
-                        shard = await node_klass.create_shard_by_kbid(
-                            txn, kbid, similarity=similarity
-                        )
-                else:
-                    raise AttributeError("Shard is not available")
+                # TODO: Shouldn't we index the resource after it has been commited?
+                counter = await self.index_resource(
+                    resource, txn, kb, uuid, seqid, partition
+                )
 
                 await txn.commit(partition, seqid)
 
+                # TODO: Look if it's really needed to commit the slug every time
                 # Slug may have conflicts as its not partitioned properly. We make it as short as possible
                 txn = await self.driver.begin()
                 resource.txn = txn
@@ -475,6 +447,48 @@ class Processor:
             else TxnAction.RESOURCE_MODIFIED,
             counter=counter,
         )
+
+    async def index_resource(
+        self,
+        resource: Resource,
+        txn: Transaction,
+        kb: KnowledgeBox,
+        uuid: str,
+        seqid: int,
+        partition: str,
+    ) -> Optional[ShardCounter]:
+        shard_id = await kb.get_resource_shard_id(uuid)
+        node_klass = get_node_klass()
+
+        if shard_id is not None:
+            shard = await kb.get_resource_shard(shard_id, node_klass)
+
+        if shard is None:
+            # It's a new resource, get current active shard to place
+            # new resource on
+            shard = await node_klass.get_current_active_shard(txn, kb.kbid)
+            if shard is None:
+                # No shard available, create a new one
+                similarity = await kb.get_similarity()
+                shard = await node_klass.create_shard_by_kbid(
+                    txn, kb.kbid, similarity=similarity
+                )
+            await kb.set_resource_shard_id(uuid, shard.sharduuid)
+
+        if shard is None:
+            raise AttributeError("Shard not available")
+
+        counter = await shard.add_resource(
+            resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
+        )
+        if counter and counter.fields > settings.max_shard_fields:
+            # The current shard is full, create a new one so next resource
+            # is placed on a new shard
+            similarity = await kb.get_similarity()
+            shard = await node_klass.create_shard_by_kbid(
+                txn, kb.kbid, similarity=similarity
+            )
+        return counter
 
     async def _mark_resource_error(
         self,
