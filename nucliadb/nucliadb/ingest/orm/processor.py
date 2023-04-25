@@ -382,7 +382,8 @@ class Processor:
                     created = created or _created
                 except ApplyMessageError as exc:
                     logger.warning(str(exc))
-                    pass
+                    continue
+
             if resource is None:
                 raise NoResourceError()
 
