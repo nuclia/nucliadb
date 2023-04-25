@@ -344,6 +344,7 @@ async def find_merge_results(
     next_page = True
     ematches: List[str] = []
     real_query = ""
+    total_paragraphs = 0
     for response in search_responses:
         # Iterate over answers from different logic shards
 
@@ -353,6 +354,7 @@ async def find_merge_results(
         ematches.extend(response.paragraph.ematches)
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
+        total_paragraphs += response.paragraph.total
 
         paragraphs.append(cast(List[ParagraphResult], response.paragraph.results))
         vectors.append(cast(List[DocumentScored], response.vector.documents))
@@ -370,7 +372,7 @@ async def find_merge_results(
         resources={},
         facets={},
         query=real_query,
-        total=len(result_paragraphs),
+        total=total_paragraphs,
         page_number=page,
         page_size=count,
         next_page=next_page,

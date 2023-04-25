@@ -55,6 +55,7 @@ pub fn produce_facets(
 }
 
 pub struct SearchBm25Response<'a> {
+    pub total: usize,
     pub text_service: &'a ParagraphReaderService,
     pub query: &'a str,
     pub facets_count: Option<FacetCounts>,
@@ -66,6 +67,7 @@ pub struct SearchBm25Response<'a> {
 }
 
 pub struct SearchIntResponse<'a> {
+    pub total: usize,
     pub text_service: &'a ParagraphReaderService,
     pub query: &'a str,
     pub facets_count: Option<FacetCounts>,
@@ -99,6 +101,7 @@ impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
 
 impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchIntResponse) -> Self {
+        let total = response.total as i32;
         let obtained = response.top_docs.len();
         let requested = response.results_per_page as usize;
         let next_page = obtained > requested;
@@ -191,8 +194,8 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
         ParagraphSearchResponse {
             results,
             facets,
+            total,
             fuzzy_distance: 0i32,
-            total: no_results as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
@@ -205,6 +208,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
 
 impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
     fn from(response: SearchBm25Response) -> Self {
+        let total = response.total as i32;
         let obtained = response.top_docs.len();
         let requested = response.results_per_page as usize;
         let next_page = obtained > requested;
@@ -297,9 +301,9 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             results,
             facets,
             next_page,
+            total,
             bm25: true,
             fuzzy_distance: 0i32,
-            total: no_results as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
