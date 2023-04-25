@@ -34,9 +34,9 @@ import google.auth.transport.requests  # type: ignore
 import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
+
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.utils import setup_telemetry
-
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
@@ -47,7 +47,9 @@ from nucliadb_utils.storages.exceptions import (
 )
 from nucliadb_utils.storages.storage import Storage, StorageField
 
-storage_ops_observer = metrics.Observer("gcs_ops", labels={"type": ""})
+storage_ops_observer = metrics.Observer(
+    "gcs_ops", labels={"type": ""}, auto_prefix=False
+)
 
 
 def strip_query_params(url: yarl.URL) -> str:

@@ -46,9 +46,11 @@ class Observer:
         error_mappings: Optional[dict[str, Type[Exception]]] = None,
         labels: Optional[dict[str, str]] = None,
         buckets: Optional[list[float]] = None,
+        auto_prefix: bool = True,
     ):
         self.error_mappings = error_mappings or {}
         self.labels = labels or {}
+        self.auto_prefix = auto_prefix
 
         assert (
             # managed by us, do not allow user to specify
@@ -60,7 +62,7 @@ class Observer:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
 
         self.counter = prometheus_client.Counter(
-            f"{name}_count",
+            self.maybe_prefix_metric(f"{name}_count"),
             f"Number of times {name} was called.",
             labelnames=tuple(self.labels.keys()) + (_STATUS_METRIC,),
         )
@@ -68,11 +70,18 @@ class Observer:
         if buckets is not None:
             hist_kwargs["buckets"] = buckets
         self.histogram = prometheus_client.Histogram(
-            f"{name}_duration_seconds",
+            self.maybe_prefix_metric(f"{name}_duration_seconds"),
             f"Histogram for {name} duration.",
             labelnames=tuple(self.labels.keys()),
             **hist_kwargs,  # type: ignore
         )
+
+    def maybe_prefix_metric(self, metric_name: str) -> str:
+        if not self.auto_prefix:
+            return metric_name
+        if not metric_name.startswith("nucliadb_"):
+            metric_name = f"nucliadb_{metric_name}"
+        return metric_name
 
     def wrap(self, labels: Optional[dict[str, str]] = None):
         def decorator(func):

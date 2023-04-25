@@ -35,7 +35,7 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb.ingest.orm.node import Node
 from nucliadb_telemetry import metrics
 
-node_observer = metrics.Observer("node_client", labels={"type": ""})
+node_observer = metrics.Observer("node_client", labels={"type": ""}, auto_prefix=False)
 
 
 async def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:

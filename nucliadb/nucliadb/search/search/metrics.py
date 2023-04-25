@@ -19,4 +19,6 @@
 #
 from nucliadb_telemetry import metrics
 
-merge_observer = metrics.Observer("merge_results", labels={"type": ""})
+merge_observer = metrics.Observer(
+    "merge_results", labels={"type": ""}, auto_prefix=False
+)

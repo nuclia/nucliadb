@@ -20,14 +20,18 @@
 import asyncio
 from typing import Dict, Optional
 
-from nucliadb_telemetry import metrics
 from redis import asyncio as aioredis
 from redis.asyncio.client import PubSub
 
+from nucliadb_telemetry import metrics
 from nucliadb_utils.cache.exceptions import GroupNotSupported, NoPubsubConfigured
 from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 
-redis_observer = metrics.Observer("redis_pubsub", labels={"type": ""})
+redis_observer = metrics.Observer(
+    "redis_pubsub",
+    labels={"type": ""},
+    auto_prefix=False,
+)
 
 
 class RedisPubsub(PubSubDriver):

@@ -49,6 +49,7 @@ processing_observer = metrics.Observer(
         "over_limits": LimitsExceededError,
         "processing_api_error": SendToProcessError,
     },
+    auto_prefix=False,
 )
 
 

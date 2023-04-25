@@ -47,7 +47,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard, ShardCounter
 from nucliadb.ingest.orm.utils import get_node_klass, set_basic
 from nucliadb.ingest.settings import settings
-from nucliadb_telemetry import errors
+from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
@@ -68,6 +68,28 @@ AUDIT_TYPES: Dict[TxnAction, int] = {
     TxnAction.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
     TxnAction.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED,
 }
+
+processor_observer = metrics.Observer(
+    "nucliadb_ingest_processor",
+    labels={"type": ""},
+    buckets=[
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.5,
+        1.0,
+        2.5,
+        5.0,
+        7.5,
+        10.0,
+        30.0,
+        60.0,
+        120.0,
+        float("inf"),
+    ],
+    error_mappings={},
+)
 
 
 class Processor:

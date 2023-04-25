@@ -67,6 +67,7 @@ predict_observer = metrics.Observer(
         "predict_api_error": SendToPredictError,
         "empty_vectors": PredictVectorMissing,
     },
+    auto_prefix=False,
 )
 
 

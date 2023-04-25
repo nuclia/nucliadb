@@ -38,7 +38,7 @@ try:
 except ImportError:  # pragma: no cover
     TiKV = False
 
-tikv_observer = metrics.Observer("tikv_client", labels={"type": ""})
+tikv_observer = metrics.Observer("tikv_client", labels={"type": ""}, auto_prefix=False)
 
 
 class TiKVTransaction(Transaction):

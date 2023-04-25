@@ -45,10 +45,16 @@ histo_buckets = [
     metrics.INF,
 ]
 grpc_client_observer = metrics.Observer(
-    "grpc_client_op", labels={"method": ""}, buckets=histo_buckets
+    "grpc_client_op",
+    labels={"method": ""},
+    buckets=histo_buckets,
+    auto_prefix=False,
 )
 grpc_server_observer = metrics.Observer(
-    "grpc_server_op", labels={"method": ""}, buckets=histo_buckets
+    "grpc_server_op",
+    labels={"method": ""},
+    buckets=histo_buckets,
+    auto_prefix=False,
 )
 
 
