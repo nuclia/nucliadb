@@ -396,7 +396,7 @@ class Processor:
 
             if resource.modified or reindex:
                 # TODO: Shouldn't we index the resource after it has been commited?
-                counter = await self.index_resource(
+                counter, shard = await self.index_resource(
                     resource, txn, kb, uuid, seqid, partition
                 )
 
@@ -456,9 +456,10 @@ class Processor:
         uuid: str,
         seqid: int,
         partition: str,
-    ) -> Optional[ShardCounter]:
+    ) -> Tuple[Optional[ShardCounter], Shard]:
         shard_id = await kb.get_resource_shard_id(uuid)
         node_klass = get_node_klass()
+        shard: Optional[Shard] = None
 
         if shard_id is not None:
             shard = await kb.get_resource_shard(shard_id, node_klass)
@@ -488,7 +489,7 @@ class Processor:
             shard = await node_klass.create_shard_by_kbid(
                 txn, kb.kbid, similarity=similarity
             )
-        return counter
+        return counter, shard
 
     async def _mark_resource_error(
         self,
