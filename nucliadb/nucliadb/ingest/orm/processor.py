@@ -348,9 +348,6 @@ class Processor:
             partition, seqid, message.multiid, message.kbid, message.uuid
         )
 
-    def generate_index(self, resource: Resource, messages: List[BrokerMessage]):
-        pass
-
     async def txn(
         self, messages: List[BrokerMessage], seqid: int, partition: str
     ) -> Optional[TxnResult]:
@@ -372,9 +369,10 @@ class Processor:
         counter = None
         created = False
         shard: Optional[Shard] = None
-
+        reindex: bool = False
         try:
             for message in messages:
+                reindex = reindex or message.reindex
                 if resource is not None:
                     assert resource.uuid == message.uuid
                 result = await self.apply_resource(message, kb, resource)
@@ -388,11 +386,11 @@ class Processor:
             if resource:
                 await resource.compute_global_text()
                 await resource.compute_global_tags(resource.indexer)
-                if message.reindex:
+                if reindex:
                     # when reindexing, let's just generate full new index message
                     resource.replace_indexer(await resource.generate_index_message())
 
-            if resource and resource.modified:
+            if resource and (resource.modified or reindex):
                 shard_id = await kb.get_resource_shard_id(uuid)
                 node_klass = get_node_klass()
 
