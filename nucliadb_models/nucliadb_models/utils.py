@@ -23,7 +23,22 @@ import pydantic
 
 
 class FieldIdString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[^/]+$")
+    regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
+
+    @classmethod
+    def validate(cls, value: str) -> str:
+        try:
+            return super().validate(value)
+        except pydantic.errors.StrRegexError:
+            raise InvalidFieldIdError(value=value)
+
+
+class InvalidFieldIdError(pydantic.errors.PydanticValueError):
+    code = "wrong_field_id"
+    msg_template = (
+        "Invalid field id: '{value}'. Field ids must be a string with only "
+        "letters, numbers, underscores, colons and dashes."
+    )
 
 
 class InvalidSlugError(pydantic.errors.PydanticValueError):
