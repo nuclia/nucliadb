@@ -417,3 +417,37 @@ async def test_extracted_shortened_metadata(
         for meta in (metadata, split_metadata):
             for cropped_field in cropped_fields:
                 assert len(meta[cropped_field]) > 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "field_id,error",
+    [
+        ("foobar", False),
+        ("My_Field_1", False),
+        ("With Spaces Not Allowed", True),
+        ("Invalid&Character", True),
+    ],
+)
+async def test_field_ids_are_validated(
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+    field_id,
+    error,
+):
+    payload = {
+        "title": "Foo",
+        "texts": {
+            field_id: {
+                "format": "HTML",
+                "body": "<p>whatever</p>",
+            }
+        },
+    }
+    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resources", json=payload)
+    if error:
+        assert resp.status_code == 422
+        body = resp.json()
+        assert body["detail"][0]["type"] == "value_error.wrong_field_id"
+    else:
+        assert resp.status_code == 201
