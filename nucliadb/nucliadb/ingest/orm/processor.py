@@ -35,9 +35,11 @@ from pydantic import BaseModel
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import (
+    ApplyMessageError,
     DeadletteredError,
     KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
+    NoResourceError,
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -375,22 +377,22 @@ class Processor:
                 reindex = reindex or message.reindex
                 if resource is not None:
                     assert resource.uuid == message.uuid
-                result = await self.apply_resource(message, kb, resource)
+                try:
+                    resource, _created = await self.apply_message(message, kb, resource)
+                    created = created or _created
+                except ApplyMessageError as exc:
+                    logger.warning(str(exc))
+                    pass
+            if resource is None:
+                raise NoResourceError()
 
-                if result is None:
-                    continue
+            await resource.compute_global_text()
+            await resource.compute_global_tags(resource.indexer)
+            if reindex:
+                # when reindexing, let's just generate full new index message
+                resource.replace_indexer(await resource.generate_index_message())
 
-                resource, _created = result
-                created = created or _created
-
-            if resource:
-                await resource.compute_global_text()
-                await resource.compute_global_tags(resource.indexer)
-                if reindex:
-                    # when reindexing, let's just generate full new index message
-                    resource.replace_indexer(await resource.generate_index_message())
-
-            if resource and (resource.modified or reindex):
+            if resource.modified or reindex:
                 shard_id = await kb.get_resource_shard_id(uuid)
                 node_klass = get_node_klass()
 
@@ -440,6 +442,10 @@ class Processor:
                 await txn.abort()
                 await self.notify_abort(partition, seqid, multi, kbid, uuid)
                 logger.warning(f"This message did not modify the resource")
+        except NoResourceError:
+            logger.warning(
+                f"Messages did not trigger any resource processing. Ignoring..."
+            )
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. The exception will be reraised at the end of the function
@@ -533,14 +539,16 @@ class Processor:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
 
-    async def apply_resource(
+    async def apply_message(
         self,
         message: BrokerMessage,
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
-    ) -> Optional[Tuple[Resource, bool]]:
+    ) -> Tuple[Resource, bool]:
+        """
+        Returns the resource and a boolean indicating if it was created or not. It will raise
+        """
         created = False
-
         if resource is None:
             # Make sure we load the resource in case it already exists on db
             if message.uuid is None and message.slug:
@@ -549,12 +557,18 @@ class Processor:
                 uuid = message.uuid
             resource = await kb.get(uuid)
 
-        if resource is None and message.source is message.MessageSource.WRITER:
-            # It's a new resource
+        if resource is None:
+            if message.source is message.MessageSource.PROCESSOR:
+                # It's a new resource, and somehow we received the message coming from processing before
+                # the "fast" one, this should not happen
+                raise ApplyMessageError(
+                    f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
+                )
+            # message.source is message.MessageSource.WRITER:
             resource = await kb.add_resource(uuid, message.slug, message.basic)
             created = True
-        elif resource is not None:
-            # It's an update of an existing resource, can come either from writer or
+        else:
+            # It's an update of an existing resource, it can come either from writer or
             # from processing
             if (
                 message.HasField("basic")
@@ -566,23 +580,12 @@ class Processor:
                     slug=message.slug,
                     deleted_fields=message.delete_fields,  # type: ignore
                 )
-        elif resource is None and message.source is message.MessageSource.PROCESSOR:
-            # It's a new resource, and somehow we received the message coming from processing before
-            # the "fast" one, this shouldn't happen
-            logger.info(
-                f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
-            )
-            return None
 
-        if message.HasField("origin") and resource:
+        if message.HasField("origin"):
             await resource.set_origin(message.origin)
-
-        if resource:
-            await resource.apply_fields(message)
-            await resource.apply_extracted(message)
-            return (resource, created)
-
-        return None
+        await resource.apply_fields(message)
+        await resource.apply_extracted(message)
+        return (resource, created)
 
     async def notify_commit(
         self, partition: str, seqid: int, multi: str, kbid: str, uuid: str
