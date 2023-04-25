@@ -1208,13 +1208,8 @@ def add_entities_to_metadata(
 
 
 def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
-    if basic.summary:
-        # If the summary is already set, we don't want to override it
+    if basic.summary or not summary_text:
         return False
-
-    if not summary_text:
-        return False
-
     basic.summary = summary_text
     return True
 
@@ -1222,12 +1217,7 @@ def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
 def maybe_update_basic_thumbnail(
     basic: PBBasic, thumbnail: Optional[CloudFile]
 ) -> bool:
-    if basic.thumbnail:
-        # If the thumbnail is already set, we don't want to override it
+    if basic.thumbnail or thumbnail is None:
         return False
-
-    if thumbnail is None:
-        return False
-
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
     return True
