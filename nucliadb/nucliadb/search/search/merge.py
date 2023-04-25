@@ -141,6 +141,7 @@ async def merge_documents_results(
             score = await text_score(result, sort.field, kbid)
             if score is not None:
                 raw_resource_list.append((result, score))
+        total += document_response.total
 
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
@@ -169,8 +170,6 @@ async def merge_documents_results(
         )
         if result.uuid not in resources:
             resources.append(result.uuid)
-
-    total = len(result_resource_list)
 
     return Resources(
         facets=facets,
