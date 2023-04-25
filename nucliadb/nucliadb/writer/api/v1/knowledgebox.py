@@ -34,6 +34,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
+    VectorSimilarity,
     KnowledgeBoxObjID,
     NucliaDBRoles,
 )
@@ -75,7 +76,7 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     else:
         slug = kbobj.uuid  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug)
+        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug, config=item)
     elif kbobj.status == KnowledgeBoxResponseStatus.CONFLICT:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
