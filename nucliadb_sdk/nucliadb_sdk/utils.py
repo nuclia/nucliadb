@@ -75,7 +75,7 @@ def create_knowledge_box(
     url = f"{api_path}/kb/{kbid}"
     client = NucliaDBClient(environment=Environment.OSS, url=url)
 
-    return KnowledgeBox(client)
+    return KnowledgeBox(client, config=kb.config)
 
 
 def get_kb(
@@ -105,7 +105,7 @@ def get_kb(
     url = f"{api_path}/kb/{kbid}"
     client = NucliaDBClient(environment=Environment.OSS, url=url)
 
-    return KnowledgeBox(client)
+    return KnowledgeBox(client, config=kb.config)
 
 
 def get_or_create(

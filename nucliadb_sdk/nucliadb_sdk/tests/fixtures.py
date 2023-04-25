@@ -96,7 +96,7 @@ def knowledgebox(nucliadb):
         search_host=url,
         train_host=url,
     )
-    yield KnowledgeBox(client)
+    yield KnowledgeBox(client, config=kb.config)
 
     response = requests.delete(
         f"{api_path}/kb/{kbid}", headers={"X-NUCLIADB-ROLES": f"MANAGER"}

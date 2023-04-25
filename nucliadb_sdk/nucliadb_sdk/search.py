@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import functools
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Optional
 
+from nucliadb_models.resource import KnowledgeBoxConfig, VectorSimilarity
 from nucliadb_models.search import KnowledgeboxSearchResults
 from nucliadb_sdk.client import NucliaDBClient
 
@@ -31,6 +33,7 @@ logger = logging.getLogger(__name__)
 class ScoreType(str, Enum):
     BM25 = "BM25"
     COSINE = "COSINE"
+    DOT = "DOT"
 
 
 class ResultType(str, Enum):
@@ -55,10 +58,14 @@ class SearchResult:
     inner_search_results: KnowledgeboxSearchResults
 
     def __init__(
-        self, inner_search_results: KnowledgeboxSearchResults, client: NucliaDBClient
+        self,
+        inner_search_results: KnowledgeboxSearchResults,
+        client: NucliaDBClient,
+        kb_config: Optional[KnowledgeBoxConfig] = None,
     ):
         self.inner_search_results = inner_search_results
         self.client = client
+        self.kb_config = kb_config
 
     def _get_result(
         self,
@@ -102,6 +109,15 @@ class SearchResult:
             result_type=result_type,
         )
 
+    @functools.cache
+    def _get_similiary_score(self) -> ScoreType:
+        if (
+            self.kb_config is not None
+            and self.kb_config.similarity == VectorSimilarity.DOT
+        ):
+            return ScoreType.DOT
+        return ScoreType.COSINE
+
     def __iter__(self) -> Iterator[SearchResource]:
         if self.inner_search_results.fulltext is not None:
             for fts in self.inner_search_results.fulltext.results:
@@ -124,7 +140,7 @@ class SearchResult:
                     field_type=sentence.field_type,
                     field=sentence.field,
                     score=sentence.score,
-                    score_type=ScoreType.COSINE,
+                    score_type=self._get_similiary_score(),
                     result_type=ResultType.SENTENCE,
                     text=sentence.text,
                 )
@@ -138,7 +154,7 @@ class SearchResult:
                     field_type=paragraph.field_type,
                     field=paragraph.field,
                     score=paragraph.score,
-                    score_type=ScoreType.COSINE,
+                    score_type=self._get_similiary_score(),
                     result_type=ResultType.PARAGRAPH,
                     text=paragraph.text,
                 )

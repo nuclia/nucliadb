@@ -37,7 +37,7 @@ from typing import (
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.labels import Label as NDBLabel
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.resource import ExtractedDataTypeName, KnowledgeBoxConfig, Resource
 from nucliadb_models.search import (
     ChatOptions,
     ChatRequest,
@@ -77,9 +77,12 @@ class KnowledgeBox:
     vectorsets: Optional[VectorSets] = None
     id: str
 
-    def __init__(self, client: NucliaDBClient):
+    def __init__(
+        self, client: NucliaDBClient, config: Optional[KnowledgeBoxConfig] = None
+    ):
         self.client = client
         self.id = self.client.reader_session.base_url.path.strip("/").split("/")[-1]
+        self.config = config
 
     def __iter__(self) -> Iterable[Resource]:
         for batch_resources in self.client.list_resources():
@@ -391,7 +394,7 @@ class KnowledgeBox:
                 text, filter, vector, vectorset, min_score, page_number, page_size
             )
         )
-        return SearchResult(result, self.client)
+        return SearchResult(result, self.client, kb_config=self.config)
 
     async def async_search(
         self,
@@ -404,7 +407,7 @@ class KnowledgeBox:
         result = await self.client.async_search(
             self.build_search_request(text, filter, vector, vectorset, min_score)
         )
-        return SearchResult(result, self.client)
+        return SearchResult(result, self.client, kb_config=self.config)
 
     def find(
         self,
