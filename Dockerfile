@@ -1,19 +1,13 @@
 FROM python:3.9
 
+WORKDIR /usr/src/app
 
+# Cachable layers
 RUN ARCH="$(uname -m)"; \
     case "$ARCH" in \
     aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_aarch64.whl;; \
     x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
     esac;
-
-RUN pip install nucliadb-node-binding>=0.7.5
-
-RUN mkdir -p /usr/src/app
-
-RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop asyncpg
-
-
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
@@ -25,11 +19,17 @@ RUN set -eux; \
     curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.17/grpc_health_probe-linux-${probeArch}; \
     echo "${probeSha256} /bin/grpc_health_probe" | sha256sum -c -; \
     chmod +x /bin/grpc_health_probe
-
-# Install entrypoint.sh dependencies
 RUN apt-get update && apt-get install -y jq
 
-# Copy source code
+
+# Cachable pip install dependencies
+COPY nucliadb/requirements.txt requirements.txt
+RUN pip install --upgrade "pip<23.1" && \
+    pip install nucliadb-node-binding>=0.7.5 Cython==0.29.24 pybind11 gunicorn uvicorn uvloop asyncpg && \
+    pip install -r requirements.txt
+
+
+# Application install
 COPY VERSION /usr/src/app/VERSION
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
@@ -37,10 +37,8 @@ COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
 
-WORKDIR /usr/src/app
-
-RUN pip install -r nucliadb/requirements-sources.txt
-RUN pip install -e /usr/src/app/nucliadb
+RUN pip install -r nucliadb/requirements-sources.txt && \
+    pip install -e /usr/src/app/nucliadb
 
 RUN mkdir -p /data
 

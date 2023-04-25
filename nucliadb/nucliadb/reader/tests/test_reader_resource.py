@@ -222,6 +222,7 @@ async def test_get_resource_filter_root_fields(reader_api, test_resource):
             "keywordsets",
             "datetimes",
             "conversations",
+            "generics",
         }
 
         assert set(data["files"]["file1"].keys()) == {"value"}
