@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -627,11 +628,11 @@ class Resource:
                 FieldType.LINK,
                 load=False,
             )
-            if link_extracted_data.link_thumbnail and self.basic.thumbnail == "":
-                self.basic.thumbnail = CloudLink.format_reader_download_uri(
-                    link_extracted_data.link_thumbnail.uri
-                )
+            if maybe_update_basic_thumbnail(
+                self.basic, link_extracted_data.link_thumbnail
+            ):
                 basic_modified = True
+
             await field_link.set_link_extracted_data(link_extracted_data)
 
             if self.basic.icon == "":
@@ -643,8 +644,8 @@ class Resource:
                 # If the title was http something or empty replace
                 self.basic.title = link_extracted_data.title
                 basic_modified = True
-            if self.basic.summary == "" and link_extracted_data.description != "":
-                self.basic.summary = link_extracted_data.description
+
+            if maybe_update_basic_summary(self.basic, link_extracted_data.description):
                 basic_modified = True
 
         for file_extracted_data in message.file_extracted_data:
@@ -658,15 +659,21 @@ class Resource:
             ):
                 self.basic.icon = file_extracted_data.icon
                 basic_modified = True
-            if file_extracted_data.file_thumbnail and self.basic.thumbnail == "":
-                self.basic.thumbnail = CloudLink.format_reader_download_uri(
-                    file_extracted_data.file_thumbnail.uri
-                )
+
+            if maybe_update_basic_thumbnail(
+                self.basic, file_extracted_data.file_thumbnail
+            ):
                 basic_modified = True
+
             await field_file.set_file_extracted_data(file_extracted_data)
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
+            if maybe_update_basic_summary(
+                self.basic, field_metadata.metadata.metadata.summary
+            ):
+                basic_modified = True
+
             field_obj = await self.get_field(
                 field_metadata.field.field,
                 field_metadata.field.field_type,
@@ -705,13 +712,9 @@ class Resource:
                 basic_user_field_metadata=user_field_metadata,
             )
 
-            if (
-                field_metadata.metadata.metadata.thumbnail
-                and self.basic.thumbnail == ""
+            if maybe_update_basic_thumbnail(
+                self.basic, field_metadata.metadata.metadata.thumbnail
             ):
-                self.basic.thumbnail = CloudLink.format_reader_download_uri(
-                    field_metadata.metadata.metadata.thumbnail.uri
-                )
                 basic_modified = True
 
             if add_field_classifications(self.basic, field_metadata):
@@ -1204,3 +1207,19 @@ def add_entities_to_metadata(
                 TrainPosition(start=start, end=end)
             )
             last_occurrence_end = end
+
+
+def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
+    if basic.summary or not summary_text:
+        return False
+    basic.summary = summary_text
+    return True
+
+
+def maybe_update_basic_thumbnail(
+    basic: PBBasic, thumbnail: Optional[CloudFile]
+) -> bool:
+    if basic.thumbnail or thumbnail is None:
+        return False
+    basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
+    return True

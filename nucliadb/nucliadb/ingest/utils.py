@@ -24,6 +24,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb.ingest.chitchat import ChitchatNucliaDB  # type: ignore
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.settings import settings
+from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
@@ -58,45 +59,52 @@ try:
 except ImportError:  # pragma: no cover
     FILES = False
 
+_DRIVER_UTIL_NAME = "driver"
+
 
 async def get_driver() -> Driver:
-    if (
-        settings.driver == "redis"
-        and REDIS
-        and "driver" not in MAIN
-        and settings.driver_redis_url is not None
-    ):
+    if _DRIVER_UTIL_NAME in MAIN:
+        return MAIN[_DRIVER_UTIL_NAME]
+
+    if settings.driver == "redis":
+        if not REDIS:
+            raise ConfigurationError("`redis` python package not installed.")
+        if settings.driver_redis_url is None:
+            raise ConfigurationError("No DRIVER_REDIS_URL env var defined.")
+
         redis_driver = RedisDriver(settings.driver_redis_url)
-        MAIN["driver"] = redis_driver
-    elif (
-        settings.driver == "tikv"
-        and TIKV
-        and "driver" not in MAIN
-        and settings.driver_tikv_url is not None
-    ):
+        MAIN[_DRIVER_UTIL_NAME] = redis_driver
+    elif settings.driver == "tikv":
+        if not TIKV:
+            raise ConfigurationError("`tikv_client` python package not installed.")
+        if settings.driver_tikv_url is None:
+            raise ConfigurationError("No DRIVER_TIKV_URL env var defined.")
+
         tikv_driver = TiKVDriver(settings.driver_tikv_url)
-        MAIN["driver"] = tikv_driver
-    elif (
-        settings.driver == "pg"
-        and PG
-        and "driver" not in MAIN
-        and settings.driver_pg_url is not None
-    ):
+        MAIN[_DRIVER_UTIL_NAME] = tikv_driver
+    elif settings.driver == "pg":
+        if not PG:
+            raise ConfigurationError("`asyncpg` python package not installed.")
+        if settings.driver_pg_url is None:
+            raise ConfigurationError("No DRIVER_PG_URL env var defined.")
         pg_driver = PGDriver(settings.driver_pg_url)
-        MAIN["driver"] = pg_driver
-    elif (
-        settings.driver == "local"
-        and FILES
-        and "driver" not in MAIN
-        and settings.driver_local_url is not None
-    ):
+        MAIN[_DRIVER_UTIL_NAME] = pg_driver
+    elif settings.driver == "local":
+        if not FILES:
+            raise ConfigurationError("`aiofiles` python package not installed.")
+        if settings.driver_local_url is None:
+            raise ConfigurationError("No DRIVER_LOCAL_URL env var defined.")
+
         local_driver = LocalDriver(settings.driver_local_url)
-        MAIN["driver"] = local_driver
-    driver: Optional[Driver] = MAIN.get("driver")
-    if driver is not None and not driver.initialized:
+        MAIN[_DRIVER_UTIL_NAME] = local_driver
+    else:
+        raise ConfigurationError(
+            f"Invalid DRIVER defined configured: {settings.driver}"
+        )
+
+    driver: Driver = MAIN[_DRIVER_UTIL_NAME]
+    if not driver.initialized:
         await driver.initialize()
-    elif driver is None:
-        raise AttributeError("No driver defined on settings")
     return driver
 
 

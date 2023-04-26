@@ -35,11 +35,11 @@ images.settings["nucliadb"] = {
     "env": {
         "NUCLIADB_DISABLE_TELEMETRY": "True",
         "NUCLIADB_ENV": "True",
-        "DRIVER": "LOCAL",
-        "LOG": "DEBUG",
-        "HTTP": "8080",
-        "GRPC": "8030",
-        "TRAIN": "8040",
+        "DRIVER": "local",
+        "LOG_LEVEL": "DEBUG",
+        "HTTP_PORT": "8080",
+        "INGEST_GRPC_PORT": "8030",
+        "TRAIN_GRPC_PORT": "8040",
     },
     "options": {
         "ports": {"8080": None, "8030": None, "8040": None},

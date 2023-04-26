@@ -19,7 +19,6 @@
 #
 import logging
 import os
-import sys
 
 import pydantic_argparse
 import uvicorn  # type: ignore
@@ -29,25 +28,7 @@ from nucliadb.config import config_nucliadb
 from nucliadb.logging import log_config
 from nucliadb.settings import Settings
 
-
-def arg_munge() -> list[str]:
-    """
-    In order to maintain continuity between docs, env vars and arg configs,
-    this function will address inconsistencies that make parsing args and env vars
-    less annoying
-    """
-    args = sys.argv[1:]
-    output_args = []
-    itr = iter(args[:])
-    for arg in itr:
-        if arg.startswith("--driver="):
-            output_args.append("--driver=" + arg[len("--driver=") :].lower())
-        elif arg == "--driver":
-            output_args.append(arg)
-            output_args.append(next(itr).lower())
-        else:
-            output_args.append(arg)
-    return output_args
+logger = logging.getLogger(__name__)
 
 
 def run():
@@ -59,7 +40,7 @@ def run():
             prog="NucliaDB",
             description="NucliaDB Starting script",
         )
-        nucliadb_args = parser.parse_typed_args(arg_munge())
+        nucliadb_args = parser.parse_typed_args()
 
     config_nucliadb(nucliadb_args)
     run_nucliadb(nucliadb_args)
@@ -71,10 +52,13 @@ def run_nucliadb(nucliadb_args: Settings):
 
     path = os.path.dirname(__file__) + "/static"
     application.mount("/widget", StaticFiles(directory=path, html=True), name="widget")
+    logger.warning(
+        f"======= Starting server on http://0.0.0.0:{nucliadb_args.http_port}/ ======"
+    )
     uvicorn.run(
         application,
         host="0.0.0.0",
-        port=nucliadb_args.http,
+        port=nucliadb_args.http_port,
         log_config=log_config,
         log_level=logging.getLevelName(running_settings.log_level),
         debug=True,
@@ -88,7 +72,7 @@ async def run_async_nucliadb(nucliadb_args: Settings):
 
     config = uvicorn.Config(
         application,
-        port=nucliadb_args.http,
+        port=nucliadb_args.http_port,
         log_level=logging.getLevelName(running_settings.log_level),
         log_config=log_config,
     )

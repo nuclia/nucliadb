@@ -20,9 +20,18 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from nucliadb_protos.resources_pb2 import FileExtractedData, PagePositions
+from nucliadb_protos.resources_pb2 import (
+    Basic,
+    CloudFile,
+    FileExtractedData,
+    PagePositions,
+)
 
-from nucliadb.ingest.orm.resource import get_file_page_positions
+from nucliadb.ingest.orm.resource import (
+    get_file_page_positions,
+    maybe_update_basic_summary,
+    maybe_update_basic_thumbnail,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -36,3 +45,39 @@ async def test_get_file_page_positions():
         get_file_extracted_data=AsyncMock(return_value=extracted_data)
     )
     assert await get_file_page_positions(file_field) == {0: (0, 10), 1: (11, 20)}
+
+
+@pytest.mark.parametrize(
+    "basic,summary,updated",
+    [
+        (Basic(), "new_summary", True),
+        (Basic(summary="summary"), "new_summary", False),
+        (Basic(summary="summary"), "", False),
+    ],
+)
+def test_maybe_update_basic_summary(basic, summary, updated):
+    assert maybe_update_basic_summary(basic, summary) == updated
+    if updated:
+        assert basic.summary == summary
+    else:
+        assert basic.summary != summary
+
+
+@pytest.mark.parametrize(
+    "basic,thumbnail,updated",
+    [
+        (Basic(), CloudFile(uri="new_thumbnail_url"), True),
+        (
+            Basic(thumbnail="old_thumbnail_url"),
+            CloudFile(uri="new_thumbnail_url"),
+            False,
+        ),
+        (Basic(thumbnail="old_thumbnail_url"), None, False),
+    ],
+)
+def test_maybe_update_basic_thumbnail(basic, thumbnail, updated):
+    assert maybe_update_basic_thumbnail(basic, thumbnail) == updated
+    if updated:
+        assert basic.thumbnail == thumbnail.uri
+    else:
+        assert basic.thumbnail == "old_thumbnail_url"

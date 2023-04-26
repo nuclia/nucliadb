@@ -57,19 +57,12 @@ spec:
           privileged: true
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-          initialDelaySeconds: 10
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
         livenessProbe:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          timeoutSeconds: 5
+          initialDelaySeconds: 60
+          periodSeconds: 120
+          timeoutSeconds: 10
           failureThreshold: 10
         command: ["nucliadb-ingest"]
         envFrom:
@@ -82,6 +75,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
+        {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+        {{- end }}
         ports:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}

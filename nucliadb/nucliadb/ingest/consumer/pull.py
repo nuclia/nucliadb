@@ -309,7 +309,7 @@ class PullWorker:
                 await asyncio.sleep(10)
 
         if self.pull_time == 0:
-            logger.info("Not pulling data from Nuclia")
+            logger.debug("Not pulling data from Nuclia")
             return
 
         # Lets do pooling from NUA

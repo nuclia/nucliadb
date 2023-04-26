@@ -66,3 +66,11 @@ class SequenceOrderViolation(Exception):
 
 class EntitiesGroupNotFound(NotFound):
     pass
+
+
+class ApplyMessageError(Exception):
+    pass
+
+
+class NoResourceError(Exception):
+    pass

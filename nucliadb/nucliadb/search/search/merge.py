@@ -141,6 +141,7 @@ async def merge_documents_results(
             score = await text_score(result, sort.field, kbid)
             if score is not None:
                 raw_resource_list.append((result, score))
+        total += document_response.total
 
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
@@ -169,8 +170,6 @@ async def merge_documents_results(
         )
         if result.uuid not in resources:
             resources.append(result.uuid)
-
-    total = len(result_resource_list)
 
     return Resources(
         facets=facets,
@@ -331,6 +330,7 @@ async def merge_paragraph_results(
     query = None
     next_page = False
     ematches: Optional[List[str]] = None
+    total = 0
     for paragraph_response in paragraph_responses:
         if ematches is None:
             ematches = paragraph_response.ematches  # type: ignore
@@ -348,6 +348,7 @@ async def merge_paragraph_results(
             score = await text_score(result, sort.field, kbid)
             if score is not None:
                 raw_paragraph_list.append((result, score))
+        total += paragraph_response.total
 
     raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
@@ -402,8 +403,6 @@ async def merge_paragraph_results(
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)
-
-    total = len(result_paragraph_list)
 
     return Paragraphs(
         results=result_paragraph_list,

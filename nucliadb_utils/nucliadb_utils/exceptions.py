@@ -31,3 +31,7 @@ class LimitsExceededError(Exception):
 
 class ShardsNotFound(Exception):
     pass
+
+
+class ConfigurationError(Exception):
+    pass

@@ -54,7 +54,7 @@ from nucliadb_utils.utilities import (
 async def train_rest_api(nucliadb: Settings):  # type: ignore
     async with aiohttp.ClientSession(
         headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http}",
+        base_url=f"http://localhost:{nucliadb.http_port}",
     ) as client:
         yield client
 
@@ -244,7 +244,11 @@ def free_port() -> int:
 @pytest.fixture(scope="function")
 def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
     from nucliadb.train.settings import settings
-    from nucliadb_utils.settings import running_settings, storage_settings
+    from nucliadb_utils.settings import (
+        FileBackendConfig,
+        running_settings,
+        storage_settings,
+    )
 
     running_settings.debug = False
     print(f"Redis ready at {maindb_driver.url}")
@@ -255,7 +259,7 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
     old_grpc_port = settings.grpc_port
 
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
     settings.grpc_port = free_port()
     set_utility(Utility.CACHE, cache)
