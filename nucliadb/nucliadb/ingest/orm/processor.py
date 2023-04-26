@@ -395,19 +395,14 @@ class Processor:
                 await resource.compute_global_tags(resource.indexer)
 
             if resource.modified or reindex:
-                counter, shard = await self.index_resource(
-                    resource, txn, kb, uuid, seqid, partition
-                )
-
                 await txn.commit(partition, seqid)
 
                 if resource.slug_modified:
-                    # Slug may have conflicts as its not partitioned properly.
-                    # We make it as short as possible
-                    txn = await self.driver.begin()
-                    resource.txn = txn
-                    await resource.set_slug()
-                    await txn.commit(resource=False)
+                    await self.commit_slug(resource)
+
+                counter, shard = await self.index_resource(
+                    resource, kb, uuid, seqid, partition
+                )
 
                 await self.notify_commit(partition, seqid, multi, kbid, uuid)
             else:
@@ -450,12 +445,28 @@ class Processor:
     async def index_resource(
         self,
         resource: Resource,
-        txn: Transaction,
         kb: KnowledgeBox,
         uuid: str,
         seqid: int,
         partition: str,
     ) -> Tuple[Optional[ShardCounter], Shard]:
+        async with self.driver.transaction() as txn:
+            kb.txn = txn
+            counter, shard = await self._inner_index_resource(
+                resource, txn, kb, uuid, seqid, partition
+            )
+            await txn.commit(resource=False)
+            return counter, shard
+
+    async def _inner_index_resource(
+        self,
+        resource: Resource,
+        txn: Transaction,
+        kb: KnowledgeBox,
+        uuid: str,
+        seqid: int,
+        partition: str,
+    ) -> ShardCounter:
         shard_id = await kb.get_resource_shard_id(uuid)
         node_klass = get_node_klass()
         shard: Optional[Shard] = None
@@ -487,6 +498,14 @@ class Processor:
             similarity = await kb.get_similarity()
             await node_klass.create_shard_by_kbid(txn, kb.kbid, similarity=similarity)
         return counter, shard  # type: ignore
+
+    async def commit_slug(self, resource: Resource):
+        # Slug may have conflicts as its not partitioned properly.
+        # We make it as short as possible
+        async with self.driver.transaction() as txn:
+            resource.txn = txn
+            await resource.set_slug()
+            await txn.commit(resource=False)
 
     async def _mark_resource_error(
         self,
