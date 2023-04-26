@@ -92,13 +92,15 @@ def reset_config():
 async def nucliadb(dummy_processing, telemetry_disabled):
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = Settings(
-            blob=f"{tmpdir}/blob",
-            maindb=f"{tmpdir}/main",
-            node=f"{tmpdir}/node",
-            http=free_port(),
-            grpc=free_port(),
-            train=free_port(),
-            log="INFO",
+            driver="local",
+            file_backend="local",
+            local_files=f"{tmpdir}/blob",
+            driver_local_url=f"{tmpdir}/main",
+            data_path=f"{tmpdir}/node",
+            http_port=free_port(),
+            ingest_grpc_port=free_port(),
+            train_grpc_port=free_port(),
+            log_level="INFO",
         )
         config_nucliadb(settings)
         server = await run_async_nucliadb(settings)
@@ -114,7 +116,7 @@ async def nucliadb(dummy_processing, telemetry_disabled):
 async def nucliadb_reader(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http}/{API_PREFIX}/v1",
+        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
     ) as client:
         yield client
 
@@ -123,7 +125,7 @@ async def nucliadb_reader(nucliadb: Settings):
 async def nucliadb_writer(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "WRITER"},
-        base_url=f"http://localhost:{nucliadb.http}/{API_PREFIX}/v1",
+        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
     ) as client:
         yield client
 
@@ -132,7 +134,7 @@ async def nucliadb_writer(nucliadb: Settings):
 async def nucliadb_manager(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
-        base_url=f"http://localhost:{nucliadb.http}/{API_PREFIX}/v1",
+        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
     ) as client:
         yield client
 
@@ -149,13 +151,13 @@ async def knowledgebox(nucliadb_manager: AsyncClient):
 
 @pytest.fixture(scope="function")
 async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.grpc}"))
+    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
     return stub
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_train(nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train}"))
+    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
     return stub
 
 

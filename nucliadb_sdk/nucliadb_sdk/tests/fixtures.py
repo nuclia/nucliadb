@@ -37,6 +37,7 @@ images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
     "env": {
+        "DRIVER": "local",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
         "dummy_processing": "True",
         "max_receive_message_length": "40",

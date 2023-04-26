@@ -22,7 +22,8 @@ from typing import Optional
 
 import pydantic
 
-from nucliadb.ingest.settings import DriverConfig
+from nucliadb.ingest.settings import DriverSettings
+from nucliadb_utils.settings import StorageSettings
 
 
 class LogLevel(str, Enum):
@@ -31,20 +32,22 @@ class LogLevel(str, Enum):
     DEBUG = "DEBUG"
 
 
-class Settings(pydantic.BaseSettings):
-    driver: DriverConfig = pydantic.Field(
-        DriverConfig.local, description="Main DB Path string"
+class Settings(DriverSettings, StorageSettings):
+    # be consistent here with DATA_PATH env var
+    data_path: str = pydantic.Field(
+        "./data/node", description="Path to node index files"
     )
-    maindb: str = pydantic.Field("./data/main", description="Main DB Path string")
-    blob: str = pydantic.Field("./data/blob", description="Blob Path string")
-    key: Optional[str] = pydantic.Field(
-        description="Nuclia Understanding API Key string"
+
+    # all settings here are mapped in to other env var settings used
+    # in the app. These are helper settings to make things easier to
+    # use with standalone app vs cluster app.
+    nua_api_key: Optional[str] = pydantic.Field(
+        description="Nuclia Understanding API Key"
     )
-    node: str = pydantic.Field("./data/node", description="Node Path string")
     zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
-    http: int = pydantic.Field(8080, description="HTTP Port int")
-    grpc: int = pydantic.Field(8030, description="GRPC Port int")
-    train: int = pydantic.Field(8031, description="Train GRPC Port int")
-    log: LogLevel = pydantic.Field(
+    http_port: int = pydantic.Field(8080, description="HTTP Port")
+    ingest_grpc_port: int = pydantic.Field(8030, description="Ingest GRPC Port int")
+    train_grpc_port: int = pydantic.Field(8031, description="Train GRPC Port int")
+    log_level: LogLevel = pydantic.Field(
         LogLevel.INFO, description="Log level [DEBUG,INFO,ERROR] string"
     )
