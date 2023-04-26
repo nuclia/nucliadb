@@ -20,17 +20,15 @@
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_models.writer import CreateResourcePayload
+
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
     InputMessageContent,
 )
-from nucliadb_models.resource import (
-    Resource as ResponseResponse,
-    ConversationFieldData,
-    FieldConversation,
-)
+from nucliadb_models.resource import ConversationFieldData, FieldConversation
+from nucliadb_models.resource import Resource as ResponseResponse
+from nucliadb_models.writer import CreateResourcePayload
 
 
 @pytest.mark.asyncio
