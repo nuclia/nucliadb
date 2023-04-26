@@ -34,9 +34,9 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
-    VectorSimilarity,
     KnowledgeBoxObjID,
     NucliaDBRoles,
+    VectorSimilarity,
 )
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
