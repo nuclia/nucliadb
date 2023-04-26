@@ -132,29 +132,30 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             if metadata.pages == 0:
                 continue
 
-            all_messages = []
-            for page in range(0, field.metadata.pages):
-                conversation_pb = await field.get_value(page + 1)
-                if conversation_pb is not None:
-                    all_messages.extend(conversation_pb.messages)
-
             full_conversation = PushConversation(messages=[])
-            for message in all_messages:
-                parsed_message = MessageToDict(
-                    message,
-                    preserving_proto_field_name=True,
-                    including_default_value_fields=True,
-                )
-                parsed_message["content"]["attachments"] = [
-                    await processing.convert_internal_cf_to_str(cf, storage)
-                    for cf in message.content.attachments
-                ]
-                parsed_message["content"][
-                    "format"
-                ] = resources_pb2.MessageContent.Format.Value(
-                    parsed_message["content"]["format"]
-                )
-                full_conversation.messages.append(models.PushMessage(**parsed_message))
+            for page in range(0, metadata.pages):
+                conversation_pb = await field.get_value(page + 1)
+                if conversation_pb is None:
+                    continue
+
+                for message in conversation_pb.messages:
+                    parsed_message = MessageToDict(
+                        message,
+                        preserving_proto_field_name=True,
+                        including_default_value_fields=True,
+                    )
+                    parsed_message["content"]["attachments"] = [
+                        await processing.convert_internal_cf_to_str(cf, storage)
+                        for cf in message.content.attachments
+                    ]
+                    parsed_message["content"][
+                        "format"
+                    ] = resources_pb2.MessageContent.Format.Value(
+                        parsed_message["content"]["format"]
+                    )
+                    full_conversation.messages.append(
+                        models.PushMessage(**parsed_message)
+                    )
             toprocess.conversationfield[field_id] = full_conversation
 
 
