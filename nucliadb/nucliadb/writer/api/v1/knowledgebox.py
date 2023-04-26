@@ -36,7 +36,6 @@ from nucliadb_models.resource import (
     KnowledgeBoxObj,
     KnowledgeBoxObjID,
     NucliaDBRoles,
-    VectorSimilarity,
 )
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
