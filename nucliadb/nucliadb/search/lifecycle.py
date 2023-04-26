@@ -21,7 +21,6 @@ from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.utils import get_driver  # type: ignore
 from nucliadb.ingest.utils import start_ingest, stop_ingest
-from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search import paragraphs

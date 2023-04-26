@@ -22,9 +22,8 @@ from typing import Awaitable, Callable, Optional, Union
 
 import pkg_resources
 
-from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.ingest import SERVICE_NAME
-from nucliadb.ingest.chitchat import start_chitchat
+from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.ingest.consumer import start_consumer
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
