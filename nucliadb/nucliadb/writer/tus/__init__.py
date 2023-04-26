@@ -27,7 +27,8 @@ from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
-from nucliadb_utils.settings import storage_settings
+from nucliadb_utils.exceptions import ConfigurationError
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 
 TUSUPLOAD = "tusupload"
 UPLOAD = "upload"
@@ -46,7 +47,7 @@ REDIS_FILE_DATA_MANAGER_FACTORY: Optional[RedisFileDataManagerFactory] = None
 async def initialize():
     global DRIVER
 
-    if storage_settings.file_backend == "gcs":
+    if storage_settings.file_backend == FileBackendConfig.GCS:
         storage_backend = GCloudBlobStore()
 
         await storage_backend.initialize(
@@ -62,7 +63,7 @@ async def initialize():
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
-    if storage_settings.file_backend == "s3":
+    elif storage_settings.file_backend == FileBackendConfig.S3:
         storage_backend = S3BlobStore()
 
         await storage_backend.initialize(
@@ -80,7 +81,7 @@ async def initialize():
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
-    if storage_settings.file_backend == "local":
+    elif storage_settings.file_backend == FileBackendConfig.LOCAL:
         storage_backend = LocalBlobStore(storage_settings.local_files)
 
         await storage_backend.initialize()
@@ -88,6 +89,9 @@ async def initialize():
         storage_manager = LocalFileStorageManager(storage_backend)
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
+
+    elif storage_settings.file_backend == FileBackendConfig.NOT_SET:
+        raise ConfigurationError("FILE_BACKEND env variable not configured")
 
 
 async def finalize():

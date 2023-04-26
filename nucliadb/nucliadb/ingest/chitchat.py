@@ -28,15 +28,20 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import ClusterMember, Node, NodeType, chitchat_update_node
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
 async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
+    util = get_utility(Utility.CHITCHAT)
+    if util is not None:
+        # already loaded
+        return util
+
     if settings.nodes_load_ingest:  # pragma: no cover
         await Node.load_active_nodes()
 
     if settings.chitchat_enabled is False:
-        logger.info(f"Chitchat not enabled - {service_name}")
+        logger.debug(f"Chitchat not enabled - {service_name}")
         return None
 
     chitchat = ChitchatNucliaDB(
@@ -47,6 +52,13 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
     set_utility(Utility.CHITCHAT, chitchat)
 
     return chitchat
+
+
+async def stop_chitchat():
+    util = get_utility(Utility.CHITCHAT)
+    if util is not None:
+        await util.close()
+        clean_utility(Utility.CHITCHAT)
 
 
 class ChitchatNucliaDB:

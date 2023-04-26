@@ -36,9 +36,15 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.redis import RedisPubsub
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import audit_settings, nuclia_settings, storage_settings
+from nucliadb_utils.settings import (
+    FileBackendConfig,
+    audit_settings,
+    nuclia_settings,
+    storage_settings,
+)
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.transaction import TransactionUtility
@@ -85,7 +91,10 @@ def clean_utility(ident: Union[Utility, str]):
 async def get_storage(
     gcs_scopes: Optional[List[str]] = None, service_name: Optional[str] = None
 ) -> Storage:
-    if storage_settings.file_backend == "s3" and Utility.STORAGE not in MAIN:
+    if Utility.STORAGE in MAIN:
+        return MAIN[Utility.STORAGE]
+
+    if storage_settings.file_backend == FileBackendConfig.S3:
         from nucliadb_utils.storages.s3 import S3Storage
 
         s3util = S3Storage(
@@ -104,7 +113,7 @@ async def get_storage(
         await s3util.initialize()
         logger.info("Configuring S3 Storage")
 
-    elif storage_settings.file_backend == "gcs" and Utility.STORAGE not in MAIN:
+    elif storage_settings.file_backend == FileBackendConfig.GCS:
         from nucliadb_utils.storages.gcs import GCSStorage
 
         gcsutil = GCSStorage(
@@ -123,19 +132,17 @@ async def get_storage(
         await gcsutil.initialize(service_name)
         logger.info("Configuring GCS Storage")
 
-    elif storage_settings.file_backend == "pg" and Utility.STORAGE not in MAIN:
+    elif storage_settings.file_backend == FileBackendConfig.PG:
         from nucliadb_utils.storages.pg import PostgresStorage
 
         pgutil = PostgresStorage(storage_settings.driver_pg_url)  # type: ignore
         set_utility(Utility.STORAGE, pgutil)
         await pgutil.initialize()
-        logger.info("Configuring GCS Storage")
+        logger.info("Configuring Postgres Storage")
 
-    elif (
-        storage_settings.file_backend == "local"
-        and Utility.STORAGE not in MAIN
-        and storage_settings.local_files
-    ):
+    elif storage_settings.file_backend == FileBackendConfig.LOCAL:
+        if storage_settings.local_files is None:
+            raise ConfigurationError("LOCAL_FILES env var not configured")
         from nucliadb_utils.storages.local import LocalStorage
 
         localutil = LocalStorage(
@@ -144,9 +151,10 @@ async def get_storage(
         set_utility(Utility.STORAGE, localutil)
         await localutil.initialize()
         logger.info("Configuring Local Storage")
-
-    if MAIN.get(Utility.STORAGE) is None:
-        raise AttributeError()
+    else:
+        raise ConfigurationError(
+            "Invalid storage settings, please configure FILE_BACKEND"
+        )
 
     return MAIN[Utility.STORAGE]
 
@@ -247,7 +255,10 @@ def get_audit() -> Optional[AuditStorage]:
 
 
 async def start_audit_utility(service: str):
-    audit_utility: Optional[AuditStorage] = None
+    audit_utility: Optional[AuditStorage] = get_utility(Utility.AUDIT)
+    if audit_utility is not None:
+        return
+
     if audit_settings.audit_driver == "basic":
         audit_utility = BasicAuditStorage()
         logger.info("Configuring basic audit log")
@@ -263,8 +274,9 @@ async def start_audit_utility(service: str):
         logger.info(
             f"Configuring stream audit log {audit_settings.audit_jetstream_target}"
         )
-    if audit_utility:
-        await audit_utility.initialize()
+    else:
+        raise ConfigurationError("Invalid audit driver")
+    await audit_utility.initialize()
     set_utility(Utility.AUDIT, audit_utility)
 
 

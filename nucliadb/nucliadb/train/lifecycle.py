@@ -20,8 +20,8 @@
 import logging
 import sys
 
+from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.train import SERVICE_NAME, logger
-from nucliadb.train.chitchat import start_chitchat, stop_chitchat
 from nucliadb.train.utils import (
     start_nodes_manager,
     start_train_grpc,

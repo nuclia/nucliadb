@@ -151,7 +151,7 @@ async def grpc_servicer(redis, transaction_utility, gcs_storage, fake_node):
 @pytest.fixture(scope="function")
 async def local_driver() -> AsyncIterator[Driver]:
     path = mkdtemp()
-    settings.driver = DriverConfig.local
+    settings.driver = DriverConfig.LOCAL
     settings.driver_local_url = path
     driver: Driver = LocalDriver(url=path)
     await driver.initialize()
@@ -168,7 +168,7 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
         url = "localhost:2379"
     else:
         url = f"{tikvd[0]}:{tikvd[2]}"
-    settings.driver = DriverConfig.tikv
+    settings.driver = DriverConfig.TIKV
     settings.driver_tikv_url = [url]
 
     driver: Driver = TiKVDriver(url=[url])
@@ -188,7 +188,7 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
 @pytest.fixture(scope="function")
 async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     url = f"redis://{redis[0]}:{redis[1]}"
-    settings.driver = DriverConfig.redis
+    settings.driver = DriverConfig.REDIS
     settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
 
     driver = RedisDriver(url=url)
