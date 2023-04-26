@@ -43,8 +43,6 @@ async def test_find(
 
         data = resp.json()
 
-        #        assert data["total"] == 62
-
         res = next(iter(data["resources"].values()))
         para = next(iter(res["fields"]["/f/file"]["paragraphs"].values()))
         assert para["position"] == {
@@ -70,8 +68,6 @@ async def test_find_order(
         assert resp.status_code == 200
 
         data = resp.json()
-
-        #        assert data["total"] == 65
 
         paragraph_count = 0
         orders = set()
