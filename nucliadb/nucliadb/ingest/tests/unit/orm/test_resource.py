@@ -33,9 +33,8 @@ from nucliadb.ingest.orm.resource import (
     maybe_update_basic_thumbnail,
 )
 
-pytestmark = pytest.mark.asyncio
 
-
+@pytest.mark.asyncio
 async def test_get_file_page_positions():
     extracted_data = FileExtractedData()
     extracted_data.file_pages_previews.positions.extend(

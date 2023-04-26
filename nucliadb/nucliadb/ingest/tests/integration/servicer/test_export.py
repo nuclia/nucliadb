@@ -113,7 +113,8 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     fed.field = "file1"
     bm.file_extracted_data.append(fed)
 
-    await stub.ProcessMessage([bm])  # type: ignore
+    resp = await stub.ProcessMessage([bm])  # type: ignore
+    assert resp.status == resp.Status.OK
 
     req = ExportRequest()
     req.kbid = result.uuid
