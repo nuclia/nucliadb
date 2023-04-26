@@ -463,7 +463,7 @@ class Processor:
         uuid: str,
         seqid: int,
         partition: str,
-    ) -> ShardCounter:
+    ) -> Tuple[Optional[ShardCounter], Shard]:
         shard_id = await kb.get_resource_shard_id(uuid)
         node_klass = get_node_klass()
         shard: Optional[Shard] = None
@@ -489,6 +489,7 @@ class Processor:
         counter = await shard.add_resource(
             resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
         )
+        # TODO: Move this out of the transaction processing
         if counter is not None and counter.fields > settings.max_shard_fields:
             # The current shard is full, create a new one so next resource
             # is placed on a new shard
