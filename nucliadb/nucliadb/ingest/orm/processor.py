@@ -369,7 +369,7 @@ class Processor:
             resource: Optional[Resource] = None
             handled_exception = None
             counter = None
-            created = False
+            resource_created = False
             shard: Optional[Shard] = None
             reindex: bool = False
             try:
@@ -378,10 +378,10 @@ class Processor:
                     if resource is not None:
                         assert resource.uuid == message.uuid
                     try:
-                        resource, _created = await self.apply_message(
+                        resource, created = await self.apply_message(
                             message, kb, resource
                         )
-                        created = created or _created
+                        resource_created = resource_created or created
                     except ApplyMessageError as exc:
                         logger.warning(str(exc))
                         continue
@@ -396,10 +396,10 @@ class Processor:
                     await resource.compute_global_text()
                     await resource.compute_global_tags(resource.indexer)
 
-                if resource.modified or reindex:
+                if resource_created or resource.modified or reindex:
                     await txn.commit(partition, seqid)
 
-                    if resource.slug_modified:
+                    if resource.slug_modified or resource_created:
                         await self.commit_slug(resource)
 
                     counter, shard = await self.index_resource(
@@ -409,7 +409,9 @@ class Processor:
                     await self.notify_commit(partition, seqid, multi, kbid, uuid)
                 else:
                     await self.notify_abort(partition, seqid, multi, kbid, uuid)
-                    logger.warning(f"This message did not modify the resource")
+                    logger.warning(
+                        f"This message did not modify not create any resource"
+                    )
             except NoResourceError:
                 logger.warning(
                     f"Messages did not trigger any resource processing. Ignoring..."
