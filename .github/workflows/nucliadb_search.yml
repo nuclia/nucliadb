@@ -14,6 +14,7 @@ on:
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
       - "nucliadb_cluster/**"
+      - "nucliadb_node/**"
   push:
     branches:
       - main
@@ -27,6 +28,7 @@ on:
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
       - "nucliadb_cluster/**"
+      - "nucliadb_node/**"
 env:
   API_VERSION: 1
   COMPONENT: nucliadb-search
