@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.reader.api.models import ResourceField
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
@@ -38,40 +41,68 @@ async def test_conversations(
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
+    messages = []
+    for i in range(300):
+        messages.append(
+            InputMessage(
+                to=["computer"],
+                who=f"person{i}",
+                timestamp=datetime.now(),
+                content=InputMessageContent(text="What is the meaning of life?"),
+                ident=str(i),
+            )
+        )
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
-        data=CreateResourcePayload(
+        data=CreateResourcePayload(  # type: ignore
             slug="myresource",
             conversations={
-                "faq": InputConversationField(
-                    messages=[
-                        InputMessage(
-                            to=["computer"],
-                            content=InputMessageContent(
-                                text="What is the meaning of life?"
-                            ),
-                            ident="1",
-                        ),
-                        InputMessage(
-                            to=["humans"],
-                            content=InputMessageContent(text="42"),
-                            ident="2",
-                        ),
-                    ]
-                ),
+                "faq": InputConversationField(messages=messages),
             },
         ).json(),
     )
+
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
+    # add another message using the api to add single message
+    resp = await nucliadb_writer.put(
+        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq/messages",
+        data="["  # type: ignore
+        + InputMessage(
+            to=[f"computer"],
+            content=InputMessageContent(text="42"),
+            ident="computer",
+        ).json()
+        + "]",
+    )
+
+    assert resp.status_code == 200
+
+    # get field summary
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=values")
     assert resp.status_code == 200
     res_resp = ResponseResponse.parse_obj(resp.json())
 
-    assert res_resp.data.conversations["faq"] == ConversationFieldData(
-        value=FieldConversation(pages=1, size=200), extracted=None, error=None
+    assert res_resp.data.conversations["faq"] == ConversationFieldData(  # type: ignore
+        value=FieldConversation(pages=2, size=200, total=301),
+        extracted=None,
+        error=None,
     )
 
-    # XXX Currently no way to get conversation pages through API
+    # get first page
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1"
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.parse_obj(resp.json())
+    assert len(field_resp.value["messages"]) == 200  # type: ignore
+
+    # get second page
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2"
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.parse_obj(resp.json())
+    assert len(field_resp.value["messages"]) == 101  # type: ignore

@@ -178,6 +178,8 @@ pub struct FieldConversation {
     pub pages: i32,
     #[prost(int32, tag="2")]
     pub size: i32,
+    #[prost(int32, tag="3")]
+    pub total: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NestedPosition {
