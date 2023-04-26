@@ -128,13 +128,13 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         if field_type_name is FieldTypeName.CONVERSATION and isinstance(
             field, Conversation
         ):
-            all_messages = []
-            all_messages.extend(field_pb.messages)
-            if field.metadata is None:
+            metadata = await field.get_metadata()
+            if metadata.pages == 0:
                 continue
 
-            for page in range(2, field.metadata.pages + 1):
-                conversation_pb = await field.get_value(page)
+            all_messages = []
+            for page in range(0, field.metadata.pages):
+                conversation_pb = await field.get_value(page + 1)
                 if conversation_pb is not None:
                     all_messages.extend(conversation_pb.messages)
 
