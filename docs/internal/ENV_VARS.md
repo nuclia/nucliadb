@@ -12,9 +12,6 @@ Settings[to be implemented yet]:
 - `LOGGER_LEVELS`
 - `DEBUG`
 - `HTTP_HOST`
-- `HTTP_PORT`
 - `HTTP_CORS_ORIGINS`
 - `GRPC_HOST`
-- `GRPC_PORT`
 - `METRICS_HTTP_HOST`
-- `METRICS_HTTP_PORT`
