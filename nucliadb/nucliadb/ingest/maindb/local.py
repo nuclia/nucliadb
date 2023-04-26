@@ -61,7 +61,7 @@ class LocalTransaction(Transaction):
         self.open = False
 
     def compute_path(self, key: str):
-        return f"{self.url}{key}"
+        return f"{self.url}{key.rstrip('/')}/__data__"
 
     async def save(self, key: str, value: bytes):
         key = self.compute_path(key)
@@ -185,9 +185,10 @@ class LocalTransaction(Transaction):
         get_all_keys = count == -1
         total_count = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
         real_count = 0
-        path = self.compute_path(match) + "/"
+        path = self.compute_path(match).replace("/__data__", "") + "/"
         for str_key in glob.glob(path + "**", recursive=True):
-            if str_key in self.deleted_keys:
+            real_key = str_key.replace("/__data__", "")
+            if real_key in self.deleted_keys:
                 continue
             if os.path.isdir(str_key) or not os.path.exists(str_key):
                 continue
@@ -196,15 +197,15 @@ class LocalTransaction(Transaction):
                     match in new_key
                     and prev_key is not None
                     and prev_key < new_key
-                    and new_key < str_key
+                    and new_key < real_key
                 ):
                     yield new_key.replace(self.url, "")
 
-            yield str_key.replace(self.url, "")
+            yield real_key.replace(self.url, "")
             if real_count >= total_count:
                 break
             real_count += 1
-            prev_key = str_key
+            prev_key = real_key
         if prev_key is None:
             for new_key in self.modified_keys.keys():
                 if match in new_key:

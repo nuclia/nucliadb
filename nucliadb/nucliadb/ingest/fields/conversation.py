@@ -28,7 +28,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb_utils.storages.storage import StorageField
 
 PAGE_SIZE = 200
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/p/{type}/{field}/{page}"
+KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
 KB_RESOURCE_FIELD_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
