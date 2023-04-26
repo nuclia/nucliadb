@@ -387,31 +387,30 @@ class Processor:
             if resource is None:
                 raise NoResourceError()
 
-            # TODO: in case of reindex = True, shouldn't we do that after generate_index_message?
-            await resource.compute_global_text()
-            await resource.compute_global_tags(resource.indexer)
             if reindex:
                 # When reindexing, let's just generate full new index message
                 resource.replace_indexer(await resource.generate_index_message())
+            else:
+                await resource.compute_global_text()
+                await resource.compute_global_tags(resource.indexer)
 
             if resource.modified or reindex:
-                # TODO: Shouldn't we index the resource after it has been commited?
                 counter, shard = await self.index_resource(
                     resource, txn, kb, uuid, seqid, partition
                 )
 
                 await txn.commit(partition, seqid)
 
-                # TODO: Look if it's really needed to commit the slug every time
-                # Slug may have conflicts as its not partitioned properly. We make it as short as possible
-                txn = await self.driver.begin()
-                resource.txn = txn
-                await resource.set_slug()
-                await txn.commit(resource=False)
+                if resource.slug_modified:
+                    # Slug may have conflicts as its not partitioned properly.
+                    # We make it as short as possible
+                    txn = await self.driver.begin()
+                    resource.txn = txn
+                    await resource.set_slug()
+                    await txn.commit(resource=False)
 
                 await self.notify_commit(partition, seqid, multi, kbid, uuid)
-
-            elif resource and resource.modified is False:
+            else:
                 await txn.abort()
                 await self.notify_abort(partition, seqid, multi, kbid, uuid)
                 logger.warning(f"This message did not modify the resource")
