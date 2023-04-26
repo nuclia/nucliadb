@@ -67,7 +67,7 @@ async def start_grpc(service_name: Optional[str] = None):
     await server.start()
 
     logger.info(
-        f"======= Ingest GRPC serving on http://0.0.0.0:{settings.grpc_port}/ ======"
+        f"======= Ingest GRPC running on http://0.0.0.0:{settings.grpc_port}/ ======"
     )
 
     health_task = asyncio.create_task(health_check(health_servicer))

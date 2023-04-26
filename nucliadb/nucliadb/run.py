@@ -28,6 +28,8 @@ from nucliadb.config import config_nucliadb
 from nucliadb.logging import log_config
 from nucliadb.settings import Settings
 
+logger = logging.getLogger(__name__)
+
 
 def run():
     if os.environ.get("NUCLIADB_ENV"):
@@ -50,6 +52,9 @@ def run_nucliadb(nucliadb_args: Settings):
 
     path = os.path.dirname(__file__) + "/static"
     application.mount("/widget", StaticFiles(directory=path, html=True), name="widget")
+    logger.warning(
+        f"======= Starting server on http://0.0.0.0:{nucliadb_args.http_port}/ ======"
+    )
     uvicorn.run(
         application,
         host="0.0.0.0",
