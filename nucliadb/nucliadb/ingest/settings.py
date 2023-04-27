@@ -41,7 +41,7 @@ class DriverConfig(str, Enum):
 
 
 class DriverSettings(BaseSettings):
-    driver: DriverConfig = Field(DriverConfig.NOT_SET, description="Storage driver")
+    driver: DriverConfig = Field(DriverConfig.NOT_SET, description="K/V storage driver")
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
     driver_local_url: Optional[str] = None
