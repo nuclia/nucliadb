@@ -55,7 +55,6 @@ async fn send_update(
     stream: &mut TcpStream,
     args: &Args,
 ) -> anyhow::Result<()> {
-
     if !cluster_snapshot.is_empty() {
         let serial = serde_json::to_string(&cluster_snapshot)
             .map_err(|e| anyhow!("Cannot serialize cluster cluster snapshot: {e}"))?;
