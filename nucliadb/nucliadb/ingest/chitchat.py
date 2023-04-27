@@ -93,29 +93,33 @@ class ChitchatNucliaDB:
     async def socket_reader(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
-        logger.info("new connection accepted")
-        while True:
-            try:
+        peer = writer.get_extra_info("peername")
+        logger.info(f"new connection accepted: {peer}")
+        try:
+            while True:
                 logger.debug("wait data in socket")
                 mgr_message = await reader.read(
                     4096
                 )  # TODO: add message types enum with proper deserialization
                 if len(mgr_message) == 0:
-                    logger.debug("empty message received")
-                    # TODO: Improve communication
-                    await asyncio.sleep(1)
-                    continue
+                    logger.warning(
+                        f"empty message received from {peer}. It disconnected"
+                    )
+                    break
                 if len(mgr_message) == 4:
-                    logger.debug("check message received: {}".format(mgr_message.hex()))
+                    logger.debug(
+                        f"check message received by {peer}: {mgr_message.hex()}"
+                    )
                     hash = binascii.crc32(mgr_message)
                     logger.debug(f"calculated hash: {hash}")
                     response = hash.to_bytes(4, byteorder="big")
-                    logger.debug("Hash response: {!r}".format(response))
+                    logger.debug(f"Hash response to {peer}: {response!r}")
                     writer.write(response)
                     await writer.drain()
-                    continue
                 else:
-                    logger.debug("update message received: {!r}".format(mgr_message))
+                    logger.debug(
+                        f"update message received from {peer}: {mgr_message!r}"
+                    )
                     members: List[ClusterMember] = list(
                         map(
                             lambda x: build_member_from_json(x),
@@ -128,18 +132,23 @@ class ChitchatNucliaDB:
                         writer.write(len(members).to_bytes(4, byteorder="big"))
                         await writer.drain()
                     else:
-                        logger.debug("connection closed by writer")
+                        logger.warning(f"connection closed by {peer}")
                         break
-            except (
-                KeyboardInterrupt,
-                SystemExit,
-                asyncio.CancelledError,
-            ):  # pragma: no cover
-                logger.info("Exiting chitchat")
-                return
-            except IOError as e:
-                logger.exception("Failed on chitchat", stack_info=True)
-                errors.capture_exception(e)
+        except (
+            KeyboardInterrupt,
+            SystemExit,
+            asyncio.CancelledError,
+        ):  # pragma: no cover
+            logger.info(f"Exiting chitchat {peer}")
+        except (IOError, BrokenPipeError) as e:
+            logger.exception(f"Failed on chitchat {peer}", stack_info=True)
+            errors.capture_exception(e)
+        finally:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                logger.warning(f"Failed to close connection to {peer}", stack_info=True)
 
     async def close(self):
         self.chitchat_update_srv.close()
