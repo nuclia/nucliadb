@@ -222,7 +222,7 @@ class NucliaDBClient:
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 
-    def list_resources(self, page: int = 1):
+    def list_resources(self, page: int = 0):
         url = CREATE_RESOURCE_PATH
         response = self.reader_session.get(url, params={"page": str(page)})
         if response.status_code == 200:
