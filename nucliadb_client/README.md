@@ -1,3 +1,3 @@
 # NucliaDB Client
 
-Client library to interact with NucliaDB
+Deprecrated! If you are here, you probably want to use nucliadb_sdk instead.

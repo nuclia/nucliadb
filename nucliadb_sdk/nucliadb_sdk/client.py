@@ -26,7 +26,7 @@ import requests
 
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
-from nucliadb_models.resource import Resource
+from nucliadb_models.resource import Resource, ResourceList
 from nucliadb_models.search import (
     ChatRequest,
     FindRequest,
@@ -222,11 +222,11 @@ class NucliaDBClient:
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 
-    def list_resources(self):
+    def list_resources(self, page: int = 0):
         url = CREATE_RESOURCE_PATH
-        response = self.reader_session.get(url)
+        response = self.reader_session.get(url, params={"page": str(page)})
         if response.status_code == 200:
-            return Resource.parse_raw(response.content)
+            return ResourceList.parse_raw(response.content)
         elif response.status_code == 404:
             raise KeyError(f"No key {id}")
         else:
