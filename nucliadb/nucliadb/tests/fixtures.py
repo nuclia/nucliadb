@@ -100,7 +100,6 @@ async def nucliadb(dummy_processing, telemetry_disabled):
             http_port=free_port(),
             ingest_grpc_port=free_port(),
             train_grpc_port=free_port(),
-            log_level="INFO",
         )
         config_nucliadb(settings)
         server = await run_async_nucliadb(settings)
