@@ -20,18 +20,34 @@
 from __future__ import annotations
 
 import asyncio
-import binascii
-import json
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple
+
+from fastapi import FastAPI, Response
+from uvicorn.config import Config
+from uvicorn.server import Server
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.node import ClusterMember, Node, NodeType, chitchat_update_node
+from nucliadb.ingest.orm.node import NODES, Node
 from nucliadb.ingest.settings import settings
-from nucliadb_telemetry import errors
+from nucliadb_models.cluster import ClusterMember, MemberType
+from nucliadb_telemetry import metrics
+from nucliadb_utils.fastapi.run import run_server_forever
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
+AVAILABLE_NODES = metrics.Gauge("nucliadb_nodes_available")
 
-async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
+SHARD_COUNT = metrics.Gauge(
+    "nucliadb_node_shard_count",
+    labels={"node": ""},
+)
+
+LOAD_SCORE = metrics.Gauge(
+    "nucliadb_node_load_score",
+    labels={"node": ""},
+)
+
+
+async def start_chitchat(service_name: str) -> Optional[ChitchatMonitor]:
     util = get_utility(Utility.CHITCHAT)
     if util is not None:
         # already loaded
@@ -45,7 +61,7 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
         logger.debug(f"Chitchat not enabled - {service_name}")
         return None
 
-    chitchat = ChitchatNucliaDB(
+    chitchat = ChitchatMonitor(
         settings.chitchat_binding_host, settings.chitchat_binding_port
     )
     await chitchat.start()
@@ -58,133 +74,110 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
 async def stop_chitchat():
     util = get_utility(Utility.CHITCHAT)
     if util is not None:
-        await util.close()
+        await util.finalize()
         clean_utility(Utility.CHITCHAT)
 
 
-class ChitchatNucliaDB:
-    chitchat_update_srv: Optional[asyncio.Server] = None
+chitchat_app = FastAPI(title="ChitChat")
+
+
+@chitchat_app.post("/update-members", status_code=204)
+async def update_members(members: List[ClusterMember]) -> Response:
+    await update_available_nodes(members)
+    return Response(status_code=204)
+
+
+def get_configured_chitchat_app(host: str, port: int) -> Tuple[Server, Config]:
+    config = Config(
+        chitchat_app,
+        host=host,
+        port=port,
+        debug=False,
+        loop="auto",
+        http="auto",
+        reload=False,
+        workers=1,
+        use_colors=False,
+        log_level="warning",
+        limit_concurrency=None,
+        backlog=2047,
+        limit_max_requests=None,
+        timeout_keep_alive=5,
+        access_log=False,
+    )
+    server = Server(config=config)
+    return server, config
+
+
+class ChitchatMonitor:
+    """
+    This is starting a HTTP server that will receives periodic chitchat-cluster
+    member changes and it will update the in-memory list of available nodes.
+    """
 
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.chitchat_update_srv = None
         self.task = None
 
-    async def inner_start(self):
-        async with self.chitchat_update_srv:
-            logger.info("awaiting connections from rust part of cluster")
-            await self.chitchat_update_srv.serve_forever()
+    async def start(self):
+        logger.info("Chitchat server started at")
+        server, config = get_configured_chitchat_app(self.host, self.port)
+        self.task = asyncio.create_task(run_server_forever(server, config))
 
     async def finalize(self):
-        await self.close()
-
-    async def start(self):
-        logger.info(f"enter chitchat.start() at {self.host}:{self.port}")
-        self.chitchat_update_srv = await asyncio.start_server(
-            self.socket_reader, host=self.host, port=self.port
-        )
-        logger.info(f"tcp server created")
-        self.task = asyncio.create_task(self.inner_start())
-
-        await asyncio.sleep(0.1)
-
-    async def socket_reader(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ):
-        peer = writer.get_extra_info("peername")
-        logger.info(f"new connection accepted: {peer}")
-        try:
-            while True:
-                logger.debug("wait data in socket")
-                mgr_message = await reader.read(
-                    4096
-                )  # TODO: add message types enum with proper deserialization
-                if len(mgr_message) == 0:
-                    logger.warning(f"empty message received from {peer}. Disconnected")
-                    break
-                if len(mgr_message) == 4:
-                    logger.debug(
-                        f"check message received from {peer}: {mgr_message.hex()}"
-                    )
-                    hash = binascii.crc32(mgr_message)
-                    response = hash.to_bytes(4, byteorder="big")
-                    writer.write(response)
-                    await writer.drain()
-                    continue
-                else:
-                    logger.debug(
-                        f"update message received from {peer}: {mgr_message!r}"
-                    )
-                    members: List[ClusterMember] = list(
-                        map(
-                            lambda x: build_member_from_json(x),
-                            json.loads(mgr_message.decode("utf8").replace("'", '"')),
-                        )
-                    )
-                    logger.debug(f"updated members: {members}")
-                    if len(members) != 0:
-                        await chitchat_update_node(members)
-                        writer.write(len(members).to_bytes(4, byteorder="big"))
-                        await writer.drain()
-                    else:
-                        logger.warning("connection closed by writer")
-                        break
-        except (
-            KeyboardInterrupt,
-            SystemExit,
-            asyncio.CancelledError,
-        ):  # pragma: no cover
-            logger.info(f"Exiting chitchat connection with {peer}")
-        except (IOError, BrokenPipeError) as e:
-            logger.exception(
-                f"Failed on chitchat connection with {peer}", stack_info=True
-            )
-            errors.capture_exception(e)
-        finally:
-            try:
-                writer.close()
-                await writer.wait_closed()
-            except Exception:
-                logger.warning(
-                    f"Errors closing writer connection with {peer}", exc_info=True
-                )
-
-    async def close(self):
-        self.chitchat_update_srv.close()
-        await self.chitchat_update_srv.wait_closed()
+        logger.info("Chitchat closed")
         self.task.cancel()
 
 
-JsonValue = Union["JsonObject", list["JsonValue"], str, bool, int, float, None]
-JsonArray = List[JsonValue]
-JsonObject = Dict[str, JsonValue]
+async def update_available_nodes(members: List[ClusterMember]) -> None:
+    valid_ids = []
+    for member in members:
+        valid_ids.append(member.node_id)
+        if member.is_self is False and member.type == MemberType.IO:
+            node = NODES.get(member.node_id)
+            if node is None:
+                logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
+                await Node.set(
+                    member.node_id,
+                    address=member.listen_addr,
+                    type=member.type,
+                    load_score=member.load_score,
+                    shard_count=member.shard_count,
+                )
+                logger.debug("Node added")
+            else:
+                logger.debug(f"{member.node_id}/{member.type} update")
+                node.load_score = member.load_score
+                node.shard_count = member.shard_count
+                logger.debug("Node updated")
+    node_ids = [x for x in NODES.keys()]
+    destroyed_node_ids = []
+    for key in node_ids:
+        if key not in valid_ids:
+            node = NODES.get(key)
+            if node is not None:
+                destroyed_node_ids.append(key)
+                logger.info(f"{key}/{node.type} remove {node.address}")
+                await Node.destroy(key)
+    update_node_metrics(NODES, destroyed_node_ids)
 
 
-def parse_shard_count(member_serial: JsonObject) -> int:
-    shard_count_str = member_serial.get("shard_count")
-    if not shard_count_str:
-        # shard_count is only set for type.IO nodes
-        logger.debug("Missing shard_count: Defaulted to 0")
-        return 0
-    try:
-        shard_count = int(shard_count_str)  # type: ignore
-    except ValueError:
-        logger.warning(
-            f"Cannot convert shard_count ({shard_count_str}). Defaulted to 0"
-        )
-        shard_count = 0
-    return shard_count
+def update_node_metrics(nodes: Dict[str, Node], destroyed_node_ids: List[str]):
+    AVAILABLE_NODES.set(len(nodes))
 
+    for node_id, node in nodes.items():
+        SHARD_COUNT.set(node.shard_count, labels=dict(node=node_id))
+        LOAD_SCORE.set(node.load_score, labels=dict(node=node_id))
 
-def build_member_from_json(member_serial: JsonObject):
-    return ClusterMember(
-        node_id=str(member_serial["id"]),
-        listen_addr=str(member_serial["address"]),
-        type=NodeType.from_str(member_serial["type"]),
-        is_self=bool(member_serial["is_self"]),
-        shard_count=parse_shard_count(member_serial),
-    )
+    for node_id in destroyed_node_ids:
+        for gauge in (SHARD_COUNT, LOAD_SCORE):
+            try:
+                gauge.remove(labels=dict(node=node_id))
+            except KeyError:
+                # Be resilient if there were no previous
+                # samples for this node_id
+                pass
 
 
 if __name__ == "__main__":  # pragma: no cover

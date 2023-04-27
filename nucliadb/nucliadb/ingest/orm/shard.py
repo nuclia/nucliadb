@@ -23,7 +23,9 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from lru import LRU  # type: ignore
-from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
+from nucliadb_protos.noderesources_pb2 import (
+    Resource as PBBrainResource  # type: ignore
+)
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodesidecar_pb2 import Counter

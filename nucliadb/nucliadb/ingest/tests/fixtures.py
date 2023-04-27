@@ -40,11 +40,12 @@ from nucliadb.ingest.maindb.local import LocalDriver
 from nucliadb.ingest.maindb.redis import RedisDriver
 from nucliadb.ingest.maindb.tikv import TiKVDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node, NodeType
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
+from nucliadb_models.cluster import MemberType
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
@@ -241,14 +242,16 @@ async def fake_node(indexing_utility_ingest):
     await Node.set(
         uuid1,
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
+        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
     await Node.set(
         uuid2,
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
+        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
@@ -596,8 +599,8 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
 
     r1 = upb.Relation(
         relation=upb.Relation.CHILD,
-        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
-        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
+        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.MemberType.RESOURCE),
+        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.MemberType.RESOURCE),
     )
 
     basic.usermetadata.relations.append(r1)
@@ -618,8 +621,8 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
     rels = []
     r1 = upb.Relation(
         relation=upb.Relation.CHILD,
-        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
-        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
+        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.MemberType.RESOURCE),
+        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.MemberType.RESOURCE),
     )
 
     rels.append(r1)

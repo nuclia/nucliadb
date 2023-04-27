@@ -21,7 +21,7 @@ from typing import Optional
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.ingest.chitchat import ChitchatNucliaDB  # type: ignore
+from nucliadb.ingest.chitchat import ChitchatMonitor
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
@@ -140,5 +140,5 @@ async def stop_ingest():
         await util.finalize()
 
 
-def get_chitchat() -> ChitchatNucliaDB:
+def get_chitchat() -> Optional[ChitchatMonitor]:
     return get_utility(Utility.CHITCHAT)

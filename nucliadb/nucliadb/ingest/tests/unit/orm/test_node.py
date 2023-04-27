@@ -24,117 +24,34 @@ from nucliadb_protos.writer_pb2 import Member
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest.orm import NODES, NodeClusterSmall
-from nucliadb.ingest.orm.node import ClusterMember, Node, NodeType, chitchat_update_node
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.settings import settings
+from nucliadb_models.cluster import MemberType
 from nucliadb_utils.keys import KB_SHARDS
 
 
-def get_cluster_member(
-    node_id="foo",
-    listen_addr="192.1.1.1:8080",
-    type=NodeType.IO,
-    is_self=False,
-    shard_count=0,
-) -> ClusterMember:
-    return ClusterMember(
-        node_id=node_id,
-        listen_addr=listen_addr,
-        type=type,
-        is_self=is_self,
-        shard_count=shard_count,
-    )
-
-
-@pytest.mark.asyncio
-async def test_chitchat_update_node():
-    NODES.clear()
-    assert NODES == {}
-    await chitchat_update_node([])
-    assert len(NODES) == 0
-
-    # Check that it ignores itself
-    member = get_cluster_member(is_self=True)
-    await chitchat_update_node([member])
-    assert len(NODES) == 0
-
-    # Check that it ignores types other than node_type=NodeType.IO
-    member = get_cluster_member(type=NodeType.INGEST)
-    await chitchat_update_node([member])
-    assert len(NODES) == 0
-
-    # Check it registers new members
-    member = get_cluster_member(node_id="node1")
-    await chitchat_update_node([member])
-    assert len(NODES) == 1
-    node = NODES["node1"]
-    assert node.address == member.listen_addr
-    assert node.shard_count == member.shard_count
-
-    # Check that it updates loads score for registered members
-    member.shard_count = 2
-    await chitchat_update_node([member])
-    assert len(NODES) == 1
-    node = NODES["node1"]
-    assert node.shard_count == 2
-
-    # Check that it removes members that are no longer reported
-    await chitchat_update_node([])
-    assert len(NODES) == 0
-
-
-def test_node_type_from_str():
-    for raw_type, node_type in [
-        ("Io", NodeType.IO),
-        ("Train", NodeType.TRAIN),
-        ("Ingest", NodeType.INGEST),
-        ("Search", NodeType.SEARCH),
-        ("Blablabla", NodeType.UNKNOWN),
-        ("Cat is everything", NodeType.UNKNOWN),
+def test_member_type_from_str():
+    for raw_type, member_type in [
+        ("io", MemberType.IO),
+        ("train", MemberType.TRAIN),
+        ("ingest", MemberType.INGEST),
+        ("search", MemberType.SEARCH),
+        ("Blablabla", MemberType.UNKNOWN),
+        ("Cat is everything", MemberType.UNKNOWN),
     ]:
-        assert NodeType.from_str(raw_type) == node_type
+        assert MemberType.from_str(raw_type) == member_type
 
 
-def test_node_type_pb_conversion():
-    for node_type, member_type in [
-        (NodeType.IO, Member.Type.IO),
-        (NodeType.TRAIN, Member.Type.TRAIN),
-        (NodeType.INGEST, Member.Type.INGEST),
-        (NodeType.SEARCH, Member.Type.SEARCH),
-        (NodeType.UNKNOWN, Member.Type.UNKNOWN),
+def test_member_type_pb_conversion():
+    for member_type, member_type in [
+        (MemberType.IO, Member.Type.IO),
+        (MemberType.TRAIN, Member.Type.TRAIN),
+        (MemberType.INGEST, Member.Type.INGEST),
+        (MemberType.SEARCH, Member.Type.SEARCH),
+        (MemberType.UNKNOWN, Member.Type.UNKNOWN),
     ]:
-        assert node_type.to_pb() == member_type
-        assert NodeType.from_pb(member_type) == node_type
-
-
-@pytest.mark.asyncio
-async def test_update_node_metrics(metrics_registry):
-    node1 = "node-1"
-    member1 = get_cluster_member(node_id=node1, type=NodeType.IO, shard_count=2)
-    await chitchat_update_node([member1])
-
-    assert metrics_registry.get_sample_value("nucliadb_nodes_available", {}) == 1
-    assert (
-        metrics_registry.get_sample_value("nucliadb_node_shard_count", {"node": node1})
-        == 2
-    )
-
-    node2 = "node-2"
-    member2 = get_cluster_member(node_id=node2, type=NodeType.IO, shard_count=1)
-    await chitchat_update_node([member2])
-
-    assert metrics_registry.get_sample_value("nucliadb_nodes_available", {}) == 1
-    assert (
-        metrics_registry.get_sample_value("nucliadb_node_shard_count", {"node": node2})
-        == 1
-    )
-
-    # Check that samples of destroyed node have been removed
-    assert (
-        metrics_registry.get_sample_value("nucliadb_node_shard_count", {"node": node1})
-        is None
-    )
-
-    NODES.clear()
+        assert member_type.to_pb() == member_type
+        assert MemberType.from_pb(member_type) == member_type
 
 
 async def get_kb_shards(txn, kbid):
@@ -200,7 +117,8 @@ async def node_errors():
     await Node.set(
         id,
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
+        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
