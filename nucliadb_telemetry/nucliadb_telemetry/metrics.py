@@ -50,7 +50,6 @@ class Observer:
     ):
         self.error_mappings = error_mappings or {}
         self.labels = labels or {}
-        self.auto_prefix = auto_prefix
 
         assert (
             # managed by us, do not allow user to specify
@@ -61,8 +60,11 @@ class Observer:
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
 
+        if auto_prefix:
+            name = prefix_metric(name)
+
         self.counter = prometheus_client.Counter(
-            self.maybe_prefix_metric(f"{name}_count"),
+            f"{name}_count",
             f"Number of times {name} was called.",
             labelnames=tuple(self.labels.keys()) + (_STATUS_METRIC,),
         )
@@ -70,18 +72,11 @@ class Observer:
         if buckets is not None:
             hist_kwargs["buckets"] = buckets
         self.histogram = prometheus_client.Histogram(
-            self.maybe_prefix_metric(f"{name}_duration_seconds"),
+            f"{name}_duration_seconds",
             f"Histogram for {name} duration.",
             labelnames=tuple(self.labels.keys()),
             **hist_kwargs,  # type: ignore
         )
-
-    def maybe_prefix_metric(self, metric_name: str) -> str:
-        if not self.auto_prefix:
-            return metric_name
-        if not metric_name.startswith("nucliadb_"):
-            metric_name = f"nucliadb_{metric_name}"
-        return metric_name
 
     def wrap(self, labels: Optional[dict[str, str]] = None):
         def decorator(func):
@@ -155,10 +150,19 @@ class ObserverRecorder:
 
 
 class Gauge:
-    def __init__(self, name: str, *, labels: Optional[dict[str, str]] = None):
+    def __init__(
+        self,
+        name: str,
+        *,
+        labels: Optional[dict[str, str]] = None,
+        auto_prefix: bool = True,
+    ):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
+
+        if auto_prefix:
+            name = prefix_metric(name)
 
         self.gauge = prometheus_client.Gauge(
             name, f"Gauge for {name}.", labelnames=tuple(self.labels.keys())
@@ -178,10 +182,19 @@ class Gauge:
 
 
 class Counter:
-    def __init__(self, name: str, *, labels: Optional[dict[str, str]] = None):
+    def __init__(
+        self,
+        name: str,
+        *,
+        labels: Optional[dict[str, str]] = None,
+        auto_prefix: bool = True,
+    ):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
+
+        if auto_prefix:
+            name = prefix_metric(name)
 
         self.counter = prometheus_client.Counter(
             name, f"Counter for {name}.", labelnames=tuple(self.labels.keys())
@@ -204,6 +217,7 @@ class Histogram:
         *,
         labels: Optional[dict[str, str]] = None,
         buckets: Optional[list[float]] = None,
+        auto_prefix: bool = True,
     ):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
@@ -212,8 +226,12 @@ class Histogram:
         kwargs = {}
         if buckets is not None:
             kwargs["buckets"] = buckets
+
+        if auto_prefix:
+            name = prefix_metric(name)
+
         self.histo = prometheus_client.Histogram(
-            name, f"Counter for {name}.", labelnames=tuple(self.labels.keys()), **kwargs  # type: ignore
+            name, f"Histogram for {name}.", labelnames=tuple(self.labels.keys()), **kwargs  # type: ignore
         )
 
     def observe(self, value: float, labels: Optional[dict[str, str]] = None):
@@ -223,6 +241,12 @@ class Histogram:
             self.histo.labels(**merged_labels).observe(value)
         else:
             self.histo.observe(value)
+
+
+def prefix_metric(metric_name: str) -> str:
+    if not metric_name.startswith("nucliadb_"):
+        metric_name = f"nucliadb_{metric_name}"
+    return metric_name
 
 
 __all__ = (

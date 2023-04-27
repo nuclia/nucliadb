@@ -104,16 +104,20 @@ class TestObserver:
         )
         counter.labels().inc.assert_called_once()
 
+    def test_observer_auto_prefix(self):
+        metrics.Observer("my_metric")
+        metrics.Observer("my_metric", auto_prefix=False)
+
 
 class TestGauge:
-    def test_guage(self):
-        gauge = metrics.Gauge("my_guage")
+    def test_gauge(self):
+        gauge = metrics.Gauge("my_gauge")
         gauge.set(5)
 
         assert gauge.gauge._value.get() == 5.0
 
-    def test_guage_with_labels(self):
-        gauge = metrics.Gauge("my_guage2", labels={"foo": "", "bar": ""})
+    def test_gauge_with_labels(self):
+        gauge = metrics.Gauge("my_gauge2", labels={"foo": "", "bar": ""})
         gauge.set(5, labels={"foo": "baz", "bar": "qux"})
 
         assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 5.0
@@ -122,12 +126,19 @@ class TestGauge:
 
         assert gauge.gauge.labels(**{"foo": "baz", "bar": "qux"})._value.get() == 0.0
 
-    def test_guage_with_env_label(self, monkeypatch):
+    def test_gauge_with_env_label(self, monkeypatch):
         monkeypatch.setenv("VERSION", "1.0.0")
-        gauge = metrics.Gauge("my_guage3")
+        gauge = metrics.Gauge("my_gauge3")
         gauge.set(5)
 
         assert gauge.gauge.labels(**{"version": "1.0.0"})._value.get() == 5.0
+
+    def test_gauge_auto_prefix(self):
+        gauge = metrics.Gauge("gauge")
+        assert gauge.gauge.describe()[0].name == "nucliadb_gauge"
+
+        gauge = metrics.Gauge("gauge", auto_prefix=False)
+        assert gauge.gauge.describe()[0].name == "gauge"
 
 
 class TestCounter:
@@ -152,10 +163,18 @@ class TestCounter:
 
         assert counter.counter.labels(**{"version": "1.0.0"})._value.get() == 1.0
 
+    def test_counter_auto_prefix(self):
+        counter = metrics.Counter("counter")
+        assert counter.counter.describe()[0].name == "nucliadb_counter"
+
+        counter = metrics.Counter("counter", auto_prefix=False)
+        assert counter.counter.describe()[0].name == "counter"
+
 
 class TestHistogram:
     def test_histo(self):
         histo = metrics.Histogram("my_histo")
+
         histo.observe(5)
 
         assert [
@@ -180,3 +199,10 @@ class TestHistogram:
         assert [
             s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0"
         ][0].value == 1.0
+
+    def test_histo_auto_prefix(self):
+        histo = metrics.Histogram("histo")
+        assert histo.histo.describe()[0].name == "nucliadb_histo"
+
+        histo = metrics.Histogram("histo", auto_prefix=False)
+        assert histo.histo.describe()[0].name == "histo"
