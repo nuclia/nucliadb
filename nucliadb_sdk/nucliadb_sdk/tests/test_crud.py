@@ -67,6 +67,19 @@ def test_create_resource(knowledgebox: KnowledgeBox):
     assert len(knowledgebox) == 0
 
 
+def test_iter_resources(knowledgebox: KnowledgeBox):
+    assert knowledgebox.get("mykey1") is None
+
+    for i in range(50):
+        knowledgebox.create_resource(text="Test resource")
+
+    res = []
+    for resource in knowledgebox:  # type: ignore
+        res.append(resource)
+
+    assert len(res) == 50
+
+
 def test_create_resource_dict(knowledgebox: KnowledgeBox):
     assert knowledgebox.get("mykey1") is None
 
