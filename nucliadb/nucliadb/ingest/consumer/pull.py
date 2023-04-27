@@ -19,6 +19,8 @@
 #
 import asyncio
 import base64
+import logging
+import time
 from typing import List, Optional
 
 import aiohttp
@@ -217,6 +219,7 @@ class PullWorker:
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
         message_source = "<msg source not set>"
+        start = time.monotonic()
 
         async with self.lock:
             try:
@@ -227,9 +230,9 @@ class PullWorker:
                 elif pb.source == pb.MessageSource.WRITER:
                     message_source = "writer"
                 if pb.HasField("audit"):
-                    time = pb.audit.when.ToDatetime().isoformat()
+                    audit_time = pb.audit.when.ToDatetime().isoformat()
                 else:
-                    time = ""
+                    audit_time = ""
 
                 logger.debug(
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
@@ -255,10 +258,16 @@ class PullWorker:
                     )
                 else:
                     message_type_name = pb.MessageType.Name(pb.type)
-                    logger.info(
+                    time_to_process = time.monotonic() - start
+                    log_level = (
+                        logging.INFO if time_to_process < 10 else logging.WARNING
+                    )
+                    logger.log(
+                        log_level,
                         f"Successfully processed {message_type_name} message from \
                             {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, \
-                                nucliadb seqid: {seqid}, partition: {self.partition} as {time}"
+                                nucliadb seqid: {seqid}, partition: {self.partition} as {audit_time}, \
+                                    total time: {time_to_process:.2f}s",
                     )
                     if self.cache is not None:
                         await self.cache.delete(
