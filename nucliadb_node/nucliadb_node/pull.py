@@ -35,11 +35,6 @@ from nucliadb_protos.nodewriter_pb2 import (
     OpStatus,
     TypeMessage,
 )
-
-from nucliadb_node import SERVICE_NAME, logger, shadow_shards
-from nucliadb_node.reader import Reader
-from nucliadb_node.settings import indexing_settings, settings
-from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
@@ -50,6 +45,11 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction_utility,
 )
+
+from nucliadb_node import SERVICE_NAME, logger, shadow_shards
+from nucliadb_node.reader import Reader
+from nucliadb_node.settings import indexing_settings, settings
+from nucliadb_node.writer import Writer
 
 subscriber_observer = metrics.Observer(
     "message_processor",
