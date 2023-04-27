@@ -130,7 +130,7 @@ class JetStreamContextTelemetry:
                         {
                             "stream": msg.metadata.stream,
                             "consumer": msg.metadata.consumer or "",
-                            "acked": "yes" if msg._ackd else "no",
+                            "acked": "yes" if msg._ackd else "no",  # type: ignore
                         },
                     )
 
