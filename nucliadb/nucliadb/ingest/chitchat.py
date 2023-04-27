@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import asyncio
-import binascii
 import json
 from typing import Dict, List, Optional, Union
 
@@ -98,24 +97,16 @@ class ChitchatNucliaDB:
         try:
             while True:
                 logger.debug("wait data in socket")
-                mgr_message = await reader.read(
-                    4096
-                )  # TODO: add message types enum with proper deserialization
+                mgr_message = await reader.read(4096)
                 if len(mgr_message) == 0:
                     logger.warning(
                         f"empty message received from {peer}. It disconnected"
                     )
                     break
                 if len(mgr_message) == 4:
-                    logger.debug(
-                        f"check message received by {peer}: {mgr_message.hex()}"
+                    logger.warning(
+                        f"Old checksum message received by {peer}. Ignoring it"
                     )
-                    hash = binascii.crc32(mgr_message)
-                    logger.debug(f"calculated hash: {hash}")
-                    response = hash.to_bytes(4, byteorder="big")
-                    logger.debug(f"Hash response to {peer}: {response!r}")
-                    writer.write(response)
-                    await writer.drain()
                 else:
                     logger.debug(
                         f"update message received from {peer}: {mgr_message!r}"

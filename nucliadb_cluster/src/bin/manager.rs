@@ -35,52 +35,11 @@ struct Args {
     update_interval: Duration,
 }
 
-async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
-    let mut rng = rand::thread_rng();
-    let syn = rng.gen::<u32>().to_be_bytes();
-    let _ = stream.write(&syn).await?;
-    debug!("Sended syn: {:?}", syn);
-    let hash = crc32fast::hash(&syn);
-    debug!("Calculated {hash}");
-    let mut response_buf: [u8; 4] = [0; 4];
-
-    match timeout(Duration::from_secs(1), stream.read(&mut response_buf)).await {
-        Ok(Ok(r)) => {
-            if r == 4 {
-                let response = u32::from_be_bytes(response_buf);
-                if response == hash {
-                    debug!("[+] Correct response receieved");
-                    Ok(true)
-                } else {
-                    debug!("Incorrect hash received: {response}");
-                    Ok(false)
-                }
-            } else {
-                debug!("Incorrect number of bytes readed from socket: {r}");
-                Ok(false)
-            }
-        }
-        Ok(Err(e)) => {
-            debug!("Error during reading from socket: {e}");
-            Ok(false)
-        }
-        Err(e) => {
-            debug!("Don't receive answer during 1 sec: {e}");
-            Ok(false)
-        }
-    }
-}
-
 async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
     loop {
         match TcpStream::connect(&monitor_addr).await {
             Ok(mut s) => {
-                if check_peer(&mut s).await? {
-                    break Ok(s);
-                }
-                debug!("Invalid peer. Sleep 1s and reconnect");
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                s.shutdown().await?
+                break Ok(s);
             }
             Err(e) => {
                 error!("Can't connect to monitor socket: {e}. Sleep 200ms and reconnect");
@@ -96,14 +55,6 @@ async fn send_update(
     stream: &mut TcpStream,
     args: &Args,
 ) -> anyhow::Result<()> {
-    if !check_peer(stream).await? {
-        error!("Check peer failed before cluster snapshot sending. Try to reconnect");
-
-        if let Err(e) = stream.shutdown().await {
-            error!("Error during shutdown stream: {e}");
-        }
-        *stream = get_stream(args.monitor_addr.clone()).await?;
-    }
 
     if !cluster_snapshot.is_empty() {
         let serial = serde_json::to_string(&cluster_snapshot)
