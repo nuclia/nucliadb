@@ -102,7 +102,7 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
 
     sample = [
         sam.labels
-        for sam in msg_time_histo.histo.collect()[0].samples
+        for sam in msg_time_histo.histo.collect()[0].samples  # type: ignore
         if sam.labels.get("le") == "0.005"
     ][0]
     sample.pop("consumer")
