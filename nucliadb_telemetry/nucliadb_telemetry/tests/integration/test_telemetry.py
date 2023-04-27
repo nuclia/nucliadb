@@ -24,9 +24,9 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_telemetry import grpc_metrics
+from nucliadb_telemetry.jetstream import msg_time_histo
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.telemetry import Greeter
-from nucliadb_telemetry.jetstream import msg_time_histo
 
 
 def fmt_span(span):

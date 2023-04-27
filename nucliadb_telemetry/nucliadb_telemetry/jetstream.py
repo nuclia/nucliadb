@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional
 
@@ -30,11 +31,8 @@ from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
 
-from nucliadb_telemetry import logger
+from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
-from nucliadb_telemetry import metrics
-from datetime import datetime
-
 
 msg_time_histo = metrics.Histogram(
     # time it takes from when msg was queue to when it finished processing
