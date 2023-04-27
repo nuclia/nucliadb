@@ -175,6 +175,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
     async def pull_subscription_worker_one(self):
         async def callback(message):
             self.messages.append(message)
+            await message.ack()
 
         await self.jsotel.pull_one(self.pull_subscription_one, callback)
 
