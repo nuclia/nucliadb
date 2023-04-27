@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from uuid import uuid4
 
 import prometheus_client  # type: ignore
@@ -37,6 +37,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from pydantic import BaseModel
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
@@ -77,6 +78,7 @@ LOAD_SCORE = prometheus_client.Gauge(
 )
 
 
+# Deprecated
 class NodeType(Enum):
     IO = 1
     SEARCH = 2
@@ -126,11 +128,45 @@ class NodeType(Enum):
             return Member.Type.UNKNOWN
 
 
+# Deprecated
 @dataclass
 class ClusterMember:
     node_id: str
     listen_addr: str
     type: NodeType
+    online: bool
+    is_self: bool
+    load_score: float
+    shard_count: int
+
+
+class MemberType(str, Enum):
+    IO = "io"
+    SEARCH = "search"
+    INGEST = "ingest"
+    TRAIN = "train"
+    UNKNOWN = "unknown"
+
+
+def is_same_member_type(a: Union[MemberType, NodeType], b: Union[MemberType, NodeType]):
+    if (
+        isinstance(a, MemberType)
+        and isinstance(b, MemberType)
+        or isinstance(a, NodeType)
+        and isinstance(b, NodeType)
+    ):
+        return a == b
+    if isinstance(a, MemberType):
+        a = NodeType.from_str(a.capitalize())
+    if isinstance(b, MemberType):
+        b = NodeType.from_str(b.capitalize())
+    return a == b
+
+
+class ClusterMemberModel(BaseModel):
+    node_id: str
+    listen_addr: str
+    type: MemberType
     online: bool
     is_self: bool
     load_score: float
@@ -478,9 +514,10 @@ class Node(AbstractNode):
 
 async def chitchat_update_node(members: List[ClusterMember]) -> None:
     valid_ids = []
+    breakpoint()
     for member in members:
         valid_ids.append(member.node_id)
-        if member.is_self is False and member.type == NodeType.IO:
+        if member.is_self is False and is_same_member_type(member.type, NodeType.IO):
             node = NODES.get(member.node_id)
             if node is None:
                 logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")

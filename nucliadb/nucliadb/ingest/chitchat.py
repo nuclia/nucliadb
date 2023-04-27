@@ -21,16 +21,33 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
+
+from fastapi import FastAPI, Response
+from uvicorn.config import Config
+from uvicorn.server import Server
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.node import ClusterMember, Node, NodeType, chitchat_update_node
+from nucliadb.ingest.orm.node import (
+    ClusterMember,
+    ClusterMemberModel,
+    Node,
+    NodeType,
+    chitchat_update_node,
+)
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
-from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+from nucliadb_utils.fastapi.run import run_server_forever
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    get_utility,
+    has_feature,
+    set_utility,
+)
 
 
-async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
+async def start_chitchat(service_name: str) -> Optional[ChitchatTCPCustom]:
     util = get_utility(Utility.CHITCHAT)
     if util is not None:
         # already loaded
@@ -43,9 +60,14 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
         logger.debug(f"Chitchat not enabled - {service_name}")
         return None
 
-    chitchat = ChitchatNucliaDB(
-        settings.chitchat_binding_host, settings.chitchat_binding_port
-    )
+    if has_feature("chitchat_http"):
+        chitchat = ChitchatHTTP(
+            settings.chitchat_binding_host, settings.chitchat_binding_port
+        )
+    else:
+        chitchat = ChitchatTCPCustom(
+            settings.chitchat_binding_host, settings.chitchat_binding_port
+        )
     await chitchat.start()
     logger.info("Chitchat started")
     set_utility(Utility.CHITCHAT, chitchat)
@@ -60,7 +82,57 @@ async def stop_chitchat():
         clean_utility(Utility.CHITCHAT)
 
 
-class ChitchatNucliaDB:
+chitchat_app = FastAPI(title="ChitChat")
+
+
+@chitchat_app.post("/update-members")
+async def update_members(members: List[ClusterMemberModel]):
+    await chitchat_update_node(members)
+    return Response(status_code=204)
+
+
+def get_configured_chitchat_app(host: str, port: int) -> Tuple[Server, Config]:
+    config = Config(
+        chitchat_app,
+        host=host,
+        port=port,
+        debug=False,
+        loop="auto",
+        http="auto",
+        reload=False,
+        workers=1,
+        use_colors=False,
+        log_level="warning",
+        limit_concurrency=None,
+        backlog=2047,
+        limit_max_requests=None,
+        timeout_keep_alive=5,
+        access_log=False,
+    )
+    server = Server(config=config)
+    return server, config
+
+
+class ChitchatHTTP:
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+        self.task = None
+
+    async def start(self):
+        logger.info("Chitchat server started at")
+        server, config = get_configured_chitchat_app(self.host, self.port)
+        self.task = asyncio.create_task(run_server_forever(server, config))
+
+    async def finalize(self):
+        await self.close()
+
+    async def close(self):
+        logger.info("Chitchat closed")
+        self.task.cancel()
+
+
+class ChitchatTCPCustom:
     chitchat_update_srv: Optional[asyncio.Server] = None
 
     def __init__(self, host: str, port: int):
@@ -75,9 +147,7 @@ class ChitchatNucliaDB:
             await self.chitchat_update_srv.serve_forever()
 
     async def finalize(self):
-        self.chitchat_update_srv.close()
-        await self.chitchat_update_srv.wait_closed()
-        self.task.cancel()
+        await self.close()
 
     async def start(self):
         logger.info(f"enter chitchat.start() at {self.host}:{self.port}")
@@ -143,6 +213,7 @@ class ChitchatNucliaDB:
 
     async def close(self):
         self.chitchat_update_srv.close()
+        await self.chitchat_update_srv.wait_closed()
         self.task.cancel()
 
 

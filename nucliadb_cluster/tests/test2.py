@@ -18,13 +18,13 @@ from typing import List, Optional
 
 
 def start_chitchat():
-    chitchat = ChitchatNucliaDBSearch("0.0.0.0", 31337)
+    chitchat = ChitchatTCPCustomSearch("0.0.0.0", 31337)
     asyncio.run(chitchat.start())
 
     return chitchat
 
 
-class ChitchatNucliaDBSearch:
+class ChitchatTCPCustomSearch:
     chitchat_update_srv: Optional[asyncio.Task] = None
 
     def __init__(self, host: str, port: int):

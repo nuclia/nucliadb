@@ -17,7 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.ingest.chitchat import build_member_from_json
+import unittest
+
+import pytest
+
+from nucliadb.ingest.chitchat import ChitchatHTTP, build_member_from_json
 from nucliadb.ingest.orm.node import NodeType
 
 
@@ -50,3 +54,21 @@ def test_build_member_from_json():
     member = build_member_from_json(member_serial)
     assert member.load_score == 0
     assert member.shard_count == 0
+
+
+@pytest.fixture(scope="function")
+def asyncio_mock():
+    task = unittest.mock.MagicMock()
+    with unittest.mock.patch(
+        "nucliadb.ingest.chitchat.asyncio.create_task", return_value=task
+    ) as mock:
+        yield mock
+
+
+@pytest.mark.asyncio
+async def test_chitchat_http(asyncio_mock):
+    chitchat = ChitchatHTTP("127.0.0.1", 8888)
+    await chitchat.start()
+    assert chitchat.task is not None
+    await chitchat.finalize()
+    chitchat.task.cancel.assert_called_once()
