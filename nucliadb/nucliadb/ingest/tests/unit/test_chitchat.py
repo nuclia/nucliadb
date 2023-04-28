@@ -76,7 +76,7 @@ async def test_update_available_nodes():
     await update_available_nodes([member])
     assert len(NODES) == 0
 
-    # Check that it ignores types other than node_type=MemberType  .IO
+    # Check that it ignores types other than node_type=MemberType.IO
     member = get_cluster_member(type=MemberType.INGEST)
     await update_available_nodes([member])
     assert len(NODES) == 0

@@ -35,7 +35,7 @@ async def chitchat_monitor_client():
 
 
 @pytest.mark.asyncio
-async def test_chitchat_api(chitchat_monitor_client):
+async def test_chitchat_monitor(chitchat_monitor_client):
     assert len(NODES) == 0
     async with chitchat_monitor_client() as client:
         member = dict(
@@ -47,6 +47,6 @@ async def test_chitchat_api(chitchat_monitor_client):
             shard_count=20,
             online=True,
         )
-        response = await client.post("/update-members", json=[member])
+        response = await client.patch("/members", json=[member])
         assert response.status_code == 204
     assert len(NODES) == 1

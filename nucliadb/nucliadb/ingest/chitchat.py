@@ -81,7 +81,7 @@ async def stop_chitchat():
 chitchat_app = FastAPI(title="ChitChat")
 
 
-@chitchat_app.post("/update-members", status_code=204)
+@chitchat_app.patch("/members", status_code=204)
 async def update_members(members: List[ClusterMember]) -> Response:
     await update_available_nodes(members)
     return Response(status_code=204)
@@ -131,26 +131,31 @@ class ChitchatMonitor:
 
 
 async def update_available_nodes(members: List[ClusterMember]) -> None:
+    # First add new nodes or update existing ones
     valid_ids = []
     for member in members:
         valid_ids.append(member.node_id)
-        if member.is_self is False and member.type == MemberType.IO:
-            node = NODES.get(member.node_id)
-            if node is None:
-                logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
-                await Node.set(
-                    member.node_id,
-                    address=member.listen_addr,
-                    type=member.type,
-                    load_score=member.load_score,
-                    shard_count=member.shard_count,
-                )
-                logger.debug("Node added")
-            else:
-                logger.debug(f"{member.node_id}/{member.type} update")
-                node.load_score = member.load_score
-                node.shard_count = member.shard_count
-                logger.debug("Node updated")
+        if member.is_self or member.type != MemberType.IO:
+            continue
+
+        node = NODES.get(member.node_id)
+        if node is None:
+            logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
+            await Node.set(
+                member.node_id,
+                address=member.listen_addr,
+                type=member.type,
+                load_score=member.load_score,
+                shard_count=member.shard_count,
+            )
+            logger.debug("Node added")
+        else:
+            logger.debug(f"{member.node_id}/{member.type} update")
+            node.load_score = member.load_score
+            node.shard_count = member.shard_count
+            logger.debug("Node updated")
+
+    # Then cleanup nodes that are no longer reported
     node_ids = [x for x in NODES.keys()]
     destroyed_node_ids = []
     for key in node_ids:
@@ -158,8 +163,9 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
             node = NODES.get(key)
             if node is not None:
                 destroyed_node_ids.append(key)
-                logger.info(f"{key}/{node.type} remove {node.address}")
+                logger.warning(f"{key}/{node.type} remove {node.address}")
                 await Node.destroy(key)
+
     update_node_metrics(NODES, destroyed_node_ids)
 
 
