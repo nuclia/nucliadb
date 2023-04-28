@@ -19,7 +19,7 @@
 
 import asyncio
 from enum import Enum
-from typing import List, Optional, Tuple, TypeVar, Union, overload
+from typing import Any, List, Optional, Tuple, TypeVar, Union, overload
 
 from fastapi import HTTPException
 from grpc import StatusCode as GrpcStatusCode
@@ -166,28 +166,50 @@ async def node_query(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
-        errors.capture_exception(exc)
-        await abort_transaction()
-        raise HTTPException(status_code=504, detail=f"Data query took too long")
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
-        else:
-            raise exc
+        results = [exc]
 
-    if results is None:
+    error = validate_node_query_results(results or [])
+    if error is not None:
         await abort_transaction()
-        raise HTTPException(
-            status_code=500, detail=f"Error while executing shard queries"
+        raise error
+
+    return results, incomplete_results, queried_nodes, queried_shards
+
+
+def validate_node_query_results(results: list[Any]) -> Optional[Exception]:
+    """
+    Validate the results of a node query and return an exception if any error is found
+
+    Handling of exception is responsibility of caller.
+    """
+    if results is None or len(results) == 0:
+        return HTTPException(
+            status_code=500, detail=f"Error while executing shard queries. No results."
         )
 
     for result in results:
         if isinstance(result, Exception):
-            errors.capture_exception(result)
-            await abort_transaction()
-            logger.exception("Error while querying shard data", exc_info=result)
-            raise HTTPException(
-                status_code=500, detail=f"Error while querying shard data"
-            )
+            status_code = 500
+            reason = "Error while querying shard data."
+            if isinstance(result, AioRpcError):
+                if result.code() is GrpcStatusCode.UNAVAILABLE:
+                    logger.warning(
+                        f"GRPC error while querying shard data: {result.debug_error_string()}"
+                    )
+                    status_code = 503
+                elif result.code() is GrpcStatusCode.INTERNAL:
+                    # handle node response errors
+                    if "AllButQueryForbidden" in result.details():
+                        status_code = 412
+                        reason = result.details().split(":")[-1].strip().strip("'")
+                else:
+                    logger.error(
+                        f"Unhandled GRPC error while querying shard data: {result.debug_error_string()}"
+                    )
+            else:
+                errors.capture_exception(result)
+                logger.exception("Error while querying shard data", exc_info=result)
 
-    return results, incomplete_results, queried_nodes, queried_shards
+            return HTTPException(status_code=status_code, detail=reason)
+
+    return None
