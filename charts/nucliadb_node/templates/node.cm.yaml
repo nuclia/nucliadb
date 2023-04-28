@@ -13,7 +13,7 @@ data:
 {{- if .Values.debug }}
   RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs=DEBUG,nucliadb_vectors=DEBUG,nucliadb_texts=DEBUG,nucliadb_cluster=DEBUG,nucliadb_relations=DEBUG"
 {{- else }}
-  RUST_LOG: "nucliadb_node=WARN,nucliadb_cluster=WARN,nucliadb_cluster=WARN"
+  RUST_LOG: "nucliadb_node=WARN,nucliadb_cluster=WARN"
 {{- end }}
   RUST_LIB_BACKTRACE: "1"
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
