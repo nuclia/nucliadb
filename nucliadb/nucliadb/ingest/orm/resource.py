@@ -119,7 +119,6 @@ class Resource:
         self.all_fields_keys: List[Tuple[int, str]] = []
         self.origin: Optional[PBOrigin] = None
         self.modified: bool = False
-        self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: List[FieldID] = []
 
@@ -243,7 +242,6 @@ class Resource:
         if slug is not None and slug != "":
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
-            self.slug_modified = True
         if deleted_fields is not None and len(deleted_fields) > 0:
             remove_field_classifications(self.basic, deleted_fields=deleted_fields)
         await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
