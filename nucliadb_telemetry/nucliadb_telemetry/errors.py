@@ -19,7 +19,6 @@
 
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
-import logging
 from typing import Any, ContextManager, Optional
 
 import pydantic

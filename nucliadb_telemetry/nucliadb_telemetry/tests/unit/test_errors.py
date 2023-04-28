@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import ANY, patch
+from unittest.mock import patch
 
 from nucliadb_telemetry import errors
 
