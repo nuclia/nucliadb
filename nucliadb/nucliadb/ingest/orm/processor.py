@@ -240,7 +240,7 @@ class Processor:
     ):
         partition = partition if self.partition is None else self.partition
         if partition is None:
-            raise AttributeError()
+            raise AttributeError("Can't process message from unknown partition")
 
         # When running in transactional mode, we need to check that
         # that the current message doesn't violate the sequence order for the
