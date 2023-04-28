@@ -19,7 +19,7 @@
 #
 import tempfile
 from unittest import mock
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import nats as natslib
 import pytest
@@ -154,13 +154,25 @@ class TestSubsciptionWorker:
             yield
         settings.data_path = previous
 
+    @pytest.fixture()
+    def nats_conn(self):
+        conn = MagicMock()
+        conn.jetstream.return_value = AsyncMock()
+        conn.drain = AsyncMock()
+        conn.close = AsyncMock()
+        with mock.patch("nucliadb_node.pull.nats.connect", return_value=conn):
+            yield conn
+
     @pytest.fixture(scope="function")
-    def worker(self, settings):
+    def worker(self, settings, nats_conn):
         writer = AsyncMock()
         reader = AsyncMock()
-        worker = Worker(writer, reader, "node")
-        worker.store_seqid = Mock()
-        yield worker
+        with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
+            "nucliadb_node.pull.shadow_shards.get_manager", return_value=AsyncMock()
+        ):
+            worker = Worker(writer, reader, "node")
+            worker.store_seqid = Mock()
+            yield worker
 
     def get_msg(self, seqid):
         client = AsyncMock()
@@ -178,3 +190,10 @@ class TestSubsciptionWorker:
         # The message is acked and ignored
         msg.ack.assert_awaited_once()
         worker.store_seqid.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_reconnected_cb(self, worker: Worker):
+        await worker.initialize()
+        await worker.reconnected_cb()
+
+        assert worker.nc.jetstream().subscribe.call_count == 2
