@@ -28,10 +28,9 @@ from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexedMessage, IndexMessage, TypeMessage
 from nucliadb_utils.utilities import get_storage
 
-from nucliadb_node import SERVICE_NAME, shadow_shards
+from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
 from nucliadb_node.settings import indexing_settings, settings
-from nucliadb_node.shadow_shards import OperationCode
 
 TEST_PARTITION = "111"
 
@@ -84,41 +83,6 @@ async def test_indexing_not_found(worker, reader):
 
     with pytest.raises(AioRpcError):
         await reader.get_shard(sipb)
-
-
-@pytest.mark.asyncio
-async def test_indexing_shadow_shard(data_path, worker, shadow_shard: str):
-    storage = await get_storage(service_name=SERVICE_NAME)
-    node_id = settings.force_host_id
-
-    # Add a set resource operation
-    pb = resource_payload(shadow_shard)
-    setpb = await create_indexing_message(pb, "kb", shadow_shard, node_id)  # type: ignore
-    await send_indexing_message(worker, setpb, node_id)  # type: ignore
-
-    # Add a delete operation
-    deletepb = delete_indexing_message("bar", shadow_shard, node_id)  # type: ignore
-    await send_indexing_message(worker, deletepb, node_id)  # type: ignore
-
-    # Check that they were stored in a shadow shard
-    ssm = shadow_shards.get_manager()
-
-    ops = []
-    for _ in range(10):
-        print("Waiting for sidecar to consume messages...")
-        await asyncio.sleep(1)
-        ops = [op async for op in ssm.iter_operations(shadow_shard)]
-        if len(ops) == 2:
-            break
-    assert len(ops) == 2
-    assert ops[0][0] == OperationCode.SET
-    assert ops[0][1] == pb
-    assert ops[1][0] == OperationCode.DELETE
-    assert ops[1][1] == "bar"
-
-    await asyncio.sleep(1)
-
-    assert await storage.get_indexing(setpb) is not None
 
 
 @pytest.mark.asyncio

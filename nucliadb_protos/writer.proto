@@ -370,17 +370,9 @@ message ListMembersResponse {
   repeated Member members = 1;
 }
 
-
-message ShadowShard {
-    noderesources.ShardId shard = 1;
-    string node = 2;
-}
-
 message ShardReplica {
     noderesources.ShardCreated shard = 1;
     string node = 2;
-
-    ShadowShard shadow_replica = 3;
 }
 
 message ShardObject {
@@ -470,23 +462,6 @@ message FileUploaded {
     
 }
 
-message CreateShadowShardRequest {
-    string kbid = 1;
-    noderesources.ShardId replica = 2;
-    // node where the shadow shard is created
-    string node = 3;
-}
-
-message DeleteShadowShardRequest {
-    string kbid = 1;
-    noderesources.ShardId replica = 2;
-}
-
-message ShadowShardResponse {
-    ShadowShard shadow_shard = 1;
-    bool success = 2;
-}
-
 message SynonymsRequest {
     string kbid = 1;
 }
@@ -552,8 +527,4 @@ service Writer {
     rpc Export(ExportRequest) returns (stream BrokerMessage) {}
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
-
-    // Shard management
-    rpc CreateShadowShard(CreateShadowShardRequest) returns (ShadowShardResponse) {}
-    rpc DeleteShadowShard(DeleteShadowShardRequest) returns (ShadowShardResponse) {}
 }

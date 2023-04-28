@@ -39,13 +39,3 @@ def test_indexing_replicas():
     shard = Shard("shard_id", pbshard)
 
     assert shard.indexing_replicas() == [("rep1", "node1"), ("rep2", "node2")]
-
-    # Add a shadow replica to the first replica
-    pbshard.replicas[0].shadow_replica.shard.id = "shadow1"
-    pbshard.replicas[0].shadow_replica.node = "node3"
-
-    assert shard.indexing_replicas() == [
-        ("rep1", "node1"),
-        ("shadow1", "node3"),
-        ("rep2", "node2"),
-    ]

@@ -1439,46 +1439,22 @@ class ListMembersResponse(google.protobuf.message.Message):
 global___ListMembersResponse = ListMembersResponse
 
 @typing_extensions.final
-class ShadowShard(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARD_FIELD_NUMBER: builtins.int
-    NODE_FIELD_NUMBER: builtins.int
-    @property
-    def shard(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    node: builtins.str
-    def __init__(
-        self,
-        *,
-        shard: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        node: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard", b"shard"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "shard", b"shard"]) -> None: ...
-
-global___ShadowShard = ShadowShard
-
-@typing_extensions.final
 class ShardReplica(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SHARD_FIELD_NUMBER: builtins.int
     NODE_FIELD_NUMBER: builtins.int
-    SHADOW_REPLICA_FIELD_NUMBER: builtins.int
     @property
     def shard(self) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
     node: builtins.str
-    @property
-    def shadow_replica(self) -> global___ShadowShard: ...
     def __init__(
         self,
         *,
         shard: nucliadb_protos.noderesources_pb2.ShardCreated | None = ...,
         node: builtins.str = ...,
-        shadow_replica: global___ShadowShard | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shadow_replica", b"shadow_replica", "shard", b"shard"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "shadow_replica", b"shadow_replica", "shard", b"shard"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard", b"shard"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "shard", b"shard"]) -> None: ...
 
 global___ShardReplica = ShardReplica
 
@@ -1785,70 +1761,6 @@ class FileUploaded(google.protobuf.message.Message):
     ) -> None: ...
 
 global___FileUploaded = FileUploaded
-
-@typing_extensions.final
-class CreateShadowShardRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    REPLICA_FIELD_NUMBER: builtins.int
-    NODE_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    @property
-    def replica(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    node: builtins.str
-    """node where the shadow shard is created"""
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-        replica: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        node: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["replica", b"replica"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "node", b"node", "replica", b"replica"]) -> None: ...
-
-global___CreateShadowShardRequest = CreateShadowShardRequest
-
-@typing_extensions.final
-class DeleteShadowShardRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    KBID_FIELD_NUMBER: builtins.int
-    REPLICA_FIELD_NUMBER: builtins.int
-    kbid: builtins.str
-    @property
-    def replica(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    def __init__(
-        self,
-        *,
-        kbid: builtins.str = ...,
-        replica: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["replica", b"replica"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "replica", b"replica"]) -> None: ...
-
-global___DeleteShadowShardRequest = DeleteShadowShardRequest
-
-@typing_extensions.final
-class ShadowShardResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHADOW_SHARD_FIELD_NUMBER: builtins.int
-    SUCCESS_FIELD_NUMBER: builtins.int
-    @property
-    def shadow_shard(self) -> global___ShadowShard: ...
-    success: builtins.bool
-    def __init__(
-        self,
-        *,
-        shadow_shard: global___ShadowShard | None = ...,
-        success: builtins.bool = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shadow_shard", b"shadow_shard"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["shadow_shard", b"shadow_shard", "success", b"success"]) -> None: ...
-
-global___ShadowShardResponse = ShadowShardResponse
 
 @typing_extensions.final
 class SynonymsRequest(google.protobuf.message.Message):

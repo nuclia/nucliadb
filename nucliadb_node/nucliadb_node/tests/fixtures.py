@@ -34,7 +34,6 @@ from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_node import shadow_shards
 from nucliadb_node.app import start_worker
 from nucliadb_node.pull import Worker
 from nucliadb_node.reader import Reader
@@ -244,7 +243,6 @@ def data_path():
     with tempfile.TemporaryDirectory() as td:
         previous = os.environ.get("DATA_PATH")
         os.environ["DATA_PATH"] = str(td)
-        shadow_shards.MAIN.pop("manager", None)
 
         yield str(td)
 
@@ -252,20 +250,3 @@ def data_path():
             os.environ.pop("DATA_PATH")
         else:  # pragma: no cover
             os.environ["DATA_PATH"] = previous
-
-
-@pytest.fixture(scope="function")
-def shadow_folder(data_path) -> str:
-    return shadow_shards.SHADOW_SHARDS_FOLDER.format(data_path=data_path)
-
-
-@pytest.fixture(scope="function")
-async def shadow_shard(
-    sidecar_stub: NodeSidecarStub, shadow_folder: str
-) -> AsyncIterable[str]:
-    resp = await sidecar_stub.CreateShadowShard(EmptyQuery())  # type: ignore
-    assert resp.success
-
-    yield resp.shard.id
-
-    await sidecar_stub.DeleteShadowShard(resp.shard)  # type: ignore
