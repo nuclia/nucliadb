@@ -31,6 +31,8 @@ from nucliadb.ingest.service.writer import (
 )
 from nucliadb_protos import writer_pb2
 
+pytestmark = pytest.mark.asyncio
+
 
 def test_update_shards_pb_replica():
     shard1_rep1 = writer_pb2.ShardReplica(
@@ -161,7 +163,6 @@ class TestWriterServicer:
         with patch("nucliadb.ingest.service.writer.ResourceORM", return_value=mock):
             yield mock
 
-    @pytest.mark.asyncio
     async def test_GetKnowledgeBox(self, writer):
         value = Mock()
         writer.proc.get_kb.return_value = value
@@ -169,7 +170,6 @@ class TestWriterServicer:
 
         assert await writer.GetKnowledgeBox(req, None) is value
 
-    @pytest.mark.asyncio
     async def test_SetVectors(self, writer: WriterServicer, resource):
         request = writer_pb2.SetVectorsRequest(
             kbid="kbid",
@@ -182,7 +182,6 @@ class TestWriterServicer:
 
         assert resp.found
 
-    @pytest.mark.asyncio
     async def test_SetVectors_not_found(self, writer: WriterServicer, resource):
         request = writer_pb2.SetVectorsRequest(
             kbid="kbid",
@@ -195,7 +194,6 @@ class TestWriterServicer:
 
         assert not resp.found
 
-    @pytest.mark.asyncio
     async def test_SetVectors_error(self, writer: WriterServicer, resource, field):
         request = writer_pb2.SetVectorsRequest(
             kbid="kbid",
@@ -209,7 +207,6 @@ class TestWriterServicer:
         assert resp.found
         writer.proc.driver.begin.return_value.abort.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_NewKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxNew(slug="slug")
         writer.proc.create_kb.return_value = "kbid"
@@ -224,7 +221,6 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    @pytest.mark.asyncio
     async def test_NewKnowledgeBox_handle_error(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxNew(slug="slug")
         writer.proc.create_kb.side_effect = Exception("error")
@@ -233,7 +229,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    @pytest.mark.asyncio
     async def test_UpdateKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
         writer.proc.update_kb.return_value = "kbid"
@@ -245,7 +240,6 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    @pytest.mark.asyncio
     async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
         writer.proc.update_kb.side_effect = KnowledgeBoxNotFound()
@@ -254,7 +248,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_UpdateKnowledgeBox_error(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug")
         writer.proc.update_kb.side_effect = Exception()
@@ -263,7 +256,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    @pytest.mark.asyncio
     async def test_DeleteKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
 
@@ -272,7 +264,6 @@ class TestWriterServicer:
         writer.proc.delete_kb.assert_called_once_with(request.uuid, request.slug)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
-    @pytest.mark.asyncio
     async def test_DeleteKnowledgeBox_handle_error(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         writer.proc.delete_kb.side_effect = Exception("error")
@@ -281,7 +272,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    @pytest.mark.asyncio
     async def test_GCKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
 
@@ -289,7 +279,6 @@ class TestWriterServicer:
 
         assert isinstance(resp, writer_pb2.GCKnowledgeBoxResponse)
 
-    @pytest.mark.asyncio
     async def test_SetLabels(self, writer: WriterServicer):
         request = writer_pb2.SetLabelsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), id="id"
@@ -300,7 +289,6 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
         writer.proc.driver.begin.return_value.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_SetLabels_missing(self, writer: WriterServicer):
         request = writer_pb2.SetLabelsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), id="id"
@@ -311,7 +299,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_SetLabels_handle_error(self, writer: WriterServicer):
         request = writer_pb2.SetLabelsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), id="id"
@@ -325,7 +312,6 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
         writer.proc.driver.begin.return_value.abort.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_DelLabels(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), id="id"
@@ -336,7 +322,6 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
         writer.proc.driver.begin.return_value.commit.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_DelLabels_missing(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), id="id"
@@ -347,7 +332,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_DelLabels_handle_error(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), id="id"
@@ -361,7 +345,6 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
         writer.proc.driver.begin.return_value.abort.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_GetLabelSet(self, writer: WriterServicer):
         request = writer_pb2.GetLabelSetRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), labelset="labelset"
@@ -372,7 +355,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetLabelSetResponse.Status.OK
 
-    @pytest.mark.asyncio
     async def test_GetLabelSet_kb_missing(self, writer: WriterServicer):
         request = writer_pb2.GetLabelSetRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), labelset="labelset"
@@ -383,7 +365,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetLabelSetResponse.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_GetEntities(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -401,7 +382,6 @@ class TestWriterServicer:
         entities_manager.get_entities.assert_called_once_with(resp)
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.OK
 
-    @pytest.mark.asyncio
     async def test_GetEntities_missing(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -412,7 +392,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_GetEntities_handle_error(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -430,7 +409,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.ERROR
 
-    @pytest.mark.asyncio
     async def test_ListEntitiesGroups(self, writer: WriterServicer):
         request = writer_pb2.ListEntitiesGroupsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -451,7 +429,6 @@ class TestWriterServicer:
         entities_manager.list_entities_groups.assert_called_once()
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.OK
 
-    @pytest.mark.asyncio
     async def test_ListEntitiesGroups_missing(self, writer: WriterServicer):
         request = writer_pb2.ListEntitiesGroupsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -462,7 +439,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_ListEntitiesGroups_handle_error(self, writer: WriterServicer):
         request = writer_pb2.ListEntitiesGroupsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
@@ -480,7 +456,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesResponse.Status.ERROR
 
-    @pytest.mark.asyncio
     async def test_GetEntitiesGroup(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesGroupRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -501,7 +476,6 @@ class TestWriterServicer:
         entities_manager.get_entities_group.assert_called_once_with("group")
         assert resp.status == writer_pb2.GetEntitiesGroupResponse.Status.OK
 
-    @pytest.mark.asyncio
     async def test_GetEntitiesGroup_missing(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesGroupRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -512,7 +486,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesGroupResponse.Status.KB_NOT_FOUND
 
-    @pytest.mark.asyncio
     async def test_GetEntitiesGroup_handle_error(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesGroupRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -530,7 +503,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesGroupResponse.Status.ERROR
 
-    @pytest.mark.asyncio
     async def test_SetEntities(self, writer: WriterServicer):
         request = writer_pb2.SetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -550,7 +522,6 @@ class TestWriterServicer:
         )
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
 
-    @pytest.mark.asyncio
     async def test_SetEntities_missing(self, writer: WriterServicer):
         request = writer_pb2.SetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -561,7 +532,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_SetEntities_handle_error(self, writer: WriterServicer):
         request = writer_pb2.SetEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -579,7 +549,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
 
-    @pytest.mark.asyncio
     async def test_DelEntities(self, writer: WriterServicer):
         request = writer_pb2.DelEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -597,7 +566,6 @@ class TestWriterServicer:
         entities_manager.delete_entities_group.assert_called_once_with(request.group)
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
 
-    @pytest.mark.asyncio
     async def test_DelEntities_missing(self, writer: WriterServicer):
         request = writer_pb2.DelEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -608,7 +576,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.NOTFOUND
 
-    @pytest.mark.asyncio
     async def test_DelEntities_handle_error(self, writer: WriterServicer):
         request = writer_pb2.DelEntitiesRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
@@ -626,7 +593,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
 
-    @pytest.mark.asyncio
     async def test_Index(self, writer: WriterServicer):
         request = writer_pb2.IndexResource(kbid="kbid", rid="rid")
 

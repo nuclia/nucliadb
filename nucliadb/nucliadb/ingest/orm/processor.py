@@ -356,76 +356,83 @@ class Processor:
         if len(messages) == 0:
             return None
 
-        async with self.driver.transaction() as txn:
-            kbid = messages[0].kbid
-            if not await KnowledgeBox.exist_kb(txn, kbid):
-                logger.warning(f"KB {kbid} is deleted: skiping txn")
-                await txn.commit(partition, seqid)
-                return None
+        txn = await self.driver.begin()
+        kbid = messages[0].kbid
+        if not await KnowledgeBox.exist_kb(txn, kbid):
+            logger.warning(f"KB {kbid} is deleted: skiping txn")
+            await txn.commit(partition, seqid)
+            return None
 
-            multi = messages[0].multiid
-            kb = KnowledgeBox(txn, self.storage, self.cache, kbid)
-            uuid = await self.get_resource_uuid(kb, messages[0])
-            resource: Optional[Resource] = None
-            handled_exception = None
-            counter = None
-            resource_created = False
-            shard: Optional[Shard] = None
-            reindex: bool = False
-            try:
-                for message in messages:
-                    reindex = reindex or message.reindex
-                    if resource is not None:
-                        assert resource.uuid == message.uuid
-                    try:
-                        resource, created = await self.apply_message(
-                            message, kb, resource
-                        )
-                        resource_created = resource_created or created
-                    except ApplyMessageError as exc:
-                        logger.warning(str(exc))
-                        continue
-
-                if resource is None:
-                    raise NoResourceError()
-
-                if reindex:
-                    # When reindexing, let's just generate full new index message
-                    resource.replace_indexer(await resource.generate_index_message())
-                else:
-                    await resource.compute_global_text()
-                    await resource.compute_global_tags(resource.indexer)
-
-                if resource_created or resource.modified or reindex:
-                    await txn.commit(partition, seqid)
-
-                    if resource.slug_modified or resource_created:
-                        await self.commit_slug(resource)
-
-                    counter, shard = await self.index_resource(
-                        resource, kb, uuid, seqid, partition
-                    )
-
-                    await self.notify_commit(partition, seqid, multi, kbid, uuid)
-                else:
-                    await self.notify_abort(partition, seqid, multi, kbid, uuid)
-                    logger.warning(
-                        f"This message did not modify not create any resource"
-                    )
-            except NoResourceError:
-                logger.warning(
-                    f"Messages did not trigger any resource processing. Ignoring..."
-                )
-            except Exception as exc:
-                # As we are in the middle of a transaction, we cannot let the exception raise directly
-                # as we need to do some cleanup. The exception will be reraised at the end of the function
-                # and then handled by the top caller, so errors can be handled in the same place.
-                await self.deadletter(messages, partition, seqid)
-                await self.notify_abort(partition, seqid, multi, kbid, uuid)
-                handled_exception = exc
-            finally:
+        multi = messages[0].multiid
+        kb = KnowledgeBox(txn, self.storage, self.cache, kbid)
+        uuid = await self.get_resource_uuid(kb, messages[0])
+        resource: Optional[Resource] = None
+        handled_exception = None
+        counter = None
+        created = False
+        shard: Optional[Shard] = None
+        reindex: bool = False
+        try:
+            for message in messages:
+                reindex = reindex or message.reindex
                 if resource is not None:
-                    resource.clean()
+                    assert resource.uuid == message.uuid
+                try:
+                    resource, _created = await self.apply_message(message, kb, resource)
+                    created = created or _created
+                except ApplyMessageError as exc:
+                    logger.warning(str(exc))
+                    continue
+
+            if resource is None:
+                raise NoResourceError()
+
+            # TODO: in case of reindex = True, shouldn't we do that after generate_index_message?
+            await resource.compute_global_text()
+            await resource.compute_global_tags(resource.indexer)
+            if reindex:
+                # When reindexing, let's just generate full new index message
+                resource.replace_indexer(await resource.generate_index_message())
+
+            if resource.modified or reindex:
+                # TODO: Shouldn't we index the resource after it has been commited?
+                counter, shard = await self.index_resource(
+                    resource, txn, kb, uuid, seqid, partition
+                )
+
+                await txn.commit(partition, seqid)
+
+                # TODO: Look if it's really needed to commit the slug every time
+                # Slug may have conflicts as its not partitioned properly. We make it as short as possible
+                txn = await self.driver.begin()
+                resource.txn = txn
+                await resource.set_slug()
+                await txn.commit(resource=False)
+
+                await self.notify_commit(partition, seqid, multi, kbid, uuid)
+
+            elif resource and resource.modified is False:
+                await txn.abort()
+                await self.notify_abort(partition, seqid, multi, kbid, uuid)
+                logger.warning(f"This message did not modify the resource")
+        except NoResourceError:
+            logger.warning(
+                f"Messages did not trigger any resource processing. Ignoring..."
+            )
+        except Exception as exc:
+            # As we are in the middle of a transaction, we cannot let the exception raise directly
+            # as we need to do some cleanup. The exception will be reraised at the end of the function
+            # and then handled by the top caller, so errors can be handled in the same place.
+            await self.deadletter(messages, partition, seqid)
+            await self.notify_abort(partition, seqid, multi, kbid, uuid)
+            handled_exception = exc
+        finally:
+            if resource is not None:
+                resource.clean()
+            # txn should be already commited or aborted, but in the event of an exception
+            # it could be left open. Make sure to close it if it's still open
+            if txn.open:
+                await txn.abort()
 
         if handled_exception is not None:
             if seqid == -1:
@@ -442,22 +449,6 @@ class Processor:
         )
 
     async def index_resource(
-        self,
-        resource: Resource,
-        kb: KnowledgeBox,
-        uuid: str,
-        seqid: int,
-        partition: str,
-    ) -> Tuple[Optional[ShardCounter], Shard]:
-        async with self.driver.transaction() as txn:
-            kb.txn = txn
-            counter, shard = await self._inner_index_resource(
-                resource, txn, kb, uuid, seqid, partition
-            )
-            await txn.commit(resource=False)
-            return counter, shard
-
-    async def _inner_index_resource(
         self,
         resource: Resource,
         txn: Transaction,
@@ -491,21 +482,12 @@ class Processor:
         counter = await shard.add_resource(
             resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
         )
-        # TODO: Move this out of the transaction processing
         if counter is not None and counter.fields > settings.max_shard_fields:
             # The current shard is full, create a new one so next resource
             # is placed on a new shard
             similarity = await kb.get_similarity()
             await node_klass.create_shard_by_kbid(txn, kb.kbid, similarity=similarity)
         return counter, shard  # type: ignore
-
-    async def commit_slug(self, resource: Resource):
-        # Slug may have conflicts as its not partitioned properly.
-        # We make it as short as possible
-        async with self.driver.transaction() as txn:
-            resource.txn = txn
-            await resource.set_slug()
-            await txn.commit(resource=False)
 
     async def _mark_resource_error(
         self,
