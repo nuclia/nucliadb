@@ -176,7 +176,7 @@ async def node_query(
     return results, incomplete_results, queried_nodes, queried_shards
 
 
-def validate_node_query_results(results: list[Any]) -> Optional[Exception]:
+def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
     """
     Validate the results of a node query and return an exception if any error is found
 
