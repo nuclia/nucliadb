@@ -62,16 +62,15 @@ def test_setup_error_handling(monkeypatch):
     monkeypatch.setenv("environment", "environment")
     with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
         errors, "SENTRY", True
-    ), patch("nucliadb_telemetry.errors.LoggingIntegration") as LoggingIntegration:
+    ):
         errors.setup_error_handling("1.0.0")
         mock_sentry_sdk.init.assert_called_once_with(
             release="1.0.0",
             environment="environment",
             dsn="sentry_url",
-            integrations=[ANY],
+            integrations=[],
             default_integrations=False,
         )
-        LoggingIntegration.assert_called_once()
 
 
 def test_setup_error_handling_no_sentry(monkeypatch):

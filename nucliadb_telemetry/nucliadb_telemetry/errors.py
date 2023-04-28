@@ -27,11 +27,10 @@ import pydantic
 try:
     import sentry_sdk
     from sentry_sdk import Scope
-    from sentry_sdk.integrations.logging import LoggingIntegration
 
     SENTRY = True
 except ImportError:  # pragma: no cover
-    Scope = LoggingIntegration = sentry_sdk = None  # type: ignore
+    Scope = sentry_sdk = None  # type: ignore
     SENTRY = False
 
 
@@ -81,14 +80,16 @@ def setup_error_handling(version: str) -> None:
     settings = ErrorHandlingSettings()
 
     if settings.sentry_url:
-        enabled_integrations: list[Any] = [
-            LoggingIntegration(level=logging.CRITICAL, event_level=logging.CRITICAL)
-        ]
+        # Disabled everywhere for now. Let's have less knobs to tweak.
+        # Either we use with with sentry or we don't.
+        # enabled_integrations: list[Any] = [
+        #     LoggingIntegration(level=logging.CRITICAL, event_level=logging.CRITICAL)
+        # ]
 
         sentry_sdk.init(
             release=version,
             environment=settings.environment,
             dsn=settings.sentry_url,
-            integrations=enabled_integrations,
+            integrations=[],
             default_integrations=False,
         )
