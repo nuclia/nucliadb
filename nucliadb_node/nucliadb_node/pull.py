@@ -216,19 +216,17 @@ class Worker:
             # First time the consumer is started
             self.last_seqid = None
 
-    async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+    async def set_resource(self, pb: IndexMessage) -> OpStatus:
         brain: Resource = await self.storage.get_indexing(pb)
         brain.shard_id = brain.resource.shard_id = pb.shard
         logger.info(f"Added {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}")
-        status: Optional[OpStatus] = None
         status = await self.writer.set_resource(brain)
         logger.info(f"...done")
         del brain
         return status
 
-    async def delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+    async def delete_resource(self, pb: IndexMessage) -> OpStatus:
         logger.info(f"Deleting {pb.resource} otx:{pb.txid}")
-        status: Optional[OpStatus] = None
         rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
         status = await self.writer.delete_resource(rid)
         logger.info(f"...done")
