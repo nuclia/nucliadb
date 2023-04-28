@@ -92,6 +92,7 @@ class FieldConversation(BaseModel):
 
     pages: Optional[int]
     size: Optional[int]
+    total: Optional[int]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldConversation) -> _T:

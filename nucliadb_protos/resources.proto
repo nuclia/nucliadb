@@ -121,6 +121,7 @@ message Conversation {
 message FieldConversation {
     int32 pages = 1;
     int32 size = 2;
+    int32 total = 3;
 }
 
 message NestedPosition {

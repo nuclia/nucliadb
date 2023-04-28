@@ -424,15 +424,18 @@ class FieldConversation(google.protobuf.message.Message):
 
     PAGES_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int
+    TOTAL_FIELD_NUMBER: builtins.int
     pages: builtins.int
     size: builtins.int
+    total: builtins.int
     def __init__(
         self,
         *,
         pages: builtins.int = ...,
         size: builtins.int = ...,
+        total: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "size", b"size"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "size", b"size", "total", b"total"]) -> None: ...
 
 global___FieldConversation = FieldConversation
 
