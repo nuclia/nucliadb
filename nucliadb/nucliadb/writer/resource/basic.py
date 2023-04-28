@@ -44,8 +44,9 @@ from nucliadb_models.metadata import (
     RelationNodeTypeMap,
     RelationTypeMap,
 )
-from nucliadb_models.text import PushTextFormat, Text
+from nucliadb_models.text import TEXT_FORMAT_TO_ICON, PushTextFormat, Text
 from nucliadb_models.writer import (
+    GENERIC_MIME_TYPE,
     ComingResourcePayload,
     CreateResourcePayload,
     UpdateResourcePayload,
@@ -83,8 +84,7 @@ def parse_basic_modify(
         bm.basic.thumbnail = item.thumbnail
     if item.layout:
         bm.basic.layout = item.layout
-    if item.icon:
-        bm.basic.icon = item.icon
+    parse_icon(bm, item)
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
             userfieldmetadata = UserFieldMetadata()
@@ -233,3 +233,17 @@ def compute_title(item: CreateResourcePayload, rid: str) -> str:
             return file_field.file.filename
 
     return item.slug or rid
+
+
+def parse_icon(bm: BrokerMessage, item: ComingResourcePayload):
+    if item.icon:
+        # User input icon takes precedence
+        bm.basic.icon = item.icon
+        return
+    elif len(item.texts) > 0:
+        # Infer icon from text file format
+        format = next(iter(item.texts.values())).format
+        bm.basic.icon = TEXT_FORMAT_TO_ICON[format]
+    else:
+        # Default
+        bm.basic.icon = GENERIC_MIME_TYPE

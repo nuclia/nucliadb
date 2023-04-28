@@ -45,7 +45,7 @@ class CreateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     slug: Optional[SlugString] = None
-    icon: Optional[str] = GENERIC_MIME_TYPE
+    icon: Optional[str] = None
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
