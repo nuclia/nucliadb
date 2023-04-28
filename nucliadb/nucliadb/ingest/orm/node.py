@@ -506,6 +506,15 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
                 destroyed_node_ids.append(key)
                 logger.info(f"{key}/{node.type} remove {node.address}")
                 await Node.destroy(key)
+    try:
+        if len(destroyed_node_ids) > 1:
+            raise Exception(
+                f"{len(destroyed_node_ids)} nodes are down simultaneously. This should never happen!"
+            )
+    except Exception as e:
+        logger.error(str(e))
+        errors.capture_exception(e)
+
     update_node_metrics(NODES, destroyed_node_ids)
 
 
