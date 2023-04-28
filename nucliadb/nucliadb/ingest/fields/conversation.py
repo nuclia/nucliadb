@@ -56,7 +56,6 @@ class Conversation(Field):
         self.metadata = None
 
     async def set_value(self, payload: PBConversation):
-        await self.db_get_metadata()
         last_page: Optional[PBConversation] = None
         metadata = await self.get_metadata()
         if self._created is False:
