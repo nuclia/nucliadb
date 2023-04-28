@@ -82,9 +82,14 @@ class KnowledgeBox:
         self.id = self.client.reader_session.base_url.path.strip("/").split("/")[-1]
 
     def __iter__(self) -> Iterable[Resource]:
-        for batch_resources in self.client.list_resources():
-            for resource in batch_resources:
+        page = 0
+        while True:
+            resources_resp = self.client.list_resources(page)
+            for resource in resources_resp.resources:
                 yield resource
+            if resources_resp.pagination.last:
+                return
+            page += 1
 
     async def __aiter__(self) -> AsyncIterable[Resource]:
         async for batch_resources in self.client.async_list_resources():

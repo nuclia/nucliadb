@@ -39,6 +39,7 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
 
     if settings.nodes_load_ingest:  # pragma: no cover
         await Node.load_active_nodes()
+        return None
 
     if settings.chitchat_enabled is False:
         logger.debug(f"Chitchat not enabled - {service_name}")
@@ -76,9 +77,7 @@ class ChitchatNucliaDB:
             await self.chitchat_update_srv.serve_forever()
 
     async def finalize(self):
-        self.chitchat_update_srv.close()
-        await self.chitchat_update_srv.wait_closed()
-        self.task.cancel()
+        await self.close()
 
     async def start(self):
         logger.info(f"enter chitchat.start() at {self.host}:{self.port}")
@@ -93,29 +92,30 @@ class ChitchatNucliaDB:
     async def socket_reader(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
-        logger.info("new connection accepted")
-        while True:
-            try:
+        peer = writer.get_extra_info("peername")
+        logger.info(f"new connection accepted: {peer}")
+        try:
+            while True:
                 logger.debug("wait data in socket")
                 mgr_message = await reader.read(
                     4096
                 )  # TODO: add message types enum with proper deserialization
                 if len(mgr_message) == 0:
-                    logger.debug("empty message received")
-                    # TODO: Improve communication
-                    await asyncio.sleep(1)
-                    continue
+                    logger.warning(f"empty message received from {peer}. Disconnected")
+                    break
                 if len(mgr_message) == 4:
-                    logger.debug("check message received: {}".format(mgr_message.hex()))
+                    logger.debug(
+                        f"check message received from {peer}: {mgr_message.hex()}"
+                    )
                     hash = binascii.crc32(mgr_message)
-                    logger.debug(f"calculated hash: {hash}")
                     response = hash.to_bytes(4, byteorder="big")
-                    logger.debug("Hash response: {!r}".format(response))
                     writer.write(response)
                     await writer.drain()
                     continue
                 else:
-                    logger.debug("update message received: {!r}".format(mgr_message))
+                    logger.debug(
+                        f"update message received from {peer}: {mgr_message!r}"
+                    )
                     members: List[ClusterMember] = list(
                         map(
                             lambda x: build_member_from_json(x),
@@ -128,21 +128,31 @@ class ChitchatNucliaDB:
                         writer.write(len(members).to_bytes(4, byteorder="big"))
                         await writer.drain()
                     else:
-                        logger.debug("connection closed by writer")
+                        logger.warning("connection closed by writer")
                         break
-            except (
-                KeyboardInterrupt,
-                SystemExit,
-                asyncio.CancelledError,
-            ):  # pragma: no cover
-                logger.info("Exiting chitchat")
-                return
-            except IOError as e:
-                logger.exception("Failed on chitchat", stack_info=True)
-                errors.capture_exception(e)
+        except (
+            KeyboardInterrupt,
+            SystemExit,
+            asyncio.CancelledError,
+        ):  # pragma: no cover
+            logger.info(f"Exiting chitchat connection with {peer}")
+        except (IOError, BrokenPipeError) as e:
+            logger.exception(
+                f"Failed on chitchat connection with {peer}", stack_info=True
+            )
+            errors.capture_exception(e)
+        finally:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                logger.warning(
+                    f"Errors closing writer connection with {peer}", exc_info=True
+                )
 
     async def close(self):
         self.chitchat_update_srv.close()
+        await self.chitchat_update_srv.wait_closed()
         self.task.cancel()
 
 

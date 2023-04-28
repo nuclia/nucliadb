@@ -64,7 +64,9 @@ class FileBackendConfig(str, Enum):
 
 
 class StorageSettings(BaseSettings):
-    file_backend: FileBackendConfig = FileBackendConfig.NOT_SET
+    file_backend: FileBackendConfig = Field(
+        FileBackendConfig.NOT_SET, description="File backend storage type"
+    )
 
     gcs_base64_creds: Optional[str] = None
     gcs_bucket: Optional[str] = None
@@ -82,7 +84,10 @@ class StorageSettings(BaseSettings):
     s3_region_name: Optional[str] = None
     s3_bucket: Optional[str] = None
 
-    local_files: Optional[str] = None
+    local_files: Optional[str] = Field(
+        None,
+        description="If using LOCAL `file_backend` storage, directory files should be stored",
+    )
     upload_token_expiration: Optional[int] = 3
 
     driver_pg_url: Optional[str] = None  # match same env var for k/v storage

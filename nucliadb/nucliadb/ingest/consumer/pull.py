@@ -19,6 +19,8 @@
 #
 import asyncio
 import base64
+import logging
+import time
 from typing import List, Optional
 
 import aiohttp
@@ -131,9 +133,12 @@ class PullWorker:
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect.
-        logger.info(
-            f"PullWorker[partition={self.partition}]: Got reconnected to NATS {self.nc.connected_url.netloc}"
+        logger.warning(
+            f"PullWorker[partition={self.partition}]: \
+                Got reconnected to NATS {self.nc.connected_url.netloc}. Attempting to re-subscribe."
         )
+        await self.drain_subscriptions()
+        await self.setup_nats_subscription()
 
     async def error_cb(self, e):
         msg = f"PullWorker[partition={self.partition}]: There was an error on consumer: {e}"
@@ -167,41 +172,47 @@ class PullWorker:
 
             if self.nc is not None:
                 self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
+                await self.setup_nats_subscription()
 
-                last_seqid = await self.processor.driver.last_seqid(self.partition)
-                if last_seqid is None:
-                    last_seqid = 1
-
-                res = await self.js.subscribe(
-                    subject=self.target.format(partition=self.partition),
-                    queue=self.group.format(partition=self.partition),
-                    stream=self.stream,
-                    flow_control=True,
-                    cb=self.subscription_worker,
-                    config=nats.js.api.ConsumerConfig(
-                        deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
-                        opt_start_seq=last_seqid,
-                        ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                        max_ack_pending=1,
-                        max_deliver=10000,
-                        ack_wait=self.ack_wait,
-                        idle_heartbeat=5.0,
-                    ),
-                )
-                self.subscriptions.append(res)
-                logger.info(
-                    f"Subscribed to {self.target.format(partition=self.partition)} \
-                        on stream {self.stream} from {last_seqid}"
-                )
         self.initialized = True
 
-    async def finalize(self):
+    async def setup_nats_subscription(self):
+        last_seqid = await self.processor.driver.last_seqid(self.partition)
+        if last_seqid is None:
+            last_seqid = 1
+        self.subscriptions.append(
+            await self.js.subscribe(
+                subject=self.target.format(partition=self.partition),
+                queue=self.group.format(partition=self.partition),
+                stream=self.stream,
+                flow_control=True,
+                cb=self.subscription_worker,
+                config=nats.js.api.ConsumerConfig(
+                    deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
+                    opt_start_seq=last_seqid,
+                    ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                    max_ack_pending=1,
+                    max_deliver=10000,
+                    ack_wait=self.ack_wait,
+                    idle_heartbeat=5.0,
+                ),
+            )
+        )
+        logger.info(
+            f"Subscribed to {self.target.format(partition=self.partition)} \
+                        on stream {self.stream} from {last_seqid}"
+        )
+
+    async def drain_subscriptions(self) -> None:
         for subscription in self.subscriptions:
             try:
                 await subscription.drain()
             except nats.errors.ConnectionClosedError:
                 pass
         self.subscriptions = []
+
+    async def finalize(self):
+        await self.drain_subscriptions()
         if self.nats_subscriber and self.nc is not None:
             try:
                 await self.nc.drain()
@@ -217,6 +228,7 @@ class PullWorker:
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
         message_source = "<msg source not set>"
+        start = time.monotonic()
 
         async with self.lock:
             try:
@@ -227,9 +239,9 @@ class PullWorker:
                 elif pb.source == pb.MessageSource.WRITER:
                     message_source = "writer"
                 if pb.HasField("audit"):
-                    time = pb.audit.when.ToDatetime().isoformat()
+                    audit_time = pb.audit.when.ToDatetime().isoformat()
                 else:
-                    time = ""
+                    audit_time = ""
 
                 logger.debug(
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
@@ -255,10 +267,16 @@ class PullWorker:
                     )
                 else:
                     message_type_name = pb.MessageType.Name(pb.type)
-                    logger.info(
+                    time_to_process = time.monotonic() - start
+                    log_level = (
+                        logging.INFO if time_to_process < 10 else logging.WARNING
+                    )
+                    logger.log(
+                        log_level,
                         f"Successfully processed {message_type_name} message from \
                             {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, \
-                                nucliadb seqid: {seqid}, partition: {self.partition} as {time}"
+                                nucliadb seqid: {seqid}, partition: {self.partition} as {audit_time}, \
+                                    total time: {time_to_process:.2f}s",
                     )
                     if self.cache is not None:
                         await self.cache.delete(

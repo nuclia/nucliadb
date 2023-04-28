@@ -35,11 +35,9 @@ from pydantic import BaseModel
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import (
-    ApplyMessageError,
     DeadletteredError,
     KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
-    NoResourceError,
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -350,6 +348,9 @@ class Processor:
             partition, seqid, message.multiid, message.kbid, message.uuid
         )
 
+    def generate_index(self, resource: Resource, messages: List[BrokerMessage]):
+        pass
+
     async def txn(
         self, messages: List[BrokerMessage], seqid: int, partition: str
     ) -> Optional[TxnResult]:
@@ -371,38 +372,64 @@ class Processor:
         counter = None
         created = False
         shard: Optional[Shard] = None
-        reindex: bool = False
+
         try:
             for message in messages:
-                reindex = reindex or message.reindex
                 if resource is not None:
                     assert resource.uuid == message.uuid
-                try:
-                    resource, _created = await self.apply_message(message, kb, resource)
-                    created = created or _created
-                except ApplyMessageError as exc:
-                    logger.warning(str(exc))
+                result = await self.apply_resource(message, kb, resource)
+
+                if result is None:
                     continue
 
-            if resource is None:
-                raise NoResourceError()
+                resource, _created = result
+                created = created or _created
 
-            # TODO: in case of reindex = True, shouldn't we do that after generate_index_message?
-            await resource.compute_global_text()
-            await resource.compute_global_tags(resource.indexer)
-            if reindex:
-                # When reindexing, let's just generate full new index message
-                resource.replace_indexer(await resource.generate_index_message())
+            if resource:
+                await resource.compute_global_text()
+                await resource.compute_global_tags(resource.indexer)
+                if message.reindex:
+                    # when reindexing, let's just generate full new index message
+                    resource.replace_indexer(await resource.generate_index_message())
 
-            if resource.modified or reindex:
-                # TODO: Shouldn't we index the resource after it has been commited?
-                counter, shard = await self.index_resource(
-                    resource, txn, kb, uuid, seqid, partition
-                )
+            if resource and resource.modified:
+                shard_id = await kb.get_resource_shard_id(uuid)
+                node_klass = get_node_klass()
+
+                if shard_id is not None:
+                    shard = await kb.get_resource_shard(shard_id, node_klass)
+
+                if shard is None:
+                    # It's a new resource, get current active shard to place
+                    # new resource on
+                    shard = await node_klass.get_current_active_shard(txn, kbid)
+                    if shard is None:
+                        # no shard available, create a new one
+                        similarity = await kb.get_similarity()
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
+                    await kb.set_resource_shard_id(uuid, shard.sharduuid)
+
+                if shard is not None:
+                    counter = await shard.add_resource(
+                        resource.indexer.brain, seqid, partition=partition, kb=kbid
+                    )
+                    if (
+                        counter is not None
+                        and counter.fields > settings.max_shard_fields
+                    ):
+                        # shard is full, create a new one so next resource
+                        # is placed on a new shard
+                        similarity = await kb.get_similarity()
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
+                else:
+                    raise AttributeError("Shard is not available")
 
                 await txn.commit(partition, seqid)
 
-                # TODO: Look if it's really needed to commit the slug every time
                 # Slug may have conflicts as its not partitioned properly. We make it as short as possible
                 txn = await self.driver.begin()
                 resource.txn = txn
@@ -415,10 +442,6 @@ class Processor:
                 await txn.abort()
                 await self.notify_abort(partition, seqid, multi, kbid, uuid)
                 logger.warning(f"This message did not modify the resource")
-        except NoResourceError:
-            logger.warning(
-                f"Messages did not trigger any resource processing. Ignoring..."
-            )
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. The exception will be reraised at the end of the function
@@ -447,47 +470,6 @@ class Processor:
             else TxnAction.RESOURCE_MODIFIED,
             counter=counter,
         )
-
-    async def index_resource(
-        self,
-        resource: Resource,
-        txn: Transaction,
-        kb: KnowledgeBox,
-        uuid: str,
-        seqid: int,
-        partition: str,
-    ) -> Tuple[Optional[ShardCounter], Shard]:
-        shard_id = await kb.get_resource_shard_id(uuid)
-        node_klass = get_node_klass()
-        shard: Optional[Shard] = None
-
-        if shard_id is not None:
-            shard = await kb.get_resource_shard(shard_id, node_klass)
-
-        if shard is None:
-            # It's a new resource, get current active shard to place
-            # new resource on
-            shard = await node_klass.get_current_active_shard(txn, kb.kbid)
-            if shard is None:
-                # No shard available, create a new one
-                similarity = await kb.get_similarity()
-                shard = await node_klass.create_shard_by_kbid(
-                    txn, kb.kbid, similarity=similarity
-                )
-            await kb.set_resource_shard_id(uuid, shard.sharduuid)
-
-        if shard is None:
-            raise AttributeError("Shard not available")
-
-        counter = await shard.add_resource(
-            resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
-        )
-        if counter is not None and counter.fields > settings.max_shard_fields:
-            # The current shard is full, create a new one so next resource
-            # is placed on a new shard
-            similarity = await kb.get_similarity()
-            await node_klass.create_shard_by_kbid(txn, kb.kbid, similarity=similarity)
-        return counter, shard  # type: ignore
 
     async def _mark_resource_error(
         self,
@@ -553,16 +535,14 @@ class Processor:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
 
-    async def apply_message(
+    async def apply_resource(
         self,
         message: BrokerMessage,
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
-    ) -> Tuple[Resource, bool]:
-        """
-        Returns the resource and a boolean indicating if it was created or not. It will raise
-        """
+    ) -> Optional[Tuple[Resource, bool]]:
         created = False
+
         if resource is None:
             # Make sure we load the resource in case it already exists on db
             if message.uuid is None and message.slug:
@@ -571,18 +551,12 @@ class Processor:
                 uuid = message.uuid
             resource = await kb.get(uuid)
 
-        if resource is None:
-            if message.source is message.MessageSource.PROCESSOR:
-                # It's a new resource, and somehow we received the message coming from processing before
-                # the "fast" one, this should not happen
-                raise ApplyMessageError(
-                    f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
-                )
-            # message.source is message.MessageSource.WRITER:
+        if resource is None and message.source is message.MessageSource.WRITER:
+            # It's a new resource
             resource = await kb.add_resource(uuid, message.slug, message.basic)
             created = True
-        else:
-            # It's an update of an existing resource, it can come either from writer or
+        elif resource is not None:
+            # It's an update of an existing resource, can come either from writer or
             # from processing
             if (
                 message.HasField("basic")
@@ -594,12 +568,23 @@ class Processor:
                     slug=message.slug,
                     deleted_fields=message.delete_fields,  # type: ignore
                 )
+        elif resource is None and message.source is message.MessageSource.PROCESSOR:
+            # It's a new resource, and somehow we received the message coming from processing before
+            # the "fast" one, this shouldn't happen
+            logger.info(
+                f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
+            )
+            return None
 
-        if message.HasField("origin"):
+        if message.HasField("origin") and resource:
             await resource.set_origin(message.origin)
-        await resource.apply_fields(message)
-        await resource.apply_extracted(message)
-        return (resource, created)
+
+        if resource:
+            await resource.apply_fields(message)
+            await resource.apply_extracted(message)
+            return (resource, created)
+
+        return None
 
     async def notify_commit(
         self, partition: str, seqid: int, multi: str, kbid: str, uuid: str

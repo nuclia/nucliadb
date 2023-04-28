@@ -118,7 +118,11 @@ class Worker:
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect
-        logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
+        logger.warning(
+            f"Got reconnected to NATS {self.nc.connected_url}. Attempting reconnect"
+        )
+        await self.drain_subscriptions()
+        await self.subscribe()
 
     async def error_cb(self, e):
         errors.capture_exception(e)
@@ -156,7 +160,7 @@ class Worker:
         logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
         await self.subscribe()
 
-    async def subscriber_finalize(self):
+    async def drain_subscriptions(self) -> None:
         for subscription in self.subscriptions:
             try:
                 await subscription.drain()
@@ -164,6 +168,8 @@ class Worker:
                 pass
         self.subscriptions = []
 
+    async def subscriber_finalize(self):
+        await self.drain_subscriptions()
         try:
             await self.nc.close()
         except (RuntimeError, AttributeError):  # pragma: no cover

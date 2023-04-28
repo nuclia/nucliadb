@@ -156,7 +156,7 @@ async def node_query(
         await abort_transaction()
         logger.info(f"No node found for any of this resources shards {kbid}")
         raise HTTPException(
-            status_code=500,
+            status_code=512,
             detail=f"No node found for any of this resources shards {kbid}",
         )
 
@@ -168,7 +168,7 @@ async def node_query(
     except asyncio.TimeoutError as exc:
         errors.capture_exception(exc)
         await abort_transaction()
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
+        raise HTTPException(status_code=504, detail=f"Data query took too long")
     except AioRpcError as exc:
         if exc.code() is GrpcStatusCode.UNAVAILABLE:
             raise HTTPException(status_code=503, detail=f"Search backend not available")
