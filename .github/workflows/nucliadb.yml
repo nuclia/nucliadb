@@ -77,7 +77,7 @@ jobs:
           pip install target/wheels/*_x86_64.whl
 
       - name: Run tests
-        run: make test
+        run: make -C nucliadb/ test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
