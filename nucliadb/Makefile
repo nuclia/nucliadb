@@ -63,3 +63,7 @@ test-ingest:
 .PHONY: test-cov-ingest
 test-cov-ingest:
 	pytest -rfE --cov=nucliadb.ingest --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml nucliadb/ingest
+
+.PHONY: test
+test:
+	pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests
