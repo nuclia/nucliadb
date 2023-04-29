@@ -78,10 +78,6 @@ jobs:
           name: openapi-${{ env.COMPONENT }}-${{ github.sha }}
           path: /tmp/openapi/
 
-  # PR workflows END here
-  # PUSH workflows contine with deploy activities
-
-  # Job to build the docker and push it to registry
   build:
     name: Build image and push
     runs-on: ubuntu-latest
@@ -100,10 +96,6 @@ jobs:
           echo "::set-output name=short_sha::$HASH"
           echo "::set-output name=branch::$BRANCH"
 
-      - name: Docker - Build
-        run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile
-
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
         with:
@@ -115,17 +107,17 @@ jobs:
       - name: Configure GCloud Docker
         run: gcloud auth configure-docker --quiet
 
-      - name: Docker - Tag
-        run: |-
-          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
-
-      - name: Docker - Push sha
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}
-
-      - name: Docker - Push latest
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          tags: |
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.short_sha }}
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.branch }}
 
   deploy:
     name: Deploy Helm chart and trigger internal CI

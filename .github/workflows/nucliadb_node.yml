@@ -204,9 +204,15 @@ jobs:
               - 'nucliadb_node/src/**'
 
       - name: Build local Node for testing
+        uses: docker/build-push-action@v4
         if: steps.filter.outputs.node_modified == 'true'
-        run: |
-          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+        with:
+          context: .
+          file: Dockerfile.node
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: eu.gcr.io/stashify-218417/node:main
 
       - name: Run tests
         run: |
@@ -278,7 +284,6 @@ jobs:
     needs: build-base-rust
     if: github.event_name == 'push'
 
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -338,13 +343,6 @@ jobs:
           echo "::set-output name=short_sha::$HASH"
           echo "::set-output name=branch::$BRANCH"
 
-      - name: Docker - Build
-        run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.node_sidecar
-
-      # PR workflows END here
-      # PUSH workflows contine with deploy activities
-
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
         with:
@@ -356,17 +354,17 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
-      - name: Docker - Tag
-        run: |-
-          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.branch }}
-
-      - name: Docker - Push sha
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }}
-
-      - name: Docker - Push latest
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.branch }}
+      - name: Build and push docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.node_sidecar
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          tags: |
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE_SIDECAR }}:${{ steps.env-vars.outputs.short_sha }}
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE_SIDECAR }}:${{ steps.env-vars.outputs.branch }}
 
   deploy:
     name: Deploy Helm chart and trigger internal CI

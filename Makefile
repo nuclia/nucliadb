@@ -60,37 +60,24 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_dataset
-	isort --profile black nucliadb_client
-	isort --profile black nucliadb_sdk
-	isort --profile black nucliadb_models
-
-	black nucliadb_dataset
-	black nucliadb_client
-	black nucliadb_sdk
-	black nucliadb_models
-
-	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
-	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
-	flake8  --config nucliadb_sdk/setup.cfg nucliadb_sdk/nucliadb_sdk
-	flake8  --config nucliadb_models/setup.cfg nucliadb_models/nucliadb_models
-
-	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
-	MYPYPATH=./mypy_stubs mypy nucliadb_client
-	MYPYPATH=./mypy_stubs mypy nucliadb_models
-	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
-
+	make -C nucliadb_dataset/ format
+	make -C nucliadb_client/ format
+	make -C nucliadb_models/ format
+	make -C nucliadb_sdk/ format
 	make -C nucliadb_node/ format
+	make -C nucliadb_utils/ format
+	make -C nucliadb/ format
+	make -C nucliadb_telemetry/ format
+
+	make -C nucliadb/ lint
+	make -C nucliadb_utils/ lint
+	make -C nucliadb_telemetry/ lint
+	make -C nucliadb_sdk/ lint
+	make -C nucliadb_dataset/ lint
+	make -C nucliadb_client/ lint
+	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
 
-	make -C nucliadb_utils/ format
-	make -C nucliadb_utils/ lint
-
-	make -C nucliadb/ format
-	make -C nucliadb/ lint
-
-	make -C nucliadb_telemetry/ format
-	make -C nucliadb_telemetry/ lint
 
 rust-code-lint:
 	cargo +nightly fmt

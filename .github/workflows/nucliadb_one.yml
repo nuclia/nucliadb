@@ -102,19 +102,37 @@ jobs:
       # or eu.gcr.io/stashify-218417/node_sidecar
 
       - name: Build local Node for testing
+        uses: docker/build-push-action@v4
         if: steps.filter.outputs.node_modified == 'true'
-        run: |
-          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+        with:
+          context: .
+          file: Dockerfile.node
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: eu.gcr.io/stashify-218417/node:main
 
       - name: Build local Sidecar for testing
+        uses: docker/build-push-action@v4
         if: steps.filter.outputs.sidecar_modified == 'true'
-        run: |
-          docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
+        with:
+          context: .
+          file: Dockerfile.node_sidecar
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          tags: eu.gcr.io/stashify-218417/node_sidecar:main
 
       - name: Build local ClusterManager for testing
+        uses: docker/build-push-action@v4
         if: steps.filter.outputs.cluster_modified == 'true'
-        run: |
-          docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
+        with:
+          context: .
+          file: Dockerfile.cluster_monitor
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          tags: eu.gcr.io/stashify-218417/cluster_manager:main
 
       - name: Run tests
         run: |
