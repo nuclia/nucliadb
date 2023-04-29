@@ -77,7 +77,8 @@ jobs:
           pip install target/wheels/*_x86_64.whl
 
       - name: Run tests
-        run: make -C nucliadb/ test
+        run: |
+          pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
