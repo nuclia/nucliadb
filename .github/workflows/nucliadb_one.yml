@@ -101,6 +101,10 @@ jobs:
       # or eu.gcr.io/stashify-218417/cluster_manager
       # or eu.gcr.io/stashify-218417/node_sidecar
 
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Build local Node for testing
         uses: docker/build-push-action@v4
         if: steps.filter.outputs.node_modified == 'true'
