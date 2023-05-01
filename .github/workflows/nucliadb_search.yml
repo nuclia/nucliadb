@@ -208,10 +208,6 @@ jobs:
           echo "::set-output name=short_sha::$HASH"
           echo "::set-output name=branch::$BRANCH"
 
-      - name: Docker - Build
-        run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile
-
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
         with:
@@ -223,17 +219,21 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
-      - name: Docker - Tag
-        run: |-
-          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Docker - Push sha
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}
-
-      - name: Docker - Push latest
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.short_sha }}
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.branch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
   deploy:
     name: Deploy Helm chart and trigger internal CI

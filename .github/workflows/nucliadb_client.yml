@@ -26,13 +26,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb_client/ install-dev
+
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb_client --config=nucliadb_client/setup.cfg
-          isort -c --profile black nucliadb_client/
-          black --check --verbose nucliadb_client
+        run: make -C nucliadb_client/ lint
 
   # Job to run tests
   tests:
@@ -54,18 +51,7 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        ## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
-        run: |
-          pip install --upgrade "pip<23.1"
-          pip install -r test-requirements.txt
-          pip install -r nucliadb_client/requirements-test.txt
-          pip install -r nucliadb_client/requirements-source.txt
-          pip install -r nucliadb_client/requirements.txt
-          pip install -e nucliadb_client
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_client/
+        run: make -C nucliadb_client/ install-dev
 
       - uses: dorny/paths-filter@v2
         id: filter
@@ -87,8 +73,7 @@ jobs:
           docker build -t nuclia/nucliadb:latest -f Dockerfile .
 
       - name: Run tests
-        run: |
-          pytest -rfE --cov=nucliadb_client -s --tb=native -v --cov-report xml --cov-append nucliadb_client/nucliadb_client
+        run: make -C nucliadb_client/ test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
