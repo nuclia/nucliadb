@@ -39,16 +39,14 @@ from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage
 
 
 class TrainNodesManager:
-    def __init__(self, driver: Driver, cache: Cache, storage: Storage):
+    def __init__(self, driver: Driver, storage: Storage):
         self.driver = driver
-        self.cache = cache
         self.storage = storage
 
     async def get_reader(self, kbid: str, shard: str) -> Tuple[Node, str]:
@@ -137,7 +135,7 @@ class TrainNodesManager:
         if not (await KnowledgeBox.exist_kb(txn, kbid)):
             return None
 
-        kbobj = KnowledgeBox(txn, self.storage, self.cache, kbid)
+        kbobj = KnowledgeBox(txn, self.storage, kbid)
         return kbobj
 
     async def get_kb_entities_manager(
@@ -154,7 +152,7 @@ class TrainNodesManager:
         self, request: GetSentencesRequest
     ) -> AsyncIterator[TrainSentence]:
         txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
         if request.uuid != "":
             # Filter by uuid
             resource = await kb.get(request.uuid)
@@ -171,7 +169,7 @@ class TrainNodesManager:
         self, request: GetParagraphsRequest
     ) -> AsyncIterator[TrainParagraph]:
         txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
         if request.uuid != "":
             # Filter by uuid
             resource = await kb.get(request.uuid)
@@ -186,7 +184,7 @@ class TrainNodesManager:
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
         txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
         if request.uuid != "":
             # Filter by uuid
             resource = await kb.get(request.uuid)
@@ -203,7 +201,7 @@ class TrainNodesManager:
         self, request: GetResourcesRequest
     ) -> AsyncIterator[TrainResource]:
         txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
         base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
         async for key in txn.keys(match=base, count=-1):
             # Fetch and Add wanted item

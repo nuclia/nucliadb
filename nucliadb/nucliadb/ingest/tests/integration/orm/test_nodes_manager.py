@@ -19,7 +19,6 @@
 #
 import uuid
 from typing import AsyncIterable
-from unittest import mock
 
 import pytest
 from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
@@ -138,7 +137,7 @@ async def shards(fake_nodes, fake_kbid: str, redis_driver: Driver):
 async def test_choose_node(shards, redis_driver: Driver, shard_index: int, nodes: set):
     driver = redis_driver
 
-    nodes_manager = NodesManager(driver=driver, cache=mock.Mock())
+    nodes_manager = NodesManager(driver=driver)
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):
@@ -152,7 +151,7 @@ async def test_apply_for_all_shards(fake_kbid: str, shards, redis_driver: Driver
     kbid = fake_kbid
     driver = redis_driver
 
-    nodes_manager = NodesManager(driver=driver, cache=mock.Mock())
+    nodes_manager = NodesManager(driver=driver)
 
     nodes = []
 

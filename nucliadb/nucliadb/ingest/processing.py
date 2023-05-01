@@ -22,7 +22,7 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import aiohttp
 import jwt  # type: ignore
@@ -126,7 +126,7 @@ async def start_processing_engine():
 
 class DummyProcessingEngine:
     def __init__(self):
-        self.calls: List[List[Any]] = []
+        self.calls: list[list[Any]] = []
 
     async def initialize(self):
         pass

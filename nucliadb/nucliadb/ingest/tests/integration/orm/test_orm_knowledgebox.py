@@ -59,7 +59,7 @@ async def test_knowledgebox_delete_all_kb_keys(
 ):
     txn = await tikv_driver.begin()
     kbid = knowledgebox_ingest
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
 
     # Create some resources in the KB
     n_resources = 100
@@ -74,7 +74,7 @@ async def test_knowledgebox_delete_all_kb_keys(
 
     # Check that all of them are there
     txn = await tikv_driver.begin()
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
     await txn.abort()
@@ -84,7 +84,7 @@ async def test_knowledgebox_delete_all_kb_keys(
 
     # Check that all of them were deleted
     txn = await tikv_driver.begin()
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
     await txn.abort()

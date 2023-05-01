@@ -22,19 +22,47 @@ from __future__ import annotations
 from typing import Optional
 from uuid import uuid4
 
-from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
-from nucliadb_protos.nodewriter_pb2 import OpStatus
-from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import ShardObject as PBShard
-from nucliadb_protos.writer_pb2 import ShardReplica
-from nucliadb_protos.writer_pb2 import Shards as PBShards
-
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm import NODE_CLUSTER
 from nucliadb.ingest.orm.abc import AbstractNode
 from nucliadb.ingest.orm.grpc_node_binding import LocalReaderWrapper, LocalWriterWrapper
 from nucliadb.ingest.orm.local_shard import LocalShard
+from nucliadb_protos import (
+    nodereader_pb2,
+    noderesources_pb2,
+    nodesidecar_pb2,
+    nodewriter_pb2,
+    utils_pb2,
+    writer_pb2,
+)
 from nucliadb_utils.keys import KB_SHARDS
+
+
+class LocalNodeSidecarInterface:
+    """
+    backward compatibile interface for sidecar
+    type interactions when running standalone.
+
+    Right now, side car only provides cached counters.
+
+    Long term, this should be removed and any caching
+    should be done at the node reader.
+    """
+
+    def __init__(self, reader: LocalReaderWrapper):
+        self._reader = reader
+
+    async def GetCount(
+        self, shard_id: noderesources_pb2.ShardId
+    ) -> nodesidecar_pb2.Counter:
+        shard = await self._reader.GetShard(
+            nodereader_pb2.GetShardRequest(shard_id=shard_id)
+        )
+        response = nodesidecar_pb2.Counter()
+        if shard is not None:
+            response.resources = shard.resources
+            response.paragraphs = shard.paragraphs
+        return response
 
 
 class LocalNode(AbstractNode):
@@ -46,6 +74,7 @@ class LocalNode(AbstractNode):
         self._writer = LocalWriterWrapper()
         self._reader = LocalReaderWrapper()
         self.address = "local"
+        self.sidecar = LocalNodeSidecarInterface(self._reader)
 
     @property
     def reader(self) -> LocalReaderWrapper:  # type: ignore
@@ -61,19 +90,22 @@ class LocalNode(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(
-        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity.ValueType
+        cls,
+        txn: Transaction,
+        kbid: str,
+        similarity: utils_pb2.VectorSimilarity.ValueType,
     ) -> LocalShard:
         node = NODE_CLUSTER.get_local_node()
         sharduuid = uuid4().hex
-        shard = PBShard(shard=sharduuid)
+        shard = writer_pb2.ShardObject(shard=sharduuid)
         shard_created = await node.new_shard(kbid, similarity=similarity)
-        sr = ShardReplica(node=str(node))
+        sr = writer_pb2.ShardReplica(node=str(node))
         sr.shard.CopyFrom(shard_created)
         shard.replicas.append(sr)
 
         key = KB_SHARDS.format(kbid=kbid)
         payload = await txn.get(key)
-        kb_shards = PBShards()
+        kb_shards = writer_pb2.Shards()
         if payload is not None:
             kb_shards.ParseFromString(payload)
         else:
@@ -87,7 +119,7 @@ class LocalNode(AbstractNode):
         return LocalShard(sharduuid=sharduuid, shard=shard, node=node)
 
     @classmethod
-    def create_shard_klass(cls, shard_id: str, pbshard: PBShard):
+    def create_shard_klass(cls, shard_id: str, pbshard: writer_pb2.ShardObject):
         node = NODE_CLUSTER.get_local_node()
         return LocalShard(sharduuid=shard_id, shard=pbshard, node=node)
 
@@ -98,18 +130,22 @@ class LocalNode(AbstractNode):
         key = KB_SHARDS.format(kbid=kbid)
         kb_shards_bytes: Optional[bytes] = await txn.get(key)
         if kb_shards_bytes is not None:
-            kb_shards = PBShards()
+            kb_shards = writer_pb2.Shards()
             kb_shards.ParseFromString(kb_shards_bytes)
-            shard: PBShard = kb_shards.shards[kb_shards.actual]
+            shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
             node = NODE_CLUSTER.get_local_node()
             return LocalShard(sharduuid=shard.shard, shard=shard, node=node)
         else:
             return None
 
-    async def add_resource(self, req: Resource) -> OpStatus:
+    async def add_resource(
+        self, req: noderesources_pb2.Resource
+    ) -> nodewriter_pb2.OpStatus:
         return await self.writer.SetResource(req)
 
-    async def delete_resource(self, req: ResourceID) -> OpStatus:
+    async def delete_resource(
+        self, req: noderesources_pb2.ResourceID
+    ) -> nodewriter_pb2.OpStatus:
         return await self.writer.RemoveResource(req)
 
     def __str__(self):

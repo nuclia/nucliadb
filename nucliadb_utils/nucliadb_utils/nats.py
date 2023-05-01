@@ -108,8 +108,11 @@ class NatsConnectionManager:
                 except nats.errors.ConnectionClosedError:  # pragma: no cover
                     pass
             try:
-                await self.nc.drain()
-            except nats.errors.ConnectionClosedError:  # pragma: no cover
+                await asyncio.wait_for(self.nc.drain(), timeout=1)
+            except (
+                nats.errors.ConnectionClosedError,
+                asyncio.TimeoutError,
+            ):  # pragma: no cover
                 pass
             await self.nc.close()
             self._subscriptions = []

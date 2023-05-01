@@ -49,6 +49,10 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest import SERVICE_NAME
+from nucliadb.ingest.consumer.auditing import (
+    IndexAuditHandler,
+    ResourceWritesAuditHandler,
+)
 from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -60,6 +64,29 @@ from nucliadb_utils.utilities import Utility, get_indexing, get_storage, set_uti
 EXAMPLE_VECTOR = base64.b64decode(
     "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"  # noqa
 )
+
+
+@pytest.fixture(autouse=True)
+async def audit_consumers(
+    maindb_driver, gcs_storage, cache, stream_audit: StreamAuditStorage
+):
+    index_auditor = IndexAuditHandler(
+        driver=maindb_driver,
+        audit=stream_audit,
+        pubsub=cache.pubsub,
+    )
+    resource_writes_auditor = ResourceWritesAuditHandler(
+        driver=maindb_driver,
+        storage=gcs_storage,
+        audit=stream_audit,
+        pubsub=cache.pubsub,
+    )
+
+    await index_auditor.initialize()
+    await resource_writes_auditor.initialize()
+    yield
+    await index_auditor.finalize()
+    await resource_writes_auditor.finalize()
 
 
 @pytest.fixture()
@@ -197,7 +224,7 @@ async def test_ingest_error_message(
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=2)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     r = await kb_obj.get(message1.uuid)
     assert r is not None
     field_obj = await r.get_field("wikipedia_ml", TEXT)
@@ -237,7 +264,7 @@ async def test_ingest_messages_origin(
     await processor.process(message=message1, seqid=1)
 
     storage = await get_storage(service_name=SERVICE_NAME)
-    kb = KnowledgeBox(txn, storage, None, knowledgebox_ingest)
+    kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
     res = Resource(txn, storage, kb, rid)
     origin = await res.get_origin()
 
@@ -255,7 +282,7 @@ async def test_ingest_messages_origin(
     await processor.process(message=message1, seqid=2)
 
     await txn.abort()  # force clearing txn cache from last pull
-    kb = KnowledgeBox(txn, storage, None, knowledgebox_ingest)
+    kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
     res = Resource(txn, storage, kb, rid)
     origin = await res.get_origin()
 
@@ -368,10 +395,6 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.counter.paragraphs == 2
-    assert auditreq.counter.fields == 2
-    assert auditreq.counter.shard != ""
-
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
@@ -382,15 +405,12 @@ async def test_ingest_audit_stream_files_only(
         assert False, "Invalid trace ID"
 
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
-    assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.ADDED
+    assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["file_1"].size == test_png_size
-    assert audit_by_fieldid["file_1"].size_delta == test_png_size
-    assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.ADDED
+    assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["file_2"].size == test_text_size
-    assert audit_by_fieldid["file_2"].size_delta == test_text_size
-    assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.ADDED
+    assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["file_3"].size == test_vectors_size
-    assert audit_by_fieldid["file_3"].size_delta == test_vectors_size
 
     #
     # Test 2: delete one of the previous field on the same resource
@@ -407,22 +427,9 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.counter.paragraphs == 2
-    assert auditreq.counter.fields == 2
-    assert auditreq.counter.shard != ""
-
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
-
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    assert auditreq.fields_audit[0].action == AuditField.FieldAction.DELETED
-    assert auditreq.fields_audit[0].size == 0
-    assert auditreq.fields_audit[0].size_delta == -test_png_size
 
     #
     # Test 3: modify a file while adding and deleting other files
@@ -440,10 +447,6 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.counter.paragraphs == 2
-    assert auditreq.counter.fields == 2
-    assert auditreq.counter.shard != ""
-
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
@@ -451,13 +454,10 @@ async def test_ingest_audit_stream_files_only(
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["file_2"].size == test_png_size
-    assert audit_by_fieldid["file_2"].size_delta == test_text_size - test_png_size
-    assert audit_by_fieldid["file_4"].action == AuditField.FieldAction.ADDED
+    assert audit_by_fieldid["file_4"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["file_4"].size == test_text_size
-    assert audit_by_fieldid["file_4"].size_delta == test_text_size
     assert audit_by_fieldid["file_3"].action == AuditField.FieldAction.DELETED
     assert audit_by_fieldid["file_3"].size == 0
-    assert audit_by_fieldid["file_3"].size_delta == -test_vectors_size
 
     #
     # Test 4: delete resource
@@ -469,16 +469,7 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
-    # Currently where not updating audit counters on delete operations
-    assert not auditreq.HasField("counter")
-
-    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
-    assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.DELETED
-    assert audit_by_fieldid["file_2"].size == 0
-    assert audit_by_fieldid["file_2"].size_delta == -test_png_size
-    assert audit_by_fieldid["file_4"].action == AuditField.FieldAction.DELETED
-    assert audit_by_fieldid["file_4"].size == 0
-    assert audit_by_fieldid["file_4"].size_delta == -test_text_size
+    assert auditreq.type == AuditRequest.AuditType.DELETED
 
     # Test 5: Delete knowledgebox
 
@@ -554,17 +545,13 @@ async def test_ingest_audit_stream_mixed(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreq.counter.paragraphs == 2
-    assert auditreq.counter.fields == 2
-    assert auditreq.counter.shard != ""
-
     assert auditreq.kbid == kbid
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
-    assert len(auditreq.fields_audit) == 3
+    assert len(auditreq.fields_audit) == 4
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
-    assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.ADDED
+    assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["text1"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["conv1"].action == AuditField.FieldAction.DELETED
 
@@ -576,29 +563,7 @@ async def test_ingest_audit_stream_mixed(
     await stream_processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
 
-    # Currently where not updating audit counters on delete operations
-    assert not auditreq.HasField("counter")
-
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    # We know what should be in the resource and all must me delete actions
-    audit_actions_by_fieldid = {
-        audit.field_id: audit.action for audit in auditreq.fields_audit
-    }
-
-    assert set(audit_actions_by_fieldid.keys()) == {
-        "text1",
-        "datetime1",
-        "layout1",
-        "link1",
-        "keywordset1",
-        "file1",
-        "file_1",
-    }
-    assert set(audit_actions_by_fieldid.values()) == {AuditField.FieldAction.DELETED}
+    assert auditreq.type == AuditRequest.AuditType.DELETED
 
     await txn.abort()
 
@@ -625,7 +590,7 @@ async def test_ingest_account_seq_stored(
     add_filefields(message, [("file_1", "file.png")])
     await stream_processor.process(message=message, seqid=1)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     r = await kb_obj.get(message.uuid)
     assert r is not None
 
@@ -676,7 +641,7 @@ async def test_ingest_autocommit_deadletter_marks_resource(
         mock_notify.side_effect = Exception("test")
         await processor.process(message=message, seqid=1)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     resource = await kb_obj.get(message.uuid)
 
     mock_notify.assert_called_once()

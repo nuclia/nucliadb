@@ -111,7 +111,6 @@ from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
-    get_audit,
     get_cache,
     get_partitioning,
     get_storage,
@@ -125,10 +124,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def initialize(self):
         storage = await get_storage(service_name=SERVICE_NAME)
-        audit = get_audit()
         driver = await get_driver()
         cache = await get_cache()
-        self.proc = Processor(driver=driver, storage=storage, audit=audit, cache=cache)
+        self.proc = Processor(driver=driver, storage=storage, cache=cache)
 
     async def finalize(self):
         ...
@@ -176,9 +174,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         txn = await self.proc.driver.begin()
         storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
 
-        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
         resobj = ResourceORM(txn, storage, kbobj, request.rid)
 
         field = await resobj.get_field(
@@ -670,9 +667,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response.uuid = ""
         txn = await self.proc.driver.begin()
         storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
 
-        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
         rid = await kbobj.get_resource_uuid_by_slug(request.slug)
         if rid:
             response.uuid = rid
@@ -687,9 +683,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         resobj = None
         txn = await self.proc.driver.begin()
         storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
 
-        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
         resobj = ResourceORM(txn, storage, kbobj, request.rid)
 
         if request.field != "":
@@ -724,9 +719,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
         storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
 
-        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
         resobj = ResourceORM(txn, storage, kbobj, request.rid)
         bm = await resobj.generate_broker_message()
         transaction = get_transaction_utility()
@@ -742,8 +736,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             txn = await self.proc.driver.begin()
             storage = await get_storage(service_name=SERVICE_NAME)
-            cache = await get_cache()
-            kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+            kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
             resobj = ResourceORM(txn, storage, kbobj, request.rid)
             resobj.disable_vectors = not request.reindex_vectors
 
@@ -795,9 +788,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             txn = await self.proc.driver.begin()
             storage = await get_storage(service_name=SERVICE_NAME)
-            cache = await get_cache()
 
-            kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+            kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
             async for resource in kbobj.iterate_resources():
                 yield await resource.generate_broker_message()
             await txn.abort()

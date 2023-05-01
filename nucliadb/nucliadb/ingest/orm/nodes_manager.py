@@ -34,9 +34,8 @@ from nucliadb_utils.keys import KB_SHARDS
 
 
 class NodesManager:
-    def __init__(self, driver: Driver, cache):
+    def __init__(self, driver: Driver):
         self.driver = driver
-        self.cache = cache
 
     async def get_shards_by_kbid_inner(self, kbid: str) -> PBShards:
         key = KB_SHARDS.format(kbid=kbid)

@@ -55,7 +55,6 @@ from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
-from nucliadb_utils.utilities import get_cache
 
 
 class EntitiesManager:
@@ -205,8 +204,7 @@ class EntitiesManager:
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         driver = await get_driver()
-        cache = await get_cache()
-        nodes_manager = NodesManager(driver=driver, cache=cache)
+        nodes_manager = NodesManager(driver=driver)
 
         async def do_entities_search(
             node: Node, shard_id: str, node_id: str
@@ -300,8 +298,7 @@ class EntitiesManager:
 
     async def get_indexed_entities_groups_names(self) -> Set[str]:
         driver = await get_driver()
-        cache = await get_cache()
-        nodes_manager = NodesManager(driver=driver, cache=cache)
+        nodes_manager = NodesManager(driver=driver)
 
         async def query_indexed_entities_group_names(
             node: Node, shard_id: str, node_id: str

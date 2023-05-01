@@ -52,7 +52,6 @@ from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
-    get_cache,
     get_partitioning,
     get_storage,
     get_transaction_utility,
@@ -634,11 +633,10 @@ async def reprocess_file_field(
     set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     storage = await get_storage(service_name=SERVICE_NAME)
-    cache = await get_cache()
     driver = await get_driver()
 
     async with driver.transaction() as txn:
-        kb = KnowledgeBox(txn, storage, cache, kbid)
+        kb = KnowledgeBox(txn, storage, kbid)
 
         resource = await kb.get(rid)
         if resource is None:

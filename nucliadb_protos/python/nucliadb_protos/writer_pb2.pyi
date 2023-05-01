@@ -1325,18 +1325,40 @@ class Notification(google.protobuf.message.Message):
     ABORT: Notification.Action.ValueType  # 1
     INDEXED: Notification.Action.ValueType  # 2
 
+    class _WriteType:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _WriteTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Notification._WriteType.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        UNSET: Notification._WriteType.ValueType  # 0
+        CREATED: Notification._WriteType.ValueType  # 1
+        MODIFIED: Notification._WriteType.ValueType  # 2
+        DELETED: Notification._WriteType.ValueType  # 3
+
+    class WriteType(_WriteType, metaclass=_WriteTypeEnumTypeWrapper): ...
+    UNSET: Notification.WriteType.ValueType  # 0
+    CREATED: Notification.WriteType.ValueType  # 1
+    MODIFIED: Notification.WriteType.ValueType  # 2
+    DELETED: Notification.WriteType.ValueType  # 3
+
     PARTITION_FIELD_NUMBER: builtins.int
     MULTI_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     SEQID_FIELD_NUMBER: builtins.int
     ACTION_FIELD_NUMBER: builtins.int
+    WRITE_TYPE_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
     partition: builtins.int
     multi: builtins.str
     uuid: builtins.str
     kbid: builtins.str
     seqid: builtins.int
     action: global___Notification.Action.ValueType
+    write_type: global___Notification.WriteType.ValueType
+    @property
+    def message(self) -> global___BrokerMessage: ...
     def __init__(
         self,
         *,
@@ -1346,8 +1368,11 @@ class Notification(google.protobuf.message.Message):
         kbid: builtins.str = ...,
         seqid: builtins.int = ...,
         action: global___Notification.Action.ValueType = ...,
+        write_type: global___Notification.WriteType.ValueType = ...,
+        message: global___BrokerMessage | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "kbid", b"kbid", "multi", b"multi", "partition", b"partition", "seqid", b"seqid", "uuid", b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["message", b"message"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "kbid", b"kbid", "message", b"message", "multi", b"multi", "partition", b"partition", "seqid", b"seqid", "uuid", b"uuid", "write_type", b"write_type"]) -> None: ...
 
 global___Notification = Notification
 

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 class PubSubChannels:
+    # stream that ingest/node publishes to for information
     RESOURCE_NOTIFY = "notify.{kbid}"
 
 

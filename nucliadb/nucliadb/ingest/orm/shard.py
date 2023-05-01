@@ -22,23 +22,17 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from lru import LRU  # type: ignore
 from nucliadb_protos.noderesources_pb2 import (
     Resource as PBBrainResource,  # type: ignore
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
-from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.nodesidecar_pb2 import Counter
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb.ingest import SERVICE_NAME  # type: ignore
 from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.abc import AbstractShard, ShardCounter
-from nucliadb_telemetry import errors
+from nucliadb.ingest.orm.abc import AbstractShard
 from nucliadb_utils.utilities import get_indexing, get_storage
-
-SHARDS = LRU(100)
 
 
 class Shard(AbstractShard):
@@ -82,7 +76,7 @@ class Shard(AbstractShard):
         partition: str,
         kb: str,
         reindex_id: Optional[str] = None,
-    ) -> Optional[ShardCounter]:
+    ) -> None:
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
             # outside of a transaction. We need to treat this as a reindex operation.
@@ -102,23 +96,10 @@ class Shard(AbstractShard):
                 resource, txid, partition, kb=kb, logical_shard=self.sharduuid
             )
 
-        shard_counter: Optional[ShardCounter] = None
         for replica_id, node_id in self.indexing_replicas():
             indexpb.node = node_id
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
-            try:
-                counter: Counter = await NODES[node_id].sidecar.GetCount(ShardId(id=replica_id))  # type: ignore
-                shard_counter = ShardCounter(
-                    shard=self.sharduuid,
-                    # even though counter returns a `resources` value here,
-                    # `resources` here from a shard is actually more like `fields`
-                    fields=counter.resources,
-                    paragraphs=counter.paragraphs,
-                )
-            except Exception as exc:
-                errors.capture_exception(exc)
-        return shard_counter
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
         replicas_cleaned: Dict[str, PBShardCleaned] = {}

@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from enum import Enum
+import logging
 from typing import Dict, List, Optional, Tuple
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -29,10 +28,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
-from pydantic import BaseModel
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
-from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
@@ -43,31 +40,15 @@ from nucliadb.ingest.orm.exceptions import (
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.orm.shard import Shard, ShardCounter
+from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.utils import get_node_klass, set_basic
-from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
-from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_cache, get_storage
+from nucliadb_utils.utilities import get_storage
 
-
-class TxnAction(Enum):
-    RESOURCE_CREATED = 0
-    RESOURCE_MODIFIED = 1
-
-
-class TxnResult(BaseModel):
-    action: TxnAction
-    counter: Optional[ShardCounter]
-
-
-AUDIT_TYPES: Dict[TxnAction, int] = {
-    TxnAction.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
-    TxnAction.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED,
-}
+logger = logging.getLogger(__name__)
 
 
 class Processor:
@@ -89,150 +70,14 @@ class Processor:
         self,
         driver: Driver,
         storage: Storage,
-        audit: Optional[AuditStorage] = None,
         cache: Optional[Cache] = None,
         partition: Optional[str] = None,
     ):
         self.messages = {}
         self.driver = driver
         self.storage = storage
-        self.audit = audit
         self.partition = partition
         self.cache = cache
-
-    @staticmethod
-    def iterate_auditable_fields(resource_keys, message):
-        """
-        Generator that emits the combined list of field ids from both
-        the existing resource and message that needs to be considered
-        in the audit of fields.
-        """
-        yielded = set()
-
-        # Include all fields present in the message we are processing
-        for field_id in message.files.keys():
-            key = (field_id, FieldType.FILE)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.conversations.keys():
-            key = (field_id, FieldType.CONVERSATION)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.layouts.keys():
-            key = (field_id, FieldType.LAYOUT)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.texts.keys():
-            key = (field_id, FieldType.TEXT)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.keywordsets.keys():
-            key = (field_id, FieldType.KEYWORDSET)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.datetimes.keys():
-            key = (field_id, FieldType.DATETIME)
-            yield key
-            yielded.add(key)
-
-        for field_id in message.links.keys():
-            key = (field_id, FieldType.LINK)
-            yield key
-            yielded.add(key)
-
-        # Include fields of the current resource
-        # We'll Ignore fields that are not in current message with the exception of DELETE resource
-        # message, then we want them all, because among other things we need to report all the individual
-        # sizes that disappear from storage
-
-        for field_type, field_id in resource_keys:
-            if field_type is FieldType.GENERIC:
-                continue
-
-            if not (
-                field_id in message.files
-                or message.type is BrokerMessage.MessageType.DELETE
-            ):
-                continue
-
-            # Avoid duplicates
-            if (field_type, field_id) in yielded:
-                continue
-
-            yield (field_id, field_type)
-
-    async def collect_audit_fields(self, message: BrokerMessage) -> List[AuditField]:
-        audit_storage_fields: List[AuditField] = []
-        txn = await self.driver.begin()
-
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBox(txn, storage, cache, message.kbid)
-        resource = Resource(txn, storage, kb, message.uuid)
-        field_keys = await resource.get_fields_ids()
-
-        for field_id, field_type in self.iterate_auditable_fields(field_keys, message):
-            field = await resource.get_field(field_id, field_type, load=True)
-            val = await field.get_value()
-
-            auditfield = AuditField()
-            auditfield.field_type = field_type
-            auditfield.field_id = field_id
-            if field_type is FieldType.FILE:
-                auditfield.filename = message.files[field_id].file.filename
-            if val is None:
-                # The field did not exist previously, so we are adding it now
-                auditfield.action = AuditField.FieldAction.ADDED
-                if field_type is FieldType.FILE:
-                    auditfield.size = auditfield.size_delta = message.files[
-                        field_id
-                    ].file.size
-            elif message.type is BrokerMessage.MessageType.DELETE:
-                # The file did exist, and we are deleting the field as a side effect of deleting the resource
-                auditfield.action = AuditField.FieldAction.DELETED
-                if field_type is FieldType.FILE:
-                    auditfield.size = 0
-                    auditfield.size_delta = -val.file.size
-            else:
-                # The field did exist, so we are overwriting it, with a modified file
-                # in case of a file
-                auditfield.action = AuditField.FieldAction.MODIFIED
-                if field_type is FieldType.FILE:
-                    auditfield.size = message.files[field_id].file.size
-                    auditfield.size_delta = (
-                        val.file.size - message.files[field_id].file.size
-                    )
-
-            audit_storage_fields.append(auditfield)
-
-        if (
-            message.delete_fields
-            and message.type is not BrokerMessage.MessageType.DELETE
-        ):
-            # If we are fully deleting a resource we won't iterate the delete_fields (if any)
-            # Make no sense as we already collected all resource fields as deleted
-            for fieldid in message.delete_fields:
-                field = await resource.get_field(
-                    fieldid.field, FieldType.FILE, load=True
-                )
-                audit_field = AuditField()
-                audit_field.action = AuditField.FieldAction.DELETED
-                audit_field.field_id = fieldid.field
-                audit_field.field_type = fieldid.field_type
-                if fieldid.field_type is FieldType.FILE:
-                    val = await field.get_value()
-                    audit_field.size = 0
-                    audit_field.size_delta = -val.file.size
-                    audit_field.filename = val.file.filename
-                audit_storage_fields.append(audit_field)
-
-        await txn.abort()
-        return audit_storage_fields
 
     async def process(
         self,
@@ -240,7 +85,7 @@ class Processor:
         seqid: int,
         partition: Optional[str] = None,
         transaction_check: bool = True,
-    ):
+    ) -> None:
         partition = partition if self.partition is None else self.partition
         if partition is None:
             raise AttributeError("Can't process message from unknown partition")
@@ -253,32 +98,10 @@ class Processor:
             if last_seqid is not None and seqid <= last_seqid:
                 raise SequenceOrderViolation(last_seqid)
 
-        audit_type: Optional[int] = None
-        audit_fields = None
-        audit_shard_counter: Optional[AuditShardCounter] = None
-
         if message.type == BrokerMessage.MessageType.DELETE:
-            audit_fields = await self.collect_audit_fields(message)
             await self.delete_resource(message, seqid, partition, transaction_check)
-            audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
-            audit_fields = await self.collect_audit_fields(message)
-            txn_result = await self.txn([message], seqid, partition, transaction_check)
-            if txn_result is not None:
-                audit_type = (
-                    AUDIT_TYPES.get(txn_result.action)
-                    if txn_result is not None
-                    else None
-                )
-                audit_shard_counter = (
-                    AuditShardCounter(
-                        shard=txn_result.counter.shard,
-                        paragraphs=txn_result.counter.paragraphs,
-                        fields=txn_result.counter.fields,
-                    )
-                    if txn_result.counter is not None
-                    else None
-                )
+            await self.txn([message], seqid, partition, transaction_check)
         elif message.type == BrokerMessage.MessageType.MULTI:
             # XXX Not supported right now
             # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
@@ -287,40 +110,9 @@ class Processor:
             # XXX Should this be removed?
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
-            audit_fields = await self.collect_audit_fields(message)
-            txn_result = await self.commit(message, seqid, partition)
-            if txn_result:
-                audit_type = (
-                    AUDIT_TYPES.get(txn_result.action)
-                    if txn_result is not None
-                    else None
-                )
-                audit_shard_counter = (
-                    AuditShardCounter(
-                        shard=txn_result.counter.shard,
-                        paragraphs=txn_result.counter.paragraphs,
-                        fields=txn_result.counter.fields,
-                    )
-                    if txn_result.counter is not None
-                    else None
-                )
+            await self.commit(message, seqid, partition)
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
-
-        # There are some operations that doesn't require audit report by definition
-        # like rollback or multi and others because there was no action executed for
-        # some reason. This is signaled as audit_type == None
-        if self.audit is not None and audit_type is not None:
-            await self.audit.report(
-                message,
-                audit_type,
-                audit_fields=audit_fields,
-                counter=audit_shard_counter,
-            )
-        elif self.audit is None:
-            logger.warning("No audit defined")
-        elif audit_type is None and txn_result is not None:
-            logger.warning(f"Audit type empty txn_result: {txn_result.action}")
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:
         if message.uuid is None:
@@ -335,9 +127,9 @@ class Processor:
         seqid: int,
         partition: str,
         transaction_check: bool = True,
-    ):
+    ) -> None:
         txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, message.kbid)
+        kb = KnowledgeBox(txn, self.storage, message.kbid)
 
         uuid = await self.get_resource_uuid(kb, message)
         shard_id = await kb.get_resource_shard_id(uuid)
@@ -354,7 +146,11 @@ class Processor:
             except Exception as exc:
                 await txn.abort()
                 await self.notify_abort(
-                    partition, seqid, message.multiid, message.kbid, message.uuid
+                    partition=partition,
+                    seqid=seqid,
+                    multi=message.multiid,
+                    kbid=message.kbid,
+                    rid=message.uuid,
                 )
                 raise exc
         if txn.open:
@@ -362,7 +158,11 @@ class Processor:
                 await sequence_manager.set_last_seqid(txn, partition, seqid)
             await txn.commit()
         await self.notify_commit(
-            partition, seqid, message.multiid, message.kbid, message.uuid
+            partition=partition,
+            seqid=seqid,
+            multi=message.multiid,
+            message=message,
+            write_type=Notification.WriteType.DELETED,
         )
 
     async def commit_slug(self, resource: Resource) -> None:
@@ -381,7 +181,7 @@ class Processor:
         seqid: int,
         partition: str,
         transaction_check: bool = True,
-    ) -> Optional[TxnResult]:
+    ) -> None:
         if len(messages) == 0:
             return None
 
@@ -395,11 +195,10 @@ class Processor:
             return None
 
         multi = messages[0].multiid
-        kb = KnowledgeBox(txn, self.storage, self.cache, kbid)
+        kb = KnowledgeBox(txn, self.storage, kbid)
         uuid = await self.get_resource_uuid(kb, messages[0])
         resource: Optional[Resource] = None
         handled_exception = None
-        counter = None
         created = False
         shard: Optional[Shard] = None
 
@@ -442,19 +241,9 @@ class Processor:
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
-                    counter = await shard.add_resource(
+                    await shard.add_resource(
                         resource.indexer.brain, seqid, partition=partition, kb=kbid
                     )
-                    if (
-                        counter is not None
-                        and counter.fields > settings.max_shard_fields
-                    ):
-                        # shard is full, create a new one so next resource
-                        # is placed on a new shard
-                        similarity = await kb.get_similarity()
-                        shard = await node_klass.create_shard_by_kbid(
-                            txn, kbid, similarity=similarity
-                        )
                 else:
                     raise AttributeError("Shard is not available")
 
@@ -465,17 +254,29 @@ class Processor:
                 if created or resource.slug_modified:
                     await self.commit_slug(resource)
 
-                await self.notify_commit(partition, seqid, multi, kbid, uuid)
+                await self.notify_commit(
+                    partition=partition,
+                    seqid=seqid,
+                    multi=multi,
+                    message=message,
+                    write_type=Notification.WriteType.CREATED
+                    if created
+                    else Notification.WriteType.MODIFIED,
+                )
             elif resource and resource.modified is False:
                 await txn.abort()
-                await self.notify_abort(partition, seqid, multi, kbid, uuid)
+                await self.notify_abort(
+                    partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+                )
                 logger.warning(f"This message did not modify the resource")
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. The exception will be reraised at the end of the function
             # and then handled by the top caller, so errors can be handled in the same place.
             await self.deadletter(messages, partition, seqid)
-            await self.notify_abort(partition, seqid, multi, kbid, uuid)
+            await self.notify_abort(
+                partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+            )
             handled_exception = exc
         finally:
             if resource is not None:
@@ -492,12 +293,7 @@ class Processor:
                 await self._mark_resource_error(resource, partition, seqid, shard, kbid)
                 raise DeadletteredError() from handled_exception
 
-        return TxnResult(
-            action=TxnAction.RESOURCE_CREATED
-            if created
-            else TxnAction.RESOURCE_MODIFIED,
-            counter=counter,
-        )
+        return None
 
     async def _mark_resource_error(
         self,
@@ -534,29 +330,34 @@ class Processor:
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
 
-    async def multi(self, message: BrokerMessage, seqid: int):
+    async def multi(self, message: BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)
 
-    async def commit(self, message: BrokerMessage, seqid: int, partition: str):
+    async def commit(self, message: BrokerMessage, seqid: int, partition: str) -> None:
         if message.multiid not in self.messages:
             # Error
             logger.error(f"Closed multi {message.multiid}")
             await self.deadletter([message], partition, seqid)
-            return
         else:
-            return await self.txn(self.messages[message.multiid], seqid, partition)
+            await self.txn(self.messages[message.multiid], seqid, partition)
 
-    async def rollback(self, message: BrokerMessage, seqid: int, partition: str):
+    async def rollback(
+        self, message: BrokerMessage, seqid: int, partition: str
+    ) -> None:
         # Error
         logger.error(f"Closed multi {message.multiid}")
         del self.messages[message.multiid]
         await self.notify_abort(
-            partition, seqid, message.multiid, message.kbid, message.uuid
+            partition=partition,
+            seqid=seqid,
+            multi=message.multiid,
+            kbid=message.kbid,
+            rid=message.uuid,
         )
 
     async def deadletter(
         self, messages: List[BrokerMessage], partition: str, seqid: int
-    ):
+    ) -> None:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
 
@@ -612,29 +413,40 @@ class Processor:
         return None
 
     async def notify_commit(
-        self, partition: str, seqid: int, multi: str, kbid: str, uuid: str
+        self,
+        *,
+        partition: str,
+        seqid: int,
+        multi: str,
+        message: BrokerMessage,
+        write_type: Notification.WriteType.Value,  # type: ignore
     ):
-        message = Notification(
+        notification = Notification(
             partition=int(partition),
             seqid=seqid,
             multi=multi,
-            uuid=uuid,
-            kbid=kbid,
-            action=Notification.COMMIT,
+            uuid=message.uuid,
+            kbid=message.kbid,
+            action=Notification.Action.COMMIT,
+            # including the message here again might feel a bit unusual but allows
+            # us to react to these notifications with the original payload
+            write_type=write_type,
+            message=message,
         )
+
         await self.notify(
-            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
-            message.SerializeToString(),
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=message.kbid),
+            notification.SerializeToString(),
         )
 
     async def notify_abort(
-        self, partition: str, seqid: int, multi: str, kbid: str, uuid: str
+        self, *, partition: str, seqid: int, multi: str, kbid: str, rid: str
     ):
         message = Notification(
             partition=int(partition),
             seqid=seqid,
             multi=multi,
-            uuid=uuid,
+            uuid=rid,
             kbid=kbid,
             action=Notification.ABORT,
         )
@@ -649,7 +461,6 @@ class Processor:
 
     # KB tools
     # XXX: Why are these utility functions here?
-
     async def get_kb_obj(
         self, txn: Transaction, kbid: KnowledgeBoxID
     ) -> Optional[KnowledgeBox]:
@@ -664,8 +475,7 @@ class Processor:
             return None
 
         storage = await get_storage()
-        cache = await get_cache()
-        kbobj = KnowledgeBox(txn, storage, cache, uuid)
+        kbobj = KnowledgeBox(txn, storage, uuid)
         return kbobj
 
     async def get_kb(self, slug: str = "", uuid: Optional[str] = "") -> KnowledgeBoxPB:
