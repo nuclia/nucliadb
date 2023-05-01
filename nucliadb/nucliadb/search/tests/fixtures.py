@@ -35,15 +35,8 @@ from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.tests.fixtures import broker_resource
 from nucliadb.ingest.utils import get_driver
 from nucliadb.search import API_PREFIX
+from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import clear_global_cache
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
 
 
 @pytest.fixture(scope="function")
@@ -73,7 +66,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
 
     running_settings.debug = False
 
-    ingest_settings.pull_time = 0
+    ingest_settings.disable_pull_worker = True
 
     ingest_settings.nuclia_partitions = 1
 
@@ -89,13 +82,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
 
 @pytest.mark.asyncio
 @pytest.fixture(scope="function")
-async def search_api(
-    redis,
-    transaction_utility,
-    indexing_utility_registered,
-    test_settings_search,
-    event_loop,
-):  # type: ignore
+async def search_api(test_settings_search, transaction_utility, redis):  # type: ignore
     from nucliadb.ingest.orm import NODES
     from nucliadb.search.app import application
 

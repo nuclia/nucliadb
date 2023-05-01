@@ -38,6 +38,8 @@ from nucliadb_utils.utilities import clear_global_cache
 @pytest.fixture(scope="function")
 async def nucliadb_api(
     redis,
+    # order matters here because of config diffs between redis/nats pubsub
+    ingest_consumers,
     transaction_utility,
     indexing_utility_registered,
     test_settings_search: None,
@@ -46,13 +48,13 @@ async def nucliadb_api(
     from nucliadb.ingest.orm import NODES
     from nucliadb.one.app import application
 
-    async def handler(req, exc):  # type: ignore
-        raise exc
-
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
 
     # Little hack to raise exeptions from VersionedFastApi
+    async def handler(req, exc):  # type: ignore
+        raise exc
+
     for route in application.routes:
         if isinstance(route, Mount) and not isinstance(route.app, StaticFiles):
             route.app.middleware_stack.handler = handler  # type: ignore
@@ -62,7 +64,7 @@ async def nucliadb_api(
     await asyncio.sleep(1)
     while len(NODES) < 2:
         print("awaiting cluster nodes - one fixtures.py")
-        await asyncio.sleep(4)
+        await asyncio.sleep(1)
 
     def make_client_fixture(
         roles: Optional[List[Enum]] = None,

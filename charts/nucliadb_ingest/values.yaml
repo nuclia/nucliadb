@@ -22,7 +22,7 @@ env:
 
 # Kubernetes settings
 config:
-  pull_time: 100
+  pull_time_error_backoff: 100
   node_replicas: 2
 
 affinity: {}
@@ -76,7 +76,6 @@ indexing:
   index_jetstream_auth:
   index_jetstream_servers:
     - nats1
-  index_jetstream_target: "node.{node}"
 
 tracing:
   enabled: false
@@ -91,6 +90,20 @@ ingest_orm_grpc_replicaCount: 2
 ingest_orm_grpc_autoscaling:
   minReplicas: 1
   maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+# ingest-processed-consumer settings
+ingest_processed_consumer_resources: {}
+ingest_processed_consumer_replicaCount: 2
+ingest_processed_consumer_autoscaling:
+  minReplicas: 1
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:

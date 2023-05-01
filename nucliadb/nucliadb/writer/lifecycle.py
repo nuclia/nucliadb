@@ -25,13 +25,13 @@ from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb.writer.utilities import get_processing
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import nuclia_settings, transaction_settings
-from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
+from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.utilities import (
     Utility,
-    finalize_utilities,
-    get_transaction_utility,
     set_utility,
+    start_transaction_utility,
+    stop_transaction_utility,
+    finalize_utilities,
 )
 
 
@@ -49,23 +49,12 @@ async def initialize():
             seed=nuclia_settings.nuclia_hash_seed,
         ),
     )
-    if transaction_settings.transaction_local:
-        transaction_utility = LocalTransactionUtility()
-    else:
-        transaction_utility = TransactionUtility(
-            nats_creds=transaction_settings.transaction_jetstream_auth,
-            nats_servers=transaction_settings.transaction_jetstream_servers,
-            nats_target=transaction_settings.transaction_jetstream_target,
-        )
-        await transaction_utility.initialize(SERVICE_NAME)
-    set_utility(Utility.TRANSACTION, transaction_utility)
+    await start_transaction_utility(SERVICE_NAME)
     await storage_initialize()
 
 
 async def finalize():
-    transaction = get_transaction_utility()
-    if transaction is not None:
-        await transaction.finalize()
+    await stop_transaction_utility()
 
     await stop_ingest()
     processing = get_processing()

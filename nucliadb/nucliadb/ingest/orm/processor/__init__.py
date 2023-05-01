@@ -41,6 +41,7 @@ from nucliadb.ingest.orm.exceptions import (
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard, ShardCounter
 from nucliadb.ingest.orm.utils import get_node_klass, set_basic
@@ -70,6 +71,18 @@ AUDIT_TYPES: Dict[TxnAction, int] = {
 
 
 class Processor:
+    """
+    This class is responsible for processing messages from the broker
+    and attempts to manage sequencing correctly with a txn id implementation.
+
+    The "txn" in this implementation is oriented around the sequence id of
+    messages coming through the message broker.
+
+    Not all writes are going to have a transaction id. For example, writes
+    coming from processor can be coming through a different channel
+    and can not use the txn id
+    """
+
     messages: Dict[str, List[BrokerMessage]]
 
     def __init__(
@@ -86,16 +99,6 @@ class Processor:
         self.audit = audit
         self.partition = partition
         self.cache = cache
-
-    async def initialize(self):
-        await self.driver.initialize()
-        if self.cache is not None:
-            await self.cache.initialize()
-
-    async def finalize(self):
-        await self.driver.finalize()
-        if self.cache is not None:
-            await self.cache.finalize()
 
     @staticmethod
     def iterate_auditable_fields(resource_keys, message):
@@ -246,7 +249,7 @@ class Processor:
         # that the current message doesn't violate the sequence order for the
         # current partition
         if transaction_check:
-            last_seqid = await self.driver.last_seqid(partition)
+            last_seqid = await sequence_manager.get_last_seqid(self.driver, partition)
             if last_seqid is not None and seqid <= last_seqid:
                 raise SequenceOrderViolation(last_seqid)
 
@@ -256,12 +259,12 @@ class Processor:
 
         if message.type == BrokerMessage.MessageType.DELETE:
             audit_fields = await self.collect_audit_fields(message)
-            await self.delete_resource(message, seqid, partition)
+            await self.delete_resource(message, seqid, partition, transaction_check)
             audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
             audit_fields = await self.collect_audit_fields(message)
-            txn_result = await self.autocommit(message, seqid, partition)
-            if txn_result:
+            txn_result = await self.txn([message], seqid, partition, transaction_check)
+            if txn_result is not None:
                 audit_type = (
                     AUDIT_TYPES.get(txn_result.action)
                     if txn_result is not None
@@ -277,6 +280,11 @@ class Processor:
                     else None
                 )
         elif message.type == BrokerMessage.MessageType.MULTI:
+            # XXX Not supported right now
+            # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
+            # This concept is probably not tenable with current architecture because
+            # of how nats works and how we would need to manage rollbacks.
+            # XXX Should this be removed?
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
             audit_fields = await self.collect_audit_fields(message)
@@ -321,7 +329,13 @@ class Processor:
             uuid = message.uuid
         return uuid
 
-    async def delete_resource(self, message: BrokerMessage, seqid: int, partition: str):
+    async def delete_resource(
+        self,
+        message: BrokerMessage,
+        seqid: int,
+        partition: str,
+        transaction_check: bool = True,
+    ):
         txn = await self.driver.begin()
         kb = KnowledgeBox(txn, self.storage, self.cache, message.kbid)
 
@@ -344,16 +358,19 @@ class Processor:
                 )
                 raise exc
         if txn.open:
-            await txn.commit(partition, seqid)
+            if transaction_check:
+                await sequence_manager.set_last_seqid(txn, partition, seqid)
+            await txn.commit()
         await self.notify_commit(
             partition, seqid, message.multiid, message.kbid, message.uuid
         )
 
-    def generate_index(self, resource: Resource, messages: List[BrokerMessage]):
-        pass
-
     async def txn(
-        self, messages: List[BrokerMessage], seqid: int, partition: str
+        self,
+        messages: List[BrokerMessage],
+        seqid: int,
+        partition: str,
+        transaction_check: bool = True,
     ) -> Optional[TxnResult]:
         if len(messages) == 0:
             return None
@@ -362,7 +379,9 @@ class Processor:
         kbid = messages[0].kbid
         if not await KnowledgeBox.exist_kb(txn, kbid):
             logger.warning(f"KB {kbid} is deleted: skiping txn")
-            await txn.commit(partition, seqid)
+            if transaction_check:
+                await sequence_manager.set_last_seqid(txn, partition, seqid)
+            await txn.commit()
             return None
 
         multi = messages[0].multiid
@@ -429,16 +448,18 @@ class Processor:
                 else:
                     raise AttributeError("Shard is not available")
 
-                await txn.commit(partition, seqid)
+                if transaction_check:
+                    await sequence_manager.set_last_seqid(txn, partition, seqid)
+                await txn.commit()
 
                 # Slug may have conflicts as its not partitioned properly. We make it as short as possible
-                txn = await self.driver.begin()
-                resource.txn = txn
-                await resource.set_slug()
-                await txn.commit(resource=False)
+                # XXX Does this write need to happen every time?
+                async with self.driver.transaction() as slug_txn:
+                    resource.txn = slug_txn
+                    await resource.set_slug()
+                    await slug_txn.commit()
 
                 await self.notify_commit(partition, seqid, multi, kbid, uuid)
-
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(partition, seqid, multi, kbid, uuid)
@@ -499,16 +520,13 @@ class Processor:
             async with self.driver.transaction() as txn:
                 resource.basic.metadata.status = PBMetadata.Status.ERROR
                 await set_basic(txn, resource.kb.kbid, resource.uuid, resource.basic)
-                await txn.commit(resource=False)
+                await txn.commit()
 
             await shard.add_resource(
                 resource.indexer.brain, seqid, partition=partition, kb=kbid
             )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
-
-    async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
-        return await self.txn([message], seqid, partition)
 
     async def multi(self, message: BrokerMessage, seqid: int):
         self.messages.setdefault(message.multiid, []).append(message)
@@ -619,7 +637,12 @@ class Processor:
             message.SerializeToString(),
         )
 
+    async def notify(self, channel, payload: bytes):
+        if self.cache is not None and self.cache.pubsub is not None:
+            await self.cache.pubsub.publish(channel, payload)
+
     # KB tools
+    # XXX: Why are these utility functions here?
 
     async def get_kb_obj(
         self, txn: Transaction, kbid: KnowledgeBoxID
@@ -684,7 +707,7 @@ class Processor:
                 )
                 if failed:
                     raise Exception("Failed to create KB")
-                await txn.commit(resource=False)
+                await txn.commit()
                 return uuid
             except KnowledgeBoxConflict:
                 raise
@@ -701,7 +724,7 @@ class Processor:
         except Exception as e:
             await txn.abort()
             raise e
-        await txn.commit(resource=False)
+        await txn.commit()
         return uuid
 
     async def list_kb(self, prefix: str):
@@ -717,9 +740,5 @@ class Processor:
         except (AttributeError, KeyError, KnowledgeBoxNotFound) as exc:
             await txn.abort()
             raise exc
-        await txn.commit(resource=False)
+        await txn.commit()
         return uuid
-
-    async def notify(self, channel, payload: bytes):
-        if self.cache is not None and self.cache.pubsub is not None:
-            await self.cache.pubsub.publish(channel, payload)

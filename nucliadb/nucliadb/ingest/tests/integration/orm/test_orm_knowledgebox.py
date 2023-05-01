@@ -70,7 +70,7 @@ async def test_knowledgebox_delete_all_kb_keys(
         assert r is not None
         await r.set_slug()
         uuids.add(bm.uuid)
-    await txn.commit(resource=False)
+    await txn.commit()
 
     # Check that all of them are there
     txn = await tikv_driver.begin()

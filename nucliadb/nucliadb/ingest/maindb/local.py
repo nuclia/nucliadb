@@ -24,11 +24,9 @@ from typing import Dict, List, Optional
 from nucliadb.ingest.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
     DEFAULT_SCAN_LIMIT,
-    TXNID,
     Driver,
     Transaction,
 )
-from nucliadb.ingest.maindb.exceptions import NoWorkerCommit
 
 try:
     import aiofiles
@@ -90,12 +88,7 @@ class LocalTransaction(Transaction):
         except NotADirectoryError:
             return None
 
-    async def commit(
-        self,
-        worker: Optional[str] = None,
-        tid: Optional[int] = None,
-        resource: bool = True,
-    ):
+    async def commit(self):
         if len(self.modified_keys) == 0 and len(self.deleted_keys) == 0:
             self.clean()
             return
@@ -109,15 +102,6 @@ class LocalTransaction(Transaction):
             await self.remove(key)
             not_to_check.append(count)
             count += 1
-        if resource:
-            if worker is None or tid is None:
-                raise NoWorkerCommit()
-            if tid != -1:
-                # If tid == -1 means we are injecting a resource via gRPC. We don't
-                # want to save the tid in this case, as it would break the next
-                # transactionability check.
-                key = TXNID.format(worker=worker)
-                await self.save(key, f"{tid}".encode())
         self.clean()
         self.open = False
 

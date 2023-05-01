@@ -32,7 +32,7 @@ from nucliadb_utils.utilities import get_pubsub, get_storage
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
-from nucliadb_node.settings import indexing_settings, settings
+from nucliadb_node.settings import settings
 
 TEST_PARTITION = "111"
 
@@ -157,9 +157,8 @@ async def create_indexing_message(
 
 async def send_indexing_message(worker: Worker, index: IndexMessage, node: str):
     # Push on stream
-    assert indexing_settings.index_jetstream_target is not None
     await worker.js.publish(
-        indexing_settings.index_jetstream_target.format(node=node),
+        const.Streams.INDEX.subject.format(node=node),
         index.SerializeToString(),
     )
 

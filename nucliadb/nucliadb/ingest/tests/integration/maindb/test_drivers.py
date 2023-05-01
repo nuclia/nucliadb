@@ -67,7 +67,7 @@ async def driver_basic(driver):
     # Test deleting a key that doesn't exist does not raise any error
     txn = await driver.begin()
     await txn.delete("/i/do/not/exist")
-    await txn.commit(resource=False)
+    await txn.commit()
 
     txn = await driver.begin()
     await txn.set("/internal/kbs/kb1/title", b"My title")
@@ -78,7 +78,7 @@ async def driver_basic(driver):
     result = await txn.get("/kbs/kb1/r/uuid1/text")
     assert result == b"My title"
 
-    await txn.commit(resource=False)
+    await txn.commit()
 
     txn = await driver.begin()
     result = await txn.get("/kbs/kb1/r/uuid1/text")
@@ -100,7 +100,7 @@ async def driver_basic(driver):
     # Test delete one key
     txn = await driver.begin()
     result = await txn.delete("/internal/kbs/kb1/title")
-    await txn.commit(resource=False)
+    await txn.commit()
 
     current_internal_kbs_keys = set()
     async for key in driver.keys("/internal/kbs"):
@@ -112,7 +112,7 @@ async def driver_basic(driver):
 
     txn = await driver.begin()
     result = await txn.delete("/internal/kbs")
-    await txn.commit(resource=False)
+    await txn.commit()
 
     current_internal_kbs_keys = set()
     async for key in driver.keys("/internal/kbs"):
@@ -124,7 +124,7 @@ async def driver_basic(driver):
 
     txn = await driver.begin()
     await txn.set("/internal/kbs", b"I am the father")
-    await txn.commit(resource=False)
+    await txn.commit()
 
     # It works without trailing slash ...
     txn = await driver.begin()
@@ -158,7 +158,7 @@ async def _test_keys_async_generator(driver):
     txn = await driver.begin()
     for i in range(10):
         await txn.set(f"/keys/{i}", str(i).encode())
-    await txn.commit(resource=False)
+    await txn.commit()
 
     txn = await driver.begin()
     async_generator = txn.keys("/keys/", count=10)
@@ -179,7 +179,7 @@ async def _test_transaction_context_manager(driver):
     async with driver.transaction() as txn:
         assert await txn.get("/some/key") is None
         await txn.set("/some/key", b"some value")
-        await txn.commit(resource=False)
+        await txn.commit()
 
     async with driver.transaction() as txn:
         assert await txn.get("/some/key") == b"some value"

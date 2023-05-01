@@ -118,13 +118,13 @@ async def shards(fake_nodes, fake_kbid: str, redis_driver: Driver):
 
     async with driver.transaction() as txn:
         await txn.set(key, shards.SerializeToString())
-        await txn.commit(resource=False)
+        await txn.commit()
 
     yield shards
 
     async with driver.transaction() as txn:
         await txn.delete(key)
-        await txn.commit(resource=False)
+        await txn.commit()
 
 
 @pytest.mark.parametrize(

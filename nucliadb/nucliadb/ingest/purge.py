@@ -77,7 +77,7 @@ async def purge_kb(driver: Driver):
             txn = await driver.begin()
             key_to_purge = KB_TO_DELETE.format(kbid=kbid)
             await txn.delete(key_to_purge)
-            await txn.commit(resource=False)
+            await txn.commit()
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
@@ -126,7 +126,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
                 logger.info(f"  X Error while deleting key {key}")
                 await txn.abort()
             else:
-                await txn.commit(resource=False)
+                await txn.commit()
 
     logger.info("FINISH PURGING KB STORAGE")
 

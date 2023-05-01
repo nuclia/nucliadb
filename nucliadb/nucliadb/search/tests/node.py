@@ -32,6 +32,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.ingest.settings import settings
+from nucliadb_utils.tests import free_port
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +87,6 @@ images.settings["nucliadb_node_sidecar"] = {
     "image": "eu.gcr.io/stashify-218417/node_sidecar",
     "version": "main",
     "env": {
-        "INDEX_JETSTREAM_TARGET": "node.{node}",
-        "INDEX_JETSTREAM_GROUP": "node-{node}",
-        "INDEX_JETSTREAM_STREAM": "node",
         "INDEX_JETSTREAM_SERVERS": "[]",
         "CACHE_PUBSUB_NATS_URL": "",
         "HOST_KEY_PATH": "/data/node.key",
@@ -96,6 +94,8 @@ images.settings["nucliadb_node_sidecar"] = {
         "SIDECAR_LISTEN_ADDRESS": "0.0.0.0:4447",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
+        "PYTHONUNBUFFERED": "1",
+        "LOG_LEVEL": "DEBUG",
     },
     "options": {
         "command": [
@@ -123,14 +123,6 @@ images.settings["nucliadb_cluster_manager"] = {
         ],
     },
 }
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
 
 
 def get_chitchat_port(container_obj, port):
@@ -211,14 +203,6 @@ class nucliadbChitchatNode(BaseImage):
 
     def check(self):
         return True
-        # channel = insecure_channel(f"{self.host}:{self.get_port()}")
-        # stub = health_pb2_grpc.HealthStub(channel)
-        # pb = HealthCheckRequest(service="Chitchat")
-        # try:
-        #    result = stub.Check(pb)
-        #    return result.status == 1
-        # except:  # noqa
-        #    return False
 
 
 class nucliadbNodeSidecar(BaseImage):

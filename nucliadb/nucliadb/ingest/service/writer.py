@@ -99,7 +99,7 @@ from nucliadb.ingest.orm.exceptions import (
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb.ingest.orm.node import Node
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.utils import get_node_klass
@@ -129,10 +129,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         driver = await get_driver()
         cache = await get_cache()
         self.proc = Processor(driver=driver, storage=storage, audit=audit, cache=cache)
-        await self.proc.initialize()
 
     async def finalize(self):
-        await self.proc.finalize()
+        ...
 
     async def GetKnowledgeBox(self, request: KnowledgeBoxID, context=None) -> KnowledgeBox:  # type: ignore
         response: KnowledgeBox = await self.proc.get_kb(
@@ -161,7 +160,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             key = KB_SHARDS.format(kbid=request.uuid)
             await txn.set(key, updated_shards.SerializeToString())
-            await txn.commit(resource=False)
+            await txn.commit()
             return CleanedKnowledgeBoxResponse()
         except Exception as e:
             errors.capture_exception(e)
@@ -197,7 +196,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         try:
             await field.set_vectors(evw)
-            await txn.commit(resource=False)
+            await txn.commit()
         except Exception as e:
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
@@ -292,7 +291,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             try:
                 await kbobj.set_labelset(request.id, request.labelset)
-                await txn.commit(resource=False)
+                await txn.commit()
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 errors.capture_exception(e)
@@ -311,7 +310,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             try:
                 await kbobj.del_labelset(request.id)
-                await txn.commit(resource=False)
+                await txn.commit()
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 errors.capture_exception(e)
@@ -380,7 +379,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             await kbobj.del_vectorset(request.vectorset)
             response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
+        await txn.commit()
         if kbobj is None:
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
@@ -394,7 +393,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             await kbobj.set_vectorset(request.id, request.vectorset)
             response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
+        await txn.commit()
         if kbobj is None:
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
@@ -418,7 +417,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = NewEntitiesGroupResponse.Status.ALREADY_EXISTS
                 return response
 
-            await txn.commit(resource=False)
+            await txn.commit()
             response.status = NewEntitiesGroupResponse.Status.OK
             return response
 
@@ -521,7 +520,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.ERROR
             else:
                 response.status = OpStatusWriter.Status.OK
-                await txn.commit(resource=False)
+                await txn.commit()
             return response
 
     async def UpdateEntitiesGroup(  # type: ignore
@@ -551,7 +550,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 )
                 return response
 
-            await txn.commit(resource=False)
+            await txn.commit()
             response.status = UpdateEntitiesGroupResponse.Status.OK
             return response
 
@@ -571,7 +570,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
             else:
-                await txn.commit(resource=False)
+                await txn.commit()
                 response.status = OpStatusWriter.Status.OK
             return response
 
@@ -609,7 +608,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 return response
             try:
                 await kbobj.set_synonyms(request.synonyms)
-                await txn.commit(resource=False)
+                await txn.commit()
                 response.status = OpStatusWriter.Status.OK
                 return response
             except Exception as e:
@@ -631,7 +630,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 return response
             try:
                 await kbobj.delete_synonyms()
-                await txn.commit(resource=False)
+                await txn.commit()
                 response.status = OpStatusWriter.Status.OK
                 return response
             except Exception as e:
@@ -650,9 +649,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.knowledgeboxes.append(slug)
 
         for partition in settings.partitions:
-            msgid = await self.proc.driver.last_seqid(partition)
-            if msgid is not None:
-                response.msgid[partition] = msgid
+            seq_id = await sequence_manager.get_last_seqid(self.proc.driver, partition)
+            if seq_id is not None:
+                response.msgid[partition] = seq_id
 
         await txn.abort()
         return response

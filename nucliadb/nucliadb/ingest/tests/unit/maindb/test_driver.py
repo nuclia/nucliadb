@@ -45,7 +45,7 @@ def driver() -> Driver:  # type: ignore
 @pytest.mark.asyncio
 async def test_transaction_does_not_abotr_if_commited(driver):
     async with driver.transaction() as txn:
-        await txn.commit(resource=False)
+        await txn.commit()
     txn.abort.assert_not_awaited()
 
 

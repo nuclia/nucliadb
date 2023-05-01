@@ -132,9 +132,6 @@ nucliadb_settings = NucliaDBSettings()
 class TransactionSettings(BaseSettings):
     transaction_jetstream_auth: Optional[str] = None
     transaction_jetstream_servers: List[str] = ["nats://localhost:4222"]
-    transaction_jetstream_target: str = "ndb.consumer.{partition}"
-    transaction_jetstream_group: str = "nucliadb-{partition}"
-    transaction_jetstream_stream: str = "nucliadb"
     transaction_local: bool = False
 
 
@@ -142,9 +139,6 @@ transaction_settings = TransactionSettings()
 
 
 class IndexingSettings(BaseSettings):
-    index_jetstream_target: Optional[str] = "node.{node}"
-    index_jetstream_group: Optional[str] = "node-{node}"
-    index_jetstream_stream: Optional[str] = "node"
     index_jetstream_servers: List[str] = []
     index_jetstream_auth: Optional[str] = None
     index_local: bool = False

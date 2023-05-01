@@ -39,12 +39,14 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     FileBackendConfig,
     audit_settings,
     nuclia_settings,
     storage_settings,
+    transaction_settings,
 )
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
@@ -76,6 +78,7 @@ class Utility(str, Enum):
     TRAIN = "train"
     TRAIN_SERVER = "train_server"
     FEATURE_FLAGS = "feature_flags"
+    NATS_MANAGER = "nats_manager"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -245,8 +248,34 @@ async def finalize_utilities():
         clean_utility(util)
 
 
+async def start_transaction_utility(
+    service_name: Optional[str] = None,
+) -> TransactionUtility:
+    from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
+
+    if transaction_settings.transaction_local:
+        transaction_utility: Union[
+            LocalTransactionUtility, TransactionUtility
+        ] = LocalTransactionUtility()
+    elif transaction_settings.transaction_jetstream_servers is not None:
+        transaction_utility = TransactionUtility(
+            nats_creds=transaction_settings.transaction_jetstream_auth,
+            nats_servers=transaction_settings.transaction_jetstream_servers,
+        )
+        await transaction_utility.initialize(service_name)
+    set_utility(Utility.TRANSACTION, transaction_utility)
+    return transaction_utility  # type: ignore
+
+
 def get_transaction_utility() -> TransactionUtility:
     return get_utility(Utility.TRANSACTION)
+
+
+async def stop_transaction_utility() -> None:
+    transaction_utility = get_transaction_utility()
+    if transaction_utility:
+        await transaction_utility.finalize()
+        clean_utility(Utility.TRANSACTION)
 
 
 def get_indexing() -> IndexingUtility:
@@ -288,6 +317,35 @@ async def stop_audit_utility():
     if audit_utility:
         await audit_utility.finalize()
         clean_utility(Utility.AUDIT)
+
+
+async def start_nats_manager(
+    service_name: str, nats_servers: list[str], nats_creds: Optional[str] = None
+) -> NatsConnectionManager:
+    nats_manager = NatsConnectionManager(
+        service_name=service_name,
+        nats_servers=nats_servers,
+        nats_creds=nats_creds,
+    )
+    await nats_manager.initialize()
+    set_utility(Utility.NATS_MANAGER, nats_manager)
+    return nats_manager
+
+
+def get_nats_manager() -> NatsConnectionManager:
+    nats_manager = get_utility(Utility.NATS_MANAGER)
+    if nats_manager is None:
+        raise ConfigurationError("Nats manager not configured")
+    return nats_manager
+
+
+async def stop_nats_manager() -> None:
+    try:
+        nats_manager = get_nats_manager()
+    except ConfigurationError:
+        return
+    await nats_manager.finalize()
+    clean_utility(Utility.NATS_MANAGER)
 
 
 def get_feature_flags() -> featureflagging.FlagService:
