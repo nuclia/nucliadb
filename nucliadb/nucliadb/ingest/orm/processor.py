@@ -46,6 +46,7 @@ from nucliadb.ingest.orm.shard import Shard, ShardCounter
 from nucliadb.ingest.orm.utils import get_node_klass, set_basic
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
@@ -597,7 +598,10 @@ class Processor:
             kbid=kbid,
             action=Notification.COMMIT,
         )
-        await self.notify(f"notify.{kbid}", message.SerializeToString())
+        await self.notify(
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
+            message.SerializeToString(),
+        )
 
     async def notify_abort(
         self, partition: str, seqid: int, multi: str, kbid: str, uuid: str
@@ -610,7 +614,10 @@ class Processor:
             kbid=kbid,
             action=Notification.ABORT,
         )
-        await self.notify(f"notify.{kbid}", message.SerializeToString())
+        await self.notify(
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
+            message.SerializeToString(),
+        )
 
     # KB tools
 

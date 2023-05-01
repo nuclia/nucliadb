@@ -90,6 +90,7 @@ images.settings["nucliadb_node_sidecar"] = {
         "INDEX_JETSTREAM_GROUP": "node-{node}",
         "INDEX_JETSTREAM_STREAM": "node",
         "INDEX_JETSTREAM_SERVERS": "[]",
+        "CACHE_PUBSUB_NATS_URL": "",
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
         "SIDECAR_LISTEN_ADDRESS": "0.0.0.0:4447",
@@ -308,6 +309,9 @@ class _NodeRunner:
         natsd_server = self.natsd.replace("localhost", docker_internal_host)
         images.settings["nucliadb_node_sidecar"]["env"][
             "INDEX_JETSTREAM_SERVERS"
+        ] = f'["{natsd_server}"]'
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "CACHE_PUBSUB_NATS_URL"
         ] = f'["{natsd_server}"]'
         gcs_server = self.gcs.replace("localhost", docker_internal_host)
         images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server

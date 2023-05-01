@@ -466,6 +466,7 @@ pub mod notification {
     pub enum Action {
         Commit = 0,
         Abort = 1,
+        Indexed = 2,
     }
 }
 //// The member information.

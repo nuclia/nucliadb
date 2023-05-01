@@ -21,13 +21,20 @@ import tempfile
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
-import nats as natslib
 import pytest
 from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_utils import const
 
 from nucliadb_node.pull import IndexedPublisher, Worker
 from nucliadb_node.settings import settings
+
+
+@pytest.fixture(autouse=True)
+def pubsub():
+    pubsub = AsyncMock()
+    with mock.patch("nucliadb_node.pull.get_pubsub", return_value=pubsub):
+        yield pubsub
 
 
 class NatsConnectionTest:
@@ -44,14 +51,11 @@ class NatsTest:
 
 
 class TestIndexedPublisher:
-    stream = "stream"
-    target = "target.{partition}"
-    auth = "token"
-    servers = ["nats://localhost:4222"]
-
     @pytest.fixture(scope="function")
-    def publisher(self, nats_mock):
-        return IndexedPublisher(self.stream, self.target, self.servers, self.auth)
+    async def publisher(self):
+        pub = IndexedPublisher()
+        await pub.initialize()
+        yield pub
 
     @pytest.fixture(scope="function")
     def index_message(self):
@@ -60,89 +64,36 @@ class TestIndexedPublisher:
         delpb.typemessage = TypeMessage.DELETION
         delpb.partition = "11"
         delpb.resource = "rid"
+        delpb.kbid = "kbid"
         return delpb
 
-    @pytest.fixture(scope="function")
-    def nats_connection(self):
-        return NatsConnectionTest()
-
-    @pytest.fixture(scope="function")
-    def nats_mock(self, nats_connection):
-        nats_test = NatsTest(nats_connection)
-        with mock.patch("nucliadb_node.pull.nats", nats_test):
-            yield nats_test
+    @pytest.mark.asyncio
+    async def test_initialize(self, publisher, pubsub):
+        assert publisher.pubsub == pubsub
 
     @pytest.mark.asyncio
-    async def test_initialize(self, nats_mock, nats_connection, publisher):
-        await publisher.initialize()
-
-        nats_mock.connect.assert_called_once_with(
-            **{
-                "closed_cb": publisher.on_connection_closed,
-                "reconnected_cb": publisher.on_reconnection,
-                "user_credentials": self.auth,
-                "servers": self.servers,
-            }
-        )
-        assert publisher.nc == nats_connection
-        assert publisher.js == nats_connection.js
-
-    @pytest.mark.asyncio
-    async def test_initialize_creates_stream_if_not_found(
-        self, nats_connection, publisher
-    ):
-        nats_connection.js.stream_info.side_effect = [
-            natslib.js.errors.NotFoundError,
-            None,
-        ]
-        await publisher.initialize()
-
-        nats_connection.js.add_stream.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_initialize_creates_stream_only_if_not_found(
-        self, nats_connection, publisher
-    ):
-        nats_connection.js.stream_info.return_value = None
-        await publisher.initialize()
-
-        nats_connection.js.add_stream.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_finalize(self, nats_connection, publisher):
-        await publisher.initialize()
-        await publisher.finalize()
+    async def test_finalize(self, publisher, pubsub):
         await publisher.finalize()
 
-        nats_connection.flush.assert_awaited_once()
-        nats_connection.close.assert_awaited_once()
+        pubsub.finalize.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_indexed(self, nats_connection, publisher, index_message):
-        await publisher.initialize()
-
+    async def test_indexed(self, publisher, index_message, pubsub):
         await publisher.indexed(index_message)
 
-        subject = self.target.format(partition=index_message.partition)
-        nats_connection.js.publish.assert_awaited_once()
-        assert nats_connection.js.publish.call_args[0][0] == subject
+        channel = const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=index_message.kbid)
+        pubsub.publish.assert_awaited_once()
+        assert pubsub.publish.call_args[0][0] == channel
 
     @pytest.mark.asyncio
     async def test_indexed_skips_if_no_partition(
-        self, nats_connection, publisher, index_message
+        self, publisher, index_message, pubsub
     ):
-        await publisher.initialize()
         index_message.ClearField("partition")
 
         await publisher.indexed(index_message)
 
-        nats_connection.js.publish.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_indexed_errors_if_not_initialized(self, publisher, index_message):
-        publisher.js = None
-        with pytest.raises(RuntimeError):
-            await publisher.indexed(index_message)
+        pubsub.publish.assert_not_awaited()
 
 
 class TestSubscriptionWorker:

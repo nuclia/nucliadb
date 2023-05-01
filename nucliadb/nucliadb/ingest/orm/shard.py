@@ -70,6 +70,7 @@ class Shard(AbstractShard):
             indexpb.resource = uuid
             indexpb.typemessage = TypeMessage.DELETION
             indexpb.partition = partition
+            indexpb.kbid = kb
             await indexing.index(indexpb, node_id)
 
     async def add_resource(

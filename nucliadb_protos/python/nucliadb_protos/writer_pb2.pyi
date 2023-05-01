@@ -1318,10 +1318,12 @@ class Notification(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         COMMIT: Notification._Action.ValueType  # 0
         ABORT: Notification._Action.ValueType  # 1
+        INDEXED: Notification._Action.ValueType  # 2
 
     class Action(_Action, metaclass=_ActionEnumTypeWrapper): ...
     COMMIT: Notification.Action.ValueType  # 0
     ABORT: Notification.Action.ValueType  # 1
+    INDEXED: Notification.Action.ValueType  # 2
 
     PARTITION_FIELD_NUMBER: builtins.int
     MULTI_FIELD_NUMBER: builtins.int

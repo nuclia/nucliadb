@@ -42,21 +42,8 @@ pub struct IndexMessage {
     pub partition: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, tag="8")]
     pub storage_key: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IndexedMessage {
-    #[prost(string, tag="1")]
-    pub node: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub shard: ::prost::alloc::string::String,
-    #[prost(uint64, tag="3")]
-    pub txid: u64,
-    #[prost(string, tag="4")]
-    pub resource: ::prost::alloc::string::String,
-    #[prost(enumeration="TypeMessage", tag="5")]
-    pub typemessage: i32,
-    #[prost(string, tag="6")]
-    pub reindex_id: ::prost::alloc::string::String,
+    #[prost(string, tag="9")]
+    pub kbid: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetGraph {

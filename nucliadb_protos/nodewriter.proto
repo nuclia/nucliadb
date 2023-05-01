@@ -35,15 +35,7 @@ message IndexMessage {
     string reindex_id = 6;
     optional string partition = 7;
     string storage_key = 8;
-}
-
-message IndexedMessage {
-    string node = 1;
-    string shard = 2;
-    uint64 txid = 3;
-    string resource = 4;
-    TypeMessage typemessage = 5;
-    string reindex_id = 6;
+    string kbid = 9;
 }
 
 message SetGraph {

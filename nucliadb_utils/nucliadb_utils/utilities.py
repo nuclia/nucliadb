@@ -47,12 +47,12 @@ from nucliadb_utils.settings import (
 )
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
-from nucliadb_utils.transaction import TransactionUtility
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb_utils.storages.local import LocalStorage
     from nucliadb_utils.storages.nuclia import NucliaStorage
     from nucliadb_utils.storages.storage import Storage
+    from nucliadb_utils.transaction import TransactionUtility
 
 
 class Utility(str, Enum):
