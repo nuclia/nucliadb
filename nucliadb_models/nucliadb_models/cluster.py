@@ -24,11 +24,11 @@ from pydantic import BaseModel
 
 
 class MemberType(str, Enum):
-    IO = "io"
-    SEARCH = "search"
-    INGEST = "ingest"
-    TRAIN = "train"
-    UNKNOWN = "unknown"
+    IO = "Io"
+    SEARCH = "Search"
+    INGEST = "Ingest"
+    TRAIN = "Train"
+    UNKNOWN = "Unknown"
 
     @staticmethod
     def from_pb(node_type: Member.Type.ValueType):

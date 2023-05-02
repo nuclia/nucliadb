@@ -41,7 +41,7 @@ async def test_chitchat_monitor(chitchat_monitor_client):
         member = dict(
             node_id=f"node",
             listen_addr=f"10.0.0.0",
-            type="io",
+            type="Io",
             is_self=False,
             load_score=11.52,
             shard_count=20,

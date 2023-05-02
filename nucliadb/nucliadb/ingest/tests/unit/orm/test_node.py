@@ -32,10 +32,10 @@ from nucliadb_utils.keys import KB_SHARDS
 
 def test_member_type_from_str():
     for raw_type, member_type in [
-        ("io", MemberType.IO),
-        ("train", MemberType.TRAIN),
-        ("ingest", MemberType.INGEST),
-        ("search", MemberType.SEARCH),
+        ("Io", MemberType.IO),
+        ("Train", MemberType.TRAIN),
+        ("Ingest", MemberType.INGEST),
+        ("Search", MemberType.SEARCH),
         ("Blablabla", MemberType.UNKNOWN),
         ("Cat is everything", MemberType.UNKNOWN),
     ]:
