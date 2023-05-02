@@ -145,7 +145,7 @@ class TestIndexedPublisher:
             await publisher.indexed(index_message)
 
 
-class TestSubsciptionWorker:
+class TestSubscriptionWorker:
     @pytest.fixture(scope="function")
     def settings(self):
         previous = settings.data_path
