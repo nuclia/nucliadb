@@ -59,7 +59,7 @@ async def test_get_file_page_positions():
     ],
 )
 def test_maybe_update_basic_summary(basic, summary, updated):
-    assert maybe_update_basic_summary(basic, summary) == updated
+    assert maybe_update_basic_summary(basic, summary) is updated
     if updated:
         assert basic.summary == summary
     else:
