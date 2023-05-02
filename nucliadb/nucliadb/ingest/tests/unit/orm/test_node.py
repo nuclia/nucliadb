@@ -36,22 +36,20 @@ def test_member_type_from_str():
         ("Train", MemberType.TRAIN),
         ("Ingest", MemberType.INGEST),
         ("Search", MemberType.SEARCH),
-        ("Blablabla", MemberType.UNKNOWN),
-        ("Cat is everything", MemberType.UNKNOWN),
     ]:
-        assert MemberType.from_str(raw_type) == member_type
+        assert MemberType(raw_type) == member_type
 
 
 def test_member_type_pb_conversion():
-    for member_type, member_type in [
+    for member_type, pb_member_type in [
         (MemberType.IO, Member.Type.IO),
         (MemberType.TRAIN, Member.Type.TRAIN),
         (MemberType.INGEST, Member.Type.INGEST),
         (MemberType.SEARCH, Member.Type.SEARCH),
         (MemberType.UNKNOWN, Member.Type.UNKNOWN),
     ]:
-        assert member_type.to_pb() == member_type
-        assert MemberType.from_pb(member_type) == member_type
+        assert member_type.to_pb() == pb_member_type
+        assert MemberType.from_pb(pb_member_type) == member_type
 
 
 async def get_kb_shards(txn, kbid):
