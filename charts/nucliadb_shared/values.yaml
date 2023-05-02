@@ -4,7 +4,6 @@ running:
   debug: False
   log_level: DEBUG
   running_environment: local
-  logging_integration: False
 
 http:
   cors:

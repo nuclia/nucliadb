@@ -18,8 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import logging
-import sys
 
 import pkg_resources
 
@@ -34,6 +32,7 @@ from nucliadb.ingest.orm.knowledgebox import (
 )
 from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
@@ -146,12 +145,8 @@ async def main():
 
 
 def run() -> int:  # pragma: no cover
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    setup_logging()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
-        stream=sys.stderr,
-    )
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     return asyncio.run(main())

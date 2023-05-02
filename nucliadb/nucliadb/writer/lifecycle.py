@@ -17,12 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-import sys
-
 from nucliadb.ingest.processing import ProcessingEngine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
-from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.tus import finalize as storage_finalize
 from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb.writer.utilities import get_processing
@@ -30,7 +27,6 @@ from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
-    running_settings,
     storage_settings,
     transaction_settings,
 )
@@ -76,15 +72,6 @@ async def initialize():
         await transaction_utility.initialize(SERVICE_NAME)
     set_utility(Utility.TRANSACTION, transaction_utility)
     await storage_initialize()
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
-    )
-
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
 
 
 async def finalize():

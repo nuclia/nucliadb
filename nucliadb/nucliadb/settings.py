@@ -48,6 +48,3 @@ class Settings(DriverSettings, StorageSettings):
     http_port: int = pydantic.Field(8080, description="HTTP Port")
     ingest_grpc_port: int = pydantic.Field(8030, description="Ingest GRPC Port int")
     train_grpc_port: int = pydantic.Field(8031, description="Train GRPC Port int")
-    log_level: LogLevel = pydantic.Field(
-        LogLevel.INFO, description="Log level [DEBUG,INFO,ERROR] string"
-    )

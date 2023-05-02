@@ -19,7 +19,6 @@
 
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
-import logging
 from typing import Any, ContextManager, Optional
 
 import pydantic
@@ -27,11 +26,10 @@ import pydantic
 try:
     import sentry_sdk
     from sentry_sdk import Scope
-    from sentry_sdk.integrations.logging import LoggingIntegration
 
     SENTRY = True
 except ImportError:  # pragma: no cover
-    Scope = LoggingIntegration = sentry_sdk = None  # type: ignore
+    Scope = sentry_sdk = None  # type: ignore
     SENTRY = False
 
 
@@ -75,25 +73,22 @@ class ErrorHandlingSettings(pydantic.BaseSettings):
     environment: str = pydantic.Field(
         "local", env=["environment", "running_environment"]
     )
-    logging_integration: bool = False
 
 
 def setup_error_handling(version: str) -> None:
     settings = ErrorHandlingSettings()
 
     if settings.sentry_url:
-        enabled_integrations: list[Any] = []
-
-        if settings.logging_integration:
-            sentry_logging = LoggingIntegration(
-                level=logging.CRITICAL, event_level=logging.CRITICAL
-            )
-            enabled_integrations.append(sentry_logging)
+        # Disabled everywhere for now. Let's have less knobs to tweak.
+        # Either we use with with sentry or we don't.
+        # enabled_integrations: list[Any] = [
+        #     LoggingIntegration(level=logging.CRITICAL, event_level=logging.CRITICAL)
+        # ]
 
         sentry_sdk.init(
             release=version,
             environment=settings.environment,
             dsn=settings.sentry_url,
-            integrations=enabled_integrations,
+            integrations=[],
             default_integrations=False,
         )

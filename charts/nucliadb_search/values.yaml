@@ -45,7 +45,6 @@ services:
 
 running:
   sentry_url:
-  chitchat_level: INFO
 
 chitchat:
   cluster_manager:

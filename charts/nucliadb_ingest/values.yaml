@@ -62,7 +62,6 @@ services:
 
 running:
   sentry_url:
-  activity_log_level: INFO
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
