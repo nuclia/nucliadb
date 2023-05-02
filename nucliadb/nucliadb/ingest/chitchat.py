@@ -23,8 +23,8 @@ import asyncio
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, Response
-from uvicorn.config import Config
-from uvicorn.server import Server
+from uvicorn.config import Config  # type: ignore
+from uvicorn.server import Server  # type: ignore
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import NODES, Node
