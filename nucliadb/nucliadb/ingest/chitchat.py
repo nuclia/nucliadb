@@ -30,7 +30,7 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import NODES, Node
 from nucliadb.ingest.settings import settings
 from nucliadb_models.cluster import ClusterMember, MemberType
-from nucliadb_telemetry import metrics
+from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.fastapi.run import run_server_forever
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
@@ -165,6 +165,15 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
                 destroyed_node_ids.append(key)
                 logger.warning(f"{key}/{node.type} remove {node.address}")
                 await Node.destroy(key)
+
+    try:
+        if len(destroyed_node_ids) > 1:
+            raise Exception(
+                f"{len(destroyed_node_ids)} nodes are down simultaneously. This should never happen!"
+            )
+    except Exception as e:
+        logger.error(str(e))
+        errors.capture_exception(e)
 
     update_node_metrics(NODES, destroyed_node_ids)
 
