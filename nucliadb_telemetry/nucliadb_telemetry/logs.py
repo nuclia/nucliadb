@@ -150,37 +150,49 @@ class UvicornAccessFormatter(JSONFormatter):
 _ACCESS_LOGGER_NAME = "uvicorn.access"
 
 
+_default_logger_levels = {
+    # some are too chatty
+    "uvicorn.error": LogLevel.WARNING,
+    "nucliadb_utils.utilities": LogLevel.WARNING,
+    # needed always for access logs
+    _ACCESS_LOGGER_NAME: LogLevel.INFO,
+}
+
+
 def setup_logging() -> None:
     settings = LogSettings()
 
     if settings.logger_levels is None:
         settings.logger_levels = {}
-    if _ACCESS_LOGGER_NAME not in settings.logger_levels:
-        settings.logger_levels[
-            _ACCESS_LOGGER_NAME
-        ] = LogLevel.INFO  # always have INFO here so we get access logs
+
+    for logger_name, level in _default_logger_levels.items():
+        if logger_name not in settings.logger_levels:
+            settings.logger_levels[logger_name] = level
 
     formatter = JSONFormatter()
-    access_formatter = UvicornAccessFormatter()
-
     json_handler = logging.StreamHandler()
     json_handler.setFormatter(formatter)
-    access_handler = logging.StreamHandler()
-    access_handler.setFormatter(access_formatter)
     stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(
+        logging.Formatter(
+            "[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s"
+        )
+    )
 
     root_logger = logging.getLogger()
     access_logger = logging.getLogger(_ACCESS_LOGGER_NAME)
     access_logger.handlers = []
     if not settings.debug:
         root_logger.addHandler(json_handler)
+        access_handler = logging.StreamHandler()
+        access_handler.setFormatter(UvicornAccessFormatter())
         access_logger.addHandler(access_handler)
     else:
         root_logger.addHandler(stream_handler)
         # regular stream access logs
-        access_log_handler = logging.StreamHandler()
-        access_log_handler.setFormatter(AccessFormatter())
-        access_logger.addHandler(stream_handler)
+        access_handler = logging.StreamHandler()
+        access_handler.setFormatter(AccessFormatter())  # not json based
+        access_logger.addHandler(access_handler)
 
     root_logger.setLevel(getattr(logging, settings.log_level.value))
 

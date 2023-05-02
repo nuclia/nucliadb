@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb_utils import featureflagging, logger
+from nucliadb_utils import featureflagging
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -53,6 +54,8 @@ if TYPE_CHECKING:  # pragma: no cover
     from nucliadb_utils.storages.local import LocalStorage
     from nucliadb_utils.storages.nuclia import NucliaStorage
     from nucliadb_utils.storages.storage import Storage
+
+logger = logging.getLogger(__name__)
 
 
 class Utility(str, Enum):

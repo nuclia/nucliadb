@@ -23,6 +23,7 @@ import os
 import pydantic_argparse
 import uvicorn  # type: ignore
 from fastapi.staticfiles import StaticFiles
+from nucliadb_telemetry.logs import setup_logging
 
 from nucliadb.config import config_nucliadb
 from nucliadb.settings import Settings
@@ -46,6 +47,8 @@ def run():
 
 
 def run_nucliadb(nucliadb_args: Settings):
+    setup_logging()
+
     from nucliadb.one.app import application
 
     path = os.path.dirname(__file__) + "/static"

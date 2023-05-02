@@ -51,7 +51,6 @@ def metrics_app() -> tuple[Server, Config]:
         backlog=2047,
         limit_max_requests=None,
         timeout_keep_alive=5,
-        access_log=False,
     )
     metrics_server = Server(config=metrics_config)
     return metrics_server, metrics_config
