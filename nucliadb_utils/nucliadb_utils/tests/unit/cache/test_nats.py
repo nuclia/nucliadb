@@ -33,7 +33,9 @@ def nats_conn():
 
 @pytest.fixture()
 async def pubsub(nats_conn):
-    yield NatsPubsub()
+    ps = NatsPubsub()
+    ps.nc = nats_conn
+    yield ps
 
 
 @pytest.mark.asyncio
