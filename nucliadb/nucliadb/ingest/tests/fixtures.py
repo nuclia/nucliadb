@@ -599,8 +599,8 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
 
     r1 = upb.Relation(
         relation=upb.Relation.CHILD,
-        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.MemberType.RESOURCE),
-        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.MemberType.RESOURCE),
+        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
     )
 
     basic.usermetadata.relations.append(r1)
@@ -621,8 +621,8 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
     rels = []
     r1 = upb.Relation(
         relation=upb.Relation.CHILD,
-        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.MemberType.RESOURCE),
-        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.MemberType.RESOURCE),
+        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
     )
 
     rels.append(r1)

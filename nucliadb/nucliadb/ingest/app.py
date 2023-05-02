@@ -113,7 +113,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     ]
 
     if chitchat is not None:
-        finalizers.append(chitchat.close)
+        finalizers.append(chitchat.finalize)
 
     return finalizers
 
