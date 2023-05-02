@@ -34,7 +34,7 @@ parse_duration = "2.1.1"
 derive_builder = "0.12.0"
 derive_more = { version = "0.99.17", default-features = false, features = ["display", "deref", "deref_mut"] }
 futures = "0.3.25"
-reqwest = "0.11.16"
+reqwest = { version = "0.11.17", default-features = true,  features = ["json"] }
 
 [dev-dependencies]
 serde_test = "1.0.150"

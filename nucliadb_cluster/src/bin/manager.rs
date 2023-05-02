@@ -41,7 +41,7 @@ async fn send_update(
 ) -> anyhow::Result<()> {
     if !cluster_snapshot.is_empty() {
         let url = format!("http://{}/members", &args.monitor_addr);
-        let res = client.post(&url).json(&cluster_snapshot).send().await?;
+        let res = client.patch(&url).json(&cluster_snapshot).send().await?;
         if !res.status().is_success() {
             bail!("Can't send cluster snapshot to monitor");
         }
@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             },
             Some(live_nodes) = cluster_watcher.next() => {
-                info!("Something changed in cluster");
+                info!("Something changed in the cluster");
 
                 let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
