@@ -211,6 +211,6 @@ class TrainNodesManager:
             if rid is not None:
                 resource = await kb.get(rid.decode())
                 if resource is not None:
-                    yield await resource.get_resource(request.metadata)
+                    yield await resource.generate_train_resource(request.metadata)
 
         await txn.abort()

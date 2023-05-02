@@ -1116,7 +1116,9 @@ class Resource:
                 pb_field.metadata.CopyFrom(metadata)
                 yield pb_field
 
-    async def get_resource(self, enabled_metadata: EnabledMetadata) -> TrainResource:
+    async def generate_train_resource(
+        self, enabled_metadata: EnabledMetadata
+    ) -> TrainResource:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         if enabled_metadata.labels:
