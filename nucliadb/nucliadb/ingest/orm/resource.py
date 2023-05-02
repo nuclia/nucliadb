@@ -19,6 +19,8 @@
 #
 from __future__ import annotations
 
+import asyncio
+from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import Basic
@@ -737,7 +739,8 @@ class Resource:
             None,
         )
 
-        self.indexer.apply_field_metadata(
+        apply_field_metadata = partial(
+            self.indexer.apply_field_metadata,
             field_key,
             metadata,
             replace_field=replace_field,
@@ -746,6 +749,8 @@ class Resource:
             extracted_text=await field_obj.get_extracted_text(),
             basic_user_field_metadata=user_field_metadata,
         )
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, apply_field_metadata)
 
         maybe_update_basic_thumbnail(
             self.basic, field_metadata.metadata.metadata.thumbnail
