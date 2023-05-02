@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
+    FieldText,
     FieldType,
     LargeComputedMetadataWrapper,
 )
@@ -65,7 +66,6 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
-from nucliadb_models.text import TEXT_FORMAT_TO_ICON
 from nucliadb_models.writer import GENERIC_MIME_TYPE
 from nucliadb_utils.storages.storage import Storage
 
@@ -103,6 +103,14 @@ KB_REVERSE: Dict[str, int] = {
 }
 
 KB_REVERSE_REVERSE = {v: k for k, v in KB_REVERSE.items()}
+
+
+PB_TEXT_FORMAT_TO_MIMETYPE = {
+    FieldText.Format.PLAIN: "text/plain",
+    FieldText.Format.HTML: "text/html",
+    FieldText.Format.RST: "text/x-rst",
+    FieldText.Format.MARKDOWN: "text/markdown",
+}
 
 
 class Resource:
@@ -615,7 +623,7 @@ class Resource:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
             basic_modified = True
 
-        if maybe_update_basic_icon(self.basic, get_text_field_icon(message)):
+        if maybe_update_basic_icon(self.basic, get_text_field_mimetype(message)):
             basic_modified = True
 
         for extracted_text in message.extracted_text:
@@ -1219,13 +1227,13 @@ def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
     return True
 
 
-def maybe_update_basic_icon(basic: PBBasic, icon: Optional[str]):
+def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]):
     if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
         # Icon already set or detected
         return False
-    if not icon:
+    if not mimetype:
         return False
-    basic.icon = icon
+    basic.icon = mimetype
     return True
 
 
@@ -1238,8 +1246,8 @@ def maybe_update_basic_thumbnail(
     return True
 
 
-def get_text_field_icon(bm: BrokerMessage) -> Optional[str]:
+def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
     if len(bm.texts) == 0:
         return None
     text_format = next(iter(bm.texts.values())).format
-    return TEXT_FORMAT_TO_ICON[text_format]
+    return PB_TEXT_FORMAT_TO_MIMETYPE[text_format]

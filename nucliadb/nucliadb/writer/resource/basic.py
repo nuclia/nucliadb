@@ -44,7 +44,7 @@ from nucliadb_models.metadata import (
     RelationNodeTypeMap,
     RelationTypeMap,
 )
-from nucliadb_models.text import TEXT_FORMAT_TO_ICON, PushTextFormat, Text
+from nucliadb_models.text import TEXT_FORMAT_TO_MIMETYPE, PushTextFormat, Text
 from nucliadb_models.writer import (
     GENERIC_MIME_TYPE,
     ComingResourcePayload,
@@ -243,7 +243,7 @@ def parse_icon(bm: BrokerMessage, item: ComingResourcePayload):
     elif len(item.texts) > 0:
         # Infer icon from text file format
         format = next(iter(item.texts.values())).format
-        bm.basic.icon = TEXT_FORMAT_TO_ICON[format]
+        bm.basic.icon = TEXT_FORMAT_TO_MIMETYPE[format]
     else:
         # Default
         bm.basic.icon = GENERIC_MIME_TYPE

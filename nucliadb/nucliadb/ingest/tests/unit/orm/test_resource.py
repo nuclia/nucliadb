@@ -23,19 +23,22 @@ import pytest
 from nucliadb_protos.resources_pb2 import (
     Basic,
     CloudFile,
+    FieldText,
     FileExtractedData,
     PagePositions,
 )
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.resource import (
     get_file_page_positions,
+    get_text_field_mimetype,
+    maybe_update_basic_icon,
     maybe_update_basic_summary,
     maybe_update_basic_thumbnail,
 )
 
-pytestmark = pytest.mark.asyncio
 
-
+@pytest.mark.asyncio
 async def test_get_file_page_positions():
     extracted_data = FileExtractedData()
     extracted_data.file_pages_previews.positions.extend(
@@ -81,3 +84,37 @@ def test_maybe_update_basic_thumbnail(basic, thumbnail, updated):
         assert basic.thumbnail == thumbnail.uri
     else:
         assert basic.thumbnail == "old_thumbnail_url"
+
+
+@pytest.mark.parametrize(
+    "text_format,mimetype",
+    [
+        (None, None),
+        (FieldText.Format.PLAIN, "text/plain"),
+        (FieldText.Format.HTML, "text/html"),
+        (FieldText.Format.RST, "text/x-rst"),
+        (FieldText.Format.MARKDOWN, "text/markdown"),
+    ],
+)
+def test_get_text_field_mimetype(text_format, mimetype):
+    message = BrokerMessage()
+    if text_format is not None:
+        message.texts["foo"].body = "foo"
+        message.texts["foo"].format = text_format
+    assert get_text_field_mimetype(message) == mimetype
+
+
+@pytest.mark.parametrize(
+    "basic,icon,updated",
+    [
+        (Basic(), None, False),
+        (Basic(icon="text/plain"), "text/html", False),
+        (Basic(), "text/html", True),
+        (Basic(icon=""), "text/html", True),
+        (Basic(icon="application/octet-stream"), "text/html", True),
+    ],
+)
+def test_maybe_update_basic_icon(basic, icon, updated):
+    assert maybe_update_basic_icon(basic, icon) == updated
+    if updated:
+        assert basic.icon == icon
