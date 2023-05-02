@@ -5,7 +5,6 @@ isort:skip_file
 import builtins
 import google.protobuf.descriptor
 import google.protobuf.message
-import nucliadb_protos.noderesources_pb2
 import sys
 
 if sys.version_info >= (3, 8):
@@ -59,23 +58,3 @@ class Counter(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["paragraphs", b"paragraphs", "resources", b"resources"]) -> None: ...
 
 global___Counter = Counter
-
-@typing_extensions.final
-class ShadowShardResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SUCCESS_FIELD_NUMBER: builtins.int
-    SHARD_FIELD_NUMBER: builtins.int
-    success: builtins.bool
-    @property
-    def shard(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    def __init__(
-        self,
-        *,
-        success: builtins.bool = ...,
-        shard: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard", b"shard"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["shard", b"shard", "success", b"success"]) -> None: ...
-
-global___ShadowShardResponse = ShadowShardResponse

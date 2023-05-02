@@ -35,7 +35,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList,
     VectorSetList,
 )
-from nucliadb_protos.nodesidecar_pb2 import Counter, ShadowShardResponse
+from nucliadb_protos.nodesidecar_pb2 import Counter
 from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 from nucliadb_protos.utils_pb2 import Relation
 
@@ -133,11 +133,3 @@ class DummySidecarStub:  # pragma: no cover
     async def GetCount(self, data):
         self.calls.setdefault("GetCount", []).append(data)
         return Counter(paragraphs=2, resources=2)
-
-    async def CreateShadowShard(self, data):
-        self.calls.setdefault("CreateShadowShard", []).append(data)
-        return ShadowShardResponse(success=True, shard=ShardId(id="shadow"))
-
-    async def DeleteShadowShard(self, data):
-        self.calls.setdefault("DeleteShadowShard", []).append(data)
-        return ShadowShardResponse(success=True, shard=ShardId(id="shadow"))

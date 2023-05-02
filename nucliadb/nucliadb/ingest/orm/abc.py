@@ -111,18 +111,6 @@ class AbstractNode(metaclass=ABCMeta):
         pass
 
     @classmethod
-    async def create_shadow_shard(
-        cls, txn: Transaction, kbid: str, node_id: str, replica_id: str
-    ):  # pragma: no cover
-        raise NotImplementedError()
-
-    @classmethod
-    async def delete_shadow_shard(
-        cls, txn: Transaction, kbid: str, replica_id: str
-    ):  # pragma: no cover
-        raise NotImplementedError()
-
-    @classmethod
     @abstractmethod
     async def get_current_active_shard(
         cls, txn: Transaction, kbid: str

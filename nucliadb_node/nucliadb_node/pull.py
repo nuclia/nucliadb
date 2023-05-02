@@ -46,7 +46,7 @@ from nucliadb_utils.utilities import (
     get_transaction_utility,
 )
 
-from nucliadb_node import SERVICE_NAME, logger, shadow_shards
+from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
@@ -90,7 +90,6 @@ class Worker:
         self.event = asyncio.Event()
         self.node = node
         self.gc_task = None
-        self.ssm = shadow_shards.get_manager()
         self.publisher = IndexedPublisher(
             stream=indexing_settings.indexed_jetstream_stream,
             subject=indexing_settings.indexed_jetstream_target,
@@ -136,7 +135,6 @@ class Worker:
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
-        await self.ssm.load()
         self.event.clear()
         await self.subscriber_initialize()
         await self.publisher.initialize()
@@ -218,31 +216,19 @@ class Worker:
             # First time the consumer is started
             self.last_seqid = None
 
-    async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+    async def set_resource(self, pb: IndexMessage) -> OpStatus:
         brain: Resource = await self.storage.get_indexing(pb)
         brain.shard_id = brain.resource.shard_id = pb.shard
-        is_shadow_shard = self.ssm.exists(pb.shard)
-        logger.info(
-            f"Added [shadow={is_shadow_shard}] {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
-        )
-        status: Optional[OpStatus] = None
-        if is_shadow_shard:
-            await self.ssm.set_resource(brain, pb.shard, pb.txid)
-        else:
-            status = await self.writer.set_resource(brain)
+        logger.info(f"Added {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}")
+        status = await self.writer.set_resource(brain)
         logger.info(f"...done")
         del brain
         return status
 
-    async def delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
-        is_shadow_shard = self.ssm.exists(pb.shard)
-        logger.info(f"Deleting [shadow={is_shadow_shard}] {pb.resource} otx:{pb.txid}")
-        status: Optional[OpStatus] = None
-        if is_shadow_shard:
-            await self.ssm.delete_resource(pb.resource, pb.shard, pb.txid)
-        else:
-            rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
-            status = await self.writer.delete_resource(rid)
+    async def delete_resource(self, pb: IndexMessage) -> OpStatus:
+        logger.info(f"Deleting {pb.resource} otx:{pb.txid}")
+        rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
+        status = await self.writer.delete_resource(rid)
         logger.info(f"...done")
         return status
 

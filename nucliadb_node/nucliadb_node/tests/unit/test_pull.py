@@ -145,7 +145,7 @@ class TestIndexedPublisher:
             await publisher.indexed(index_message)
 
 
-class TestSubsciptionWorker:
+class TestSubscriptionWorker:
     @pytest.fixture(scope="function")
     def settings(self):
         previous = settings.data_path
@@ -167,9 +167,7 @@ class TestSubsciptionWorker:
     def worker(self, settings, nats_conn):
         writer = AsyncMock()
         reader = AsyncMock()
-        with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
-            "nucliadb_node.pull.shadow_shards.get_manager", return_value=AsyncMock()
-        ):
+        with mock.patch("nucliadb_node.pull.get_storage"):
             worker = Worker(writer, reader, "node")
             worker.store_seqid = Mock()
             yield worker

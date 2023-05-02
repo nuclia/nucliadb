@@ -23,9 +23,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from lru import LRU  # type: ignore
-from nucliadb_protos.noderesources_pb2 import (
-    Resource as PBBrainResource,  # type: ignore
-)
+from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodesidecar_pb2 import Counter
@@ -49,14 +47,11 @@ class Shard(AbstractShard):
 
     def indexing_replicas(self) -> List[Tuple[str, str]]:
         """
-        Returns the replica ids and nodes for the shard replicas and the shadow shards (if present)
+        Returns the replica ids and nodes for the shard replicas
         """
         result = []
         for replica in self.shard.replicas:
             result.append((replica.shard.id, replica.node))
-            if replica.HasField("shadow_replica"):
-                shadow_replica = replica.shadow_replica
-                result.append((shadow_replica.shard.id, shadow_replica.node))
         return result
 
     async def delete_resource(self, uuid: str, txid: int, partition: str, kb: str):
