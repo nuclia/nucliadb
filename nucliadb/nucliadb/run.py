@@ -23,10 +23,10 @@ import os
 import pydantic_argparse
 import uvicorn  # type: ignore
 from fastapi.staticfiles import StaticFiles
-from nucliadb_telemetry.logs import setup_logging
 
 from nucliadb.config import config_nucliadb
 from nucliadb.settings import Settings
+from nucliadb_telemetry.logs import setup_logging
 
 logger = logging.getLogger(__name__)
 
