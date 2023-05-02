@@ -9,7 +9,7 @@ RUN apt-get -y update \
     cmake \
     libpq-dev \
     libpq5  \
-    libssl-dev \
+    libssl1.1 \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
