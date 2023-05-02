@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 
 from nucliadb.config import config_nucliadb
 from nucliadb.settings import Settings
+from nucliadb_telemetry.logs import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ def run():
 
 
 def run_nucliadb(nucliadb_args: Settings):
+    setup_logging()
+
     from nucliadb.one.app import application
 
     path = os.path.dirname(__file__) + "/static"
