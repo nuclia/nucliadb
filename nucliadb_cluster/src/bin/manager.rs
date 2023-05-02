@@ -1,15 +1,14 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use clap::Parser;
 use log::{debug, error, info};
 use nucliadb_cluster::{node, Node, NodeSnapshot, NodeType};
-use rand::Rng;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{self, TcpStream};
+use reqwest::Client;
+use tokio::net::{self};
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
 use tokio_stream::StreamExt;
 
 #[derive(Debug, Parser)]
@@ -35,60 +34,18 @@ struct Args {
     update_interval: Duration,
 }
 
-async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
-    loop {
-        match TcpStream::connect(&monitor_addr).await {
-            Ok(mut s) => {
-                break Ok(s);
-            }
-            Err(e) => {
-                error!("Can't connect to monitor socket: {e}. Sleep 200ms and reconnect");
-                tokio::time::sleep(Duration::from_millis(200)).await;
-                continue;
-            }
-        }
-    }
-}
-
 async fn send_update(
     cluster_snapshot: Vec<NodeSnapshot>,
-    stream: &mut TcpStream,
+    client: &mut Client,
     args: &Args,
 ) -> anyhow::Result<()> {
-
     if !cluster_snapshot.is_empty() {
-        let serial = serde_json::to_string(&cluster_snapshot)
-            .map_err(|e| anyhow!("Cannot serialize cluster cluster snapshot: {e}"))?;
-
-        stream
-            .write_buf(&mut serial.as_bytes())
-            .await
-            .map_err(|e| anyhow!("Error during sending cluster cluster snapshot: {e}"))?;
-
-        stream
-            .flush()
-            .await
-            .map_err(|e| anyhow!("Error during flushing stream: {e}"))?;
-
-        let mut buffer = vec![];
-
-        stream
-            .read_buf(&mut buffer)
-            .await
-            .map_err(Into::into)
-            .and_then(|n| {
-                if n == 0 {
-                    Err(anyhow!("None update answer"))
-                } else if buffer.try_into().map(u32::from_be_bytes)
-                    != Ok(cluster_snapshot.len() as u32)
-                {
-                    Err(anyhow!("Received invalid update answer"))
-                } else {
-                    Ok(())
-                }
-            })?;
+        let url = format!("http://{}/members", &args.monitor_addr);
+        let res = client.post(&url).json(&cluster_snapshot).send().await?;
+        if !res.status().is_success() {
+            bail!("Can't send cluster snapshot to monitor");
+        }
     }
-
     Ok(())
 }
 
@@ -127,15 +84,11 @@ async fn main() -> anyhow::Result<()> {
     let node = node.start().await?;
 
     let mut cluster_watcher = node.cluster_watcher().await;
-    let mut writer = get_stream(arg.monitor_addr.clone())
-        .await
-        .with_context(|| "Can't create update writer")?;
-
+    let mut client = Client::new();
     loop {
         tokio::select! {
             _ = termination.recv() => {
                 node.shutdown().await?;
-                writer.shutdown().await?;
                 break
             },
             _ = sleep(arg.update_interval) => {
@@ -146,23 +99,23 @@ async fn main() -> anyhow::Result<()> {
 
                 debug!("Cluster snapshot {cluster_snapshot:?}");
 
-                if let Err(e) = send_update(cluster_snapshot, &mut writer, &arg).await {
+                if let Err(e) = send_update(cluster_snapshot, &mut client, &arg).await {
                     error!("Send cluster cluster_snapshot failed: {e}");
                 } else {
-                    info!("Update sended")
+                    debug!("Update sent")
                 }
             },
             Some(live_nodes) = cluster_watcher.next() => {
-                debug!("Something changed in cluster");
+                info!("Something changed in cluster");
 
                 let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
-                debug!("Cluster snapshot {cluster_snapshot:?}");
+                info!("Cluster snapshot {cluster_snapshot:?}");
 
-                if let Err(e) = send_update(cluster_snapshot, &mut writer, &arg).await {
+                if let Err(e) = send_update(cluster_snapshot, &mut client, &arg).await {
                     error!("Send cluster cluster_snapshot failed: {e}");
                 } else {
-                    info!("Update sended")
+                    info!("Update sent")
                 }
             }
         };

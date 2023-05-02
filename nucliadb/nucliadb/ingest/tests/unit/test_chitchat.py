@@ -93,11 +93,15 @@ async def test_update_available_nodes():
     # Check that it updates loads score for registered members
     member.load_score = 30
     member.shard_count = 2
-    await update_available_nodes([member])
-    assert len(NODES) == 1
+    member2 = get_cluster_member(node_id="node2", load_score=10, shard_count=1)
+    await update_available_nodes([member, member2])
+    assert len(NODES) == 2
     node = NODES["node1"]
     assert node.load_score == 30
     assert node.shard_count == 2
+    node2 = NODES["node2"]
+    assert node2.load_score == 10
+    assert node2.shard_count == 1
 
     # Check that it removes members that are no longer reported
     await update_available_nodes([])
