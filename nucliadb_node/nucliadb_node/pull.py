@@ -29,19 +29,17 @@ from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
-from nucliadb_protos.nodewriter_pb2 import (
-    IndexedMessage,
-    IndexMessage,
-    OpStatus,
-    TypeMessage,
-)
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
+from nucliadb_protos.writer_pb2 import Notification
 from nucliadb_telemetry import errors, metrics
+from nucliadb_utils import const
 from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
+    get_pubsub,
     get_storage,
     get_transaction_utility,
 )
@@ -90,18 +88,14 @@ class Worker:
         self.event = asyncio.Event()
         self.node = node
         self.gc_task = None
-        self.publisher = IndexedPublisher(
-            stream=indexing_settings.indexed_jetstream_stream,
-            subject=indexing_settings.indexed_jetstream_target,
-            auth=indexing_settings.index_jetstream_auth,
-            servers=indexing_settings.index_jetstream_servers,
-        )
+        self.publisher = IndexedPublisher()
         self.load_seqid()
 
     async def finalize(self):
         if self.gc_task:
             self.gc_task.cancel()
 
+        await self.publisher.finalize()
         await self.subscriber_finalize()
 
         transaction_utility = get_transaction_utility()
@@ -109,7 +103,6 @@ class Worker:
             await transaction_utility.finalize()
             clean_utility(Utility.TRANSACTION)
 
-        await self.publisher.finalize()
         await self.storage.finalize()
 
     async def disconnected_cb(self):
@@ -331,79 +324,29 @@ class Worker:
 
 
 class IndexedPublisher:
-    def __init__(
-        self,
-        stream: str,
-        subject: str,
-        servers: List[str],
-        auth: Optional[str],
-    ):
-        self.stream = stream
-        self.subject = subject
-        self.auth: Optional[str] = auth
-        self.servers: List[str] = servers
-        self.js = None
-        self.nc = None
+    def __init__(self):
+        self.pubsub = None
 
     async def initialize(self):
-        options = dict(
-            closed_cb=self.on_connection_closed,
-            reconnected_cb=self.on_reconnection,
-        )
-        if self.auth is not None:
-            options["user_credentials"] = self.auth
-        if len(self.servers) > 0:
-            options["servers"] = self.servers
-        self.nc = await nats.connect(**options)
-        self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
-        await self.create_stream_if_not_exists()
-
-    async def create_stream_if_not_exists(self):
-        try:
-            await self.js.stream_info(self.stream)
-        except StreamNotFoundError:
-            logger.info("Creating publisher stream")
-            await self.js.add_stream(
-                name=self.stream,
-                subjects=[self.subject.format(partition=">")],
-            )
-            await self.js.stream_info(self.stream)
-
-    async def on_reconnection(self):
-        logger.warning(
-            "Got reconnected to NATS {url}".format(url=self.nc.connected_url)
-        )
-
-    async def on_connection_closed(self):
-        logger.warning("Connection is closed on NATS")
+        self.pubsub = await get_pubsub()
 
     async def finalize(self):
-        if self.nc is not None:
-            try:
-                await self.nc.flush()
-                await self.nc.close()
-            except (RuntimeError, AttributeError):  # pragma: no cover
-                # RuntimeError: can be thrown if event loop is closed
-                # AttributeError: can be thrown by nats-py when handling shutdown
-                pass
-            self.nc = None
+        await self.pubsub.finalize()
 
     async def indexed(self, indexpb: IndexMessage):
-        if self.js is None:
-            raise RuntimeError("Not initialized")
-
         if not indexpb.HasField("partition"):
             logger.warning(f"Could not publish message without partition")
             return
 
-        indexedpb = IndexedMessage()
-        indexedpb.node = indexpb.node
-        indexedpb.shard = indexpb.shard
-        indexedpb.txid = indexpb.txid
-        indexedpb.resource = indexpb.resource
-        indexedpb.typemessage = indexpb.typemessage
-        indexedpb.reindex_id = indexpb.reindex_id
-        subject = self.subject.format(partition=indexpb.partition)
-        await self.js.publish(subject, indexedpb.SerializeToString())
-        logger.info(f"Published to indexed stream {subject}")
-        return
+        message = Notification(
+            partition=int(indexpb.partition),
+            seqid=indexpb.txid,
+            uuid=indexpb.resource,
+            kbid=indexpb.kbid,
+            action=Notification.INDEXED,
+        )
+
+        await self.pubsub.publish(
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=indexpb.kbid),
+            message.SerializeToString(),
+        )

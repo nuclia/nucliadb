@@ -17,30 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
-
-from nucliadb_utils import settings as utils_settings
-from pydantic import BaseSettings
+class PubSubChannels:
+    RESOURCE_NOTIFY = "notify.{kbid}"
 
 
-class Settings(BaseSettings):
-    host_key_path: str = "node.key"
-    force_host_id: Optional[str] = None
-
-    writer_listen_address: str = "0.0.0.0:10000"
-    reader_listen_address: str = "0.0.0.0:10001"
-    sidecar_listen_address: str = "0.0.0.0:10002"
-
-    data_path: Optional[str] = None
-
-
-settings = Settings()
-indexing_settings = utils_settings.IndexingSettings()
-
-
-class RunningSettings(BaseSettings):
-    debug: bool = True
-    log_level: str = "DEBUG"
-
-
-running_settings = RunningSettings()
+class Features:
+    WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
+    SEEK_TO_PARAGRAPH = "nucliadb_seek_to_paragraph"

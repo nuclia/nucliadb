@@ -326,6 +326,7 @@ message Notification {
     enum Action {
         COMMIT = 0;
         ABORT = 1;
+        INDEXED = 2;
     }
     Action action = 6;
 }

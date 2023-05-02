@@ -135,7 +135,6 @@ class TransactionSettings(BaseSettings):
     transaction_jetstream_target: str = "ndb.consumer.{partition}"
     transaction_jetstream_group: str = "nucliadb-{partition}"
     transaction_jetstream_stream: str = "nucliadb"
-    transaction_notification: str = "notify.{kbid}"
     transaction_local: bool = False
 
 

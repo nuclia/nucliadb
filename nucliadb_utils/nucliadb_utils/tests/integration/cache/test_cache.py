@@ -44,7 +44,7 @@ async def test_redis_pubsub(redis):
 @pytest.mark.asyncio
 async def test_nats_pubsub(natsd):
     settings.cache_pubsub_driver = "nats"
-    settings.cache_pubsub_nats_url = natsd
+    settings.cache_pubsub_nats_url = [natsd]
     second_pubsub = NatsPubsub(hosts=[natsd], name="second")
     await second_pubsub.initialize()
     await cache_validation(second_pubsub)

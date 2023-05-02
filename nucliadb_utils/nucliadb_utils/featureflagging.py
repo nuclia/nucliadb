@@ -23,6 +23,8 @@ from typing import Any, Optional
 import mrflagly
 import pydantic
 
+from nucliadb_utils import const
+
 
 class Settings(pydantic.BaseSettings):
     environment: str = pydantic.Field(
@@ -33,9 +35,13 @@ class Settings(pydantic.BaseSettings):
 
 DEFAULT_FLAG_DATA: dict[str, Any] = {
     # These are just defaults to use for local dev and tests
-    "nucliadb_seek_to_paragraph": {
+    const.Features.SEEK_TO_PARAGRAPH: {
         "rollout": 0,
         "variants": {"environment": ["stage"]},
+    },
+    const.Features.WAIT_FOR_INDEX: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
     },
 }
 

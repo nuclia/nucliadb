@@ -189,6 +189,7 @@ class Storage:
         response.txid = txid
         response.typemessage = TypeMessage.CREATION
         response.storage_key = key
+        response.kbid = kb
         if partition:
             response.partition = partition
         return response
@@ -218,6 +219,7 @@ class Storage:
         response.reindex_id = reindex_id
         response.typemessage = TypeMessage.CREATION
         response.storage_key = key
+        response.kbid = kb
         if partition:
             response.partition = partition
         return response

@@ -16,31 +16,35 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from typing import Optional
 
-from nucliadb_utils import settings as utils_settings
-from pydantic import BaseSettings
+from unittest import mock
 
+import pytest
 
-class Settings(BaseSettings):
-    host_key_path: str = "node.key"
-    force_host_id: Optional[str] = None
-
-    writer_listen_address: str = "0.0.0.0:10000"
-    reader_listen_address: str = "0.0.0.0:10001"
-    sidecar_listen_address: str = "0.0.0.0:10002"
-
-    data_path: Optional[str] = None
+from nucliadb_utils.cache.nats import NatsPubsub
 
 
-settings = Settings()
-indexing_settings = utils_settings.IndexingSettings()
+@pytest.fixture()
+def nats_conn():
+    conn = mock.AsyncMock()
+    with mock.patch("nucliadb_utils.cache.nats.Client", return_value=conn):
+        yield conn
 
 
-class RunningSettings(BaseSettings):
-    debug: bool = True
-    log_level: str = "DEBUG"
+@pytest.fixture()
+async def pubsub(nats_conn):
+    ps = NatsPubsub()
+    ps.nc = nats_conn
+    yield ps
 
 
-running_settings = RunningSettings()
+@pytest.mark.asyncio
+async def test_unsubscribe_twice_raises_key_error(pubsub: NatsPubsub):
+    key = "foobar"
+    await pubsub.subscribe(lambda x: None, key, group="", subscription_id=key)
+
+    await pubsub.unsubscribe(key, subscription_id=key)
+
+    # Unsubscribing twice with the same request_id should raise KeyError
+    with pytest.raises(KeyError):
+        await pubsub.unsubscribe(key, subscription_id=key)

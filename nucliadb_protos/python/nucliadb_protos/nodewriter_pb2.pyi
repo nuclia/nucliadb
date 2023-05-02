@@ -117,6 +117,7 @@ class IndexMessage(google.protobuf.message.Message):
     REINDEX_ID_FIELD_NUMBER: builtins.int
     PARTITION_FIELD_NUMBER: builtins.int
     STORAGE_KEY_FIELD_NUMBER: builtins.int
+    KBID_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
     """physical shard message is for"""
@@ -126,6 +127,7 @@ class IndexMessage(google.protobuf.message.Message):
     reindex_id: builtins.str
     partition: builtins.str
     storage_key: builtins.str
+    kbid: builtins.str
     def __init__(
         self,
         *,
@@ -137,42 +139,13 @@ class IndexMessage(google.protobuf.message.Message):
         reindex_id: builtins.str = ...,
         partition: builtins.str | None = ...,
         storage_key: builtins.str = ...,
+        kbid: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "partition", b"partition"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_partition", b"_partition"]) -> typing_extensions.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage
-
-@typing_extensions.final
-class IndexedMessage(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NODE_FIELD_NUMBER: builtins.int
-    SHARD_FIELD_NUMBER: builtins.int
-    TXID_FIELD_NUMBER: builtins.int
-    RESOURCE_FIELD_NUMBER: builtins.int
-    TYPEMESSAGE_FIELD_NUMBER: builtins.int
-    REINDEX_ID_FIELD_NUMBER: builtins.int
-    node: builtins.str
-    shard: builtins.str
-    txid: builtins.int
-    resource: builtins.str
-    typemessage: global___TypeMessage.ValueType
-    reindex_id: builtins.str
-    def __init__(
-        self,
-        *,
-        node: builtins.str = ...,
-        shard: builtins.str = ...,
-        txid: builtins.int = ...,
-        resource: builtins.str = ...,
-        typemessage: global___TypeMessage.ValueType = ...,
-        reindex_id: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
-
-global___IndexedMessage = IndexedMessage
 
 @typing_extensions.final
 class SetGraph(google.protobuf.message.Message):

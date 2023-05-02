@@ -31,6 +31,7 @@ from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
 from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2 import NewShardRequest
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
+from nucliadb_utils.cache.settings import settings as cache_settings
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
@@ -209,6 +210,8 @@ async def worker(
     settings.force_host_id = "node1"
     settings.data_path = data_path
     indexing_settings.index_jetstream_servers = [natsd]
+    cache_settings.cache_pubsub_driver = "nats"
+    cache_settings.cache_pubsub_nats_url = [natsd]
 
     worker = await start_worker(writer, reader)
     yield worker
