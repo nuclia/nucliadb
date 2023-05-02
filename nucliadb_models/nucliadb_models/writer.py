@@ -45,7 +45,7 @@ class CreateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     slug: Optional[SlugString] = None
-    icon: Optional[str] = GENERIC_MIME_TYPE
+    icon: Optional[str] = None
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
@@ -67,6 +67,9 @@ class CreateResourcePayload(BaseModel):
 
     @validator("icon")
     def icon_check(cls, v):
+        if v is None:
+            return v
+
         if "/" not in v:
             raise ValueError("Icon should be a MIME string")
 

@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
+    FieldText,
     FieldType,
     LargeComputedMetadataWrapper,
 )
@@ -65,6 +66,7 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
+from nucliadb_models.writer import GENERIC_MIME_TYPE
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -101,6 +103,14 @@ KB_REVERSE: Dict[str, int] = {
 }
 
 KB_REVERSE_REVERSE = {v: k for k, v in KB_REVERSE.items()}
+
+
+PB_TEXT_FORMAT_TO_MIMETYPE = {
+    FieldText.Format.PLAIN: "text/plain",
+    FieldText.Format.HTML: "text/html",
+    FieldText.Format.RST: "text/x-rst",
+    FieldText.Format.MARKDOWN: "text/markdown",
+}
 
 
 class Resource:
@@ -613,6 +623,9 @@ class Resource:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
             basic_modified = True
 
+        if maybe_update_basic_icon(self.basic, get_text_field_mimetype(message)):
+            basic_modified = True
+
         for extracted_text in message.extracted_text:
             field_obj = await self.get_field(
                 extracted_text.field.field, extracted_text.field.field_type, load=False
@@ -635,9 +648,9 @@ class Resource:
 
             await field_link.set_link_extracted_data(link_extracted_data)
 
-            if self.basic.icon == "":
-                self.basic.icon = "application/stf-link"
+            if maybe_update_basic_icon(self.basic, "application/stf-link"):
                 basic_modified = True
+
             if (
                 self.basic.title.startswith("http") and link_extracted_data.title != ""
             ) or (self.basic.title == "" and link_extracted_data.title != ""):
@@ -654,10 +667,8 @@ class Resource:
                 FieldType.FILE,
                 load=False,
             )
-            if file_extracted_data.icon != "" and (
-                self.basic.icon == "" or self.basic.icon == "application/octet-stream"
-            ):
-                self.basic.icon = file_extracted_data.icon
+
+            if maybe_update_basic_icon(self.basic, file_extracted_data.icon):
                 basic_modified = True
 
             if maybe_update_basic_thumbnail(
@@ -1216,6 +1227,16 @@ def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
     return True
 
 
+def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
+    if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
+        # Icon already set or detected
+        return False
+    if not mimetype:
+        return False
+    basic.icon = mimetype
+    return True
+
+
 def maybe_update_basic_thumbnail(
     basic: PBBasic, thumbnail: Optional[CloudFile]
 ) -> bool:
@@ -1223,3 +1244,10 @@ def maybe_update_basic_thumbnail(
         return False
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
     return True
+
+
+def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
+    if len(bm.texts) == 0:
+        return None
+    text_format = next(iter(bm.texts.values())).format
+    return PB_TEXT_FORMAT_TO_MIMETYPE[text_format]

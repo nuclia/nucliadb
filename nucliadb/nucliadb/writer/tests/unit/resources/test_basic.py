@@ -18,15 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.writer.resource.basic import compute_title
+from nucliadb.writer.resource.basic import compute_title, parse_icon
 from nucliadb_models.common import File
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
+from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.writer import CreateResourcePayload
 
 
-def get_resource_payload(link_uri=None, filename=None, slug=None):
+def get_resource_payload(link_uri=None, filename=None, slug=None, text=None, icon=None):
     payload = CreateResourcePayload()
     if link_uri:
         payload.links["mylink"] = LinkField(uri=link_uri)
@@ -34,6 +36,10 @@ def get_resource_payload(link_uri=None, filename=None, slug=None):
         payload.files["myfile"] = FileField(file=File(filename=filename, payload=""))
     if slug:
         payload.slug = slug
+    if text:
+        payload.texts["text"] = TextField(body=text, format=TextFormat.PLAIN)
+    if icon:
+        payload.icon = icon
     return payload
 
 
@@ -59,3 +65,17 @@ def get_resource_payload(link_uri=None, filename=None, slug=None):
 )
 def test_compute_title(payload, resource_uuid, expected_title):
     assert compute_title(payload, resource_uuid) == expected_title
+
+
+@pytest.mark.parametrize(
+    "payload,expected_icon",
+    [
+        (get_resource_payload(icon="image/png", text="footext"), "image/png"),
+        (get_resource_payload(text="sometext"), "text/plain"),
+        (get_resource_payload(), "application/generic"),
+    ],
+)
+def test_parse_icon(payload, expected_icon):
+    message = BrokerMessage()
+    parse_icon(message, payload)
+    assert message.basic.icon == expected_icon

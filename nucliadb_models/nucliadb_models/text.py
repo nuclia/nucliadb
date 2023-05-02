@@ -44,6 +44,14 @@ class TextFormat(Enum):  # type: ignore
     MARKDOWN = "MARKDOWN"
 
 
+TEXT_FORMAT_TO_MIMETYPE = {
+    TextFormat.PLAIN: "text/plain",
+    TextFormat.HTML: "text/html",
+    TextFormat.RST: "text/x-rst",
+    TextFormat.MARKDOWN: "text/markdown",
+}
+
+
 # Visualization classes (Those used on reader endpoints)
 
 
