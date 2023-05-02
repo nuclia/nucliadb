@@ -167,9 +167,7 @@ class TestSubscriptionWorker:
     def worker(self, settings, nats_conn):
         writer = AsyncMock()
         reader = AsyncMock()
-        with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
-            "nucliadb_node.pull.shadow_shards.get_manager", return_value=AsyncMock()
-        ):
+        with mock.patch("nucliadb_node.pull.get_storage"):
             worker = Worker(writer, reader, "node")
             worker.store_seqid = Mock()
             yield worker
