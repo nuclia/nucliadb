@@ -41,9 +41,14 @@ async fn send_update(
 ) -> anyhow::Result<()> {
     if !cluster_snapshot.is_empty() {
         let url = format!("http://{}/members", &args.monitor_addr);
-        let res = client.patch(&url).json(&cluster_snapshot).send().await?;
-        if !res.status().is_success() {
-            bail!("Can't send cluster snapshot to monitor");
+        let resp = client.patch(&url).json(&cluster_snapshot).send().await?;
+        if !resp.status().is_success() {
+            let resp_status = resp.status().as_u16();
+            let resp_text = resp.text().await?;
+            bail!(format!(
+                "Error sending cluster snapshot to monitor. Response HTTP{}: {}",
+                &resp_status, &resp_text,
+            ))
         }
     }
     Ok(())
