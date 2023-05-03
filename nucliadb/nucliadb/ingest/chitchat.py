@@ -133,7 +133,7 @@ class ChitchatMonitor:
         self.server = None
 
     async def start(self):
-        logger.info("Chitchat server started at")
+        logger.info(f"Chitchat server started at: {self.host}:{self.port}")
         self.server, config = get_configured_chitchat_app(self.host, self.port)
         self.task = asyncio.create_task(start_server(self.server, config))
 
