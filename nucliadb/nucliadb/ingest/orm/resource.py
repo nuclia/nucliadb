@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
@@ -108,6 +109,8 @@ KB_REVERSE: Dict[str, int] = {
 }
 
 KB_REVERSE_REVERSE = {v: k for k, v in KB_REVERSE.items()}
+
+_executor = ThreadPoolExecutor(10)
 
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
@@ -750,7 +753,7 @@ class Resource:
             basic_user_field_metadata=user_field_metadata,
         )
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, apply_field_metadata)
+        await loop.run_in_executor(_executor, apply_field_metadata)
 
         maybe_update_basic_thumbnail(
             self.basic, field_metadata.metadata.metadata.thumbnail
