@@ -65,3 +65,6 @@ class ClusterMember(BaseModel):
     is_self: bool
     load_score: float
     shard_count: int
+
+    class Config:
+        allow_population_by_field_name = True
