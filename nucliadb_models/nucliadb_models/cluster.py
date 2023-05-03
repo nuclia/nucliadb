@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
+from typing import Optional
 
 from nucliadb_protos.writer_pb2 import Member
 from pydantic import BaseModel, Field
@@ -63,8 +64,8 @@ class ClusterMember(BaseModel):
     listen_addr: str = Field(alias="address")
     type: MemberType
     is_self: bool
-    load_score: float
-    shard_count: int
+    load_score: Optional[float]
+    shard_count: Optional[int]
 
     class Config:
         allow_population_by_field_name = True

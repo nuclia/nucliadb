@@ -31,7 +31,7 @@ from nucliadb.ingest.orm.node import NODES, Node
 from nucliadb.ingest.settings import settings
 from nucliadb_models.cluster import ClusterMember, MemberType
 from nucliadb_telemetry import errors, metrics
-from nucliadb_utils.fastapi.run import run_server_forever
+from nucliadb_utils.fastapi.run import start_server
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 AVAILABLE_NODES = metrics.Gauge("nucliadb_nodes_available")
@@ -119,14 +119,16 @@ class ChitchatMonitor:
         self.host = host
         self.port = port
         self.task = None
+        self.server = None
 
     async def start(self):
         logger.info("Chitchat server started at")
-        server, config = get_configured_chitchat_app(self.host, self.port)
-        self.task = asyncio.create_task(run_server_forever(server, config))
+        self.server, config = get_configured_chitchat_app(self.host, self.port)
+        self.task = asyncio.create_task(start_server(self.server, config))
 
     async def finalize(self):
         logger.info("Chitchat closed")
+        await self.server.shutdown()
         self.task.cancel()
 
 
@@ -141,12 +143,16 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
         node = NODES.get(member.node_id)
         if node is None:
             logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
+            if member.load_score is None or member.shard_count is None:
+                logger.warning(
+                    f"Node {member.node_id} has no load_score or shard_count"
+                )
             await Node.set(
                 member.node_id,
                 address=member.listen_addr,
                 type=member.type,
-                load_score=member.load_score,
-                shard_count=member.shard_count,
+                load_score=member.load_score or 0.0,
+                shard_count=member.shard_count or 0,
             )
             logger.debug("Node added")
         else:

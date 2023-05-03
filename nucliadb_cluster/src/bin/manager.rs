@@ -41,7 +41,12 @@ async fn send_update(
 ) -> anyhow::Result<()> {
     if !cluster_snapshot.is_empty() {
         let url = format!("http://{}/members", &args.monitor_addr);
-        let resp = client.patch(&url).json(&cluster_snapshot).send().await?;
+
+        let payload = serde_json::to_string(&cluster_snapshot)
+            .map_err(|e| anyhow::anyhow!("Cannot serialize cluster cluster snapshot: {e}"))?;
+
+        let resp = client.patch(&url).body(payload).send().await?;
+
         if !resp.status().is_success() {
             let resp_status = resp.status().as_u16();
             let resp_text = resp.text().await?;
