@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import unittest
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -27,10 +28,10 @@ from nucliadb_models.cluster import ClusterMember, MemberType
 
 
 @pytest.fixture(scope="function")
-def asyncio_mock():
+def start_server():
     task = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "nucliadb.ingest.chitchat.asyncio.create_task", return_value=task
+        "nucliadb.ingest.chitchat.start_server", return_value=task
     ) as mock:
         yield mock
 
@@ -54,12 +55,12 @@ def get_cluster_member(
 
 
 @pytest.mark.asyncio
-async def test_chitchat_monitor(asyncio_mock):
+async def test_chitchat_monitor(start_server):
     chitchat = ChitchatMonitor("127.0.0.1", 8888)
     await chitchat.start()
-    assert chitchat.task is not None
+    chitchat.server = AsyncMock()
     await chitchat.finalize()
-    chitchat.task.cancel.assert_called_once()
+    chitchat.server.shutdown.assert_awaited_once()
 
 
 @pytest.mark.asyncio
