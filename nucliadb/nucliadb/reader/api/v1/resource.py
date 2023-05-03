@@ -309,5 +309,6 @@ async def get_resource_field(
 
     await txn.abort()
     return Response(
-        content=resource_field.json(exclude_unset=True), media_type="application/json"
+        content=resource_field.json(exclude_unset=True, by_alias=True),
+        media_type="application/json",
     )
