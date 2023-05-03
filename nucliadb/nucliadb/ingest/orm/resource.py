@@ -774,9 +774,15 @@ class Resource:
         ) = await field_obj.set_vectors(field_vectors)
         field_key = self.generate_field_id(field_vectors.field)
         if vo is not None:
-            self.indexer.apply_field_vectors(
-                field_key, vo, replace_field_sentences, replace_splits_sentences
+            apply_field_vectors = partial(
+                self.indexer.apply_field_vectors,
+                field_key,
+                vo,
+                replace_field_sentences,
+                replace_splits_sentences,
             )
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(_executor, apply_field_vectors)
         else:
             raise AttributeError("VO not found on set")
 
