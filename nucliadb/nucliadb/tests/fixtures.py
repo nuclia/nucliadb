@@ -48,7 +48,9 @@ def free_port() -> int:
 
     sock = socket.socket()
     sock.bind(("", 0))
-    return sock.getsockname()[1]
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
 
 
 @pytest.fixture(scope="function")

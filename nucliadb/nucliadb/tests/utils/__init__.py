@@ -69,6 +69,6 @@ def broker_resource(
     return bm
 
 
-async def inject_message(writer: WriterStub, message):
+async def inject_message(writer: WriterStub, message: BrokerMessage):
     resp = await writer.ProcessMessage([message])  # type: ignore
     assert resp.status == OpStatusWriter.Status.OK
