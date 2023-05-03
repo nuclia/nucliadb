@@ -140,25 +140,31 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
         if member.is_self or member.type != MemberType.IO:
             continue
 
+        load_score = member.load_score
+        if load_score is None:
+            load_score = 0.0
+            logger.warning(f"Node {member.node_id} has no load_score")
+
+        shard_count = member.shard_count
+        if shard_count is None:
+            shard_count = 0
+            logger.warning(f"Node {member.node_id} has no shard_count")
+
         node = NODES.get(member.node_id)
         if node is None:
             logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
-            if member.load_score is None or member.shard_count is None:
-                logger.warning(
-                    f"Node {member.node_id} has no load_score or shard_count"
-                )
             await Node.set(
                 member.node_id,
                 address=member.listen_addr,
                 type=member.type,
-                load_score=member.load_score or 0.0,
-                shard_count=member.shard_count or 0,
+                load_score=load_score,
+                shard_count=shard_count,
             )
             logger.debug("Node added")
         else:
             logger.debug(f"{member.node_id}/{member.type} update")
-            node.load_score = member.load_score
-            node.shard_count = member.shard_count
+            node.load_score = load_score
+            node.shard_count = shard_count
             logger.debug("Node updated")
 
     # Then cleanup nodes that are no longer reported
