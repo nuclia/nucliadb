@@ -69,12 +69,6 @@ SHARD_COUNT = prometheus_client.Gauge(
     labelnames=["node"],
 )
 
-LOAD_SCORE = prometheus_client.Gauge(
-    "nucliadb_node_load_score",
-    "Current load score reported by nodes via chitchat",
-    labelnames=["node"],
-)
-
 
 class NodeType(Enum):
     IO = 1
@@ -130,9 +124,7 @@ class ClusterMember:
     node_id: str
     listen_addr: str
     type: NodeType
-    online: bool
     is_self: bool
-    load_score: float
     shard_count: int
 
 
@@ -145,14 +137,12 @@ class Node(AbstractNode):
         self,
         address: str,
         type: NodeType,
-        load_score: float,
         shard_count: int,
         dummy: bool = False,
     ):
         self.address = address
         self.type = type
         self.label = type.name
-        self.load_score = load_score
         self.shard_count = shard_count
         self.dummy = dummy
 
@@ -202,9 +192,7 @@ class Node(AbstractNode):
                 node = NODES.get(node_id)
                 if node is None:
                     raise NodesUnsync(f"Node {node_id} is not found or not available")
-                logger.info(
-                    f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
-                )
+                logger.info(f"Node obj: {node} Shards: {node.shard_count}")
                 shard_created = await node.new_shard(
                     kbid, similarity=kb_shards.similarity
                 )
@@ -260,11 +248,10 @@ class Node(AbstractNode):
         ident: str,
         address: str,
         type: NodeType,
-        load_score: float,
         shard_count: int,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, type, load_score, shard_count, dummy)
+        NODES[ident] = Node(address, type, shard_count, dummy)
 
     @classmethod
     async def get(cls, ident: str) -> Optional[Node]:
@@ -285,7 +272,6 @@ class Node(AbstractNode):
             NODES[member.id] = Node(
                 member.listen_address,
                 NodeType.from_pb(member.type),
-                member.load_score,
                 member.shard_count,
                 member.dummy,
             )
@@ -298,7 +284,6 @@ class Node(AbstractNode):
                 id=str(nodeid),
                 listen_address=node.address,
                 type=node.type.to_pb(),
-                load_score=node.load_score,
                 shard_count=node.shard_count,
                 dummy=node.dummy,
             )
@@ -402,13 +387,11 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
                     member.node_id,
                     address=member.listen_addr,
                     type=member.type,
-                    load_score=member.load_score,
                     shard_count=member.shard_count,
                 )
                 logger.debug("Node added")
             else:
                 logger.debug(f"{member.node_id}/{member.type} update")
-                node.load_score = member.load_score
                 node.shard_count = member.shard_count
                 logger.debug("Node updated")
     node_ids = [x for x in NODES.keys()]
@@ -457,10 +440,9 @@ def update_node_metrics(nodes: Dict[str, Node], destroyed_node_ids: List[str]):
 
     for node_id, node in nodes.items():
         SHARD_COUNT.labels(node=node_id).set(node.shard_count)
-        LOAD_SCORE.labels(node=node_id).set(node.load_score)
 
     for node_id in destroyed_node_ids:
-        for gauge in (SHARD_COUNT, LOAD_SCORE):
+        for gauge in (SHARD_COUNT,):
             try:
                 gauge.remove(node_id)
             except KeyError:

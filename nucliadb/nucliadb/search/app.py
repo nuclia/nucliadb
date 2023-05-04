@@ -112,7 +112,6 @@ async def chitchat_members(request: Request) -> JSONResponse:
                 "id": node_id,
                 "listen_address": node.address,
                 "type": node.label,
-                "load_score": node.load_score,
                 "shard_count": node.shard_count,
                 "dummy": node.dummy,
             }

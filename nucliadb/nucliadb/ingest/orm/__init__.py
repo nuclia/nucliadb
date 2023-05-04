@@ -37,7 +37,6 @@ NODES: Dict[str, Node] = {}
 class ScoredNode:
     id: str
     shard_count: int
-    load_score: float
 
 
 class ClusterObject:
@@ -60,9 +59,7 @@ class ClusterObject:
         """
         target_replicas = settings.node_replicas
         available_nodes = [
-            ScoredNode(
-                id=node_id, shard_count=node.shard_count, load_score=node.load_score
-            )
+            ScoredNode(id=node_id, shard_count=node.shard_count)
             for node_id, node in NODES.items()
         ]
         if len(available_nodes) < target_replicas:
@@ -90,10 +87,8 @@ class ClusterObject:
                     f"Could not find enough nodes with available shards. Available: {len(available_nodes)}, Required: {target_replicas}"  # noqa
                 )
 
-        # Sort available nodes by increasing shard_count and load_scode
-        sorted_nodes = sorted(
-            available_nodes, key=lambda x: (x.shard_count, x.load_score)
-        )
+        # Sort available nodes by increasing shard_count
+        sorted_nodes = sorted(available_nodes, key=lambda x: x.shard_count)
         return [node.id for node in sorted_nodes][:target_replicas]
 
 
