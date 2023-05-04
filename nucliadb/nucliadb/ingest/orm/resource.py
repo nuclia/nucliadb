@@ -19,8 +19,12 @@
 #
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
+from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -33,7 +37,9 @@ from nucliadb_protos.resources_pb2 import (
     FieldMetadata,
     FieldText,
     FieldType,
+    FileExtractedData,
     LargeComputedMetadataWrapper,
+    LinkExtractedData,
 )
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
@@ -103,6 +109,8 @@ KB_REVERSE: Dict[str, int] = {
 }
 
 KB_REVERSE_REVERSE = {v: k for k, v in KB_REVERSE.items()}
+
+_executor = ThreadPoolExecutor(10)
 
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
@@ -606,7 +614,6 @@ class Resource:
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
         field_obj: Field
-        basic_modified = False
         for error in message.errors:
             field_obj = await self.get_field(error.field, error.field_type, load=False)
             await field_obj.set_error(error)
@@ -616,183 +623,199 @@ class Resource:
         if self.basic is None:
             raise KeyError("Resource Not Found")
 
+        previous_basic = Basic()
+        previous_basic.CopyFrom(self.basic)
+
         if errors:
             self.basic.metadata.status = PBMetadata.Status.ERROR
-            basic_modified = True
         elif errors is False and message.source is message.MessageSource.PROCESSOR:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
-            basic_modified = True
 
-        if maybe_update_basic_icon(self.basic, get_text_field_mimetype(message)):
-            basic_modified = True
+        maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
         for extracted_text in message.extracted_text:
-            field_obj = await self.get_field(
-                extracted_text.field.field, extracted_text.field.field_type, load=False
-            )
-            await field_obj.set_extracted_text(extracted_text)
-            self._modified_extracted_text.append(
-                extracted_text.field,
-            )
+            await self._apply_extracted_text(extracted_text)
 
         for link_extracted_data in message.link_extracted_data:
-            field_link: Link = await self.get_field(
-                link_extracted_data.field,
-                FieldType.LINK,
-                load=False,
-            )
-            if maybe_update_basic_thumbnail(
-                self.basic, link_extracted_data.link_thumbnail
-            ):
-                basic_modified = True
-
-            await field_link.set_link_extracted_data(link_extracted_data)
-
-            if maybe_update_basic_icon(self.basic, "application/stf-link"):
-                basic_modified = True
-
-            if (
-                self.basic.title.startswith("http") and link_extracted_data.title != ""
-            ) or (self.basic.title == "" and link_extracted_data.title != ""):
-                # If the title was http something or empty replace
-                self.basic.title = link_extracted_data.title
-                basic_modified = True
-
-            if maybe_update_basic_summary(self.basic, link_extracted_data.description):
-                basic_modified = True
+            await self._apply_link_extracted_data(link_extracted_data)
 
         for file_extracted_data in message.file_extracted_data:
-            field_file: File = await self.get_field(
-                file_extracted_data.field,
-                FieldType.FILE,
-                load=False,
-            )
-
-            if maybe_update_basic_icon(self.basic, file_extracted_data.icon):
-                basic_modified = True
-
-            if maybe_update_basic_thumbnail(
-                self.basic, file_extracted_data.file_thumbnail
-            ):
-                basic_modified = True
-
-            await field_file.set_file_extracted_data(file_extracted_data)
+            await self._apply_file_extracted_data(file_extracted_data)
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
-            if maybe_update_basic_summary(
-                self.basic, field_metadata.metadata.metadata.summary
-            ):
-                basic_modified = True
-
-            field_obj = await self.get_field(
-                field_metadata.field.field,
-                field_metadata.field.field_type,
-                load=False,
-            )
-            (
-                metadata,
-                replace_field,
-                replace_splits,
-            ) = await field_obj.set_field_metadata(field_metadata)
-            field_key = self.generate_field_id(field_metadata.field)
-
-            page_positions: Optional[FilePagePositions] = None
-            if field_metadata.field.field_type == FieldType.FILE and isinstance(
-                field_obj, File
-            ):
-                page_positions = await get_file_page_positions(field_obj)
-
-            user_field_metadata = next(
-                (
-                    fm
-                    for fm in self.basic.fieldmetadata
-                    if fm.field.field == field_metadata.field.field
-                    and fm.field.field_type == field_metadata.field.field_type
-                ),
-                None,
-            )
-
-            self.indexer.apply_field_metadata(
-                field_key,
-                metadata,
-                replace_field=replace_field,
-                replace_splits=replace_splits,
-                page_positions=page_positions,
-                extracted_text=await field_obj.get_extracted_text(),
-                basic_user_field_metadata=user_field_metadata,
-            )
-
-            if maybe_update_basic_thumbnail(
-                self.basic, field_metadata.metadata.metadata.thumbnail
-            ):
-                basic_modified = True
-
-            if add_field_classifications(self.basic, field_metadata):
-                basic_modified = True
+            await self._apply_field_computed_metadata(field_metadata)
 
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
-                field_obj = await self.get_field(
-                    field_vectors.field.field,
-                    field_vectors.field.field_type,
-                    load=False,
-                )
-                (
-                    vo,
-                    replace_field_sentences,
-                    replace_splits_sentences,
-                ) = await field_obj.set_vectors(field_vectors)
-                field_key = self.generate_field_id(field_vectors.field)
-                if vo is not None:
-                    self.indexer.apply_field_vectors(
-                        field_key, vo, replace_field_sentences, replace_splits_sentences
-                    )
-                else:
-                    raise AttributeError("VO not found on set")
+                await self._apply_extracted_vectors(field_vectors)
             for user_vectors in message.user_vectors:
-                field_obj = await self.get_field(
-                    user_vectors.field.field,
-                    user_vectors.field.field_type,
-                    load=False,
-                )
-                uv, vectors_to_delete = await field_obj.set_user_vectors(user_vectors)
-                field_key = self.generate_field_id(user_vectors.field)
-                if uv is not None:
-                    # We need to make sure that the vectors replaced are not on the new vectors
-                    # So we extend the vectors to delete with the one replaced by the update
-                    for vectorset, vectors in vectors_to_delete.items():
-                        for vector in vectors.vectors:
-                            if (
-                                vector
-                                not in user_vectors.vectors_to_delete[vectorset].vectors
-                            ):
-                                user_vectors.vectors_to_delete[
-                                    vectorset
-                                ].vectors.append(vector)
-                    self.indexer.apply_user_vectors(
-                        field_key, uv, user_vectors.vectors_to_delete
-                    )
-                else:
-                    raise AttributeError("User Vectors not found on set")
+                await self._apply_user_vectors(user_vectors)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
-            field_obj = await self.get_field(
-                field_large_metadata.field.field,
-                field_large_metadata.field.field_type,
-                load=False,
-            )
-            await field_obj.set_large_field_metadata(field_large_metadata)
+            await self._apply_field_large_metadata(field_large_metadata)
 
         for relation in message.relations:
             self.indexer.brain.relations.append(relation)
         await self.set_relations(message.relations)  # type: ignore
 
-        if basic_modified:
+        # Basic proto may have been modified in some apply functions but we only
+        # want to set it once
+        if self.basic != previous_basic:
             await self.set_basic(self.basic)
+
+    async def _apply_extracted_text(self, extracted_text: ExtractedTextWrapper):
+        field_obj = await self.get_field(
+            extracted_text.field.field, extracted_text.field.field_type, load=False
+        )
+        await field_obj.set_extracted_text(extracted_text)
+        self._modified_extracted_text.append(
+            extracted_text.field,
+        )
+
+    async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
+        assert self.basic is not None
+        field_link: Link = await self.get_field(
+            link_extracted_data.field,
+            FieldType.LINK,
+            load=False,
+        )
+        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail)
+
+        await field_link.set_link_extracted_data(link_extracted_data)
+
+        maybe_update_basic_icon(self.basic, "application/stf-link")
+
+        if (
+            self.basic.title.startswith("http") and link_extracted_data.title != ""
+        ) or (self.basic.title == "" and link_extracted_data.title != ""):
+            # If the title was http something or empty replace
+            self.basic.title = link_extracted_data.title
+
+        maybe_update_basic_summary(self.basic, link_extracted_data.description)
+
+    async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
+        assert self.basic is not None
+        field_file: File = await self.get_field(
+            file_extracted_data.field,
+            FieldType.FILE,
+            load=False,
+        )
+        maybe_update_basic_icon(self.basic, file_extracted_data.icon)
+        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
+        await field_file.set_file_extracted_data(file_extracted_data)
+
+    async def _apply_field_computed_metadata(
+        self, field_metadata: FieldComputedMetadataWrapper
+    ):
+        assert self.basic is not None
+        maybe_update_basic_summary(self.basic, field_metadata.metadata.metadata.summary)
+
+        field_obj = await self.get_field(
+            field_metadata.field.field,
+            field_metadata.field.field_type,
+            load=False,
+        )
+        (
+            metadata,
+            replace_field,
+            replace_splits,
+        ) = await field_obj.set_field_metadata(field_metadata)
+        field_key = self.generate_field_id(field_metadata.field)
+
+        page_positions: Optional[FilePagePositions] = None
+        if field_metadata.field.field_type == FieldType.FILE and isinstance(
+            field_obj, File
+        ):
+            page_positions = await get_file_page_positions(field_obj)
+
+        user_field_metadata = next(
+            (
+                fm
+                for fm in self.basic.fieldmetadata
+                if fm.field.field == field_metadata.field.field
+                and fm.field.field_type == field_metadata.field.field_type
+            ),
+            None,
+        )
+
+        apply_field_metadata = partial(
+            self.indexer.apply_field_metadata,
+            field_key,
+            metadata,
+            replace_field=replace_field,
+            replace_splits=replace_splits,
+            page_positions=page_positions,
+            extracted_text=await field_obj.get_extracted_text(),
+            basic_user_field_metadata=user_field_metadata,
+        )
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(_executor, apply_field_metadata)
+
+        maybe_update_basic_thumbnail(
+            self.basic, field_metadata.metadata.metadata.thumbnail
+        )
+
+        add_field_classifications(self.basic, field_metadata)
+
+    async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
+        field_obj = await self.get_field(
+            field_vectors.field.field,
+            field_vectors.field.field_type,
+            load=False,
+        )
+        (
+            vo,
+            replace_field_sentences,
+            replace_splits_sentences,
+        ) = await field_obj.set_vectors(field_vectors)
+        field_key = self.generate_field_id(field_vectors.field)
+        if vo is not None:
+            apply_field_vectors = partial(
+                self.indexer.apply_field_vectors,
+                field_key,
+                vo,
+                replace_field_sentences,
+                replace_splits_sentences,
+            )
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(_executor, apply_field_vectors)
+        else:
+            raise AttributeError("VO not found on set")
+
+    async def _apply_user_vectors(self, user_vectors: UserVectorsWrapper):
+        field_obj = await self.get_field(
+            user_vectors.field.field,
+            user_vectors.field.field_type,
+            load=False,
+        )
+        uv, vectors_to_delete = await field_obj.set_user_vectors(user_vectors)
+        field_key = self.generate_field_id(user_vectors.field)
+        if uv is not None:
+            # We need to make sure that the vectors replaced are not on the new vectors
+            # So we extend the vectors to delete with the one replaced by the update
+            for vectorset, vectors in vectors_to_delete.items():
+                for vector in vectors.vectors:
+                    if vector not in user_vectors.vectors_to_delete[vectorset].vectors:
+                        user_vectors.vectors_to_delete[vectorset].vectors.append(vector)
+            self.indexer.apply_user_vectors(
+                field_key, uv, user_vectors.vectors_to_delete
+            )
+        else:
+            raise AttributeError("User Vectors not found on set")
+
+    async def _apply_field_large_metadata(
+        self, field_large_metadata: LargeComputedMetadataWrapper
+    ):
+        field_obj = await self.get_field(
+            field_large_metadata.field.field,
+            field_large_metadata.field.field_type,
+            load=False,
+        )
+        await field_obj.set_large_field_metadata(field_large_metadata)
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
@@ -1107,7 +1130,9 @@ class Resource:
                 pb_field.metadata.CopyFrom(metadata)
                 yield pb_field
 
-    async def get_resource(self, enabled_metadata: EnabledMetadata) -> TrainResource:
+    async def generate_train_resource(
+        self, enabled_metadata: EnabledMetadata
+    ) -> TrainResource:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         if enabled_metadata.labels:
