@@ -130,13 +130,16 @@ jobs:
       - name: Build local ClusterManager for testing
         uses: docker/build-push-action@v4
         if: steps.filter.outputs.cluster_modified == 'true'
-        with:
-          context: .
-          file: Dockerfile.cluster_monitor
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
-          tags: eu.gcr.io/stashify-218417/cluster_manager:main
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
+
+        # with:
+        #   context: .
+        #   file: Dockerfile.cluster_monitor
+        #   push: false
+        #   cache-from: type=gha
+        #   cache-to: type=gha,mode=min
+        #   tags: eu.gcr.io/stashify-218417/cluster_manager:main
 
       - name: Run tests
         run: |
