@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from datetime import datetime
 from time import time
 from typing import List, Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
+from pydantic.error_wrappers import ValidationError
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -111,39 +113,40 @@ async def find_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
-    if SearchOptions.DOCUMENT in features:
-        return HTTPClientError(status_code=422, detail="fulltext search not supported")
-
-    item = FindRequest(
-        query=query,
-        advanced_query=advanced_query,
-        fields=fields,
-        filters=filters,
-        faceted=faceted,
-        sort=(
-            SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-            if sort_field is not None
-            else None
-        ),
-        page_number=page_number,
-        page_size=page_size,
-        min_score=min_score,
-        range_creation_end=range_creation_end,
-        range_creation_start=range_creation_start,
-        range_modification_end=range_modification_end,
-        range_modification_start=range_modification_start,
-        features=features,
-        reload=reload,
-        debug=debug,
-        highlight=highlight,
-        show=show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
-        shards=shards,
-        with_duplicates=with_duplicates,
-        with_status=with_status,
-        with_synonyms=with_synonyms,
-    )
+    try:
+        item = FindRequest(
+            query=query,
+            advanced_query=advanced_query,
+            fields=fields,
+            filters=filters,
+            faceted=faceted,
+            sort=(
+                SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+                if sort_field is not None
+                else None
+            ),
+            page_number=page_number,
+            page_size=page_size,
+            min_score=min_score,
+            range_creation_end=range_creation_end,
+            range_creation_start=range_creation_start,
+            range_modification_end=range_modification_end,
+            range_modification_start=range_modification_start,
+            features=features,
+            reload=reload,
+            debug=debug,
+            highlight=highlight,
+            show=show,
+            field_type_filter=field_type_filter,
+            extracted=extracted,
+            shards=shards,
+            with_duplicates=with_duplicates,
+            with_status=with_status,
+            with_synonyms=with_synonyms,
+        )
+    except ValidationError as exc:
+        detail = json.loads(exc.json())
+        return HTTPClientError(status_code=422, detail=detail)
     try:
         return await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
