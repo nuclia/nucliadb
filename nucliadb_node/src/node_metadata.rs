@@ -97,14 +97,3 @@ impl NodeMetadata {
         })
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn backwards_compatible() {
-        let dir = std::path::Path::new("/Users/hermegarcia/Downloads/node_metadata.json");
-        let meta = NodeMetadata::load(dir).unwrap();
-        println!("{meta:?}")
-    }
-}
