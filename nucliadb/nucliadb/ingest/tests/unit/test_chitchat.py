@@ -27,7 +27,6 @@ def test_build_member_from_json():
         "address": "10.0.0.1",
         "type": "Io",
         "is_self": "",
-        "load_score": "11.52",
         "shard_count": "10",
     }
     member = build_member_from_json(member_serial)
@@ -35,18 +34,13 @@ def test_build_member_from_json():
     assert member.node_id == "node1"
     assert member.listen_addr == "10.0.0.1"
     assert member.type == NodeType.IO
-    assert member.load_score == 11.52
     assert member.shard_count == 10
     assert not member.is_self
 
-    member_serial["load_score"] = "invalid"
     member_serial["shard_count"] = "invalid"
     member = build_member_from_json(member_serial)
-    assert member.load_score == 0
     assert member.shard_count == 0
 
-    member_serial.pop("load_score")
     member_serial.pop("shard_count")
     member = build_member_from_json(member_serial)
-    assert member.load_score == 0
     assert member.shard_count == 0

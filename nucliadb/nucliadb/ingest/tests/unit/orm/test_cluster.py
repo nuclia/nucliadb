@@ -31,28 +31,26 @@ from nucliadb.ingest.settings import settings
 @pytest.fixture(scope="function")
 def nodes():
     nodes = {
-        "node-0": Node("node-0", NodeType.IO, shard_count=0, load_score=10, dummy=True),
-        "node-1": Node("node-1", NodeType.IO, shard_count=0, load_score=0, dummy=True),
-        "node-2": Node("node-2", NodeType.IO, shard_count=30, load_score=0, dummy=True),
-        "node-3": Node("node-3", NodeType.IO, shard_count=40, load_score=0, dummy=True),
+        "node-30": Node("node-30", NodeType.IO, shard_count=30, dummy=True),
+        "node-40": Node("node-40", NodeType.IO, shard_count=40, dummy=True),
+        "node-0": Node("node-0", NodeType.IO, shard_count=0, dummy=True),
     }
     with mock.patch.object(orm, "NODES", new=nodes):
         yield nodes
 
 
-def test_find_nodes(nodes):
+def test_find_nodes_orders_by_shard_count(nodes):
     cluster = orm.ClusterObject()
     nodes_found = cluster.find_nodes()
     assert len(nodes_found) == settings.node_replicas
-    assert nodes_found == ["node-1", "node-0"]
+    assert nodes_found == ["node-0", "node-30"]
 
 
 def test_find_nodes_exclude_nodes(nodes):
     cluster = orm.ClusterObject()
-    excluded_node = "node-1"
+    excluded_node = "node-0"
     nodes_found = cluster.find_nodes(exclude_nodes=[excluded_node])
-    assert len(nodes_found) == settings.node_replicas
-    assert excluded_node not in nodes_found
+    assert nodes_found == ["node-30", "node-40"]
 
     with pytest.raises(NodeClusterSmall):
         all_nodes = list(nodes.keys())

@@ -247,6 +247,7 @@ pub struct ShardMetadata {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NodeMetadata {
+    #[deprecated]
     #[prost(float, tag="1")]
     pub load_score: f32,
     #[prost(uint64, tag="2")]
@@ -260,6 +261,7 @@ pub mod node_metadata {
     pub struct ShardMetadata {
         #[prost(string, tag="1")]
         pub kbid: ::prost::alloc::string::String,
+        #[deprecated]
         #[prost(float, tag="2")]
         pub load_score: f32,
     }

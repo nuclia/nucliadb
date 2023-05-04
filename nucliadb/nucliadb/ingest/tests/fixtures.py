@@ -242,7 +242,6 @@ async def fake_node(indexing_utility_ingest):
         uuid1,
         address="nohost:9999",
         type=NodeType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
@@ -250,7 +249,6 @@ async def fake_node(indexing_utility_ingest):
         uuid2,
         address="nohost:9999",
         type=NodeType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )

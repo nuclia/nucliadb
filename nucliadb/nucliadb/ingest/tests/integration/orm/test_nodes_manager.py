@@ -41,7 +41,6 @@ async def fake_nodes():
         "node-0",
         address="nohost:9999",
         type=NodeType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
@@ -49,7 +48,6 @@ async def fake_nodes():
         "node-1",
         address="nohost:9999",
         type=NodeType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
@@ -57,7 +55,6 @@ async def fake_nodes():
         "node-2",
         address="nohost:9999",
         type=NodeType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )

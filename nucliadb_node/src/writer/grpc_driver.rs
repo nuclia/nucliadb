@@ -45,9 +45,8 @@ const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
-    ShardCreation(String, String),
-    ShardDeletion(String),
-    ParagraphCount(String, u64),
+    ShardCreation,
+    ShardDeletion,
 }
 
 pub struct NodeWriterGRPCDriver {
@@ -138,10 +137,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .new_shard(&request)
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
         std::mem::drop(writer);
-        self.emit_event(NodeWriterEvent::ShardCreation(
-            result.id.clone(),
-            request.kbid,
-        ));
+        self.emit_event(NodeWriterEvent::ShardCreation);
         Ok(tonic::Response::new(result))
     }
 
@@ -159,8 +155,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         std::mem::drop(writer);
         match result {
             Ok(_) => {
-                self.emit_event(NodeWriterEvent::ShardDeletion(shard_id.id.clone()));
-
+                self.emit_event(NodeWriterEvent::ShardDeletion);
                 Ok(tonic::Response::new(shard_id))
             }
             Err(e) => {
@@ -223,12 +218,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 debug!("Set resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
-
-                self.emit_event(NodeWriterEvent::ParagraphCount(
-                    shard_id.id.clone(),
-                    status.count_paragraphs,
-                ));
-
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
@@ -327,11 +316,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 debug!("Remove resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
-
-                self.emit_event(NodeWriterEvent::ParagraphCount(
-                    shard_id.id.clone(),
-                    status.count_paragraphs,
-                ));
 
                 Ok(tonic::Response::new(status))
             }

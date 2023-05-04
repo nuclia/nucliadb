@@ -161,20 +161,6 @@ JsonArray = List[JsonValue]
 JsonObject = Dict[str, JsonValue]
 
 
-def parse_load_score(member_serial: JsonObject) -> float:
-    try:
-        load_score = float(member_serial.get("load_score"))  # type: ignore
-    except TypeError:
-        # load score is set only on `Io` node so this log will be redundant if set to
-        # an higher log level.
-        logger.debug("Missing load score: Defaulted to 0")
-        load_score = 0.0
-    except ValueError:
-        logger.warning("Cannot convert load score. Defaulted to 0")
-        load_score = 0.0
-    return load_score
-
-
 def parse_shard_count(member_serial: JsonObject) -> int:
     shard_count_str = member_serial.get("shard_count")
     if not shard_count_str:
@@ -197,9 +183,7 @@ def build_member_from_json(member_serial: JsonObject):
         listen_addr=str(member_serial["address"]),
         type=NodeType.from_str(member_serial["type"]),
         is_self=bool(member_serial["is_self"]),
-        load_score=parse_load_score(member_serial),
         shard_count=parse_shard_count(member_serial),
-        online=True,
     )
 
 

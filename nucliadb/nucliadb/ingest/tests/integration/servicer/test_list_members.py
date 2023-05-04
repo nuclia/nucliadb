@@ -34,5 +34,4 @@ async def test_list_members(grpc_servicer: IngestFixture):
 
     for member in response.members:
         assert member.type == Member.Type.IO
-        assert isinstance(member.load_score, float)
         assert isinstance(member.shard_count, int)

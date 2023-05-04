@@ -33,18 +33,14 @@ def get_cluster_member(
     node_id="foo",
     listen_addr="192.1.1.1:8080",
     type=NodeType.IO,
-    online=True,
     is_self=False,
-    load_score=0,
     shard_count=0,
 ) -> ClusterMember:
     return ClusterMember(
         node_id=node_id,
         listen_addr=listen_addr,
         type=type,
-        online=online,
         is_self=is_self,
-        load_score=load_score,
         shard_count=shard_count,
     )
 
@@ -72,16 +68,13 @@ async def test_chitchat_update_node():
     assert len(NODES) == 1
     node = NODES["node1"]
     assert node.address == member.listen_addr
-    assert node.load_score == member.load_score
     assert node.shard_count == member.shard_count
 
     # Check that it updates loads score for registered members
-    member.load_score = 30
     member.shard_count = 2
     await chitchat_update_node([member])
     assert len(NODES) == 1
     node = NODES["node1"]
-    assert node.load_score == 30
     assert node.shard_count == 2
 
     # Check that it removes members that are no longer reported
@@ -116,9 +109,7 @@ def test_node_type_pb_conversion():
 @pytest.mark.asyncio
 async def test_update_node_metrics(metrics_registry):
     node1 = "node-1"
-    member1 = get_cluster_member(
-        node_id=node1, type=NodeType.IO, load_score=10, shard_count=2
-    )
+    member1 = get_cluster_member(node_id=node1, type=NodeType.IO, shard_count=2)
     await chitchat_update_node([member1])
 
     assert metrics_registry.get_sample_value("nucliadb_nodes_available", {}) == 1
@@ -126,15 +117,9 @@ async def test_update_node_metrics(metrics_registry):
         metrics_registry.get_sample_value("nucliadb_node_shard_count", {"node": node1})
         == 2
     )
-    assert (
-        metrics_registry.get_sample_value("nucliadb_node_load_score", {"node": node1})
-        == 10
-    )
 
     node2 = "node-2"
-    member2 = get_cluster_member(
-        node_id=node2, type=NodeType.IO, load_score=40, shard_count=1
-    )
+    member2 = get_cluster_member(node_id=node2, type=NodeType.IO, shard_count=1)
     await chitchat_update_node([member2])
 
     assert metrics_registry.get_sample_value("nucliadb_nodes_available", {}) == 1
@@ -142,18 +127,10 @@ async def test_update_node_metrics(metrics_registry):
         metrics_registry.get_sample_value("nucliadb_node_shard_count", {"node": node2})
         == 1
     )
-    assert (
-        metrics_registry.get_sample_value("nucliadb_node_load_score", {"node": node2})
-        == 40
-    )
 
     # Check that samples of destroyed node have been removed
     assert (
         metrics_registry.get_sample_value("nucliadb_node_shard_count", {"node": node1})
-        is None
-    )
-    assert (
-        metrics_registry.get_sample_value("nucliadb_node_load_score", {"node": node1})
         is None
     )
 
@@ -224,7 +201,6 @@ async def node_errors():
         id,
         address="nohost:9999",
         type=NodeType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )

@@ -489,6 +489,7 @@ pub struct Member {
     #[prost(bool, tag="5")]
     pub dummy: bool,
     //// The load score of the member.
+    #[deprecated]
     #[prost(float, tag="6")]
     pub load_score: f32,
     //// The number of shards in the node.
