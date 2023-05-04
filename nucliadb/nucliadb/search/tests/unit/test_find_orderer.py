@@ -47,3 +47,13 @@ def test_orderer():
 
     sorted_items = list(orderer.sorted_by_insertion())
     assert sorted_items == boosted_items + regular_items
+
+
+def test_orderer_handles_duplicate_insertions():
+    orderer = Orderer()
+    orderer.add_boosted("a")
+    orderer.add_boosted("b")
+    orderer.add_boosted("a")
+    orderer.add_boosted("c")
+    orderer.add("a")
+    assert list(orderer.sorted_by_insertion()) == ["a", "b", "c"]
