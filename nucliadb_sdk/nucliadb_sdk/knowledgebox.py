@@ -533,7 +533,6 @@ class KnowledgeBox:
 
         if text is not None:
             args["query"] = text
-            args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
         if vector is not None and vectorset is not None:
@@ -544,7 +543,6 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.VECTOR)
 
         if len(args["features"]) == 0:
-            args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
         args["min_score"] = min_score
