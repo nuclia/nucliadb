@@ -95,3 +95,20 @@ async def test_find_with_label_changes(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_find_does_not_support_fulltext_search(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/find?query=title&features=document",
+    )
+    assert resp.status_code == 422
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={"query": "title", "features": ["document"]},
+    )
+    assert resp.status_code == 422

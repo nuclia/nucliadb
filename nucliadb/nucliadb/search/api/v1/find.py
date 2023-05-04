@@ -48,24 +48,14 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_audit
 
 FIND_EXAMPLES = {
-    "filtering_by_icon": {
-        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
-        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+    "find_hybrid_search": {
+        "summary": "Do a hybrid search on a Knowledge Box",
+        "description": "Perform a hybrid search that will return text and semantic results matching the query",
         "value": {
-            "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
+            "query": "How can I be an effective product manager?",
+            "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
         },
-    },
-    "get_language_counts": {
-        "summary": "Get the number of documents for each language",
-        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
-        "value": {
-            "page_size": 0,
-            "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
-        },
-    },
+    }
 }
 
 
