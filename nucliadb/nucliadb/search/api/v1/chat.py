@@ -51,7 +51,7 @@ END_OF_STREAM = "_END_"
 
 CHAT_EXAMPLES = {
     "search_and_chat": {
-        "summary": "Ask who won the leage final",
+        "summary": "Ask who won the league final",
         "description": "You can ask a question to your knowledge box",  # noqa
         "value": {
             "query": "Who won the league final?",
