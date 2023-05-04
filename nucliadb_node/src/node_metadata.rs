@@ -26,7 +26,14 @@ use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 
-use crate::reader::NodeReaderService;
+use crate::env;
+
+fn number_of_shards() -> NodeResult<usize> {
+    Ok(std::fs::read_dir(env::shards_path())?
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .count())
+}
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct NodeMetadata {
@@ -90,10 +97,8 @@ impl NodeMetadata {
 
     pub fn create(path: &Path) -> NodeResult<Self> {
         debug!("Creating node metadata file '{}'", path.display());
-        let reader = NodeReaderService::new();
-        let shard_iter = reader.iter_shards()?;
-        Ok(NodeMetadata {
-            shard_count: shard_iter.count() as u64,
-        })
+        number_of_shards()
+            .map(|i| i as u64)
+            .map(|shard_count| NodeMetadata { shard_count })
     }
 }
