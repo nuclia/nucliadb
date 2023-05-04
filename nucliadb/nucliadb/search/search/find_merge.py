@@ -121,9 +121,17 @@ class Orderer:
         self.boosted_items.append(key)
 
     def sorted_by_insertion(self) -> Iterator[Any]:
+        returned = set()
         for key in self.boosted_items:
+            if key in returned:
+                continue
+            returned.add(key)
             yield key
+
         for key in self.items:
+            if key in returned:
+                continue
+            returned.add(key)
             yield key
 
 
