@@ -35,7 +35,6 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     FindRequest,
-    FindSearchOptions,
     KnowledgeboxFindResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -54,7 +53,7 @@ FIND_EXAMPLES = {
         "description": "Perform a hybrid search that will return text and semantic results matching the query",
         "value": {
             "query": "How can I be an effective product manager?",
-            "features": [FindSearchOptions.PARAGRAPH, FindSearchOptions.VECTOR],
+            "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
         },
     }
 }
@@ -90,10 +89,10 @@ async def find_knowledgebox(
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
     range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[FindSearchOptions] = Query(
+    features: List[SearchOptions] = Query(
         default=[
-            FindSearchOptions.PARAGRAPH,
-            FindSearchOptions.VECTOR,
+            SearchOptions.PARAGRAPH,
+            SearchOptions.VECTOR,
         ],
     ),
     reload: bool = Query(default=True),
@@ -112,6 +111,9 @@ async def find_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
+    if SearchOptions.DOCUMENT in features:
+        return HTTPClientError(status_code=422, detail="fulltext search not supported")
+
     item = FindRequest(
         query=query,
         advanced_query=advanced_query,
