@@ -338,8 +338,8 @@ async def test_search_handles_limits_exceeded_error(
         kb = knowledgebox_ingest
         resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
         assert resp.status_code == 402
-        assert resp.json() == "over the quota"
+        assert resp.json() == {"detail": "over the quota"}
 
         resp = await client.post(f"/{KB_PREFIX}/{kb}/search", json={})
         assert resp.status_code == 402
-        assert resp.json() == "over the quota"
+        assert resp.json() == {"detail": "over the quota"}
