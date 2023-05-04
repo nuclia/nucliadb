@@ -103,8 +103,8 @@ async def test_find_handles_limits_exceeded_error(
         kb = knowledgebox_ingest
         resp = await client.get(f"/{KB_PREFIX}/{kb}/find")
         assert resp.status_code == 402
-        assert resp.json() == "over the quota"
+        assert resp.json() == {"detail": "over the quota"}
 
         resp = await client.post(f"/{KB_PREFIX}/{kb}/find", json={})
         assert resp.status_code == 402
-        assert resp.json() == "over the quota"
+        assert resp.json() == {"detail": "over the quota"}

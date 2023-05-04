@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
@@ -422,6 +422,12 @@ class FindRequest(SearchRequest):
         SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
     ]
+
+    @validator("features")
+    def fulltext_not_supported(cls, v):
+        if SearchOptions.DOCUMENT in v or SearchOptions.DOCUMENT == v:
+            raise ValueError("fulltext search not supported")
+        return v
 
 
 class SCORE_TYPE(str, Enum):
