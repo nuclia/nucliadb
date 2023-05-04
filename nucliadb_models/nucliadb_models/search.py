@@ -417,10 +417,16 @@ class ChatRequest(BaseModel):
     context: Optional[List[Message]] = None
 
 
+class FindSearchOptions(str, Enum):
+    PARAGRAPH = "paragraph"
+    RELATIONS = "relations"
+    VECTOR = "vector"
+
+
 class FindRequest(SearchRequest):
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.VECTOR,
+    features: List[FindSearchOptions] = [
+        FindSearchOptions.PARAGRAPH,
+        FindSearchOptions.VECTOR,
     ]
 
 

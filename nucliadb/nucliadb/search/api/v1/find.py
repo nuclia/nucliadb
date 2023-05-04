@@ -35,6 +35,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     FindRequest,
+    FindSearchOptions,
     KnowledgeboxFindResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -53,7 +54,7 @@ FIND_EXAMPLES = {
         "description": "Perform a hybrid search that will return text and semantic results matching the query",
         "value": {
             "query": "How can I be an effective product manager?",
-            "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
+            "features": [FindSearchOptions.PARAGRAPH, FindSearchOptions.VECTOR],
         },
     }
 }
@@ -89,11 +90,11 @@ async def find_knowledgebox(
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
     range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = Query(
+    features: List[FindSearchOptions] = Query(
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.VECTOR,
-        ]
+            FindSearchOptions.PARAGRAPH,
+            FindSearchOptions.VECTOR,
+        ],
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
