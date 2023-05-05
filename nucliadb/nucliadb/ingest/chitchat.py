@@ -23,8 +23,6 @@ import asyncio
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, Response
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
@@ -75,16 +73,7 @@ async def stop_chitchat():
         clean_utility(Utility.CHITCHAT)
 
 
-middleware = [
-    Middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    ),
-]
-
-chitchat_app = FastAPI(title="Chitchat monitor server", middleware=middleware)
+chitchat_app = FastAPI(title="Chitchat monitor server")
 
 
 @chitchat_app.patch("/members", status_code=204)
@@ -109,7 +98,6 @@ def get_configured_chitchat_app(host: str, port: int) -> Tuple[Server, Config]:
         backlog=2047,
         limit_max_requests=None,
         timeout_keep_alive=5,
-        access_log=False,
     )
     server = Server(config=config)
     return server, config
