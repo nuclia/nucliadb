@@ -64,7 +64,6 @@ class ClusterMember(BaseModel):
     listen_addr: str = Field(alias="address")
     type: MemberType
     is_self: bool
-    load_score: Optional[float]
     shard_count: Optional[int]
 
     class Config:

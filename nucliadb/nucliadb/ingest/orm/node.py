@@ -65,7 +65,6 @@ class Node(AbstractNode):
         self,
         address: str,
         type: MemberType,
-        load_score: float,
         shard_count: int,
         dummy: bool = False,
     ):
@@ -177,7 +176,6 @@ class Node(AbstractNode):
         ident: str,
         address: str,
         type: MemberType,
-        load_score: float,
         shard_count: int,
         dummy: bool = False,
     ):
@@ -202,7 +200,6 @@ class Node(AbstractNode):
             NODES[member.id] = Node(
                 member.listen_address,
                 MemberType.from_pb(member.type),
-                member.load_score,
                 member.shard_count,
                 member.dummy,
             )

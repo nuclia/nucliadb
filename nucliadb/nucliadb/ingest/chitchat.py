@@ -43,11 +43,6 @@ SHARD_COUNT = metrics.Gauge(
     labels={"node": ""},
 )
 
-LOAD_SCORE = metrics.Gauge(
-    "nucliadb_node_load_score",
-    labels={"node": ""},
-)
-
 
 async def start_chitchat(service_name: str) -> Optional[ChitchatMonitor]:
     util = get_utility(Utility.CHITCHAT)
@@ -151,11 +146,6 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
         if member.is_self or member.type != MemberType.IO:
             continue
 
-        load_score = member.load_score
-        if load_score is None:
-            load_score = 0.0
-            logger.warning(f"Node {member.node_id} has no load_score")
-
         shard_count = member.shard_count
         if shard_count is None:
             shard_count = 0
@@ -168,13 +158,11 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
                 member.node_id,
                 address=member.listen_addr,
                 type=member.type,
-                load_score=load_score,
                 shard_count=shard_count,
             )
             logger.debug("Node added")
         else:
             logger.debug(f"{member.node_id}/{member.type} update")
-            node.load_score = load_score
             node.shard_count = shard_count
             logger.debug("Node updated")
 
@@ -206,10 +194,9 @@ def update_node_metrics(nodes: Dict[str, Node], destroyed_node_ids: List[str]):
 
     for node_id, node in nodes.items():
         SHARD_COUNT.set(node.shard_count, labels=dict(node=node_id))
-        LOAD_SCORE.set(node.load_score, labels=dict(node=node_id))
 
     for node_id in destroyed_node_ids:
-        for gauge in (SHARD_COUNT, LOAD_SCORE):
+        for gauge in (SHARD_COUNT,):
             try:
                 gauge.remove(labels=dict(node=node_id))
             except KeyError:

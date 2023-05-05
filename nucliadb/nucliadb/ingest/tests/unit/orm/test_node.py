@@ -116,7 +116,6 @@ async def node_errors():
         id,
         address="nohost:9999",
         type=MemberType.IO,
-        load_score=0.0,
         shard_count=0,
         dummy=True,
     )
