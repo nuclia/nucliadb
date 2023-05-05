@@ -33,9 +33,8 @@ from nucliadb_models.cluster import MemberType
 def nodes():
     nodes = {
         "node-0": Node("node-0", MemberType.IO, shard_count=0, dummy=True),
-        "node-1": Node("node-1", MemberType.IO, shard_count=0, dummy=True),
-        "node-2": Node("node-2", MemberType.IO, shard_count=30, dummy=True),
-        "node-3": Node("node-3", MemberType.IO, shard_count=40, dummy=True),
+        "node-30": Node("node-2", MemberType.IO, shard_count=30, dummy=True),
+        "node-40": Node("node-3", MemberType.IO, shard_count=40, dummy=True),
     }
     with mock.patch.object(orm, "NODES", new=nodes):
         yield nodes
