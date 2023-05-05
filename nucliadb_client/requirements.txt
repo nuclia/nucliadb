@@ -6,3 +6,4 @@ aiofiles
 nucliadb-protos
 nucliadb-models
 nucliadb-telemetry>=1.9.2
+urllib3<1.27,>=1.21.1

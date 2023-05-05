@@ -14,3 +14,4 @@ types-google-cloud-ndb
 types-boto3
 nucliadb-protos
 nucliadb-sdk
+urllib3<1.27,>=1.21.1
