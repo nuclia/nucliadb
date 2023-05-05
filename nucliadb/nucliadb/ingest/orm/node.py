@@ -19,12 +19,9 @@
 #
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 from typing import Dict, List, Optional
 from uuid import uuid4
 
-import prometheus_client  # type: ignore
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
@@ -49,6 +46,7 @@ from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
 )
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.settings import settings
+from nucliadb_models.cluster import MemberType
 from nucliadb_telemetry import errors
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.keys import KB_SHARDS
@@ -56,76 +54,6 @@ from nucliadb_utils.keys import KB_SHARDS
 READ_CONNECTIONS = LRU(50)
 WRITE_CONNECTIONS = LRU(50)
 SIDECAR_CONNECTIONS = LRU(50)
-
-
-AVAILABLE_NODES = prometheus_client.Gauge(
-    "nucliadb_nodes_available",
-    "Current number of nodes available",
-)
-
-SHARD_COUNT = prometheus_client.Gauge(
-    "nucliadb_node_shard_count",
-    "Current number of shards reported by nodes via chitchat",
-    labelnames=["node"],
-)
-
-
-class NodeType(Enum):
-    IO = 1
-    SEARCH = 2
-    INGEST = 3
-    TRAIN = 4
-    UNKNOWN = 5
-
-    @staticmethod
-    def from_str(label) -> NodeType:
-        if label in "Io":
-            return NodeType.IO
-        elif label in "Search":
-            return NodeType.SEARCH
-        elif label in "Ingest":
-            return NodeType.INGEST
-        elif label in "Train":
-            return NodeType.TRAIN
-        else:
-            logger.warning(f"Unknown '{label}' node type")
-            return NodeType.UNKNOWN
-
-    @staticmethod
-    def from_pb(node_type: Member.Type.ValueType):
-        if node_type == Member.Type.IO:
-            return NodeType.IO
-        elif node_type == Member.Type.SEARCH:
-            return NodeType.SEARCH
-        elif node_type == Member.Type.INGEST:
-            return NodeType.INGEST
-        elif node_type == Member.Type.TRAIN:
-            return NodeType.TRAIN
-        elif node_type == Member.Type.UNKNOWN:
-            return NodeType.UNKNOWN
-        else:
-            raise ValueError(f"incompatible node type '{node_type}'")
-
-    def to_pb(self) -> Member.Type.ValueType:
-        if self == NodeType.IO:
-            return Member.Type.IO
-        elif self == NodeType.SEARCH:
-            return Member.Type.SEARCH
-        elif self == NodeType.INGEST:
-            return Member.Type.INGEST
-        elif self == NodeType.TRAIN:
-            return Member.Type.TRAIN
-        else:
-            return Member.Type.UNKNOWN
-
-
-@dataclass
-class ClusterMember:
-    node_id: str
-    listen_addr: str
-    type: NodeType
-    is_self: bool
-    shard_count: int
 
 
 class Node(AbstractNode):
@@ -136,7 +64,7 @@ class Node(AbstractNode):
     def __init__(
         self,
         address: str,
-        type: NodeType,
+        type: MemberType,
         shard_count: int,
         dummy: bool = False,
     ):
@@ -247,7 +175,7 @@ class Node(AbstractNode):
         cls,
         ident: str,
         address: str,
-        type: NodeType,
+        type: MemberType,
         shard_count: int,
         dummy: bool = False,
     ):
@@ -271,7 +199,7 @@ class Node(AbstractNode):
         for member in members.members:
             NODES[member.id] = Node(
                 member.listen_address,
-                NodeType.from_pb(member.type),
+                MemberType.from_pb(member.type),
                 member.shard_count,
                 member.dummy,
             )
@@ -375,46 +303,6 @@ class Node(AbstractNode):
         return self._reader
 
 
-async def chitchat_update_node(members: List[ClusterMember]) -> None:
-    valid_ids = []
-    for member in members:
-        valid_ids.append(member.node_id)
-        if member.is_self is False and member.type == NodeType.IO:
-            node = NODES.get(member.node_id)
-            if node is None:
-                logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
-                await Node.set(
-                    member.node_id,
-                    address=member.listen_addr,
-                    type=member.type,
-                    shard_count=member.shard_count,
-                )
-                logger.debug("Node added")
-            else:
-                logger.debug(f"{member.node_id}/{member.type} update")
-                node.shard_count = member.shard_count
-                logger.debug("Node updated")
-    node_ids = [x for x in NODES.keys()]
-    destroyed_node_ids = []
-    for key in node_ids:
-        if key not in valid_ids:
-            node = NODES.get(key)
-            if node is not None:
-                destroyed_node_ids.append(key)
-                logger.info(f"{key}/{node.type} remove {node.address}")
-                await Node.destroy(key)
-    try:
-        if len(destroyed_node_ids) > 1:
-            raise Exception(
-                f"{len(destroyed_node_ids)} nodes are down simultaneously. This should never happen!"
-            )
-    except Exception as e:
-        logger.error(str(e))
-        errors.capture_exception(e)
-
-    update_node_metrics(NODES, destroyed_node_ids)
-
-
 def get_replica(shards: PBShards, replica_id: str) -> Optional[ShardReplica]:
     for logic_shard in shards.shards:
         for replica_shard in logic_shard.replicas:
@@ -433,19 +321,3 @@ class ReplicaShardNotFound(Exception):
 
 class KBNotFoundError(Exception):
     pass
-
-
-def update_node_metrics(nodes: Dict[str, Node], destroyed_node_ids: List[str]):
-    AVAILABLE_NODES.set(len(nodes))
-
-    for node_id, node in nodes.items():
-        SHARD_COUNT.labels(node=node_id).set(node.shard_count)
-
-    for node_id in destroyed_node_ids:
-        for gauge in (SHARD_COUNT,):
-            try:
-                gauge.remove(node_id)
-            except KeyError:
-                # Be resilient if there were no previous
-                # samples for this node_id
-                pass

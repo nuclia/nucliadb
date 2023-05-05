@@ -1,3 +1,4 @@
 httpx
 requests
 nucliadb-models
+urllib3<1.27,>=1.21.1

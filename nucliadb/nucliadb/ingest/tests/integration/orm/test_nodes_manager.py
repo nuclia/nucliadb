@@ -25,8 +25,9 @@ import pytest
 from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
 
 from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm.node import Node, NodeType
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.nodes_manager import NodesManager
+from nucliadb_models.cluster import MemberType
 from nucliadb_utils.keys import KB_SHARDS
 
 
@@ -40,21 +41,21 @@ async def fake_nodes():
     await Node.set(
         "node-0",
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
         shard_count=0,
         dummy=True,
     )
     await Node.set(
         "node-1",
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
         shard_count=0,
         dummy=True,
     )
     await Node.set(
         "node-2",
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
         shard_count=0,
         dummy=True,
     )

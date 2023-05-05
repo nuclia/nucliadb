@@ -40,11 +40,12 @@ from nucliadb.ingest.maindb.local import LocalDriver
 from nucliadb.ingest.maindb.redis import RedisDriver
 from nucliadb.ingest.maindb.tikv import TiKVDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node, NodeType
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
+from nucliadb_models.cluster import MemberType
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
@@ -241,14 +242,14 @@ async def fake_node(indexing_utility_ingest):
     await Node.set(
         uuid1,
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
         shard_count=0,
         dummy=True,
     )
     await Node.set(
         uuid2,
         address="nohost:9999",
-        type=NodeType.IO,
+        type=MemberType.IO,
         shard_count=0,
         dummy=True,
     )
