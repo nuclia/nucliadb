@@ -20,6 +20,7 @@ import asyncio
 import os
 import time
 from functools import wraps
+from inspect import isasyncgenfunction, isgeneratorfunction
 from typing import TYPE_CHECKING, Optional, Type, Union
 
 import prometheus_client
@@ -82,6 +83,22 @@ class Observer:
                 async def inner(*args, **kwargs):
                     with ObserverRecorder(self, labels or {}):
                         return await func(*args, **kwargs)
+
+            elif isasyncgenfunction(func):
+
+                @wraps(func)
+                async def inner(*args, **kwargs):
+                    with ObserverRecorder(self, labels or {}):
+                        async for item in func(*args, **kwargs):
+                            yield item
+
+            elif isgeneratorfunction(func):
+
+                @wraps(func)
+                def inner(*args, **kwargs):
+                    with ObserverRecorder(self, labels or {}):
+                        for item in func(*args, **kwargs):
+                            yield item
 
             else:
 
