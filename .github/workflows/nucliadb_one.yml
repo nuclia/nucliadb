@@ -133,6 +133,7 @@ jobs:
         run: |
           docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
 
+        # TODO: un-comment when we sort out image cache issues
         # with:
         #   context: .
         #   file: Dockerfile.cluster_monitor
