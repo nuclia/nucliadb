@@ -23,4 +23,3 @@ class PubSubChannels:
 
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
-    SEEK_TO_PARAGRAPH = "nucliadb_seek_to_paragraph"
