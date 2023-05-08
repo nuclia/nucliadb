@@ -76,7 +76,6 @@ async def start_predict_engine():
     if nuclia_settings.dummy_predict:
         predict_util = DummyPredictEngine()
     else:
-        breakpoint()
         predict_util = PredictEngine(
             nuclia_settings.nuclia_inner_predict_url,
             nuclia_settings.nuclia_public_url,
