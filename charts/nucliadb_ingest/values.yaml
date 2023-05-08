@@ -100,7 +100,7 @@ ingest_orm_grpc_autoscaling:
 
 # ingest-processed-consumer settings
 ingest_processed_consumer_resources: {}
-ingest_processed_consumer_replicaCount: 2
+ingest_processed_consumer_replicaCount: 1
 ingest_processed_consumer_autoscaling:
   minReplicas: 1
   maxReplicas: 5
