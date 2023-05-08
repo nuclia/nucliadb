@@ -89,11 +89,13 @@ async def test_update_available_nodes():
 
     # Check that it updates loads score for registered members
     member.shard_count = 2
+    member.listen_addr = "0.0.0.0:7777"
     member2 = get_cluster_member(node_id="node2", shard_count=1)
     await update_available_nodes([member, member2])
     assert len(NODES) == 2
     node = NODES["node1"]
     assert node.shard_count == 2
+    assert node.address == "0.0.0.0:7777"
     node2 = NODES["node2"]
     assert node2.shard_count == 1
 

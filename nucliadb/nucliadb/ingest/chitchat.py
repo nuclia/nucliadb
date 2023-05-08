@@ -151,6 +151,7 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
             logger.debug("Node added")
         else:
             logger.debug(f"{member.node_id}/{member.type} update")
+            node.address = member.listen_addr
             node.shard_count = shard_count
             logger.debug("Node updated")
 
