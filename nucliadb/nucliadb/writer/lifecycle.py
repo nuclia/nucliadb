@@ -25,10 +25,7 @@ from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb.writer.utilities import get_processing
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import (
-    nuclia_settings,
-    transaction_settings,
-)
+from nucliadb_utils.settings import nuclia_settings, transaction_settings
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
