@@ -230,7 +230,7 @@ async def get_paragraph_text(
     if cache_val is not None:
         return cache_val
 
-    if False and split in (None, "") and has_feature("nucliadb_seek_to_paragraph"):
+    if split in (None, "") and has_feature("nucliadb_seek_to_paragraph"):
         text = await get_paragraph_text_by_seeking(
             field=field_obj, start=start, end=end
         )
