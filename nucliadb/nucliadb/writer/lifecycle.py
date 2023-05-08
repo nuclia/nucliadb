@@ -28,10 +28,10 @@ from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.utilities import (
     Utility,
+    finalize_utilities,
     set_utility,
     start_transaction_utility,
     stop_transaction_utility,
-    finalize_utilities,
 )
 
 
