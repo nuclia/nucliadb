@@ -36,12 +36,12 @@ pub enum VectorErr {
     FsError(#[from] nucliadb_core::fs_state::FsError),
     #[error("Garbage collection delayed")]
     WorkDelayed,
-    #[error("Several writers are open at the same time ")]
-    MultipleWriters,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
     #[error("Can not merge zero datapoints")]
     EmptyMerge,
+    #[error("A writer is already open for this index")]
+    WriterExists,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

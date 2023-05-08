@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
@@ -50,8 +51,8 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
 }
 
 pub struct VectorReaderService {
-    index: Index,
-    indexset: IndexSet,
+    default: Index,
+    set: IndexSet,
 }
 impl Debug for VectorReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -63,38 +64,19 @@ impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
         let time = SystemTime::now();
+        let index = self.get_index(vectorset)?;
+        let reader = index.reader()?;
 
-        let indexet_slock = self.indexset.get_slock()?;
-        if vectorset.is_empty() {
-            debug!("Id for the vectorset is empty");
-            let index_slock = self.index.get_slock()?;
-            let no_nodes = self.index.no_nodes(&index_slock);
-            std::mem::drop(index_slock);
+        let no_nodes = reader.no_nodes();
+        std::mem::drop(reader);
 
-            let metrics = context::get_metrics();
-            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors("count".to_string());
-            metrics.record_request_time(metric, took);
-            debug!("Ending at {took} ms");
+        let metrics = context::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::vectors("count".to_string());
+        metrics.record_request_time(metric, took);
+        debug!("Ending at {took} ms");
 
-            Ok(no_nodes)
-        } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-            debug!("Counting nodes for {vectorset}");
-            let lock = index.get_slock()?;
-            let no_nodes = index.no_nodes(&lock);
-            std::mem::drop(lock);
-
-            let metrics = context::get_metrics();
-            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors("count".to_string());
-            metrics.record_request_time(metric, took);
-            debug!("Ending at {took} ms");
-
-            Ok(no_nodes)
-        } else {
-            debug!("There was not a set called {vectorset}");
-            Ok(0)
-        }
+        Ok(no_nodes)
     }
 }
 impl ReaderChild for VectorReaderService {
@@ -113,8 +95,6 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
-        let indexet_slock = self.indexset.get_slock()?;
-        let index_slock = self.index.get_slock()?;
         let mut formula = Formula::new();
         request
             .tags
@@ -122,33 +102,18 @@ impl ReaderChild for VectorReaderService {
             .cloned()
             .map(LabelClause::new)
             .for_each(|c| formula.extend(c));
-        let search_request = (total_to_get, request, formula);
+
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
         }
-        let result = if request.vector_set.is_empty() {
-            debug!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&search_request, &index_slock)?
-        } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
-            debug!(
-                "{id:?} - vectorset specified and found, searching on {}",
-                request.vector_set
-            );
-            let lock = index.get_slock()?;
-            index.search(&search_request, &lock)?
-        } else {
-            debug!(
-                "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
-                request.vector_set
-            );
-            vec![]
-        };
+        let search_request = (total_to_get, request, formula);
+        let index = self.get_index(&request.vector_set)?;
+        let reader = index.reader()?;
+        let result = reader.search(&search_request)?;
+        std::mem::drop(reader);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
         }
-
-        std::mem::drop(indexet_slock);
-        std::mem::drop(index_slock);
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Creating results: starts at {v} ms");
@@ -179,8 +144,8 @@ impl ReaderChild for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
         let time = SystemTime::now();
-        let lock = self.index.get_slock().unwrap();
-        let result = self.index.get_keys(&lock)?;
+        let reader = self.default.reader()?;
+        let result = reader.keys()?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("Ending at {v} ms")
         }
@@ -211,6 +176,16 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl VectorReaderService {
+    fn get_index<'a>(&'a self, name: &str) -> NodeResult<Cow<'a, Index>> {
+        if name.is_empty() {
+            return Ok(Cow::Borrowed(&self.default));
+        }
+        match self.set.get(name) {
+            Ok(None) => Err(node_error!("Undefined set {name}")),
+            Ok(Some(i)) => Ok(Cow::Owned(i)),
+            Err(e) => Err(e.into()),
+        }
+    }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
@@ -237,10 +212,9 @@ impl VectorReaderService {
             let Some(similarity) = config.similarity.map(|i| i.into()) else {
                 return Err(node_error!("A similarity must be specified"));
             };
-            Ok(VectorReaderService {
-                index: Index::new(path, IndexMetadata { similarity })?,
-                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
-            })
+            let default = Index::new(path, IndexMetadata { similarity })?;
+            let set = IndexSet::new(path_indexset, IndexCheck::None)?;
+            Ok(VectorReaderService { default, set })
         }
     }
     #[tracing::instrument(skip_all)]
@@ -250,10 +224,9 @@ impl VectorReaderService {
         if !path.exists() {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
-            Ok(VectorReaderService {
-                index: Index::open(path, IndexCheck::None)?,
-                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
-            })
+            let default = Index::open(path, IndexCheck::None)?;
+            let set = IndexSet::new(path_indexset, IndexCheck::None)?;
+            Ok(VectorReaderService { default, set })
         }
     }
 }

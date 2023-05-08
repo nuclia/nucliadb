@@ -213,8 +213,7 @@ impl State {
         self.delete_log.insert(id.as_bytes(), deleted_since);
     }
     #[must_use]
-    pub fn add(&mut self, dp: DataPoint) -> bool {
-        let meta = dp.meta();
+    pub fn add(&mut self, meta: Journal) -> bool {
         self.no_nodes += meta.no_nodes();
         self.current.add_unit(meta);
         if self.current.size() == BUFFER_CAP {
@@ -237,7 +236,7 @@ impl State {
             self.data_points.remove(&dp.id());
             self.no_nodes -= dp.no_nodes();
         });
-        self.add(new)
+        self.add(new.meta())
     }
     pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
         self.data_point_iterator()
@@ -337,7 +336,7 @@ mod test {
             .take(5)
             .map(|dp| {
                 let no_nodes = dp.meta().no_nodes();
-                let _ = state.add(dp);
+                let _ = state.add(dp.meta());
                 no_nodes
             })
             .sum::<usize>();

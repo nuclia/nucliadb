@@ -56,14 +56,14 @@ impl VectorEngine for Index {
         }
         let new_dp =
             DataPoint::new(self.location(), elems, Some(temporal_mark), similarity).unwrap();
-        let lock = self.get_elock().unwrap();
-        self.add(new_dp, &lock);
-        self.delete(batch_id, temporal_mark, &lock);
-        self.commit(lock).unwrap();
+        let mut writer = self.writer().unwrap();
+        writer.add(new_dp);
+        writer.delete(batch_id, temporal_mark);
+        writer.commit().unwrap();
     }
 
     fn search(&self, no_results: usize, query: &[f32]) {
-        let lock = self.get_slock().unwrap();
-        self.search(&Request(no_results, query), &lock).unwrap();
+        let reader = self.reader().unwrap();
+        reader.search(&Request(no_results, query)).unwrap();
     }
 }
