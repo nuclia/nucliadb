@@ -87,6 +87,3 @@ indexing:
   index_jetstream_auth:
   index_jetstream_servers:
     - nats1
-  index_jetstream_target: "node.{node}"
-  index_jetstream_group: "nucliadb-{partition}"
-  index_jetstream_stream: "nucliadb"

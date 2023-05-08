@@ -31,6 +31,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils import const
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction_utility
 
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
@@ -121,7 +122,9 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(1)
 
     writer = BrokerMessage()
@@ -179,7 +182,9 @@ async def test_knowledgebox_file_upload_root(
     transaction = get_transaction_utility()
 
     assert transaction.js is not None
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(1)
     writer = BrokerMessage()
     writer.ParseFromString(msgs[0].data)
@@ -235,7 +240,9 @@ async def test_knowledgebox_file_upload_root_headers(
     transaction = get_transaction_utility()
 
     assert transaction.js is not None
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(1)
     writer = BrokerMessage()
     writer.ParseFromString(msgs[0].data)
@@ -322,7 +329,9 @@ async def test_knowledgebox_file_tus_upload_field(
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(2)
 
     writer = BrokerMessage()
@@ -370,7 +379,9 @@ async def test_knowledgebox_file_upload_field_headers(
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(2)
     writer = BrokerMessage()
     writer.ParseFromString(msgs[1].data)
@@ -488,7 +499,9 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(2)
 
     writer = BrokerMessage()
@@ -606,7 +619,9 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
 
     transaction = get_transaction_utility()
 
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    sub = await transaction.js.pull_subscribe(
+        const.Streams.INGEST.subject.format(partition="1"), "auto"
+    )
     msgs = await sub.fetch(2)
 
     writer = BrokerMessage()

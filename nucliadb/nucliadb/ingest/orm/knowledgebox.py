@@ -149,7 +149,7 @@ class KnowledgeBox:
 
         when = datetime.now().isoformat()
         await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
-        await subtxn.commit(resource=False)
+        await subtxn.commit()
 
         audit_util = get_audit()
         if audit_util is not None:
@@ -413,7 +413,7 @@ class KnowledgeBox:
                         await txn.abort()
                         raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
-        await txn.commit(resource=False)
+        await txn.commit()
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
@@ -435,7 +435,7 @@ class KnowledgeBox:
                 txn = await driver.begin()
                 for key in chunk_of_keys:
                     await txn.delete(key)
-                await txn.commit(resource=False)
+                await txn.commit()
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
         pb = await self.get_shards_object()

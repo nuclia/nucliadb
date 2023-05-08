@@ -57,7 +57,11 @@ setup(
             # Standalone
             "nucliadb = nucliadb.run:run",
             # Ingest
+            #   - This command runs pull workers + ingest write consumer
             "nucliadb-ingest = nucliadb.ingest.app:run_consumer",
+            #   - Only runs processed resources write consumer
+            "nucliadb-ingest-processed-consumer = nucliadb.ingest.app:run_processed_consumer",
+            #   - Only runs GRPC Service
             "nucliadb-ingest-orm-grpc = nucliadb.ingest.app:run_orm_grpc",
             # Reader
             "nucliadb-reader = nucliadb.reader.run:run",

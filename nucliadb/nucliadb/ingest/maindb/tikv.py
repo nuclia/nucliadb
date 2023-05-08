@@ -24,11 +24,9 @@ from typing import Any, List, Optional
 from nucliadb.ingest.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
     DEFAULT_SCAN_LIMIT,
-    TXNID,
     Driver,
     Transaction,
 )
-from nucliadb.ingest.maindb.exceptions import NoWorkerCommit
 from nucliadb_telemetry import metrics
 
 try:
@@ -57,23 +55,7 @@ class TiKVTransaction(Transaction):
             await self.txn.rollback()
         self.open = False
 
-    async def commit(
-        self,
-        worker: Optional[str] = None,
-        tid: Optional[int] = None,
-        resource: bool = True,
-    ):
-        if resource:
-            if worker is None or tid is None:
-                raise NoWorkerCommit()
-            if tid != -1:
-                # If tid == -1 means we are injecting a resource via gRPC. We don't
-                # want to save the tid in this case, as it would break the next
-                # transactionability check.
-                key = TXNID.format(worker=worker)
-                with tikv_observer({"type": "put"}):
-                    await self.txn.put(key.encode(), str(tid).encode())
-
+    async def commit(self):
         with tikv_observer({"type": "commit"}):
             await self.txn.commit()
         self.open = False

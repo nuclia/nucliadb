@@ -26,10 +26,10 @@ jobs:
           cache: "pip"
 
       - name: Install package
-        run: make -C nucliadb_client/ install-dev
+        run: make -C nucliadb_dataset/ install-dev
 
       - name: Run pre-checks
-        run: make -C nucliadb_client/ lint
+        run: make -C nucliadb_dataset/ lint
 
   # Job to run tests
   tests:
@@ -51,7 +51,7 @@ jobs:
           cache: "pip"
 
       - name: Install the package
-        run: make -C nucliadb_client/ install-dev
+        run: make -C nucliadb_dataset/ install-dev
 
       - uses: dorny/paths-filter@v2
         id: filter
@@ -72,7 +72,7 @@ jobs:
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile .
       - name: Run tests
-        run: make -C nucliadb_client/ test
+        run: make -C nucliadb_dataset/ test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

@@ -34,6 +34,7 @@ from nucliadb.run import run_async_nucliadb
 from nucliadb.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
+from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -41,16 +42,6 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
 
 
 @pytest.fixture(scope="function")

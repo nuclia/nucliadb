@@ -46,7 +46,11 @@ class WaitFor:
 
 class LocalTransactionUtility:
     async def commit(
-        self, writer: BrokerMessage, partition: int, wait: bool = False
+        self,
+        writer: BrokerMessage,
+        partition: int,
+        wait: bool = False,
+        target_subject: Optional[str] = None,
     ) -> int:
         from nucliadb_utils.utilities import get_ingest
 
@@ -73,12 +77,10 @@ class TransactionUtility:
     def __init__(
         self,
         nats_servers: List[str],
-        nats_target: str,
         nats_creds: Optional[str] = None,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
-        self.nats_target = nats_target
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -105,7 +107,7 @@ class TransactionUtility:
     def _get_notification_action_type(self):
         if has_feature(const.Features.WAIT_FOR_INDEX):
             return Notification.Action.INDEXED
-        return Notification.Action.COMMIT
+        return Notification.Action.COMMIT  # currently do not handle ABORT!
 
     async def wait_for_commited(
         self, kbid: str, waiting_for: WaitFor, request_id: str
@@ -117,7 +119,13 @@ class TransactionUtility:
             pb = Notification()
             pb.ParseFromString(data)
             if pb.uuid == waiting_for.uuid and pb.action == action_type:
-                if waiting_for.seq is None or pb.seqid == waiting_for.seq:
+                if (
+                    waiting_for.seq is None
+                    or pb.seqid == waiting_for.seq
+                    # if we're waiting for index of this resource
+                    # the seq id will not match
+                    or action_type != Notification.Action.INDEXED
+                ):
                     event.set()
 
         waiting_event = Event()
@@ -155,7 +163,13 @@ class TransactionUtility:
         await self.nc.close()
 
     async def commit(
-        self, writer: BrokerMessage, partition: int, wait: bool = False
+        self,
+        writer: BrokerMessage,
+        partition: int,
+        wait: bool = False,
+        target_subject: Optional[
+            str
+        ] = None,  # allow customizing where to send the message
     ) -> int:
         waiting_event: Optional[Event] = None
 
@@ -167,9 +181,10 @@ class TransactionUtility:
                 writer.kbid, waiting_for, request_id=request_id
             )
 
-        res = await self.js.publish(
-            self.nats_target.format(partition=partition), writer.SerializeToString()
-        )
+        if target_subject is None:
+            target_subject = const.Streams.INGEST.subject.format(partition=partition)
+
+        res = await self.js.publish(target_subject, writer.SerializeToString())
 
         waiting_for.seq = res.seq
 

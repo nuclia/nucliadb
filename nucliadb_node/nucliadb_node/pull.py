@@ -36,13 +36,7 @@ from nucliadb_utils import const
 from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    get_pubsub,
-    get_storage,
-    get_transaction_utility,
-)
+from nucliadb_utils.utilities import get_pubsub, get_storage
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.reader import Reader
@@ -97,11 +91,6 @@ class Worker:
 
         await self.publisher.finalize()
         await self.subscriber_finalize()
-
-        transaction_utility = get_transaction_utility()
-        if transaction_utility:
-            await transaction_utility.finalize()
-            clean_utility(Utility.TRANSACTION)
 
         await self.storage.finalize()
 
@@ -291,19 +280,22 @@ class Worker:
     async def subscribe(self):
         logger.info(f"Last seqid {self.last_seqid}")
         try:
-            await self.js.stream_info(indexing_settings.index_jetstream_stream)
+            await self.js.stream_info(const.Streams.INDEX.name)
         except StreamNotFoundError:
             logger.info("Creating stream")
             res = await self.js.add_stream(
-                name=indexing_settings.index_jetstream_stream,
-                subjects=[indexing_settings.index_jetstream_target.format(node=">")],
+                name=const.Streams.INDEX.name,
+                subjects=[
+                    const.Streams.INDEX.subject.format(node=">"),
+                ],
             )
-            await self.js.stream_info(indexing_settings.index_jetstream_stream)
+            await self.js.stream_info(const.Streams.INDEX.name)
 
+        subject = const.Streams.INDEX.subject.format(node=self.node)
         res = await self.js.subscribe(
-            subject=indexing_settings.index_jetstream_target.format(node=self.node),
-            queue=indexing_settings.index_jetstream_group.format(node=self.node),
-            stream=indexing_settings.index_jetstream_stream,
+            subject=subject,
+            queue=const.Streams.INDEX.group.format(node=self.node),
+            stream=const.Streams.INDEX.name,
             flow_control=True,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
@@ -317,10 +309,7 @@ class Worker:
             ),
         )
         self.subscriptions.append(res)
-        logger.info(
-            f"Subscribed to {indexing_settings.index_jetstream_target.format(node=self.node)} on \
-             stream {indexing_settings.index_jetstream_stream}"
-        )
+        logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
 
 class IndexedPublisher:

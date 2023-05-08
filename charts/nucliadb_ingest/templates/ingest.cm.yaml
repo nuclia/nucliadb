@@ -11,14 +11,13 @@ metadata:
 data:
   GRPC_PORT: {{ .Values.serving.grpc | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
-  PULL_TIME: {{ .Values.config.pull_time | quote }}
+  PULL_TIME_ERROR_BACKOFF: {{ .Values.config.pull_time_error_backoff | quote }}
   NODE_REPLICAS: {{ .Values.config.node_replicas | quote }}
 {{- if .Values.debug }}
   LOG_LEVEL: "DEBUG"
 {{- end }}
   SENTRY_URL: {{ .Values.running.sentry_url }}
 
-  INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}
 

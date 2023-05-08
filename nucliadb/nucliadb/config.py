@@ -117,9 +117,8 @@ def config_nucliadb(nucliadb_args: Settings):
 
     if nucliadb_args.nua_api_key:
         nuclia_settings.nuclia_service_account = nucliadb_args.nua_api_key
-        ingest_settings.pull_time = 60
     else:
-        ingest_settings.pull_time = 0
+        ingest_settings.disable_pull_worker = True
         nuclia_settings.dummy_processing = True
         nuclia_settings.dummy_predict = True
 

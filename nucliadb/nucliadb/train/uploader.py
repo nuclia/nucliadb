@@ -51,10 +51,9 @@ class UploadServicer:
         driver = await get_driver()
         cache = await get_cache()
         self.proc = Processor(driver=driver, storage=storage, audit=audit, cache=cache)
-        await self.proc.initialize()
 
     async def finalize(self):
-        await self.proc.finalize()
+        ...
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):
