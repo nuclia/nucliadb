@@ -78,6 +78,8 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     ingest_settings.nuclia_partitions = 1
 
     nuclia_settings.dummy_processing = True
+    nuclia_settings.dummy_predict = True
+
     ingest_settings.grpc_port = free_port()
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
@@ -91,7 +93,7 @@ async def search_api(
     redis,
     transaction_utility,
     indexing_utility_registered,
-    test_settings_search: None,
+    test_settings_search,
     event_loop,
 ):  # type: ignore
     from nucliadb.ingest.orm import NODES
@@ -194,13 +196,14 @@ async def multiple_search_resource(
     knowledgebox_ingest,
 ):
     """
-    Create a resource that has every possible bit of information
+    Create 100 resources that have every possible bit of information
     """
-    for count in range(100):
+    n_resources = 100
+    for count in range(1, n_resources + 1):
         message = broker_resource(knowledgebox_ingest)
         await processor.process(message=message, seqid=count)
 
-    await wait_for_shard(knowledgebox_ingest, 100)
+    await wait_for_shard(knowledgebox_ingest, n_resources)
     return knowledgebox_ingest
 
 

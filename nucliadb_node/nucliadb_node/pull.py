@@ -268,7 +268,7 @@ class Worker:
                 # Remove this block in the future once we're confident it's not needed.
                 errors.capture_exception(storage_error)
                 logger.warning(
-                    "Error retrieving the indexing payload we do not block as that means its already deleted"
+                    "Error retrieving the indexing payload we do not block as that means its already deleted!"
                 )
             except Exception as e:
                 event_id = errors.capture_exception(e)

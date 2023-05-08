@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.ingest.processing import ProcessingEngine
+from nucliadb.ingest.processing import start_processing_engine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.tus import finalize as storage_finalize
@@ -25,13 +25,14 @@ from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb.writer.utilities import get_processing
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import (
-    nuclia_settings,
-    storage_settings,
-    transaction_settings,
-)
+from nucliadb_utils.settings import nuclia_settings, transaction_settings
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
-from nucliadb_utils.utilities import Utility, get_transaction_utility, set_utility
+from nucliadb_utils.utilities import (
+    Utility,
+    finalize_utilities,
+    get_transaction_utility,
+    set_utility,
+)
 
 
 async def initialize():
@@ -39,20 +40,8 @@ async def initialize():
 
     await start_ingest(SERVICE_NAME)
 
-    processing_engine = ProcessingEngine(
-        nuclia_service_account=nuclia_settings.nuclia_service_account,
-        nuclia_zone=nuclia_settings.nuclia_zone,
-        onprem=nuclia_settings.onprem,
-        nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
-        nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
-        nuclia_public_url=nuclia_settings.nuclia_public_url,
-        driver=storage_settings.file_backend,
-        dummy=nuclia_settings.dummy_processing,
-        disable_send_to_process=nuclia_settings.disable_send_to_process,
-        days_to_keep=storage_settings.upload_token_expiration,
-    )
-    await processing_engine.initialize()
-    set_utility(Utility.PROCESSING, processing_engine)
+    await start_processing_engine()
+
     set_utility(
         Utility.PARTITION,
         PartitionUtility(
@@ -86,3 +75,5 @@ async def finalize():
     await storage_finalize()
 
     await clean_telemetry(SERVICE_NAME)
+
+    await finalize_utilities()
