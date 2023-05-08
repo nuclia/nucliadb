@@ -61,7 +61,6 @@ async def global_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    reload: bool = False,
     user_vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
@@ -71,7 +70,6 @@ async def global_query_to_pb(
     fields = fields or []
 
     request = SearchRequest()
-    request.reload = reload
     request.with_duplicates = with_duplicates
 
     if with_status is not None:
@@ -220,11 +218,9 @@ async def paragraph_query_to_pb(
     range_modification_end: Optional[datetime] = None,
     sort: Optional[str] = None,
     sort_ord: str = SortOrder.DESC.value,
-    reload: bool = False,
     with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:
     request = ParagraphSearchRequest()
-    request.reload = reload
     request.with_duplicates = with_duplicates
 
     # We need to ask for all and cut later

@@ -222,7 +222,6 @@ async def generate_token_classification_payloads(
     for entitygroup in trainset.filter.labels:
         request.filter.tags.append(f"/e/{entitygroup}")
         request.filter.conjunction = StreamFilter.Conjunction.OR
-    request.reload = True
     batch = TokenClassificationBatch()
     async for field_item in node.stream_get_fields(request):
         _, field_type, field = field_item.field.split("/")

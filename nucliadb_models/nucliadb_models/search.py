@@ -359,7 +359,6 @@ class SearchRequest(BaseModel):
         SearchOptions.DOCUMENT,
         SearchOptions.VECTOR,
     ]
-    reload: bool = True
     debug: bool = False
     highlight: bool = False
     show: List[ResourceProperties] = [ResourceProperties.BASIC]

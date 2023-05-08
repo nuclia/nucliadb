@@ -82,7 +82,6 @@ async def generate_paragraph_classification_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     request.filter.tags.append(labelset)
-    request.reload = True
     batch = ParagraphClassificationBatch()
 
     async for paragraph_item in node.stream_get_paragraphs(request):

@@ -107,7 +107,6 @@ async def search_knowledgebox(
             SearchOptions.VECTOR,
         ]
     ),
-    reload: bool = Query(default=True),
     debug: bool = Query(False),
     highlight: bool = Query(default=False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
@@ -142,7 +141,6 @@ async def search_knowledgebox(
         range_modification_end=range_modification_end,
         range_modification_start=range_modification_start,
         features=features,
-        reload=reload,
         debug=debug,
         highlight=highlight,
         show=show,
@@ -281,7 +279,6 @@ async def search(
         range_modification_start=item.range_modification_start,
         range_modification_end=item.range_modification_end,
         fields=item.fields,
-        reload=item.reload,
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,

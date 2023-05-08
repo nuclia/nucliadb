@@ -78,7 +78,6 @@ async def search(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    reload: bool = Query(False),
     highlight: bool = Query(False),
     split: bool = Query(False),
     show: List[ResourceProperties] = Query(list(ResourceProperties)),
@@ -109,7 +108,6 @@ async def search(
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        reload=reload,
         sort=sort.value if sort else None,
         sort_ord=sort_order.value,
     )
