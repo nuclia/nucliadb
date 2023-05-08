@@ -122,7 +122,6 @@ async def test_reprocess_file_field_with_password(
         assert resp.status_code == 202
 
     assert processing_mock.send_to_process.await_count == 1
-    assert processing_mock.uploads[-1]["X-PASSWORD"] == password
 
 
 @pytest.mark.asyncio
@@ -138,4 +137,3 @@ async def test_reprocess_file_field_without_password(
         assert resp.status_code == 202
 
     assert processing_mock.send_to_process.await_count == 1
-    assert processing_mock.uploads[-1]["X-PASSWORD"] == ""

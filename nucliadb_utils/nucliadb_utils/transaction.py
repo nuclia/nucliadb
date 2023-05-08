@@ -148,7 +148,10 @@ class TransactionUtility:
         self.js = get_traced_jetstream(self.nc, service_name or "nucliadb")
 
     async def finalize(self):
-        await self.nc.drain()
+        try:
+            await self.nc.drain()
+        except nats.errors.ConnectionClosedError:
+            pass
         await self.nc.close()
 
     async def commit(
