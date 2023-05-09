@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
-use std::sync::MutexGuard;
-use std::time::Duration;
 
 use nucliadb_core::fs_state;
 use nucliadb_core::tracing::*;
@@ -31,7 +29,6 @@ use crate::data_point::{DataPoint, DpId, Similarity};
 use crate::data_point_provider::merger;
 use crate::VectorR;
 
-const SLEEP_TIME: Duration = Duration::from_millis(100);
 pub(crate) struct Worker {
     location: PathBuf,
     work_flag: MergerWriterSync,
@@ -72,26 +69,14 @@ impl Worker {
         );
         merger::send_merge_request(worker);
     }
-    fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
-        loop {
-            match self.work_flag.try_to_start_working() {
-                Ok(lock) => break lock,
-                Err(_) => {
-                    info!("Merge delayed at: {:?}", self.location);
-                    std::thread::sleep(SLEEP_TIME);
-                }
-            }
-        }
-    }
+
     fn work(&self) -> VectorR<()> {
-        let work_flag = self.try_to_work_or_delay();
-
         let subscriber = self.location.as_path();
-        info!("{subscriber:?} is ready to perform a merge");
+        // We must ensure that GC does not happen while working.
         let lock = fs_state::shared_lock(subscriber)?;
-        let state: State = fs_state::load_state(&lock)?;
-        std::mem::drop(lock);
-
+        let (_, state) = fs_state::load_state::<State>(subscriber)?;
+        // Merging can happen offline
+        info!("{subscriber:?} is ready to perform a merge");
         let Some(work) = state.current_work_unit().map(|work|
             work
             .iter()
@@ -101,26 +86,20 @@ impl Worker {
         ) else { return Ok(());};
         let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
         let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
-        std::mem::drop(state);
-
         let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
 
-        let lock = fs_state::exclusive_lock(subscriber)?;
-        let mut state: State = fs_state::load_state(&lock)?;
+        // We are updating the state, but first
+        // synchronize with the writer.
+        let work_flag = self.work_flag.start_working();
+        let (_, mut state) = fs_state::load_state::<State>(subscriber)?;
         let creates_work = state.replace_work_unit(new_dp);
-        fs_state::persist_state(&lock, &state)?;
-        std::mem::drop(lock);
+        fs_state::persist_state(subscriber, &state)?;
         info!("Merge on {subscriber:?}:\n{report}");
         if creates_work {
             self.notify_merger();
         }
-
-        info!("Removing deprecated datapoints");
-        ids.into_iter()
-            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
-            .filter(|(.., r)| r.is_err())
-            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
         std::mem::drop(work_flag);
+        std::mem::drop(lock);
 
         info!("Merge request completed");
         Ok(())

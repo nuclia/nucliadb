@@ -22,16 +22,17 @@ mod merge_worker;
 mod merger;
 mod state;
 mod work_flag;
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
 use std::mem;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::time::SystemTime;
 
 use fs2::FileExt;
 pub use merger::Merger;
-use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::fs_state::{self, SLock, Version};
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
@@ -52,12 +53,6 @@ pub trait SearchRequest {
     fn get_filter(&self) -> &Formula;
     fn no_results(&self) -> usize;
     fn with_duplicates(&self) -> bool;
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum IndexCheck {
-    None,
-    Sanity,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -84,149 +79,29 @@ impl IndexMetadata {
 #[derive(Clone)]
 pub struct Index {
     metadata: IndexMetadata,
-    work_flag: MergerWriterSync,
-    state: Arc<RwLock<State>>,
-    date: Arc<RwLock<Version>>,
     location: PathBuf,
 }
 impl Index {
-    fn read_state(&self) -> RwLockReadGuard<'_, State> {
-        self.state.read().unwrap_or_else(|e| e.into_inner())
-    }
-    fn write_state(&self) -> RwLockWriteGuard<'_, State> {
-        self.state.write().unwrap_or_else(|e| e.into_inner())
-    }
-    fn read_date(&self) -> RwLockReadGuard<'_, Version> {
-        self.date.read().unwrap_or_else(|e| e.into_inner())
-    }
-    fn write_date(&self) -> RwLockWriteGuard<'_, Version> {
-        self.date.write().unwrap_or_else(|e| e.into_inner())
-    }
-    fn get_elock(&self) -> VectorR<ELock> {
-        let lock = fs_state::exclusive_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
-    }
-    fn get_slock(&self) -> VectorR<SLock> {
-        let lock = fs_state::shared_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
-    }
-    fn update(&self, lock: &Lock) -> VectorR<()> {
-        let disk_v = fs_state::crnt_version(lock)?;
-        let date = self.read_date();
-        if disk_v > *date {
-            mem::drop(date);
-            let new_state = fs_state::load_state(lock)?;
-            let mut state = self.write_state();
-            let mut date = self.write_date();
-            *state = new_state;
-            *date = disk_v;
-            mem::drop(date);
-            mem::drop(state);
-        }
-        Ok(())
-    }
-    fn notify_merger(&self) {
-        let worker = Worker::request(
-            self.location.clone(),
-            self.work_flag.clone(),
-            self.metadata.similarity,
-        );
-        merger::send_merge_request(worker);
-    }
-    fn get_keys(&self, _: &Lock) -> VectorR<Vec<String>> {
-        self.read_state().keys(&self.location)
-    }
-    fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<Neighbour>> {
-        self.read_state()
-            .search(&self.location, request, self.metadata.similarity)
-    }
-    fn no_nodes(&self, _: &Lock) -> usize {
-        self.read_state().no_nodes()
-    }
-
-    fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &ELock) {
-        let mut state = self.write_state();
-        state.remove(prefix.as_ref(), temporal_mark);
-    }
-    fn collect_garbage(&self) -> VectorR<()> {
-        use std::collections::HashSet;
-        let work_flag = self.work_flag.try_to_start_working()?;
-        let state = self.read_state();
-        let in_use_dp: HashSet<_> = state.dpid_iter().collect();
-        for dir_entry in std::fs::read_dir(&self.location)? {
-            let entry = dir_entry?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-            if path.is_file() {
-                continue;
-            }
-            let Ok(dpid) = DpId::parse_str(&name) else {
-                info!("Unknown item {path:?} found");
-                continue;
-            };
-            if !in_use_dp.contains(&dpid) {
-                info!("found garbage {name}");
-                let Err(err)  = DataPoint::delete(&self.location, dpid) else { continue };
-                warn!("{name} is garbage and could not be deleted because of {err}");
-            }
-        }
-        std::mem::drop(work_flag);
-        Ok(())
-    }
-    #[must_use]
-    fn add(&self, journal: Journal, _: &ELock) -> bool {
-        let mut state = self.write_state();
-        state.add(journal)
-    }
-    fn commit(&self, lock: ELock) -> VectorR<()> {
-        let state = self.read_state();
-        let mut date = self.write_date();
-        fs_state::persist_state::<State>(&lock, &state)?;
-        *date = fs_state::crnt_version(&lock)?;
-        Ok(())
-    }
-
-    pub fn open(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
+    pub fn open(path: &Path) -> VectorR<Index> {
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
             // Old indexes may not have this file so in that case the
             // metadata file they should have is created.
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
-        let index = Index {
+        Ok(Index {
             metadata,
-            work_flag: MergerWriterSync::new(),
-            state: Arc::new(RwLock::new(state)),
-            date: Arc::new(RwLock::new(date)),
             location: path.to_path_buf(),
-        };
-        if let IndexCheck::Sanity = with_check {
-            let mut state = index.write_state();
-            let merge_work = state.work_stack_len();
-            (0..merge_work).for_each(|_| index.notify_merger());
-        }
-        Ok(index)
+        })
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         std::fs::create_dir_all(path)?;
         fs_state::initialize_disk(path, State::new)?;
         metadata.write(path)?;
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
-        let index = Index {
+        Ok(Index {
             metadata,
-            work_flag: MergerWriterSync::new(),
-            state: Arc::new(RwLock::new(state)),
-            date: Arc::new(RwLock::new(date)),
             location: path.to_path_buf(),
-        };
-        Ok(index)
+        })
     }
     pub fn writer(&self) -> VectorR<Writer> {
         Writer::new(self.clone())
@@ -242,22 +117,85 @@ impl Index {
     }
 }
 
+struct InnerState {
+    inner: State,
+    version: Version,
+}
+impl InnerState {
+    pub fn new(path: &Path) -> VectorR<InnerState> {
+        let (version, inner) = fs_state::load_state::<State>(path)?;
+        Ok(InnerState { inner, version })
+    }
+}
+struct OpenState {
+    inner: Arc<RwLock<InnerState>>,
+}
+impl OpenState {
+    pub fn read(&self) -> RwLockReadGuard<'_, InnerState> {
+        self.inner.read().unwrap_or_else(|e| e.into_inner())
+    }
+    pub fn new(path: &Path) -> VectorR<OpenState> {
+        let inner = Arc::new(RwLock::new(InnerState::new(path)?));
+        Ok(OpenState { inner })
+    }
+    pub fn apply<F, R>(&self, transform: F) -> VectorR<R>
+    where F: FnOnce(&mut InnerState) -> VectorR<R> {
+        let mut writer = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        transform(&mut writer)
+    }
+    pub fn persist(&self, path: &Path) -> VectorR<()> {
+        let state = self.read();
+        Ok(fs_state::persist_state(path, &state.inner)?)
+    }
+    pub fn update(&self, location: &Path) -> VectorR<()> {
+        let location = location.to_path_buf();
+        let transform = move |state: &mut InnerState| {
+            let disk_version = fs_state::crnt_version(&location)?;
+            if disk_version > state.version {
+                let (new_version, new_state) = fs_state::load_state(&location)?;
+                state.inner = new_state;
+                state.version = new_version;
+            }
+            Ok(())
+        };
+        self.apply(transform)
+    }
+}
+
 pub struct Reader {
-    inner: Index,
+    #[allow(unused)]
     lock: SLock,
+    inner: Index,
+    state: OpenState,
 }
 impl Reader {
     fn new(inner: Index) -> VectorR<Reader> {
-        inner.get_slock().map(|lock| Reader { inner, lock })
+        let lock = fs_state::shared_lock(inner.location())?;
+        let state = OpenState::new(&inner.location)?;
+        Ok(Reader { lock, inner, state })
+    }
+    pub fn update(&self) -> VectorR<()> {
+        self.state.update(self.location())
+    }
+    pub fn get_keys(&self) -> VectorR<Vec<String>> {
+        let state = self.state.read();
+        state.inner.keys(self.location())
     }
     pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
-        self.inner.search(request, &self.lock)
-    }
-    pub fn keys(&self) -> VectorR<Vec<String>> {
-        self.inner.get_keys(&self.lock)
+        let state = self.state.read();
+        let location = self.location();
+        let similarity = self.metadata().similarity;
+        state.inner.search(location, request, similarity)
     }
     pub fn no_nodes(&self) -> usize {
-        self.inner.no_nodes(&self.lock)
+        let state = self.state.read();
+        state.inner.no_nodes()
+    }
+    pub fn location(&self) -> &Path {
+        self.inner.location()
+    }
+    pub fn metadata(&self) -> &IndexMetadata {
+        self.inner.metadata()
     }
     pub fn index(&self) -> &Index {
         &self.inner
@@ -266,26 +204,44 @@ impl Reader {
 
 pub struct Writer {
     #[allow(unused)]
-    flag: File,
+    writer_flag: File,
+    work_flag: MergerWriterSync,
     datapoint_buffer: Vec<Journal>,
     delete_buffer: Vec<(String, SystemTime)>,
     inner: Index,
+    state: OpenState,
 }
 impl Writer {
+    fn notify_merger(&self) {
+        let worker = Worker::request(
+            self.location().to_path_buf(),
+            self.work_flag.clone(),
+            self.metadata().similarity,
+        );
+        merger::send_merge_request(worker);
+    }
     fn new(inner: Index) -> VectorR<Writer> {
-        let flag = OpenOptions::new()
+        let work_flag = MergerWriterSync::new();
+        let writer_flag = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(inner.location.join(WRITER_FLAG))?;
-        flag.try_lock_exclusive()
+        writer_flag
+            .try_lock_exclusive()
             .map_err(|_| VectorErr::WriterExists)?;
-        Ok(Writer {
-            flag,
+        let state = OpenState::new(&inner.location)?;
+        let work_len = state.read().inner.work_stack_len();
+        let writer = Writer {
             inner,
+            writer_flag,
+            work_flag,
+            state,
             datapoint_buffer: vec![],
             delete_buffer: vec![],
-        })
+        };
+        (0..work_len).for_each(|_| writer.notify_merger());
+        Ok(writer)
     }
     pub fn add(&mut self, datapoint: DataPoint) {
         self.datapoint_buffer.push(datapoint.meta());
@@ -297,30 +253,65 @@ impl Writer {
         if self.has_work() {
             return Err(VectorErr::WorkDelayed);
         }
-        self.inner.collect_garbage()
+        // Synchronizing with readers and merger.
+        let location = self.location();
+        let lock = fs_state::exclusive_lock(self.location())?;
+        self.state.update(location)?;
+
+        let state = self.state.read();
+        let in_use_dp: HashSet<_> = state.inner.dpid_iter().collect();
+        for dir_entry in std::fs::read_dir(location)? {
+            let entry = dir_entry?;
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_file() {
+                continue;
+            }
+            let Ok(dpid) = DpId::parse_str(&name) else {
+                info!("Unknown item {path:?} found");
+                continue;
+            };
+            if !in_use_dp.contains(&dpid) {
+                info!("found garbage {name}");
+                let Err(err)  = DataPoint::delete(location, dpid) else { continue };
+                warn!("{name} is garbage and could not be deleted because of {err}");
+            }
+        }
+        mem::drop(lock);
+        Ok(())
     }
     pub fn commit(&mut self) -> VectorR<()> {
         if !self.has_work() {
             return Ok(());
         }
+        let adds = mem::take(&mut self.datapoint_buffer);
+        let deletes = mem::take(&mut self.delete_buffer);
+        let location = self.location();
+        let work_flag = self.work_flag.start_working();
+        // Get the last version of the state, merges may have happen.
+        // Is important to ensure that we are the only ones working on the
+        // state.
+        self.state.update(location)?;
 
-        let lock = self.inner.get_elock()?;
-        self.inner.update(&lock)?;
-        let merge_work = self
-            .datapoint_buffer
-            .iter()
-            .copied()
-            .fold(0, |acc, i| acc + (self.inner.add(i, &lock) as usize));
-        self.delete_buffer
-            .iter()
-            .for_each(|(prefix, time)| self.inner.delete(prefix, *time, &lock));
-        self.inner.commit(lock)?;
-
-        // The work was commited so is not needed anymore
-        self.datapoint_buffer.clear();
-        self.delete_buffer.clear();
+        // Modifying the state with the current buffers
+        let merge_work = self.state.apply(move |state: &mut InnerState| {
+            let merge_work = adds
+                .iter()
+                .copied()
+                .fold(0, |acc, i| acc + (state.inner.add(i) as usize));
+            deletes
+                .iter()
+                .for_each(|(prefix, time)| state.inner.remove(prefix, *time));
+            Ok(merge_work)
+        })?;
+        // Persisting the new state
+        {
+            // Moving the work flag to this scope
+            let _work_flag = work_flag;
+            self.state.persist(location)?;
+        }
         // Once the commit is done is safe to notify the merger
-        (0..merge_work).for_each(|_| self.inner.notify_merger());
+        (0..merge_work).for_each(|_| self.notify_merger());
         Ok(())
     }
     pub fn abort(&mut self) {
@@ -329,6 +320,12 @@ impl Writer {
     }
     pub fn has_work(&self) -> bool {
         self.datapoint_buffer.len() + self.delete_buffer.len() > 0
+    }
+    pub fn location(&self) -> &Path {
+        self.inner.location()
+    }
+    pub fn metadata(&self) -> &IndexMetadata {
+        self.inner.metadata()
     }
     pub fn index(&self) -> &Index {
         &self.inner
@@ -367,7 +364,7 @@ mod test {
         let Err(VectorErr::WriterExists) = index.writer() else {
             panic!("This should have failed");
         };
-        std::mem::drop(writer);
+        mem::drop(writer);
 
         // Is safe to open a new writer again
         let _writer = index.writer()?;

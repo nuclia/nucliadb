@@ -65,14 +65,15 @@ where S: Serialize {
     Ok(())
 }
 
-fn read_state<S>(path: &Path) -> FsResult<S>
+fn read_state<S>(path: &Path) -> FsResult<(Version, S)>
 where S: DeserializeOwned {
-    let mut file = BufReader::new(
-        OpenOptions::new()
-            .read(true)
-            .open(path.join(names::STATE))?,
-    );
-    Ok(bincode::deserialize_from(&mut file)?)
+    let file = OpenOptions::new()
+        .read(true)
+        .open(path.join(names::STATE))?;
+    let modified = file.metadata()?.modified()?;
+    let mut buff = BufReader::new(file);
+    let state: S = bincode::deserialize_from(&mut buff)?;
+    Ok((Version(modified), state))
 }
 
 pub fn initialize_disk<S, F>(path: &Path, with: F) -> FsResult<()>
@@ -82,6 +83,9 @@ where
 {
     if !path.join(names::STATE).is_file() {
         write_state(path, &with())?;
+    }
+    if !path.join(names::LOCK).is_file() {
+        Lock::open_lock(path)?;
     }
     Ok(())
 }
@@ -93,17 +97,17 @@ pub fn shared_lock(path: &Path) -> FsResult<SLock> {
     Ok(SLock::new(path)?)
 }
 
-pub fn persist_state<S>(lock: &ELock, state: &S) -> FsResult<()>
+pub fn persist_state<S>(path: &Path, state: &S) -> FsResult<()>
 where S: Serialize {
-    write_state(lock.as_ref(), state)
+    write_state(path, state)
 }
 
-pub fn load_state<S>(lock: &Lock) -> FsResult<S>
+pub fn load_state<S>(path: &Path) -> FsResult<(Version, S)>
 where S: DeserializeOwned {
-    read_state(lock.as_ref())
+    read_state(path)
 }
-pub fn crnt_version(lock: &Lock) -> FsResult<Version> {
-    let meta = std::fs::metadata(lock.path.join(names::STATE))?;
+pub fn crnt_version(path: &Path) -> FsResult<Version> {
+    let meta = std::fs::metadata(path.join(names::STATE))?;
     Ok(Version(meta.modified()?))
 }
 
@@ -195,18 +199,21 @@ mod tests {
     fn test() {
         let dir = TempDir::new().unwrap();
         initialize_disk(dir.path(), State::default).unwrap();
-        let lock = exclusive_lock(dir.path()).unwrap();
+        let lock_0 = shared_lock(dir.path()).unwrap();
+        let lock_1 = shared_lock(dir.path()).unwrap();
+        assert!(dir.path().join(names::LOCK).is_file());
+        std::mem::drop(lock_0);
+        std::mem::drop(lock_1);
+        let elock = exclusive_lock(dir.path()).unwrap();
+        std::mem::drop(elock);
+        assert!(dir.path().join(names::STATE).is_file());
+        let v0 = crnt_version(dir.path()).unwrap();
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
-        let v0 = crnt_version(&lock).unwrap();
-        std::mem::drop(lock);
-        let lock = exclusive_lock(dir.path()).unwrap();
-        assert!(dir.path().join(names::STATE).is_file());
-        assert!(dir.path().join(names::LOCK).is_file());
-        assert_eq!(v0, crnt_version(&lock).unwrap());
+        assert_eq!(v0, crnt_version(dir.path()).unwrap());
         std::thread::sleep(std::time::Duration::from_millis(100));
         write_state(dir.path(), &State::default()).unwrap();
-        let new_version = crnt_version(&lock).unwrap();
+        let new_version = crnt_version(dir.path()).unwrap();
         assert!(v0 < new_version);
     }
 }

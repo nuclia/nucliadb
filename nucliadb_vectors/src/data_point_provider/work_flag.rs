@@ -18,9 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
-
-use crate::{VectorErr, VectorR};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 #[derive(Clone)]
 pub struct MergerWriterSync(Arc<Mutex<()>>);
@@ -28,11 +26,7 @@ impl MergerWriterSync {
     pub fn new() -> MergerWriterSync {
         MergerWriterSync(Arc::new(Mutex::new(())))
     }
-    pub fn try_to_start_working(&self) -> VectorR<MutexGuard<'_, ()>> {
-        match self.0.try_lock() {
-            Ok(lock) => Ok(lock),
-            Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
-            Err(TryLockError::WouldBlock) => Err(VectorErr::WorkDelayed),
-        }
+    pub fn start_working(&self) -> MutexGuard<'_, ()> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
