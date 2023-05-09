@@ -59,6 +59,9 @@ chitchat:
 
 config:
   search_timeout: 10 # seconds
+  search_cache_redis_host:
+  search_cache_redis_port:
+
 
 serviceMonitor:
   enabled: False
