@@ -18,7 +18,7 @@ image_other: cluster_manager:main
 # both until all component settings are removed from
 # settings not mapped directly through env
 env:
-  SEARCH_TIMEOUT: 10 # seconds
+  SEARCH_TIMEOUT: "10" # seconds
   SEARCH_CACHE_REDIS_HOST:
   SEARCH_CACHE_REDIS_PORT:
 
