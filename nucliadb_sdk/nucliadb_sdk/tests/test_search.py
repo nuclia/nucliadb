@@ -280,9 +280,9 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert len(results.sentences.results) == 20
 
 
-@pytest.skipif(
+@pytest.mark.skipif(
     TESTING_IN_CI,
-    reason="Skip this test in CI since it is accessing the HuggingFace API",
+    reason="It is accessing the HuggingFace API",
 )
 def test_standard_examples(knowledgebox: KnowledgeBox):
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
