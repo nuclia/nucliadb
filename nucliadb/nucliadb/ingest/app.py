@@ -18,13 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Optional
 
 import pkg_resources
 
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
-from nucliadb.ingest.consumer import start_consumer
+from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
@@ -35,56 +35,31 @@ from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.run import run_until_exit
 from nucliadb_utils.settings import indexing_settings, transaction_settings
-from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
     get_indexing,
-    get_transaction_utility,
     set_utility,
     start_audit_utility,
+    start_nats_manager,
+    start_transaction_utility,
     stop_audit_utility,
+    stop_nats_manager,
+    stop_transaction_utility,
 )
-
-
-async def start_transaction_utility(service_name: Optional[str] = None):
-    if transaction_settings.transaction_local:
-        transaction_utility: Union[
-            LocalTransactionUtility, TransactionUtility
-        ] = LocalTransactionUtility()
-    elif (
-        transaction_settings.transaction_jetstream_servers is not None
-        and transaction_settings.transaction_jetstream_target is not None
-    ):
-        transaction_utility = TransactionUtility(
-            nats_creds=transaction_settings.transaction_jetstream_auth,
-            nats_servers=transaction_settings.transaction_jetstream_servers,
-            nats_target=transaction_settings.transaction_jetstream_target,
-        )
-        await transaction_utility.initialize(service_name)
-    set_utility(Utility.TRANSACTION, transaction_utility)
 
 
 async def start_indexing_utility(service_name: Optional[str] = None):
     if (
         not indexing_settings.index_local
         and indexing_settings.index_jetstream_servers is not None
-        and indexing_settings.index_jetstream_target is not None
     ):
         indexing_utility = IndexingUtility(
             nats_creds=indexing_settings.index_jetstream_auth,
             nats_servers=indexing_settings.index_jetstream_servers,
-            nats_target=indexing_settings.index_jetstream_target,
         )
         await indexing_utility.initialize(service_name)
         set_utility(Utility.INDEXING, indexing_utility)
-
-
-async def stop_transaction_utility():
-    transaction_utility = get_transaction_utility()
-    if transaction_utility:
-        await transaction_utility.finalize()
-        clean_utility(Utility.TRANSACTION)
 
 
 async def stop_indexing_utility():
@@ -97,45 +72,85 @@ async def stop_indexing_utility():
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await setup_telemetry(SERVICE_NAME)
 
-    chitchat = await start_chitchat(SERVICE_NAME)
-
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
-    metrics_server = await serve_metrics()
 
     finalizers = [
-        metrics_server.shutdown,
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
-        stop_chitchat,
     ]
 
-    if chitchat is not None:
-        finalizers.append(chitchat.finalize)
+    if not transaction_settings.transaction_local:
+        # if we're running in standalone, we do not
+        # want these services
+        await start_nats_manager(
+            SERVICE_NAME,
+            transaction_settings.transaction_jetstream_servers,
+            transaction_settings.transaction_jetstream_auth,
+        )
+        finalizers.append(stop_nats_manager)
+
+        await start_chitchat(SERVICE_NAME)
+        finalizers.append(stop_chitchat)
 
     return finalizers
 
 
-async def initialize_consumer_and_grpc() -> list[Callable[[], Awaitable[None]]]:
+async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
     finalizers = await initialize()
 
     grpc_finalizer = await start_grpc(SERVICE_NAME)
-    consumer_finalizer = await start_consumer(SERVICE_NAME)
+    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
 
-    return [grpc_finalizer, consumer_finalizer] + finalizers
+    return [grpc_finalizer, pull_workers] + finalizers
+
+
+async def initialize_grpc() -> list[Callable[[], Awaitable[None]]]:
+    finalizers = await initialize()
+
+    grpc_finalizer = await start_grpc(SERVICE_NAME)
+
+    return [grpc_finalizer] + finalizers
 
 
 async def main_consumer():  # pragma: no cover
-    finalizers = await initialize_consumer_and_grpc()
-    await run_until_exit(finalizers)
+    finalizers = await initialize()
+    metrics_server = await serve_metrics()
+
+    # grpc service here for legacy but can be removed
+    # useful part is the health check
+    grpc_finalizer = await start_grpc(SERVICE_NAME)
+
+    # pull workers could be pulled out into it's own deployment
+    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+    ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
+
+    await run_until_exit(
+        [grpc_finalizer, pull_workers, ingest_consumers, metrics_server.shutdown]
+        + finalizers
+    )
 
 
 async def main_orm_grpc():  # pragma: no cover
+    finalizers = await initialize_grpc()
+    metrics_server = await serve_metrics()
+    await run_until_exit([metrics_server.shutdown] + finalizers)
+
+
+async def main_ingest_processed_consumer():  # pragma: no cover
     finalizers = await initialize()
+
+    metrics_server = await serve_metrics()
+
+    # grpc service here for legacy but can be removed(sans health check)
     grpc_finalizer = await start_grpc(SERVICE_NAME)
-    await run_until_exit([grpc_finalizer] + finalizers)
+    consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
+
+    await run_until_exit(
+        [grpc_finalizer, consumer, metrics_server.shutdown] + finalizers
+    )
 
 
 def setup_configuration():  # pragma: no cover
@@ -163,3 +178,11 @@ def run_orm_grpc() -> None:  # pragma: no cover
     """
     setup_configuration()
     asyncio.run(main_orm_grpc())
+
+
+def run_processed_consumer() -> None:  # pragma: no cover
+    """
+    Run the consumer + GRPC ingest service
+    """
+    setup_configuration()
+    asyncio.run(main_ingest_processed_consumer())

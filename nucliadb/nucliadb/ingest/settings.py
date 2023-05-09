@@ -53,7 +53,8 @@ class Settings(DriverSettings):
 
     partitions: List[str] = ["1"]
 
-    pull_time: int = 100
+    pull_time_error_backoff: int = 100
+    disable_pull_worker: bool = False
 
     replica_number: int = -1
     total_replicas: int = 1

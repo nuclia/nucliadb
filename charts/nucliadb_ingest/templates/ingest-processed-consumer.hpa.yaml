@@ -1,0 +1,18 @@
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ingest-processed-consumer
+  labels:
+    app: ingest-processed-consumer
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ingest-processed-consumer
+  minReplicas: {{.Values.ingest_orm_grpc_autoscaling.minReplicas}}
+  maxReplicas: {{.Values.ingest_orm_grpc_autoscaling.maxReplicas}}
+  metrics: {{- toYaml .Values.ingest_processed_consumer_autoscaling.metrics | nindent 4}}

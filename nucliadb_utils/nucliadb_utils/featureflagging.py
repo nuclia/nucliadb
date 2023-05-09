@@ -39,6 +39,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
+    const.Features.SEPARATE_PROCESSED_MESSAGE_WRITES: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 

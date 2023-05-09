@@ -28,6 +28,13 @@ from nucliadb.ingest import service
 pytestmark = pytest.mark.asyncio
 
 
+@pytest.fixture(autouse=True)
+def nats_manager():
+    mock = MagicMock()
+    with patch("nucliadb.ingest.service.get_nats_manager", return_value=mock):
+        yield mock
+
+
 async def test_health_check():
     servicer = MagicMock()
     with patch.object(service, "NODES", {"node1": "node1"}):
@@ -42,6 +49,18 @@ async def test_health_check():
 async def test_health_check_fail():
     servicer = MagicMock()
     with patch.object(service, "NODES", {}):
+        task = asyncio.create_task(service.health_check(servicer))
+        await asyncio.sleep(0.05)
+
+        servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
+
+        task.cancel()
+
+
+async def test_health_check_fail_unhealthy_nats(nats_manager):
+    nats_manager.healthy.return_value = False
+    servicer = MagicMock()
+    with patch.object(service, "NODES", {"node1": "node1"}):  # has nodes
         task = asyncio.create_task(service.health_check(servicer))
         await asyncio.sleep(0.05)
 

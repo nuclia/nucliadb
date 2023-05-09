@@ -22,7 +22,6 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List, Optional
 
-TXNID = "/internal/worker/{worker}"
 DEFAULT_SCAN_LIMIT = 10
 DEFAULT_BATCH_SCAN_LIMIT = 100
 
@@ -34,12 +33,7 @@ class Transaction:
     async def abort(self):
         raise NotImplementedError()
 
-    async def commit(
-        self,
-        worker: Optional[str] = None,
-        tid: Optional[int] = None,
-        resource: bool = True,
-    ):
+    async def commit(self):
         raise NotImplementedError()
 
     async def batch_get(self, keys: List[str]):
@@ -62,16 +56,6 @@ class Transaction:
 
 class Driver:
     initialized = False
-
-    async def last_seqid(self, worker: str) -> Optional[int]:
-        txn = await self.begin()
-        key = TXNID.format(worker=worker)
-        last_seq = await txn.get(key)
-        await txn.abort()
-        if last_seq is None:
-            return None
-        else:
-            return int(last_seq)
 
     async def initialize(self):
         raise NotImplementedError()

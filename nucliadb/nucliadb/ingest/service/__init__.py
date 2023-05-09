@@ -30,16 +30,22 @@ from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.grpc import get_traced_grpc_server
+from nucliadb_utils.utilities import get_nats_manager
 
 
 async def health_check(health_servicer):
     while True:
+        nats_manager = get_nats_manager()
         if len(NODES) == 0 and settings.driver != DriverConfig.LOCAL:
+            await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
+        elif nats_manager is not None and not nats_manager.healthy():
+            # validate nats manager health
             await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
         else:
             await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+
         try:
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
         except (
             asyncio.CancelledError,
             asyncio.TimeoutError,

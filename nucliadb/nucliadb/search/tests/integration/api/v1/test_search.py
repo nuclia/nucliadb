@@ -135,9 +135,9 @@ async def test_multiple_search_resource_all(
             else:
                 break
         assert len(resp.json()["paragraphs"]["results"]) == 20
-        assert resp.json()["paragraphs"]["total"] == 20
+        assert resp.json()["paragraphs"]["total"] == 100
         assert len(resp.json()["fulltext"]["results"]) == 20
-        assert resp.json()["fulltext"]["total"] == 20
+        assert resp.json()["fulltext"]["total"] == 100
 
         assert resp.json()["paragraphs"]["next_page"] is False
         assert resp.json()["fulltext"]["next_page"] is False

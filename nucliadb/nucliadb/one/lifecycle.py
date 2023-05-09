@@ -19,7 +19,9 @@
 #
 import asyncio
 
-from nucliadb.ingest.app import initialize_consumer_and_grpc as initialize_ingest
+from nucliadb.ingest.app import initialize_grpc as initialize_ingest_grpc
+from nucliadb.ingest.app import initialize_pull_workers
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.reader.lifecycle import finalize as finalize_reader
 from nucliadb.reader.lifecycle import initialize as initialize_reader
 from nucliadb.search.lifecycle import finalize as finalize_search
@@ -34,7 +36,10 @@ SYNC_FINALIZERS = []
 
 
 async def initialize():
-    finalizers = await initialize_ingest()
+    if ingest_settings.disable_pull_worker:
+        finalizers = await initialize_ingest_grpc()
+    else:
+        finalizers = await initialize_pull_workers()
     SYNC_FINALIZERS.extend(finalizers)
     await initialize_writer()
     await initialize_reader()

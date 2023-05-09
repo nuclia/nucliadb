@@ -68,32 +68,10 @@ class TestPullWorker:
             driver=AsyncMock(),
             partition="1",
             storage=AsyncMock(),
-            pull_time=100,
+            pull_time_error_backoff=100,
             zone="zone",
             nuclia_cluster_url="nuclia_cluster_url",
             nuclia_public_url="nuclia_public_url",
             audit=None,
-            target="target",
-            group="group",
-            stream="stream",
             onprem=False,
         )
-
-    async def test_lifecycle(self, worker: PullWorker, processor, nats_conn):
-        await worker.initialize()
-
-        assert worker.processor == processor
-        assert worker.nc == nats_conn
-
-        nats_conn.jetstream.assert_called_once()
-        nats_conn.jetstream().subscribe.assert_called_once()
-
-        await worker.finalize()
-
-        nats_conn.jetstream().subscribe.return_value.drain.assert_called_once()
-
-    async def test_reconnect(self, worker: PullWorker, processor, nats_conn):
-        await worker.initialize()
-        await worker.reconnected_cb()
-
-        assert nats_conn.jetstream().subscribe.call_count == 2

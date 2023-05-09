@@ -6,7 +6,7 @@ install-dev:
 	pip install -r ../code-requirements.txt
 	cd .. && pip install -r nucliadb_dataset/requirements-sources.txt
 	pip install -r requirements.txt
-	pip install -r requirements-test.txt
+	cd .. && pip install -r nucliadb_dataset/requirements-test.txt
 	pip install -e .
 
 .PHONY: format

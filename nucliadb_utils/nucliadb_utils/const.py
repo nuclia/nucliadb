@@ -21,5 +21,37 @@ class PubSubChannels:
     RESOURCE_NOTIFY = "notify.{kbid}"
 
 
+class Streams:
+    class INGEST:
+        """
+        Writing resource changes go to this steam/consumer group.
+        """
+
+        name = "nucliadb"
+        subject = "ndb.consumer.{partition}"
+        group = "nucliadb-{partition}"
+
+    class INGEST_PROCESSED:
+        """
+        Resources that have been processed by learning need to be
+        written to the database and then Indexed.
+        """
+
+        name = "nucliadb"
+        subject = "ndb.consumer.processed"
+        group = "nucliadb-processed"
+
+    class INDEX:
+        """
+        Indexing resources on the IndexNode
+        """
+
+        name = "node"
+        subject = "node.{node}"
+        group = "node-{node}"
+
+
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
+    SEPARATE_PROCESSED_MESSAGE_WRITES = "nucliadb_separate_processed_message_writes"
+

@@ -41,11 +41,11 @@ from nucliadb_utils.settings import (
 @pytest.fixture(scope="function")
 async def writer_api(
     redis,
+    grpc_servicer: IngestFixture,
     gcs_storage_writer,
     transaction_utility,
     processing_utility,
     tus_manager,
-    grpc_servicer: IngestFixture,
     event_loop,
 ) -> AsyncIterator[Callable[[List[Enum], str, str], AsyncClient]]:
     nucliadb_settings.nucliadb_ingest = grpc_servicer.host

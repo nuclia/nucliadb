@@ -24,8 +24,7 @@ from typing import Any, AsyncGenerator, List, Optional
 
 import asyncpg
 
-from nucliadb.ingest.maindb.driver import DEFAULT_SCAN_LIMIT, TXNID, Driver, Transaction
-from nucliadb.ingest.maindb.exceptions import NoWorkerCommit
+from nucliadb.ingest.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS resources (
@@ -106,23 +105,9 @@ class PGTransaction(Transaction):
                     self.open = False
                     await self.connection.close()
 
-    async def commit(
-        self,
-        worker: Optional[str] = None,
-        tid: Optional[int] = None,
-        resource: bool = True,
-    ):
+    async def commit(self):
         async with self._lock:
             try:
-                if resource:
-                    if worker is None or tid is None:
-                        raise NoWorkerCommit()
-                    if tid != -1:
-                        # If tid == -1 means we are injecting a resource via gRPC. We don't
-                        # want to save the tid in this case, as it would break the next
-                        # transactionability check.
-                        key = TXNID.format(worker=worker)
-                        await self.data_layer.set(key, str(tid).encode())
                 await self.txn.commit()
             except Exception:
                 await self.txn.rollback()
