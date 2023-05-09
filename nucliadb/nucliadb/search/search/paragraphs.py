@@ -26,12 +26,12 @@ from typing import Optional
 from redis import asyncio as aioredis
 from redis.asyncio.client import Redis
 
-from nucliadb.ingest.fields.base import Field, FieldTypes
+from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.settings import settings
 from nucliadb_telemetry import metrics
-from nucliadb_utils.utilities import get_utility, has_feature, set_utility
+from nucliadb_utils.utilities import get_utility, set_utility
 
 from .cache import get_resource_from_cache
 
@@ -167,27 +167,6 @@ async def get_paragraph_from_full_text(
         return extracted_text.text[start:end]
 
 
-@GET_PARAGRAPH_LATENCY.wrap({"type": "seek"})
-async def get_paragraph_text_by_seeking(*, field: Field, start: int, end: int) -> str:
-    """
-    Instead of pulling the full text and slicing it, this function
-    seeks directly to the paragraph.
-
-    Text is stored in a predictable protobuf message format that we can still seek to:
-
-    >>> ExtractedText(text='text').SerializeToString()[2:]
-    b'text'
-
-    We can NOT support split_text with this approach.
-    """
-    # seek directly to paragraph
-    storage_field = field.get_storage_field(FieldTypes.FIELD_TEXT)
-    data = b""
-    async for chunk in storage_field.read_range(start + 2, end + 2):
-        data += chunk
-    return data.decode("utf-8", "ignore")
-
-
 async def get_paragraph_text(
     *,
     kbid: str,
@@ -230,14 +209,9 @@ async def get_paragraph_text(
     if cache_val is not None:
         return cache_val
 
-    if split in (None, "") and has_feature("nucliadb_seek_to_paragraph"):
-        text = await get_paragraph_text_by_seeking(
-            field=field_obj, start=start, end=end
-        )
-    else:
-        text = await get_paragraph_from_full_text(
-            field=field_obj, start=start, end=end, split=split
-        )
+    text = await get_paragraph_from_full_text(
+        field=field_obj, start=start, end=end, split=split
+    )
 
     if highlight:
         text = highlight_paragraph(text, words=matches, ematches=ematches)

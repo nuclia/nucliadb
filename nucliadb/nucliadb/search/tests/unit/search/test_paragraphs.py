@@ -74,13 +74,6 @@ async def test_get_paragraph_from_full_text_with_split(
     )
 
 
-async def test_get_paragraph_text_by_seeking(field, extracted_text: ExtractedText):
-    assert (
-        await paragraphs.get_paragraph_text_by_seeking(field=field, start=0, end=12)
-        == extracted_text.text
-    )
-
-
 class TestGetParagraphText:
     @pytest.fixture()
     def orm_resource(self, field):
@@ -134,20 +127,3 @@ class TestGetParagraphText:
             )
             == "Cached Value!"
         )
-
-    async def test_get_paragraph_text_with_seeking(self, orm_resource, pcache):
-        with patch("nucliadb.search.search.paragraphs.has_feature", return_value=True):
-            assert (
-                await paragraphs.get_paragraph_text(
-                    kbid="kbid",
-                    rid="rid",
-                    field="/t/text",
-                    start=0,
-                    end=12,
-                    split=None,
-                    highlight=True,
-                    ematches=None,
-                    matches=None,
-                )
-                == "Hello World!"
-            )

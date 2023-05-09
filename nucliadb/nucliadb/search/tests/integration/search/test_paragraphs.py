@@ -19,7 +19,6 @@
 
 import asyncio
 import uuid
-from unittest.mock import patch
 
 import pytest
 from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper
@@ -116,15 +115,3 @@ async def test_get_paragraph_text(
         orm_resource=orm_resource,
     )
     assert text1 == "Hello"
-
-    # now with seeking
-    with patch("nucliadb.search.search.paragraphs.has_feature", return_value=True):
-        text2 = await paragraphs.get_paragraph_text(
-            kbid=kbid,
-            rid=uid,
-            field="/t/field",
-            start=0,
-            end=5,
-            orm_resource=orm_resource,
-        )
-        assert text2 == "Hello"
