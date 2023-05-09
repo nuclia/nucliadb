@@ -32,7 +32,6 @@ def txn():
 @pytest.fixture()
 def driver(txn):
     mock = MagicMock()
-    mock.begin = AsyncMock(return_value=txn)
     mock.transaction.return_value.__aenter__.return_value = txn
     yield mock
 
@@ -50,11 +49,6 @@ def shard():
 @pytest.fixture()
 def resource():
     yield MagicMock()
-
-
-@pytest.fixture()
-def message():
-    yield MagicMock(kbid="kbid", reindex=False)
 
 
 async def test_mark_resource_error(processor: Processor, txn, shard, resource):
