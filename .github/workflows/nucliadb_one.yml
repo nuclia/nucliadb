@@ -106,19 +106,16 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build local Node for testing
-        uses: docker/build-push-action@v4
         if: steps.filter.outputs.node_modified == 'true'
         run: |
           docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
       - name: Build local Sidecar for testing
-        uses: docker/build-push-action@v4
         if: steps.filter.outputs.sidecar_modified == 'true'
         run: |
           docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
 
       - name: Build local ClusterManager for testing
-        uses: docker/build-push-action@v4
         if: steps.filter.outputs.cluster_modified == 'true'
         run: |
           docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
