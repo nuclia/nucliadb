@@ -382,7 +382,6 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> Optional[TxnResult]:
-        breakpoint()
         if len(messages) == 0:
             return None
 
