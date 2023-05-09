@@ -17,13 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from typing import Any, Dict
 
+import pytest
 from sentence_transformers import SentenceTransformer  # type: ignore
 
 from nucliadb_sdk import Entity, File, KnowledgeBox
 from nucliadb_sdk.labels import Label
 from nucliadb_sdk.search import ResultType, ScoreType
+
+TESTING_IN_CI = os.environ.get("CI") == "true"
 
 DATA: Dict[str, Any] = {
     "text": [
@@ -276,6 +280,10 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert len(results.sentences.results) == 20
 
 
+@pytest.skipif(
+    TESTING_IN_CI,
+    reason="Skip this test in CI since it is accessing the HuggingFace API",
+)
 def test_standard_examples(knowledgebox: KnowledgeBox):
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
     knowledgebox.create_resource(
