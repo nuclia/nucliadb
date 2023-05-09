@@ -28,7 +28,7 @@ jobs:
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION+$(echo $GITHUB_SHA | cut -c1-6)
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_shared/Chart.yaml
-          echo "::set-output name=version_number::$VERSION_SHA"
+          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure Git
         run: |

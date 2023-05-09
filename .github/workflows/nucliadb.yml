@@ -164,7 +164,7 @@ jobs:
         run: |-
           python bump.py --build=${{github.run_number}}
           VERSION=`cat VERSION`
-          echo "::set-output name=version_number::$VERSION"
+          echo "version_number=$VERSION" >> $GITHUB_OUTPUT
 
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
@@ -196,7 +196,7 @@ jobs:
         id: branch_name
         run: |-
           BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
-          echo "::set-output name=branch_name::$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
