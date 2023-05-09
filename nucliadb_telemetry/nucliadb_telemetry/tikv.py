@@ -19,8 +19,8 @@
 
 import tikv_client  # type: ignore
 from opentelemetry import trace
+from opentelemetry.instrumentation.instrumentor import BaseInstrumentor  # type: ignore
 from opentelemetry.instrumentation.utils import unwrap
-from opentelemetry.instrumentor import BaseInstrumentor
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.trace import SpanKind, Tracer
 from wrapt import wrap_function_wrapper  # type: ignore
