@@ -47,6 +47,10 @@ spec:
             port:
               number: {{.Values.serving.port}}
             host: "search.{{ .Release.Namespace }}.svc.cluster.local"
+          retries:
+            attempts: 3
+            perTryTimeout: 1s
+            retryOn: connect-failure
       corsPolicy:
         allowOrigins:
           - exact: "*"
