@@ -26,7 +26,7 @@ from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.grpc import get_traced_grpc_channel
-from nucliadb_utils.settings import nuclia_settings, nucliadb_settings
+from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
@@ -142,13 +142,3 @@ async def stop_ingest():
 
 def get_chitchat() -> Optional[ChitchatMonitor]:
     return get_utility(Utility.CHITCHAT)
-
-
-def get_processing_api_url() -> str:
-    if nuclia_settings.nuclia_service_account:
-        return (
-            nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
-            + "/api/v1/processing"
-        )
-    else:
-        return nuclia_settings.nuclia_cluster_url + "/api/internal/processing"

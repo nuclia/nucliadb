@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 import os
 
-import aiohttp
 import nucliadb_contributor_assets  # type: ignore
 import pkg_resources
 from fastapi import FastAPI
@@ -31,7 +31,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
-from nucliadb.ingest.utils import get_processing_api_url
+from nucliadb.http_clients.processing import ProcessingHTTPClient
 from nucliadb.one.lifecycle import finalize, initialize
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
@@ -44,6 +44,8 @@ from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, nuclia_settings, running_settings
+
+logger = logging.getLogger(__name__)
 
 middleware = [
     Middleware(
@@ -103,22 +105,13 @@ async def api_config_check(request):
     valid_nua_key = False
     nua_key_check_error = None
     if nuclia_settings.nuclia_service_account is not None:
-        processing_url = get_processing_api_url()
-        url = processing_url + "/status"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url,
-                headers={
-                    "X-STF-NUAKEY": f"Bearer {nuclia_settings.nuclia_service_account}"
-                },
-            ) as resp:
-                if resp.status == 200:
-                    valid_nua_key = True
-                else:
-                    resp_text = await resp.text()
-                    nua_key_check_error = (
-                        f"Error checking NUA key: {resp.status} - {resp_text}"
-                    )
+        async with ProcessingHTTPClient() as processing_client:
+            try:
+                await processing_client.status()
+                valid_nua_key = True
+            except Exception as exc:
+                logger.warning(f"Error validating nua key", exc_info=exc)
+                nua_key_check_error = f"Error checking NUA key: {str(exc)}"
     return JSONResponse(
         {
             "nua_api_key": {

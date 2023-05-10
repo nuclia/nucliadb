@@ -21,13 +21,13 @@ import asyncio
 import base64
 from typing import List, Optional
 
-import aiohttp
 import nats
 from aiohttp.client_exceptions import ClientConnectorError
 from aiohttp.web import Response
 from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.http_clients.processing import ProcessingHTTPClient
 from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
@@ -76,7 +76,7 @@ class PullWorker:
         self.lock = asyncio.Lock()
         self.processor = Processor(driver, storage, audit, cache, partition)
 
-    async def handle_message(self, payload: bytes):
+    async def handle_message(self, payload: str) -> None:
         pb = BrokerMessage()
         pb.ParseFromString(base64.b64decode(payload))
 
@@ -129,56 +129,34 @@ class PullWorker:
         processing_url = get_processing_api_url()
         url = processing_url + "/pull?partition=" + self.partition
 
-        async with aiohttp.ClientSession() as session:
+        async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
             logger.info(f"{url}")
 
             while True:
                 try:
-                    async with session.get(
-                        url,
-                        headers=headers,
-                    ) as resp:
-                        if resp.status != 200:
-                            text = await resp.text()
-                            if resp.status == 429:
-                                logger.info("Pull worker rate limited, backoff")
-                            else:
+                    data = await processing_http_client.pull(self.partition)
+                    if data.status == "ok":
+                        logger.info(
+                            f"Message received from proxy, partition: {self.partition}"
+                        )
+                        async with self.lock:
+                            try:
+                                await self.handle_message(data.payload)
+                            except Exception as e:
+                                errors.capture_exception(e)
                                 logger.exception(
-                                    f"Pull worker unexpected status code {resp.status}:{text}"
+                                    "Error while pulling and processing message"
                                 )
-                            await asyncio.sleep(self.pull_time_error_backoff)
-                            continue
-                        try:
-                            data = await resp.json()
-                        except Exception:
-                            text = await resp.text()
-                            logger.exception(f"Error parsing {resp.status}:{text}")
-                            await asyncio.sleep(self.pull_time_error_backoff)
-                            continue
-
-                        if data.get("status") == "ok":
-                            check_proxy_telemetry_headers(resp)
-                            logger.info(
-                                f"Message received from proxy, partition: {self.partition}"
-                            )
-                            async with self.lock:
-                                try:
-                                    await self.handle_message(data["payload"])
-                                except Exception as e:
-                                    errors.capture_exception(e)
-                                    logger.exception(
-                                        "Error while pulling and forwarding proxy message to nucliadb nats"
-                                    )
-                                    raise e
-                        elif data.get("status") == "empty":
-                            logger_activity.debug(
-                                f"No messages waiting in partition #{self.partition}"
-                            )
-                            await asyncio.sleep(self.pull_time_empty_backoff)
-                        else:
-                            logger.info(f"Proxy pull answered with error: {data}")
-                            await asyncio.sleep(self.pull_time_error_backoff)
+                                raise e
+                    elif data.status == "empty":
+                        logger_activity.debug(
+                            f"No messages waiting in partition #{self.partition}"
+                        )
+                        await asyncio.sleep(self.pull_time_empty_backoff)
+                    else:
+                        logger.info(f"Proxy pull answered with error: {data}")
+                        await asyncio.sleep(self.pull_time_error_backoff)
                 except (
                     asyncio.exceptions.CancelledError,
                     RuntimeError,
@@ -204,25 +182,5 @@ class PullWorker:
                     raise e
 
                 except Exception:
-                    logger.exception("Gathering changes")
+                    logger.exception("Unhandled error pulling messages from processing")
                     await asyncio.sleep(self.pull_time_error_backoff)
-
-
-class TelemetryHeadersMissing(Exception):
-    pass
-
-
-def check_proxy_telemetry_headers(resp: Response):
-    try:
-        expected = [
-            "x-b3-traceid",
-            "x-b3-spanid",
-            "x-b3-sampled",
-        ]
-        missing = [header for header in expected if header not in resp.headers]
-        if len(missing) > 0:
-            raise TelemetryHeadersMissing(
-                f"Missing headers {missing} in proxy response"
-            )
-    except TelemetryHeadersMissing:
-        logger.warning("Some telemetry headers not found in proxy response")
