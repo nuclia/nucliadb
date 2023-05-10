@@ -8,6 +8,7 @@ imageVersion: latest
 # app settings
 env:
   DATA_PATH: "/data"
+  #NUA_API_KEY: "..."
 
 affinity: {}
 nodeSelector: {}

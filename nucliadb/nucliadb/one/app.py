@@ -40,7 +40,7 @@ from nucliadb_telemetry.fastapi import instrument_app, metrics_endpoint
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
-from nucliadb_utils.settings import http_settings, running_settings
+from nucliadb_utils.settings import http_settings, nuclia_settings, running_settings
 
 middleware = [
     Middleware(
@@ -96,8 +96,13 @@ async def homepage(request):
     return HTMLResponse("NucliaDB Standalone Server")
 
 
+async def api_config(request):
+    return {"nua_api_key": nuclia_settings.nuclia_service_account is not None}
+
+
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
+application.add_route("/config", api_config)
 application.add_route("/metrics", metrics_endpoint)
 
 # mount contributor app assets
