@@ -29,11 +29,7 @@ from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb_utils.exceptions import ConfigurationError
-from nucliadb_utils.settings import (
-    nuclia_settings,
-    running_settings,
-    transaction_settings,
-)
+from nucliadb_utils.settings import running_settings, transaction_settings
 from nucliadb_utils.utilities import get_audit, get_cache, get_nats_manager, get_storage
 
 
@@ -66,13 +62,8 @@ async def start_pull_workers(
             partition=partition,
             storage=storage,
             pull_time_error_backoff=settings.pull_time_error_backoff,
-            zone=nuclia_settings.nuclia_zone,
             cache=cache,
             audit=audit,
-            creds=nuclia_settings.nuclia_service_account,
-            nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
-            nuclia_public_url=nuclia_settings.nuclia_public_url,
-            onprem=nuclia_settings.onprem,
             local_subscriber=transaction_settings.transaction_local,
         )
         task = asyncio.create_task(worker.loop())

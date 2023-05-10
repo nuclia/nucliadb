@@ -32,10 +32,12 @@ from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.utils import get_processing_api_url
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction_utility, has_feature
 
@@ -56,13 +58,8 @@ class PullWorker:
         partition: str,
         storage: Storage,
         pull_time_error_backoff: int,
-        zone: str,
-        nuclia_cluster_url: str,
-        nuclia_public_url: str,
         audit: Optional[AuditStorage],
-        onprem: bool,
         cache: Optional[Cache] = None,
-        creds: Optional[str] = None,
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
     ):
@@ -72,13 +69,8 @@ class PullWorker:
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.audit = audit
-        self.zone = zone
-        self.nuclia_cluster_url = nuclia_cluster_url
-        self.nuclia_public_url = nuclia_public_url
         self.local_subscriber = local_subscriber
-        self.creds = creds
         self.cache = cache
-        self.onprem = onprem
         self.nc = None
 
         self.lock = asyncio.Lock()
@@ -131,21 +123,12 @@ class PullWorker:
     async def _loop(self):
         headers = {}
         data = None
-        if self.creds is not None:
-            headers["X-STF-NUAKEY"] = f"Bearer {self.creds}"
+        if nuclia_settings.nuclia_service_account is not None:
+            headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
-        if self.onprem:
-            url = (
-                self.nuclia_public_url.format(zone=self.zone)
-                + "/api/v1/processing/pull?partition="
-                + self.partition
-            )
-        else:
-            url = (
-                self.nuclia_cluster_url
-                + "/api/internal/processing/pull?partition="
-                + self.partition
-            )
+        processing_url = get_processing_api_url()
+        url = processing_url + "/pull?partition=" + self.partition
+
         async with aiohttp.ClientSession() as session:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
             logger.info(f"{url}")
