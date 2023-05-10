@@ -158,13 +158,20 @@ class PullWorker:
                     ) as resp:
                         if resp.status != 200:
                             text = await resp.text()
-                            logger.exception(f"Wrong status {resp.status}:{text}")
+                            if resp.status == 429:
+                                logger.info("Pull worker rate limited, backoff")
+                            else:
+                                logger.exception(
+                                    f"Pull worker unexpected status code {resp.status}:{text}"
+                                )
+                            await asyncio.sleep(self.pull_time_error_backoff)
                             continue
                         try:
                             data = await resp.json()
                         except Exception:
                             text = await resp.text()
-                            logger.exception(f"Wrong parsing {resp.status}:{text}")
+                            logger.exception(f"Error parsing {resp.status}:{text}")
+                            await asyncio.sleep(self.pull_time_error_backoff)
                             continue
 
                         if data.get("status") == "ok":

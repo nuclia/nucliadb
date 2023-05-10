@@ -93,7 +93,7 @@ for route in application.routes:
 
 
 async def homepage(request):
-    return HTMLResponse("NucliaDB One Service")
+    return HTMLResponse("NucliaDB Standalone Server")
 
 
 # Use raw starlette routes to avoid unnecessary overhead

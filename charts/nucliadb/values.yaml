@@ -1,0 +1,27 @@
+# NucliaDB Settings
+
+# image settings
+imagePullPolicy: IfNotPresent
+image: nuclia/nucliadb
+imageVersion: latest
+
+# app settings
+env:
+  DATA_PATH: "/data"
+
+affinity: {}
+nodeSelector: {}
+tolerations: []
+topologySpreadConstraints: []
+
+resources: {}
+#  limits:
+#    memory: "2600Mi"
+#  requests:
+#    memory: "600Mi"
+#    cpu: 1
+
+storage:
+  class: ssd
+  size: 100Gi
+  data_path: /data
