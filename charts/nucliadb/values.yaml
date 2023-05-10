@@ -9,6 +9,7 @@ imageVersion: latest
 env:
   DATA_PATH: "/data"
   #NUA_API_KEY: "..."
+  #NUCLIA_ZONE: "europe1"
 
 affinity: {}
 nodeSelector: {}

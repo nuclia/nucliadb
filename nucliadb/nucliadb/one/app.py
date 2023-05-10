@@ -22,6 +22,7 @@ import os
 import nucliadb_contributor_assets  # type: ignore
 import pkg_resources
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -97,7 +98,9 @@ async def homepage(request):
 
 
 async def api_config(request):
-    return {"nua_api_key": nuclia_settings.nuclia_service_account is not None}
+    return JSONResponse(
+        {"nua_api_key": nuclia_settings.nuclia_service_account is not None}
+    )
 
 
 # Use raw starlette routes to avoid unnecessary overhead
