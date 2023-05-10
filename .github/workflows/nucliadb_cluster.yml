@@ -105,8 +105,8 @@ jobs:
         run: |-
           HASH=`git rev-parse --short HEAD`
           BRANCH=${GITHUB_REF##*/}
-          echo "::set-output name=short_sha::$HASH"
-          echo "::set-output name=branch::$BRANCH"
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       # As base image is on a private registry, we need to authenticate 1st to be able to download that image
       - name: Setup gcloud CLI
