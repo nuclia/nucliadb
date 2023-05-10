@@ -23,7 +23,6 @@ from typing import List, Optional
 
 import nats
 from aiohttp.client_exceptions import ClientConnectorError
-from aiohttp.web import Response
 from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
