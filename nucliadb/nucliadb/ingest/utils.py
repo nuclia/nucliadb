@@ -144,7 +144,7 @@ def get_chitchat() -> Optional[ChitchatMonitor]:
     return get_utility(Utility.CHITCHAT)
 
 
-def get_processing_url() -> str:
+def get_processing_api_url() -> str:
     if nuclia_settings.nuclia_service_account:
         return (
             nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone)
