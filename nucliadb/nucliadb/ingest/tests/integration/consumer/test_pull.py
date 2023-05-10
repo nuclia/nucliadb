@@ -77,7 +77,11 @@ async def pull_processor_api():
 
     await start_server(server, config)
 
-    yield PullProcessorAPI(url=f"http://127.0.0.1:{port}", messages=messages)
+    url = f"http://127.0.0.1:{port}"
+    with patch(
+        "nucliadb.http_clients.processing.nuclia_settings.nuclia_cluster_url", url
+    ):
+        yield PullProcessorAPI(url=url, messages=messages)
 
     await server.shutdown()
 
@@ -89,11 +93,7 @@ async def pull_worker(redis_driver, pull_processor_api: PullProcessorAPI):
         partition="1",
         storage=None,  # type: ignore
         pull_time_error_backoff=5,
-        zone="zone",
-        nuclia_cluster_url=pull_processor_api.url,
-        nuclia_public_url="nuclia_public_url",
         audit=None,
-        onprem=False,
         pull_time_empty_backoff=0.1,
     )
 
