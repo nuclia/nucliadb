@@ -31,7 +31,6 @@ from nucliadb.ingest import logger, logger_activity
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.utils import get_processing_api_url
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -125,12 +124,8 @@ class PullWorker:
         if nuclia_settings.nuclia_service_account is not None:
             headers["X-STF-NUAKEY"] = f"Bearer {nuclia_settings.nuclia_service_account}"
 
-        processing_url = get_processing_api_url()
-        url = processing_url + "/pull?partition=" + self.partition
-
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
-            logger.info(f"{url}")
 
             while True:
                 try:
