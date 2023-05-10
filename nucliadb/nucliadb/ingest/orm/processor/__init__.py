@@ -365,6 +365,16 @@ class Processor:
             partition, seqid, message.multiid, message.kbid, message.uuid
         )
 
+    async def commit_slug(self, resource: Resource) -> None:
+        # Slug may have conflicts as its not partitioned properly,
+        # so we commit it in a different transaction to make it as short as possible
+        prev_txn = resource.txn
+        async with self.driver.transaction() as txn:
+            resource.txn = txn
+            await resource.set_slug()
+            await txn.commit()
+        resource.txn = prev_txn
+
     async def txn(
         self,
         messages: List[BrokerMessage],
@@ -452,12 +462,8 @@ class Processor:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
                 await txn.commit()
 
-                # Slug may have conflicts as its not partitioned properly. We make it as short as possible
-                # XXX Does this write need to happen every time?
-                async with self.driver.transaction() as slug_txn:
-                    resource.txn = slug_txn
-                    await resource.set_slug()
-                    await slug_txn.commit()
+                if created or resource.slug_modified:
+                    await self.commit_slug(resource)
 
                 await self.notify_commit(partition, seqid, multi, kbid, uuid)
             elif resource and resource.modified is False:

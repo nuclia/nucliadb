@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -97,3 +97,15 @@ async def test_mark_resource_error_skip_no_resource(
     )
 
     driver.transaction.assert_not_called()
+
+
+async def test_commit_slug(processor: Processor, txn, resource):
+    another_txn = Mock()
+    resource.txn = another_txn
+    resource.set_slug = AsyncMock()
+
+    await processor.commit_slug(resource)
+
+    resource.set_slug.assert_awaited_once()
+    txn.commit.assert_awaited_once()
+    assert resource.txn is another_txn
