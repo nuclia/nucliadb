@@ -164,7 +164,7 @@ class PullWorker:
 
                 except ClientConnectorError:
                     logger.error(
-                        f"Could not connect to {url}, verify your internet connection"
+                        f"Could not connect to processing engine, verify your internet connection"
                     )
                     await asyncio.sleep(self.pull_time_error_backoff)
 
