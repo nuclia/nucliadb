@@ -11,7 +11,6 @@ metadata:
     chart: "{{ .Chart.Name }}"
 data:
   SENTRY_URL: {{ .Values.running.sentry_url }}
-  SEARCH_TIMEOUT: {{ .Values.config.search_timeout | quote }}
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
@@ -26,6 +25,7 @@ data:
   SEEDS: "{{ .Values.chitchat.node.node0_svc_fixed_ip }}:{{ .Values.chitchat.node.chitchat_port }}"
   UPDATE_INTERVAL: {{ .Values.chitchat.cluster_manager.update_interval }}
   LIVELINESS_UPDATE: {{ .Values.chitchat.cluster_manager.liveliness_update }}
+
 {{- if .Values.debug }}
   RUST_LOG: "nucliadb_cluster=DEBUG"
 {{- else }}

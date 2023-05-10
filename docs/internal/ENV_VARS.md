@@ -15,3 +15,6 @@ Settings[to be implemented yet]:
 - `HTTP_CORS_ORIGINS`
 - `GRPC_HOST`
 - `METRICS_HTTP_HOST`
+- `SEARCH_TIMEOUT`: Time in seconds for which the search endpoints wait for the index node search request response before we timeout and return an HTTP error.
+- `SEARCH_CACHE_REDIS_HOST`: Hostname of the redis instance used as cache by the search component.
+- `SEARCH_CACHE_REDIS_PORT`: Port of the redis instance used as cache by the search component.

@@ -18,7 +18,9 @@ image_other: cluster_manager:main
 # both until all component settings are removed from
 # settings not mapped directly through env
 env:
-  EXAMPLE: "VALUE"
+  SEARCH_TIMEOUT: "10" # seconds
+  SEARCH_CACHE_REDIS_HOST:
+  SEARCH_CACHE_REDIS_PORT:
 
 # Kubernetes settings
 affinity: {}
@@ -57,8 +59,6 @@ chitchat:
     node0_svc_fixed_ip: 10.4.0.255
     chitchat_port: 4444
 
-config:
-  search_timeout: 10 # seconds
 
 serviceMonitor:
   enabled: False

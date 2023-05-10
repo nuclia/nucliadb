@@ -67,7 +67,6 @@ data:
   TRANSACTION_JETSTREAM_AUTH: {{ .Values.transaction.transaction_jetstream_auth }}
   TRANSACTION_JETSTREAM_SERVERS: {{ toJson .Values.transaction.transaction_jetstream_servers | quote }}
   DRIVER: {{ .Values.maindb.driver }}
-
 {{- if eq .Values.maindb.driver "redis" }}
   DRIVER_REDIS_URL: {{ .Values.maindb.driver_redis_url }}
 {{- else if eq .Values.maindb.driver "tikv" }}
