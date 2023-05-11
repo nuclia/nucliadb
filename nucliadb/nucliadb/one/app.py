@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 import os
 
 import nucliadb_contributor_assets  # type: ignore
 import pkg_resources
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -29,6 +31,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
+from nucliadb.http_clients.processing import ProcessingHTTPClient
 from nucliadb.one.lifecycle import finalize, initialize
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
@@ -40,7 +43,9 @@ from nucliadb_telemetry.fastapi import instrument_app, metrics_endpoint
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
-from nucliadb_utils.settings import http_settings, running_settings
+from nucliadb_utils.settings import http_settings, nuclia_settings, running_settings
+
+logger = logging.getLogger(__name__)
 
 middleware = [
     Middleware(
@@ -93,11 +98,34 @@ for route in application.routes:
 
 
 async def homepage(request):
-    return HTMLResponse("NucliaDB One Service")
+    return HTMLResponse("NucliaDB Standalone Server")
+
+
+async def api_config_check(request):
+    valid_nua_key = False
+    nua_key_check_error = None
+    if nuclia_settings.nuclia_service_account is not None:
+        async with ProcessingHTTPClient() as processing_client:
+            try:
+                await processing_client.status()
+                valid_nua_key = True
+            except Exception as exc:
+                logger.warning(f"Error validating nua key", exc_info=exc)
+                nua_key_check_error = f"Error checking NUA key: {str(exc)}"
+    return JSONResponse(
+        {
+            "nua_api_key": {
+                "has_key": nuclia_settings.nuclia_service_account is not None,
+                "valid": valid_nua_key,
+                "error": nua_key_check_error,
+            }
+        }
+    )
 
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
+application.add_route("/config-check", api_config_check)
 application.add_route("/metrics", metrics_endpoint)
 
 # mount contributor app assets

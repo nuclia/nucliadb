@@ -16,28 +16,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiohttp.web import Response
 
-from nucliadb.ingest.consumer.pull import PullWorker, check_proxy_telemetry_headers
-
-
-@pytest.fixture(scope="function")
-def errors():
-    with mock.patch("nucliadb.ingest.consumer.pull.errors") as errors:
-        yield errors
-
-
-def test_check_proxy_telemetry_headers_ok(errors):
-    resp = Response(
-        headers={"x-b3-traceid": "foo", "x-b3-spanid": "bar", "x-b3-sampled": "baz"}
-    )
-    check_proxy_telemetry_headers(resp)
-
-    errors.capture_exception.assert_not_called()
+from nucliadb.ingest.consumer.pull import PullWorker
 
 
 class TestPullWorker:

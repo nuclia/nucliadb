@@ -1,0 +1,27 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nucliadb
+  labels:
+    app: nucliadb
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: nucliadb
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      appProtocol: http
+    - name: train
+      port: 8040
+      protocol: TCP
+      appProtocol: grpc
+    - name: grpc
+      port: 8060
+      protocol: TCP
+      appProtocol: grpc
