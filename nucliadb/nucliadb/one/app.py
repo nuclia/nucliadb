@@ -24,7 +24,9 @@ import nucliadb_contributor_assets  # type: ignore
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRouter
 from fastapi.staticfiles import StaticFiles
+from fastapi_versioning import version
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -83,25 +85,13 @@ base_app.include_router(api_reader_v1)
 base_app.include_router(api_search_v1)
 base_app.include_router(api_train_v1)
 
-application = VersionedFastAPI(
-    base_app,
-    version_format="{major}",
-    prefix_format=f"/{API_PREFIX}/v{{major}}",
-    default_version=(1, 0),
-    enable_latest=False,
-    kwargs=fastapi_settings,
-)
 
-for route in application.routes:
-    if isinstance(route, Mount):
-        extend_openapi(route)
+standalone_api_router = APIRouter()
 
 
-async def homepage(request):
-    return HTMLResponse("NucliaDB Standalone Server")
-
-
-async def api_config_check(request):
+@standalone_api_router.get("/config-check")
+@version(1)
+async def api_config_check():
     valid_nua_key = False
     nua_key_check_error = None
     if nuclia_settings.nuclia_service_account is not None:
@@ -123,9 +113,29 @@ async def api_config_check(request):
     )
 
 
+base_app.include_router(standalone_api_router)
+
+application = VersionedFastAPI(
+    base_app,
+    version_format="{major}",
+    prefix_format=f"/{API_PREFIX}/v{{major}}",
+    default_version=(1, 0),
+    enable_latest=False,
+    kwargs=fastapi_settings,
+)
+
+
+for route in application.routes:
+    if isinstance(route, Mount):
+        extend_openapi(route)
+
+
+async def homepage(request):
+    return HTMLResponse("NucliaDB Standalone Server")
+
+
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/config-check", api_config_check)
 application.add_route("/metrics", metrics_endpoint)
 
 # mount contributor app assets
