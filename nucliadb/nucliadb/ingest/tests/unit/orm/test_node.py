@@ -97,11 +97,6 @@ async def test_create_shard_by_kbid(one_replica, txn, fake_node):
     # New shard has been created in a different node
     assert kb_shards.shards[1].replicas[0].node != node
 
-    # Attempting to create another shard should fail
-    # because we don't have sufficient nodes
-    with pytest.raises(NodeClusterSmall):
-        await Node.create_shard_by_kbid(txn, kbid)
-
 
 @pytest.mark.asyncio
 async def test_create_shard_by_kbid_insufficient_nodes(txn):

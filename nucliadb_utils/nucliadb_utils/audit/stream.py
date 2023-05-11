@@ -23,9 +23,15 @@ from typing import List, Optional
 
 import mmh3  # type: ignore
 import nats
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
+from google.protobuf.timestamp_pb2 import Timestamp
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditKBCounter,
+    AuditRequest,
+    AuditShardCounter,
+)
 from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.resources_pb2 import FieldID
 from opentelemetry.trace import get_current_span
 
 from nucliadb_utils import logger
@@ -132,25 +138,37 @@ class StreamAuditStorage(AuditStorage):
 
     async def report(
         self,
-        message: BrokerMessage,
+        *,
+        kbid: str,
         audit_type: AuditRequest.AuditType.Value,  # type: ignore
+        when: Optional[Timestamp] = None,
+        user: Optional[str] = None,
+        origin: Optional[str] = None,
+        rid: Optional[str] = None,
+        field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
         counter: Optional[AuditShardCounter] = None,
+        kb_counter: Optional[AuditKBCounter] = None,
     ):
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
-        auditrequest.kbid = message.kbid
-        auditrequest.userid = message.audit.user
-        auditrequest.rid = message.uuid
-        auditrequest.origin = message.audit.origin
+        auditrequest.kbid = kbid
+        auditrequest.userid = user or ""
+        auditrequest.rid = rid or ""
+        auditrequest.origin = origin or ""
         auditrequest.type = audit_type
-        auditrequest.time.CopyFrom(message.audit.when)
+        if when is None:
+            auditrequest.time.FromDatetime(datetime.now())
+        else:
+            auditrequest.time.CopyFrom(when)
 
-        for field in message.field_metadata:
-            auditrequest.field_metadata.append(field.field)
+        auditrequest.field_metadata.extend(field_metadata or [])
 
         if audit_fields:
             auditrequest.fields_audit.extend(audit_fields)
+
+        if kb_counter:
+            auditrequest.kb_counter.CopyFrom(kb_counter)
 
         if counter:
             auditrequest.counter.CopyFrom(counter)

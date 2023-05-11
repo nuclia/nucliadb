@@ -153,6 +153,19 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     )
 
 
+async def main_subscriber_workers():  # pragma: no cover
+    finalizers = await initialize()
+
+    metrics_server = await serve_metrics()
+
+    auditor_closer = await consumer_service.start_auditor()
+    shard_creator_closer = await consumer_service.start_shard_creator()
+
+    await run_until_exit(
+        [auditor_closer, shard_creator_closer, metrics_server.shutdown] + finalizers
+    )
+
+
 def setup_configuration():  # pragma: no cover
     setup_logging()
 
@@ -186,3 +199,11 @@ def run_processed_consumer() -> None:  # pragma: no cover
     """
     setup_configuration()
     asyncio.run(main_ingest_processed_consumer())
+
+
+def run_subscriber_workers() -> None:  # pragma: no cover
+    """
+    Run the consumer + GRPC ingest service
+    """
+    setup_configuration()
+    asyncio.run(main_subscriber_workers())

@@ -29,7 +29,6 @@ from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
     finalize_utilities,
-    get_cache,
     get_utility,
     set_utility,
     start_audit_utility,
@@ -44,8 +43,7 @@ async def initialize() -> None:
     await start_predict_engine()
 
     driver = await get_driver()
-    cache = await get_cache()
-    set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))
+    set_utility(Utility.NODES, NodesManager(driver=driver))
     await start_chitchat(SERVICE_NAME)
 
     await paragraphs.initialize_cache()

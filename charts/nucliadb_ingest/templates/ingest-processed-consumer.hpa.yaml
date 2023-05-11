@@ -13,6 +13,6 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: ingest-processed-consumer
-  minReplicas: {{.Values.ingest_orm_grpc_autoscaling.minReplicas}}
-  maxReplicas: {{.Values.ingest_orm_grpc_autoscaling.maxReplicas}}
+  minReplicas: {{.Values.ingest_processed_consumer_autoscaling.minReplicas}}
+  maxReplicas: {{.Values.ingest_processed_consumer_autoscaling.maxReplicas}}
   metrics: {{- toYaml .Values.ingest_processed_consumer_autoscaling.metrics | nindent 4}}

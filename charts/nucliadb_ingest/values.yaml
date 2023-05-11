@@ -111,3 +111,17 @@ ingest_processed_consumer_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+
+# ingest-subscriber-workers settings
+ingest_subscriber_workers_resources: {}
+ingest_subscriber_workers_replicaCount: 2
+ingest_subscriber_workers_autoscaling:
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75

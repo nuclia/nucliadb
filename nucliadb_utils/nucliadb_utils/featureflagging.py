@@ -43,6 +43,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
+    const.Features.AUDITING_BW_COMPAT_SHARD_COUNTER: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 

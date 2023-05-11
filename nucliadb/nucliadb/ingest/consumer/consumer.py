@@ -34,7 +34,6 @@ from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils import const
-from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -72,20 +71,17 @@ class IngestConsumer:
         partition: str,
         storage: Storage,
         nats_connection_manager: NatsConnectionManager,
-        audit: Optional[AuditStorage],
         cache: Optional[Cache] = None,
     ):
         self.driver = driver
         self.partition = partition
-        self.storage = storage
-        self.audit = audit
         self.cache = cache
         self.nats_connection_manager = nats_connection_manager
         self.ack_wait = 10 * 60
         self.initialized = False
 
         self.lock = asyncio.Lock()
-        self.processor = Processor(driver, storage, audit, cache, partition)
+        self.processor = Processor(driver, storage, cache, partition)
 
     async def initialize(self):
         await self.setup_nats_subscription()

@@ -31,7 +31,6 @@ from nucliadb_utils.grpc import get_traced_grpc_server
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    get_cache,
     get_storage,
     get_utility,
     set_utility,
@@ -75,11 +74,8 @@ async def stop_train_grpc():
 
 async def start_nodes_manager():
     driver = await get_driver()
-    cache = await get_cache()
     storage = await get_storage()
-    set_utility(
-        Utility.NODES, TrainNodesManager(driver=driver, cache=cache, storage=storage)
-    )
+    set_utility(Utility.NODES, TrainNodesManager(driver=driver, storage=storage))
 
 
 async def stop_nodes_manager():

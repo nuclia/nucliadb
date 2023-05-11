@@ -329,6 +329,15 @@ message Notification {
         INDEXED = 2;
     }
     Action action = 6;
+
+    enum WriteType {
+        UNSET = 0;
+        CREATED = 1;
+        MODIFIED = 2;
+        DELETED = 3;
+    }
+    WriteType write_type = 7;
+    BrokerMessage message = 8;
 }
 
 

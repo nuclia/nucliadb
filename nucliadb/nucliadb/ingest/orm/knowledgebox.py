@@ -55,7 +55,6 @@ from nucliadb.ingest.orm.utils import (
     get_node_klass,
     set_basic,
 )
-from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
@@ -80,13 +79,10 @@ KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
 
 class KnowledgeBox:
-    def __init__(
-        self, txn: Transaction, storage: Storage, cache: Union[Cache, None], kbid: str
-    ):
+    def __init__(self, txn: Transaction, storage: Storage, kbid: str):
         self.txn = txn
         self.storage = storage
         self.kbid = kbid
-        self.cache = cache
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
 

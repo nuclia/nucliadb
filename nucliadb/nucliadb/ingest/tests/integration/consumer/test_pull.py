@@ -93,7 +93,6 @@ async def pull_worker(redis_driver, pull_processor_api: PullProcessorAPI):
         partition="1",
         storage=None,  # type: ignore
         pull_time_error_backoff=5,
-        audit=None,
         pull_time_empty_backoff=0.1,
     )
 

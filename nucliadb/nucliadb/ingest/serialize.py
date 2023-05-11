@@ -55,7 +55,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.vectors import UserVectorSet
-from nucliadb_utils.utilities import get_cache, get_storage
+from nucliadb_utils.utilities import get_storage
 
 
 async def set_resource_field_extracted_data(
@@ -433,9 +433,8 @@ async def get_orm_resource(
     service_name: Optional[str] = None,
 ) -> Optional[ORMResource]:
     storage = await get_storage(service_name=service_name)
-    cache = await get_cache()
 
-    kb = KnowledgeBox(txn, storage, cache, kbid)
+    kb = KnowledgeBox(txn, storage, kbid)
 
     if rid is None:
         if slug is None:
@@ -457,8 +456,7 @@ async def get_resource_uuid_by_slug(
     kbid: str, slug: str, service_name: Optional[str] = None
 ) -> Optional[str]:
     storage = await get_storage(service_name=service_name)
-    cache = await get_cache()
     driver = await get_driver()
     txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, cache, kbid)
+    kb = KnowledgeBox(txn, storage, kbid)
     return await kb.get_resource_uuid_by_slug(slug)

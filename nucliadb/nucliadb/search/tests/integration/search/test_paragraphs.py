@@ -96,7 +96,7 @@ async def test_get_paragraph_text(
     uid = uuid.uuid4().hex
     basic = Basic(slug="slug", uuid=uid)
     await set_basic(txn, kbid, uid, basic)
-    kb = KnowledgeBox(txn, gcs_storage, cache, kbid)
+    kb = KnowledgeBox(txn, gcs_storage, kbid)
     orm_resource = await kb.get(uid)
     field_obj = await orm_resource.get_field("field", 4, load=False)
     await field_obj.set_extracted_text(

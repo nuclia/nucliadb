@@ -27,7 +27,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.search import SERVICE_NAME
-from nucliadb_utils.utilities import get_cache, get_storage
+from nucliadb_utils.utilities import get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
@@ -57,8 +57,7 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
         if uuid not in resource_cache:
             transaction = await get_transaction()
             storage = await get_storage(service_name=SERVICE_NAME)
-            cache = await get_cache()
-            kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+            kb = KnowledgeBoxORM(transaction, storage, kbid)
             orm_resource = await kb.get(uuid)
 
         if orm_resource is not None:

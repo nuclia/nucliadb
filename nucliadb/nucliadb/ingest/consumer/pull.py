@@ -33,7 +33,6 @@ from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
-from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
@@ -56,21 +55,17 @@ class PullWorker:
         partition: str,
         storage: Storage,
         pull_time_error_backoff: int,
-        audit: Optional[AuditStorage],
         cache: Optional[Cache] = None,
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
     ):
-        self.driver = driver
         self.partition = partition
-        self.storage = storage
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
-        self.audit = audit
         self.local_subscriber = local_subscriber
         self.cache = cache
 
-        self.processor = Processor(driver, storage, audit, cache, partition)
+        self.processor = Processor(driver, storage, cache, partition)
 
     async def handle_message(self, payload: str) -> None:
         pb = BrokerMessage()

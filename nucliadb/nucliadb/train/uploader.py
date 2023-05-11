@@ -41,16 +41,15 @@ from nucliadb.ingest.utils import get_driver
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.models import RequestData
 from nucliadb.train.settings import settings
-from nucliadb_utils.utilities import get_audit, get_cache, get_storage
+from nucliadb_utils.utilities import get_cache, get_storage
 
 
 class UploadServicer:
     async def initialize(self):
         storage = await get_storage(service_name=SERVICE_NAME)
-        audit = get_audit()
         driver = await get_driver()
         cache = await get_cache()
-        self.proc = Processor(driver=driver, storage=storage, audit=audit, cache=cache)
+        self.proc = Processor(driver=driver, storage=storage, cache=cache)
 
     async def finalize(self):
         ...

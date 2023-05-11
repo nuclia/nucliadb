@@ -40,7 +40,7 @@ from nucliadb.ingest.maindb.local import LocalDriver
 from nucliadb.ingest.maindb.redis import RedisDriver
 from nucliadb.ingest.maindb.tikv import TiKVDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.orm.node import NODES, Node
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import DriverConfig, settings
@@ -52,7 +52,7 @@ from nucliadb_protos import writer_pb2_grpc
 from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.cache.redis import RedisPubsub
+from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
@@ -75,14 +75,14 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def processor(maindb_driver, gcs_storage, cache, audit):
-    proc = Processor(maindb_driver, gcs_storage, audit, cache, partition="1")
+async def processor(maindb_driver, gcs_storage, cache):
+    proc = Processor(maindb_driver, gcs_storage, cache, partition="1")
     yield proc
 
 
 @pytest.fixture(scope="function")
-async def stream_processor(maindb_driver, gcs_storage, cache, stream_audit):
-    proc = Processor(maindb_driver, gcs_storage, stream_audit, cache, partition="1")
+async def stream_processor(maindb_driver, gcs_storage, cache):
+    proc = Processor(maindb_driver, gcs_storage, cache, partition="1")
     yield proc
 
 
@@ -241,24 +241,29 @@ async def txn(maindb_driver):
 
 
 @pytest.fixture(scope="function")
-async def cache(redis):
+async def pubsub(natsd):
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is None:
-        url = f"redis://{redis[0]}:{redis[1]}"
-        pubsub = RedisPubsub(url)
+        pubsub = NatsPubsub(hosts=[natsd])
         await pubsub.initialize()
         set_utility(Utility.PUBSUB, pubsub)
 
-    che = Cache(pubsub)
-    await che.initialize()
-    yield che
-    await che.finalize()
+    yield pubsub
     await pubsub.finalize()
     set_utility(Utility.PUBSUB, None)
 
 
 @pytest.fixture(scope="function")
+async def cache(pubsub):
+    che = Cache(pubsub)
+    await che.initialize()
+    yield che
+    await che.finalize()
+
+
+@pytest.fixture(scope="function")
 async def fake_node(_natsd_reset, indexing_utility_ingest):
+    NODES.clear()
     uuid1 = str(uuid.uuid4())
     uuid2 = str(uuid.uuid4())
     await Node.set(
@@ -614,7 +619,7 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
     txn = await driver.begin()
 
     rid = str(uuid.uuid4())
-    kb_obj = KnowledgeBox(txn, storage, cache, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
     await test_resource.set_slug()
 

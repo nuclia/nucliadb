@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 class PubSubChannels:
+    # stream that ingest/node publishes to for information
     RESOURCE_NOTIFY = "notify.{kbid}"
 
 
@@ -54,3 +55,4 @@ class Streams:
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
     SEPARATE_PROCESSED_MESSAGE_WRITES = "nucliadb_separate_processed_message_writes"
+    AUDITING_BW_COMPAT_SHARD_COUNTER = "nucliadb_auditing_bw_compat_shard_counter"

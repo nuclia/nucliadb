@@ -50,12 +50,12 @@ def test_find_nodes_orders_by_shard_count(nodes):
 def test_find_nodes_exclude_nodes(nodes):
     cluster = orm.ClusterObject()
     excluded_node = "node-0"
-    nodes_found = cluster.find_nodes(exclude_nodes=[excluded_node])
+    nodes_found = cluster.find_nodes(avoid_nodes=[excluded_node])
     assert nodes_found == ["node-30", "node-40"]
 
-    with pytest.raises(NodeClusterSmall):
-        all_nodes = list(nodes.keys())
-        cluster.find_nodes(exclude_nodes=all_nodes)
+    # even if all are used, still should find nodes
+    all_nodes = list(nodes.keys())
+    assert cluster.find_nodes(avoid_nodes=all_nodes) == ["node-0", "node-30"]
 
 
 def test_find_nodes_raises_error_if_not_enough_nodes_are_found(nodes):

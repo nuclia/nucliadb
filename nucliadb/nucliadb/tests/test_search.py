@@ -32,14 +32,22 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.ingest.consumer import shard_creator
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.ingest.tests.vectors import V1
+from nucliadb.ingest.utils import get_driver
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.utilities import Utility, clean_utility, get_audit, set_utility
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    get_audit,
+    get_storage,
+    set_utility,
+)
 
 
 @pytest.mark.asyncio
@@ -1219,7 +1227,7 @@ async def test_search_handles_predict_errors(
 
 
 async def create_dummy_resources(
-    nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, kbid, n=10
+    nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, kbid, n=10, start=0
 ):
     payloads = [
         {
@@ -1227,7 +1235,7 @@ async def create_dummy_resources(
             "title": f"Dummy resource {i}",
             "summary": f"Dummy resource {i} summary",
         }
-        for i in range(n)
+        for i in range(start, n)
     ]
     for payload in payloads:
         resp = await nucliadb_writer.post(
@@ -1303,11 +1311,19 @@ async def kb_with_two_logic_shards(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
 ):
+    sc = shard_creator.ShardCreatorHandler(
+        driver=await get_driver(), storage=await get_storage(), pubsub=None  # type: ignore
+    )
     resp = await nucliadb_manager.post("/kbs", json={})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
-    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10)
+    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=8)
+
+    # trigger creating new shard manually here
+    await sc.process_kb(kbid)
+
+    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10, start=8)
 
     yield kbid
 

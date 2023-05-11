@@ -52,7 +52,7 @@ from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
-from nucliadb_utils.utilities import get_audit, get_cache, get_storage
+from nucliadb_utils.utilities import get_audit, get_storage
 
 
 @api.get(
@@ -232,14 +232,13 @@ async def get_resource_field(
     page: Union[Literal["last", "first"], int] = Query("last"),
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
-    cache = await get_cache()
     driver = await get_driver()
 
     txn = await driver.begin()
 
     pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
 
-    kb = ORMKnowledgeBox(txn, storage, cache, kbid)
+    kb = ORMKnowledgeBox(txn, storage, kbid)
 
     if rid is None:
         assert rslug is not None, "Either rid or rslug must be defined"

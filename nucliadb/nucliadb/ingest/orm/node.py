@@ -100,11 +100,10 @@ class Node(AbstractNode):
             kb_shards.ParseFromString(kb_shards_binary)
 
         try:
-            # When choosing the nodes, we need to exclude nodes in which there is already a shard from the same KB
-            kb_nodes = [
+            existing_kb_nodes = [
                 replica.node for shard in kb_shards.shards for replica in shard.replicas
             ]
-            node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=kb_nodes)
+            node_ids = NODE_CLUSTER.find_nodes(avoid_nodes=existing_kb_nodes)
         except NodeClusterSmall as err:
             errors.capture_exception(err)
             logger.error(

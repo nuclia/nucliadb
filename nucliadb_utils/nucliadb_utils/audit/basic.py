@@ -19,8 +19,15 @@
 #
 from typing import List, Optional
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
+from google.protobuf.timestamp_pb2 import Timestamp
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditKBCounter,
+    AuditRequest,
+    AuditShardCounter,
+)
 from nucliadb_protos.nodereader_pb2 import SearchRequest
+from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
@@ -31,8 +38,23 @@ class BasicAuditStorage(AuditStorage):
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None, counter: Optional[AuditShardCounter] = None):  # type: ignore
-        logger.debug(f"AUDIT {audit_type} {self.message_to_str(message)}")
+    async def report(
+        self,
+        *,
+        kbid: str,
+        audit_type: AuditRequest.AuditType.Value,  # type: ignore
+        when: Optional[Timestamp] = None,
+        user: Optional[str] = None,
+        origin: Optional[str] = None,
+        rid: Optional[str] = None,
+        field_metadata: Optional[List[FieldID]] = None,
+        audit_fields: Optional[List[AuditField]] = None,
+        counter: Optional[AuditShardCounter] = None,
+        kb_counter: Optional[AuditKBCounter] = None,
+    ):  # type: ignore
+        logger.debug(
+            f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {counter}"
+        )
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")

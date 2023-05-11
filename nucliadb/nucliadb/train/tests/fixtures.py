@@ -215,7 +215,7 @@ async def test_pagination_resources(
     # Add entities
     storage = await get_storage()
     txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest, cache=None)
+    kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     entities_manager = EntitiesManager(kb, txn)
     entities = EntitiesGroup()
     entities.entities["entity1"].value = "PERSON"

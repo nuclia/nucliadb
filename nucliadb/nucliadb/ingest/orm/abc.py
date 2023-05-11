@@ -75,7 +75,7 @@ class AbstractShard(metaclass=ABCMeta):
         partition: str,
         kb: str,
         reindex_id: Optional[str] = None,
-    ) -> Optional[ShardCounter]:  # pragma: no cover
+    ) -> None:  # pragma: no cover
         pass
 
 

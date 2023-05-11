@@ -458,6 +458,10 @@ pub struct Notification {
     pub seqid: i64,
     #[prost(enumeration="notification::Action", tag="6")]
     pub action: i32,
+    #[prost(enumeration="notification::WriteType", tag="7")]
+    pub write_type: i32,
+    #[prost(message, optional, tag="8")]
+    pub message: ::core::option::Option<BrokerMessage>,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {
@@ -467,6 +471,14 @@ pub mod notification {
         Commit = 0,
         Abort = 1,
         Indexed = 2,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum WriteType {
+        Unset = 0,
+        Created = 1,
+        Modified = 2,
+        Deleted = 3,
     }
 }
 //// The member information.

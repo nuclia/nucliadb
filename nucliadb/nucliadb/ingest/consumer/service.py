@@ -30,7 +30,16 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import running_settings, transaction_settings
-from nucliadb_utils.utilities import get_audit, get_cache, get_nats_manager, get_storage
+from nucliadb_utils.utilities import (
+    get_audit,
+    get_cache,
+    get_nats_manager,
+    get_pubsub,
+    get_storage,
+)
+
+from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
+from .shard_creator import ShardCreatorHandler
 
 
 def _handle_task_result(task: asyncio.Task) -> None:
@@ -54,7 +63,6 @@ async def start_pull_workers(
     driver = await get_driver()
     cache = await get_cache()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
-    audit = get_audit()
     tasks = []
     for partition in settings.partitions:
         worker = PullWorker(
@@ -63,7 +71,6 @@ async def start_pull_workers(
             storage=storage,
             pull_time_error_backoff=settings.pull_time_error_backoff,
             cache=cache,
-            audit=audit,
             local_subscriber=transaction_settings.transaction_local,
         )
         task = asyncio.create_task(worker.loop())
@@ -89,7 +96,6 @@ async def start_ingest_consumers(
     driver = await get_driver()
     cache = await get_cache()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
-    audit = get_audit()
     nats_connection_manager = get_nats_manager()
 
     for partition in settings.partitions:
@@ -98,7 +104,6 @@ async def start_ingest_consumers(
             partition=partition,
             storage=storage,
             cache=cache,
-            audit=audit,
             nats_connection_manager=nats_connection_manager,
         )
         await consumer.initialize()
@@ -129,7 +134,6 @@ async def start_ingest_processed_consumer(
     driver = await get_driver()
     cache = await get_cache()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
-    audit = get_audit()
     nats_connection_manager = get_nats_manager()
 
     consumer = IngestProcessedConsumer(
@@ -137,9 +141,38 @@ async def start_ingest_processed_consumer(
         partition="-1",
         storage=storage,
         cache=cache,
-        audit=audit,
         nats_connection_manager=nats_connection_manager,
     )
     await consumer.initialize()
 
     return nats_connection_manager.finalize
+
+
+async def start_auditor() -> Callable[[], Awaitable[None]]:
+    driver = await get_driver()
+    audit = get_audit()
+    assert audit is not None
+    pubsub = await get_pubsub()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    index_auditor = IndexAuditHandler(driver=driver, audit=audit, pubsub=pubsub)
+    resource_writes_auditor = ResourceWritesAuditHandler(
+        driver=driver, storage=storage, audit=audit, pubsub=pubsub
+    )
+
+    await index_auditor.initialize()
+    await resource_writes_auditor.initialize()
+
+    return partial(
+        asyncio.gather, index_auditor.finalize(), resource_writes_auditor.finalize()  # type: ignore
+    )
+
+
+async def start_shard_creator() -> Callable[[], Awaitable[None]]:
+    driver = await get_driver()
+    pubsub = await get_pubsub()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    shard_creator = ShardCreatorHandler(driver=driver, storage=storage, pubsub=pubsub)
+    await shard_creator.initialize()
+
+    return shard_creator.finalize
