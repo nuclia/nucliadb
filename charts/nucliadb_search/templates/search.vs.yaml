@@ -42,6 +42,9 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/suggest'
           method:
             regex: "GET|OPTIONS"
+      retries:
+        attempts: 3
+        retryOn: connect-failure
       route:
         - destination:
             port:

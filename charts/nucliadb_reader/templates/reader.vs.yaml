@@ -34,10 +34,13 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/resources'
           method:
             regex: "GET|OPTIONS"
+      retries:
+        attempts: 3
+        retryOn: connect-failure
       route:
         - destination:
             port:
-              number: {{ .Values.serving.port }}
+              number: {{.Values.serving.port}}
             host: "reader.{{ .Release.Namespace }}.svc.cluster.local"
       corsPolicy:
         allowOrigins:
