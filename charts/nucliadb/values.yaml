@@ -7,9 +7,8 @@ imageVersion: latest
 
 # app settings
 env:
-  DATA_PATH: "/data"
+  NUCLIA_ZONE: "europe1"
   #NUA_API_KEY: "..."
-  #NUCLIA_ZONE: "europe1"
 
 affinity: {}
 nodeSelector: {}
@@ -26,4 +25,3 @@ resources: {}
 storage:
   class: ssd
   size: 100Gi
-  data_path: /data

@@ -69,6 +69,8 @@ spec:
           - name: "{{ $key }}"
             value: {{ tpl $value $ | toJson }}
           {{- end }}
+          - name: DATA_PATH
+            value: "/data"
         ports:
         - name: http
           containerPort: 8080
@@ -80,7 +82,7 @@ spec:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:
         - name: ndb-pv
-          mountPath: {{ .Values.storage.data_path }}
+          mountPath: /data
   volumeClaimTemplates:
   - metadata:
       name: ndb-pv

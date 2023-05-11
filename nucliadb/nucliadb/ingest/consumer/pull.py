@@ -69,9 +69,7 @@ class PullWorker:
         self.audit = audit
         self.local_subscriber = local_subscriber
         self.cache = cache
-        self.nc = None
 
-        self.lock = asyncio.Lock()
         self.processor = Processor(driver, storage, audit, cache, partition)
 
     async def handle_message(self, payload: str) -> None:
@@ -134,15 +132,14 @@ class PullWorker:
                         logger.info(
                             f"Message received from proxy, partition: {self.partition}"
                         )
-                        async with self.lock:
-                            try:
-                                await self.handle_message(data.payload)
-                            except Exception as e:
-                                errors.capture_exception(e)
-                                logger.exception(
-                                    "Error while pulling and processing message"
-                                )
-                                raise e
+                        try:
+                            await self.handle_message(data.payload)
+                        except Exception as e:
+                            errors.capture_exception(e)
+                            logger.exception(
+                                "Error while pulling and processing message"
+                            )
+                            raise e
                     elif data.status == "empty":
                         logger_activity.debug(
                             f"No messages waiting in partition #{self.partition}"
@@ -164,7 +161,8 @@ class PullWorker:
 
                 except ClientConnectorError:
                     logger.error(
-                        f"Could not connect to processing engine, verify your internet connection"
+                        f"Could not connect to processing engine, \
+                         {processing_http_client.base_url} verify your internet connection"
                     )
                     await asyncio.sleep(self.pull_time_error_backoff)
 
