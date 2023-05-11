@@ -19,14 +19,15 @@ spec:
           method:
             regex: "GET|POST|OPTIONS"
 
+      retries:
+        attempts: 3
+        retryOn: connect-failure
       route:
         - destination:
             port:
               number: {{.Values.serving.port}}
             host: "train.{{ .Release.Namespace }}.svc.cluster.local"
-          retries:
-            attempts: 3
-            retryOn: connect-failure
+
       corsPolicy:
         allowOrigins:
           - exact: "*"
