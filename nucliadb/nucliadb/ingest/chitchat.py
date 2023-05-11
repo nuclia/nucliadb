@@ -93,7 +93,7 @@ def get_configured_chitchat_app(host: str, port: int) -> Tuple[Server, Config]:
         reload=False,
         workers=1,
         use_colors=False,
-        log_level="warning",
+        log_config=None,
         limit_concurrency=None,
         backlog=2047,
         limit_max_requests=None,
