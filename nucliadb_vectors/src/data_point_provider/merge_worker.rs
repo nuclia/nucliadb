@@ -73,7 +73,6 @@ impl Worker {
     fn work(&self) -> VectorR<()> {
         let subscriber = self.location.as_path();
         // We must ensure that GC does not happen while working.
-        let lock = fs_state::shared_lock(subscriber)?;
         let (_, state) = fs_state::load_state::<State>(subscriber)?;
         // Merging can happen offline
         info!("{subscriber:?} is ready to perform a merge");
@@ -93,13 +92,12 @@ impl Worker {
         let work_flag = self.work_flag.start_working();
         let (_, mut state) = fs_state::load_state::<State>(subscriber)?;
         let creates_work = state.replace_work_unit(new_dp);
-        fs_state::persist_state(subscriber, &state)?;
+        fs_state::atomic_write(subscriber, &state)?;
         info!("Merge on {subscriber:?}:\n{report}");
         if creates_work {
             self.notify_merger();
         }
         std::mem::drop(work_flag);
-        std::mem::drop(lock);
 
         info!("Merge request completed");
         Ok(())

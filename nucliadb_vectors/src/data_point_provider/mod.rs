@@ -32,7 +32,7 @@ use std::time::SystemTime;
 
 use fs2::FileExt;
 pub use merger::Merger;
-use nucliadb_core::fs_state::{self, SLock, Version};
+use nucliadb_core::fs_state::{self, Version};
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
@@ -47,6 +47,7 @@ pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
 const WRITER_FLAG: &str = "writer.flag";
+const READERS_STATUS: &str = "readers";
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -96,6 +97,7 @@ impl Index {
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         std::fs::create_dir_all(path)?;
+        std::fs::create_dir_all(path.join(READERS_STATUS))?;
         fs_state::initialize_disk(path, State::new)?;
         metadata.write(path)?;
         Ok(Index {
@@ -127,6 +129,8 @@ impl InnerState {
         Ok(InnerState { inner, version })
     }
 }
+
+#[derive(Clone)]
 struct OpenState {
     inner: Arc<RwLock<InnerState>>,
 }
@@ -145,37 +149,83 @@ impl OpenState {
     }
     pub fn persist(&self, path: &Path) -> VectorR<()> {
         let state = self.read();
-        Ok(fs_state::persist_state(path, &state.inner)?)
-    }
-    pub fn update(&self, location: &Path) -> VectorR<()> {
-        let location = location.to_path_buf();
-        let transform = move |state: &mut InnerState| {
-            let disk_version = fs_state::crnt_version(&location)?;
-            if disk_version > state.version {
-                let (new_version, new_state) = fs_state::load_state(&location)?;
-                state.inner = new_state;
-                state.version = new_version;
-            }
-            Ok(())
-        };
-        self.apply(transform)
+        Ok(fs_state::atomic_write(path, &state.inner)?)
     }
 }
 
 pub struct Reader {
-    #[allow(unused)]
-    lock: SLock,
+    status: PathBuf,
     inner: Index,
     state: OpenState,
 }
+impl Drop for Reader {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.status);
+    }
+}
 impl Reader {
     fn new(inner: Index) -> VectorR<Reader> {
-        let lock = fs_state::shared_lock(inner.location())?;
-        let state = OpenState::new(&inner.location)?;
-        Ok(Reader { lock, inner, state })
+        let id = uuid::Uuid::new_v4().to_string();
+        let status_dir = inner.location().join(READERS_STATUS);
+        let status = status_dir.join(id).with_extension("json");
+        let state = OpenState::new(inner.location())?;
+        {
+            // Creating the reader status
+            let mut status_file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&status)?;
+            status_file.lock_exclusive()?;
+
+            let watching = state.read().inner.dpid_iter().collect::<Vec<_>>();
+            let mut status_buf = BufWriter::new(&mut status_file);
+            serde_json::to_writer(&mut status_buf, &watching)?;
+            status_buf.flush()?;
+            mem::drop(status_buf);
+
+            status_file.unlock()?;
+        }
+        Ok(Reader {
+            status,
+            inner,
+            state,
+        })
     }
-    pub fn update(&self) -> VectorR<()> {
-        self.state.update(self.location())
+    pub fn schedule_update(&self) -> VectorR<()> {
+        // Is important that reader state updates
+        // and status updates are done atomically.
+        // Otherwise data points that are in use may be delete by the GC.
+        let location = self.inner.location().to_path_buf();
+        let status = self.status.clone();
+        let transform = move |state: &mut InnerState| {
+            let disk_version = fs_state::crnt_version(&location)?;
+            if disk_version > state.version {
+                let mut status_file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(&status)?;
+                status_file.lock_exclusive()?;
+
+                let (new_version, new_state) = fs_state::load_state(&location)?;
+                state.inner = new_state;
+                state.version = new_version;
+
+                let watching = state.inner.dpid_iter().collect::<Vec<_>>();
+                let mut status_buf = BufWriter::new(&mut status_file);
+                serde_json::to_writer(&mut status_buf, &watching)?;
+                status_buf.flush()?;
+                mem::drop(status_buf);
+
+                status_file.unlock()?;
+            }
+            Ok(())
+        };
+        // Updating the state in the background
+        let state = self.state.clone();
+        std::thread::spawn(move || state.apply(transform));
+        Ok(())
     }
     pub fn get_keys(&self) -> VectorR<Vec<String>> {
         let state = self.state.read();
@@ -212,6 +262,19 @@ pub struct Writer {
     state: OpenState,
 }
 impl Writer {
+    fn update(&self) -> VectorR<()> {
+        let location = self.inner.location().to_path_buf();
+        let transform = move |state: &mut InnerState| {
+            let disk_version = fs_state::crnt_version(&location)?;
+            if disk_version > state.version {
+                let (new_version, new_state) = fs_state::load_state(&location)?;
+                state.inner = new_state;
+                state.version = new_version;
+            }
+            Ok(())
+        };
+        self.state.apply(transform)
+    }
     fn notify_merger(&self) {
         let worker = Worker::request(
             self.location().to_path_buf(),
@@ -253,13 +316,26 @@ impl Writer {
         if self.has_work() {
             return Err(VectorErr::WorkDelayed);
         }
-        // Synchronizing with readers and merger.
         let location = self.location();
-        let lock = fs_state::exclusive_lock(self.location())?;
-        self.state.update(location)?;
-
+        // Synchronizing with the merger.
+        let work_flag = self.work_flag.start_working();
+        self.update()?;
         let state = self.state.read();
-        let in_use_dp: HashSet<_> = state.inner.dpid_iter().collect();
+        let mut in_use_dp: HashSet<_> = state.inner.dpid_iter().collect();
+        // Loading the readers status
+        for reader_status in std::fs::read_dir(location.join(READERS_STATUS))? {
+            let entry = reader_status?;
+            let status_file = OpenOptions::new().read(true).open(entry.path())?;
+            status_file.lock_shared()?;
+            let mut status_buf = BufReader::new(&status_file);
+            let status: Vec<DpId> = serde_json::from_reader(&mut status_buf)?;
+            status_file.unlock()?;
+            status.into_iter().for_each(|i| {
+                in_use_dp.insert(i);
+            });
+        }
+
+        // Garbage is whatever is not in use
         for dir_entry in std::fs::read_dir(location)? {
             let entry = dir_entry?;
             let path = entry.path();
@@ -277,7 +353,7 @@ impl Writer {
                 warn!("{name} is garbage and could not be deleted because of {err}");
             }
         }
-        mem::drop(lock);
+        mem::drop(work_flag);
         Ok(())
     }
     pub fn commit(&mut self) -> VectorR<()> {
@@ -291,7 +367,7 @@ impl Writer {
         // Get the last version of the state, merges may have happen.
         // Is important to ensure that we are the only ones working on the
         // state.
-        self.state.update(location)?;
+        self.update()?;
 
         // Modifying the state with the current buffers
         let merge_work = self.state.apply(move |state: &mut InnerState| {
@@ -344,10 +420,17 @@ mod test {
         let dir = tempfile::tempdir()?;
         let metadata = IndexMetadata::default();
         let index = Index::new(dir.path(), metadata)?;
-        let _reader1 = index.reader()?;
-        let _reader2 = index.reader()?;
-        let _reader3 = index.reader()?;
-        let _reader4 = index.reader()?;
+        let readers_status = dir.path().join(READERS_STATUS);
+        {
+            let _reader1 = index.reader()?;
+            let _reader2 = index.reader()?;
+            let _reader3 = index.reader()?;
+            let _reader4 = index.reader()?;
+            let reader_count = std::fs::read_dir(&readers_status)?.count();
+            assert_eq!(reader_count, 4);
+        }
+        let reader_count = std::fs::read_dir(&readers_status)?.count();
+        assert_eq!(reader_count, 0);
         Ok(())
     }
     #[test]
@@ -377,6 +460,7 @@ mod test {
         let dir = tempfile::tempdir()?;
         let index = Index::new(dir.path(), IndexMetadata::default())?;
         let writer = index.writer()?;
+        let _reader = index.reader()?;
         let empty_no_entries = std::fs::read_dir(dir.path())?.count();
 
         for _ in 0..10 {

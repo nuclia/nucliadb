@@ -18,10 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fs::{File, OpenOptions};
-use std::io;
+use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::SystemTime;
 
 use fs2::FileExt;
@@ -40,7 +39,6 @@ pub enum FsError {
 }
 
 mod names {
-    pub const LOCK: &str = "lk.lock";
     pub const STATE: &str = "state.bincode";
     pub const TEMP: &str = "temp_state.bincode";
 }
@@ -52,16 +50,20 @@ fn write_state<S>(path: &Path, state: &S) -> FsResult<()>
 where S: Serialize {
     let temporal_path = path.join(names::TEMP);
     let state_path = path.join(names::STATE);
-    let mut file = BufWriter::new(
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&temporal_path)?,
-    );
-    bincode::serialize_into(&mut file, state)?;
-    file.flush()?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&temporal_path)?;
+
+    file.lock_exclusive()?;
+    let mut file_buf = BufWriter::new(&mut file);
+    bincode::serialize_into(&mut file_buf, state)?;
+    file_buf.flush()?;
     std::fs::rename(&temporal_path, state_path)?;
+    std::mem::drop(file_buf);
+    file.unlock()?;
+
     Ok(())
 }
 
@@ -70,9 +72,11 @@ where S: DeserializeOwned {
     let file = OpenOptions::new()
         .read(true)
         .open(path.join(names::STATE))?;
+    file.lock_shared()?;
     let modified = file.metadata()?.modified()?;
-    let mut buff = BufReader::new(file);
+    let mut buff = BufReader::new(&file);
     let state: S = bincode::deserialize_from(&mut buff)?;
+    file.unlock()?;
     Ok((Version(modified), state))
 }
 
@@ -84,20 +88,10 @@ where
     if !path.join(names::STATE).is_file() {
         write_state(path, &with())?;
     }
-    if !path.join(names::LOCK).is_file() {
-        Lock::open_lock(path)?;
-    }
     Ok(())
 }
 
-pub fn exclusive_lock(path: &Path) -> FsResult<ELock> {
-    Ok(ELock::new(path)?)
-}
-pub fn shared_lock(path: &Path) -> FsResult<SLock> {
-    Ok(SLock::new(path)?)
-}
-
-pub fn persist_state<S>(path: &Path, state: &S) -> FsResult<()>
+pub fn atomic_write<S>(path: &Path, state: &S) -> FsResult<()>
 where S: Serialize {
     write_state(path, state)
 }
@@ -109,111 +103,4 @@ where S: DeserializeOwned {
 pub fn crnt_version(path: &Path) -> FsResult<Version> {
     let meta = std::fs::metadata(path.join(names::STATE))?;
     Ok(Version(meta.modified()?))
-}
-
-/// A Lock that may be exclusive or shared
-/// Useful when the code would work in either case.
-pub struct Lock {
-    path: PathBuf,
-    #[allow(unused)]
-    lock: File,
-}
-impl Lock {
-    fn open_lock(path: &Path) -> io::Result<File> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(path.join(names::LOCK))?;
-        Ok(file)
-    }
-    fn exclusive(path: &Path) -> io::Result<Lock> {
-        let path = path.to_path_buf();
-        let lock = Lock::open_lock(&path)?;
-        lock.lock_exclusive()?;
-        Ok(Lock { lock, path })
-    }
-    fn shared(path: &Path) -> io::Result<Lock> {
-        let path = path.to_path_buf();
-        let lock = Lock::open_lock(&path)?;
-        lock.lock_shared()?;
-        Ok(Lock { lock, path })
-    }
-}
-impl AsRef<Path> for Lock {
-    fn as_ref(&self) -> &Path {
-        &self.path
-    }
-}
-
-/// A exclusive lock
-pub struct ELock(Lock);
-impl ELock {
-    pub(super) fn new(path: &Path) -> io::Result<ELock> {
-        Lock::exclusive(path).map(ELock)
-    }
-}
-impl std::ops::Deref for ELock {
-    type Target = Lock;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl AsRef<Path> for ELock {
-    fn as_ref(&self) -> &Path {
-        self.0.as_ref()
-    }
-}
-
-/// A shared lock
-pub struct SLock(Lock);
-impl SLock {
-    pub fn new(path: &Path) -> io::Result<SLock> {
-        Lock::shared(path).map(SLock)
-    }
-}
-impl std::ops::Deref for SLock {
-    type Target = Lock;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl AsRef<Path> for SLock {
-    fn as_ref(&self) -> &Path {
-        self.0.as_ref()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use tempfile::TempDir;
-
-    use super::*;
-
-    #[derive(Serialize, serde::Deserialize, Default)]
-    struct State {
-        n: usize,
-    }
-
-    #[test]
-    fn test() {
-        let dir = TempDir::new().unwrap();
-        initialize_disk(dir.path(), State::default).unwrap();
-        let lock_0 = shared_lock(dir.path()).unwrap();
-        let lock_1 = shared_lock(dir.path()).unwrap();
-        assert!(dir.path().join(names::LOCK).is_file());
-        std::mem::drop(lock_0);
-        std::mem::drop(lock_1);
-        let elock = exclusive_lock(dir.path()).unwrap();
-        std::mem::drop(elock);
-        assert!(dir.path().join(names::STATE).is_file());
-        let v0 = crnt_version(dir.path()).unwrap();
-        assert!(dir.path().join(names::STATE).is_file());
-        assert!(dir.path().join(names::LOCK).is_file());
-        assert_eq!(v0, crnt_version(dir.path()).unwrap());
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        write_state(dir.path(), &State::default()).unwrap();
-        let new_version = crnt_version(dir.path()).unwrap();
-        assert!(v0 < new_version);
-    }
 }
