@@ -33,6 +33,7 @@ from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import has_feature
 
 from .utils import DelayedTaskHandler
 
@@ -118,10 +119,21 @@ class IndexAuditHandler:
             total_fields += shard_counter.resources
             total_paragraphs += shard_counter.paragraphs
 
+            if has_feature(const.Features.AUDITING_BW_COMPAT_SHARD_COUNTER):
+                await self.audit.report(
+                    kbid=kbid,
+                    audit_type=audit_pb2.AuditRequest.AuditType.MODIFIED,
+                    counter=audit_pb2.AuditShardCounter(
+                        shard=shard_id,
+                        fields=shard_counter.resources,
+                        paragraphs=shard_counter.paragraphs,
+                    ),
+                )
+
         await self.audit.report(
             kbid=kbid,
             audit_type=audit_pb2.AuditRequest.AuditType.INDEXED,
-            counter=audit_pb2.AuditKBCounter(
+            kb_counter=audit_pb2.AuditKBCounter(
                 fields=total_fields, paragraphs=total_paragraphs
             ),
         )

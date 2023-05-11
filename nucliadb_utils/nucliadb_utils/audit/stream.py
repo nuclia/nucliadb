@@ -24,7 +24,12 @@ from typing import List, Optional
 import mmh3  # type: ignore
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
-from nucliadb_protos.audit_pb2 import AuditField, AuditKBCounter, AuditRequest
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditKBCounter,
+    AuditRequest,
+    AuditShardCounter,
+)
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from opentelemetry.trace import get_current_span
@@ -142,7 +147,8 @@ class StreamAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        counter: Optional[AuditKBCounter] = None,
+        counter: Optional[AuditShardCounter] = None,
+        kb_counter: Optional[AuditKBCounter] = None,
     ):
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
@@ -161,8 +167,11 @@ class StreamAuditStorage(AuditStorage):
         if audit_fields:
             auditrequest.fields_audit.extend(audit_fields)
 
+        if kb_counter:
+            auditrequest.kb_counter.CopyFrom(kb_counter)
+
         if counter:
-            auditrequest.kb_counter.CopyFrom(counter)
+            auditrequest.counter.CopyFrom(counter)
 
         auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
 

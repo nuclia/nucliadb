@@ -77,7 +77,7 @@ async def test_report(audit_storage: StreamAuditStorage, nats):
         kbid="kbid",
         audit_type=AuditRequest.AuditType.DELETED,
         audit_fields=[],
-        counter=AuditKBCounter(),
+        kb_counter=AuditKBCounter(),
     )
 
     await wait_for_queue(audit_storage)
