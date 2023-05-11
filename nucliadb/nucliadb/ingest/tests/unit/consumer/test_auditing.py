@@ -87,7 +87,7 @@ async def test_handle_message(
     audit.report.assert_called_with(
         kbid="kbid",
         audit_type=AuditRequest.AuditType.INDEXED,
-        counter=AuditKBCounter(fields=5, paragraphs=6),
+        kb_counter=AuditKBCounter(fields=5, paragraphs=6),
     )
 
 
