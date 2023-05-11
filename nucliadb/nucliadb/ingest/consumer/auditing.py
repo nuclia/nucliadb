@@ -35,6 +35,7 @@ from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import has_feature
 
+from . import metrics
 from .utils import DelayedTaskHandler
 
 logger = logging.getLogger(__name__)
@@ -92,12 +93,15 @@ class IndexAuditHandler:
 
         if notification.action != writer_pb2.Notification.Action.INDEXED:
             # not a notification we care about
+            metrics.total_messages.inc({"action": "ignored", "type": "audit_counter"})
             return
 
         self.task_handler.schedule(
             notification.kbid, partial(self.process_kb, notification.kbid)
         )
+        metrics.total_messages.inc({"action": "scheduled", "type": "audit_counter"})
 
+    @metrics.handler_histo.wrap({"type": "audit_counter"})
     async def process_kb(self, kbid: str) -> None:
         try:
             shard_groups: list[
@@ -290,19 +294,22 @@ class ResourceWritesAuditHandler:
         notification.ParseFromString(data)
 
         if notification.write_type == notification.WriteType.UNSET:
+            metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
             return
 
-        message = notification.message
-        audit_fields = await self.collect_audit_fields(message)
-        field_metadata = [fi.field for fi in message.field_metadata]
+        metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
+        with metrics.handler_histo.wrap({"type": "audit_fields"}):
+            message = notification.message
+            audit_fields = await self.collect_audit_fields(message)
+            field_metadata = [fi.field for fi in message.field_metadata]
 
-        await self.audit.report(
-            kbid=message.kbid,
-            when=message.audit.when,
-            user=message.audit.user,
-            rid=message.uuid,
-            origin=message.audit.origin,
-            field_metadata=field_metadata,
-            audit_type=AUDIT_TYPES.get(notification.write_type),
-            audit_fields=audit_fields,
-        )
+            await self.audit.report(
+                kbid=message.kbid,
+                when=message.audit.when,
+                user=message.audit.user,
+                rid=message.uuid,
+                origin=message.audit.origin,
+                field_metadata=field_metadata,
+                audit_type=AUDIT_TYPES.get(notification.write_type),
+                audit_fields=audit_fields,
+            )

@@ -32,6 +32,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
 
+from . import metrics
 from .utils import DelayedTaskHandler
 
 logger = logging.getLogger(__name__)
@@ -79,12 +80,15 @@ class ShardCreatorHandler:
         notification.ParseFromString(data)
 
         if notification.action != writer_pb2.Notification.Action.INDEXED:
+            metrics.total_messages.inc({"type": "shard_creator", "action": "ignored"})
             return
 
         self.task_handler.schedule(
             notification.kbid, partial(self.process_kb, notification.kbid)
         )
+        metrics.total_messages.inc({"type": "shard_creator", "action": "scheduled"})
 
+    @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
         kb_shards = await self.node_manager.get_shards_by_kbid_inner(kbid)
         current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
