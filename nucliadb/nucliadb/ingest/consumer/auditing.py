@@ -124,7 +124,7 @@ class IndexAuditHandler:
                     kbid=kbid,
                     audit_type=audit_pb2.AuditRequest.AuditType.MODIFIED,
                     counter=audit_pb2.AuditShardCounter(
-                        shard=shard_id,
+                        shard=shard_obj.shard,
                         fields=shard_counter.resources,
                         paragraphs=shard_counter.paragraphs,
                     ),
