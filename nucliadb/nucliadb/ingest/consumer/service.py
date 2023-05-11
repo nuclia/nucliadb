@@ -30,8 +30,6 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import running_settings, transaction_settings
-from nucliadb_utils.utilities import get_audit, get_cache, get_nats_manager, get_storage
-from nucliadb_utils.settings import running_settings, transaction_settings
 from nucliadb_utils.utilities import (
     get_audit,
     get_cache,
