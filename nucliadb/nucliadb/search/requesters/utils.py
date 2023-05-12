@@ -21,6 +21,7 @@ import asyncio
 from enum import Enum
 from typing import Any, List, Optional, Tuple, TypeVar, Union, overload
 
+import backoff
 from fastapi import HTTPException
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -36,6 +37,7 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
@@ -77,7 +79,7 @@ T = TypeVar(
 )
 
 
-@overload
+@overload  # type: ignore
 async def node_query(
     kbid: str,
     method: Method,
@@ -117,6 +119,12 @@ async def node_query(
     ...
 
 
+class RetriableNodeQueryException(Exception):
+    pass
+
+
+# overload does not play nice with backoff
+@backoff.on_exception(backoff.expo, (RetriableNodeQueryException,), max_tries=3)  # type: ignore
 async def node_query(
     kbid: str,
     method: Method,
@@ -137,6 +145,7 @@ async def node_query(
     queried_shards = []
     queried_nodes = []
     incomplete_results = False
+    used_nodes = []
 
     for shard_obj in shard_groups:
         try:
@@ -151,6 +160,7 @@ async def node_query(
                 ops.append(func(node, shard_id, pb_query))  # type: ignore
                 queried_nodes.append((node.label, shard_id, node_id))
                 queried_shards.append(shard_id)
+                used_nodes.append(node)
 
     if not ops:
         await abort_transaction()
@@ -168,7 +178,7 @@ async def node_query(
     except asyncio.TimeoutError as exc:
         results = [exc]
 
-    error = validate_node_query_results(results or [])
+    error = validate_node_query_results(results or [], used_nodes)
     if error is not None:
         await abort_transaction()
         raise error
@@ -176,7 +186,9 @@ async def node_query(
     return results, incomplete_results, queried_nodes, queried_shards
 
 
-def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
+def validate_node_query_results(
+    results: list[Any], used_nodes: list[Node]
+) -> Optional[HTTPException]:
     """
     Validate the results of a node query and return an exception if any error is found
 
@@ -187,16 +199,32 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             status_code=500, detail=f"Error while executing shard queries. No results."
         )
 
-    for result in results:
+    for i, result in enumerate(results):
         if isinstance(result, Exception):
             status_code = 500
             reason = "Error while querying shard data."
             if isinstance(result, AioRpcError):
                 if result.code() is GrpcStatusCode.UNAVAILABLE:
-                    logger.warning(
-                        f"GRPC error while querying shard data: {result.debug_error_string()}"
-                    )
-                    status_code = 503
+                    if len(results) == len(used_nodes):
+                        # only reset connection of detected failure
+                        logger.warning(
+                            "GRPC connection failure detected, resetting connection"
+                        )
+                        used_nodes[i].reset_connections()
+                    else:
+                        logger.warning(
+                            "GRPC connection failure detected with incomplete results, resetting all connections"
+                        )
+                        # for some reason result set isn't the same, reset all connections
+                        for node in used_nodes:
+                            node.reset_connections()
+                    # Enable retries on errors here
+                    # XXX this is somewhat a workaround and we should consider
+                    # a better GRPC interface to work with everywhere longer term
+                    # that would enable some automatically retry handling for us
+                    # and stale connection handling but right now, all
+                    # our node allows us to directly interact with stub/connections
+                    raise RetriableNodeQueryException()
                 elif result.code() is GrpcStatusCode.INTERNAL:
                     # handle node response errors
                     if "AllButQueryForbidden" in result.details():
