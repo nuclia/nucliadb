@@ -51,13 +51,21 @@ async def test_tikv_instrumentation(
 
     expected_calls = [
         call(name="myspan"),
-        call(name="begin", attributes={"db.system": "tikv", "db.operation": "begin"}),
-        call(name="put", attributes={"db.system": "tikv", "db.operation": "put"}),
-        call(name="put", attributes={"db.system": "tikv", "db.operation": "put"}),
-        call(name="get", attributes={"db.system": "tikv", "db.operation": "get"}),
+        call(
+            name="TiKV begin", attributes={"db.system": "tikv", "db.operation": "begin"}
+        ),
+        call(name="TiKV put", attributes={"db.system": "tikv", "db.operation": "put"}),
+        call(name="TiKV put", attributes={"db.system": "tikv", "db.operation": "put"}),
+        call(name="TiKV get", attributes={"db.system": "tikv", "db.operation": "get"}),
         call(name="nested"),
-        call(name="delete", attributes={"db.system": "tikv", "db.operation": "delete"}),
-        call(name="commit", attributes={"db.system": "tikv", "db.operation": "commit"}),
+        call(
+            name="TiKV delete",
+            attributes={"db.system": "tikv", "db.operation": "delete"},
+        ),
+        call(
+            name="TiKV commit",
+            attributes={"db.system": "tikv", "db.operation": "commit"},
+        ),
     ]
 
     for i, mocked in enumerate(tracer.start_as_current_span.call_args_list):  # type: ignore[attr-defined]
