@@ -229,74 +229,66 @@ class Node(AbstractNode):
             grpc_address = f"{hostname}:{port}"
         return grpc_address
 
+    def reset_connections(self) -> None:
+        if self.address in SIDECAR_CONNECTIONS:
+            del SIDECAR_CONNECTIONS[self.address]
+        self._sidecar = None
+
+        if self.address in WRITE_CONNECTIONS:
+            del WRITE_CONNECTIONS[self.address]
+        self._writer = None
+
+        if self.address in READ_CONNECTIONS:
+            del READ_CONNECTIONS[self.address]
+        self._reader = None
+
     @property
     def sidecar(self) -> NodeSidecarStub:
-        if (
-            self._sidecar is None
-            and self.address not in SIDECAR_CONNECTIONS
-            and self.dummy is False
-        ):
-            grpc_address = self._get_service_address(
-                settings.sidecar_port_map, settings.node_sidecar_port
-            )
-            channel = get_traced_grpc_channel(
-                grpc_address, SERVICE_NAME, variant="_sidecar"
-            )
-            SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)
-        if (
-            self._sidecar is None
-            and self.address not in SIDECAR_CONNECTIONS
-            and self.dummy is True
-        ):
-            SIDECAR_CONNECTIONS[self.address] = DummySidecarStub()
+        if self._sidecar is None and self.address not in SIDECAR_CONNECTIONS:
+            if not self.dummy:
+                grpc_address = self._get_service_address(
+                    settings.sidecar_port_map, settings.node_sidecar_port
+                )
+                channel = get_traced_grpc_channel(
+                    grpc_address, SERVICE_NAME, variant="_sidecar"
+                )
+                SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)
+            else:
+                SIDECAR_CONNECTIONS[self.address] = DummySidecarStub()
         if self._sidecar is None:
             self._sidecar = SIDECAR_CONNECTIONS[self.address]
         return self._sidecar
 
     @property
     def writer(self) -> NodeWriterStub:
-        if (
-            self._writer is None
-            and self.address not in WRITE_CONNECTIONS
-            and self.dummy is False
-        ):
-            grpc_address = self._get_service_address(
-                settings.writer_port_map, settings.node_writer_port
-            )
-            channel = get_traced_grpc_channel(
-                grpc_address, SERVICE_NAME, variant="_writer"
-            )
-            WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
-        if (
-            self._writer is None
-            and self.address not in WRITE_CONNECTIONS
-            and self.dummy is True
-        ):
-            WRITE_CONNECTIONS[self.address] = DummyWriterStub()
+        if self._writer is None and self.address not in WRITE_CONNECTIONS:
+            if not self.dummy:
+                grpc_address = self._get_service_address(
+                    settings.writer_port_map, settings.node_writer_port
+                )
+                channel = get_traced_grpc_channel(
+                    grpc_address, SERVICE_NAME, variant="_writer"
+                )
+                WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
+            else:
+                WRITE_CONNECTIONS[self.address] = DummyWriterStub()
         if self._writer is None:
             self._writer = WRITE_CONNECTIONS[self.address]
         return self._writer
 
     @property
     def reader(self) -> NodeReaderStub:
-        if (
-            self._reader is None
-            and self.address not in READ_CONNECTIONS
-            and self.dummy is False
-        ):
-            grpc_address = self._get_service_address(
-                settings.reader_port_map, settings.node_reader_port
-            )
-            channel = get_traced_grpc_channel(
-                grpc_address, SERVICE_NAME, variant="_reader"
-            )
-            READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
-        if (
-            self._reader is None
-            and self.address not in READ_CONNECTIONS
-            and self.dummy is True
-        ):
-            READ_CONNECTIONS[self.address] = DummyReaderStub()
+        if self._reader is None and self.address not in READ_CONNECTIONS:
+            if not self.dummy:
+                grpc_address = self._get_service_address(
+                    settings.reader_port_map, settings.node_reader_port
+                )
+                channel = get_traced_grpc_channel(
+                    grpc_address, SERVICE_NAME, variant="_reader"
+                )
+                READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
+            else:
+                READ_CONNECTIONS[self.address] = DummyReaderStub()
         if self._reader is None:
             self._reader = READ_CONNECTIONS[self.address]
         return self._reader

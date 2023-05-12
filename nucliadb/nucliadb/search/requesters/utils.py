@@ -20,8 +20,9 @@
 import asyncio
 from enum import Enum
 from typing import Any, List, Optional, Tuple, TypeVar, Union, overload
-
+import backoff
 from fastapi import HTTPException
+from nucliadb.ingest.orm.node import Node
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import (
@@ -117,6 +118,11 @@ async def node_query(
     ...
 
 
+class RetriableNodeQueryException(Exception):
+    pass
+
+
+@backoff.on_exception(backoff.expo, (RetriableNodeQueryException,), max_tries=2)
 async def node_query(
     kbid: str,
     method: Method,
@@ -137,6 +143,7 @@ async def node_query(
     queried_shards = []
     queried_nodes = []
     incomplete_results = False
+    used_nodes = []
 
     for shard_obj in shard_groups:
         try:
@@ -151,6 +158,7 @@ async def node_query(
                 ops.append(func(node, shard_id, pb_query))  # type: ignore
                 queried_nodes.append((node.label, shard_id, node_id))
                 queried_shards.append(shard_id)
+                used_nodes.append(node)
 
     if not ops:
         await abort_transaction()
@@ -168,7 +176,7 @@ async def node_query(
     except asyncio.TimeoutError as exc:
         results = [exc]
 
-    error = validate_node_query_results(results or [])
+    error = validate_node_query_results(results or [], used_nodes)
     if error is not None:
         await abort_transaction()
         raise error
@@ -176,7 +184,9 @@ async def node_query(
     return results, incomplete_results, queried_nodes, queried_shards
 
 
-def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
+def validate_node_query_results(
+    results: list[Any], used_nodes: list[Node]
+) -> Optional[HTTPException]:
     """
     Validate the results of a node query and return an exception if any error is found
 
@@ -196,7 +206,9 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
                     logger.warning(
                         f"GRPC error while querying shard data: {result.debug_error_string()}"
                     )
-                    status_code = 503
+                    for node in used_nodes:
+                        node.reset_connections()
+                    raise RetriableNodeQueryException()
                 elif result.code() is GrpcStatusCode.INTERNAL:
                     # handle node response errors
                     if "AllButQueryForbidden" in result.details():
