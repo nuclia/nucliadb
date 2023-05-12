@@ -4,14 +4,15 @@ services:
   nucliadb:
     image: nuclia/nucliadb:latest
     environment:
-      #- NUA_API_KEY=
+      # - NUA_API_KEY=
       - NUCLIA_ZONE=europe-1
       - CORS_ORIGINS=["http://localhost:8080"]
       - DRIVER=PG
       - DRIVER_PG_URL=postgres://nucliadb:nucliadb@postgres:5432/nucliadb
-      - auth_policy=upstream_auth_header
-      - auth_policy_user_header=X-Forwarded-User
-      - auth_policy_user_deafult_roles=["READER", "WRITER"]
+      - auth_policy=upstream_oauth2
+      # - auth_policy=upstream_auth_header
+      # - auth_policy_user_header=X-Forwarded-User
+      - auth_policy_user_deafult_roles=["MANAGER","READER", "WRITER"]
       - DATA_PATH=/data
       - HTTP_PORT=8080
       - INGEST_GRPC_PORT=8060
@@ -62,6 +63,7 @@ services:
       - OAUTH2_PROXY_COOKIE_SECRET=vLevdGju4C766R8KypPJZ806co4-kwNS9qMuPxLXqls=
       - OAUTH2_PROXY_EMAIL_DOMAINS=nuclia.com
       - OAUTH2_PROXY_PASS_USER_HEADERS=true
+      - OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER=true
     depends_on:
       - postgres
       - redis
