@@ -151,8 +151,7 @@ class JetStreamContextTelemetry:
             try:
                 result = await self.js.publish(subject, body, headers=headers, **kwargs)
             except Exception as error:
-                if type(error) != Exception:
-                    set_span_exception(span, error)
+                set_span_exception(span, error)
                 raise error
 
         return result
@@ -245,8 +244,7 @@ class NatsClientTelemetry:
             try:
                 result = await self.nc.publish(subject, body, headers=headers, **kwargs)
             except Exception as error:
-                if type(error) != Exception:
-                    set_span_exception(span, error)
+                set_span_exception(span, error)
                 raise error
 
         return result
@@ -268,8 +266,7 @@ class NatsClientTelemetry:
                     subject, payload, timeout, old_style, headers  # type: ignore
                 )
             except Exception as error:
-                if type(error) != Exception:
-                    set_span_exception(span, error)
+                set_span_exception(span, error)
                 raise error
 
         return result

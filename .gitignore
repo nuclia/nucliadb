@@ -96,5 +96,4 @@ benchmarks.json
 
 
 # debugging
-tikv.py
 nucliadb-user.creds
