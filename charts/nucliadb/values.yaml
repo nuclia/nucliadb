@@ -8,6 +8,7 @@ imageVersion: latest
 # app settings
 env:
   NUCLIA_ZONE: "europe1"
+  CORS_ORIGINS: '["http://localhost:8080"]'
   #NUA_API_KEY: "..."
 
 affinity: {}

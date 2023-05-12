@@ -1,17 +1,17 @@
 name: nucliadb One (py)
 env:
   API_VERSION: 1
-  COMPONENT: nucliadb-one
+  COMPONENT: nucliadb-standalone
 on:
   pull_request:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_one.yml"
+      - ".github/workflows/nucliadb_standalone.yml"
       - "charts/nucliadb/**"
       - "nucliadb/nucliadb/ingest/**"
       - "nucliadb/nucliadb/writer/**"
-      - "nucliadb/nucliadb/one/**"
+      - "nucliadb/nucliadb/standalone/**"
       - "nucliadb/nucliadb/reader/**"
       - "nucliadb/nucliadb/search/**"
       - "nucliadb_models/**"
@@ -20,11 +20,11 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_one.yml"
+      - ".github/workflows/nucliadb_standalone.yml"
       - "charts/nucliadb/**"
       - "nucliadb/nucliadb/ingest/**"
       - "nucliadb/nucliadb/writer/**"
-      - "nucliadb/nucliadb/one/**"
+      - "nucliadb/nucliadb/standalone/**"
       - "nucliadb/nucliadb/reader/**"
       - "nucliadb/nucliadb/search/**"
       - "nucliadb_models/**"
@@ -51,7 +51,7 @@ jobs:
         run: make -C nucliadb/ install-dev
 
       - name: Run pre-checks
-        run: make -C nucliadb/ lint-one
+        run: make -C nucliadb/ lint-standalone
 
   # Job to run tests
   tests:
@@ -122,10 +122,10 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb.one -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/one
+          pytest -rfE --cov=nucliadb.standalone -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/standalone
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
-          flags: one
+          flags: standalone
