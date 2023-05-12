@@ -39,8 +39,9 @@ def _instrument(
             SpanAttributes.DB_SYSTEM: "tikv",
             SpanAttributes.DB_OPERATION: operation,
         }
+        span_name = f"TiKV {operation}"
         with tracer.start_as_current_span(
-            name=operation,
+            name=span_name,
             kind=SpanKind.CLIENT,
             attributes=attributes,
         ) as span:
