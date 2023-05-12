@@ -22,6 +22,7 @@ from typing import Awaitable, Callable, Optional
 
 import pkg_resources
 
+from nucliadb import health
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.ingest.consumer import service as consumer_service
@@ -95,61 +96,59 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         await start_chitchat(SERVICE_NAME)
         finalizers.append(stop_chitchat)
 
+    health.register_health_checks(
+        [health.nats_manager_healthy, health.nodes_health_check, health.pubsub_check]
+    )
+
     return finalizers
 
 
-async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
+async def initialize_grpc():  # pragma: no cover
     finalizers = await initialize()
-
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
-    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
-
-    return [grpc_finalizer, pull_workers] + finalizers
-
-
-async def initialize_grpc() -> list[Callable[[], Awaitable[None]]]:
-    finalizers = await initialize()
-
     grpc_finalizer = await start_grpc(SERVICE_NAME)
 
     return [grpc_finalizer] + finalizers
+
+
+async def initialize_pull_workers() -> list[Callable[[], Awaitable[None]]]:
+    finalizers = await initialize_grpc()
+    pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
+
+    return [pull_workers] + finalizers
 
 
 async def main_consumer():  # pragma: no cover
     finalizers = await initialize()
     metrics_server = await serve_metrics()
 
-    # grpc service here for legacy but can be removed
-    # useful part is the health check
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
+    grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
 
     # pull workers could be pulled out into it's own deployment
     pull_workers = await consumer_service.start_pull_workers(SERVICE_NAME)
     ingest_consumers = await consumer_service.start_ingest_consumers(SERVICE_NAME)
 
     await run_until_exit(
-        [grpc_finalizer, pull_workers, ingest_consumers, metrics_server.shutdown]
+        [grpc_health_finalizer, pull_workers, ingest_consumers, metrics_server.shutdown]
         + finalizers
     )
 
 
 async def main_orm_grpc():  # pragma: no cover
-    finalizers = await initialize_grpc()
+    finalizers = await initialize()
+    grpc_finalizer = await start_grpc(SERVICE_NAME)
     metrics_server = await serve_metrics()
-    await run_until_exit([metrics_server.shutdown] + finalizers)
+    await run_until_exit([grpc_finalizer, metrics_server.shutdown] + finalizers)
 
 
 async def main_ingest_processed_consumer():  # pragma: no cover
     finalizers = await initialize()
 
     metrics_server = await serve_metrics()
-
-    # grpc service here for legacy but can be removed(sans health check)
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
+    grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
 
     await run_until_exit(
-        [grpc_finalizer, consumer, metrics_server.shutdown] + finalizers
+        [grpc_health_finalizer, consumer, metrics_server.shutdown] + finalizers
     )
 
 
@@ -157,14 +156,17 @@ async def main_subscriber_workers():  # pragma: no cover
     finalizers = await initialize()
 
     metrics_server = await serve_metrics()
-    # required for the health check
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
-
+    grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     auditor_closer = await consumer_service.start_auditor()
     shard_creator_closer = await consumer_service.start_shard_creator()
 
     await run_until_exit(
-        [auditor_closer, shard_creator_closer, metrics_server.shutdown, grpc_finalizer]
+        [
+            auditor_closer,
+            shard_creator_closer,
+            metrics_server.shutdown,
+            grpc_health_finalizer,
+        ]
         + finalizers
     )
 
@@ -182,7 +184,9 @@ def setup_configuration():  # pragma: no cover
 
 def run_consumer() -> None:  # pragma: no cover
     """
-    Run the consumer + GRPC ingest service
+    Running:
+        - main consumer
+        - pull worker
     """
     setup_configuration()
     asyncio.run(main_consumer())
@@ -190,7 +194,8 @@ def run_consumer() -> None:  # pragma: no cover
 
 def run_orm_grpc() -> None:  # pragma: no cover
     """
-    Run the ingest GRPC service
+    Runs:
+        - Ingest GRPC Service
     """
     setup_configuration()
     asyncio.run(main_orm_grpc())
@@ -198,7 +203,8 @@ def run_orm_grpc() -> None:  # pragma: no cover
 
 def run_processed_consumer() -> None:  # pragma: no cover
     """
-    Run the consumer + GRPC ingest service
+    Runs:
+        - Consumer for processed messages from pull processor(CPU heavy)
     """
     setup_configuration()
     asyncio.run(main_ingest_processed_consumer())
@@ -206,7 +212,10 @@ def run_processed_consumer() -> None:  # pragma: no cover
 
 def run_subscriber_workers() -> None:  # pragma: no cover
     """
-    Run the consumer + GRPC ingest service
+    Runs:
+        - shard creator subscriber
+        - audit counter subscriber
+        - audit fields subscriber
     """
     setup_configuration()
     asyncio.run(main_subscriber_workers())

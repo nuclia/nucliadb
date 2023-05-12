@@ -18,27 +18,40 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from grpc_health.v1 import health_pb2
 
-from nucliadb.ingest import service
+from nucliadb import health
+from nucliadb.ingest import orm
+from nucliadb.ingest.settings import DriverConfig, settings
 
 pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture(autouse=True)
+def register_checks():
+    health.register_health_checks(
+        [health.nats_manager_healthy, health.nodes_health_check, health.pubsub_check]
+    )
+    yield
+    health.unregister_all_checks()
+
+
+@pytest.fixture(autouse=True)
 def nats_manager():
     mock = MagicMock()
-    with patch("nucliadb.ingest.service.get_nats_manager", return_value=mock):
+    with patch("nucliadb.health.get_nats_manager", return_value=mock):
         yield mock
 
 
-async def test_health_check():
-    servicer = MagicMock()
-    with patch.object(service, "NODES", {"node1": "node1"}):
-        task = asyncio.create_task(service.health_check(servicer))
+async def test_grpc_health_check():
+    servicer = AsyncMock()
+    with patch.object(orm, "NODES", {"node1": "node1"}), patch.object(
+        settings, "driver", DriverConfig.PG
+    ):
+        task = asyncio.create_task(health.grpc_health_check(servicer))
         await asyncio.sleep(0.05)
 
         servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.SERVING)
@@ -47,9 +60,11 @@ async def test_health_check():
 
 
 async def test_health_check_fail():
-    servicer = MagicMock()
-    with patch.object(service, "NODES", {}):
-        task = asyncio.create_task(service.health_check(servicer))
+    servicer = AsyncMock()
+    with patch.object(orm, "NODES", {}), patch.object(
+        settings, "driver", DriverConfig.PG
+    ):
+        task = asyncio.create_task(health.grpc_health_check(servicer))
         await asyncio.sleep(0.05)
 
         servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
@@ -59,9 +74,9 @@ async def test_health_check_fail():
 
 async def test_health_check_fail_unhealthy_nats(nats_manager):
     nats_manager.healthy.return_value = False
-    servicer = MagicMock()
-    with patch.object(service, "NODES", {"node1": "node1"}):  # has nodes
-        task = asyncio.create_task(service.health_check(servicer))
+    servicer = AsyncMock()
+    with patch.object(orm, "NODES", {"node1": "node1"}):  # has nodes
+        task = asyncio.create_task(health.grpc_health_check(servicer))
         await asyncio.sleep(0.05)
 
         servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)

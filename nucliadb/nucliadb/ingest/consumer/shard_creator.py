@@ -32,6 +32,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
 
+from . import metrics
 from .utils import DelayedTaskHandler
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ class ShardCreatorHandler:
         driver: Driver,
         storage: Storage,
         pubsub: PubSubDriver,
-        check_delay: float = 10.0
+        check_delay: float = 10.0,
     ):
         self.driver = driver
         self.storage = storage
@@ -79,13 +80,17 @@ class ShardCreatorHandler:
         notification.ParseFromString(data)
 
         if notification.action != writer_pb2.Notification.Action.INDEXED:
+            metrics.total_messages.inc({"type": "shard_creator", "action": "ignored"})
             return
 
         self.task_handler.schedule(
             notification.kbid, partial(self.process_kb, notification.kbid)
         )
+        metrics.total_messages.inc({"type": "shard_creator", "action": "scheduled"})
 
+    @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
+        logger.info({"message": "Processing notification for kbid", "kbid": kbid})
         kb_shards = await self.node_manager.get_shards_by_kbid_inner(kbid)
         current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
 
@@ -96,6 +101,7 @@ class ShardCreatorHandler:
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
         if shard_counter.resources > settings.max_shard_fields:
+            logger.warning({"message": "Adding shard", "kbid": kbid})
             async with self.driver.transaction() as txn:
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 similarity = await kb.get_similarity()
