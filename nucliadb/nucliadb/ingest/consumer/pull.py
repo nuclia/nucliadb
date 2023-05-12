@@ -99,7 +99,6 @@ class PullWorker:
         """
         Run this forever
         """
-
         while True:
             try:
                 await self._loop()
