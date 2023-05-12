@@ -122,13 +122,7 @@ class RetriableNodeQueryException(Exception):
     pass
 
 
-@backoff.on_exception(
-    backoff.constant,
-    (RetriableNodeQueryException,),
-    interval=1,
-    max_tries=3,
-    jitter=backoff.random_jitter,
-)
+@backoff.on_exception(backoff.expo, (RetriableNodeQueryException,), max_tries=3)
 async def node_query(
     kbid: str,
     method: Method,
