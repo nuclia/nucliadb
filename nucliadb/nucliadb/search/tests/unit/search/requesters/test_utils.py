@@ -41,7 +41,9 @@ def test_validate_node_query_results_unhandled_error():
     assert isinstance(error, HTTPException)
 
 
-def test_validate_node_query_results_unavailable():
+def test_validate_node_query_results_unavailable_reset_conns():
+    # if result len match used nodes len, just reset the connection
+    # from the used node
     node = MagicMock()
     with pytest.raises(utils.RetriableNodeQueryException):
         utils.validate_node_query_results(
@@ -58,6 +60,27 @@ def test_validate_node_query_results_unavailable():
         )
 
     node.reset_connections.assert_called_once()
+
+
+def test_validate_node_query_results_unavailable_reset_all_node_conns():
+    node1 = MagicMock()
+    node2 = MagicMock()
+    with pytest.raises(utils.RetriableNodeQueryException):
+        utils.validate_node_query_results(
+            [
+                AioRpcError(
+                    code=StatusCode.UNAVAILABLE,
+                    initial_metadata=Mock(),
+                    trailing_metadata=Mock(),
+                    details="",
+                    debug_error_string="",
+                )
+            ],
+            [node1, node2],
+        )
+
+    node1.reset_connections.assert_called_once()
+    node2.reset_connections.assert_called_once()
 
 
 def test_validate_node_query_results_invalid_query():

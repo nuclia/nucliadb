@@ -198,7 +198,7 @@ def validate_node_query_results(
             status_code=500, detail=f"Error while executing shard queries. No results."
         )
 
-    for result in results:
+    for i, result in enumerate(results):
         if isinstance(result, Exception):
             status_code = 500
             reason = "Error while querying shard data."
@@ -207,8 +207,13 @@ def validate_node_query_results(
                     logger.warning(
                         f"GRPC error while querying shard data: {result.debug_error_string()}"
                     )
-                    for node in used_nodes:
-                        node.reset_connections()
+                    if len(results) == len(used_nodes):
+                        # only reset connection of detected failure
+                        used_nodes[i].reset_connections()
+                    else:
+                        # for some reason result set isn't the same, reset all connections
+                        for node in used_nodes:
+                            node.reset_connections()
                     raise RetriableNodeQueryException()
                 elif result.code() is GrpcStatusCode.INTERNAL:
                     # handle node response errors
