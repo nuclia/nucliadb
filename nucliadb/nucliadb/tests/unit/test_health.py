@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from grpc_health.v1 import health_pb2
 
 from nucliadb import health
 from nucliadb.ingest import orm
+from nucliadb.ingest.settings import DriverConfig, settings
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,8 +47,10 @@ def nats_manager():
 
 
 async def test_grpc_health_check():
-    servicer = MagicMock()
-    with patch.object(orm, "NODES", {"node1": "node1"}):
+    servicer = AsyncMock()
+    with patch.object(orm, "NODES", {"node1": "node1"}), patch.object(
+        settings, "driver", DriverConfig.PG
+    ):
         task = asyncio.create_task(health.grpc_health_check(servicer))
         await asyncio.sleep(0.05)
 
@@ -57,10 +60,12 @@ async def test_grpc_health_check():
 
 
 async def test_health_check_fail():
-    servicer = MagicMock()
-    with patch.object(orm, "NODES", {}):
+    servicer = AsyncMock()
+    with patch.object(orm, "NODES", {}), patch.object(
+        settings, "driver", DriverConfig.PG
+    ):
         task = asyncio.create_task(health.grpc_health_check(servicer))
-        await asyncio.sleep(0.07)
+        await asyncio.sleep(0.05)
 
         servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
 
@@ -69,7 +74,7 @@ async def test_health_check_fail():
 
 async def test_health_check_fail_unhealthy_nats(nats_manager):
     nats_manager.healthy.return_value = False
-    servicer = MagicMock()
+    servicer = AsyncMock()
     with patch.object(orm, "NODES", {"node1": "node1"}):  # has nodes
         task = asyncio.create_task(health.grpc_health_check(servicer))
         await asyncio.sleep(0.05)

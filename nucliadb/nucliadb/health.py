@@ -58,7 +58,10 @@ def pubsub_check() -> bool:
 
 
 def register_health_checks(checks: list[Callable[[], bool]]) -> None:
-    _health_checks.extend(checks)
+    for check in checks:
+        if check in _health_checks:
+            continue
+        _health_checks.append(check)
 
 
 def unregister_health_check(check: Callable[[], bool]) -> None:
