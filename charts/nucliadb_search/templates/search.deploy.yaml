@@ -59,12 +59,18 @@ spec:
           httpGet:
             path: /health/ready
             port: {{ .Values.serving.port }}
-          initialDelaySeconds: 20
+          initialDelaySeconds: 2
           timeoutSeconds: 10
-          periodSeconds: 20
+          periodSeconds: 10
         command: [
           "nucliadb-search"
         ]
+        lifecycle:
+          preStop:
+            exec:
+              # in order to avoid latent load balancer routing/update issues, arbitrarily throw
+              # some delay in the shutdown process
+              command: ["sleep", "15"]
         envFrom:
         - configMapRef:
             name: nucliadb-config
