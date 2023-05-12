@@ -79,7 +79,7 @@ T = TypeVar(
 )
 
 
-@overload
+@overload  # type: ignore
 async def node_query(
     kbid: str,
     method: Method,
@@ -123,7 +123,8 @@ class RetriableNodeQueryException(Exception):
     pass
 
 
-@backoff.on_exception(backoff.expo, (RetriableNodeQueryException,), max_tries=3)
+# overload does not play nice with backoff
+@backoff.on_exception(backoff.expo, (RetriableNodeQueryException,), max_tries=3)  # type: ignore
 async def node_query(
     kbid: str,
     method: Method,
