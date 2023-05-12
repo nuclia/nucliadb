@@ -111,6 +111,8 @@ class IndexAuditHandler:
             logger.warning(f"No shards found for kbid {kbid}, skipping")
             return
 
+        logger.info({"message": "Processing counter audit for kbid", "kbid": kbid})
+
         total_fields = 0
         total_paragraphs = 0
 
@@ -297,8 +299,12 @@ class ResourceWritesAuditHandler:
             metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
             return
 
+        logger.info(
+            {"message": "Processing field audit for kbid", "kbid": notification.kbid}
+        )
+
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
-        with metrics.handler_histo.wrap({"type": "audit_fields"}):
+        with metrics.handler_histo({"type": "audit_fields"}):
             message = notification.message
             audit_fields = await self.collect_audit_fields(message)
             field_metadata = [fi.field for fi in message.field_metadata]
