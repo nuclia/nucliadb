@@ -78,7 +78,6 @@ def run():
 
 async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
     _, server = get_server(settings)
-    server.run()
     await server.startup()
     return server
 
