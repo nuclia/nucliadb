@@ -17,9 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_telemetry import metrics
-
-total_messages = metrics.Counter(
-    "nucliadb_subscriber_messages", labels={"type": "", "action": "scheduled"}
-)
-handler_histo = metrics.Observer("nucliadb_subscriber_handler", labels={"type": ""})
