@@ -20,9 +20,9 @@
 import asyncio
 from enum import Enum
 from typing import Any, List, Optional, Tuple, TypeVar, Union, overload
+
 import backoff
 from fastapi import HTTPException
-from nucliadb.ingest.orm.node import Node
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import (
@@ -37,6 +37,7 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
