@@ -210,11 +210,23 @@ def validate_node_query_results(
                     )
                     if len(results) == len(used_nodes):
                         # only reset connection of detected failure
+                        logger.warning(
+                            "GRPC connection failure detected, resetting connection"
+                        )
                         used_nodes[i].reset_connections()
                     else:
+                        logger.warning(
+                            "GRPC connection failure detected with incomplete results, resetting all connections"
+                        )
                         # for some reason result set isn't the same, reset all connections
                         for node in used_nodes:
                             node.reset_connections()
+                    # Enable retries on errors here
+                    # XXX this is somewhat a workaround and we should consider
+                    # a better GRPC interface to work with everywhere longer term
+                    # that would enable some automatically retry handling for us
+                    # and stale connection handling but right now, all
+                    # our node allows us to directly interact with stub/connections
                     raise RetriableNodeQueryException()
                 elif result.code() is GrpcStatusCode.INTERNAL:
                     # handle node response errors
