@@ -205,9 +205,6 @@ def validate_node_query_results(
             reason = "Error while querying shard data."
             if isinstance(result, AioRpcError):
                 if result.code() is GrpcStatusCode.UNAVAILABLE:
-                    logger.warning(
-                        f"GRPC error while querying shard data: {result.debug_error_string()}"
-                    )
                     if len(results) == len(used_nodes):
                         # only reset connection of detected failure
                         logger.warning(
