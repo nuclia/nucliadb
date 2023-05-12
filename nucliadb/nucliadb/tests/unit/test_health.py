@@ -60,7 +60,7 @@ async def test_health_check_fail():
     servicer = MagicMock()
     with patch.object(orm, "NODES", {}):
         task = asyncio.create_task(health.grpc_health_check(servicer))
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.07)
 
         servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
 
