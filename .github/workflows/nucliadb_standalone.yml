@@ -1,4 +1,4 @@
-name: nucliadb One (py)
+name: nucliadb Standalone (py)
 env:
   API_VERSION: 1
   COMPONENT: nucliadb-standalone

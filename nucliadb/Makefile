@@ -21,12 +21,12 @@ lint:
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
-.PHONY: lint-one
-lint-one:
-	flake8 nucliadb/one --config=setup.cfg
-	cd .. && isort -c --profile black nucliadb/nucliadb/one
-	black --check nucliadb/one
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/one
+.PHONY: lint-standalone
+lint-standalone:
+	flake8 nucliadb/standalone --config=setup.cfg
+	cd .. && isort -c --profile black nucliadb/nucliadb/standalone
+	black --check nucliadb/standalone
+	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/standalone
 
 .PHONY: lint-reader
 lint-reader:
