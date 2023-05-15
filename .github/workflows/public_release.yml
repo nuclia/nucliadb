@@ -1,0 +1,88 @@
+# This workflow is meant to:
+# 1. Create a new git tag
+# 2. Create a new release artifact in github repo
+# 3. Create a new helm chart package and upload it as a release artifact
+#
+# This is meant to ONLY happen when VERSION file is updated and pushed to main branch
+# and meant to be used as a mechanism to communicate sets of changes to the public.
+# Since we deploy in a CD way, the way we release and communicate differs internally from externally
+name: Tag and public artifact release
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "VERSION"
+jobs:
+  release:
+    name: Tag and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            version_modified:
+              - 'VERSION'
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Set image version
+        run: |-
+          VERSION=`cat VERSION`
+          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
+          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_reader/Chart.yaml
+
+      - name: Set helm package image
+        id: version_step
+        run: |-
+          VERSION=`cat VERSION`
+          echo "version_number=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Install Helm
+        uses: azure/setup-helm@v2.0
+        with:
+          version: v3.4.0
+
+      - name: Build helm package
+        run: |-
+          helm lint charts/nucliadb
+          helm package charts/nucliadb
+          curl --data-binary "@nucliadb_reader-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ steps.version_step.outputs.version_number }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version_step.outputs.version_number }}
+          release_name: Release ${{ steps.version_step.outputs.version_number }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./nucliadb-${{ steps.version_step.outputs.version_number }}.tgz
+          asset_name: nucliadb-${{ steps.version_step.outputs.version_number }}.tgz
+          asset_content_type: application/tar+gzip
