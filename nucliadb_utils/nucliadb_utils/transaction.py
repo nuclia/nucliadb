@@ -59,7 +59,7 @@ class LocalTransactionUtility:
         async def iterator(writer):
             yield writer
 
-        resp = await ingest.ProcessMessage(iterator(writer))
+        resp = await ingest.ProcessMessage(iterator(writer))  # type: ignore
         if resp.status != OpStatusWriter.Status.OK:
             logger.error(f"Local transaction failed processing {writer}")
         return 0
