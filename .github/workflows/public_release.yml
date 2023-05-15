@@ -44,17 +44,17 @@ jobs:
       - name: Update image version
         uses: mikefarah/yq@master
         with:
-          cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.version_number }}+${{ steps.env-vars.outputs.short_sha }}"' 'charts/nucliadb/values.yml'
+          cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.version_number }}+${{ steps.env-vars.outputs.short_sha }}"' 'charts/nucliadb/values.yaml'
       
       - name: Set chart version
         uses: mikefarah/yq@master
         with:
-          cmd: yq -i '.version = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yml'
+          cmd: yq -i '.version = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yaml'
         
       - name: Set chart app version
         uses: mikefarah/yq@master
         with:
-          cmd: yq -i '.appVersion = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yml'
+          cmd: yq -i '.appVersion = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yaml'
 
       - name: Install Helm
         uses: azure/setup-helm@v2.0
