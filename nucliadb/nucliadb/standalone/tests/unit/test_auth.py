@@ -32,7 +32,7 @@ def http_request():
 
 def test_get_mapped_roles():
     settings = Settings(
-        auth_policy_user_deafult_roles=[NucliaDBRoles.READER],
+        auth_policy_user_default_roles=[NucliaDBRoles.READER],
         auth_policy_role_mapping={
             "group": {"managers": [NucliaDBRoles.MANAGER]},
             "other": {"other": [NucliaDBRoles.READER]},
@@ -51,7 +51,7 @@ def test_get_mapped_roles():
     # no values
     assert (
         auth.get_mapped_roles(
-            settings=Settings(auth_policy_user_deafult_roles=[]), data={}
+            settings=Settings(auth_policy_user_default_roles=[]), data={}
         )
         == []
     )
@@ -63,7 +63,7 @@ async def test_auth_header_backend(http_request):
         Settings(
             auth_policy=AuthPolicy.UPSTREAM_AUTH_HEADER,
             auth_policy_user_header="X-User",
-            auth_policy_user_deafult_roles=[NucliaDBRoles.READER],
+            auth_policy_user_default_roles=[NucliaDBRoles.READER],
         )
     )
 
@@ -83,7 +83,7 @@ async def test_oauth2_backend(http_request):
     backend = auth.get_auth_backend(
         settings=Settings(
             auth_policy=AuthPolicy.UPSTREAM_OAUTH2,
-            auth_policy_user_deafult_roles=[NucliaDBRoles.READER],
+            auth_policy_user_default_roles=[NucliaDBRoles.READER],
         )
     )
 
@@ -116,7 +116,7 @@ async def test_baseic_backend(http_request):
     backend = auth.get_auth_backend(
         settings=Settings(
             auth_policy=AuthPolicy.UPSTREAM_BASICAUTH,
-            auth_policy_user_deafult_roles=[NucliaDBRoles.READER],
+            auth_policy_user_default_roles=[NucliaDBRoles.READER],
         )
     )
 

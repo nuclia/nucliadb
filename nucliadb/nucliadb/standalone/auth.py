@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_mapped_roles(*, settings: Settings, data: dict[str, str]) -> list[str]:
-    output = [r.value for r in settings.auth_policy_user_deafult_roles]
+    output = [r.value for r in settings.auth_policy_user_default_roles]
     if settings.auth_policy_role_mapping is None:
         return output
 
@@ -130,7 +130,7 @@ class BasicAuthAuthenticationBackend(AuthenticationBackend):
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.default_roles = settings.auth_policy_user_deafult_roles
+        self.default_roles = settings.auth_policy_user_default_roles
 
     async def authenticate(
         self, request: HTTPConnection
