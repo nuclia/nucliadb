@@ -84,7 +84,7 @@ class CreateResourcePayload(BaseModel):
     @validator("origin_json")
     def origin_json_check(cls, value):
         limit = 400_000
-        if len(json.dumps(value.metadata)) > limit:
+        if value and value.metadata and len(json.dumps(value.metadata)) > limit:
             raise ValueError(
                 f"metadata should be less than {limit} bytes when serialized to JSON"
             )
