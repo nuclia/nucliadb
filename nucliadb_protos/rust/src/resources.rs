@@ -130,6 +130,11 @@ pub mod origin {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OriginJson {
+    #[prost(message, optional, tag="1")]
+    pub metadata: ::core::option::Option<::prost_types::Struct>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Relations {
     #[prost(message, repeated, tag="1")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,

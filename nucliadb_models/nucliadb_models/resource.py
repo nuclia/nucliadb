@@ -45,6 +45,7 @@ from nucliadb_models.metadata import (
     ComputedMetadata,
     Metadata,
     Origin,
+    OriginJSON,
     Relation,
     UserFieldMetadata,
     UserMetadata,
@@ -272,6 +273,7 @@ class Resource(BaseModel):
     queue: Optional[QueueType]
 
     origin: Optional[Origin]
+    origin_json: Optional[OriginJSON]
     relations: Optional[List[Relation]]
 
     data: Optional[ResourceData]

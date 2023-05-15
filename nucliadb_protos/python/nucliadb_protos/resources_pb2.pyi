@@ -8,6 +8,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import google.protobuf.struct_pb2
 import google.protobuf.timestamp_pb2
 import nucliadb_protos.utils_pb2
 import sys
@@ -315,6 +316,23 @@ class Origin(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["colaborators", b"colaborators", "created", b"created", "filename", b"filename", "metadata", b"metadata", "modified", b"modified", "related", b"related", "source", b"source", "source_id", b"source_id", "tags", b"tags", "url", b"url"]) -> None: ...
 
 global___Origin = Origin
+
+@typing_extensions.final
+class OriginJSON(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    METADATA_FIELD_NUMBER: builtins.int
+    @property
+    def metadata(self) -> google.protobuf.struct_pb2.Struct: ...
+    def __init__(
+        self,
+        *,
+        metadata: google.protobuf.struct_pb2.Struct | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> None: ...
+
+global___OriginJSON = OriginJSON
 
 @typing_extensions.final
 class Relations(google.protobuf.message.Message):

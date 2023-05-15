@@ -207,6 +207,13 @@ async def serialize(
         if orm_resource.origin is not None:
             resource.origin = models.Origin.from_message(orm_resource.origin)
 
+    if ResourceProperties.ORIGIN_JSON in show:
+        await orm_resource.get_origin_json()
+        if orm_resource.origin_json is not None:
+            resource.origin_json = models.OriginJSON.from_message(
+                orm_resource.origin_json
+            )
+
     include_errors = ResourceProperties.ERRORS in show
 
     if field_type_filter and (include_values or include_extracted_data):

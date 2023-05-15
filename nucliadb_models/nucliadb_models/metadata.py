@@ -348,5 +348,24 @@ class Origin(InputOrigin):
         return cls(**data)
 
 
+class OriginJSON(BaseModel):
+    """
+    Arbitrary JSON metadata that is provided by the user.
+    This is not meant to be searchable, but is meant to be serialized on results.
+    """
+
+    metadata: Dict[Any, Any]
+
+    @classmethod
+    def from_message(cls: Type[_T], message: resources_pb2.OriginJSON) -> _T:
+        return cls(
+            **MessageToDict(
+                message,
+                preserving_proto_field_name=True,
+                including_default_value_fields=False,
+            )
+        )
+
+
 class Relations(BaseModel):
     relations: Optional[List[Relation]]

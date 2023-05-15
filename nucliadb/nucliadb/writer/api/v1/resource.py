@@ -58,7 +58,7 @@ from nucliadb.writer.resource.basic import (
     set_status_modify,
 )
 from nucliadb.writer.resource.field import extract_fields, parse_fields
-from nucliadb.writer.resource.origin import parse_origin
+from nucliadb.writer.resource.origin import parse_origin, parse_origin_json
 from nucliadb.writer.resource.slug import resource_slug_exists
 from nucliadb.writer.resource.vectors import (
     create_vectorset,
@@ -145,6 +145,8 @@ async def create_resource(
 
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
+    if item.origin_json is not None:
+        parse_origin_json(writer.origin_json, item.origin_json)
 
     await parse_fields(
         writer=writer,
@@ -260,6 +262,8 @@ async def modify_resource(
     parse_audit(writer.audit, request)
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
+    if item.origin_json is not None:
+        parse_origin_json(writer.origin_json, item.origin_json)
 
     await parse_fields(
         writer=writer,

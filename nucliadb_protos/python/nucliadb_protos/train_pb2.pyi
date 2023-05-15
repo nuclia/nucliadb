@@ -89,6 +89,7 @@ from nucliadb_protos.resources_pb2 import (
     NestedListPosition as NestedListPosition,
     NestedPosition as NestedPosition,
     Origin as Origin,
+    OriginJSON as OriginJSON,
     PagePositions as PagePositions,
     Paragraph as Paragraph,
     ParagraphAnnotation as ParagraphAnnotation,

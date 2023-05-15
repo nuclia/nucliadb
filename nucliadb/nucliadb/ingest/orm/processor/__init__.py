@@ -405,6 +405,9 @@ class Processor:
         if message.HasField("origin") and resource:
             await resource.set_origin(message.origin)
 
+        if message.HasField("origin_json") and resource:
+            await resource.set_origin_json(message.origin_json)
+
         if resource:
             await resource.apply_fields(message)
             await resource.apply_extracted(message)

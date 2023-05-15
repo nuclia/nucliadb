@@ -126,6 +126,8 @@ pub struct BrokerMessage {
     /// If true, force reindex all paragraphs in a resource
     #[prost(bool, tag="36")]
     pub reindex: bool,
+    #[prost(message, optional, tag="37")]
+    pub origin_json: ::core::option::Option<super::resources::OriginJson>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {

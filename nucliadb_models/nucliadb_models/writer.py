@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
@@ -30,6 +31,7 @@ from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     InputMetadata,
     Origin,
+    OriginJSON,
     UserFieldMetadata,
     UserMetadata,
 )
@@ -53,6 +55,7 @@ class CreateResourcePayload(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     uservectors: Optional[UserVectorsWrapper] = None
     origin: Optional[Origin] = None
+    origin_json: Optional[OriginJSON] = None
 
     files: Dict[FieldIdString, FileField] = {}
     links: Dict[FieldIdString, LinkField] = {}
@@ -78,6 +81,15 @@ class CreateResourcePayload(BaseModel):
 
         return v
 
+    @validator("origin_json")
+    def origin_json_check(cls, value):
+        limit = 400_000
+        if len(json.dumps(value.metadata)) > limit:
+            raise ValueError(
+                f"metadata should be less than {limit} bytes when serialized to JSON"
+            )
+        return value
+
 
 class UpdateResourcePayload(BaseModel):
     title: Optional[str] = None
@@ -90,6 +102,7 @@ class UpdateResourcePayload(BaseModel):
     uservectors: Optional[UserVectorsWrapper] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[Origin] = None
+    origin_json: Optional[OriginJSON] = None
 
     files: Dict[FieldIdString, FileField] = {}
     links: Dict[FieldIdString, LinkField] = {}
