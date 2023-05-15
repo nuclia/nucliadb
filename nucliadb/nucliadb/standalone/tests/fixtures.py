@@ -31,6 +31,7 @@ from starlette.routing import Mount
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.standalone.settings import Settings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.utilities import clear_global_cache
 
@@ -46,8 +47,9 @@ async def nucliadb_api(
     event_loop,
 ):  # type: ignore
     from nucliadb.ingest.orm import NODES
-    from nucliadb.one.app import application
+    from nucliadb.standalone.run import get_server
 
+    app, _ = get_server(Settings())
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
 
@@ -55,11 +57,11 @@ async def nucliadb_api(
     async def handler(req, exc):  # type: ignore
         raise exc
 
-    for route in application.routes:
+    for route in app.routes:
         if isinstance(route, Mount) and not isinstance(route.app, StaticFiles):
             route.app.middleware_stack.handler = handler  # type: ignore
 
-    await application.router.startup()
+    await app.router.startup()
 
     await asyncio.sleep(1)
     while len(NODES) < 2:
@@ -78,7 +80,7 @@ async def nucliadb_api(
         if root is False:
             client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
-        client = AsyncClient(app=application, base_url=client_base_url)  # type: ignore
+        client = AsyncClient(app=app, base_url=client_base_url)  # type: ignore
         client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
         client.headers["X-NUCLIADB-USER"] = user
 
@@ -86,7 +88,7 @@ async def nucliadb_api(
 
     yield make_client_fixture
 
-    await application.router.shutdown()
+    await app.router.shutdown()
     await driver.flushall()
     await driver.close(close_connection_pool=True)
 

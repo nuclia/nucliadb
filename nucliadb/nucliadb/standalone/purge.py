@@ -17,8 +17,28 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
+# Standalone purge command
+import asyncio
+import os
 
-logger = logging.getLogger("nucliadb.one")
+import pydantic_argparse
 
-API_PREFIX = "api"
+from nucliadb.standalone.config import config_nucliadb
+from nucliadb.standalone.settings import Settings
+
+
+def purge():
+    from nucliadb.ingest.purge import main
+
+    if os.environ.get("NUCLIADB_ENV"):
+        nucliadb_args = Settings()
+    else:
+        parser = pydantic_argparse.ArgumentParser(
+            model=Settings,
+            prog="NucliaDB",
+            description="NucliaDB Starting script",
+        )
+        nucliadb_args = parser.parse_typed_args()
+
+    config_nucliadb(nucliadb_args)
+    asyncio.run(main())

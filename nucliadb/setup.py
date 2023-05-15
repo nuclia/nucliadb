@@ -55,7 +55,7 @@ setup(
         "console_scripts": [
             # Service commands
             # Standalone
-            "nucliadb = nucliadb.run:run",
+            "nucliadb = nucliadb.standalone.run:run",
             # Ingest
             #   - This command runs pull workers + ingest write consumer
             "nucliadb-ingest = nucliadb.ingest.app:run_consumer",

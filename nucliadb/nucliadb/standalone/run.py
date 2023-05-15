@@ -20,18 +20,23 @@
 import logging
 import os
 
+import pkg_resources
 import pydantic_argparse
 import uvicorn  # type: ignore
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 
-from nucliadb.config import config_nucliadb
-from nucliadb.settings import Settings
+from nucliadb.standalone.config import config_nucliadb
+from nucliadb.standalone.settings import Settings
+from nucliadb_telemetry import errors
+from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
 
 logger = logging.getLogger(__name__)
 
 
-def run():
+def setup() -> Settings:
+    setup_logging()
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
     if os.environ.get("NUCLIADB_ENV"):
         nucliadb_args = Settings()
     else:
@@ -43,41 +48,39 @@ def run():
         nucliadb_args = parser.parse_typed_args()
 
     config_nucliadb(nucliadb_args)
-    run_nucliadb(nucliadb_args)
+
+    return nucliadb_args
 
 
-def run_nucliadb(nucliadb_args: Settings):
-    setup_logging()
+def get_server(settings: Settings) -> tuple[FastAPI, uvicorn.Server]:
+    from nucliadb.standalone.app import application_factory
 
-    from nucliadb.one.app import application
+    application = application_factory(settings)
 
-    path = os.path.dirname(__file__) + "/static"
-    application.mount("/widget", StaticFiles(directory=path, html=True), name="widget")
-    logger.warning(
-        f"======= Starting server on http://0.0.0.0:{nucliadb_args.http_port}/ ======"
+    config = uvicorn.Config(
+        application, host="0.0.0.0", port=settings.http_port, log_config=None
     )
-    uvicorn.run(
-        application,
-        host="0.0.0.0",
-        port=nucliadb_args.http_port,
-        log_config=None,
-        debug=True,
-        reload=False,
-    )
-
-
-async def run_async_nucliadb(nucliadb_args: Settings):
-    from nucliadb.one.app import application
-
-    config = uvicorn.Config(application, port=nucliadb_args.http_port, log_config=None)
     server = uvicorn.Server(config)
     config.load()
     server.lifespan = config.lifespan_class(config)
+    return application, server
+
+
+def run():
+    settings = setup()
+    app, server = get_server(settings)
+    instrument_app(app, excluded_urls=["/"], metrics=True)
+    logger.warning(
+        f"======= Starting server on http://0.0.0.0:{settings.http_port}/ ======"
+    )
+    server.run()
+
+
+async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
+    _, server = get_server(settings)
     await server.startup()
     return server
 
 
 if __name__ == "__main__":
-    nucliadb_args = Settings()
-    config_nucliadb(nucliadb_args)
-    run_nucliadb(nucliadb_args)
+    run()

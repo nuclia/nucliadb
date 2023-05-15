@@ -1,4 +1,4 @@
-![nucliadb_one](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_one.yml/badge.svg)
+![nucliadb_standalone](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_standalone.yml/badge.svg)
 ![nucliadb_writer](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_writer.yml/badge.svg)
 ![nucliadb_reader](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_reader.yml/badge.svg)
 ![nucliadb_ingest](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_ingest.yml/badge.svg)

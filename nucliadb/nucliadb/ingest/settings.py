@@ -42,10 +42,12 @@ class DriverConfig(str, Enum):
 
 class DriverSettings(BaseSettings):
     driver: DriverConfig = Field(DriverConfig.NOT_SET, description="K/V storage driver")
-    driver_redis_url: Optional[str] = None
-    driver_tikv_url: Optional[List[str]] = []
-    driver_local_url: Optional[str] = None
-    driver_pg_url: Optional[str] = None
+    driver_redis_url: Optional[str] = Field(None, description="Redis URL")
+    driver_tikv_url: Optional[List[str]] = Field([], description="TiKV PD URL")
+    driver_local_url: Optional[str] = Field(
+        None, description="Local path to store data on file system."
+    )
+    driver_pg_url: Optional[str] = Field(None, description="PostgreSQL DSN")
 
 
 class Settings(DriverSettings):

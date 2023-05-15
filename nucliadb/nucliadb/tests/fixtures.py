@@ -29,9 +29,9 @@ from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.config import config_nucliadb
-from nucliadb.run import run_async_nucliadb
-from nucliadb.settings import Settings
+from nucliadb.standalone.config import config_nucliadb
+from nucliadb.standalone.run import run_async_nucliadb
+from nucliadb.standalone.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
 from nucliadb_utils.tests import free_port

@@ -40,7 +40,7 @@ from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb.settings import Settings
+from nucliadb.standalone.settings import Settings
 from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
