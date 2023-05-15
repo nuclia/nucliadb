@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "charts/nucliadb_shared/**"
 
 env:
   HASH: $(git rev-parse --short "$GITHUB_SHA")
