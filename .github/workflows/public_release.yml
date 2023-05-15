@@ -56,7 +56,9 @@ jobs:
         run: |-
           helm lint charts/nucliadb
           helm package charts/nucliadb
-          curl --data-binary "@nucliadb_reader-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
+      - name: LS
+        run: ls -lah
 
       - name: Bump version and push tag
         id: tag_version
