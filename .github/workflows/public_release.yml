@@ -10,7 +10,7 @@ name: Tag and public artifact release
 on:
   push:
     branches:
-      - main
+      - chart-release
     paths:
       - "VERSION"
 jobs:
