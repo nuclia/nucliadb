@@ -169,11 +169,13 @@ class Processor:
         # Slug may have conflicts as its not partitioned properly,
         # so we commit it in a different transaction to make it as short as possible
         prev_txn = resource.txn
-        async with self.driver.transaction() as txn:
-            resource.txn = txn
-            await resource.set_slug()
-            await txn.commit()
-        resource.txn = prev_txn
+        try:
+            async with self.driver.transaction() as txn:
+                resource.txn = txn
+                await resource.set_slug()
+                await txn.commit()
+        finally:
+            resource.txn = prev_txn
 
     async def txn(
         self,
