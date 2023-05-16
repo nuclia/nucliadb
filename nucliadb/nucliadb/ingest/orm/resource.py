@@ -80,7 +80,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
-KB_RESOURCE_ORIGIN_JSON = "/kbs/{kbid}/r/{uuid}/origin-json"
+KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/origin-json"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
@@ -296,7 +296,7 @@ class Resource:
         if self.extra is None:
             pb = PBExtra()
             payload = await self.txn.get(
-                KB_RESOURCE_ORIGIN_JSON.format(kbid=self.kb.kbid, uuid=self.uuid)
+                KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
             )
             if payload is None:
                 return None
@@ -305,7 +305,7 @@ class Resource:
         return self.extra
 
     async def set_extra(self, payload: PBExtra):
-        key = KB_RESOURCE_ORIGIN_JSON.format(kbid=self.kb.kbid, uuid=self.uuid)
+        key = KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
         await self.txn.set(
             key,
             payload.SerializeToString(),
