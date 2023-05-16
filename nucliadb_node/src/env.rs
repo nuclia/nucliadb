@@ -214,6 +214,11 @@ pub fn log_level() -> Vec<(String, Level)> {
     }
 }
 
+pub fn span_levels() -> Vec<(String, Level)> {
+    let default = "nucliadb_node=INFO,nucliadb_cluster=INFO".to_string();
+    parse_log_level(&default)
+}
+
 pub fn get_sentry_env() -> &'static str {
     let default = SENTRY_DEV;
     match env::var("RUNNING_ENVIRONMENT") {

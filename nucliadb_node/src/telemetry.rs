@@ -23,7 +23,7 @@ use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_subscriber::filter::{FilterFn, Targets};
+use tracing_subscriber::filter::{FilterFn, LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
@@ -33,48 +33,44 @@ use crate::env;
 const TRACE_ID: &str = "trace-id";
 
 pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
-    let log_levels = env::log_level();
-
     let mut layers = Vec::new();
 
+    let log_levels = env::log_level();
+    let stdout = stdout_layer(log_levels);
+    layers.push(stdout);
+
     if env::jaeger_enabled() {
-        layers.push(init_jaeger(log_levels.clone())?);
+        let span_levels = env::span_levels();
+        let jaeger = jaeger_layer(span_levels)?;
+        layers.push(jaeger);
     }
 
-    let stdout_layer = tracing_subscriber::fmt::layer()
-        .with_level(true)
-        .with_filter(Targets::new().with_targets(log_levels))
-        .boxed();
-
-    layers.push(stdout_layer);
-
-    let sentry_env = env::get_sentry_env();
-    let guard = sentry::init((
-        env::sentry_url(),
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            environment: Some(sentry_env.into()),
-            ..Default::default()
-        },
-    ));
-    layers.push(sentry_tracing::layer().boxed());
+    let sentry_guard = setup_sentry(env::get_sentry_env(), env::sentry_url());
+    let sentry = sentry_layer();
+    layers.push(sentry);
 
     tracing_subscriber::registry()
         .with(layers)
         .try_init()
         .with_context(|| "trying to init tracing")?;
-    Ok(guard)
+
+    Ok(sentry_guard)
 }
 
-pub(crate) fn run_with_telemetry<F, R>(current: Span, f: F) -> R
-where F: FnOnce() -> R {
-    let tid = current.context().span().span_context().trace_id();
-    sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
+fn stdout_layer(log_levels: Vec<(String, Level)>) -> Box<dyn Layer<Registry> + Send + Sync> {
+    let format = tracing_subscriber::fmt::format().with_level(true).compact();
+
+    tracing_subscriber::fmt::layer()
+        .event_format(format)
+        .with_filter(Targets::new().with_targets(log_levels))
+        .boxed()
 }
 
-fn init_jaeger(
-    log_levels: Vec<(String, Level)>,
+fn jaeger_layer(
+    _span_levels: Vec<(String, Level)>,
 ) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
+    global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
+
     let agent_endpoint = env::jaeger_agent_endp();
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
@@ -82,26 +78,43 @@ fn init_jaeger(
         .with_auto_split_batch(true)
         .install_batch(opentelemetry::runtime::Tokio)?;
 
-    // This filter is needed because we want to keep logs in stdout and attach logs to jaeger
-    // spans in really rare cases So, basically it checks the source of event (allowed
-    // only from nucliadb_node crate) and filter out all events without special field
-    // For attaching log to jaeger span use this:
-    // tracing::event!(Level::INFO, trace_marker = true, "your logs for jaeger here: {}", foo =
-    // bar);
-    let filter = FilterFn::new(|metadata| {
-        metadata
-            .file()
-            .filter(|file| file.contains("nucliadb_node"))
-            .map(|_| metadata.is_event())
-            .map(|state| state && metadata.fields().field("trace_marker").is_none())
-            .map(|state| !state)
-            .unwrap_or_default()
+    // To avoid sending too much information to Jaeger, we filter out all events
+    // (as they are logged to stdout), spans from external instrumented crates
+    // (like tantivy, hyper, tower, mio...) and spans below INFO level (default
+    // span level).
+    let level_filter = LevelFilter::from_level(Level::INFO);
+    let span_filter = FilterFn::new(|metadata| {
+        metadata.is_span()
+            && metadata
+                .file()
+                .filter(|file| file.contains("nucliadb"))
+                .is_some()
     });
-    global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     Ok(tracing_opentelemetry::layer()
         .with_tracer(tracer)
-        .with_filter(Targets::new().with_targets(log_levels))
-        .with_filter(filter)
+        .with_filter(level_filter)
+        .with_filter(span_filter)
         .boxed())
+}
+
+fn setup_sentry(env: &'static str, sentry_url: String) -> ClientInitGuard {
+    sentry::init((
+        sentry_url,
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            environment: Some(env.into()),
+            ..Default::default()
+        },
+    ))
+}
+
+fn sentry_layer() -> Box<dyn Layer<Registry> + Send + Sync> {
+    sentry_tracing::layer().boxed()
+}
+
+pub fn run_with_telemetry<F, R>(current: Span, f: F) -> R
+where F: FnOnce() -> R {
+    let tid = current.context().span().span_context().trace_id();
+    sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
