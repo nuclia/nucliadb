@@ -208,6 +208,7 @@ class Worker:
         status = await self.writer.set_resource(self.brain)
         logger.info(f"...done")
         del self.brain
+        self.brain = None
         return status
 
     async def delete_resource(self, pb: IndexMessage) -> OpStatus:
