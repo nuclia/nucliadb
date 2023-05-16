@@ -628,7 +628,7 @@ async def test_ingest_txn_missing_kb(
 
 
 @pytest.mark.asyncio
-@pytest.skip("This logic was temporarily commented out from processor")
+@pytest.mark.skip("This logic was temporarily commented out from processor")
 async def test_ingest_autocommit_deadletter_marks_resource(
     kbid: str, processor: Processor, txn, gcs_storage, cache
 ):
