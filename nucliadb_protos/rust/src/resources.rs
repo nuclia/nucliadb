@@ -130,7 +130,7 @@ pub mod origin {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct OriginJson {
+pub struct Extra {
     #[prost(message, optional, tag="1")]
     pub metadata: ::core::option::Option<::prost_types::Struct>,
 }

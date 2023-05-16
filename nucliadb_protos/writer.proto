@@ -118,7 +118,7 @@ message BrokerMessage {
     // If true, force reindex all paragraphs in a resource
     bool reindex = 36;
 
-    resources.OriginJSON origin_json = 37;
+    resources.Extra extra = 37;
 }
 
 

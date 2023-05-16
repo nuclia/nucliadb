@@ -127,7 +127,7 @@ pub struct BrokerMessage {
     #[prost(bool, tag="36")]
     pub reindex: bool,
     #[prost(message, optional, tag="37")]
-    pub origin_json: ::core::option::Option<super::resources::OriginJson>,
+    pub extra: ::core::option::Option<super::resources::Extra>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {

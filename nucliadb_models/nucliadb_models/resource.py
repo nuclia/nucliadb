@@ -43,9 +43,9 @@ from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
     ComputedMetadata,
+    Extra,
     Metadata,
     Origin,
-    OriginJSON,
     Relation,
     UserFieldMetadata,
     UserMetadata,
@@ -273,7 +273,7 @@ class Resource(BaseModel):
     queue: Optional[QueueType]
 
     origin: Optional[Origin]
-    origin_json: Optional[OriginJSON]
+    extra: Optional[Extra]
     relations: Optional[List[Relation]]
 
     data: Optional[ResourceData]

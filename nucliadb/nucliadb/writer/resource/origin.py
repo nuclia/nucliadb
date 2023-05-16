@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from nucliadb_protos.resources_pb2 import Origin
 
-from nucliadb_models import InputOrigin, OriginJSON
+from nucliadb_models import Extra, InputOrigin
 from nucliadb_protos import resources_pb2
 
 
@@ -42,5 +42,5 @@ def parse_origin(origin: Origin, origin_payload: InputOrigin):
     origin.source = Origin.Source.API
 
 
-def parse_origin_json(proto: resources_pb2.OriginJSON, payload: OriginJSON):
+def parse_extra(proto: resources_pb2.Extra, payload: Extra):
     proto.metadata.update(payload.metadata)

@@ -29,9 +29,9 @@ from nucliadb_models.keywordset import FieldKeywordset
 from nucliadb_models.layout import InputLayoutField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
+    Extra,
     InputMetadata,
     Origin,
-    OriginJSON,
     UserFieldMetadata,
     UserMetadata,
 )
@@ -55,7 +55,7 @@ class CreateResourcePayload(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     uservectors: Optional[UserVectorsWrapper] = None
     origin: Optional[Origin] = None
-    origin_json: Optional[OriginJSON] = None
+    extra: Optional[Extra] = None
 
     files: Dict[FieldIdString, FileField] = {}
     links: Dict[FieldIdString, LinkField] = {}
@@ -81,8 +81,8 @@ class CreateResourcePayload(BaseModel):
 
         return v
 
-    @validator("origin_json")
-    def origin_json_check(cls, value):
+    @validator("extra")
+    def extra_check(cls, value):
         limit = 400_000
         if value and value.metadata and len(json.dumps(value.metadata)) > limit:
             raise ValueError(
@@ -102,7 +102,7 @@ class UpdateResourcePayload(BaseModel):
     uservectors: Optional[UserVectorsWrapper] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[Origin] = None
-    origin_json: Optional[OriginJSON] = None
+    extra: Optional[Extra] = None
 
     files: Dict[FieldIdString, FileField] = {}
     links: Dict[FieldIdString, LinkField] = {}

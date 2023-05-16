@@ -318,7 +318,7 @@ class Origin(google.protobuf.message.Message):
 global___Origin = Origin
 
 @typing_extensions.final
-class OriginJSON(google.protobuf.message.Message):
+class Extra(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     METADATA_FIELD_NUMBER: builtins.int
@@ -332,7 +332,7 @@ class OriginJSON(google.protobuf.message.Message):
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> None: ...
 
-global___OriginJSON = OriginJSON
+global___Extra = Extra
 
 @typing_extensions.final
 class Relations(google.protobuf.message.Message):

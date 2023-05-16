@@ -453,36 +453,36 @@ async def test_field_ids_are_validated(
         assert resp.status_code == 201
 
 
-async def test_origin_json(
+async def test_extra(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
 ):
     """
     Test description:
-    - Check that limits are applied to origin json metadata
-    - Check that origin json metadata is returned only if requested on resource GET
-    - Check that origin json metadata is returned only if requested on search results
-    - Check modification of origin json metadata
+    - Check that limits are applied
+    - Check that it is returned only if requested on resource GET
+    - Check that it is returned only if requested on search results
+    - Check modification
     """
     kbid = knowledgebox
-    invalid_origin_json = {"metadata": {i: f"foo{i}" for i in range(100000)}}
+    invalid_extra = {"metadata": {i: f"foo{i}" for i in range(100000)}}
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
             "title": "Foo",
-            "origin_json": invalid_origin_json,
+            "extra": invalid_extra,
         },
     )
     assert resp.status_code == 422
     error_detail = resp.json()["detail"][0]
-    assert error_detail["loc"] == ["body", "origin_json"]
+    assert error_detail["loc"] == ["body", "extra"]
     assert error_detail["type"] == "value_error"
     assert (
         error_detail["msg"]
         == "metadata should be less than 400000 bytes when serialized to JSON"
     )
-    origin_json = {
+    extra = {
         "metadata": {
             "str": "str",
             "number": 2.0,
@@ -494,7 +494,7 @@ async def test_origin_json(
         f"/kb/{kbid}/resources",
         json={
             "title": "Foo",
-            "origin_json": origin_json,
+            "extra": extra,
         },
         headers={"X-SYNCHRONOUS": "true"},
         timeout=None,
@@ -502,35 +502,35 @@ async def test_origin_json(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    # Check that origin json metadata is not returned by default on GET
+    # Check that extra metadata is not returned by default on GET
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
-    assert "origin_json" not in resp.json()
+    assert "extra" not in resp.json()
 
-    # Check that origin json metadata is returned when requested on GET
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=origin_json")
+    # Check that extra metadata is returned when requested on GET
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
     assert resp.status_code == 200
-    assert resp.json()["origin_json"] == origin_json
+    assert resp.json()["extra"] == extra
 
-    # Check that origin json metadata is not returned by default on search
+    # Check that extra metadata is not returned by default on search
     resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo")
     assert resp.status_code == 200
     resource = resp.json()["resources"][rid]
-    assert "origin_json" not in resource
+    assert "extra" not in resource
 
-    # Check that origin json metadata is returned when requested on search results
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo&show=origin_json")
+    # Check that extra metadata is returned when requested on search results
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo&show=extra")
     assert resp.status_code == 200
     resource = resp.json()["resources"][rid]
-    assert resource["origin_json"] == origin_json
+    assert resource["extra"] == extra
 
-    # Check modification of origin json metadata
-    origin_json["metadata"].pop("dict")
+    # Check modification of extra metadata
+    extra["metadata"].pop("dict")
     resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}", json={"origin_json": origin_json}
+        f"/kb/{kbid}/resource/{rid}", json={"extra": extra}
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=origin_json")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
     assert resp.status_code == 200
-    assert resp.json()["origin_json"] == origin_json
+    assert resp.json()["extra"] == extra

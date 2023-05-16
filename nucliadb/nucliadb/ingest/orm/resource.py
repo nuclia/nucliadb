@@ -28,6 +28,7 @@ from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -44,7 +45,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
-from nucliadb_protos.resources_pb2 import OriginJSON as PBOriginJSON
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.resources_pb2 import UserVectorsWrapper
@@ -138,7 +138,7 @@ class Resource:
         self.relations: Optional[PBRelations] = None
         self.all_fields_keys: List[Tuple[int, str]] = []
         self.origin: Optional[PBOrigin] = None
-        self.origin_json: Optional[PBOriginJSON] = None
+        self.extra: Optional[PBExtra] = None
         self.modified: bool = False
         self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
@@ -291,27 +291,27 @@ class Resource:
         self.modified = True
         self.origin = payload
 
-    # Origin JSON
-    async def get_origin_json(self) -> Optional[PBOriginJSON]:
-        if self.origin_json is None:
-            pb = PBOriginJSON()
+    # Extra
+    async def get_extra(self) -> Optional[PBExtra]:
+        if self.extra is None:
+            pb = PBExtra()
             payload = await self.txn.get(
                 KB_RESOURCE_ORIGIN_JSON.format(kbid=self.kb.kbid, uuid=self.uuid)
             )
             if payload is None:
                 return None
             pb.ParseFromString(payload)
-            self.origin_json = pb
-        return self.origin_json
+            self.extra = pb
+        return self.extra
 
-    async def set_origin_json(self, payload: PBOriginJSON):
+    async def set_extra(self, payload: PBExtra):
         key = KB_RESOURCE_ORIGIN_JSON.format(kbid=self.kb.kbid, uuid=self.uuid)
         await self.txn.set(
             key,
             payload.SerializeToString(),
         )
         self.modified = True
-        self.origin_json = payload
+        self.extra = payload
 
     # Relations
     async def get_relations(self) -> Optional[PBRelations]:

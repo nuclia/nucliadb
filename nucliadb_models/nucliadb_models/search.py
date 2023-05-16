@@ -42,7 +42,7 @@ _T = TypeVar("_T")
 class ResourceProperties(str, Enum):
     BASIC = "basic"
     ORIGIN = "origin"
-    ORIGIN_JSON = "origin_json"
+    ORIGIN_JSON = "extra"
     RELATIONS = "relations"
     VALUES = "values"
     EXTRACTED = "extracted"

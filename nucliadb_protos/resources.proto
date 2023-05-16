@@ -91,7 +91,7 @@ message Origin {
     repeated string related = 10;
 }
 
-message OriginJSON {
+message Extra {
     google.protobuf.Struct metadata = 1;
 }
 

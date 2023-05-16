@@ -53,7 +53,7 @@ from nucliadb.writer.exceptions import (
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic, set_processing_info
 from nucliadb.writer.resource.field import parse_fields
-from nucliadb.writer.resource.origin import parse_origin, parse_origin_json
+from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
 from nucliadb.writer.tus.exceptions import (
     HTTPBadRequest,
@@ -693,8 +693,8 @@ async def store_file_on_nuclia_db(
         parse_basic(writer, item, toprocess)
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)
-        if item.origin_json is not None:
-            parse_origin_json(writer.origin_json, item.origin_json)
+        if item.extra is not None:
+            parse_extra(writer.extra, item.extra)
 
         await parse_fields(
             writer=writer,
