@@ -51,6 +51,7 @@ def resource():
     yield MagicMock()
 
 
+@pytest.skip("This logic was temporarily commented out from processor")
 async def test_mark_resource_error(processor: Processor, txn, shard, resource):
     with patch("nucliadb.ingest.orm.processor.set_basic") as set_basic:
         await processor._mark_resource_error(
@@ -67,6 +68,7 @@ async def test_mark_resource_error(processor: Processor, txn, shard, resource):
     )
 
 
+@pytest.skip("This logic was temporarily commented out from processor")
 async def test_mark_resource_error_handle_error(
     processor: Processor, shard, resource, txn
 ):
