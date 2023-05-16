@@ -29,7 +29,6 @@ target
 venv/
 nucliadb/.mypy_cache
 lib
-bin
 share
 pyvenv.cfg
 
