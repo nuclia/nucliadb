@@ -23,7 +23,7 @@ use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_subscriber::filter::{FilterFn, Targets, LevelFilter};
+use tracing_subscriber::filter::{FilterFn, LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
@@ -58,9 +58,7 @@ pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
 }
 
 fn stdout_layer(log_levels: Vec<(String, Level)>) -> Box<dyn Layer<Registry> + Send + Sync> {
-    let format = tracing_subscriber::fmt::format()
-        .with_level(true)
-        .compact();
+    let format = tracing_subscriber::fmt::format().with_level(true).compact();
 
     tracing_subscriber::fmt::layer()
         .event_format(format)
@@ -68,7 +66,9 @@ fn stdout_layer(log_levels: Vec<(String, Level)>) -> Box<dyn Layer<Registry> + S
         .boxed()
 }
 
-fn jaeger_layer(_span_levels: Vec<(String, Level)>) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
+fn jaeger_layer(
+    _span_levels: Vec<(String, Level)>,
+) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
     global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     let agent_endpoint = env::jaeger_agent_endp();
@@ -85,7 +85,10 @@ fn jaeger_layer(_span_levels: Vec<(String, Level)>) -> NodeResult<Box<dyn Layer<
     let level_filter = LevelFilter::from_level(Level::INFO);
     let span_filter = FilterFn::new(|metadata| {
         metadata.is_span()
-            && metadata.file().filter(|file| file.contains("nucliadb")).is_some()
+            && metadata
+                .file()
+                .filter(|file| file.contains("nucliadb"))
+                .is_some()
     });
 
     Ok(tracing_opentelemetry::layer()
