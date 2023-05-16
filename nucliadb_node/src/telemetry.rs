@@ -58,8 +58,12 @@ pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
 }
 
 fn stdout_layer(log_levels: Vec<(String, Level)>) -> Box<dyn Layer<Registry> + Send + Sync> {
-    let stdout_layer = tracing_subscriber::fmt::layer()
+    let format = tracing_subscriber::fmt::format()
         .with_level(true)
+        .compact();
+
+    tracing_subscriber::fmt::layer()
+        .event_format(format)
         .with_filter(Targets::new().with_targets(log_levels))
         .boxed()
 }

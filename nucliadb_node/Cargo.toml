@@ -89,6 +89,7 @@ tracing-subscriber = { version = "0.3.11", features = [
     "env-filter",
     "registry",
     "std",
+    "json",
 ] }
 dotenvy = "0.15.1"
 tracing-log = { version = "0.1.3", features = ["env_logger"] }
