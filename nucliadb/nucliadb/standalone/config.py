@@ -21,7 +21,7 @@
 import logging
 import os
 
-from nucliadb.settings import Settings
+from nucliadb.standalone.settings import Settings
 
 logger = logging.getLogger(__name__)
 

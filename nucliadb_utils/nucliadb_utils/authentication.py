@@ -31,7 +31,7 @@ from starlette.responses import RedirectResponse, Response
 from starlette.websockets import WebSocket
 
 
-class STFUser(BaseUser):
+class NucliaUser(BaseUser):
     def __init__(self, username: str) -> None:
         self.username = username
 
@@ -44,7 +44,10 @@ class STFUser(BaseUser):
         return self.username
 
 
-class STFAuthenticationBackend(AuthenticationBackend):
+STFUser = NucliaUser
+
+
+class NucliaCloudAuthenticationBackend(AuthenticationBackend):
     def __init__(
         self,
         roles_header: str = "X-NUCLIADB-ROLES",
@@ -65,11 +68,14 @@ class STFAuthenticationBackend(AuthenticationBackend):
 
         if self.user_header in request.headers:
             user = request.headers[self.user_header]
-            stf_user: BaseUser = STFUser(username=user)
+            nuclia_user: BaseUser = NucliaUser(username=user)
         else:
-            stf_user = STFUser(username="anonymous")
+            nuclia_user = NucliaUser(username="anonymous")
 
-        return auth_creds, stf_user
+        return auth_creds, nuclia_user
+
+
+STFAuthenticationBackend = NucliaCloudAuthenticationBackend
 
 
 def has_required_scope(conn: HTTPConnection, scopes: typing.Sequence[str]) -> bool:

@@ -27,10 +27,10 @@ from starlette.requests import Request
 from nucliadb_utils import authentication
 
 
-class TestSTFAuthenticationBackend:
+class TestNucliaCloudAuthenticationBackend:
     @pytest.fixture()
     def backend(self):
-        return authentication.STFAuthenticationBackend()
+        return authentication.NucliaCloudAuthenticationBackend()
 
     @pytest.fixture()
     def req(self):
@@ -38,13 +38,13 @@ class TestSTFAuthenticationBackend:
 
     @pytest.mark.asyncio
     async def test_authenticate(
-        self, backend: authentication.STFAuthenticationBackend, req
+        self, backend: authentication.NucliaCloudAuthenticationBackend, req
     ):
         assert await backend.authenticate(req) is None
 
     @pytest.mark.asyncio
     async def test_authenticate_with_user(
-        self, backend: authentication.STFAuthenticationBackend, req
+        self, backend: authentication.NucliaCloudAuthenticationBackend, req
     ):
         req.headers = {
             backend.roles_header: "admin",
@@ -58,7 +58,7 @@ class TestSTFAuthenticationBackend:
 
     @pytest.mark.asyncio
     async def test_authenticate_with_anon(
-        self, backend: authentication.STFAuthenticationBackend, req
+        self, backend: authentication.NucliaCloudAuthenticationBackend, req
     ):
         req.headers = {backend.roles_header: "admin"}
 
