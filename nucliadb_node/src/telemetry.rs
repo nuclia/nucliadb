@@ -23,7 +23,7 @@ use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_subscriber::filter::{FilterFn, Targets};
+use tracing_subscriber::filter::{FilterFn, Targets, LevelFilter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
@@ -82,26 +82,20 @@ fn init_jaeger(
         .with_auto_split_batch(true)
         .install_batch(opentelemetry::runtime::Tokio)?;
 
-    // This filter is needed because we want to keep logs in stdout and attach logs to jaeger
-    // spans in really rare cases So, basically it checks the source of event (allowed
-    // only from nucliadb_node crate) and filter out all events without special field
-    // For attaching log to jaeger span use this:
-    // tracing::event!(Level::INFO, trace_marker = true, "your logs for jaeger here: {}", foo =
-    // bar);
-    let filter = FilterFn::new(|metadata| {
-        metadata
-            .file()
-            .filter(|file| file.contains("nucliadb_node"))
-            .map(|_| metadata.is_event())
-            .map(|state| state && metadata.fields().field("trace_marker").is_none())
-            .map(|state| !state)
-            .unwrap_or_default()
+    // To avoid sending too much information to Jaeger, we filter out all events
+    // (as they are logged to stdout), spans from external instrumented crates
+    // (like tantivy, hyper, tower, mio...) and spans below INFO level (default
+    // span level).
+    let level_filter = LevelFilter::from_level(Level::INFO);
+    let span_filter = FilterFn::new(|metadata| {
+        metadata.is_span()
+            && metadata.file().filter(|file| file.contains("nucliadb")).is_some()
     });
     global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     Ok(tracing_opentelemetry::layer()
         .with_tracer(tracer)
-        .with_filter(Targets::new().with_targets(log_levels))
-        .with_filter(filter)
+        .with_filter(level_filter)
+        .with_filter(span_filter)
         .boxed())
 }
