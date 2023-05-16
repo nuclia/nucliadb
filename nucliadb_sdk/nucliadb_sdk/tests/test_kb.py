@@ -18,12 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
+import nucliadb_sdk
+from nucliadb_models.resource import KnowledgeBoxObj
 
-from nucliadb_sdk.utils import KnowledgeBoxAlreadyExists, create_knowledge_box
 
+def test_create_kb(sdk: nucliadb_sdk.NucliaSDK):
+    kb: KnowledgeBoxObj = sdk.create_knowledge_box(slug="hola")
+    assert sdk.get_knowledge_box(kbid=kb.uuid) is not None
+    assert sdk.get_knowledge_box_by_slug(slug="hola") is not None
 
-def test_create_kb(nucliadb: str):
-    kb = create_knowledge_box(slug="hola", nucliadb_base_url=nucliadb)
-    assert kb is not None
-    with pytest.raises(KnowledgeBoxAlreadyExists):
-        create_knowledge_box(slug="hola", nucliadb_base_url=nucliadb)
+    with pytest.raises(nucliadb_sdk.exceptions.ConflictError):
+        sdk.create_knowledge_box(slug="hola")

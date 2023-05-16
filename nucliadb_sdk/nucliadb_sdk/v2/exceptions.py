@@ -1,6 +1,22 @@
-class NotFoundError(Exception):
+class ClientError(Exception):
     pass
 
 
-class UnknownError(Exception):
+class NotFoundError(ClientError):
+    pass
+
+
+class AuthError(ClientError):
+    pass
+
+
+class RateLimitError(ClientError):
+    pass
+
+
+class ConflictError(ClientError):
+    pass
+
+
+class UnknownError(ClientError):
     pass

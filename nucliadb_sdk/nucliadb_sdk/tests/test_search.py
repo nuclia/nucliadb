@@ -26,6 +26,8 @@ from sentence_transformers import SentenceTransformer  # type: ignore
 from nucliadb_sdk import Entity, File, KnowledgeBox
 from nucliadb_sdk.labels import Label
 from nucliadb_sdk.search import ResultType, ScoreType
+import nucliadb_sdk
+from nucliadb_models.resource import KnowledgeBoxObj
 
 TESTING_IN_CI = os.environ.get("CI") == "true"
 
@@ -237,40 +239,55 @@ DATA: Dict[str, Any] = {
 }
 
 
-def test_search_resource(knowledgebox: KnowledgeBox):
+def test_search_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
     # Lets create a bunch of resources
-
     text: str
     for index, text in enumerate(DATA["text"]):
         if index == 50:
             break
         label = DATA["label"][index]
-        knowledgebox.create_resource(
-            text=text,
-            labels=[f"emoji/{label}"],
-            vectors={"all-MiniLM-L6-v2": [1.0, 2.0, 3.0, 2.0]},
+        sdk.create_resource(
+            kbid=knowledgebox.uuid,
+            texts={"text": {"body": text}},
+            usermetadata={"classifications": [{"labelset": "emoji", "label": label}]},
+            uservectors=[
+                {
+                    "field": {
+                        "field": "text",
+                        "field_type": "text",
+                    },
+                    "vectors": {
+                        "all-MiniLM-L6-v2": {
+                            "vectors": {
+                                "vector": [1.0, 2.0, 3.0, 2.0],
+                            },
+                        }
+                    },
+                }
+            ],
         )
 
-    assert len(knowledgebox) == 50
-    labels = knowledgebox.get_uploaded_labels()
+    resources = sdk.list_resources(kbid=knowledgebox.uuid, query_params={"size": 50})
+    assert resources.pagination.size == 50
+    assert resources.pagination.last
 
-    assert labels["emoji"].count == 50 * 2
-    assert labels["emoji"].labels["0"] == 9 * 2
+    results = sdk.search(
+        kbid=knowledgebox.uuid, features=["document"], faceted=["/l"], page_size=0
+    )
+    assert results.fulltext.facets == {"/l": {"/l/emoji": 50 * 2}}
 
-    resources = knowledgebox.search(text="love")
+    resources = sdk.search(kbid=knowledgebox.uuid, query="love")
     assert resources.fulltext.total == 5
     assert len(resources.resources) == 5
 
-    resources = knowledgebox.search(filter=[Label(labelset="emoji", label="0")])
-
-    assert resources.fulltext.total == 9 * 2
-
-    resources = knowledgebox.search(filter=["emoji/0"])
-
-    assert resources.fulltext.total == 9 * 2
+    resources = sdk.search(
+        kbid=knowledgebox.uuid, features=["document"], faceted=["/l/emoji"], page_size=0
+    )
+    assert resources.fulltext.facets["/l/emoji"]["/l/emoji/0"] == 9 * 2
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
-    results = knowledgebox.search(
+    results = sdk.search(
+        kbid=knowledgebox.uuid,
         vector=vector_q,
         vectorset="all-MiniLM-L6-v2",
         min_score=0.70,

@@ -29,9 +29,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_client.client import NucliaDBClient as GRPCNucliaDBClient
-from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_sdk.client import Environment, NucliaDBClient
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+import nucliadb_sdk
 
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
@@ -64,58 +62,59 @@ class NucliaDB(BaseImage):
             return False
 
 
-@pytest.fixture(scope="session")
-def nucliadb():
-    if os.environ.get("TEST_LOCAL_NUCLIADB"):
-        yield os.environ.get("TEST_LOCAL_NUCLIADB")
-    else:
-        container = NucliaDB()
-        host, port = container.run()
-        public_api_url = f"http://{host}:{port}"
-        yield public_api_url
-        container.stop()
-
-
-@pytest.fixture(scope="function")
-def knowledgebox(nucliadb):
-    kbslug = uuid4().hex
-    api_path = f"{nucliadb}/api/v1"
-    response = requests.post(
-        f"{api_path}/kbs",
-        json={"slug": kbslug},
-        headers={"X-NUCLIADB-ROLES": "MANAGER"},
-    )
-    assert response.status_code == 201
-
-    kb = KnowledgeBoxObj.parse_raw(response.content)
-    kbid = kb.uuid
-
-    url = f"{api_path}/kb/{kbid}"
-    client = NucliaDBClient(
-        environment=Environment.OSS,
-        writer_host=url,
-        reader_host=url,
-        search_host=url,
-        train_host=url,
-    )
-    yield KnowledgeBox(client)
-
-    response = requests.delete(
-        f"{api_path}/kb/{kbid}", headers={"X-NUCLIADB-ROLES": f"MANAGER"}
-    )
-    assert response.status_code == 200
-
-
 @dataclass
-class SDKFixture:
+class NucliaFixture:
     host: str
     port: int
     grpc: int
     container: Optional[NucliaDB] = None
 
 
+@pytest.fixture(scope="session")
+def nucliadb():
+    if os.environ.get("TEST_LOCAL_NUCLIADB"):
+        yield NucliaFixture(
+            host=os.environ.get("TEST_LOCAL_NUCLIADB"),
+            port=8080,
+            grpc=8060,
+            container="local",
+        )
+    else:
+        container = NucliaDB()
+        host, port = container.run()
+        network = container.container_obj.attrs["NetworkSettings"]
+        if os.environ.get("TESTING", "") == "jenkins":
+            grpc = 8060
+        else:
+            service_port = "8060/tcp"
+            grpc = network["Ports"][service_port][0]["HostPort"]
+        yield NucliaFixture(
+            host=host, port=port, grpc=grpc, container=container.container_obj
+        )
+        container.stop()
+
+
+@pytest.fixture(scope="session")
+def sdk(nucliadb: NucliaFixture):
+    sdk = nucliadb_sdk.NucliaSDK(
+        region=nucliadb_sdk.Region.ON_PREM,
+        url=f"http://{nucliadb.host}:{nucliadb.port}/api/",
+    )
+    return sdk
+
+
+@pytest.fixture(scope="function")
+def knowledgebox(sdk: nucliadb_sdk.NucliaSDK):
+    kbslug = uuid4().hex
+    kb = sdk.create_knowledge_box(slug=kbslug)
+
+    yield kb
+
+    sdk.delete_knowledge_box(kbid=kb.uuid)
+
+
 async def init_fixture(
-    nucliadb: SDKFixture,
+    nucliadb: NucliaFixture,
     dataset_slug: str,
     dataset_location: str,
 ):
@@ -129,25 +128,6 @@ async def init_fixture(
 
 
 @pytest.fixture(scope="session")
-def nucliadb_imported():
-    ndb = NucliaDB()
-    host, port = ndb.run()
-    network = ndb.container_obj.attrs["NetworkSettings"]
-
-    if os.environ.get("TESTING", "") == "jenkins":
-        grpc = 8060
-    else:
-        service_port = "8060/tcp"
-        grpc = network["Ports"][service_port][0]["HostPort"]
-    yield SDKFixture(host=host, port=port, grpc=grpc, container=ndb.container_obj)
-    ndb.stop()
-
-
-@pytest.fixture(scope="session")
-def docs_fixture(nucliadb_imported: SDKFixture):
-    kbid = asyncio.run(init_fixture(nucliadb_imported, "docs", NUCLIA_DOCS_dataset))
-    client = NucliaDBClient(
-        environment=Environment.OSS,
-        url=f"http://{nucliadb_imported.host}:{nucliadb_imported.port}/api/v1/kb/{kbid}",
-    )
-    return KnowledgeBox(client)
+def docs_dataset(nucliadb: NucliaFixture):
+    kbid = asyncio.run(init_fixture(nucliadb, "docs", NUCLIA_DOCS_dataset))
+    yield kbid
