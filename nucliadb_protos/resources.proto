@@ -4,6 +4,7 @@ package resources;
 
 import public "nucliadb_protos/utils.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 message CloudFile {
     string uri = 1;
@@ -88,6 +89,10 @@ message Origin {
     repeated string colaborators = 8;
     string filename = 9;
     repeated string related = 10;
+}
+
+message Extra {
+    google.protobuf.Struct metadata = 1;
 }
 
 message Relations {
@@ -453,3 +458,5 @@ message FieldID {
     FieldType field_type = 1;
     string field = 2;
 }
+
+

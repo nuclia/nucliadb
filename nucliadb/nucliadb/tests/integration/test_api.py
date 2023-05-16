@@ -451,3 +451,86 @@ async def test_field_ids_are_validated(
         assert body["detail"][0]["type"] == "value_error.wrong_field_id"
     else:
         assert resp.status_code == 201
+
+
+async def test_extra(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+):
+    """
+    Test description:
+    - Check that limits are applied
+    - Check that it is returned only if requested on resource GET
+    - Check that it is returned only if requested on search results
+    - Check modification
+    """
+    kbid = knowledgebox
+    invalid_extra = {"metadata": {i: f"foo{i}" for i in range(100000)}}
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Foo",
+            "extra": invalid_extra,
+        },
+    )
+    assert resp.status_code == 422
+    error_detail = resp.json()["detail"][0]
+    assert error_detail["loc"] == ["body", "extra"]
+    assert error_detail["type"] == "value_error"
+    assert (
+        error_detail["msg"]
+        == "metadata should be less than 400000 bytes when serialized to JSON"
+    )
+    extra = {
+        "metadata": {
+            "str": "str",
+            "number": 2.0,
+            "list": [1.0, 2.0, 3.0],
+            "dict": {"foo": "bar"},
+        }
+    }
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Foo",
+            "extra": extra,
+        },
+        headers={"X-SYNCHRONOUS": "true"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Check that extra metadata is not returned by default on GET
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 200
+    assert "extra" not in resp.json()
+
+    # Check that extra metadata is returned when requested on GET
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
+    assert resp.status_code == 200
+    assert resp.json()["extra"] == extra
+
+    # Check that extra metadata is not returned by default on search
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo")
+    assert resp.status_code == 200
+    resource = resp.json()["resources"][rid]
+    assert "extra" not in resource
+
+    # Check that extra metadata is returned when requested on search results
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=foo&show=extra")
+    assert resp.status_code == 200
+    resource = resp.json()["resources"][rid]
+    assert resource["extra"] == extra
+
+    # Check modification of extra metadata
+    extra["metadata"].pop("dict")
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}", json={"extra": extra}
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
+    assert resp.status_code == 200
+    assert resp.json()["extra"] == extra

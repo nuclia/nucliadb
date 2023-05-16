@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Union
 import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, OpStatusWriter
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 
 from nucliadb_utils import const, logger
@@ -59,7 +59,9 @@ class LocalTransactionUtility:
         async def iterator(writer):
             yield writer
 
-        await ingest.ProcessMessage(iterator(writer))  # type: ignore
+        resp = await ingest.ProcessMessage(iterator(writer))  # type: ignore
+        if resp.status != OpStatusWriter.Status.OK:
+            logger.error(f"Local transaction failed processing {writer}")
         return 0
 
     async def finalize(self):

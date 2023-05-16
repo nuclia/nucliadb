@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic.class_validators import root_validator
 
 from nucliadb_models.common import FIELD_TYPES_MAP
@@ -346,6 +346,24 @@ class Origin(InputOrigin):
         # to avoid migration
         data["collaborators"] = data.pop("colaborators", [])
         return cls(**data)
+
+
+class Extra(BaseModel):
+    metadata: Dict[Any, Any] = Field(
+        ...,
+        title="Metadata",
+        description="Arbitrary JSON metadata provided by the user that is not meant to be searchable, but can be serialized on results.",  # noqa
+    )
+
+    @classmethod
+    def from_message(cls: Type[_T], message: resources_pb2.Extra) -> _T:
+        return cls(
+            **MessageToDict(
+                message,
+                preserving_proto_field_name=True,
+                including_default_value_fields=False,
+            )
+        )
 
 
 class Relations(BaseModel):

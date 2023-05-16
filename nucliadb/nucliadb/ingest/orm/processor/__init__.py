@@ -405,6 +405,9 @@ class Processor:
         if message.HasField("origin") and resource:
             await resource.set_origin(message.origin)
 
+        if message.HasField("extra") and resource:
+            await resource.set_extra(message.extra)
+
         if resource:
             await resource.apply_fields(message)
             await resource.apply_extracted(message)

@@ -28,6 +28,7 @@ from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -79,6 +80,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
+KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
@@ -136,6 +138,7 @@ class Resource:
         self.relations: Optional[PBRelations] = None
         self.all_fields_keys: List[Tuple[int, str]] = []
         self.origin: Optional[PBOrigin] = None
+        self.extra: Optional[PBExtra] = None
         self.modified: bool = False
         self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
@@ -287,6 +290,28 @@ class Resource:
         )
         self.modified = True
         self.origin = payload
+
+    # Extra
+    async def get_extra(self) -> Optional[PBExtra]:
+        if self.extra is None:
+            pb = PBExtra()
+            payload = await self.txn.get(
+                KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
+            )
+            if payload is None:
+                return None
+            pb.ParseFromString(payload)
+            self.extra = pb
+        return self.extra
+
+    async def set_extra(self, payload: PBExtra):
+        key = KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(
+            key,
+            payload.SerializeToString(),
+        )
+        self.modified = True
+        self.extra = payload
 
     # Relations
     async def get_relations(self) -> Optional[PBRelations]:
@@ -870,16 +895,6 @@ class Resource:
         for _, split in extracted_text.split_text.items():
             field_text += f" {split} "
         brain.apply_field_text(fieldkey, field_text)
-
-    async def get_all(self):
-        if self.basic is None:
-            self.basic = await self.get_basic()
-
-        if self.origin is None:
-            self.origin = await self.get_origin()
-
-        if self.relations is None:
-            self.relations = await self.get_relations()
 
     def clean(self):
         self._indexer = None

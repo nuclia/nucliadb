@@ -55,6 +55,7 @@ from nucliadb_protos.resources_pb2 import (
     Conversation as Conversation,
     DATETIME as DATETIME,
     Entity as Entity,
+    Extra as Extra,
     ExtractedTextWrapper as ExtractedTextWrapper,
     ExtractedVectorsWrapper as ExtractedVectorsWrapper,
     FILE as FILE,

@@ -117,7 +117,10 @@ message BrokerMessage {
 
     // If true, force reindex all paragraphs in a resource
     bool reindex = 36;
+
+    resources.Extra extra = 37;
 }
+
 
 message WriterStatusResponse {
     repeated string knowledgeboxes = 1;
