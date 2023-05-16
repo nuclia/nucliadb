@@ -80,7 +80,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
-KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/origin-json"
+KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
