@@ -41,7 +41,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard
-from nucliadb.ingest.orm.utils import get_node_klass, set_basic
+from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
@@ -169,11 +169,13 @@ class Processor:
         # Slug may have conflicts as its not partitioned properly,
         # so we commit it in a different transaction to make it as short as possible
         prev_txn = resource.txn
-        async with self.driver.transaction() as txn:
-            resource.txn = txn
-            await resource.set_slug()
-            await txn.commit()
-        resource.txn = prev_txn
+        try:
+            async with self.driver.transaction() as txn:
+                resource.txn = txn
+                await resource.set_slug()
+                await txn.commit()
+        finally:
+            resource.txn = prev_txn
 
     async def txn(
         self,
@@ -290,7 +292,8 @@ class Processor:
             if seqid == -1:
                 raise handled_exception
             else:
-                await self._mark_resource_error(resource, partition, seqid, shard, kbid)
+                # Removing this until we figure out how to properly index the error state
+                # await self._mark_resource_error(resource, partition, seqid, shard, kbid)
                 raise DeadletteredError() from handled_exception
 
         return None
@@ -317,11 +320,12 @@ class Processor:
                 f"Skip when resource does not even have basic metadata: {resource}"
             )
             return
-        txn = None
+        prev_txn = resource.txn
         try:
             async with self.driver.transaction() as txn:
+                resource.txn = txn
                 resource.basic.metadata.status = PBMetadata.Status.ERROR
-                await set_basic(txn, resource.kb.kbid, resource.uuid, resource.basic)
+                await resource.set_basic(resource.basic)
                 await txn.commit()
 
             await shard.add_resource(
@@ -329,6 +333,8 @@ class Processor:
             )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
+        finally:
+            resource.txn = prev_txn
 
     async def multi(self, message: BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)

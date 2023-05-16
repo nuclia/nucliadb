@@ -84,6 +84,7 @@ class Worker:
         self.gc_task = None
         self.publisher = IndexedPublisher()
         self.load_seqid()
+        self.brain: Optional[Resource] = None
 
     async def finalize(self):
         if self.gc_task:
@@ -199,12 +200,15 @@ class Worker:
             self.last_seqid = None
 
     async def set_resource(self, pb: IndexMessage) -> OpStatus:
-        brain: Resource = await self.storage.get_indexing(pb)
-        brain.shard_id = brain.resource.shard_id = pb.shard
-        logger.info(f"Added {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}")
-        status = await self.writer.set_resource(brain)
+        self.brain = await self.storage.get_indexing(pb)
+        self.brain.shard_id = self.brain.resource.shard_id = pb.shard
+        logger.info(
+            f"Added {self.brain.resource.uuid} at {self.brain.shard_id} otx:{pb.txid}"
+        )
+        status = await self.writer.set_resource(self.brain)
         logger.info(f"...done")
-        del brain
+        del self.brain
+        self.brain = None
         return status
 
     async def delete_resource(self, pb: IndexMessage) -> OpStatus:
@@ -250,7 +254,13 @@ class Worker:
                     logger.error(
                         f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                     )
-                    raise grpc_error
+                    if (
+                        pb.typemessage == TypeMessage.CREATION
+                        and self.brain
+                        and self.brain.HasField("metadata")
+                    ):
+                        # Hard fail if we have the correct data
+                        raise grpc_error
 
             except IndexDataNotFound as storage_error:
                 # This should never happen now.
