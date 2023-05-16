@@ -85,9 +85,15 @@ class Settings(DriverSettings):
     sidecar_port_map: Dict[str, int] = {}
 
     # Node limits
-    max_shard_fields: int = 200000  # max number of fields to target per shard
-    max_node_replicas: int = (
-        600  # max number of shard replicas a single node will manage
+    max_shard_paragraphs: int = Field(
+        200_000,
+        title="Max shard paragraphs",
+        description="Maximum number of paragraphs to target per shard",
+    )
+    max_node_replicas: int = Field(
+        600,
+        title="Max node replicas",
+        description="Maximum number of shard replicas a single node will manage",
     )
 
     local_reader_threads: int = 5

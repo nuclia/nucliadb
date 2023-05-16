@@ -100,7 +100,7 @@ class ShardCreatorHandler:
         shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
-        if shard_counter.resources > settings.max_shard_fields:
+        if shard_counter.paragraphs > settings.max_shard_paragraphs:
             logger.warning({"message": "Adding shard", "kbid": kbid})
             async with self.driver.transaction() as txn:
                 kb = KnowledgeBox(txn, self.storage, kbid)

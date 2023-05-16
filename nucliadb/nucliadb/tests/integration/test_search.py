@@ -1295,18 +1295,18 @@ async def kb_with_one_logic_shard(
 
 
 @pytest.fixture(scope="function")
-def max_shard_fields():
-    prev = ingest_settings.max_shard_fields
-    ingest_settings.max_shard_fields = 20
+def max_shard_paragraphs():
+    prev = ingest_settings.max_shard_paragraphs
+    ingest_settings.max_shard_paragraphs = 20
 
     yield
 
-    ingest_settings.max_shard_fields = prev
+    ingest_settings.max_shard_paragraphs = prev
 
 
 @pytest.fixture(scope="function")
 async def kb_with_two_logic_shards(
-    max_shard_fields,
+    max_shard_paragraphs,
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,

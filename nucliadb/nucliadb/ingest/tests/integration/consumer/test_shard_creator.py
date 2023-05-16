@@ -38,7 +38,7 @@ async def test_shard_auto_create(
 ):
     from nucliadb.ingest.settings import settings
 
-    settings.max_shard_fields = 1
+    settings.max_shard_paragraphs = 1
 
     sc = shard_creator.ShardCreatorHandler(
         driver=maindb_driver,
