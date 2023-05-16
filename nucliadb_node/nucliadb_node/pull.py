@@ -200,7 +200,7 @@ class Worker:
             self.last_seqid = None
 
     async def set_resource(self, pb: IndexMessage) -> OpStatus:
-        self.brain: Resource = await self.storage.get_indexing(pb)
+        self.brain = await self.storage.get_indexing(pb)
         self.brain.shard_id = self.brain.resource.shard_id = pb.shard
         logger.info(
             f"Added {self.brain.resource.uuid} at {self.brain.shard_id} otx:{pb.txid}"
