@@ -250,7 +250,9 @@ class Worker:
                     logger.error(
                         f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                     )
-                    raise grpc_error
+                    if pb.HasField("metadata"):
+                        # Hard fail if we have the correct data
+                        raise grpc_error
 
             except IndexDataNotFound as storage_error:
                 # This should never happen now.
