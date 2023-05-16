@@ -21,13 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            version_modified:
-              - 'VERSION'
 
       - name: Calculate short sha
         id: env-vars
@@ -45,12 +38,12 @@ jobs:
         uses: mikefarah/yq@master
         with:
           cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.version_number }}+${{ steps.env-vars.outputs.short_sha }}"' 'charts/nucliadb/values.yaml'
-      
+
       - name: Set chart version
         uses: mikefarah/yq@master
         with:
           cmd: yq -i '.version = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yaml'
-        
+
       - name: Set chart app version
         uses: mikefarah/yq@master
         with:
@@ -85,12 +78,12 @@ jobs:
           prerelease: false
 
       - name: Upload Release Asset
-        id: upload-release-asset 
+        id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           asset_path: ./nucliadb-${{ steps.version_step.outputs.version_number }}.tgz
           asset_name: nucliadb-${{ steps.version_step.outputs.version_number }}-chart.tgz
           asset_content_type: application/tar+gzip
