@@ -119,44 +119,44 @@ impl Index {
     }
 }
 
-struct InnerState {
-    inner: State,
+struct InnerContext {
+    state: State,
     version: Version,
 }
-impl InnerState {
-    pub fn new(path: &Path) -> VectorR<InnerState> {
-        let (version, inner) = fs_state::load_state::<State>(path)?;
-        Ok(InnerState { inner, version })
+impl InnerContext {
+    pub fn new(path: &Path) -> VectorR<InnerContext> {
+        let (version, state) = fs_state::load_state::<State>(path)?;
+        Ok(InnerContext { state, version })
     }
 }
 
 #[derive(Clone)]
-struct OpenState {
-    inner: Arc<RwLock<InnerState>>,
+struct Context {
+    inner: Arc<RwLock<InnerContext>>,
 }
-impl OpenState {
-    pub fn read(&self) -> RwLockReadGuard<'_, InnerState> {
+impl Context {
+    pub fn read(&self) -> RwLockReadGuard<'_, InnerContext> {
         self.inner.read().unwrap_or_else(|e| e.into_inner())
     }
-    pub fn new(path: &Path) -> VectorR<OpenState> {
-        let inner = Arc::new(RwLock::new(InnerState::new(path)?));
-        Ok(OpenState { inner })
+    pub fn new(path: &Path) -> VectorR<Context> {
+        let inner = Arc::new(RwLock::new(InnerContext::new(path)?));
+        Ok(Context { inner })
     }
     pub fn apply<F, R>(&self, transform: F) -> VectorR<R>
-    where F: FnOnce(&mut InnerState) -> VectorR<R> {
+    where F: FnOnce(&mut InnerContext) -> VectorR<R> {
         let mut writer = self.inner.write().unwrap_or_else(|e| e.into_inner());
         transform(&mut writer)
     }
     pub fn persist(&self, path: &Path) -> VectorR<()> {
         let state = self.read();
-        Ok(fs_state::atomic_write(path, &state.inner)?)
+        Ok(fs_state::atomic_write(path, &state.state)?)
     }
 }
 
 pub struct Reader {
     status: PathBuf,
     inner: Index,
-    state: OpenState,
+    context: Context,
 }
 impl Drop for Reader {
     fn drop(&mut self) {
@@ -168,7 +168,7 @@ impl Reader {
         let id = uuid::Uuid::new_v4().to_string();
         let status_dir = inner.location().join(READERS_STATUS);
         let status = status_dir.join(id).with_extension("json");
-        let state = OpenState::new(inner.location())?;
+        let context = Context::new(inner.location())?;
         {
             // Creating the reader status
             let mut status_file = OpenOptions::new()
@@ -178,7 +178,7 @@ impl Reader {
                 .open(&status)?;
             status_file.lock_exclusive()?;
 
-            let watching = state.read().inner.dpid_iter().collect::<Vec<_>>();
+            let watching = context.read().state.dpid_iter().collect::<Vec<_>>();
             let mut status_buf = BufWriter::new(&mut status_file);
             serde_json::to_writer(&mut status_buf, &watching)?;
             status_buf.flush()?;
@@ -189,7 +189,7 @@ impl Reader {
         Ok(Reader {
             status,
             inner,
-            state,
+            context,
         })
     }
     pub fn schedule_update(&self) -> VectorR<()> {
@@ -198,7 +198,7 @@ impl Reader {
         // Otherwise data points that are in use may be delete by the GC.
         let location = self.inner.location().to_path_buf();
         let status = self.status.clone();
-        let transform = move |state: &mut InnerState| {
+        let transform = move |state: &mut InnerContext| {
             let disk_version = fs_state::crnt_version(&location)?;
             if disk_version > state.version {
                 let mut status_file = OpenOptions::new()
@@ -209,10 +209,10 @@ impl Reader {
                 status_file.lock_exclusive()?;
 
                 let (new_version, new_state) = fs_state::load_state(&location)?;
-                state.inner = new_state;
+                state.state = new_state;
                 state.version = new_version;
 
-                let watching = state.inner.dpid_iter().collect::<Vec<_>>();
+                let watching = state.state.dpid_iter().collect::<Vec<_>>();
                 let mut status_buf = BufWriter::new(&mut status_file);
                 serde_json::to_writer(&mut status_buf, &watching)?;
                 status_buf.flush()?;
@@ -223,23 +223,23 @@ impl Reader {
             Ok(())
         };
         // Updating the state in the background
-        let state = self.state.clone();
+        let state = self.context.clone();
         std::thread::spawn(move || state.apply(transform));
         Ok(())
     }
-    pub fn get_keys(&self) -> VectorR<Vec<String>> {
-        let state = self.state.read();
-        state.inner.keys(self.location())
+    pub fn keys(&self) -> VectorR<Vec<String>> {
+        let state = self.context.read();
+        state.state.keys(self.location())
     }
     pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
-        let state = self.state.read();
+        let context = self.context.read();
         let location = self.location();
         let similarity = self.metadata().similarity;
-        state.inner.search(location, request, similarity)
+        context.state.search(location, request, similarity)
     }
-    pub fn no_nodes(&self) -> usize {
-        let state = self.state.read();
-        state.inner.no_nodes()
+    pub fn number_of_nodes(&self) -> usize {
+        let context = self.context.read();
+        context.state.no_nodes()
     }
     pub fn location(&self) -> &Path {
         self.inner.location()
@@ -259,21 +259,21 @@ pub struct Writer {
     datapoint_buffer: Vec<Journal>,
     delete_buffer: Vec<(String, SystemTime)>,
     inner: Index,
-    state: OpenState,
+    context: Context,
 }
 impl Writer {
     fn update(&self) -> VectorR<()> {
         let location = self.inner.location().to_path_buf();
-        let transform = move |state: &mut InnerState| {
+        let transform = move |context: &mut InnerContext| {
             let disk_version = fs_state::crnt_version(&location)?;
-            if disk_version > state.version {
+            if disk_version > context.version {
                 let (new_version, new_state) = fs_state::load_state(&location)?;
-                state.inner = new_state;
-                state.version = new_version;
+                context.state = new_state;
+                context.version = new_version;
             }
             Ok(())
         };
-        self.state.apply(transform)
+        self.context.apply(transform)
     }
     fn notify_merger(&self) {
         let worker = Worker::request(
@@ -293,13 +293,13 @@ impl Writer {
         writer_flag
             .try_lock_exclusive()
             .map_err(|_| VectorErr::WriterExists)?;
-        let state = OpenState::new(&inner.location)?;
-        let work_len = state.read().inner.work_stack_len();
+        let context = Context::new(&inner.location)?;
+        let work_len = context.read().state.work_stack_len();
         let writer = Writer {
             inner,
             writer_flag,
             work_flag,
-            state,
+            context,
             datapoint_buffer: vec![],
             delete_buffer: vec![],
         };
@@ -320,8 +320,8 @@ impl Writer {
         // Synchronizing with the merger.
         let work_flag = self.work_flag.start_working();
         self.update()?;
-        let state = self.state.read();
-        let mut in_use_dp: HashSet<_> = state.inner.dpid_iter().collect();
+        let context = self.context.read();
+        let mut in_use_dp: HashSet<_> = context.state.dpid_iter().collect();
         // Loading the readers status
         for reader_status in std::fs::read_dir(location.join(READERS_STATUS))? {
             let entry = reader_status?;
@@ -370,21 +370,21 @@ impl Writer {
         self.update()?;
 
         // Modifying the state with the current buffers
-        let merge_work = self.state.apply(move |state: &mut InnerState| {
+        let merge_work = self.context.apply(move |state: &mut InnerContext| {
             let merge_work = adds
                 .iter()
                 .copied()
-                .fold(0, |acc, i| acc + (state.inner.add(i) as usize));
+                .fold(0, |acc, i| acc + (state.state.add(i) as usize));
             deletes
                 .iter()
-                .for_each(|(prefix, time)| state.inner.remove(prefix, *time));
+                .for_each(|(prefix, time)| state.state.remove(prefix, *time));
             Ok(merge_work)
         })?;
         // Persisting the new state
         {
             // Moving the work flag to this scope
             let _work_flag = work_flag;
-            self.state.persist(location)?;
+            self.context.persist(location)?;
         }
         // Once the commit is done is safe to notify the merger
         (0..merge_work).for_each(|_| self.notify_merger());

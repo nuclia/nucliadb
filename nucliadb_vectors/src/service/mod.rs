@@ -19,13 +19,14 @@
 //
 
 pub mod reader;
-pub mod writer;
+// pub mod writer;
 
 use nucliadb_core::protos::VectorSimilarity as GrpcSimilarity;
 pub use reader::*;
-pub use writer::*;
 
+// pub use writer::*;
 use crate::data_point::Similarity;
+const SET_LOCK: &str = "rest.lock";
 
 impl From<GrpcSimilarity> for Similarity {
     fn from(value: GrpcSimilarity) -> Self {
