@@ -133,3 +133,27 @@ async def test_handle_message_ignore_not_indexed(
     await shard_creator_handler.finalize()
 
     node_klass.create_shard_by_kbid.assert_not_called()
+
+
+@pytest.fixture()
+def has_feature():
+    with patch("nucliadb.ingest.consumer.shard_creator.has_feature") as mock:
+        yield mock
+
+
+def test_should_create_new_shard(has_feature):
+    sc = shard_creator.ShardCreatorHandler(
+        driver=MagicMock(), storage=MagicMock(), pubsub=MagicMock()
+    )
+    low_counter = Counter(
+        paragraphs=settings.max_shard_paragraphs - 1,
+        resources=settings.max_shard_fields - 1,
+    )
+    high_counter = Counter(
+        paragraphs=settings.max_shard_paragraphs + 1,
+        resources=settings.max_shard_fields + 1,
+    )
+    for feature_enabled in [True, False]:
+        has_feature.return_value = feature_enabled
+        assert sc.should_create_new_shard(low_counter) is False
+        assert sc.should_create_new_shard(high_counter) is True
