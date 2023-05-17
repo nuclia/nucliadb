@@ -627,8 +627,16 @@ mod tests {
                 .await
                 .expect("Error in new_shard request");
 
-            request_ids.push(response.get_ref().id.clone());
+            let shard_id = response.into_inner().id;
+            request_ids.push(shard_id.clone());
+
+            // Get shard to ensure it is in cache
+            client
+                .get_shard(Request::new(ShardId { id: shard_id }))
+                .await
+                .expect("Error in get_shard request");
         }
+
         let response = client
             .list_shards(Request::new(EmptyQuery {}))
             .await
