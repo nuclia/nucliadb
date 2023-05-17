@@ -81,7 +81,7 @@ python-code-lint:
 
 rust-code-lint:
 	cargo +nightly fmt
-	cargo +nightly clippy --tests
+	cargo clippy --tests
 
 
 test-rust:
