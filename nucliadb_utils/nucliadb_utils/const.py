@@ -56,4 +56,3 @@ class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
     SEPARATE_PROCESSED_MESSAGE_WRITES = "nucliadb_separate_processed_message_writes"
     AUDITING_BW_COMPAT_SHARD_COUNTER = "nucliadb_auditing_bw_compat_shard_counter"
-    PARAGRAPH_SHARD_CREATION = "nucliadb_paragraph_shard_creation"

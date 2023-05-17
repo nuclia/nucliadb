@@ -30,9 +30,7 @@ from nucliadb.ingest.settings import settings
 from nucliadb_protos import noderesources_pb2, nodesidecar_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.const import Features
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import has_feature
 
 from . import metrics
 from .utils import DelayedTaskHandler
@@ -91,9 +89,7 @@ class ShardCreatorHandler:
         metrics.total_messages.inc({"type": "shard_creator", "action": "scheduled"})
 
     def should_create_new_shard(self, counter: nodesidecar_pb2.Counter) -> bool:
-        if has_feature(Features.PARAGRAPH_SHARD_CREATION):
-            return counter.paragraphs > settings.max_shard_paragraphs
-        return counter.resources > settings.max_shard_fields
+        return counter.paragraphs > settings.max_shard_paragraphs
 
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
