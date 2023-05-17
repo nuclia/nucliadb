@@ -18,11 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt::Debug;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use fs2::FileExt;
 use nucliadb_core::context;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
@@ -33,7 +32,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, *};
 
-use super::SET_LOCK;
+use super::{MaybeLocked, SET_LOCK};
 use crate::data_point_provider::*;
 use crate::formula::{Formula, LabelClause};
 
@@ -49,27 +48,6 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     }
     fn no_results(&self) -> usize {
         self.0
-    }
-}
-
-enum SomeReader<'service> {
-    Default(&'service Reader),
-    Other(&'service File, Reader),
-}
-impl<'service> Drop for SomeReader<'service> {
-    fn drop(&mut self) {
-        let SomeReader::Other(lock, _) = self else {
-            return;
-        };
-        let _ = lock.unlock();
-    }
-}
-impl<'service> SomeReader<'service> {
-    pub fn inner(&self) -> &Reader {
-        match self {
-            Self::Other(_, inner) => inner,
-            Self::Default(inner) => inner,
-        }
     }
 }
 
@@ -91,7 +69,6 @@ impl VectorReader for VectorReaderService {
         let some_reader = self.get_index(vectorset)?;
         let reader = some_reader.inner();
         let no_nodes = reader.number_of_nodes();
-
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("count".to_string());
@@ -196,14 +173,13 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl VectorReaderService {
-    fn get_index<'a>(&'a self, name: &str) -> NodeResult<SomeReader<'a>> {
+    fn get_index<'a>(&'a self, name: &str) -> NodeResult<MaybeLocked<'a, Reader>> {
         if name.is_empty() {
-            Ok(SomeReader::Default(&self.default))
+            Ok(MaybeLocked::no_lock(&self.default))
         } else {
-            self.rest_lock.lock_shared()?;
             let path = self.rest.join(name);
             let reader = Index::open(&path).and_then(|i| i.reader())?;
-            Ok(SomeReader::Other(&self.rest_lock, reader))
+            Ok(MaybeLocked::with_shared_lock(reader, &self.rest_lock)?)
         }
     }
     #[tracing::instrument(skip_all)]
@@ -230,16 +206,12 @@ impl VectorReaderService {
         let Some(similarity) = config.similarity.map(|i| i.into()) else {
             return Err(node_error!("A similarity must be specified"));
         };
-
+        std::fs::create_dir_all(&config.vectorset)?;
         let path = &config.path;
         let rest = config.vectorset.clone();
         let metadata = IndexMetadata { similarity };
         let default = Index::new(path, metadata).and_then(|i| Index::reader(&i))?;
-        let rest_lock = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(rest.join(SET_LOCK))?;
+        let rest_lock = File::create(rest.join(SET_LOCK))?;
         Ok(VectorReaderService {
             default,
             rest,
@@ -254,11 +226,7 @@ impl VectorReaderService {
         let path = &config.path;
         let rest = config.vectorset.clone();
         let default = Index::open(path).and_then(|i| Index::reader(&i))?;
-        let rest_lock = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(rest.join(SET_LOCK))?;
+        let rest_lock = File::open(rest.join(SET_LOCK))?;
         Ok(VectorReaderService {
             default,
             rest,

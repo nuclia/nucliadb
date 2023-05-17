@@ -390,6 +390,10 @@ impl Writer {
         (0..merge_work).for_each(|_| self.notify_merger());
         Ok(())
     }
+    pub fn number_of_nodes(&self) -> usize {
+        let context = self.context.read();
+        context.state.no_nodes()
+    }
     pub fn abort(&mut self) {
         self.datapoint_buffer.clear();
         self.delete_buffer.clear();

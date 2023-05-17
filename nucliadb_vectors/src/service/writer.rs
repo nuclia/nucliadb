@@ -17,9 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::fmt::Debug;
+use std::fs::File;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
-use data_point::{Elem, LabelDictionary};
+use fs2::FileExt;
 use nucliadb_core::context;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
@@ -28,20 +30,13 @@ use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 
-use crate::data_point::DataPoint;
+use super::SET_LOCK;
+use crate::data_point::{DataPoint, Elem, LabelDictionary};
 use crate::data_point_provider::*;
-use crate::indexset::{IndexKeyCollector, IndexSet};
-use crate::{data_point, VectorErr};
-
-impl IndexKeyCollector for Vec<String> {
-    fn add_key(&mut self, key: String) {
-        self.push(key);
-    }
-}
-
 pub struct VectorWriterService {
+    rest_lock: File,
+    rest: PathBuf,
     default: Writer,
-    set: IndexSet,
 }
 
 impl Debug for VectorWriterService {
@@ -53,11 +48,16 @@ impl Debug for VectorWriterService {
 impl VectorWriter for VectorWriterService {
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
+        let id: Option<String> = None;
         let time = SystemTime::now();
 
-        let id: Option<String> = None;
-        let mut collector = Vec::new();
-        self.set.keys(&mut collector)?;
+        let sets: Vec<_> = std::fs::read_dir(&self.rest)?
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|entry| entry.is_dir())
+            .flat_map(|entry| entry.file_name().map(|i| i.to_os_string()))
+            .map(|i| i.to_string_lossy().to_string())
+            .collect();
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -65,7 +65,7 @@ impl VectorWriter for VectorWriterService {
         metrics.record_request_time(metric, took);
 
         debug!("{id:?} - Ending at {took} ms");
-        Ok(collector)
+        Ok(sets)
     }
 
     #[tracing::instrument(skip_all)]
@@ -80,13 +80,15 @@ impl VectorWriter for VectorWriterService {
         let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
         let similarity = similarity.into();
-        self.set.create(indexid, similarity)?;
+        let metadata = IndexMetadata { similarity };
+        let index_location = self.rest.join(indexid);
+        Index::new(&index_location, metadata)?;
+
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("add_vectorset".to_string());
         metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
-
         Ok(())
     }
     #[tracing::instrument(skip_all)]
@@ -96,7 +98,11 @@ impl VectorWriter for VectorWriterService {
         let id = setid.shard.as_ref().map(|s| &s.id);
         let set = &setid.vectorset;
         let indexid = &setid.vectorset;
-        self.set.remove_index(indexid)?;
+        let index_location = self.rest.join(indexid);
+        self.rest_lock.lock_exclusive()?;
+        std::fs::remove_dir_all(index_location)?;
+        self.rest_lock.unlock()?;
+
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("remove_vectorset".to_string());
@@ -117,9 +123,7 @@ impl WriterChild for VectorWriterService {
         let time = SystemTime::now();
         let id: Option<String> = None;
 
-        let index = self.default.index();
-        let reader = index.reader()?;
-        let no_nodes = reader.no_nodes();
+        let no_nodes = self.default.number_of_nodes();
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -188,15 +192,12 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Datapoint creation: starts {v} ms");
         }
-        let location = self.default.index().location();
-        let similarity = self.default.index().metadata().similarity;
+
         if !elems.is_empty() {
-            self.default.add(DataPoint::new(
-                location,
-                elems,
-                Some(temporal_mark),
-                similarity,
-            )?);
+            let location = self.default.location();
+            let similarity = self.default.metadata().similarity;
+            let dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
+            self.default.add(dp);
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Datapoint creation: ends {v} ms");
@@ -219,23 +220,18 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Modifying sets: starts {v} ms");
         }
-        let iter = resource
-            .vectors_to_delete
-            .keys()
-            .chain(resource.vectors.keys())
-            .cloned()
-            .flat_map(|i| self.set.get(&i).transpose().map(|j| (i, j)));
-        for (name, index) in iter {
-            let index = index?;
-            let similarity = index.metadata().similarity;
-            let location = index.location();
-            let mut writer = index.writer()?;
-            if let Some(vectors_to_delete) = resource.vectors_to_delete.get(&name) {
+
+        let deletes = resource.vectors_to_delete.keys();
+        let adds = resource.vectors.keys();
+        for index_name in deletes.chain(adds) {
+            let index_path = self.rest.join(index_name);
+            let mut writer = Index::open(&index_path).and_then(|i| Index::writer(&i))?;
+            if let Some(vectors_to_delete) = resource.vectors_to_delete.get(index_name) {
                 for key in vectors_to_delete.vectors.iter().cloned() {
                     writer.delete(key, temporal_mark)
                 }
             }
-            if let Some(vectors_to_insert) = resource.vectors.get(&name) {
+            if let Some(vectors_to_insert) = resource.vectors.get(index_name) {
                 let mut elems = vec![];
                 for (key, user_vector) in vectors_to_insert.vectors.iter() {
                     let key = key.clone();
@@ -244,12 +240,10 @@ impl WriterChild for VectorWriterService {
                     elems.push(Elem::new(key, vector, labels, None));
                 }
                 if !elems.is_empty() {
-                    writer.add(DataPoint::new(
-                        location,
-                        elems,
-                        Some(temporal_mark),
-                        similarity,
-                    )?)
+                    let location = writer.location();
+                    let similarity = writer.metadata().similarity;
+                    let dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
+                    writer.add(dp);
                 }
             }
             writer.commit()?;
@@ -270,16 +264,7 @@ impl WriterChild for VectorWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
 
-        self.collect_garbage_for(&self.default)?;
-        let mut index_keys = vec![];
-        self.set.keys(&mut index_keys)?;
-        for index_key in index_keys {
-            let Some(index) = self.set.get(&index_key)? else {
-                return Err(node_error!("Unknown state for {index_key}"));
-            };
-            let writer = index.writer()?;
-            self.collect_garbage_for(&writer)?;
-        }
+        self.default.collect_garbage()?;
 
         let metrics = context::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -292,16 +277,6 @@ impl WriterChild for VectorWriterService {
 }
 
 impl VectorWriterService {
-    fn collect_garbage_for(&self, writer: &Writer) -> NodeResult<()> {
-        let location = writer.index().location();
-        match writer.collect_garbage() {
-            Ok(_) => debug!("Garbage collected for main index {location:?}"),
-            Err(VectorErr::WorkDelayed) => debug!("Garbage collection delayed {location:?}"),
-            Err(e) => Err(e)?,
-        }
-        Ok(())
-    }
-
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
@@ -320,30 +295,38 @@ impl VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let indexset = std::path::Path::new(&config.vectorset);
-        if path.exists() {
-            Err(node_error!("Shard does exist".to_string()))
-        } else {
-            let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified"));
-            };
-            let default = Index::new(path, IndexMetadata { similarity })?.writer()?;
-            let set = IndexSet::new(indexset, IndexCheck::None)?;
-            Ok(VectorWriterService { default, set })
+        if config.path.exists() {
+            return Err(node_error!("Shard does exist".to_string()));
         }
+        let Some(similarity) = config.similarity.map(|i| i.into()) else {
+                return Err(node_error!("A similarity must be specified"));
+        };
+        std::fs::create_dir_all(&config.vectorset)?;
+        let path = &config.path;
+        let metadata = IndexMetadata { similarity };
+        let default = Index::new(path, metadata).and_then(|i| Index::writer(&i))?;
+        let rest = config.vectorset.clone();
+        let rest_lock = File::create(rest.join(SET_LOCK))?;
+        Ok(VectorWriterService {
+            default,
+            rest,
+            rest_lock,
+        })
     }
     #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let indexset = std::path::Path::new(&config.vectorset);
-        if !path.exists() {
-            Err(node_error!("Shard does not exist".to_string()))
-        } else {
-            let default = Index::open(path, IndexCheck::Sanity)?.writer()?;
-            let set = IndexSet::new(indexset, IndexCheck::Sanity)?;
-            Ok(VectorWriterService { default, set })
+        if !config.path.exists() {
+            return Err(node_error!("Shard does exist".to_string()));
         }
+        let path = &config.path;
+        let rest = config.vectorset.clone();
+        let default = Index::open(path).and_then(|i| Index::writer(&i))?;
+        let rest_lock = File::open(rest.join(SET_LOCK))?;
+        Ok(VectorWriterService {
+            default,
+            rest,
+            rest_lock,
+        })
     }
 }
 
