@@ -28,8 +28,8 @@ import requests
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_client.client import NucliaDBClient as GRPCNucliaDBClient
 import nucliadb_sdk
+from nucliadb_client.client import NucliaDBClient as GRPCNucliaDBClient
 
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",

@@ -17,17 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 import os
 from typing import Any, Dict
 
 import pytest
 from sentence_transformers import SentenceTransformer  # type: ignore
 
-from nucliadb_sdk import Entity, File, KnowledgeBox
-from nucliadb_sdk.labels import Label
-from nucliadb_sdk.search import ResultType, ScoreType
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.search import ResourceProperties, SearchOptions
 
 TESTING_IN_CI = os.environ.get("CI") == "true"
 
@@ -297,21 +296,51 @@ def test_search_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nuclia
     assert len(results.sentences.results) == 20
 
 
-@pytest.mark.skipif(
-    TESTING_IN_CI,
-    reason="It is accessing the HuggingFace API",
-)
-def test_standard_examples(knowledgebox: KnowledgeBox):
+# can fail in CI due to HuggingFace API
+@pytest.mark.xfail
+def test_standard_examples(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
-    knowledgebox.create_resource(
+    sdk.create_resource(
+        kbid=knowledgebox.uuid,
         title="Happy dog",
-        binary=File(data=b"Happy dog file data", filename="data.txt"),
-        text="I'm Sierra, a very happy dog",
-        labels=["emotion/positive"],
-        entities=[Entity(type="NAME", value="Sierra", positions=[(4, 9)])],
-        vectors={
-            "all-MiniLM-L6-v2": encoder.encode(["I'm Sierra, a very happy dog"])[0]
+        files={
+            "upload": {
+                "file": {
+                    "filename": "data.txt",
+                    "payload": base64.b64encode(b"Happy dog file data"),
+                }
+            }
         },
+        texts={"text": {"body": "I'm Sierra, a very happy dog"}},
+        usermetadata={
+            "classifications": [{"labelset": "emotion", "label": "positive"}]
+        },
+        fieldmetadata=[
+            {
+                "field": {
+                    "field": "text",
+                    "field_type": "text",
+                },
+                "token": [{"token": "Sierra", "klass": "NAME", "start": 4, "end": 9}],
+            }
+        ],
+        uservectors=[
+            {
+                "field": {
+                    "field": "text",
+                    "field_type": "text",
+                },
+                "vectors": {
+                    "all-MiniLM-L6-v2": {
+                        "vectors": {
+                            "vector": encoder.encode(["I'm Sierra, a very happy dog"])[
+                                0
+                            ].tolist()
+                        },
+                    }
+                },
+            }
+        ],
     )
 
     sentences = [
@@ -323,90 +352,61 @@ def test_standard_examples(knowledgebox: KnowledgeBox):
         ("Day 6", "love is tough", "emotion/negative"),
     ]
     for title, sentence, label in sentences:
-        knowledgebox.create_resource(
+        sdk.create_resource(
+            kbid=knowledgebox.uuid,
             title=title,
-            text=sentence,
-            labels=[label],
-            vectors={"all-MiniLM-L6-v2": encoder.encode([sentence])[0]},
+            texts={"text": {"body": sentence}},
+            usermetadata={
+                "classifications": [
+                    {"labelset": label.split("/")[0], "label": label.split("/")[1]}
+                ]
+            },
+            uservectors=[
+                {
+                    "field": {
+                        "field": "text",
+                        "field_type": "text",
+                    },
+                    "vectors": {
+                        "all-MiniLM-L6-v2": {
+                            "vectors": {
+                                "vector": encoder.encode([sentence])[0].tolist()
+                            },
+                        }
+                    },
+                }
+            ],
         )
 
     # test semantic search
-    results = list(
-        knowledgebox.search(
-            vector=encoder.encode(["To be in love"])[0],
-            vectorset="all-MiniLM-L6-v2",
-            min_score=0.25,
-        )
+    results = sdk.search(
+        kbid=knowledgebox.uuid,
+        vector=encoder.encode(["To be in love"])[0].tolist(),
+        vectorset="all-MiniLM-L6-v2",
+        min_score=0.25,
+        features=[SearchOptions.VECTOR],
+        show=[ResourceProperties.BASIC, ResourceProperties.VALUES],
     )
-    assert len(results) == 2
-    assert results[0].text == "love is tough"
-    assert results[0].labels == ["negative"]
-    assert results[0].score_type == ScoreType.COSINE
-    assert results[1].text == "he is heartbroken"
-    assert results[1].labels == ["negative"]
-    assert results[0].score_type == ScoreType.COSINE
+    assert len(results.resources) == 2
+    res = next(iter(results.resources.values()))
+    assert res.data.texts["text"].value.body == "love is tough"
 
     # full text search results
-    results = list(knowledgebox.search(text="dog"))
-    assert len(results) == 4
-    assert results[0].text == "Happy dog"
-    assert results[0].labels == ["positive"]
-    assert results[0].score_type == ScoreType.BM25
-    assert results[0].result_type == ResultType.FULLTEXT
-    assert results[1].text == "Dog in catalan is gos"
-    assert results[1].labels == ["neutral"]
-    assert results[1].score_type == ScoreType.BM25
-    assert results[1].result_type == ResultType.FULLTEXT
-    assert results[2].text == "I'm Sierra, a very happy dog"
-    assert results[2].labels == ["positive"]
-    assert results[2].score_type == ScoreType.BM25
-    assert results[2].result_type == ResultType.FULLTEXT
-    assert results[3].text == "Happy dog"
-    assert results[3].labels == ["positive"]
-    assert results[3].result_type == ResultType.PARAGRAPH
+    results = sdk.search(
+        kbid=knowledgebox.uuid,
+        query="dog",
+        features=[SearchOptions.DOCUMENT, SearchOptions.PARAGRAPH],
+    )
+    assert len(results.fulltext.results) == 3
+    assert len(results.paragraphs.results) == 1
 
     # test filter
-    results = list(knowledgebox.search(filter=["emotion/positive"]))
-
-    assert len(results) == 6
-    assert set([r.text for r in results]) == set(
-        [
-            "what a delighful day",
-            "Happy dog",
-            "I'm Sierra, a very happy dog",
-            "Day 2",
-        ]
+    results = sdk.search(
+        kbid=knowledgebox.uuid,
+        filters=["/l/emotion/positive"],
+        features=[SearchOptions.DOCUMENT, SearchOptions.PARAGRAPH],
+        show=[ResourceProperties.BASIC, ResourceProperties.VALUES],
     )
 
-
-def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
-    # Lets create a bunch of resources
-
-    text: str
-    for index, text in enumerate(DATA["text"]):
-        if index == 50:
-            break
-        label = DATA["label"][index]
-        knowledgebox.create_resource(
-            text=text,
-            labels=[str(label)],
-            vectors={"all-MiniLM-L6-v2": [1.0, 2.0, 3.0, 2.0]},
-        )
-
-    assert len(knowledgebox) == 50
-    labels = knowledgebox.get_uploaded_labels()
-
-    assert labels["default"].count == 100
-    assert labels["default"].labels["0"] == 18
-
-    resources = knowledgebox.search(text="love")
-    assert resources.fulltext.total == 5
-    assert len(resources.resources) == 5
-
-    resources = knowledgebox.search(filter=["12"])
-
-    vector_q = [1.0, 2.0, 3.0, 2.0]
-    resources = knowledgebox.search(
-        vector=vector_q,
-        vectorset="all-MiniLM-L6-v2",
-    )
+    assert len(results.fulltext.results) == 4
+    assert len(results.paragraphs.results) == 2

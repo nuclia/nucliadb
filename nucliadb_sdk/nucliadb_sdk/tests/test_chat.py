@@ -17,15 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_sdk.knowledgebox import KnowledgeBox
+import nucliadb_sdk
 
 
-def test_chat_resource(docs_fixture: KnowledgeBox):
-    find_result, answer, relations_result, learning_id = docs_fixture.chat(
-        text="Nuclia loves Semantic Search"
-    )
-    assert learning_id == "00"
-    assert answer == b"valid answer  to"
-    assert len(find_result.resources) == 9
-    assert relations_result
-    assert len(relations_result.entities["Nuclia"].related_to) == 18
+def test_chat_resource(docs_dataset, sdk: nucliadb_sdk.NucliaSDK):
+    result = sdk.chat(kbid=docs_dataset, query="Nuclia loves Semantic Search")
+    assert result.learning_id == "00"
+    assert result.answer == "valid answer  to"
+    assert len(result.result.resources) == 9
+    assert result.relations
+    assert len(result.relations.entities["Nuclia"].related_to) == 18
