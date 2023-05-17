@@ -166,6 +166,14 @@ impl Drop for Reader {
     }
 }
 impl Reader {
+    fn open_status_file(location: &Path) -> VectorR<File> {
+        Ok(OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(location)?)
+    }
     fn new(inner: Index) -> VectorR<Reader> {
         let id = uuid::Uuid::new_v4().to_string();
         let update_scheduled = Arc::new(AtomicBool::new(false));
@@ -178,11 +186,7 @@ impl Reader {
         }
 
         // Creating the reader status
-        let mut status_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&status)?;
+        let mut status_file = Reader::open_status_file(&status)?;
         status_file.lock_exclusive()?;
         let watching = context.read().state.dpid_iter().collect::<Vec<_>>();
         let mut status_buf = BufWriter::new(&mut status_file);
@@ -210,13 +214,8 @@ impl Reader {
         let transform = move |state: &mut InnerContext| {
             let disk_version = fs_state::crnt_version(&location)?;
             if disk_version > state.version {
-                let mut status_file = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .create(true)
-                    .open(&status)?;
+                let mut status_file = Reader::open_status_file(&status)?;
                 status_file.lock_exclusive()?;
-
                 let (new_version, new_state) = fs_state::load_state(&location)?;
                 state.state = new_state;
                 state.version = new_version;
