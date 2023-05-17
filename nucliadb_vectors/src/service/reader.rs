@@ -109,6 +109,7 @@ impl ReaderChild for VectorReaderService {
         let some_reader = self.get_index(&request.vector_set)?;
         let reader = some_reader.inner();
         let result = reader.search(&search_request)?;
+        reader.schedule_update();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
         }

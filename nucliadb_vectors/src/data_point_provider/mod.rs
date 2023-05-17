@@ -27,6 +27,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
 use std::mem;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::time::SystemTime;
 
@@ -157,6 +158,7 @@ pub struct Reader {
     status: PathBuf,
     inner: Index,
     context: Context,
+    update_scheduled: Arc<AtomicBool>,
 }
 impl Drop for Reader {
     fn drop(&mut self) {
@@ -166,6 +168,7 @@ impl Drop for Reader {
 impl Reader {
     fn new(inner: Index) -> VectorR<Reader> {
         let id = uuid::Uuid::new_v4().to_string();
+        let update_scheduled = Arc::new(AtomicBool::new(false));
         let status_dir = inner.location().join(READERS_STATUS);
         let status = status_dir.join(id).with_extension("json");
         let context = Context::new(inner.location())?;
@@ -190,9 +193,13 @@ impl Reader {
             status,
             inner,
             context,
+            update_scheduled,
         })
     }
-    pub fn schedule_update(&self) -> VectorR<()> {
+    pub fn schedule_update(&self) {
+        if self.update_scheduled.swap(true, Ordering::SeqCst) {
+            return;
+        }
         // Is important that reader state updates
         // and status updates are done atomically.
         // Otherwise data points that are in use may be delete by the GC.
@@ -217,15 +224,18 @@ impl Reader {
                 serde_json::to_writer(&mut status_buf, &watching)?;
                 status_buf.flush()?;
                 mem::drop(status_buf);
-
                 status_file.unlock()?;
             }
             Ok(())
         };
         // Updating the state in the background
         let state = self.context.clone();
-        std::thread::spawn(move || state.apply(transform));
-        Ok(())
+        let update_scheduled = self.update_scheduled.clone();
+        let background_update = move || {
+            let _ = state.apply(transform);
+            update_scheduled.swap(false, Ordering::SeqCst);
+        };
+        std::thread::spawn(background_update);
     }
     pub fn keys(&self) -> VectorR<Vec<String>> {
         let state = self.context.read();
@@ -417,7 +427,38 @@ mod test {
     use nucliadb_core::NodeResult;
 
     use super::*;
-    use crate::data_point::Similarity;
+    use crate::data_point::{Elem, LabelDictionary, Similarity};
+
+    #[test]
+    fn test_reader_update() -> NodeResult<()> {
+        let number_of_nodes = 100;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path();
+        let metadata = IndexMetadata::default();
+        let index = Index::new(path, metadata)?;
+        let elems: Vec<_> = (0..number_of_nodes)
+            .into_iter()
+            .map(|i| format!("key_{i}"))
+            .map(|i| Elem::new(i, vec![0.0; 12], LabelDictionary::default(), None))
+            .collect();
+
+        let mut writer = index.writer()?;
+        let reader = index.reader()?;
+        let empty_state_reader = index.reader()?;
+        let timestamp = SystemTime::now();
+        let datapoint = DataPoint::new(path, elems, Some(timestamp), Similarity::Dot)?;
+        writer.add(datapoint);
+        writer.commit()?;
+        // Not updated yet
+        assert_eq!(empty_state_reader.number_of_nodes(), 0);
+        assert_eq!(reader.number_of_nodes(), 0);
+        reader.schedule_update();
+        while reader.update_scheduled.load(Ordering::SeqCst) {}
+        // Now the reader has been updated
+        assert_eq!(reader.number_of_nodes(), number_of_nodes);
+        assert_eq!(empty_state_reader.number_of_nodes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn many_readers() -> VectorR<()> {
