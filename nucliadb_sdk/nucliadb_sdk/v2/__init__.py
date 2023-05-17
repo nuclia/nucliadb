@@ -16,17 +16,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from .sdk import NucliaSDK, Region
 
-import pytest
-
-import nucliadb_sdk
-from nucliadb_models.resource import KnowledgeBoxObj
-
-
-def test_create_kb(sdk: nucliadb_sdk.NucliaSDK):
-    kb: KnowledgeBoxObj = sdk.create_knowledge_box(slug="hola")
-    assert sdk.get_knowledge_box(kbid=kb.uuid) is not None
-    assert sdk.get_knowledge_box_by_slug(slug="hola") is not None
-
-    with pytest.raises(nucliadb_sdk.exceptions.ConflictError):
-        sdk.create_knowledge_box(slug="hola")
+__all__ = ("NucliaSDK", "Region")
