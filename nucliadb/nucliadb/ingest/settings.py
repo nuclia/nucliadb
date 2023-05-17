@@ -70,9 +70,6 @@ class Settings(DriverSettings):
     chitchat_binding_port: int = 31337
     chitchat_enabled: bool = True
 
-    # chitchat_peers_addr: List[str] = ["localhost:3001"] # TODO is it seed list?
-    # swim_host_key: str = "ingest.key" # TODO: ask if it's swim specific keys?
-
     logging_config: Optional[str] = None
 
     node_writer_port: int = 10000
