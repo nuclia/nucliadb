@@ -226,8 +226,9 @@ impl VectorReaderService {
         }
         let path = &config.path;
         let rest = config.vectorset.clone();
+        let rest_path = rest.join(SET_LOCK);
         let default = Index::open(path).and_then(|i| Index::reader(&i))?;
-        let rest_lock = File::open(rest.join(SET_LOCK))?;
+        let rest_lock = File::open(&rest_path).or_else(|_| File::create(&rest_path))?;
         Ok(VectorReaderService {
             default,
             rest,

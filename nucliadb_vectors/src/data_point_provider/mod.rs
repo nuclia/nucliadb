@@ -172,23 +172,25 @@ impl Reader {
         let status_dir = inner.location().join(READERS_STATUS);
         let status = status_dir.join(id).with_extension("json");
         let context = Context::new(inner.location())?;
-        {
-            // Creating the reader status
-            let mut status_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(&status)?;
-            status_file.lock_exclusive()?;
 
-            let watching = context.read().state.dpid_iter().collect::<Vec<_>>();
-            let mut status_buf = BufWriter::new(&mut status_file);
-            serde_json::to_writer(&mut status_buf, &watching)?;
-            status_buf.flush()?;
-            mem::drop(status_buf);
-
-            status_file.unlock()?;
+        if !status_dir.exists() {
+            std::fs::create_dir_all(&status_dir)?;
         }
+
+        // Creating the reader status
+        let mut status_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&status)?;
+        status_file.lock_exclusive()?;
+        let watching = context.read().state.dpid_iter().collect::<Vec<_>>();
+        let mut status_buf = BufWriter::new(&mut status_file);
+        serde_json::to_writer(&mut status_buf, &watching)?;
+        status_buf.flush()?;
+        mem::drop(status_buf);
+        status_file.unlock()?;
+
         Ok(Reader {
             status,
             inner,
@@ -437,7 +439,6 @@ mod test {
         let metadata = IndexMetadata::default();
         let index = Index::new(path, metadata)?;
         let elems: Vec<_> = (0..number_of_nodes)
-            .into_iter()
             .map(|i| format!("key_{i}"))
             .map(|i| Elem::new(i, vec![0.0; 12], LabelDictionary::default(), None))
             .collect();
