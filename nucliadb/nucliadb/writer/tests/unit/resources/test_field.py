@@ -18,12 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from unittest import mock
+from nucliadb_models.common import FileB64
+from nucliadb_models.conversation import InputConversationField, InputMessageContent, InputMessage
 
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.processing import PushPayload
-from nucliadb.writer.resource.field import parse_file_field
+from nucliadb.writer.resource.field import parse_conversation_field, parse_file_field
 from nucliadb_models import File, FileField
 
 FIELD_MODULE = "nucliadb.writer.resource.field"
@@ -37,6 +39,15 @@ def processing_mock():
         processing.convert_external_filefield_to_str.return_value = "external"
         get_processing_mock.return_value = processing
         yield processing
+
+
+@pytest.fixture(scope="function")
+def storage_mock():
+    cf = CloudFile()
+    storage = mock.AsyncMock()
+    storage.upload_b64file_to_cloudfile = mock.AsyncMock(return_value=cf)
+    with mock.patch(f"{FIELD_MODULE}.get_storage", return_value=storage):
+        yield storage
 
 
 @pytest.mark.parametrize(
@@ -66,3 +77,34 @@ async def test_parse_file_field_does_not_store_password(processing_mock, file_fi
     )
 
     assert not writer_bm.files[field_key].password
+
+def get_file():
+    return FileB64(filename="myfile.pdf", payload="foo", md5="bar")
+
+def get_message(id, who, to, text, attachments=None):
+    content = InputMessageContent(text=text)
+    if not isinstance(to, list):
+        to = [to]
+    if attachments:
+        content.attachments.extend(attachments)
+    msg = InputMessage(who=who, to=to, content=content, ident=id)
+    return msg
+
+
+@pytest.mark.asyncio
+async def test_parse_conversation_field(storage_mock, processing_mock):
+    key = "conv"
+    kbid = "kbid"
+    uuid = "uuid"
+    bm = BrokerMessage()
+    pp = PushPayload(uuid=uuid, kbid=kbid, partition=1, userid="user")
+    attachment = get_file()
+    m1 = get_message(id="m1", who="ramon", to="nucliadb", text="look at this idea", attachments=[attachment])
+    m2 = get_message(id="m2", who="nucliadb", to="ramon", text="ok")
+
+    conversation_field = InputConversationField(messages=[m1, m2])
+
+    await parse_conversation_field(key, conversation_field, bm, pp, kbid, uuid)
+
+    breakpoint()
+    pass
