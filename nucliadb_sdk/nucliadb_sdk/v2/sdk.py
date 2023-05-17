@@ -122,7 +122,7 @@ def _request_builder(
         resp = self._request(path, method, data=data, query_params=query_params)
 
         if response_type is not None:
-            if issubclass(response_type, BaseModel):  # type: ignore
+            if isinstance(response_type, type) and issubclass(response_type, BaseModel):
                 return response_type.parse_raw(resp.content)  # type: ignore
             else:
                 return response_type(resp)  # type: ignore
