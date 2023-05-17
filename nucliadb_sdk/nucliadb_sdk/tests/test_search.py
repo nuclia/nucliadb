@@ -238,7 +238,7 @@ DATA: Dict[str, Any] = {
 }
 
 
-def test_search_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
+def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
     # Lets create a bunch of resources
     text: str
     for index, text in enumerate(DATA["text"]):
@@ -246,7 +246,7 @@ def test_search_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nuclia
             break
         label = DATA["label"][index]
         sdk.create_resource(
-            kbid=knowledgebox.uuid,
+            kbid=kb.uuid,
             texts={"text": {"body": text}},
             usermetadata={"classifications": [{"labelset": "emoji", "label": label}]},
             uservectors=[
@@ -266,27 +266,27 @@ def test_search_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nuclia
             ],
         )
 
-    resources = sdk.list_resources(kbid=knowledgebox.uuid, query_params={"size": 50})
+    resources = sdk.list_resources(kbid=kb.uuid, query_params={"size": 50})
     assert resources.pagination.size == 50
     assert resources.pagination.last
 
     results = sdk.search(
-        kbid=knowledgebox.uuid, features=["document"], faceted=["/l"], page_size=0
+        kbid=kb.uuid, features=["document"], faceted=["/l"], page_size=0
     )
     assert results.fulltext.facets == {"/l": {"/l/emoji": 50 * 2}}
 
-    resources = sdk.search(kbid=knowledgebox.uuid, query="love")
+    resources = sdk.search(kbid=kb.uuid, query="love")
     assert resources.fulltext.total == 5
     assert len(resources.resources) == 5
 
     resources = sdk.search(
-        kbid=knowledgebox.uuid, features=["document"], faceted=["/l/emoji"], page_size=0
+        kbid=kb.uuid, features=["document"], faceted=["/l/emoji"], page_size=0
     )
     assert resources.fulltext.facets["/l/emoji"]["/l/emoji/0"] == 9 * 2
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
     results = sdk.search(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         vector=vector_q,
         vectorset="all-MiniLM-L6-v2",
         min_score=0.70,
@@ -298,10 +298,10 @@ def test_search_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nuclia
 
 # can fail in CI due to HuggingFace API
 @pytest.mark.xfail
-def test_standard_examples(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
+def test_standard_examples(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
     sdk.create_resource(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         title="Happy dog",
         files={
             "upload": {
@@ -353,7 +353,7 @@ def test_standard_examples(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nucl
     ]
     for title, sentence, label in sentences:
         sdk.create_resource(
-            kbid=knowledgebox.uuid,
+            kbid=kb.uuid,
             title=title,
             texts={"text": {"body": sentence}},
             usermetadata={
@@ -380,7 +380,7 @@ def test_standard_examples(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nucl
 
     # test semantic search
     results = sdk.search(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         vector=encoder.encode(["To be in love"])[0].tolist(),
         vectorset="all-MiniLM-L6-v2",
         min_score=0.25,
@@ -393,7 +393,7 @@ def test_standard_examples(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nucl
 
     # full text search results
     results = sdk.search(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         query="dog",
         features=[SearchOptions.DOCUMENT, SearchOptions.PARAGRAPH],
     )
@@ -402,7 +402,7 @@ def test_standard_examples(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.Nucl
 
     # test filter
     results = sdk.search(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         filters=["/l/emotion/positive"],
         features=[SearchOptions.DOCUMENT, SearchOptions.PARAGRAPH],
         show=[ResourceProperties.BASIC, ResourceProperties.VALUES],

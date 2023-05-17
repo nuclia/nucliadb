@@ -365,7 +365,7 @@ class KnowledgeBox:
                 "kind": [labelset_type.value],
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
 
     def get_labels(self) -> KnowledgeBoxLabels:
         resp = self.client.get_labels()

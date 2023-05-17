@@ -30,6 +30,9 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 import nucliadb_sdk
 from nucliadb_client.client import NucliaDBClient as GRPCNucliaDBClient
+from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.client import Environment, NucliaDBClient
+from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
@@ -67,17 +70,20 @@ class NucliaFixture:
     host: str
     port: int
     grpc: int
+    url: str
     container: Optional[NucliaDB] = None
 
 
 @pytest.fixture(scope="session")
 def nucliadb():
     if os.environ.get("TEST_LOCAL_NUCLIADB"):
+        host = os.environ.get("TEST_LOCAL_NUCLIADB")
         yield NucliaFixture(
-            host=os.environ.get("TEST_LOCAL_NUCLIADB"),
+            host=host,
             port=8080,
             grpc=8060,
             container="local",
+            url=f"http://{host}:8080/api",
         )
     else:
         container = NucliaDB()
@@ -89,28 +95,45 @@ def nucliadb():
             service_port = "8060/tcp"
             grpc = network["Ports"][service_port][0]["HostPort"]
         yield NucliaFixture(
-            host=host, port=port, grpc=grpc, container=container.container_obj
+            host=host,
+            port=port,
+            grpc=grpc,
+            container=container.container_obj,
+            url=f"http://{host}:{port}/api",
         )
         container.stop()
 
 
 @pytest.fixture(scope="session")
 def sdk(nucliadb: NucliaFixture):
-    sdk = nucliadb_sdk.NucliaSDK(
-        region=nucliadb_sdk.Region.ON_PREM,
-        url=f"http://{nucliadb.host}:{nucliadb.port}/api/",
-    )
+    sdk = nucliadb_sdk.NucliaSDK(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
     return sdk
 
 
 @pytest.fixture(scope="function")
-def knowledgebox(sdk: nucliadb_sdk.NucliaSDK):
+def kb(sdk: nucliadb_sdk.NucliaSDK):
     kbslug = uuid4().hex
     kb = sdk.create_knowledge_box(slug=kbslug)
 
     yield kb
 
     sdk.delete_knowledge_box(kbid=kb.uuid)
+
+
+@pytest.fixture(scope="function")
+def knowledgebox(kb: KnowledgeBoxObj, nucliadb: NucliaFixture):
+    """
+    b/w compatible fixture since other components depend on this
+    """
+    url = f"{nucliadb.url}/v1/kb/{kb.uuid}"
+    client = NucliaDBClient(
+        environment=Environment.OSS,
+        writer_host=url,
+        reader_host=url,
+        search_host=url,
+        train_host=url,
+    )
+    yield KnowledgeBox(client)
 
 
 async def init_fixture(

@@ -26,12 +26,12 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.search import ResourceProperties
 
 
-def test_crud_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
+def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
     with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
-        sdk.get_resource_by_slug(kbid=knowledgebox.uuid, slug="mykey1")
+        sdk.get_resource_by_slug(kbid=kb.uuid, slug="mykey1")
 
     sdk.create_resource(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         texts={"text": {"body": "I'm Ramon"}},
         slug="mykey1",
         files={
@@ -69,7 +69,7 @@ def test_crud_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSD
         ],
     )
     resource = sdk.get_resource_by_slug(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         slug="mykey1",
         query_params={
             "show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]
@@ -82,13 +82,13 @@ def test_crud_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSD
     assert resource.data.files["file"].value.file.filename == "data"
 
     sdk.update_resource(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         rid=resource.id,
         texts={"text": {"body": "I'm an updated Ramon"}},
     )
 
     resource = sdk.get_resource_by_slug(
-        kbid=knowledgebox.uuid,
+        kbid=kb.uuid,
         slug="mykey1",
         query_params={
             "show": [ResourceProperties.BASIC.value, ResourceProperties.VALUES.value]
@@ -96,7 +96,7 @@ def test_crud_resource(knowledgebox: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSD
     )
     assert resource.data.texts["text"].value.body == "I'm an updated Ramon"
 
-    sdk.delete_resource(kbid=knowledgebox.uuid, rid=resource.id)
+    sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
 
     with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
-        sdk.get_resource_by_slug(kbid=knowledgebox.uuid, slug="mykey1")
+        sdk.get_resource_by_slug(kbid=kb.uuid, slug="mykey1")

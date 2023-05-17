@@ -28,6 +28,10 @@ class AuthError(ClientError):
     pass
 
 
+class AccountLimitError(ClientError):
+    pass
+
+
 class RateLimitError(ClientError):
     pass
 

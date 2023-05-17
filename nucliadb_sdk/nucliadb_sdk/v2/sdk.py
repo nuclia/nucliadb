@@ -24,6 +24,12 @@ from typing import Any, Callable, Optional, Type, Union
 import httpx
 from pydantic import BaseModel
 
+from nucliadb_models.entities import (
+    CreateEntitiesGroupPayload,
+    EntitiesGroup,
+    UpdateEntitiesGroupPayload,
+)
+from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxList,
@@ -189,6 +195,10 @@ class NucliaSDK:
             raise exceptions.AuthError(
                 f"Auth error {response.status_code}: {response.text}"
             )
+        elif response.status_code == 402:
+            raise exceptions.AccountLimitError(
+                f"Account limits exceeded error {response.status_code}: {response.text}"
+            )
         elif response.status_code == 429:
             raise exceptions.RateLimitError(response.text)
         elif response.status_code == 419:
@@ -206,18 +216,15 @@ class NucliaSDK:
     create_knowledge_box = _request_builder(
         "/v1/kbs", "POST", (), KnowledgeBoxConfig, KnowledgeBoxObj
     )
-
     delete_knowledge_box = _request_builder(
         "/v1/kb/{kbid}", "DELETE", ("kbid",), None, KnowledgeBoxObj
     )
-
     get_knowledge_box = _request_builder(
         "/v1/kb/{kbid}", "GET", ("kbid",), None, KnowledgeBoxObj
     )
     get_knowledge_box_by_slug = _request_builder(
         "/v1/kb/s/{slug}", "GET", ("slug",), None, KnowledgeBoxObj
     )
-
     list_knowledge_boxes = _request_builder(
         "/v1/kbs", "GET", (), None, KnowledgeBoxList
     )
@@ -230,7 +237,6 @@ class NucliaSDK:
         CreateResourcePayload,
         ResourceCreated,
     )
-
     update_resource = _request_builder(
         "/v1/kb/{kbid}/resource/{rid}",
         "PATCH",
@@ -238,21 +244,67 @@ class NucliaSDK:
         UpdateResourcePayload,
         ResourceUpdated,
     )
-
     delete_resource = _request_builder(
         "/v1/kb/{kbid}/resource/{rid}", "DELETE", ("kbid", "rid"), None, None
     )
-
     get_resource_by_slug = _request_builder(
         "/v1/kb/{kbid}/slug/{slug}", "GET", ("kbid", "slug"), None, Resource
     )
-
     get_resource_by_id = _request_builder(
         "/v1/kb/{kbid}/resource/{rid}", "GET", ("kbid", "rid"), None, Resource
     )
-
     list_resources = _request_builder(
         "/v1/kb/{kbid}/resources", "GET", ("kbid",), None, ResourceList
+    )
+
+    # Labels
+    set_labelset = _request_builder(
+        "/v1/kb/{kbid}/labelset/{labelset}",
+        "POST",
+        ("kbid", "labelset"),
+        LabelSet,
+        None,
+    )
+    delete_labelset = _request_builder(
+        "/v1/kb/{kbid}/labelset/{labelset}", "DELETE", ("kbid", "labelset"), None, None
+    )
+    get_labelsets = _request_builder(
+        "/v1/kb/{kbid}/labelset", "GET", ("kbid", "labelset"), None, KnowledgeBoxLabels
+    )
+    get_labelset = _request_builder(
+        "/v1/kb/{kbid}/labelset/{labelset}", "GET", ("kbid", "labelset"), None, LabelSet
+    )
+
+    # Entity Groups
+    create_entitygroup = _request_builder(
+        "/v1/kb/{kbid}/entitiesgroups",
+        "POST",
+        ("kbid",),
+        CreateEntitiesGroupPayload,
+        None,
+    )
+    update_entitygroup = _request_builder(
+        "/v1/kb/{kbid}/entitiesgroup/{group}",
+        "PATCH",
+        ("kbid", "group"),
+        UpdateEntitiesGroupPayload,
+        None,
+    )
+    set_entitygroup_entities = _request_builder(
+        "/v1/kb/{kbid}/entitiesgroup/{group}",
+        "POST",
+        ("kbid", "group"),
+        EntitiesGroup,
+        None,
+    )
+    delete_entitygroup = _request_builder(
+        "/v1/kb/{kbid}/labelset/{labelset}", "DELETE", ("kbid", "labelset"), None, None
+    )
+    get_entitygroups = _request_builder(
+        "/v1/kb/{kbid}/labelset", "GET", ("kbid", "labelset"), None, KnowledgeBoxLabels
+    )
+    get_entitygroup = _request_builder(
+        "/v1/kb/{kbid}/labelset/{labelset}", "GET", ("kbid", "labelset"), None, LabelSet
     )
 
     # Vectorsets
@@ -263,11 +315,9 @@ class NucliaSDK:
         VectorSet,
         None,
     )
-
     delete_vectorset = _request_builder(
         "/v1/kb/{kbid}/vectorset/{vectorset}", "POST", ("kbid", "vectorset"), None, None
     )
-
     list_vectorsets = _request_builder(
         "/v1/kb/{kbid}/vectorsets", "GET", ("kbid",), None, VectorSets
     )
@@ -276,7 +326,6 @@ class NucliaSDK:
     find = _request_builder(
         "/v1/kb/{kbid}/find", "POST", ("kbid",), FindRequest, KnowledgeboxFindResults
     )
-
     search = _request_builder(
         "/v1/kb/{kbid}/search",
         "POST",
@@ -284,7 +333,6 @@ class NucliaSDK:
         SearchRequest,
         KnowledgeboxSearchResults,
     )
-
     chat = _request_builder(
         "/v1/kb/{kbid}/chat", "POST", ("kbid",), ChatRequest, chat_response_parser
     )
