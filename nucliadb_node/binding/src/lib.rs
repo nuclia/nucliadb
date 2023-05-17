@@ -297,10 +297,10 @@ impl NodeWriter {
         }
     }
 
-    pub fn new_shard<'p>(&mut self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_telemetry_event(TelemetryEvent::Create);
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).unwrap();
-        match self.writer.new_shard(&request) {
+        match RustWriterService::new_shard(&request) {
             Ok(shard) => Ok(PyList::new(py, shard.encode_to_vec())),
             Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }
