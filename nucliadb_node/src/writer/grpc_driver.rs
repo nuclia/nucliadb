@@ -132,11 +132,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
         debug!("Creating new shard");
         let request = request.into_inner();
         send_telemetry_event(TelemetryEvent::Create).await;
-        let mut writer = self.inner.write().await;
-        let result = writer
-            .new_shard(&request)
+        let result = NodeWriterService::new_shard(&request)
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
-        std::mem::drop(writer);
         self.emit_event(NodeWriterEvent::ShardCreation);
         Ok(tonic::Response::new(result))
     }
