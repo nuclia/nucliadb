@@ -21,26 +21,25 @@ from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.reader.api.models import ResourceField
+from nucliadb.tests.utils import inject_message
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
     InputMessageContent,
 )
 from nucliadb_models.resource import ConversationFieldData, FieldConversation
+from nucliadb_models.resource import Resource
 from nucliadb_models.resource import Resource as ResponseResponse
 from nucliadb_models.writer import CreateResourcePayload
 
 
-@pytest.mark.asyncio
-async def test_conversations(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
-):
+@pytest.fixture(scope="function")
+async def resource_with_conversation(nucliadb_writer, knowledgebox):
     messages = []
     for i in range(300):
         messages.append(
@@ -80,6 +79,17 @@ async def test_conversations(
 
     assert resp.status_code == 200
 
+    yield rid
+
+
+@pytest.mark.asyncio
+async def test_conversations(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource_with_conversation,
+):
+    rid = resource_with_conversation
+
     # get field summary
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=values")
     assert resp.status_code == 200
@@ -113,3 +123,39 @@ async def test_conversations(
     assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + [
         "computer"
     ]
+
+
+@pytest.mark.asyncio
+async def test_conversations_extracted_text(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+    resource_with_conversation,
+):
+    rid = resource_with_conversation
+
+    # Inject fake processing data for the conversation
+    bm = BrokerMessage()
+    bm.uuid = rid
+    bm.kbid = knowledgebox
+    etw = ExtractedTextWrapper()
+    etw.field.field_type = FieldType.CONVERSATION
+    etw.field.field = "faq"
+    etw.body.text = "Some extracted text"
+    etw.body.split_text["1"] = "Split text 1"
+    etw.body.split_text["2"] = "Split text 2"
+    bm.extracted_text.append(etw)
+
+    await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    resource = Resource.parse_obj(resp.json())
+    extracted = resource.data.conversations["faq"].extracted  # type: ignore
+    assert extracted.text.text == "Some extracted text"  # type: ignore
+    assert extracted.text.split_text["1"] == "Split text 1"  # type: ignore
+    assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
