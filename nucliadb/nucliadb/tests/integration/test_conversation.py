@@ -21,9 +21,14 @@ from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldType
+from nucliadb_protos.resources_pb2 import (
+    ExtractedTextWrapper,
+    FieldComputedMetadataWrapper,
+    FieldID,
+    FieldType,
+    Paragraph,
+)
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.reader.api.models import ResourceField
 from nucliadb.tests.utils import inject_message
@@ -35,11 +40,12 @@ from nucliadb_models.conversation import (
 from nucliadb_models.resource import ConversationFieldData, FieldConversation
 from nucliadb_models.resource import Resource
 from nucliadb_models.resource import Resource as ResponseResponse
+from nucliadb_models.search import KnowledgeboxFindResults
 from nucliadb_models.writer import CreateResourcePayload
 
 
 @pytest.fixture(scope="function")
-async def resource_with_conversation(nucliadb_writer, knowledgebox):
+async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebox):
     messages = []
     for i in range(300):
         messages.append(
@@ -53,7 +59,7 @@ async def resource_with_conversation(nucliadb_writer, knowledgebox):
         )
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "X-Synchronous": "true"},
         data=CreateResourcePayload(  # type: ignore
             slug="myresource",
             conversations={
@@ -78,6 +84,30 @@ async def resource_with_conversation(nucliadb_writer, knowledgebox):
     )
 
     assert resp.status_code == 200
+
+    # Inject synthetic extracted data for the conversation
+    extracted_text = "Some extracted text"
+    extracted_split_text = {"1": "Split text 1", "2": "Split text 2"}
+
+    bm = BrokerMessage()
+    bm.uuid = rid
+    bm.kbid = knowledgebox
+    field = FieldID(field="faq", field_type=FieldType.CONVERSATION)
+
+    etw = ExtractedTextWrapper()
+    etw.field.MergeFrom(field)
+    etw.body.text = extracted_text
+    etw.body.split_text.update(extracted_split_text)
+    bm.extracted_text.append(etw)
+
+    fmw = FieldComputedMetadataWrapper()
+    fmw.field.MergeFrom(field)
+    for split, text in extracted_split_text.items():
+        paragraph = Paragraph(start=0, end=len(text), kind=Paragraph.TypeParagraph.TEXT)
+        fmw.metadata.split_metadata[split].paragraphs.append(paragraph)
+    bm.field_metadata.append(fmw)
+
+    await inject_message(nucliadb_grpc, bm)
 
     yield rid
 
@@ -126,32 +156,15 @@ async def test_conversations(
 
 
 @pytest.mark.asyncio
-async def test_conversations_extracted_text(
-    nucliadb_grpc: WriterStub,
+async def test_extracted_text_is_serialized_properly(
     nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
     knowledgebox,
     resource_with_conversation,
 ):
     rid = resource_with_conversation
 
-    # Inject fake processing data for the conversation
-    bm = BrokerMessage()
-    bm.uuid = rid
-    bm.kbid = knowledgebox
-    etw = ExtractedTextWrapper()
-    etw.field.field_type = FieldType.CONVERSATION
-    etw.field.field = "faq"
-    etw.body.text = "Some extracted text"
-    etw.body.split_text["1"] = "Split text 1"
-    etw.body.split_text["2"] = "Split text 2"
-    bm.extracted_text.append(etw)
-
-    await inject_message(nucliadb_grpc, bm)
-
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
-        timeout=None,
     )
     assert resp.status_code == 200
     resource = Resource.parse_obj(resp.json())
@@ -159,3 +172,33 @@ async def test_conversations_extracted_text(
     assert extracted.text.text == "Some extracted text"  # type: ignore
     assert extracted.text.split_text["1"] == "Split text 1"  # type: ignore
     assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_find_conversations(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource_with_conversation,
+):
+    rid = resource_with_conversation
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/find?query=&show=values&show=extracted&extracted=text",
+    )
+    assert resp.status_code == 200
+    results = KnowledgeboxFindResults.parse_obj(resp.json())
+    resource = results.resources[rid]
+
+    # Check extracted
+    conversation = resource.data.conversations["faq"]  # type: ignore
+    extracted = conversation.extracted
+    assert extracted.text.text == "Some extracted text"  # type: ignore
+    assert extracted.text.split_text["1"] == "Split text 1"  # type: ignore
+    assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
+
+    # Check paragraph positions match the split text values
+    field = resource.fields["/c/faq"]
+    paragraphs = field.paragraphs
+    assert len(paragraphs) == 2
+    assert paragraphs[f"{rid}/c/faq/1/0-12"].text == "Split text 1"
+    assert paragraphs[f"{rid}/c/faq/2/0-12"].text == "Split text 2"
