@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+
 import tikv_client  # type: ignore
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor  # type: ignore
@@ -39,6 +41,17 @@ def _instrument(
             SpanAttributes.DB_SYSTEM: "tikv",
             SpanAttributes.DB_OPERATION: operation,
         }
+
+        # Frame 0 is this wrapper call, frame 1 is it's caller
+        sysframe = sys._getframe(1)
+        attributes.update(
+            {
+                SpanAttributes.CODE_FILEPATH: sysframe.f_code.co_filename,
+                SpanAttributes.CODE_LINENO: sysframe.f_lineno,
+                SpanAttributes.CODE_FUNCTION: sysframe.f_code.co_name,
+            }
+        )
+
         span_name = f"TiKV {operation}"
         with tracer.start_as_current_span(
             name=span_name,

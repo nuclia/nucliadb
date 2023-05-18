@@ -25,11 +25,11 @@ use nucliadb_node::writer::NodeWriterService;
 use prost::Message;
 
 fn main() -> anyhow::Result<()> {
-    let mut writer = NodeWriterService::new();
+    let writer = NodeWriterService::new();
     let reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");
-    let new_shard = writer.new_shard(&NewShardRequest::default())?;
+    let new_shard = NodeWriterService::new_shard(&NewShardRequest::default())?;
     let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
     for file_path in std::fs::read_dir(resources_dir).unwrap() {

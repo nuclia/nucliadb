@@ -16,19 +16,16 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-import pytest
-
-from nucliadb_sdk.knowledgebox import KnowledgeBox
-
-
-def test_find_resource(docs_fixture: KnowledgeBox):
-    resources = docs_fixture.find(text="love")
-    assert resources.total == 10
-    assert len([x for x in resources]) == 10
+import nucliadb_sdk
+from nucliadb_models.search import KnowledgeboxFindResults
 
 
-@pytest.mark.asyncio
-async def test_find_async_resource(docs_fixture: KnowledgeBox):
-    resources = await docs_fixture.async_find(text="love")
-    assert resources.total == 10
-    assert len([x for x in resources]) == 10
+def test_find_resource(docs_dataset, sdk: nucliadb_sdk.NucliaSDK):
+    results: KnowledgeboxFindResults = sdk.find(kbid=docs_dataset, query="love")
+    assert results.total == 10
+    paragraphs = 0
+    for res in results.resources.values():
+        for field in res.fields.values():
+            paragraphs += len(field.paragraphs)
+
+    assert paragraphs == 10

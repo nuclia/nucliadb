@@ -109,19 +109,17 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new_shard(&mut self, request: &NewShardRequest) -> NodeResult<ShardCreated> {
+    pub fn new_shard(request: &NewShardRequest) -> NodeResult<ShardCreated> {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = env::shards_path_id(&shard_id);
         let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path, request)?;
-        let data = ShardCreated {
-            id: new_shard.id.clone(),
+        Ok(ShardCreated {
+            id: shard_id,
             document_service: new_shard.document_version() as i32,
             paragraph_service: new_shard.paragraph_version() as i32,
             vector_service: new_shard.vector_version() as i32,
             relation_service: new_shard.relation_version() as i32,
-        };
-        self.cache.insert(shard_id, new_shard);
-        Ok(data)
+        })
     }
 
     #[tracing::instrument(skip_all)]
