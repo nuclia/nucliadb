@@ -1295,18 +1295,18 @@ async def kb_with_one_logic_shard(
 
 
 @pytest.fixture(scope="function")
-def max_shard_fields():
-    prev = ingest_settings.max_shard_fields
-    ingest_settings.max_shard_fields = 20
+def max_shard_paragraphs():
+    prev = ingest_settings.max_shard_paragraphs
+    ingest_settings.max_shard_paragraphs = 20
 
     yield
 
-    ingest_settings.max_shard_fields = prev
+    ingest_settings.max_shard_paragraphs = prev
 
 
 @pytest.fixture(scope="function")
 async def kb_with_two_logic_shards(
-    max_shard_fields,
+    max_shard_paragraphs,
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -1321,6 +1321,7 @@ async def kb_with_two_logic_shards(
     await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=8)
 
     # trigger creating new shard manually here
+    sc.should_create_new_shard = Mock(return_value=True)  # type: ignore
     await sc.process_kb(kbid)
 
     await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10, start=8)

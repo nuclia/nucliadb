@@ -70,9 +70,6 @@ class Settings(DriverSettings):
     chitchat_binding_port: int = 31337
     chitchat_enabled: bool = True
 
-    # chitchat_peers_addr: List[str] = ["localhost:3001"] # TODO is it seed list?
-    # swim_host_key: str = "ingest.key" # TODO: ask if it's swim specific keys?
-
     logging_config: Optional[str] = None
 
     node_writer_port: int = 10000
@@ -85,9 +82,15 @@ class Settings(DriverSettings):
     sidecar_port_map: Dict[str, int] = {}
 
     # Node limits
-    max_shard_fields: int = 200000  # max number of fields to target per shard
-    max_node_replicas: int = (
-        600  # max number of shard replicas a single node will manage
+    max_shard_paragraphs: int = Field(
+        300_000,
+        title="Max shard paragraphs",
+        description="Maximum number of paragraphs to target per shard",
+    )
+    max_node_replicas: int = Field(
+        600,
+        title="Max node replicas",
+        description="Maximum number of shard replicas a single node will manage",
     )
 
     local_reader_threads: int = 5

@@ -86,7 +86,9 @@ async def shard_creator_handler(pubsub, nodes_manager, node_klass, kb):
 async def test_handle_message_create_new_shard(
     shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, node_klass, kb
 ):
-    sidecar.GetCount.return_value = Counter(resources=settings.max_shard_fields + 1)
+    sidecar.GetCount.return_value = Counter(
+        paragraphs=settings.max_shard_paragraphs + 1
+    )
 
     notif = Notification(
         kbid="kbid",
@@ -104,7 +106,9 @@ async def test_handle_message_create_new_shard(
 async def test_handle_message_do_not_create(
     shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, node_klass, kb
 ):
-    sidecar.GetCount.return_value = Counter(resources=settings.max_shard_fields - 1)
+    sidecar.GetCount.return_value = Counter(
+        paragraphs=settings.max_shard_paragraphs - 1
+    )
 
     notif = Notification(
         kbid="kbid",
@@ -129,3 +133,17 @@ async def test_handle_message_ignore_not_indexed(
     await shard_creator_handler.finalize()
 
     node_klass.create_shard_by_kbid.assert_not_called()
+
+
+def test_should_create_new_shard():
+    sc = shard_creator.ShardCreatorHandler(
+        driver=MagicMock(), storage=MagicMock(), pubsub=MagicMock()
+    )
+    low_counter = Counter(
+        paragraphs=settings.max_shard_paragraphs - 1,
+    )
+    high_counter = Counter(
+        paragraphs=settings.max_shard_paragraphs + 1,
+    )
+    assert sc.should_create_new_shard(low_counter) is False
+    assert sc.should_create_new_shard(high_counter) is True
