@@ -87,12 +87,6 @@ class Settings(DriverSettings):
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
-    # Deprecated. Remove once max_shard_paragraphs is fully tested
-    max_shard_fields: int = Field(
-        200_000,
-        title="[Deprecated] Max shard fields",
-        description="[Deprecated] Maximum number of paragraphs to target per shard",
-    )
     max_node_replicas: int = Field(
         600,
         title="Max node replicas",
