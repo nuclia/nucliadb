@@ -98,7 +98,9 @@ async def test_conversations(
     )
     assert resp.status_code == 200
     field_resp = ResourceField.parse_obj(resp.json())
-    assert len(field_resp.value["messages"]) == 200  # type: ignore
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert len(msgs) == 200
+    assert [m["ident"] for m in msgs] == [str(i) for i in range(200)]
 
     # get second page
     resp = await nucliadb_reader.get(
@@ -106,4 +108,8 @@ async def test_conversations(
     )
     assert resp.status_code == 200
     field_resp = ResourceField.parse_obj(resp.json())
-    assert len(field_resp.value["messages"]) == 101  # type: ignore
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert len(msgs) == 101
+    assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + [
+        "computer"
+    ]
