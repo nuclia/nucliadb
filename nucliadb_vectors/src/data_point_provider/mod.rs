@@ -374,6 +374,7 @@ impl Writer {
         let adds = mem::take(&mut self.datapoint_buffer);
         let deletes = mem::take(&mut self.delete_buffer);
         let location = self.location();
+
         let work_flag = self.work_flag.start_working();
         // Get the last version of the state, merges may have happen.
         // Is important to ensure that we are the only ones working on the
@@ -392,11 +393,9 @@ impl Writer {
             Ok(merge_work)
         })?;
         // Persisting the new state
-        {
-            // Moving the work flag to this scope
-            let _work_flag = work_flag;
-            self.context.persist(location)?;
-        }
+        self.context.persist(location)?;
+        mem::drop(work_flag);
+
         // Once the commit is done is safe to notify the merger
         (0..merge_work).for_each(|_| self.notify_merger());
         Ok(())
