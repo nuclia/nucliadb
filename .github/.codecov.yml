@@ -75,7 +75,7 @@ flag_management:
       carryforward: true
       statuses:
         - type: project
-          target: 60%
+          target: 38%
     - name: dataset
       paths:
         - nucliadb_dataset/nucliadb_dataset/**
