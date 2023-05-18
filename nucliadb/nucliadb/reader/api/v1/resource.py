@@ -284,12 +284,14 @@ async def get_resource_field(
 
         if isinstance(field, Conversation):
             if page == "first":
-                page = 1
+                page_to_fetch = 1
             elif page == "last":
                 conversation_metadata = await field.get_metadata()
-                page = conversation_metadata.pages
+                page_to_fetch = conversation_metadata.pages
+            else:
+                page_to_fetch = int(page)
 
-            value = await field.get_value(page=page)
+            value = await field.get_value(page=page_to_fetch)
             resource_field.value = models.Conversation.from_message(value)
 
     if ResourceFieldProperties.EXTRACTED in show and extracted:

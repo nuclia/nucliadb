@@ -124,8 +124,11 @@ message Conversation {
 }
 
 message FieldConversation {
+    // Total number of pages
     int32 pages = 1;
+    // Max page size
     int32 size = 2;
+    // Total number of messages
     int32 total = 3;
 }
 

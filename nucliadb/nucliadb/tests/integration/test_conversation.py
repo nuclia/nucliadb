@@ -83,6 +83,7 @@ async def test_conversations(
     # get field summary
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=values")
     assert resp.status_code == 200
+
     res_resp = ResponseResponse.parse_obj(resp.json())
 
     assert res_resp.data.conversations["faq"] == ConversationFieldData(  # type: ignore
