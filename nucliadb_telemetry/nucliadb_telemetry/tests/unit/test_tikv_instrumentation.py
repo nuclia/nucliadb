@@ -20,6 +20,7 @@
 from unittest.mock import AsyncMock, MagicMock, Mock, call
 
 import pytest
+from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.trace import TracerProvider
 from tikv_client.asynchronous import TransactionClient  # type: ignore
 
@@ -52,27 +53,68 @@ async def test_tikv_instrumentation(
     expected_calls = [
         call(name="myspan"),
         call(
-            name="TiKV begin", attributes={"db.system": "tikv", "db.operation": "begin"}
+            name="TiKV begin",
+            attributes={
+                SpanAttributes.DB_SYSTEM: "tikv",
+                SpanAttributes.DB_OPERATION: "begin",
+            },
         ),
-        call(name="TiKV put", attributes={"db.system": "tikv", "db.operation": "put"}),
-        call(name="TiKV put", attributes={"db.system": "tikv", "db.operation": "put"}),
-        call(name="TiKV get", attributes={"db.system": "tikv", "db.operation": "get"}),
+        call(
+            name="TiKV put",
+            attributes={
+                SpanAttributes.DB_SYSTEM: "tikv",
+                SpanAttributes.DB_OPERATION: "put",
+            },
+        ),
+        call(
+            name="TiKV put",
+            attributes={
+                SpanAttributes.DB_SYSTEM: "tikv",
+                SpanAttributes.DB_OPERATION: "put",
+            },
+        ),
+        call(
+            name="TiKV get",
+            attributes={
+                SpanAttributes.DB_SYSTEM: "tikv",
+                SpanAttributes.DB_OPERATION: "get",
+            },
+        ),
         call(name="nested"),
         call(
             name="TiKV delete",
-            attributes={"db.system": "tikv", "db.operation": "delete"},
+            attributes={
+                SpanAttributes.DB_SYSTEM: "tikv",
+                SpanAttributes.DB_OPERATION: "delete",
+            },
         ),
         call(
             name="TiKV commit",
-            attributes={"db.system": "tikv", "db.operation": "commit"},
+            attributes={
+                SpanAttributes.DB_SYSTEM: "tikv",
+                SpanAttributes.DB_OPERATION: "commit",
+            },
         ),
     ]
 
     for i, mocked in enumerate(tracer.start_as_current_span.call_args_list):  # type: ignore[attr-defined]
         expected = expected_calls[i]
-        assert expected.kwargs["name"] == mocked.kwargs["name"]
-        if "attributes" in expected.kwargs:
-            assert expected.kwargs["attributes"] == mocked.kwargs["attributes"]
+        assert mocked.kwargs["name"] == expected.kwargs["name"]
+
+        expected_attrs = expected.kwargs.get("attributes")
+        if expected_attrs:
+            mocked_attrs = mocked.kwargs["attributes"]
+            assert (
+                mocked_attrs[SpanAttributes.DB_SYSTEM]
+                == expected_attrs[SpanAttributes.DB_SYSTEM]
+            )
+            assert (
+                mocked_attrs[SpanAttributes.DB_OPERATION]
+                == expected_attrs[SpanAttributes.DB_OPERATION]
+            )
+            assert mocked_attrs[SpanAttributes.CODE_FILEPATH] == __file__
+            assert mocked_attrs[SpanAttributes.CODE_FUNCTION] == __name__
+            assert mocked_attrs[SpanAttributes.CODE_LINENO] > 0
 
 
 @pytest.fixture
