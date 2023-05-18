@@ -68,13 +68,16 @@ async def set_text_value(
     try:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
+        split = None
+        if result_paragraph.paragraph_index:
+            split = result_paragraph.paragraph_index.split
         result_paragraph.paragraph.text = await get_paragraph_text(
             kbid=kbid,
             rid=result_paragraph.rid,
             field=result_paragraph.field,
             start=result_paragraph.paragraph.position.start,
             end=result_paragraph.paragraph.position.end,
-            split=None,  # TODO
+            split=split,
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO

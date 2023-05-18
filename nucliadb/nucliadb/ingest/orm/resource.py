@@ -769,6 +769,7 @@ class Resource:
             None,
         )
 
+        extracted_text = await field_obj.get_extracted_text()
         apply_field_metadata = partial(
             self.indexer.apply_field_metadata,
             field_key,
@@ -776,7 +777,7 @@ class Resource:
             replace_field=replace_field,
             replace_splits=replace_splits,
             page_positions=page_positions,
-            extracted_text=await field_obj.get_extracted_text(),
+            extracted_text=extracted_text,
             basic_user_field_metadata=user_field_metadata,
         )
         loop = asyncio.get_running_loop()

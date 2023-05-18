@@ -64,7 +64,7 @@ class Conversation(Field):
             except PageNotFound:
                 pass
 
-        # Make sure files are on our region
+        # Make sure message attachment files are on our region
         for message in payload.messages:
             new_message_files = []
             for count, file in enumerate(message.content.attachments):
