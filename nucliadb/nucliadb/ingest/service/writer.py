@@ -88,7 +88,6 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.consumer import shard_creator
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import (
@@ -128,9 +127,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         driver = await get_driver()
         cache = await get_cache()
         self.proc = Processor(driver=driver, storage=storage, cache=cache)
-        self.sc = shard_creator.ShardCreatorHandler(
-            driver=driver, storage=storage, pubsub=None  # type: ignore
-        )
 
     async def finalize(self):
         ...
@@ -770,8 +766,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     kb=request.kbid,
                     reindex_id=uuid.uuid4().hex,
                 )
-                # trigger possibly creating new shard manually here
-                await self.sc.process_kb(request.kbid)
 
             response = IndexStatus()
             await txn.abort()
