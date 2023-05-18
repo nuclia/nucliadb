@@ -132,12 +132,21 @@ async def test_create_shard_by_kbid_rolls_back(txn, fake_node, node_errors):
         await Node.create_shard_by_kbid(txn, "foo")
 
 
+def test_node_str():
+    node = Node(
+        id="node-1", address="host:1234", type=MemberType.IO, shard_count=0, dummy=True
+    )
+    assert str(node) == repr(node) == "Node(node-1, host:1234)"
+
+
 def test_reset_connection():
     READ_CONNECTIONS.clear()
     WRITE_CONNECTIONS.clear()
     SIDECAR_CONNECTIONS.clear()
 
-    node = Node("host:1234", MemberType.IO, 0, dummy=True)
+    node = Node(
+        id="id", address="host:1234", type=MemberType.IO, shard_count=0, dummy=True
+    )
     assert node.reader is not None
     assert node.writer is not None
     assert node.sidecar is not None
