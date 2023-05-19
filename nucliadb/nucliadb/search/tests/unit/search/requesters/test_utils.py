@@ -27,16 +27,16 @@ from nucliadb.search.requesters import utils
 
 
 def test_validate_node_query_results():
-    assert utils.validate_node_query_results([Mock()], []) is None
+    assert utils.validate_node_query_results([Mock()]) is None
 
 
 def test_validate_node_query_results_no_results():
-    assert isinstance(utils.validate_node_query_results([], []), HTTPException)
-    assert isinstance(utils.validate_node_query_results(None, []), HTTPException)
+    assert isinstance(utils.validate_node_query_results([]), HTTPException)
+    assert isinstance(utils.validate_node_query_results(None), HTTPException)
 
 
 def test_validate_node_query_results_unhandled_error():
-    error = utils.validate_node_query_results([Exception()], [])
+    error = utils.validate_node_query_results([Exception()])
     assert isinstance(error, HTTPException)
 
 
@@ -50,8 +50,7 @@ def test_validate_node_query_results_invalid_query():
                 details="An invalid argument was passed: 'Query is invalid. AllButQueryForbidden'",
                 debug_error_string="",
             )
-        ],
-        [],
+        ]
     )
 
     assert isinstance(result, HTTPException)
