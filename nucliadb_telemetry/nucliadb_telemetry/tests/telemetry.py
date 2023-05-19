@@ -33,7 +33,6 @@ from opentelemetry.propagators.b3 import B3MultiFormat
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_telemetry import context
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry, NatsClientTelemetry
@@ -44,7 +43,12 @@ from nucliadb_telemetry.tests.grpc import (
     helloworld_pb2,
     helloworld_pb2_grpc,
 )
-from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import (
+    clean_telemetry,
+    get_telemetry,
+    init_telemetry,
+    set_info_on_span,
+)
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
@@ -317,7 +321,7 @@ async def http_service(
 
     @app.get("/")
     async def simple_api():
-        context.add_context({"my.data": "is this"})
+        set_info_on_span({"my.data": "is this"})
         tracer = tracer_provider.get_tracer(__name__)
         with tracer.start_as_current_span("simple_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
