@@ -19,7 +19,7 @@
 
 import json
 import logging
-from typing import Optional, TypeVar
+from typing import Optional
 
 from grpc import aio  # type: ignore
 from grpc import ChannelCredentials
