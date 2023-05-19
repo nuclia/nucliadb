@@ -27,6 +27,7 @@ import orjson
 import pydantic
 from opentelemetry import trace
 from opentelemetry.trace.span import INVALID_SPAN
+from . import context
 
 from nucliadb_telemetry.settings import LogLevel, LogSettings
 
@@ -99,6 +100,10 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
             "function": record.funcName,
         }
+
+        current_ctx = context.get_context()
+        if len(current_ctx) > 0:
+            data["context"] = current_ctx
 
         current_span = trace.get_current_span()
         if current_span not in (INVALID_SPAN, None):

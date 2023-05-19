@@ -42,6 +42,7 @@ from opentelemetry.util.http import (
     normalise_response_header_name,
     remove_url_credentials,
 )
+from nucliadb_telemetry.context import get_context as get_nuclia_context
 
 ServerRequestHookT = Optional[Callable[[Span, dict], None]]
 
@@ -309,7 +310,15 @@ class OpenTelemetryMiddleware:
                     send,
                 )
 
-                await self.app(scope, receive, otel_send)
+                try:
+                    await self.app(scope, receive, otel_send)
+                finally:
+                    # set custom context on the span
+                    if current_span.is_recording():
+                        current_span.set_attributes(
+                            {f"nuclia.{k}": v for k, v in get_nuclia_context().items()}
+                        )
+
         finally:
             if token:
                 context.detach(token)

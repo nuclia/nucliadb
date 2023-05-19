@@ -25,7 +25,7 @@ from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import _get_route_details  # type: ignore
 from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.responses import PlainTextResponse
-
+from .context import ContextInjectorMiddleware
 from nucliadb_telemetry.fastapi.metrics import PrometheusMiddleware
 from nucliadb_telemetry.fastapi.tracing import (
     OpenTelemetryMiddleware,
@@ -69,9 +69,7 @@ def instrument_app(
 ):
     if metrics:
         # b/w compat
-        app.add_middleware(PrometheusMiddleware, filter_unhandled_paths=True)
-    if SentryAsgiMiddleware is not None:
-        app.add_middleware(SentryAsgiMiddleware)
+        app.add_middleware(PrometheusMiddleware)
 
     excluded_urls_obj = ExcludeList(excluded_urls)
 
@@ -82,3 +80,9 @@ def instrument_app(
         server_request_hook=server_request_hook,
         tracer_provider=tracer_provider,
     )
+    app.add_middleware(ContextInjectorMiddleware)
+
+    if SentryAsgiMiddleware is not None:
+        # add last to catch all exceptions
+        # `add_middleware` always adds to the beginning of the middleware list
+        app.add_middleware(SentryAsgiMiddleware)

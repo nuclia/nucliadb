@@ -43,12 +43,8 @@ from nucliadb_telemetry.tests.grpc import (
     helloworld_pb2,
     helloworld_pb2_grpc,
 )
-from nucliadb_telemetry.utils import (
-    clean_telemetry,
-    get_telemetry,
-    init_telemetry,
-    set_info_on_span,
-)
+from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
+from nucliadb_telemetry import context
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
@@ -321,7 +317,7 @@ async def http_service(
 
     @app.get("/")
     async def simple_api():
-        set_info_on_span({"my.data": "is this"})
+        context.add_context({"my.data": "is this"})
         tracer = tracer_provider.get_tracer(__name__)
         with tracer.start_as_current_span("simple_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
