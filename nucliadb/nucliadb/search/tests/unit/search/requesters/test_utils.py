@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
-import pytest
 from fastapi import HTTPException
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
