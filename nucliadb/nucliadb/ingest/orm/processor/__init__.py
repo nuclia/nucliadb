@@ -21,6 +21,7 @@ import asyncio
 import logging
 from typing import Dict, List, Optional, Tuple
 
+import aiohttp.client_exceptions
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -272,7 +273,11 @@ class Processor:
                     partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
                 )
                 logger.warning(f"This message did not modify the resource")
-        except (asyncio.TimeoutError, asyncio.CancelledError):  # pragma: no cover
+        except (
+            asyncio.TimeoutError,
+            asyncio.CancelledError,
+            aiohttp.client_exceptions.ClientError,
+        ):  # pragma: no cover
             # Unhandled exceptions here that should bubble and hard fail
             # XXX We swallow too many exceptions here!
             await self.notify_abort(
