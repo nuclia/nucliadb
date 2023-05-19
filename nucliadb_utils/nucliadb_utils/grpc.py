@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import logging
 from typing import Optional
 
@@ -54,6 +55,27 @@ def get_traced_grpc_server(service_name: str, max_receive_message: int = 100):
     else:
         options = [
             ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
+            (
+                "grpc.service_config",
+                json.dumps(
+                    {
+                        "name": [{}],  # require to enable retrying all methods
+                        "retryPolicy": {
+                            "maxAttempts": 4,
+                            "initialBackoff": "0.02s",
+                            "maxBackoff": "2s",
+                            "backoffMultiplier": 2,
+                            "retryableStatusCodes": [
+                                "UNAVAILABLE",
+                                "DEADLINE_EXCEEDED",
+                                "ABORTED",
+                                "CANCELLED",
+                            ],
+                        },
+                        "waitForReady": True,
+                    }
+                ),
+            ),
         ]
         server = aio.server(options=options)
     return server

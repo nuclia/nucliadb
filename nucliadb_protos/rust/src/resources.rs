@@ -179,10 +179,13 @@ pub struct Conversation {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldConversation {
+    /// Total number of pages
     #[prost(int32, tag="1")]
     pub pages: i32,
+    /// Max page size
     #[prost(int32, tag="2")]
     pub size: i32,
+    /// Total number of messages
     #[prost(int32, tag="3")]
     pub total: i32,
 }
