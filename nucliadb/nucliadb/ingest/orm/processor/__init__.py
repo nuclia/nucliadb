@@ -230,7 +230,7 @@ class Processor:
                     resource.replace_indexer(await resource.generate_index_message())
 
             if resource and resource.modified:
-                shard = await self.index_resource(
+                shard = await self.index_resource(  # noqa
                     resource=resource,
                     txn=txn,
                     uuid=uuid,
@@ -238,7 +238,6 @@ class Processor:
                     seqid=seqid,
                     partition=partition,
                     kb=kb,
-                    shard=shard,
                 )
 
                 if transaction_check:
@@ -311,7 +310,6 @@ class Processor:
         seqid: int,
         partition: str,
         kb: KnowledgeBox,
-        shard: Optional[Shard] = None,
     ) -> Shard:
         shard_id = await kb.get_resource_shard_id(uuid)
         node_klass = get_node_klass()
