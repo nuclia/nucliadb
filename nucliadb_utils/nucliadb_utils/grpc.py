@@ -69,6 +69,7 @@ def get_traced_grpc_server(service_name: str, max_receive_message: int = 100):
                                 "UNAVAILABLE",
                                 "DEADLINE_EXCEEDED",
                                 "ABORTED",
+                                "CANCELLED",
                             ],
                         },
                         "waitForReady": True,
