@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import logging
 from typing import Dict, List, Optional, Tuple
 
@@ -271,6 +272,13 @@ class Processor:
                     partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
                 )
                 logger.warning(f"This message did not modify the resource")
+        except (asyncio.TimeoutError, asyncio.CancelledError):  # pragma: no cover
+            # Unhandled exceptions here that should bubble and hard fail
+            # XXX We swallow too many exceptions here!
+            await self.notify_abort(
+                partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+            )
+            raise
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. The exception will be reraised at the end of the function
