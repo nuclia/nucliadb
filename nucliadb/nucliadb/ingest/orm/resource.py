@@ -200,6 +200,7 @@ class Resource:
         if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
+    @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
         self,
         payload: PBBasic,
@@ -615,6 +616,7 @@ class Resource:
 
         await field_obj.delete()
 
+    @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
         for field, layout in message.layouts.items():
             await self.set_field(FieldType.LAYOUT, field, layout)
@@ -640,6 +642,7 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
+    @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
         field_obj: Field
