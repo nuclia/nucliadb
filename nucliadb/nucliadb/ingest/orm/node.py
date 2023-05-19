@@ -241,19 +241,6 @@ class Node(AbstractNode):
             grpc_address = f"{hostname}:{port}"
         return grpc_address
 
-    def reset_connections(self) -> None:
-        if self.address in SIDECAR_CONNECTIONS:
-            del SIDECAR_CONNECTIONS[self.address]
-        self._sidecar = None
-
-        if self.address in WRITE_CONNECTIONS:
-            del WRITE_CONNECTIONS[self.address]
-        self._writer = None
-
-        if self.address in READ_CONNECTIONS:
-            del READ_CONNECTIONS[self.address]
-        self._reader = None
-
     @property
     def sidecar(self) -> NodeSidecarStub:
         if self._sidecar is None and self.address not in SIDECAR_CONNECTIONS:

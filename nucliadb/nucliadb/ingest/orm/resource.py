@@ -71,6 +71,7 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
@@ -199,6 +200,7 @@ class Resource:
         if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
+    @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
         self,
         payload: PBBasic,
@@ -337,6 +339,7 @@ class Resource:
         self.modified = True
         self.relations = relations
 
+    @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(self) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
@@ -613,6 +616,7 @@ class Resource:
 
         await field_obj.delete()
 
+    @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
         for field, layout in message.layouts.items():
             await self.set_field(FieldType.LAYOUT, field, layout)
@@ -638,6 +642,7 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
+    @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
         field_obj: Field
@@ -848,6 +853,7 @@ class Resource:
     def generate_field_id(self, field: FieldID) -> str:
         return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
 
+    @processor_observer.wrap({"type": "compute_global_tags"})
     async def compute_global_tags(self, brain: ResourceBrain):
         origin = await self.get_origin()
         basic = await self.get_basic()
@@ -880,6 +886,7 @@ class Resource:
                 field_data = await fieldobj.db_get_value()
                 brain.process_keywordset_fields(fieldkey, field_data)
 
+    @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):
         # For each extracted
         for type, field in await self.get_fields_ids(force=True):
