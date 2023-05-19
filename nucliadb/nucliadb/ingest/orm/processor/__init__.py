@@ -230,7 +230,7 @@ class Processor:
                     resource.replace_indexer(await resource.generate_index_message())
 
             if resource and resource.modified:
-                await self.index_resource(
+                shard = await self.index_resource(
                     resource=resource,
                     txn=txn,
                     uuid=uuid,
@@ -312,7 +312,7 @@ class Processor:
         partition: str,
         kb: KnowledgeBox,
         shard: Optional[Shard] = None,
-    ) -> None:
+    ) -> Shard:
         shard_id = await kb.get_resource_shard_id(uuid)
         node_klass = get_node_klass()
 
@@ -337,6 +337,7 @@ class Processor:
             )
         else:
             raise AttributeError("Shard is not available")
+        return shard
 
     async def _mark_resource_error(
         self,
