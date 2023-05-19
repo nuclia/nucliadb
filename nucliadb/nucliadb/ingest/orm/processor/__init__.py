@@ -40,8 +40,8 @@ from nucliadb.ingest.orm.exceptions import (
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
-from nucliadb.ingest.orm.processor.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.utils import get_node_klass
