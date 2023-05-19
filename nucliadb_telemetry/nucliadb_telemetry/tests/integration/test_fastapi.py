@@ -210,7 +210,7 @@ class TestCasePrometheusMiddlewareFilterUnhandledPaths:
     @pytest.fixture(scope="class")
     def app(self):
         app_ = Starlette()
-        app_.add_middleware(PrometheusMiddleware, filter_unhandled_paths=True)
+        app_.add_middleware(PrometheusMiddleware)
         app_.add_route("/metrics/", metrics_endpoint)
 
         return app_
