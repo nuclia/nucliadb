@@ -21,7 +21,7 @@ import asyncio
 
 import pytest
 
-from nucliadb_telemetry import context, logs
+from nucliadb_telemetry import context
 
 
 @pytest.mark.asyncio

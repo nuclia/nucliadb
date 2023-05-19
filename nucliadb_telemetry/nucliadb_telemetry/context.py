@@ -26,8 +26,9 @@
 # This allows us to leverage context data for both tracing and logs.
 #
 import contextvars
+from typing import Optional
 
-context_data = contextvars.ContextVar("data", default=None)
+context_data = contextvars.ContextVar[Optional[dict[str, str]]]("data", default=None)
 
 
 def add_context(new_data: dict[str, str]):

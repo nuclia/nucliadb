@@ -34,7 +34,7 @@ def get_path_template(scope: Scope) -> FoundPathTemplate:
     if "found_path_template" in scope:
         return scope["found_path_template"]
     app: Starlette = scope["app"]
-    path, sub_scope = find_route(scope, app.routes)
+    path, sub_scope = find_route(scope, app.routes)  # type:ignore
     if path is None:
         path = URL(scope=scope).path
     path_template = FoundPathTemplate(path, sub_scope, sub_scope is not None)
@@ -53,7 +53,7 @@ def find_route(
             if mount_match == Match.FULL:
                 scope.update(child_scope)
                 sub_path, sub_match = find_route(scope, route.routes)
-                if sub_match:
+                if sub_match and sub_path is not None:
                     return route.path + sub_path, sub_match
         elif isinstance(route, Route):
             match, child_scope = route.matches(scope)

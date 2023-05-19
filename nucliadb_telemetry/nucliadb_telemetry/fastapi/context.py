@@ -38,6 +38,6 @@ class ContextInjectorMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         found_path_template = get_path_template(request.scope)
         if found_path_template.match:
-            context.add_context(found_path_template.scope.get("path_params", {}))
+            context.add_context(found_path_template.scope.get("path_params", {}))  # type: ignore
 
         return await call_next(request)
