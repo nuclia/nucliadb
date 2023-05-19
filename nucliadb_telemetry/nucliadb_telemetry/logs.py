@@ -27,9 +27,10 @@ import orjson
 import pydantic
 from opentelemetry import trace
 from opentelemetry.trace.span import INVALID_SPAN
-from . import context
 
 from nucliadb_telemetry.settings import LogLevel, LogSettings
+
+from . import context
 
 try:
     from uvicorn.logging import AccessFormatter  # type: ignore

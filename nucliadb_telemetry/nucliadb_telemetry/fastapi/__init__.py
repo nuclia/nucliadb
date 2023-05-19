@@ -25,12 +25,14 @@ from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import _get_route_details  # type: ignore
 from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.responses import PlainTextResponse
-from .context import ContextInjectorMiddleware
+
 from nucliadb_telemetry.fastapi.metrics import PrometheusMiddleware
 from nucliadb_telemetry.fastapi.tracing import (
     OpenTelemetryMiddleware,
     ServerRequestHookT,
 )
+
+from .context import ContextInjectorMiddleware
 
 try:
     from sentry_sdk.integrations.asgi import SentryAsgiMiddleware

@@ -24,6 +24,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
+
 from .utils import get_path_template
 
 try:

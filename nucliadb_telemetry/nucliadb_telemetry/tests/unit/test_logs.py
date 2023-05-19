@@ -17,16 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import logging
 from unittest.mock import MagicMock, patch
 
 import orjson
 import pydantic
-from nucliadb_telemetry import context
-import asyncio
 import pytest
 
-from nucliadb_telemetry import logs
+from nucliadb_telemetry import context, logs
 
 
 def test_setup_logging(monkeypatch):

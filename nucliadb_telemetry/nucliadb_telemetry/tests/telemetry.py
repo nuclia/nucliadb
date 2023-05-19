@@ -33,6 +33,7 @@ from opentelemetry.propagators.b3 import B3MultiFormat
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
+from nucliadb_telemetry import context
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry, NatsClientTelemetry
@@ -44,7 +45,6 @@ from nucliadb_telemetry.tests.grpc import (
     helloworld_pb2_grpc,
 )
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
-from nucliadb_telemetry import context
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",

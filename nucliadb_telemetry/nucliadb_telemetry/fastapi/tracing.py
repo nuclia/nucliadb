@@ -42,6 +42,7 @@ from opentelemetry.util.http import (
     normalise_response_header_name,
     remove_url_credentials,
 )
+
 from nucliadb_telemetry.context import get_context as get_nuclia_context
 
 ServerRequestHookT = Optional[Callable[[Span, dict], None]]
