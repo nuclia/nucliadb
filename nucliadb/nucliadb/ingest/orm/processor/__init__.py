@@ -40,6 +40,7 @@ from nucliadb.ingest.orm.exceptions import (
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard
@@ -123,6 +124,7 @@ class Processor:
             uuid = message.uuid
         return uuid
 
+    @processor_observer.wrap({"type": "delete_resource"})
     async def delete_resource(
         self,
         message: BrokerMessage,
@@ -167,6 +169,7 @@ class Processor:
             write_type=Notification.WriteType.DELETED,
         )
 
+    @processor_observer.wrap({"type": "commit_slug"})
     async def commit_slug(self, resource: Resource) -> None:
         # Slug may have conflicts as its not partitioned properly,
         # so we commit it in a different transaction to make it as short as possible
@@ -179,6 +182,7 @@ class Processor:
         finally:
             resource.txn = prev_txn
 
+    @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
         messages: List[BrokerMessage],
@@ -226,34 +230,19 @@ class Processor:
                     resource.replace_indexer(await resource.generate_index_message())
 
             if resource and resource.modified:
-                shard_id = await kb.get_resource_shard_id(uuid)
-                node_klass = get_node_klass()
+                shard = await self.index_resource(  # noqa
+                    resource=resource,
+                    txn=txn,
+                    uuid=uuid,
+                    kbid=kbid,
+                    seqid=seqid,
+                    partition=partition,
+                    kb=kb,
+                )
 
-                if shard_id is not None:
-                    shard = await kb.get_resource_shard(shard_id, node_klass)
-
-                if shard is None:
-                    # It's a new resource, get current active shard to place
-                    # new resource on
-                    shard = await node_klass.get_current_active_shard(txn, kbid)
-                    if shard is None:
-                        # no shard available, create a new one
-                        similarity = await kb.get_similarity()
-                        shard = await node_klass.create_shard_by_kbid(
-                            txn, kbid, similarity=similarity
-                        )
-                    await kb.set_resource_shard_id(uuid, shard.sharduuid)
-
-                if shard is not None:
-                    await shard.add_resource(
-                        resource.indexer.brain, seqid, partition=partition, kb=kbid
-                    )
-                else:
-                    raise AttributeError("Shard is not available")
-
+                await txn.commit()
                 if transaction_check:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
-                await txn.commit()
 
                 if created or resource.slug_modified:
                     await self.commit_slug(resource)
@@ -310,6 +299,44 @@ class Processor:
                 raise DeadletteredError() from handled_exception
 
         return None
+
+    @processor_observer.wrap({"type": "index_resource"})
+    async def index_resource(
+        self,
+        resource: Resource,
+        txn: Transaction,
+        uuid: str,
+        kbid: str,
+        seqid: int,
+        partition: str,
+        kb: KnowledgeBox,
+    ) -> Shard:
+        shard_id = await kb.get_resource_shard_id(uuid)
+        node_klass = get_node_klass()
+
+        shard = None
+        if shard_id is not None:
+            shard = await kb.get_resource_shard(shard_id, node_klass)
+
+        if shard is None:
+            # It's a new resource, get current active shard to place
+            # new resource on
+            shard = await node_klass.get_current_active_shard(txn, kbid)
+            if shard is None:
+                # no shard available, create a new one
+                similarity = await kb.get_similarity()
+                shard = await node_klass.create_shard_by_kbid(
+                    txn, kbid, similarity=similarity
+                )
+            await kb.set_resource_shard_id(uuid, shard.sharduuid)
+
+        if shard is not None:
+            await shard.add_resource(
+                resource.indexer.brain, seqid, partition=partition, kb=kbid
+            )
+        else:
+            raise AttributeError("Shard is not available")
+        return shard
 
     async def _mark_resource_error(
         self,
@@ -380,6 +407,7 @@ class Processor:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
 
+    @processor_observer.wrap({"type": "apply_resource"})
     async def apply_resource(
         self,
         message: BrokerMessage,
