@@ -26,7 +26,11 @@
 # This allows us to leverage context data for both tracing and logs.
 #
 import contextvars
-from typing import Optional
+from typing import Optional, Sequence, Union
+
+from opentelemetry.trace import get_current_span
+
+from nucliadb_telemetry.settings import telemetry_settings
 
 context_data = contextvars.ContextVar[Optional[dict[str, str]]]("data", default=None)
 
@@ -37,14 +41,40 @@ def add_context(new_data: dict[str, str]):
 
     This is so data is propated forward but not backward.
     """
+
+    # set the data on the current active span
+    set_info_on_span({f"nuclia.{key}": value for key, value in new_data.items()})
+
     data = context_data.get()
     if data is None:
         data = {}
     else:
         data = data.copy()
+
     data.update(new_data)
     context_data.set(data)  # always set the context
 
 
 def get_context() -> dict[str, str]:
     return context_data.get() or {}
+
+
+def set_info_on_span(
+    headers: dict[
+        str,
+        Union[
+            str,
+            bool,
+            int,
+            float,
+            Sequence[str],
+            Sequence[bool],
+            Sequence[int],
+            Sequence[float],
+        ],
+    ]
+):
+    if telemetry_settings.jaeger_enabled:
+        span = get_current_span()
+        if span is not None:
+            span.set_attributes(headers)

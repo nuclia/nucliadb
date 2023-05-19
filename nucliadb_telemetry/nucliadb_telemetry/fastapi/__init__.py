@@ -75,6 +75,7 @@ def instrument_app(
 
     excluded_urls_obj = ExcludeList(excluded_urls)
 
+    app.add_middleware(ContextInjectorMiddleware)
     app.add_middleware(
         OpenTelemetryMiddleware,
         excluded_urls=excluded_urls_obj,
@@ -82,7 +83,6 @@ def instrument_app(
         server_request_hook=server_request_hook,
         tracer_provider=tracer_provider,
     )
-    app.add_middleware(ContextInjectorMiddleware)
 
     if SentryAsgiMiddleware is not None:
         # add last to catch all exceptions
