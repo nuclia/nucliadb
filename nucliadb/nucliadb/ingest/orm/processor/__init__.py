@@ -314,6 +314,7 @@ class Processor:
         shard_id = await kb.get_resource_shard_id(uuid)
         node_klass = get_node_klass()
 
+        shard = None
         if shard_id is not None:
             shard = await kb.get_resource_shard(shard_id, node_klass)
 
