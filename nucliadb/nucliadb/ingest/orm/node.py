@@ -279,23 +279,3 @@ class Node(AbstractNode):
         if self._reader is None:
             self._reader = READ_CONNECTIONS[self.address]
         return self._reader
-
-
-def get_replica(shards: PBShards, replica_id: str) -> Optional[ShardReplica]:
-    for logic_shard in shards.shards:
-        for replica_shard in logic_shard.replicas:
-            if replica_shard.shard.id == replica_id:
-                return replica_shard
-    return None
-
-
-class UpdatingShardsError(Exception):
-    pass
-
-
-class ReplicaShardNotFound(Exception):
-    pass
-
-
-class KBNotFoundError(Exception):
-    pass

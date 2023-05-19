@@ -23,12 +23,11 @@ use std::time::Duration;
 use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, SetGraph,
-    ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
+    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest,
+    NodeMetadata, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId,
+    ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
-use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
 use opentelemetry::global;
@@ -417,91 +416,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
             None => {
                 let message = format!("Shard not found {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
-            }
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
-    async fn move_shard(
-        &self,
-        request: Request<MoveShardRequest>,
-    ) -> Result<Response<EmptyResponse>, Status> {
-        self.instrument(&request);
-
-        let request = request.into_inner();
-        let shard_id = request.shard_id.unwrap();
-
-        let service = self.inner.read().await;
-
-        let Some(shard) = service.get_shard(&shard_id) else {
-            return Err(tonic::Status::not_found(format!(
-                "Shard {} not found",
-                shard_id.id
-            )));
-        };
-
-        match Publisher::default()
-            .append(&shard.path)
-            // `unwrap` call is safe since the shard path already terminate by a valid file name.
-            .unwrap()
-            .retry_on_failure(RetryPolicy::MaxDuration(MAX_MOVE_SHARD_DURATION))
-            .send_to(&request.address)
-            .await
-        {
-            Ok(_) => {
-                debug!(
-                    "Shard {} moved to {} successfully",
-                    shard_id.id, request.address
-                );
-
-                Ok(tonic::Response::new(EmptyResponse {}))
-            }
-            Err(e) => {
-                let e = format!(
-                    "Error transfering shard {} to {}: {}",
-                    shard_id.id, request.address, e
-                );
-
-                error!("{}", e);
-
-                Err(tonic::Status::internal(e))
-            }
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
-    async fn accept_shard(
-        &self,
-        request: Request<AcceptShardRequest>,
-    ) -> Result<Response<EmptyResponse>, Status> {
-        self.instrument(&request);
-
-        let request = request.into_inner();
-        let shard_id = request.shard_id.unwrap();
-
-        if !request.override_shard && self.inner.read().await.get_shard(&shard_id).is_some() {
-            return Err(tonic::Status::already_exists(format!(
-                "Shard {} already exists",
-                shard_id.id
-            )));
-        }
-
-        match Listener::default()
-            .save_at(env::shards_path())
-            .listen_once(request.port as u16)
-            .await
-        {
-            Ok(_) => {
-                debug!("Shard {} received successfully", shard_id.id);
-
-                Ok(tonic::Response::new(EmptyResponse {}))
-            }
-            Err(e) => {
-                let e = format!("Error receiving shard {}: {}", shard_id.id, e);
-
-                error!("{}", e);
-
-                Err(tonic::Status::internal(e))
             }
         }
     }

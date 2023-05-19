@@ -444,8 +444,11 @@ class FieldConversation(google.protobuf.message.Message):
     SIZE_FIELD_NUMBER: builtins.int
     TOTAL_FIELD_NUMBER: builtins.int
     pages: builtins.int
+    """Total number of pages"""
     size: builtins.int
+    """Max page size"""
     total: builtins.int
+    """Total number of messages"""
     def __init__(
         self,
         *,

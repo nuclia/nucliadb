@@ -48,17 +48,6 @@ message DeleteGraphNodes {
     repeated utils.RelationNode nodes = 1;
 }
 
-message MoveShardRequest {
-    noderesources.ShardId shard_id = 1;
-    string address = 2;
-}
-
-message AcceptShardRequest {
-    noderesources.ShardId shard_id = 1;
-    uint32 port = 2;
-    bool override_shard = 3;
-}
-
 message NewShardRequest {
     utils.VectorSimilarity similarity = 1;
     string kbid = 2;
@@ -85,9 +74,6 @@ service NodeWriter {
     rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
     rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
     rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
-
-    rpc MoveShard(MoveShardRequest) returns (noderesources.EmptyResponse) {}
-    rpc AcceptShard(AcceptShardRequest) returns (noderesources.EmptyResponse) {}
 
     rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }
