@@ -17,12 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
-from nucliadb_telemetry import context
 import asyncio
+
 import pytest
 
-from nucliadb_telemetry import logs
+from nucliadb_telemetry import context, logs
 
 
 @pytest.mark.asyncio

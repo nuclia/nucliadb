@@ -1,8 +1,10 @@
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
-from .utils import get_path_template
+
 from nucliadb_telemetry import context
+
+from .utils import get_path_template
 
 
 class ContextInjectorMiddleware(BaseHTTPMiddleware):
