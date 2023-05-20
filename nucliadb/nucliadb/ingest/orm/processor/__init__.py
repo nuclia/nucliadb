@@ -240,9 +240,9 @@ class Processor:
                     kb=kb,
                 )
 
-                await txn.commit()
                 if transaction_check:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
+                await txn.commit()
 
                 if created or resource.slug_modified:
                     await self.commit_slug(resource)
