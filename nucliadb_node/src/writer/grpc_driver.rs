@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::time::Duration;
-
 use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
