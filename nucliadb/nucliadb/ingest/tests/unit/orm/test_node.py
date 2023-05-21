@@ -125,3 +125,10 @@ async def node_errors():
 async def test_create_shard_by_kbid_rolls_back(txn, fake_node, node_errors):
     with pytest.raises(ValueError):
         await Node.create_shard_by_kbid(txn, "foo")
+
+
+def test_node_str():
+    node = Node(
+        id="node-1", address="host:1234", type=MemberType.IO, shard_count=0, dummy=True
+    )
+    assert str(node) == repr(node) == "Node(node-1, host:1234)"
