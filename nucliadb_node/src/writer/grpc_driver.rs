@@ -39,9 +39,6 @@ use crate::env;
 use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
-/// Indicates the maximum duration used to move one shard from one node to another on failure only.
-const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
     ShardCreation,
