@@ -162,7 +162,9 @@ class PullWorker:
 
                 except nats.errors.MaxPayloadError as e:
                     if data is not None:
-                        payload_length = len(data.payload) if data.payload else 0
+                        payload_length = 0
+                        if data.payload:
+                            payload_length = len(base64.b64decode(data.payload))
                         logger.error(
                             f"Message too big to transaction: {payload_length}"
                         )
