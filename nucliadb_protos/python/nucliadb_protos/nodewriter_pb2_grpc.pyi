@@ -85,14 +85,6 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.noderesources_pb2.VectorSetList,
     ]
-    MoveShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.MoveShardRequest,
-        nucliadb_protos.noderesources_pb2.EmptyResponse,
-    ]
-    AcceptShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.AcceptShardRequest,
-        nucliadb_protos.noderesources_pb2.EmptyResponse,
-    ]
     GetMetadata: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.EmptyQuery,
         nucliadb_protos.noderesources_pb2.NodeMetadata,
@@ -177,18 +169,6 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.VectorSetList: ...
-    @abc.abstractmethod
-    def MoveShard(
-        self,
-        request: nucliadb_protos.nodewriter_pb2.MoveShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
-    @abc.abstractmethod
-    def AcceptShard(
-        self,
-        request: nucliadb_protos.nodewriter_pb2.AcceptShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
     @abc.abstractmethod
     def GetMetadata(
         self,

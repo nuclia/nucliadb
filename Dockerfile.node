@@ -9,7 +9,6 @@ COPY Cargo.toml \
     /nucliadb/
 COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
-COPY nucliadb_ftp /nucliadb/nucliadb_ftp
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
@@ -44,7 +43,6 @@ COPY Cargo.toml \
     /nucliadb/
 COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
-COPY nucliadb_ftp /nucliadb/nucliadb_ftp
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
