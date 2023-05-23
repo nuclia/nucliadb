@@ -67,6 +67,12 @@ class PullWorker:
 
         self.processor = Processor(driver, storage, cache, partition)
 
+    def __str__(self) -> str:
+        return f"PullWorker(partition={self.partition})"
+
+    def __repr__(self) -> str:
+        return str(self)
+
     async def handle_message(self, payload: str) -> None:
         pb = BrokerMessage()
         pb.ParseFromString(base64.b64decode(payload))
@@ -124,7 +130,7 @@ class PullWorker:
                     data = await processing_http_client.pull(self.partition)
                     if data.status == "ok":
                         logger.info(
-                            f"Message received from proxy, partition: {self.partition}"
+                            f"Message {data.msgid} received from proxy, partition: {self.partition}"
                         )
                         try:
                             await self.handle_message(data.payload)

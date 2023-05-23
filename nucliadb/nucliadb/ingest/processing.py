@@ -417,7 +417,9 @@ class ProcessingEngine:
                 data = await resp.json()
                 raise LimitsExceededError(resp.status, data["detail"])
             else:
-                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
+                error_text = await resp.text()
+                logger.warning(f"Error sending to process: {resp.status} {error_text}")
+                raise SendToProcessError()
 
         logger.info(
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
