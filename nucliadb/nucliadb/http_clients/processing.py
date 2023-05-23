@@ -89,7 +89,7 @@ class StatusResponse(pydantic.BaseModel):
 class PullResponse(pydantic.BaseModel):
     status: str
     payload: Optional[str] = None
-    msgid: int
+    msgid: Optional[int] = None
 
 
 class ProcessingHTTPClient:
