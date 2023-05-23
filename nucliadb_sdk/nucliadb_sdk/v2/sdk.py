@@ -16,14 +16,17 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import asyncio
 import base64
 import enum
 import io
 from typing import Any, Callable, Optional, Type, Union
 
 import httpx
+import orjson
 from pydantic import BaseModel
 
+from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     EntitiesGroup,
@@ -49,6 +52,7 @@ from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
+    ResourceFieldAdded,
     ResourceUpdated,
     UpdateResourcePayload,
 )
@@ -89,11 +93,33 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     )
 
 
+def _parse_list_of_pydantic(
+    data: list[Any],
+) -> str:
+    output = []
+    for item in data:
+        if isinstance(item, BaseModel):
+            output.append(item.dict())
+        else:
+            output.append(item)
+    return orjson.dumps(output).decode("utf-8")
+
+
+def _parse_response(response_type, resp: httpx.Response) -> Any:
+    if response_type is not None:
+        if isinstance(response_type, type) and issubclass(response_type, BaseModel):
+            return response_type.parse_raw(resp.content)  # type: ignore
+        else:
+            return response_type(resp)  # type: ignore
+    else:
+        return resp.content
+
+
 def _request_builder(
     path_template: str,
     method: str,
     path_params: tuple[str, ...],
-    request_type: Optional[Type[BaseModel]],
+    request_type: Optional[Union[Type[BaseModel], list[Any]]],
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
@@ -109,17 +135,22 @@ def _request_builder(
         data = None
         if request_type is not None:
             if content is not None:
-                if not isinstance(content, request_type):
-                    raise TypeError(f"Expected {request_type}, got {type(content)}")
-                else:
-                    data = content.json()
+                try:
+                    if not isinstance(content, request_type):  # type: ignore
+                        raise TypeError(f"Expected {request_type}, got {type(content)}")
+                    else:
+                        data = content.json()
+                except TypeError:
+                    if not isinstance(content, list):
+                        raise
+                    data = _parse_list_of_pydantic(content)
             else:
                 # pull properties out of kwargs now
                 content_data = {}
                 for key in list(kwargs.keys()):
-                    if key in request_type.__fields__:
+                    if key in request_type.__fields__:  # type: ignore
                         content_data[key] = kwargs.pop(key)
-                data = request_type.parse_obj(content_data).json()
+                data = request_type.parse_obj(content_data).json()  # type: ignore
 
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
@@ -127,26 +158,20 @@ def _request_builder(
 
         resp = self._request(path, method, data=data, query_params=query_params)
 
-        if response_type is not None:
-            if isinstance(response_type, type) and issubclass(response_type, BaseModel):
-                return response_type.parse_raw(resp.content)  # type: ignore
-            else:
-                return response_type(resp)  # type: ignore
+        if asyncio.iscoroutine(resp):
+
+            async def _wrapped_resp():
+                real_resp = await resp
+                return _parse_response(response_type, real_resp)
+
+            return _wrapped_resp()
         else:
-            return resp.content
+            return _parse_response(response_type, resp)
 
     return _func
 
 
-class NucliaSDK:
-    """
-    Example usage:
-
-    from nucliadb_sdk.v2.sdk import *
-    sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
-    sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
-    """
-
+class _NucliaSDKBase:
     def __init__(
         self,
         *,
@@ -175,7 +200,7 @@ class NucliaSDK:
                 self.base_url = url.rstrip("/")
             headers["X-STF-SERVICEACCOUNT"] = f"Bearer {api_key}"
 
-        self.session = httpx.Client(headers=headers, base_url=self.base_url)
+        self.headers = headers
 
     def _request(
         self,
@@ -184,14 +209,9 @@ class NucliaSDK:
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[dict[str, str]] = None,
     ):
-        url = f"{self.base_url}{path}"
-        opts: dict[str, Any] = {}
-        if data is not None:
-            opts["data"] = data
-        if query_params is not None:
-            opts["params"] = query_params
-        response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
+        raise NotImplementedError
 
+    def _check_response(self, response: httpx.Response):
         if response.status_code < 300:
             return response
         elif response.status_code in (401, 403):
@@ -208,7 +228,7 @@ class NucliaSDK:
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
             raise exceptions.NotFoundError(
-                f"Resource not found at url {url}: {response.text}"
+                f"Resource not found at url {response.url}: {response.text}"
             )
         else:
             raise exceptions.UnknownError(
@@ -258,6 +278,15 @@ class NucliaSDK:
     )
     list_resources = _request_builder(
         "/v1/kb/{kbid}/resources", "GET", ("kbid",), None, ResourceList
+    )
+
+    # Conversation endpoints
+    add_conversation_message = _request_builder(
+        "/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
+        "PUT",
+        ("kbid", "rid", "field_id"),
+        list[InputMessage],  # type: ignore
+        ResourceFieldAdded,
     )
 
     # Labels
@@ -339,3 +368,86 @@ class NucliaSDK:
     chat = _request_builder(
         "/v1/kb/{kbid}/chat", "POST", ("kbid",), ChatRequest, chat_response_parser
     )
+
+
+class NucliaSDK(_NucliaSDKBase):
+    """
+    Example usage:
+
+    from nucliadb_sdk.v2.sdk import *
+    sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
+    sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
+    """
+
+    def __init__(
+        self,
+        *,
+        region: Region = Region.EUROPE1,
+        api_key: Optional[str] = None,
+        url: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: Optional[float] = 60.0,
+    ):
+        super().__init__(region=region, api_key=api_key, url=url, headers=headers)
+        self.session = httpx.Client(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
+
+    def _request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[dict[str, str]] = None,
+    ):
+        url = f"{self.base_url}{path}"
+        opts: dict[str, Any] = {}
+        if data is not None:
+            opts["data"] = data
+        if query_params is not None:
+            opts["params"] = query_params
+        response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
+        return self._check_response(response)
+
+
+class NucliaSDKAsync(_NucliaSDKBase):
+    """
+    Example usage:
+
+    from nucliadb_sdk.v2.sdk import *
+    sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
+    sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
+    """
+
+    def __init__(
+        self,
+        *,
+        region: Region = Region.EUROPE1,
+        api_key: Optional[str] = None,
+        url: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: Optional[float] = 60.0,
+    ):
+        super().__init__(region=region, api_key=api_key, url=url, headers=headers)
+        self.session = httpx.AsyncClient(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
+
+    async def _request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[dict[str, str]] = None,
+    ):
+        url = f"{self.base_url}{path}"
+        opts: dict[str, Any] = {}
+        if data is not None:
+            opts["data"] = data
+        if query_params is not None:
+            opts["params"] = query_params
+        response: httpx.Response = await getattr(self.session, method.lower())(
+            url, **opts
+        )
+        self._check_response(response)
+        return response
