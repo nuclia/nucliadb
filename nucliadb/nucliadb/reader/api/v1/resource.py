@@ -17,8 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Literal, Optional, Union
-from typing import get_args as typing_get_args
+from typing import List, Optional, Union
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
