@@ -69,15 +69,13 @@ async def set_text_value(
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
         split = None
-        if result_paragraph.paragraph_index:
-            split = result_paragraph.paragraph_index.split
         result_paragraph.paragraph.text = await get_paragraph_text(
             kbid=kbid,
             rid=result_paragraph.rid,
             field=result_paragraph.field,
             start=result_paragraph.paragraph.position.start,
             end=result_paragraph.paragraph.position.end,
-            split=split,
+            split=result_paragraph.split,
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
@@ -253,6 +251,7 @@ async def merge_paragraphs_vectors(
         for vector in vectors_shard:
             if vector.score >= min_score:
                 doc_id_split = vector.doc_id.id.split("/")
+                split = None
                 if len(doc_id_split) == 5:
                     rid, field_type, field, index, position = doc_id_split
                     paragraph_id = f"{rid}/{field_type}/{field}/{position}"
@@ -269,6 +268,7 @@ async def merge_paragraphs_vectors(
                         score=vector.score,
                         start=int(start),
                         end=int(end),
+                        split=split,
                         id=paragraph_id,
                     ),
                 )
