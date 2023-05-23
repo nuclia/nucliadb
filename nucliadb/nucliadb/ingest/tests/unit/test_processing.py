@@ -28,7 +28,7 @@ from nucliadb.ingest.processing import (
     PushPayload,
 )
 from nucliadb_models import File, FileField
-from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 
 TEST_FILE = FileField(
     password="mypassword", file=File(filename="myfile.pdf", payload="")
@@ -159,6 +159,5 @@ async def test_send_to_process_500(engine):
         "POST", 500, text="error", context_manager=False
     )
 
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SendToProcessError):
         await engine.send_to_process(TEST_ITEM, 1)
-    assert str(exc.value) == "500: error"
