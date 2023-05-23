@@ -18,8 +18,7 @@ grpcio-testing>=1.44.0
 grpcio-reflection>=1.44.0
 orjson>=3.6.7
 types-setuptools
-# latest pydantic has conflicts with handling some of our routes
-pydantic>=1.9.0,<1.10.7
+pydantic>=1.9.0
 aiobotocore>=2.1.1
 aioboto3
 botocore
