@@ -386,9 +386,12 @@ class NucliaSDK(_NucliaSDKBase):
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[dict[str, str]] = None,
+        timeout: Optional[float] = 60.0,
     ):
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.Client(headers=self.headers, base_url=self.base_url)
+        self.session = httpx.Client(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
 
     def _request(
         self,
@@ -423,9 +426,12 @@ class NucliaSDKAsync(_NucliaSDKBase):
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[dict[str, str]] = None,
+        timeout: Optional[float] = 60.0,
     ):
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url)
+        self.session = httpx.AsyncClient(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
 
     async def _request(
         self,
