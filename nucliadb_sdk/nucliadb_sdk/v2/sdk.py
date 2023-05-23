@@ -16,17 +16,17 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import asyncio
 import base64
 import enum
-import json
-import io, asyncio
+import io
 from typing import Any, Callable, Optional, Type, Union
 
 import httpx
+import orjson
 from pydantic import BaseModel
-from nucliadb_models.conversation import InputMessage
 
-from nucliadb_models.writer import ResourceFieldAdded
+from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     EntitiesGroup,
@@ -52,6 +52,7 @@ from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
+    ResourceFieldAdded,
     ResourceUpdated,
     UpdateResourcePayload,
 )
@@ -94,14 +95,14 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
 
 def _parse_list_of_pydantic(
     data: list[Any],
-) -> bytes:
+) -> str:
     output = []
     for item in data:
         if isinstance(item, BaseModel):
             output.append(item.dict())
         else:
             output.append(item)
-    return json.dumps(output)
+    return orjson.dumps(output).decode("utf-8")
 
 
 def _parse_response(response_type, resp: httpx.Response) -> Any:
@@ -118,7 +119,7 @@ def _request_builder(
     path_template: str,
     method: str,
     path_params: tuple[str, ...],
-    request_type: Optional[Type[BaseModel]],
+    request_type: Optional[Union[Type[BaseModel], list[Any]]],
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
@@ -135,7 +136,7 @@ def _request_builder(
         if request_type is not None:
             if content is not None:
                 try:
-                    if not isinstance(content, request_type):
+                    if not isinstance(content, request_type):  # type: ignore
                         raise TypeError(f"Expected {request_type}, got {type(content)}")
                     else:
                         data = content.json()
@@ -147,9 +148,9 @@ def _request_builder(
                 # pull properties out of kwargs now
                 content_data = {}
                 for key in list(kwargs.keys()):
-                    if key in request_type.__fields__:
+                    if key in request_type.__fields__:  # type: ignore
                         content_data[key] = kwargs.pop(key)
-                data = request_type.parse_obj(content_data).json()
+                data = request_type.parse_obj(content_data).json()  # type: ignore
 
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
@@ -227,7 +228,7 @@ class _NucliaSDKBase:
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
             raise exceptions.NotFoundError(
-                f"Resource not found at url {url}: {response.text}"
+                f"Resource not found at url {response.url}: {response.text}"
             )
         else:
             raise exceptions.UnknownError(
@@ -284,7 +285,7 @@ class _NucliaSDKBase:
         "/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
         "PUT",
         ("kbid", "rid", "field_id"),
-        list[InputMessage],
+        list[InputMessage],  # type: ignore
         ResourceFieldAdded,
     )
 
