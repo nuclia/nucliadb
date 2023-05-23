@@ -29,11 +29,12 @@ from nucliadb_sdk.utils import (
     get_or_create,
     list_kbs,
 )
-from nucliadb_sdk.v2 import NucliaSDK, Region, exceptions
+from nucliadb_sdk.v2 import NucliaSDK, NucliaSDKAsync, Region, exceptions
 from nucliadb_sdk.vectors import Vector
 
 __all__ = (
     "NucliaSDK",
+    "NucliaSDKAsync",
     "Region",
     "exceptions",
     # OLD support APIs
