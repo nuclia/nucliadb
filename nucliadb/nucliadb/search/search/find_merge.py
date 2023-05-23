@@ -68,7 +68,6 @@ async def set_text_value(
     try:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
-        split = None
         result_paragraph.paragraph.text = await get_paragraph_text(
             kbid=kbid,
             rid=result_paragraph.rid,
