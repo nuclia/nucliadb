@@ -616,6 +616,9 @@ class Resource:
 
         await field_obj.delete()
 
+    def has_field(self, type: int, field: str) -> bool:
+        return (type, field) in self.fields
+
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
         for field, layout in message.layouts.items():
@@ -795,6 +798,12 @@ class Resource:
         add_field_classifications(self.basic, field_metadata)
 
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
+        if not self.has_field(
+            field_vectors.field.field_type, field_vectors.field.field
+        ):
+            # skipping because field does not exist
+            return
+
         field_obj = await self.get_field(
             field_vectors.field.field,
             field_vectors.field.field_type,

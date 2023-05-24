@@ -165,12 +165,27 @@ async def test_vector_duplicate_fields(
 
     # Add some labelled paragraphs to it
     bm = BrokerMessage()
-    field1_if = FieldID(field="field1", field_type=FieldType.TEXT)
+    field = FieldID(field="field1", field_type=FieldType.TEXT)
+    fcmw = FieldComputedMetadataWrapper(field=field)
+    p1 = Paragraph(
+        start=0,
+        end=82,
+        classifications=[Classification(labelset="ls1", label="label1")],
+    )
+    p2 = Paragraph(
+        start=84,
+        end=103,
+        classifications=[Classification(labelset="ls1", label="label2")],
+    )
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    fcmw.metadata.metadata.paragraphs.append(p2)
+    bm.field_metadata.append(fcmw)
+    bm.texts["field1"].body = "My text1"
 
     for i in range(5):
         bm.field_vectors.append(
             ExtractedVectorsWrapper(
-                field=field1_if,
+                field=field,
                 vectors=utils_pb2.VectorObject(
                     vectors=utils_pb2.Vectors(
                         vectors=[
@@ -187,11 +202,16 @@ async def test_vector_duplicate_fields(
             )
         )
 
+    await r.apply_fields(bm)
     await r.apply_extracted(bm)
 
+    count = 0
     for pkey1, para in r.indexer.brain.paragraphs.items():
         for pkey2, para2 in para.paragraphs.items():
             for key, sent in para2.sentences.items():
+                count += 1
                 assert (
                     len(sent.vector) == 768
                 ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
+
+    assert count == 1
