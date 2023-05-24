@@ -86,7 +86,6 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
     assert resp.status_code == 200
 
     # Inject synthetic extracted data for the conversation
-    extracted_text = "Some extracted text"
     extracted_split_text = {"1": "Split text 1", "2": "Split text 2"}
 
     bm = BrokerMessage()
@@ -96,7 +95,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
 
     etw = ExtractedTextWrapper()
     etw.field.MergeFrom(field)
-    etw.body.text = extracted_text
+    etw.body.text = ""  # with convos, text is empty
     etw.body.split_text.update(extracted_split_text)
     bm.extracted_text.append(etw)
 
@@ -169,7 +168,7 @@ async def test_extracted_text_is_serialized_properly(
     assert resp.status_code == 200
     resource = Resource.parse_obj(resp.json())
     extracted = resource.data.conversations["faq"].extracted  # type: ignore
-    assert extracted.text.text == "Some extracted text"  # type: ignore
+    assert extracted.text.text == ""  # type: ignore
     assert extracted.text.split_text["1"] == "Split text 1"  # type: ignore
     assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
 
@@ -192,7 +191,7 @@ async def test_find_conversations(
     # Check extracted
     conversation = resource.data.conversations["faq"]  # type: ignore
     extracted = conversation.extracted
-    assert extracted.text.text == "Some extracted text"  # type: ignore
+    assert extracted.text.text == ""  # type: ignore
     assert extracted.text.split_text["1"] == "Split text 1"  # type: ignore
     assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
 
