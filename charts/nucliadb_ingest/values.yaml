@@ -85,8 +85,11 @@ tracing:
 
 # ingest-orm-grpc settings
 # flat structure so no issues merging
-ingest_orm_grpc_resources: {}
-ingest_orm_grpc_replicaCount: 2
+ingest_orm_grpc_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
+ingest_orm_grpc_replicaCount: 1
 ingest_orm_grpc_autoscaling:
   minReplicas: 1
   maxReplicas: 2
@@ -99,7 +102,10 @@ ingest_orm_grpc_autoscaling:
           averageUtilization: 75
 
 # ingest-processed-consumer settings
-ingest_processed_consumer_resources: {}
+ingest_processed_consumer_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
 ingest_processed_consumer_replicaCount: 1
 ingest_processed_consumer_autoscaling:
   minReplicas: 1
@@ -113,8 +119,11 @@ ingest_processed_consumer_autoscaling:
           averageUtilization: 75
 
 # ingest-subscriber-workers settings
-ingest_subscriber_workers_resources: {}
-ingest_subscriber_workers_replicaCount: 2
+ingest_subscriber_workers_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
+ingest_subscriber_workers_replicaCount: 1
 ingest_subscriber_workers_autoscaling:
   minReplicas: 1
   maxReplicas: 5
