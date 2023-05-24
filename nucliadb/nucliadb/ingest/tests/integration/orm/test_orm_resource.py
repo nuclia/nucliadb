@@ -24,6 +24,7 @@ from uuid import uuid4
 import pytest
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
+from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, ExtractedVectorsWrapper
 from nucliadb_protos.resources_pb2 import FieldID as PBFieldID
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
@@ -33,8 +34,6 @@ from nucliadb_protos.resources_pb2 import UserFieldMetadata as PBUserFieldMetada
 from nucliadb_protos.train_pb2 import EnabledMetadata
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos import utils_pb2
-from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, ExtractedVectorsWrapper
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     Classification,
@@ -44,6 +43,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos import utils_pb2
 
 
 @pytest.mark.asyncio
