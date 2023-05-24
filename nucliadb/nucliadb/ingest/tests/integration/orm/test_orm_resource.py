@@ -33,6 +33,8 @@ from nucliadb_protos.resources_pb2 import UserFieldMetadata as PBUserFieldMetada
 from nucliadb_protos.train_pb2 import EnabledMetadata
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos import utils_pb2
+from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, ExtractedVectorsWrapper
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     Classification,
@@ -147,3 +149,49 @@ async def test_iterate_paragraphs(
     async for paragraph in r.iterate_paragraphs(EnabledMetadata(labels=True)):
         assert len(paragraph.metadata.labels.paragraph) == 1
         assert paragraph.metadata.labels.paragraph[0].label in ("label1", "label2")
+
+
+@pytest.mark.asyncio
+async def test_vector_duplicate_fields(
+    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+):
+    basic = PBBasic(title="My title", summary="My summary")
+    basic.metadata.status = PBMetadata.Status.PROCESSED
+
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
+    assert r is not None
+
+    # Add some labelled paragraphs to it
+    bm = BrokerMessage()
+    field1_if = FieldID(field="field1", field_type=FieldType.TEXT)
+
+    for i in range(5):
+        bm.field_vectors.append(
+            ExtractedVectorsWrapper(
+                field=field1_if,
+                vectors=utils_pb2.VectorObject(
+                    vectors=utils_pb2.Vectors(
+                        vectors=[
+                            utils_pb2.Vector(
+                                start=0,
+                                end=1,
+                                start_paragraph=0,
+                                end_paragraph=1,
+                                vector=[0.1] * 768,
+                            )
+                        ]
+                    )
+                ),
+            )
+        )
+
+    await r.apply_extracted(bm)
+
+    for pkey1, para in r.indexer.brain.paragraphs.items():
+        for pkey2, para2 in para.paragraphs.items():
+            for key, sent in para2.sentences.items():
+                assert (
+                    len(sent.vector) == 768
+                ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
