@@ -238,6 +238,7 @@ async def merge_paragraphs_vectors(
                     rid=paragraph.uuid,
                     score=paragraph.score.bm25,
                     start=paragraph.start,
+                    split=paragraph.split,
                     end=paragraph.end,
                     id=paragraph.paragraph,
                 )
