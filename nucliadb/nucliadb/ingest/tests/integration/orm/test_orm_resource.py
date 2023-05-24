@@ -24,7 +24,7 @@ from uuid import uuid4
 import pytest
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
-from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, ExtractedVectorsWrapper
+from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper
 from nucliadb_protos.resources_pb2 import FieldID as PBFieldID
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
