@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
@@ -79,6 +80,8 @@ from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+
+logger = logging.getLogger(__name__)
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
@@ -802,6 +805,9 @@ class Resource:
             field_vectors.field.field_type, field_vectors.field.field
         ):
             # skipping because field does not exist
+            logger.warning(
+                f'Field "{field_vectors.field.field}" does not exist, skipping vectors'
+            )
             return
 
         field_obj = await self.get_field(
