@@ -96,8 +96,7 @@ spec:
       - name: cluster-manager
         image: "{{ .Values.containerRegistry }}/{{ .Values.image_other }}"
         imagePullPolicy: {{ .Values.imageOtherPullPolicy }}
-        command: ["/entrypoint.sh"]
-        args: ["/nucliadb_cluster/cluster_manager"]
+        command: ["/nucliadb_cluster/cluster_manager"]
         envFrom:
         - configMapRef:
             name: nucliadb-config
