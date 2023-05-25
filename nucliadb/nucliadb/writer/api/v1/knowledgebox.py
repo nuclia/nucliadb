@@ -37,7 +37,6 @@ from nucliadb_models.resource import (
     KnowledgeBoxObjID,
     NucliaDBRoles,
 )
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -111,8 +110,6 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
     if item.description:
         pbrequest.config.description = item.description
 
-    set_info_on_span({"nuclia.kbid": kbid})
-
     kbobj: UpdateKnowledgeBoxResponse = await ingest.UpdateKnowledgeBox(pbrequest)  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObjID(uuid=kbobj.uuid)
@@ -134,8 +131,6 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
 @version(1)
 async def delete_kb(request: Request, kbid: str):
     ingest = get_ingest()
-
-    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: DeleteKnowledgeBoxResponse = await ingest.DeleteKnowledgeBox(  # type: ignore
         KnowledgeBoxID(uuid=kbid)
