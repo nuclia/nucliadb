@@ -31,8 +31,7 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViolation
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
-from nucliadb_telemetry import errors, metrics
-from nucliadb_telemetry.utils import set_info_on_span
+from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
@@ -144,7 +143,7 @@ class IngestConsumer:
                 logger.debug(
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
                 )
-                set_info_on_span({"nuclia.kbid": pb.kbid, "nuclia.rid": pb.uuid})
+                context.add_context({"kbid": pb.kbid, "rid": pb.uuid})
 
                 try:
                     with consumer_observer(

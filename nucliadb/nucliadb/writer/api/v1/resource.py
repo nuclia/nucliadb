@@ -73,7 +73,6 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -184,8 +183,6 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    set_info_on_span({"nuclia.rid": uuid, "nuclia.kbid": kbid})
-
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
@@ -255,8 +252,6 @@ async def modify_resource(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
-
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
@@ -338,8 +333,6 @@ async def reprocess_resource(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
-
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = await get_driver()
 
@@ -402,8 +395,6 @@ async def delete_resource(
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
-    set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
-
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()
 
@@ -447,8 +438,6 @@ async def reindex_resource(
     index_req.kbid = kbid
     index_req.rid = rid
     index_req.reindex_vectors = reindex_vectors
-
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     await ingest.ReIndex(index_req)  # type: ignore
     return Response(status_code=200)
