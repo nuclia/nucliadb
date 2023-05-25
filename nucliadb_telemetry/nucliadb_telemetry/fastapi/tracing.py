@@ -310,6 +310,7 @@ class OpenTelemetryMiddleware:
                 )
 
                 await self.app(scope, receive, otel_send)
+
         finally:
             if token:
                 context.detach(token)

@@ -32,6 +32,8 @@ from nucliadb_telemetry.fastapi.tracing import (
     ServerRequestHookT,
 )
 
+from .context import ContextInjectorMiddleware
+
 try:
     from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 except ImportError:  # pragma: no cover
@@ -69,12 +71,11 @@ def instrument_app(
 ):
     if metrics:
         # b/w compat
-        app.add_middleware(PrometheusMiddleware, filter_unhandled_paths=True)
-    if SentryAsgiMiddleware is not None:
-        app.add_middleware(SentryAsgiMiddleware)
+        app.add_middleware(PrometheusMiddleware)
 
     excluded_urls_obj = ExcludeList(excluded_urls)
 
+    app.add_middleware(ContextInjectorMiddleware)
     app.add_middleware(
         OpenTelemetryMiddleware,
         excluded_urls=excluded_urls_obj,
@@ -82,3 +83,8 @@ def instrument_app(
         server_request_hook=server_request_hook,
         tracer_provider=tracer_provider,
     )
+
+    if SentryAsgiMiddleware is not None:
+        # add last to catch all exceptions
+        # `add_middleware` always adds to the beginning of the middleware list
+        app.add_middleware(SentryAsgiMiddleware)
