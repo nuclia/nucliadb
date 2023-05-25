@@ -342,40 +342,42 @@ class KnowledgeboxShards(BaseModel):
 
 
 class Defaults:
-    query = Field("", title="Query", description="The query to search for")
-    advanced_query = Field(
-        None,
+    query = dict(default="", title="Query", description="The query to search for")
+    advanced_query = dict(
+        default=None,
         title="Advanced query",
         description="An advanced query to search for. Follows the tantivy query parser syntax: https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html",  # noqa: E501
     )
-    fields = Field([], title="Fields", description="The list of fields to search in")
-    filters = Field(
-        [],
+    fields = dict(
+        default=[], title="Fields", description="The list of fields to search in"
+    )
+    filters = dict(
+        default=[],
         title="Filters",
         description="The list of filters to apply. The filters follow the syntax defined in https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa: E501
     )
-    faceted = Field(
-        [],
+    faceted = dict(
+        default=[],
         title="Faceted",
         description="The list of facets to calculate. The facets follow the syntax defined in https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa: E501
     )
-    min_score = Field(
-        0.70,
+    min_score = dict(
+        default=0.70,
         title="Minimum result score",
         description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
     )
 
 
 class SearchRequest(BaseModel):
-    query: str = Defaults.query
-    advanced_query: Optional[str] = Defaults.advanced_query
-    fields: List[str] = Defaults.fields
-    filters: List[str] = Defaults.filters
-    faceted: List[str] = Defaults.faceted
+    query: str = Field(**Defaults.query)
+    advanced_query: Optional[str] = Field(**Defaults.advanced_query)
+    fields: List[str] = Field(**Defaults.fields)
+    filters: List[str] = Field(**Defaults.filters)
+    faceted: List[str] = Field(**Defaults.faceted)
     sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
-    min_score: float = Defaults.min_score
+    min_score: float = Field(**Defaults.min_score)
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
