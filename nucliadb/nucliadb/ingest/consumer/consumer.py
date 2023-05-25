@@ -31,8 +31,7 @@ from nucliadb.ingest import logger
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViolation
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
-from nucliadb_telemetry import errors, metrics
-from nucliadb_telemetry import context
+from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
