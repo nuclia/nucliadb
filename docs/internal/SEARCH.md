@@ -113,7 +113,7 @@ The hierarchy of tags is the following:
 - `/e`: document entities as `/e/{entity-type}/{entity-id}`
   - Example: `/e/CITY/Barcelona`
 
-- `/s`: languages(`s` for speach)
+- `/s`: languages(`s` for speech)
   - `/s/p`: primary language of the document
     - Example: `/s/p/ca` for catalan language
   - `/s/s`: all other detected languages
