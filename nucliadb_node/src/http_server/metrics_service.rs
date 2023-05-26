@@ -22,7 +22,7 @@ use nucliadb_core::{context, tracing};
 
 pub async fn metrics_service() -> String {
     let metrics = context::get_metrics();
-    match metrics.collect() {
+    match metrics.export() {
         Ok(m) => m,
         Err(err) => {
             tracing::error!("Could not collect metrics due to {err:?}");

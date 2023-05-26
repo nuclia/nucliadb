@@ -20,27 +20,27 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 
-use crate::metrics::{self, Metrics};
+use crate::metrics::{self, MetricsCollector};
 
 lazy_static! {
-    static ref METRICS: Arc<dyn Metrics> = create_metrics();
+    static ref METRICS: Arc<dyn MetricsCollector> = create_metrics();
 }
 
 #[cfg(prometheus_metrics)]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::PrometheusMetrics::new())
+fn create_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::new(metrics::PrometheusMetricsCollector::new())
 }
 
 #[cfg(log_metrics)]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::ConsoleLogMetrics)
+fn create_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::new(metrics::ConsoleLogMetricsCollector)
 }
 
 #[cfg(not(any(prometheus_metrics, log_metrics)))]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::NoMetrics)
+fn create_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::new(metrics::NoOpMetricsCollector)
 }
 
-pub fn get_metrics() -> Arc<dyn Metrics> {
+pub fn get_metrics() -> Arc<dyn MetricsCollector> {
     Arc::clone(&METRICS)
 }
