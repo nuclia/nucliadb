@@ -31,6 +31,30 @@ pub mod request_time;
 
 mod collector;
 
-pub use collector::{
-    ConsoleLogMetricsCollector, MetricsCollector, NoOpMetricsCollector, PrometheusMetricsCollector,
-};
+use std::sync::Arc;
+
+use collector::MetricsCollector;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref METRICS: Arc<dyn MetricsCollector> = create_metrics();
+}
+
+#[cfg(prometheus_metrics)]
+fn create_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::new(collector::PrometheusMetricsCollector::new())
+}
+
+#[cfg(log_metrics)]
+fn create_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::new(collector::ConsoleLogMetricsCollector)
+}
+
+#[cfg(not(any(prometheus_metrics, log_metrics)))]
+fn create_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::new(collector::NoOpMetricsCollector)
+}
+
+pub fn get_metrics() -> Arc<dyn MetricsCollector> {
+    Arc::clone(&METRICS)
+}

@@ -29,7 +29,7 @@ use nucliadb_core::protos::{
     VectorSimilarity,
 };
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::{context, thread};
+use nucliadb_core::{metrics, thread};
 
 use super::shard_disk_structure::*;
 use crate::services::versions::Versions;
@@ -195,7 +195,7 @@ impl ShardWriterService {
 
         metadata.serialize(&metadata_path)?;
         let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/new".to_string());
         metrics.record_request_time(metric, took);
@@ -226,7 +226,7 @@ impl ShardWriterService {
             path: path.join(RELATIONS_DIR),
         };
         let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/open".to_string());
         metrics.record_request_time(metric, took);
@@ -283,7 +283,7 @@ impl ShardWriterService {
             error!("Error stopping the Relation writer service: {}", e);
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/stop".to_string());
         metrics.record_request_time(metric, took);
@@ -356,7 +356,7 @@ impl ShardWriterService {
             s.spawn(|_| relation_result = relation_task());
         });
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/set_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -417,7 +417,7 @@ impl ShardWriterService {
             s.spawn(|_| relation_result = relation_task());
         });
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/remove_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -454,7 +454,7 @@ impl ShardWriterService {
             s.spawn(|_| vector_result = vector_task());
         });
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/get_opstatus".to_string());
         metrics.record_request_time(metric, took);

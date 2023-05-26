@@ -22,7 +22,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::*;
@@ -229,7 +229,7 @@ impl RelationReader for RelationsReaderService {
             .and_then(|reader| reader.no_nodes())
             .map(|v| v as usize)?);
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("count".to_string());
         metrics.record_request_time(metric, took);
@@ -264,7 +264,7 @@ impl RelationReader for RelationsReaderService {
             debug!("{id:?} - Ending at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("get_edges".to_string());
         metrics.record_request_time(metric, took);
@@ -299,7 +299,7 @@ impl RelationReader for RelationsReaderService {
             debug!("{id:?} - Ending at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("get_node_types".to_string());
         metrics.record_request_time(metric, took);
@@ -325,7 +325,7 @@ impl ReaderChild for RelationsReaderService {
             prefix: self.prefix_search(request)?,
         });
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("search".to_string());
         metrics.record_request_time(metric, took);
@@ -344,7 +344,7 @@ impl ReaderChild for RelationsReaderService {
             .map(|s| format!("{s:?}"))
             .collect();
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("stored_ids".to_string());
         metrics.record_request_time(metric, took);

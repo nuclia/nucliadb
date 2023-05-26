@@ -21,7 +21,7 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -72,7 +72,7 @@ impl RelationWriter for RelationsWriterService {
         }
         let result = Ok(writer.commit(&mut self.wmode)?);
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("delete_nodes".to_string());
         metrics.record_request_time(metric, took);
@@ -131,7 +131,7 @@ impl RelationWriter for RelationsWriterService {
 
         let result = Ok(writer.commit(&mut self.wmode)?);
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("join_graph".to_string());
         metrics.record_request_time(metric, took);
@@ -166,7 +166,7 @@ impl WriterChild for RelationsWriterService {
             debug!("Ending at {v} ms")
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("count".to_string());
         metrics.record_request_time(metric, took);
@@ -187,7 +187,7 @@ impl WriterChild for RelationsWriterService {
             debug!("{id:?} - Ending at {v} ms")
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("delete_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -237,7 +237,7 @@ impl WriterChild for RelationsWriterService {
             debug!("{id:?} - Ending at {v} ms")
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::relations("set_resource".to_string());
         metrics.record_request_time(metric, took);
