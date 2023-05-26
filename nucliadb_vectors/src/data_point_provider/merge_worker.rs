@@ -18,20 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
-
 use nucliadb_core::fs_state;
 use nucliadb_core::tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::work_flag::MergerWriterSync;
 use super::State;
 use crate::data_point::{DataPoint, DpId, Similarity};
 use crate::data_point_provider::merger;
 use crate::VectorR;
 
+
 pub(crate) struct Worker {
     location: PathBuf,
-    work_flag: MergerWriterSync,
     similarity: Similarity,
 }
 impl MergeQuery for Worker {
@@ -40,15 +38,10 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
-    pub(crate) fn request(
-        location: PathBuf,
-        work_flag: MergerWriterSync,
-        similarity: Similarity,
-    ) -> MergeRequest {
+    pub fn request(location: PathBuf, similarity: Similarity) -> MergeRequest {
         Box::new(Worker {
             similarity,
             location,
-            work_flag,
         })
     }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
@@ -61,15 +54,6 @@ impl Worker {
         write!(msg, "==> {new}").unwrap();
         msg
     }
-    fn notify_merger(&self) {
-        let worker = Worker::request(
-            self.location.clone(),
-            self.work_flag.clone(),
-            self.similarity,
-        );
-        merger::send_merge_request(worker);
-    }
-
     fn work(&self) -> VectorR<()> {
         let subscriber = self.location.as_path();
         // We must ensure that GC does not happen while working.
@@ -89,16 +73,10 @@ impl Worker {
 
         // We are updating the state, but first
         // synchronize with the writer.
-        let work_flag = self.work_flag.start_working();
         let (_, mut state) = fs_state::load_state::<State>(subscriber)?;
-        let creates_work = state.replace_work_unit(new_dp);
+        state.replace_work_unit(new_dp);
         fs_state::atomic_write(subscriber, &state)?;
         info!("Merge on {subscriber:?}:\n{report}");
-        if creates_work {
-            self.notify_merger();
-        }
-        std::mem::drop(work_flag);
-
         info!("Merge request completed");
         Ok(())
     }

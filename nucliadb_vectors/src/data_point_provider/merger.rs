@@ -59,7 +59,7 @@ pub struct Merger {
 
 impl Merger {
     pub fn install_global() -> VectorR<impl FnOnce()> {
-        let mut status = Err(VectorErr::MergerAlreadyInitialized);
+        let mut status = Err(VectorErr::MergerExistsError);
         MERGER_NOTIFIER_SET.call_once(|| unsafe {
             let (stxn, rtxn) = mpsc::channel();
             let handler = MergerHandle(stxn);

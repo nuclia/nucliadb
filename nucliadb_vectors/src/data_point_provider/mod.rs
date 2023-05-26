@@ -21,7 +21,7 @@
 mod merge_worker;
 mod merger;
 mod state;
-mod work_flag;
+
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
@@ -37,7 +37,7 @@ use nucliadb_core::fs_state::{self, Version};
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
-use work_flag::MergerWriterSync;
+use tempfile::NamedTempFile as TemporalFile;
 
 pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId, Journal, Similarity};
@@ -46,9 +46,24 @@ use crate::formula::Formula;
 use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
+// Remain
 const METADATA: &str = "metadata.json";
+const STATE: &str = "state.bincode";
+const READERS: &str = "readers";
 const WRITER_FLAG: &str = "writer.flag";
-const READERS_STATUS: &str = "readers";
+
+// Atomically update 'path' with the contents that 'serializer'
+// writes into the buffer.
+fn persist_data<F, R>(path: &Path, serializer: F) -> VectorR<R>
+where for<'a> F: FnOnce(&mut BufWriter<&'a mut TemporalFile>) -> VectorR<R> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    let mut buffer = BufWriter::new(&mut file);
+    let user_result = serializer(&mut buffer)?;
+    buffer.flush()?;
+    std::mem::drop(buffer);
+    file.persist(path)?;
+    Ok(user_result)
+}
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -64,9 +79,9 @@ pub struct IndexMetadata {
 }
 impl IndexMetadata {
     pub fn write(&self, path: &Path) -> VectorR<()> {
-        let mut writer = BufWriter::new(File::create(path.join(METADATA))?);
-        serde_json::to_writer(&mut writer, self)?;
-        Ok(writer.flush()?)
+        persist_data(&path.join(METADATA), |buffer| {
+            Ok(serde_json::to_writer(buffer, self)?)
+        })
     }
     pub fn open(path: &Path) -> VectorR<Option<IndexMetadata>> {
         let path = &path.join(METADATA);
@@ -85,25 +100,29 @@ pub struct Index {
 }
 impl Index {
     pub fn open(path: &Path) -> VectorR<Index> {
-        let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
-            // Old indexes may not have this file so in that case the
-            // metadata file they should have is created.
-            let metadata = IndexMetadata::default();
-            metadata.write(path).map(|_| metadata)
-        })?;
-        Ok(Index {
-            metadata,
-            location: path.to_path_buf(),
-        })
+        match IndexMetadata::open(path)? {
+            Some(metadata) => Ok(Index {
+                metadata,
+                location: path.to_path_buf(),
+            }),
+            None => {
+                // Old indexes may not have this file so in that case the
+                // metadata file they should have is created.
+                let location = path.to_path_buf();
+                let metadata = IndexMetadata::default();
+                metadata.write(&location)?;
+                Ok(Index { metadata, location })
+            }
+        }
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
-        std::fs::create_dir_all(path)?;
-        std::fs::create_dir_all(path.join(READERS_STATUS))?;
-        fs_state::initialize_disk(path, State::new)?;
-        metadata.write(path)?;
-        Ok(Index {
-            metadata,
-            location: path.to_path_buf(),
+        let location = path.to_path_buf();
+        std::fs::create_dir_all(&location)?;
+        std::fs::create_dir_all(location.join(READERS))?;
+        persist_data(&location.join(STATE), |buffer| {
+            bincode::serialize_into(buffer, &State::new())?;
+            metadata.write(&location)?;
+            Ok(Index { metadata, location })
         })
     }
     pub fn writer(&self) -> VectorR<Writer> {
@@ -149,8 +168,10 @@ impl Context {
         transform(&mut writer)
     }
     pub fn persist(&self, path: &Path) -> VectorR<()> {
-        let state = self.read();
-        Ok(fs_state::atomic_write(path, &state.state)?)
+        let context = self.read();
+        persist_data(&path.join(STATE), |buffer| {
+            Ok(bincode::serialize_into(buffer, &context.state)?)
+        })
     }
 }
 
@@ -177,7 +198,7 @@ impl Reader {
     fn new(inner: Index) -> VectorR<Reader> {
         let id = uuid::Uuid::new_v4().to_string();
         let update_scheduled = Arc::new(AtomicBool::new(false));
-        let status_dir = inner.location().join(READERS_STATUS);
+        let status_dir = inner.location().join(READERS);
         let status = status_dir.join(id).with_extension("json");
         let context = Context::new(inner.location())?;
 
@@ -266,7 +287,6 @@ impl Reader {
 pub struct Writer {
     #[allow(unused)]
     writer_flag: File,
-    work_flag: MergerWriterSync,
     datapoint_buffer: Vec<Journal>,
     delete_buffer: Vec<(String, SystemTime)>,
     inner: Index,
@@ -287,15 +307,12 @@ impl Writer {
         self.context.apply(transform)
     }
     fn notify_merger(&self) {
-        let worker = Worker::request(
-            self.location().to_path_buf(),
-            self.work_flag.clone(),
-            self.metadata().similarity,
-        );
+        let location = self.location().to_path_buf();
+        let similarity = self.metadata().similarity;
+        let worker = Worker::request(location, similarity);
         merger::send_merge_request(worker);
     }
     fn new(inner: Index) -> VectorR<Writer> {
-        let work_flag = MergerWriterSync::new();
         let writer_flag = OpenOptions::new()
             .read(true)
             .write(true)
@@ -303,13 +320,12 @@ impl Writer {
             .open(inner.location.join(WRITER_FLAG))?;
         writer_flag
             .try_lock_exclusive()
-            .map_err(|_| VectorErr::WriterExists)?;
+            .map_err(|_| VectorErr::WriterExistsError)?;
         let context = Context::new(&inner.location)?;
         let work_len = context.read().state.work_stack_len();
         let writer = Writer {
             inner,
             writer_flag,
-            work_flag,
             context,
             datapoint_buffer: vec![],
             delete_buffer: vec![],
@@ -325,16 +341,13 @@ impl Writer {
     }
     pub fn collect_garbage(&self) -> VectorR<()> {
         if self.has_work() {
-            return Err(VectorErr::WorkDelayed);
+            return Err(VectorErr::WouldBlockError);
         }
         let location = self.location();
-        // Synchronizing with the merger.
-        let work_flag = self.work_flag.start_working();
-        self.update()?;
         let context = self.context.read();
         let mut in_use_dp: HashSet<_> = context.state.dpid_iter().collect();
         // Loading the readers status
-        for reader_status in std::fs::read_dir(location.join(READERS_STATUS))? {
+        for reader_status in std::fs::read_dir(location.join(READERS))? {
             let entry = reader_status?;
             let status_file = OpenOptions::new().read(true).open(entry.path())?;
             status_file.lock_shared()?;
@@ -364,7 +377,6 @@ impl Writer {
                 warn!("{name} is garbage and could not be deleted because of {err}");
             }
         }
-        mem::drop(work_flag);
         Ok(())
     }
     pub fn commit(&mut self) -> VectorR<()> {
@@ -375,29 +387,22 @@ impl Writer {
         let deletes = mem::take(&mut self.delete_buffer);
         let location = self.location();
 
-        let work_flag = self.work_flag.start_working();
         // Get the last version of the state, merges may have happen.
         // Is important to ensure that we are the only ones working on the
         // state.
         self.update()?;
 
         // Modifying the state with the current buffers
-        let merge_work = self.context.apply(move |state: &mut InnerContext| {
-            let merge_work = adds
-                .iter()
-                .copied()
-                .fold(0, |acc, i| acc + (state.state.add(i) as usize));
+        self.context.apply(move |state: &mut InnerContext| {
+            adds.iter().copied().for_each(|i| state.state.add(i));
             deletes
                 .iter()
                 .for_each(|(prefix, time)| state.state.remove(prefix, *time));
-            Ok(merge_work)
+            Ok(())
         })?;
+
         // Persisting the new state
         self.context.persist(location)?;
-        mem::drop(work_flag);
-
-        // Once the commit is done is safe to notify the merger
-        (0..merge_work).for_each(|_| self.notify_merger());
         Ok(())
     }
     pub fn number_of_nodes(&self) -> usize {
@@ -464,7 +469,7 @@ mod test {
         let dir = tempfile::tempdir()?;
         let metadata = IndexMetadata::default();
         let index = Index::new(dir.path(), metadata)?;
-        let readers_status = dir.path().join(READERS_STATUS);
+        let readers_status = dir.path().join(READERS);
         {
             let _reader1 = index.reader()?;
             let _reader2 = index.reader()?;
@@ -488,7 +493,7 @@ mod test {
         let writer = index.writer()?;
 
         // There is no another writer for this index
-        let Err(VectorErr::WriterExists) = index.writer() else {
+        let Err(VectorErr::WriterExistsError) = index.writer() else {
             panic!("This should have failed");
         };
         mem::drop(writer);

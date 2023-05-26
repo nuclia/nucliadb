@@ -212,18 +212,17 @@ impl State {
     pub fn remove(&mut self, id: &str, deleted_since: SystemTime) {
         self.delete_log.insert(id.as_bytes(), deleted_since);
     }
-    #[must_use]
-    pub fn add(&mut self, meta: Journal) -> bool {
+    pub fn add(&mut self, meta: Journal) {
         self.no_nodes += meta.no_nodes();
         self.current.add_unit(meta);
         if self.current.size() == BUFFER_CAP {
             self.close_work_unit();
         }
-        self.current.size() == 0
     }
-    #[must_use]
-    pub fn replace_work_unit(&mut self, new: DataPoint) -> bool {
-        let Some(unit) = self.work_stack.pop_back() else { return false };
+    pub fn replace_work_unit(&mut self, new: DataPoint) {
+        let Some(unit) = self.work_stack.pop_back() else { 
+            return;
+        };
         let age_cap = self
             .work_stack
             .back()
@@ -335,9 +334,8 @@ mod test {
         let no_nodes = DataPointProducer::new(dir.path())
             .take(5)
             .map(|dp| {
-                let no_nodes = dp.meta().no_nodes();
-                let _ = state.add(dp.meta());
-                no_nodes
+                state.add(dp.meta());
+                dp.meta().no_nodes()
             })
             .sum::<usize>();
         assert_eq!(state.no_nodes(), no_nodes);

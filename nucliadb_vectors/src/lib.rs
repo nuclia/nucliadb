@@ -23,24 +23,29 @@ pub mod data_point_provider;
 mod data_types;
 pub mod formula;
 pub mod service;
-
+use tempfile::PersistError;
 use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum VectorErr {
     #[error("json error: {0}")]
-    SJ(#[from] serde_json::Error),
+    SerdeJsonError(#[from] serde_json::Error),
     #[error("IO error: {0}")]
-    IoErr(#[from] std::io::Error),
+    IoError(#[from] std::io::Error),
+    #[error("Serialization error: {0}")]
+    BincodeError(#[from] bincode::Error),
+    #[error("The operation is blocked by another one")]
+    WouldBlockError,
+    #[error("Merger is already initialized")]
+    MergerExistsError,
+    #[error("Can not merge zero datapoints")]
+    EmptyMergeError,
+    #[error("A writer is already open for this index")]
+    WriterExistsError,
+    #[error("A file update could not be performed: {0}")]
+    UpdateError(#[from] PersistError),
+    // Will deprecate
     #[error("Error in fs: {0}")]
     FsError(#[from] nucliadb_core::fs_state::FsError),
-    #[error("Garbage collection delayed")]
-    WorkDelayed,
-    #[error("Merger is already initialized")]
-    MergerAlreadyInitialized,
-    #[error("Can not merge zero datapoints")]
-    EmptyMerge,
-    #[error("A writer is already open for this index")]
-    WriterExists,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;
