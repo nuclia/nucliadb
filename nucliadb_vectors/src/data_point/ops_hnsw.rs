@@ -100,7 +100,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         candidates.truncate(k_neighbours);
         candidates
     }
-    fn cosine_similarity(&self, x: Address, y: Address) -> f32 {
+    fn similarity(&self, x: Address, y: Address) -> f32 {
         self.tracker.similarity(x, y)
     }
     fn get_random_layer(&mut self) -> usize {
@@ -118,7 +118,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         vec_counter: &RepCounter,
     ) -> Option<(Address, f32)> {
         let mut visited_nodes = HashSet::new();
-        let mut candidates = BinaryHeap::from([Cnx(x, self.cosine_similarity(x, query))]);
+        let mut candidates = BinaryHeap::from([Cnx(x, self.similarity(x, query))]);
         loop {
             match candidates.pop() {
                 None => break None,
@@ -134,11 +134,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                         // The vector satisfies the given filter
                         && filter.run(n, self.tracker) =>
                 {
-                    break Some((n, self.cosine_similarity(n, query)));
+                    break Some((n, self.similarity(n, query)));
                 }
                 Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, _)| {
                     if !visited_nodes.contains(&n) {
-                        candidates.push(Cnx(n, self.cosine_similarity(n, query)));
+                        candidates.push(Cnx(n, self.similarity(n, query)));
                         visited_nodes.insert(n);
                     }
                 }),
@@ -157,7 +157,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let mut ms_neighbours = BinaryHeap::new();
         for ep in entry_points.iter().copied() {
             visited.insert(ep);
-            let similarity = self.cosine_similarity(x, ep);
+            let similarity = self.similarity(x, ep);
             candidates.push(Cnx(ep, similarity));
             ms_neighbours.push(Reverse(Cnx(ep, similarity)));
         }
@@ -169,7 +169,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                     for (y, _) in layer.get_out_edges(cn) {
                         if !visited.contains(&y) {
                             visited.insert(y);
-                            let similarity = self.cosine_similarity(x, y);
+                            let similarity = self.similarity(x, y);
                             if similarity > ws || ms_neighbours.len() < k_neighbours {
                                 candidates.push(Cnx(y, similarity));
                                 ms_neighbours.push(Reverse(Cnx(y, similarity)));

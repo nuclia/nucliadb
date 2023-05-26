@@ -361,5 +361,17 @@ mod tests {
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
+
+        let bad_request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0],
+            tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            reload: false,
+            with_duplicates: false,
+        };
+        assert!(reader.search(&bad_request).is_err());
     }
 }

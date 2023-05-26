@@ -42,6 +42,8 @@ pub enum VectorErr {
     MergerAlreadyInitialized,
     #[error("Can not merge zero datapoints")]
     EmptyMerge,
+    #[error("Inconsistent dimensions")]
+    InconsistentDimensions,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

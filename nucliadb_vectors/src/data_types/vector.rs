@@ -35,6 +35,12 @@ fn encode_unit(mut buff: Vec<u8>, unit: Unit) -> Vec<u8> {
     buff
 }
 
+pub fn vector_len(mut x: &[u8]) -> u64 {
+    let mut buff_x = [0; 8];
+    x.read_exact(&mut buff_x).unwrap();
+    Len::from_le_bytes(buff_x)
+}
+
 pub fn cosine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
