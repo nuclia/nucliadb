@@ -39,5 +39,5 @@ pub async fn run_http_metrics_server(options: MetricsServerOptions) {
         // Services will be added here
         .serve(metrics.into_make_service())
         .await
-        .expect("Error starting the http server");
+        .expect("Error starting the HTTP server");
 }
