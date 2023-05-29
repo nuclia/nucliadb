@@ -451,6 +451,7 @@ pub mod field_text {
         Html = 1,
         Rst = 2,
         Markdown = 3,
+        Json = 4,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

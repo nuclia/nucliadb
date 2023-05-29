@@ -42,6 +42,7 @@ class TextFormat(Enum):  # type: ignore
     HTML = "HTML"
     RST = "RST"
     MARKDOWN = "MARKDOWN"
+    JSON = "JSON"
 
 
 TEXT_FORMAT_TO_MIMETYPE = {
@@ -49,6 +50,7 @@ TEXT_FORMAT_TO_MIMETYPE = {
     TextFormat.HTML: "text/html",
     TextFormat.RST: "text/x-rst",
     TextFormat.MARKDOWN: "text/markdown",
+    TextFormat.JSON: "application/json",
 }
 
 
@@ -87,6 +89,7 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
     HTML = 1
     MARKDOWN = 2
     RST = 3
+    JSON = 4
 
 
 class Text(BaseModel):
