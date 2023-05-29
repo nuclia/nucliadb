@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import re
 
 import pydantic
@@ -58,3 +59,10 @@ class SlugString(pydantic.ConstrainedStr):
             return super().validate(value)
         except pydantic.errors.StrRegexError:
             raise InvalidSlugError(value=value)
+
+
+def validate_json(value: str):
+    try:
+        json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON") from exc

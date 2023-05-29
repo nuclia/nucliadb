@@ -21,8 +21,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
+from nucliadb_models.utils import validate_json
 from nucliadb_protos import resources_pb2
 
 _T = TypeVar("_T")
@@ -42,6 +43,7 @@ class TextFormat(Enum):  # type: ignore
     HTML = "HTML"
     RST = "RST"
     MARKDOWN = "MARKDOWN"
+    JSON = "JSON"
 
 
 TEXT_FORMAT_TO_MIMETYPE = {
@@ -49,6 +51,7 @@ TEXT_FORMAT_TO_MIMETYPE = {
     TextFormat.HTML: "text/html",
     TextFormat.RST: "text/x-rst",
     TextFormat.MARKDOWN: "text/markdown",
+    TextFormat.JSON: "application/json",
 }
 
 
@@ -78,6 +81,12 @@ class TextField(BaseModel):
     body: str
     format: TextFormat = TextFormat.PLAIN
 
+    @root_validator(pre=False, skip_on_failure=True)
+    def check_text_format(cls, values):
+        if values.get("format") == TextFormat.JSON:
+            validate_json(values.get("body", ""))
+        return values
+
 
 # Processing classes (Those used to sent to push endpoints)
 
@@ -87,6 +96,7 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
     HTML = 1
     MARKDOWN = 2
     RST = 3
+    JSON = 4
 
 
 class Text(BaseModel):

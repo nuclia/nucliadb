@@ -124,6 +124,7 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.HTML: "text/html",
     FieldText.Format.RST: "text/x-rst",
     FieldText.Format.MARKDOWN: "text/markdown",
+    FieldText.Format.JSON: "application/json",
 }
 
 

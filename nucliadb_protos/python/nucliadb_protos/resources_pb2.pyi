@@ -1191,12 +1191,14 @@ class FieldText(google.protobuf.message.Message):
         HTML: FieldText._Format.ValueType  # 1
         RST: FieldText._Format.ValueType  # 2
         MARKDOWN: FieldText._Format.ValueType  # 3
+        JSON: FieldText._Format.ValueType  # 4
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: FieldText.Format.ValueType  # 0
     HTML: FieldText.Format.ValueType  # 1
     RST: FieldText.Format.ValueType  # 2
     MARKDOWN: FieldText.Format.ValueType  # 3
+    JSON: FieldText.Format.ValueType  # 4
 
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
