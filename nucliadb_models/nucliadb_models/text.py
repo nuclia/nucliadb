@@ -21,8 +21,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
+from nucliadb_models.utils import validate_json
 from nucliadb_protos import resources_pb2
 
 _T = TypeVar("_T")
@@ -79,6 +80,12 @@ class FieldText(BaseModel):
 class TextField(BaseModel):
     body: str
     format: TextFormat = TextFormat.PLAIN
+
+    @root_validator(pre=False, skip_on_failure=True)
+    def check_text_format(cls, values):
+        if values.get("format") == TextFormat.JSON:
+            validate_json(values.get("body", ""))
+        return values
 
 
 # Processing classes (Those used to sent to push endpoints)

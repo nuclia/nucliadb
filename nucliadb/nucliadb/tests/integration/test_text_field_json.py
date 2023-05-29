@@ -56,3 +56,29 @@ async def test_text_field_in_json_format(
 
     body = resp.json()
     assert json.loads(body["data"]["texts"][field_id]["value"]["body"]) == payload
+
+
+@pytest.mark.asyncio
+async def test_text_field_with_invalid_json(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+    field_id = "json-text"
+    invalid_json = '{hello": "world"}'
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        headers={"x-synchronous": "true"},
+        json={
+            "title": "JSON text field",
+            "texts": {
+                field_id: {
+                    "body": invalid_json,
+                    "format": TextFormat.JSON.value,
+                }
+            },
+        },
+    )
+    assert resp.status_code == 422
