@@ -16,8 +16,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-pub mod async_tasks;
-pub mod grpc;
+pub mod instrumentor;
+
 /// metrics
 /// Every metric must be define in its own module, which must fulfill the following requirements:
 /// - The name of the module must be the name of the name of the metric.
@@ -28,6 +28,7 @@ pub mod grpc;
 /// - If the metric is called SomeName, a struct 'SomeNameKey' must be defined.
 /// - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
 pub mod request_time;
+pub mod middleware;
 
 mod collectors;
 
