@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::metrics::collector::MetricsCollector;
+use crate::metrics::collectors::MetricsCollector;
 use crate::metrics::request_time;
 use crate::{tracing, NodeResult};
 

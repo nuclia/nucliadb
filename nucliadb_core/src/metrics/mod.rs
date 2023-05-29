@@ -29,12 +29,13 @@ pub mod grpc;
 /// - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
 pub mod request_time;
 
-mod collector;
+mod collectors;
 
 use std::sync::Arc;
 
-use collector::MetricsCollector;
 use lazy_static::lazy_static;
+
+use self::collectors::MetricsCollector;
 
 lazy_static! {
     static ref METRICS: Arc<dyn MetricsCollector> = create_metrics();
@@ -42,17 +43,17 @@ lazy_static! {
 
 #[cfg(prometheus_metrics)]
 fn create_metrics() -> Arc<dyn MetricsCollector> {
-    Arc::new(collector::PrometheusMetricsCollector::new())
+    Arc::new(collectors::PrometheusMetricsCollector::new())
 }
 
 #[cfg(log_metrics)]
 fn create_metrics() -> Arc<dyn MetricsCollector> {
-    Arc::new(collector::ConsoleLogMetricsCollector)
+    Arc::new(collectors::ConsoleLogMetricsCollector)
 }
 
 #[cfg(not(any(prometheus_metrics, log_metrics)))]
 fn create_metrics() -> Arc<dyn MetricsCollector> {
-    Arc::new(collector::NoOpMetricsCollector)
+    Arc::new(collectors::NoOpMetricsCollector)
 }
 
 pub fn get_metrics() -> Arc<dyn MetricsCollector> {

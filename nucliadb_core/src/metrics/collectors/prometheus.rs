@@ -1,7 +1,7 @@
 use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
 
-use crate::metrics::collector::MetricsCollector;
+use crate::metrics::collectors::MetricsCollector;
 use crate::metrics::request_time;
 use crate::NodeResult;
 
