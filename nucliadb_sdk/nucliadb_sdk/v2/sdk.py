@@ -20,7 +20,7 @@ import asyncio
 import base64
 import enum
 import io
-from typing import Any, Callable, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import httpx
 import orjson
@@ -118,7 +118,7 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
 def _request_builder(
     path_template: str,
     method: str,
-    path_params: tuple[str, ...],
+    path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
@@ -178,7 +178,7 @@ class _NucliaSDKBase:
         region: Region = Region.EUROPE1,
         api_key: Optional[str] = None,
         url: Optional[str] = None,
-        headers: Optional[dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
         self.region = region
         self.api_key = api_key
@@ -207,7 +207,7 @@ class _NucliaSDKBase:
         path,
         method: str,
         data: Optional[Union[str, bytes]] = None,
-        query_params: Optional[dict[str, str]] = None,
+        query_params: Optional[Dict[str, str]] = None,
     ):
         raise NotImplementedError
 
@@ -385,7 +385,7 @@ class NucliaSDK(_NucliaSDKBase):
         region: Region = Region.EUROPE1,
         api_key: Optional[str] = None,
         url: Optional[str] = None,
-        headers: Optional[dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
@@ -398,10 +398,10 @@ class NucliaSDK(_NucliaSDKBase):
         path,
         method: str,
         data: Optional[Union[str, bytes]] = None,
-        query_params: Optional[dict[str, str]] = None,
+        query_params: Optional[Dict[str, str]] = None,
     ):
         url = f"{self.base_url}{path}"
-        opts: dict[str, Any] = {}
+        opts: Dict[str, Any] = {}
         if data is not None:
             opts["data"] = data
         if query_params is not None:
@@ -425,7 +425,7 @@ class NucliaSDKAsync(_NucliaSDKBase):
         region: Region = Region.EUROPE1,
         api_key: Optional[str] = None,
         url: Optional[str] = None,
-        headers: Optional[dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
@@ -438,10 +438,10 @@ class NucliaSDKAsync(_NucliaSDKBase):
         path,
         method: str,
         data: Optional[Union[str, bytes]] = None,
-        query_params: Optional[dict[str, str]] = None,
+        query_params: Optional[Dict[str, str]] = None,
     ):
         url = f"{self.base_url}{path}"
-        opts: dict[str, Any] = {}
+        opts: Dict[str, Any] = {}
         if data is not None:
             opts["data"] = data
         if query_params is not None:
