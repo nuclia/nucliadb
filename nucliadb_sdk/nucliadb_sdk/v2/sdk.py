@@ -20,7 +20,7 @@ import asyncio
 import base64
 import enum
 import io
-from typing import Any, Callable, Optional, Type, Union
+from typing import Any, Callable, List, Optional, Type, Union
 
 import httpx
 import orjson
@@ -94,7 +94,7 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
 
 
 def _parse_list_of_pydantic(
-    data: list[Any],
+    data: List[Any],
 ) -> str:
     output = []
     for item in data:
@@ -119,7 +119,7 @@ def _request_builder(
     path_template: str,
     method: str,
     path_params: tuple[str, ...],
-    request_type: Optional[Union[Type[BaseModel], list[Any]]],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
@@ -285,7 +285,7 @@ class _NucliaSDKBase:
         "/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
         "PUT",
         ("kbid", "rid", "field_id"),
-        list[InputMessage],  # type: ignore
+        List[InputMessage],  # type: ignore
         ResourceFieldAdded,
     )
 
