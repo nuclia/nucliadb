@@ -5,7 +5,7 @@ use tonic::body::BoxBody;
 use tonic::{Request, Response, Status};
 use tower::{Layer, Service};
 
-use crate::metrics::instrumentor;
+use crate::metrics::task_instrumentor;
 
 
 #[derive(Debug, Clone, Default)]
@@ -19,6 +19,7 @@ impl<S> Layer<S> for MetricsLayer {
     }
 }
 
+/// Dynamically instrument service calls by HTTP path / gRPC method.
 #[derive(Debug, Clone)]
 pub struct EndpointMetrics<S> {
     inner: S,
@@ -52,7 +53,7 @@ where
             let task_id = req.uri().path().into();
 
             let call = inner.call(req);
-            let instrumented = instrumentor::instrument(task_id, call);
+            let instrumented = task_instrumentor::instrument(task_id, call);
 
             // continue gRPC
             let response = instrumented.await;

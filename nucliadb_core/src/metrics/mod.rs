@@ -16,7 +16,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-pub mod instrumentor;
+pub mod task_instrumentor;
+pub mod middleware;
 
 /// metrics
 /// Every metric must be define in its own module, which must fulfill the following requirements:
@@ -28,7 +29,6 @@ pub mod instrumentor;
 /// - If the metric is called SomeName, a struct 'SomeNameKey' must be defined.
 /// - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
 pub mod request_time;
-pub mod middleware;
 
 mod collectors;
 
