@@ -51,7 +51,6 @@ impl Meter for PrometheusMeter {
 
         let mut buf = String::new();
         encoding::text::encode(&mut buf, &self.registry)?;
-        println!("EXPORT: {buf}");
         Ok(buf)
     }
 
