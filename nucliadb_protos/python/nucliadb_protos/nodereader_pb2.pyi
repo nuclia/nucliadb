@@ -928,6 +928,7 @@ class SearchRequest(google.protobuf.message.Message):
     RELATIONS_FIELD_NUMBER: builtins.int
     RELATION_PREFIX_FIELD_NUMBER: builtins.int
     RELATION_SUBGRAPH_FIELD_NUMBER: builtins.int
+    MIN_SCORE_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
@@ -964,6 +965,7 @@ class SearchRequest(google.protobuf.message.Message):
     def relation_prefix(self) -> global___RelationPrefixSearchRequest: ...
     @property
     def relation_subgraph(self) -> global___EntitiesSubgraphRequest: ...
+    min_score: builtins.float
     def __init__(
         self,
         *,
@@ -988,9 +990,10 @@ class SearchRequest(google.protobuf.message.Message):
         relations: global___RelationSearchRequest | None = ...,
         relation_prefix: global___RelationPrefixSearchRequest | None = ...,
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
+        min_score: builtins.float = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "min_score", b"min_score", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
     @typing.overload

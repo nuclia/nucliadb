@@ -421,6 +421,8 @@ pub struct SearchRequest {
     pub relation_prefix: ::core::option::Option<RelationPrefixSearchRequest>,
     #[prost(message, optional, tag="21")]
     pub relation_subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
+    #[prost(float, tag="22")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

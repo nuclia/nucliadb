@@ -56,6 +56,7 @@ async def global_query_to_pb(
     page_number: int,
     page_size: int,
     sort: SortOptions,
+    min_score: float,
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
@@ -73,6 +74,7 @@ async def global_query_to_pb(
     fields = fields or []
 
     request = SearchRequest()
+    request.min_score = min_score
     request.reload = reload
     request.with_duplicates = with_duplicates
 
