@@ -27,7 +27,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use super::{SearchRequest, VectorR};
-use crate::data_point::{DataPoint, DpId, Journal, Neighbour, Similarity};
+use crate::data_point::{DataPoint, DpId, Journal, Neighbour, ResultsRequested, Similarity};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 const BUFFER_CAP: usize = 5;
@@ -190,21 +190,17 @@ impl State {
     ) -> VectorR<Vec<Neighbour>> {
         let query = request.get_query();
         let filter = request.get_filter();
-        let with_duplicates = request.with_duplicates();
-        let no_results = request.no_results();
+        let results = ResultsRequested {
+            n_results: request.no_results(),
+            min_score: request.min_score(),
+            with_duplicates: request.with_duplicates(),
+        };
         let mut ffsv = Fssc::new(request.no_results());
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
             data_point
-                .search(
-                    &delete_log,
-                    query,
-                    filter,
-                    with_duplicates,
-                    no_results,
-                    similarity,
-                )
+                .search(&delete_log, query, filter, results, similarity)
                 .for_each(|candidate| ffsv.add(candidate));
         }
         Ok(ffsv.into())

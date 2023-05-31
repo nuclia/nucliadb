@@ -47,6 +47,9 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn no_results(&self) -> usize {
         self.0
     }
+    fn min_score(&self) -> f32 {
+        self.1.min_score
+    }
 }
 
 pub struct VectorReaderService {
@@ -343,6 +346,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: true,
+            min_score: 0.0,
         };
         let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 4);
@@ -356,6 +360,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            min_score: 0.0,
         };
         let result = reader.search(&request).unwrap();
         let no_nodes = reader.count("").unwrap();

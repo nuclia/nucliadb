@@ -454,6 +454,7 @@ impl ShardReaderService {
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             with_duplicates: true,
+            min_score: search_request.min_score,
             tags: search_request
                 .filter
                 .iter()

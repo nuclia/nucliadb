@@ -56,6 +56,13 @@ impl DeleteLog for NoDLog {
     }
 }
 
+#[derive(Default, Clone, Copy)]
+pub struct ResultsRequested {
+    pub n_results: usize,
+    pub with_duplicates: bool,
+    pub min_score: f32,
+}
+
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Similarity {
     Dot,
@@ -329,8 +336,7 @@ impl DataPoint {
         delete_log: &Dlog,
         query: &[f32],
         filter: &Formula,
-        with_duplicates: bool,
-        results: usize,
+        results: ResultsRequested,
         similarity: Similarity,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
@@ -339,14 +345,15 @@ impl DataPoint {
         let neighbours = ops.search(
             Address(self.journal.nodes),
             self.index.as_ref(),
-            results,
+            results.n_results,
             filter,
-            with_duplicates,
+            results.with_duplicates,
         );
         neighbours
             .into_iter()
+            .filter(move |(_, dist)| *dist > results.min_score)
             .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
-            .take(results)
+            .take(results.n_results)
     }
     pub fn merge<Dlog>(
         dir: &path::Path,
