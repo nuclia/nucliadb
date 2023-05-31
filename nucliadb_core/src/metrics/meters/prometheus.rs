@@ -43,7 +43,6 @@ impl Meter for PrometheusMeter {
     fn export(&self) -> NodeResult<String> {
         self.tasks_monitor
             .export_all()
-            .into_iter()
             .for_each(|(task_id, metrics)| {
                 let labels = TaskLabels { request: task_id };
                 self.tokio_task_metrics.collect(labels, metrics.to_owned());

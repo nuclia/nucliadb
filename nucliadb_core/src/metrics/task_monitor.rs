@@ -41,7 +41,7 @@ impl MultiTaskMonitor {
         // Monitor::new(task_id, &self.task_monitors)
     }
 
-    pub fn export_all(&self) -> Vec<(TaskId, TaskMetrics)> {
+    pub fn export_all(&self) -> impl Iterator<Item=(TaskId, TaskMetrics)> + '_ {
         self.task_monitors
             .iter()
             .filter_map(|item| {
@@ -49,7 +49,6 @@ impl MultiTaskMonitor {
                 let metrics = item.value().intervals().next();
                 metrics.map(|metrics| (task_id, metrics))
             })
-            .collect()
     }
 }
 
