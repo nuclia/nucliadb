@@ -342,7 +342,9 @@ class KnowledgeboxShards(BaseModel):
 
 
 class SearchParamDefaults:
-    query = dict(default="", title="Query", description="The query to search for")
+    query: dict[str, str] = dict(
+        default="", title="Query", description="The query to search for"
+    )
     advanced_query = dict(
         default=None,
         title="Advanced query",

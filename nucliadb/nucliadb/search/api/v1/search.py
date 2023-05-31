@@ -86,17 +86,17 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(**SearchParamDefaults.query),
-    advanced_query: Optional[str] = Query(**SearchParamDefaults.advanced_query),
-    fields: List[str] = Query(**SearchParamDefaults.fields),
-    filters: List[str] = Query(**SearchParamDefaults.filters),
-    faceted: List[str] = Query(**SearchParamDefaults.faceted),
+    query: str = Query(**SearchParamDefaults.query),  # type: ignore
+    advanced_query: Optional[str] = Query(**SearchParamDefaults.advanced_query),  # type: ignore
+    fields: List[str] = Query(**SearchParamDefaults.fields),  # type: ignore
+    filters: List[str] = Query(**SearchParamDefaults.filters),  # type: ignore
+    faceted: List[str] = Query(**SearchParamDefaults.faceted),  # type: ignore
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: Optional[int] = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
-    min_score: float = Query(**SearchParamDefaults.min_score),
+    min_score: float = Query(**SearchParamDefaults.min_score),  # type: ignore
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
