@@ -346,20 +346,22 @@ class SearchParamDefaults:
     advanced_query = dict(
         default=None,
         title="Advanced query",
-        description="An advanced query to search for. Follows the tantivy query parser syntax: https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html",  # noqa: E501
+        description="An advanced query to search for. See https://docs.nuclia.dev/docs/query/#advanced-query for examples of advanced queries.",  # noqa: E501
     )
     fields = dict(
-        default=[], title="Fields", description="The list of fields to search in"
+        default=[],
+        title="Fields",
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details, see: https://docs.nuclia.dev/docs/query/#search-in-a-specific-field",  # noqa: E501
     )
     filters = dict(
         default=[],
         title="Filters",
-        description="The list of filters to apply. The filters follow the syntax defined in https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
     )
     faceted = dict(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the syntax defined in https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
     )
     min_score = dict(
         default=0.70,
