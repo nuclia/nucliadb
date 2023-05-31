@@ -341,7 +341,7 @@ class KnowledgeboxShards(BaseModel):
         return cls(**as_dict)
 
 
-class ParamDefaults:
+class SearchParamDefaults:
     query = dict(default="", title="Query", description="The query to search for")
     advanced_query = dict(
         default=None,
@@ -369,15 +369,15 @@ class ParamDefaults:
 
 
 class SearchRequest(BaseModel):
-    query: str = Field(**ParamDefaults.query)
-    advanced_query: Optional[str] = Field(**ParamDefaults.advanced_query)
-    fields: List[str] = Field(**ParamDefaults.fields)
-    filters: List[str] = Field(**ParamDefaults.filters)
-    faceted: List[str] = Field(**ParamDefaults.faceted)
+    query: str = Field(**SearchParamDefaults.query)
+    advanced_query: Optional[str] = Field(**SearchParamDefaults.advanced_query)
+    fields: List[str] = Field(**SearchParamDefaults.fields)
+    filters: List[str] = Field(**SearchParamDefaults.filters)
+    faceted: List[str] = Field(**SearchParamDefaults.faceted)
     sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
-    min_score: float = Field(**ParamDefaults.min_score)
+    min_score: float = Field(**SearchParamDefaults.min_score)
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
