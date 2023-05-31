@@ -1,4 +1,8 @@
 # Changelog
+## 0.7.7
+
+- Skip results lower than min_score
+
 ## 0.7.6
 
 - Properly compute total search results for document and paragaph
