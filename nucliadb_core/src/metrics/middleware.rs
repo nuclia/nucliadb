@@ -1,12 +1,11 @@
 use std::task::{Context, Poll};
 
+use futures::future::BoxFuture;
 use hyper::Body;
 use tonic::body::BoxBody;
-use tonic::{Request, Response, Status};
 use tower::{Layer, Service};
 
-use crate::metrics::task_instrumentor;
-
+use crate::metrics;
 
 #[derive(Debug, Clone, Default)]
 pub struct MetricsLayer;
@@ -32,7 +31,7 @@ where
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = futures::future::BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -51,12 +50,14 @@ where
 
         Box::pin(async move {
             let task_id = req.uri().path().into();
-
             let call = inner.call(req);
-            let instrumented = task_instrumentor::instrument(task_id, call);
-
-            // continue gRPC
-            let response = instrumented.await;
+            let response = match metrics::get_metrics().task_monitor(task_id) {
+                Some(monitor) => {
+                    let instrumented = monitor.instrument(call);
+                    instrumented.await
+                }
+                None => call.await,
+            };
 
             response
         })

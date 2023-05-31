@@ -16,47 +16,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-pub mod task_instrumentor;
 pub mod middleware;
 
-/// metrics
-/// Every metric must be define in its own module, which must fulfill the following requirements:
-/// - The name of the module must be the name of the name of the metric.
-/// - If the metric is called SomeName, then there must be a type 'SomeNameMetric' describing such
-///   metric.
-/// - If the metric is called SomeName, a function 'register_some_name' must be defined and its job
-///   is to recive a registry, register there the metric and return such metric.
-/// - If the metric is called SomeName, a struct 'SomeNameKey' must be defined.
-/// - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
-pub mod request_time;
-
-mod collectors;
+mod meters;
+mod metrics;
+mod task_monitor;
 
 use std::sync::Arc;
 
 use lazy_static::lazy_static;
+pub use metrics::request_time;
 
-use self::collectors::MetricsCollector;
+use self::meters::Meter;
 
 lazy_static! {
-    static ref METRICS: Arc<dyn MetricsCollector> = create_metrics();
+    // static ref METRICS: Arc<dyn Meter> = create_metrics();
+    static ref METRICS: Arc<dyn Meter> = Arc::new(meters::PrometheusMeter::new());
 }
 
 #[cfg(prometheus_metrics)]
-fn create_metrics() -> Arc<dyn MetricsCollector> {
-    Arc::new(collectors::PrometheusMetricsCollector::new())
+fn create_metrics() -> Arc<dyn Meter> {
+    Arc::new(meters::PrometheusMeter::new())
 }
 
 #[cfg(log_metrics)]
-fn create_metrics() -> Arc<dyn MetricsCollector> {
-    Arc::new(collectors::ConsoleLogMetricsCollector)
+fn create_metrics() -> Arc<dyn Meter> {
+    Arc::new(meters::ConsoleMeter)
 }
 
 #[cfg(not(any(prometheus_metrics, log_metrics)))]
-fn create_metrics() -> Arc<dyn MetricsCollector> {
-    Arc::new(collectors::NoOpMetricsCollector)
+fn create_metrics() -> Arc<dyn Meter> {
+    Arc::new(meters::NoOpMeter)
 }
 
-pub fn get_metrics() -> Arc<dyn MetricsCollector> {
+pub fn get_metrics() -> Arc<dyn Meter> {
     Arc::clone(&METRICS)
 }

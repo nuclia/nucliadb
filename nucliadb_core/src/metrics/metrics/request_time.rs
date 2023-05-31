@@ -59,12 +59,12 @@ impl RequestTimeKey {
     }
 }
 
-pub(super) type RequestTimeMetric = Family<RequestTimeKey, Histogram>;
+pub type RequestTimeMetric = Family<RequestTimeKey, Histogram>;
 const BUCKETS: [f64; 12] = [
     0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 2.5, 5.0, 10.0, 30.0, 60.0,
 ];
 
-pub(super) fn register_request_time(registry: &mut Registry) -> RequestTimeMetric {
+pub fn register_request_time(registry: &mut Registry) -> RequestTimeMetric {
     let constructor = || Histogram::new(BUCKETS.iter().copied());
     let metric = RequestTimeMetric::new_with_constructor(constructor);
     registry.register(

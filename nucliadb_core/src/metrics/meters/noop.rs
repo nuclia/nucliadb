@@ -1,9 +1,9 @@
-use crate::metrics::collectors::MetricsCollector;
-use crate::metrics::request_time;
+use crate::metrics::meters::Meter;
+use crate::metrics::metrics::request_time;
 use crate::NodeResult;
 
-pub struct NoOpMetricsCollector;
-impl MetricsCollector for NoOpMetricsCollector {
+pub struct NoOpMeter;
+impl Meter for NoOpMeter {
     fn export(&self) -> NodeResult<String> {
         Ok(Default::default())
     }
