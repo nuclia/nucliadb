@@ -31,8 +31,7 @@ pub use metrics::request_time;
 use self::meters::Meter;
 
 lazy_static! {
-    // static ref METRICS: Arc<dyn Meter> = create_metrics();
-    static ref METRICS: Arc<dyn Meter> = Arc::new(meters::PrometheusMeter::new());
+    static ref METRICS: Arc<dyn Meter> = create_metrics();
 }
 
 #[cfg(prometheus_metrics)]
