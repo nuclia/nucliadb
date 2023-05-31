@@ -224,7 +224,7 @@ class _NucliaSDKBase:
             )
         elif response.status_code == 429:
             raise exceptions.RateLimitError(response.text)
-        elif response.status_code == 419:
+        elif response.status_code == 409:
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
             raise exceptions.NotFoundError(
