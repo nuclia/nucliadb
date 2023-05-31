@@ -41,14 +41,12 @@ impl MultiTaskMonitor {
         // Monitor::new(task_id, &self.task_monitors)
     }
 
-    pub fn export_all(&self) -> impl Iterator<Item=(TaskId, TaskMetrics)> + '_ {
-        self.task_monitors
-            .iter()
-            .filter_map(|item| {
-                let task_id = item.key().to_owned();
-                let metrics = item.value().intervals().next();
-                metrics.map(|metrics| (task_id, metrics))
-            })
+    pub fn export_all(&self) -> impl Iterator<Item = (TaskId, TaskMetrics)> + '_ {
+        self.task_monitors.iter().filter_map(|item| {
+            let task_id = item.key().to_owned();
+            let metrics = item.value().intervals().next();
+            metrics.map(|metrics| (task_id, metrics))
+        })
     }
 }
 

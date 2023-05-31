@@ -25,6 +25,5 @@
 ///   is to recive a registry, register there the metric and return such metric.
 /// - If the metric is called SomeName, a struct 'SomeNameKey' must be defined.
 /// - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
-
 pub mod request_time;
 pub mod tokio_tasks;

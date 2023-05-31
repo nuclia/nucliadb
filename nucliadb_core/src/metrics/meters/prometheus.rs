@@ -21,8 +21,8 @@ use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metrics::tokio_tasks::TaskLabels;
-use crate::metrics::metrics::{request_time, tokio_tasks};
+use crate::metrics::metric::tokio_tasks::TaskLabels;
+use crate::metrics::metric::{request_time, tokio_tasks};
 use crate::metrics::task_monitor::{Monitor, MultiTaskMonitor, TaskId};
 use crate::NodeResult;
 

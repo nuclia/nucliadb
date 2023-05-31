@@ -20,13 +20,13 @@
 pub mod middleware;
 
 mod meters;
-mod metrics;
+mod metric;
 mod task_monitor;
 
 use std::sync::Arc;
 
 use lazy_static::lazy_static;
-pub use metrics::request_time;
+pub use metric::request_time;
 
 use self::meters::Meter;
 

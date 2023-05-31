@@ -20,7 +20,7 @@
 use std::fmt::Debug;
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metrics::request_time;
+use crate::metrics::metric::request_time;
 use crate::{tracing, NodeResult};
 
 pub struct ConsoleMeter;

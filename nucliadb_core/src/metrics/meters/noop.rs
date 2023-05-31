@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metrics::request_time;
+use crate::metrics::metric::request_time;
 use crate::NodeResult;
 
 pub struct NoOpMeter;

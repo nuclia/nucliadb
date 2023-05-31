@@ -25,7 +25,7 @@ pub use console::ConsoleMeter;
 pub use noop::NoOpMeter;
 pub use prometheus::PrometheusMeter;
 
-use crate::metrics::metrics::request_time;
+use crate::metrics::metric::request_time;
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::NodeResult;
 
