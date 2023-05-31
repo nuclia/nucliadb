@@ -2062,7 +2062,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.7.6"
+version = "0.7.7"
 dependencies = [
  "bincode",
  "log",
