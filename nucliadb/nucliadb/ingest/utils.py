@@ -109,6 +109,8 @@ async def get_driver() -> Driver:
 
 
 async def start_ingest(service_name: Optional[str] = None):
+    await get_driver()  # force init
+
     actual_service = get_utility(Utility.INGEST)
     if actual_service is not None:
         return
