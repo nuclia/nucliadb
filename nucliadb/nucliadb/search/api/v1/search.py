@@ -27,6 +27,7 @@ from fastapi_versioning import version
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import param_to_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
@@ -86,17 +87,17 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(**SearchParamDefaults.query),  # type: ignore
-    advanced_query: Optional[str] = Query(**SearchParamDefaults.advanced_query),  # type: ignore
-    fields: List[str] = Query(**SearchParamDefaults.fields),  # type: ignore
-    filters: List[str] = Query(**SearchParamDefaults.filters),  # type: ignore
-    faceted: List[str] = Query(**SearchParamDefaults.faceted),  # type: ignore
+    query: str = param_to_query(SearchParamDefaults.query),
+    advanced_query: Optional[str] = param_to_query(SearchParamDefaults.advanced_query),
+    fields: List[str] = param_to_query(SearchParamDefaults.fields),
+    filters: List[str] = param_to_query(SearchParamDefaults.filters),
+    faceted: List[str] = param_to_query(SearchParamDefaults.faceted),
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: Optional[int] = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
-    min_score: float = Query(**SearchParamDefaults.min_score),  # type: ignore
+    min_score: float = param_to_query(SearchParamDefaults.min_score),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
