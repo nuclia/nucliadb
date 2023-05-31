@@ -119,8 +119,8 @@ class Worker:
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         self.event.clear()
-        await self.subscriber_initialize()
         await self.publisher.initialize()
+        await self.subscriber_initialize()
         self.gc_task = asyncio.create_task(self.garbage())
 
     async def subscriber_initialize(self):
