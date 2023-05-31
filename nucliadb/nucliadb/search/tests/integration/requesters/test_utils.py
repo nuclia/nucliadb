@@ -47,6 +47,7 @@ async def test_vector_result_metadata(
             order=SortOrder.DESC,
             limit=None,
         ),
+        min_score=-1,
     )
 
     results, _, _, _ = await node_query(kbid, Method.SEARCH, pb_query)

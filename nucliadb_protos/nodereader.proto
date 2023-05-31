@@ -337,6 +337,8 @@ message SearchRequest {
     RelationSearchRequest relations = 19 [deprecated = true];
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
+
+    float min_score = 22;
 }
 
 message SuggestRequest {

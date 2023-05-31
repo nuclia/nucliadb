@@ -278,6 +278,7 @@ async def search(
         filters=item.filters,
         faceted=item.faceted,
         sort=sort_options,
+        min_score=item.min_score,
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
