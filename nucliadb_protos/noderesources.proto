@@ -147,6 +147,8 @@ message Resource {
         ERROR = 2;
         DELETE = 3;
         PENDING = 4;
+        BLOCKED = 5;
+        EXPIRED = 6;
     }
 
     ResourceStatus status = 5; // Tantivy doc
