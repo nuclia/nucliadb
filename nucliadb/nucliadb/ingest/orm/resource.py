@@ -621,13 +621,16 @@ class Resource:
         self.modified = True
         return field_obj
 
-    async def delete_field(self, type: int, key: str):
+    async def delete_field(self, type: FieldType.ValueType, key: str):
         field = (type, key)
         if field in self.fields:
             field_obj = self.fields[field]
             del self.fields[field]
         else:
             field_obj = KB_FIELDS[type](id=key, resource=self)
+
+        if field in self.all_fields_keys:
+            self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))  # type: ignore
         vo = await field_obj.get_vectors()
