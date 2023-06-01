@@ -68,6 +68,7 @@ jobs:
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v1
         with:
+          project_id: "${{ secrets.PROJECT_ID }}"
           credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
       - name: "Set up Cloud SDK"
@@ -75,7 +76,7 @@ jobs:
 
       # setup docker, as we need to pull the node image to run the tests
       - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
 
       - name: Setup Python
         uses: actions/setup-python@v4
