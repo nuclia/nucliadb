@@ -35,8 +35,8 @@ jobs:
 
       - name: test push
         run: |
-          docker pull redis:latest
-          docker tag eu.gcr.io/stashify-218417/test-redis:1 redis:latest
+          docker pull docker.io/library/redis:latestlatest
+          docker tag docker.io/library/redis:latest eu.gcr.io/stashify-218417/test-redis:1
           docker push eu.gcr.io/stashify-218417/test-redis:1
 
       - name: Test image
