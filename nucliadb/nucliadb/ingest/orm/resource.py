@@ -617,8 +617,9 @@ class Resource:
 
     async def update_all_fields_key(
         self,
-        updated: List[Tuple[FieldType.ValueType, str]],
-        deleted: List[Tuple[FieldType.ValueType, str]],
+        *,
+        updated: Optional[List[FieldID]] = None,
+        deleted: Optional[List[FieldID]] = None,
     ):
         all_fields = await self.get_all_fields_key()
         if all_fields is None:
@@ -626,14 +627,12 @@ class Resource:
 
         needs_update = False
 
-        for type, id in updated:
-            field = FieldID(field_type=type, field=id)
+        for field in updated or []:
             if field not in all_fields.fields:
                 all_fields.fields.append(field)
                 needs_update = True
 
-        for type, id in deleted:
-            field = FieldID(field_type=type, field=id)
+        for field in deleted or []:
             if field in all_fields.fields:
                 all_fields.fields.remove(field)
                 needs_update = True
@@ -678,43 +677,48 @@ class Resource:
 
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
-        updated_fields = []
+        message_updated_fields = []
         for field, layout in message.layouts.items():
-            await self.set_field(FieldType.LAYOUT, field, layout)
-            updated_fields.append((FieldType.LAYOUT, field))
+            fid = FieldID(field_type=FieldType.LAYOUT, field=field)
+            await self.set_field(fid.field_type, fid.field, layout)
+            message_updated_fields.append(fid)
 
         for field, text in message.texts.items():
-            await self.set_field(FieldType.TEXT, field, text)
-            updated_fields.append((FieldType.TEXT, field))
+            fid = FieldID(field_type=FieldType.TEXT, field=field)
+            await self.set_field(fid.field_type, fid.field, text)
+            message_updated_fields.append(fid)
 
         for field, keywordset in message.keywordsets.items():
-            await self.set_field(FieldType.KEYWORDSET, field, keywordset)
-            updated_fields.append((FieldType.KEYWORDSET, field))
+            fid = FieldID(field_type=FieldType.KEYWORDSET, field=field)
+            await self.set_field(fid.field_type, fid.field, keywordset)
+            message_updated_fields.append(fid)
 
         for field, datetimeobj in message.datetimes.items():
-            await self.set_field(FieldType.DATETIME, field, datetimeobj)
-            updated_fields.append((FieldType.DATETIME, field))
+            fid = FieldID(field_type=FieldType.DATETIME, field=field)
+            await self.set_field(fid.field_type, fid.field, datetimeobj)
+            message_updated_fields.append(fid)
 
         for field, link in message.links.items():
-            await self.set_field(FieldType.LINK, field, link)
-            updated_fields.append((FieldType.LINK, field))
+            fid = FieldID(field_type=FieldType.LINK, field=field)
+            await self.set_field(fid.field_type, fid.field, link)
+            message_updated_fields.append(fid)
 
         for field, file in message.files.items():
-            await self.set_field(FieldType.FILE, field, file)
-            updated_fields.append((FieldType.FILE, field))
+            fid = FieldID(field_type=FieldType.FILE, field=field)
+            await self.set_field(fid.field_type, fid.field, file)
+            message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
-            await self.set_field(FieldType.CONVERSATION, field, conversation)
-            updated_fields.append((FieldType.CONVERSATION, field))
+            fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
+            await self.set_field(fid.field_type, fid.field, conversation)
+            message_updated_fields.append(fid)
 
-        deleted_fields = []
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
-            deleted_fields.append((fieldid.field_type, fieldid.field))
 
-        if len(updated_fields) or len(deleted_fields):
+        if len(message_updated_fields) or len(message.deleted_fields):
             await self.update_all_fields_key(
-                updated=updated_fields, deleted=deleted_fields
+                updated=message_updated_fields, deleted=message.deleted_fields
             )
 
     @processor_observer.wrap({"type": "apply_extracted"})
