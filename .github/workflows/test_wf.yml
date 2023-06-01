@@ -1,0 +1,43 @@
+name: TEST WORKFLOW
+env:
+  API_VERSION: 1
+  COMPONENT: nucliadb-standalone
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  # Job to run tests
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/auth@v1
+        with:
+          project_id: "${{ secrets.PROJECT_ID }}"
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        run: gcloud auth configure-docker gcr.io --quiet
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Build local ClusterManager for testing
+        run: |
+          docker run eu.gcr.io/stashify-218417/cluster_manager:main echo "ClusterManager image pulled"
