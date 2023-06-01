@@ -31,7 +31,7 @@ jobs:
 
       # setup docker, as we need to pull the node image to run the tests
       - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
+        run: gcloud auth configure-docker
 
       - name: test push
         run: |
