@@ -19,7 +19,7 @@
 #
 from nucliadb.ingest.fields.base import Field
 
-VALID_GLOBAL = ("title", "summary")
+VALID_GENERIC_FIELDS = ("title", "summary")
 
 
 class Generic(Field):
@@ -28,7 +28,7 @@ class Generic(Field):
     type: str = "a"
 
     async def set_value(self, payload: str):
-        if self.id not in VALID_GLOBAL:
+        if self.id not in VALID_GENERIC_FIELDS:
             raise AttributeError(self.id)
 
         if self.resource.basic is None:
@@ -37,7 +37,7 @@ class Generic(Field):
         setattr(self.resource.basic, self.id, payload)
 
     async def get_value(self) -> str:
-        if self.id not in VALID_GLOBAL:
+        if self.id not in VALID_GENERIC_FIELDS:
             raise AttributeError(self.id)
         if self.resource.basic is None:
             await self.resource.get_basic()

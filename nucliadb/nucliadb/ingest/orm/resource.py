@@ -65,7 +65,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.date import Datetime
 from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.fields.generic import VALID_GLOBAL, Generic
+from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.keywordset import Keywordset
 from nucliadb.ingest.fields.layout import Layout
 from nucliadb.ingest.fields.link import Link
@@ -569,7 +569,7 @@ class Resource:
             # We make sure that title and summary are set to be added
             basic = await self.get_basic()
             if basic is not None:
-                for generic in VALID_GLOBAL:
+                for generic in VALID_GENERIC_FIELDS:
                     append = True
                     if generic == "title" and basic.title == "":
                         append = False
