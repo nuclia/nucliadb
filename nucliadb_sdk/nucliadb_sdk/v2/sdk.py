@@ -224,7 +224,10 @@ class _NucliaSDKBase:
             )
         elif response.status_code == 429:
             raise exceptions.RateLimitError(response.text)
-        elif response.status_code in (409, 419):  # 419 is a custom error code for kb creation conflict
+        elif response.status_code in (
+            409,
+            419,
+        ):  # 419 is a custom error code for kb creation conflict
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
             raise exceptions.NotFoundError(
