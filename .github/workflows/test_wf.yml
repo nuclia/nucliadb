@@ -38,6 +38,7 @@ jobs:
       - name: test push
         run: |
           docker -v
+          gcloud -v
           docker pull docker.io/library/redis:latest
           docker tag docker.io/library/redis:latest eu.gcr.io/stashify-218417/test-redis:1
           docker push eu.gcr.io/stashify-218417/test-redis:1
