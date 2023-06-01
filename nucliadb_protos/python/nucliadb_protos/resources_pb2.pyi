@@ -1952,14 +1952,14 @@ global___FieldID = FieldID
 class AllFieldIDs(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FIELD_FIELD_NUMBER: builtins.int
+    FIELDS_FIELD_NUMBER: builtins.int
     @property
-    def field(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldID]: ...
+    def fields(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldID]: ...
     def __init__(
         self,
         *,
-        field: collections.abc.Iterable[global___FieldID] | None = ...,
+        fields: collections.abc.Iterable[global___FieldID] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> None: ...
 
 global___AllFieldIDs = AllFieldIDs

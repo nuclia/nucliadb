@@ -464,5 +464,5 @@ message FieldID {
 }
 
 message AllFieldIDs {
-    repeated FieldID field = 1;
+    repeated FieldID fields = 1;
 }

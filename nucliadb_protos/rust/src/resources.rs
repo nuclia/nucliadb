@@ -705,7 +705,7 @@ pub struct FieldId {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AllFieldIDs {
     #[prost(message, repeated, tag="1")]
-    pub field: ::prost::alloc::vec::Vec<FieldId>,
+    pub fields: ::prost::alloc::vec::Vec<FieldId>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

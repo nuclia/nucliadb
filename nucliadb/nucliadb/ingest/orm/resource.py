@@ -639,31 +639,76 @@ class Resource:
         key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         await self.txn.set(key, all_fields.SerializeToString())
 
+    async def update_all_fields_key(
+        self,
+        *,
+        updated: Optional[List[FieldID]] = None,
+        deleted: Optional[List[FieldID]] = None,
+    ):
+        all_fields = await self.get_all_field_ids()
+        if all_fields is None:
+            all_fields = PBAllFieldIDs()
+
+        needs_update = False
+
+        for field in updated or []:
+            if field not in all_fields.fields:
+                all_fields.fields.append(field)
+                needs_update = True
+
+        for field in deleted or []:
+            if field in all_fields.fields:
+                all_fields.fields.remove(field)
+                needs_update = True
+
+        if needs_update:
+            await self.set_all_field_ids(all_fields)
+
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
+        message_updated_fields = []
         for field, layout in message.layouts.items():
-            await self.set_field(FieldType.LAYOUT, field, layout)
+            fid = FieldID(field_type=FieldType.LAYOUT, field=field)
+            await self.set_field(fid.field_type, fid.field, layout)
+            message_updated_fields.append(fid)
 
         for field, text in message.texts.items():
-            await self.set_field(FieldType.TEXT, field, text)
+            fid = FieldID(field_type=FieldType.TEXT, field=field)
+            await self.set_field(fid.field_type, fid.field, text)
+            message_updated_fields.append(fid)
 
         for field, keywordset in message.keywordsets.items():
-            await self.set_field(FieldType.KEYWORDSET, field, keywordset)
+            fid = FieldID(field_type=FieldType.KEYWORDSET, field=field)
+            await self.set_field(fid.field_type, fid.field, keywordset)
+            message_updated_fields.append(fid)
 
         for field, datetimeobj in message.datetimes.items():
-            await self.set_field(FieldType.DATETIME, field, datetimeobj)
+            fid = FieldID(field_type=FieldType.DATETIME, field=field)
+            await self.set_field(fid.field_type, fid.field, datetimeobj)
+            message_updated_fields.append(fid)
 
         for field, link in message.links.items():
-            await self.set_field(FieldType.LINK, field, link)
+            fid = FieldID(field_type=FieldType.LINK, field=field)
+            await self.set_field(fid.field_type, fid.field, link)
+            message_updated_fields.append(fid)
 
         for field, file in message.files.items():
-            await self.set_field(FieldType.FILE, field, file)
+            fid = FieldID(field_type=FieldType.FILE, field=field)
+            await self.set_field(fid.field_type, fid.field, file)
+            message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
-            await self.set_field(FieldType.CONVERSATION, field, conversation)
+            fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
+            await self.set_field(fid.field_type, fid.field, conversation)
+            message_updated_fields.append(fid)
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
+
+        if len(message_updated_fields) or len(message.delete_fields):
+            await self.update_all_fields_key(
+                updated=message_updated_fields, deleted=message.delete_fields
+            )
 
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
