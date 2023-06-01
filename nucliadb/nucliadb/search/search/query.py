@@ -260,6 +260,9 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.PENDING: Resource.ResourceStatus.PENDING,
     ResourceProcessingStatus.PROCESSED: Resource.ResourceStatus.PROCESSED,
     ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR,
+    ResourceProcessingStatus.EMPTY: Resource.ResourceStatus.EMPTY,
+    ResourceProcessingStatus.BLOCKED: Resource.ResourceStatus.BLOCKED,
+    ResourceProcessingStatus.EXPIRED: Resource.ResourceStatus.EXPIRED,
 }
 
 
