@@ -140,7 +140,7 @@ class Resource:
         basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
     ):
-        self.fields: dict[Tuple[int, str], Field] = {}
+        self.fields: dict[Tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
         self.all_fields_keys: list[Tuple[FieldType.ValueType, str]] = []
@@ -397,7 +397,11 @@ class Resource:
         return brain
 
     async def generate_field_vectors(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         vo = await field.get_vectors()
         if vo is None:
@@ -409,7 +413,11 @@ class Resource:
         bm.field_vectors.append(evw)
 
     async def generate_user_vectors(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         uv = await field.get_user_vectors()
         if uv is None:
@@ -421,7 +429,11 @@ class Resource:
         bm.user_vectors.append(uvw)
 
     async def generate_field_large_computed_metadata(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         lcm = await field.get_large_field_metadata()
         if lcm is None:
@@ -435,7 +447,7 @@ class Resource:
     async def generate_field_computed_metadata(
         self,
         bm: BrokerMessage,
-        type_id: int,
+        type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
     ):
@@ -452,7 +464,11 @@ class Resource:
             # Make sure cloud files are removed for exporting
 
     async def generate_extracted_text(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         etw = ExtractedTextWrapper()
         etw.field.field = field_id
@@ -465,7 +481,7 @@ class Resource:
     async def generate_field(
         self,
         bm: BrokerMessage,
-        type_id: int,
+        type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
     ):
@@ -546,7 +562,9 @@ class Resource:
         return bm
 
     # Fields
-    async def get_fields(self, force: bool = False) -> dict[Tuple[int, str], Field]:
+    async def get_fields(
+        self, force: bool = False
+    ) -> dict[Tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
@@ -599,7 +617,7 @@ class Resource:
             self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
-    async def get_field(self, key: str, type: int, load: bool = True):
+    async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -643,7 +661,7 @@ class Resource:
 
         await field_obj.delete()
 
-    def has_field(self, type: int, field: str) -> bool:
+    def has_field(self, type: FieldType.ValueType, field: str) -> bool:
         return (type, field) in self.fields
 
     async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:

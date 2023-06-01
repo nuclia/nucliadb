@@ -23,6 +23,8 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb_protos.resources_pb2 import FieldType
+
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.nodes_manager import NodesManager
@@ -180,7 +182,9 @@ class ResourceWritesAuditHandler:
         await self.pubsub.unsubscribe(self.subscription_id)
 
     def iterate_auditable_fields(
-        self, resource_keys: list[tuple[int, str]], message: writer_pb2.BrokerMessage
+        self,
+        resource_keys: list[tuple[FieldType.ValueType, str]],
+        message: writer_pb2.BrokerMessage,
     ):
         """
         Generator that emits the combined list of field ids from both
