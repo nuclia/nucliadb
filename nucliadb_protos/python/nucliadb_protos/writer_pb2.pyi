@@ -74,6 +74,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList as VectorSetList,
 )
 from nucliadb_protos.resources_pb2 import (
+    AllFields as AllFields,
     Basic as Basic,
     Block as Block,
     CONVERSATION as CONVERSATION,
