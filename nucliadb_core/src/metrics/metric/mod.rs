@@ -16,28 +16,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-mod metrics_service;
-
-use std::net::SocketAddr;
-
-use axum::routing::get;
-use axum::Router;
-
-use crate::env::metrics_http_port;
-
-pub struct MetricsServerOptions {
-    pub default_http_port: u16,
-}
-
-pub async fn run_http_metrics_server(options: MetricsServerOptions) {
-    // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
-    let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
-    axum_server::bind(addr)
-        // Services will be added here
-        .serve(metrics.into_make_service())
-        .await
-        .expect("Error starting the HTTP server");
-}
+/// Every metric must be define in its own module, which must fulfill the following requirements:
+/// - The name of the module must be the name of the name of the metric.
+/// - If the metric is called SomeName, then there must be a type 'SomeNameMetric' describing such
+///   metric.
+/// - If the metric is called SomeName, a function 'register_some_name' must be defined and its job
+///   is to recive a registry, register there the metric and return such metric.
+/// - If the metric is called SomeName, a struct 'SomeNameKey' must be defined.
+/// - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
+pub mod request_time;
+pub mod tokio_tasks;

@@ -16,28 +16,29 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-mod metrics_service;
+mod console;
+mod noop;
+mod prometheus;
 
-use std::net::SocketAddr;
+pub use console::ConsoleMeter;
+pub use noop::NoOpMeter;
+pub use prometheus::PrometheusMeter;
 
-use axum::routing::get;
-use axum::Router;
+use crate::metrics::metric::request_time;
+use crate::metrics::task_monitor::{Monitor, TaskId};
+use crate::NodeResult;
 
-use crate::env::metrics_http_port;
+pub trait Meter: Send + Sync {
+    fn record_request_time(
+        &self,
+        metric: request_time::RequestTimeKey,
+        value: request_time::RequestTimeValue,
+    );
 
-pub struct MetricsServerOptions {
-    pub default_http_port: u16,
-}
+    fn export(&self) -> NodeResult<String>;
 
-pub async fn run_http_metrics_server(options: MetricsServerOptions) {
-    // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
-    let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
-    axum_server::bind(addr)
-        // Services will be added here
-        .serve(metrics.into_make_service())
-        .await
-        .expect("Error starting the HTTP server");
+    fn task_monitor(&self, _task_id: TaskId) -> Option<Monitor> {
+        None
+    }
 }

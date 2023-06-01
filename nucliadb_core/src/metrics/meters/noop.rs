@@ -16,28 +16,20 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-mod metrics_service;
+use crate::metrics::meters::Meter;
+use crate::metrics::metric::request_time;
+use crate::NodeResult;
 
-use std::net::SocketAddr;
-
-use axum::routing::get;
-use axum::Router;
-
-use crate::env::metrics_http_port;
-
-pub struct MetricsServerOptions {
-    pub default_http_port: u16,
-}
-
-pub async fn run_http_metrics_server(options: MetricsServerOptions) {
-    // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
-    let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
-    axum_server::bind(addr)
-        // Services will be added here
-        .serve(metrics.into_make_service())
-        .await
-        .expect("Error starting the HTTP server");
+pub struct NoOpMeter;
+impl Meter for NoOpMeter {
+    fn export(&self) -> NodeResult<String> {
+        Ok(Default::default())
+    }
+    fn record_request_time(
+        &self,
+        _: request_time::RequestTimeKey,
+        _: request_time::RequestTimeValue,
+    ) {
+    }
 }
