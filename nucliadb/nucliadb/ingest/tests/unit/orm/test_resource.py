@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from nucliadb_protos.resources_pb2 import (
-    AllFields,
+    AllFieldIDs,
     Basic,
     CloudFile,
     FieldID,
@@ -171,7 +171,7 @@ async def test_get_set_all_fields_key(txn, storage, kb):
 
     assert await resource.get_all_fields_key() is None
 
-    all_fields = AllFields()
+    all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text"))
 
     await resource.set_all_fields_key(all_fields)
@@ -187,7 +187,7 @@ async def test_update_all_fields_key(txn, storage, kb):
     # Initial value is None
     assert await resource.get_all_fields_key() is None
 
-    all_fields = AllFields()
+    all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text2"))
 

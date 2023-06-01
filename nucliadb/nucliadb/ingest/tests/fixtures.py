@@ -696,7 +696,7 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
     t2.added.FromDatetime(datetime.now())
     t2.file.CopyFrom(TEST_CLOUDFILE)
 
-    await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+    await test_resource.set_field(rpb.FieldID(field_type=rpb.FieldType.FILE, field="file1"), t2)
 
     # 2.2 LINK FIELD
 
@@ -706,7 +706,7 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
     )
     li2.added.FromDatetime(datetime.now())
     li2.headers["AUTHORIZATION"] = "Bearer xxxxx"
-    linkfield = await test_resource.set_field(rpb.FieldType.LINK, "link1", li2)
+    linkfield = await test_resource.set_field(rpb.FieldID(field_type=rpb.FieldType.LINK, field="link1"), li2)
 
     ex1 = rpb.LinkExtractedData()
     ex1.date.FromDatetime(datetime.now())
@@ -727,7 +727,7 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
     # 2.3 TEXT FIELDS
 
     t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
-    textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
+    textfield = await test_resource.set_field(rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text1"), t23)
 
     await textfield.set_extracted_text(make_extracted_text(textfield.id, body="MyText"))
     await textfield.set_field_metadata(make_field_metadata(textfield.id))

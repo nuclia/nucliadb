@@ -23,6 +23,8 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb_protos.resources_pb2 import FieldID
+
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.nodes_manager import NodesManager
@@ -180,7 +182,7 @@ class ResourceWritesAuditHandler:
         await self.pubsub.unsubscribe(self.subscription_id)
 
     def iterate_auditable_fields(
-        self, resource_keys: list[tuple[int, str]], message: writer_pb2.BrokerMessage
+        self, resource_keys: list[FieldID], message: writer_pb2.BrokerMessage
     ):
         """
         Generator that emits the combined list of field ids from both
@@ -225,7 +227,8 @@ class ResourceWritesAuditHandler:
             yield key
             yielded.add(key)
 
-        for field_type, field_id in resource_keys:
+        for fid in resource_keys:
+            field_type, field_id = fid.field_type, fid.field
             if field_type is writer_pb2.FieldType.GENERIC:
                 continue
 
@@ -248,11 +251,11 @@ class ResourceWritesAuditHandler:
         async with self.driver.transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, message.kbid)
             resource = Resource(txn, self.storage, kb, message.uuid)
-            field_keys = await resource.get_fields_ids()
+            field_ids = await resource.get_fields_ids()
 
             if message.type != writer_pb2.BrokerMessage.MessageType.DELETE:
                 for field_id, field_type in self.iterate_auditable_fields(
-                    field_keys, message
+                    field_ids, message
                 ):
                     auditfield = audit_pb2.AuditField()
                     auditfield.field_type = field_type

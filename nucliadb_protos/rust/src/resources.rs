@@ -703,7 +703,7 @@ pub struct FieldId {
     pub field: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct AllFields {
+pub struct AllFieldIDs {
     #[prost(message, repeated, tag="1")]
     pub fields: ::prost::alloc::vec::Vec<FieldId>,
 }

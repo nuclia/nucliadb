@@ -1949,7 +1949,7 @@ class FieldID(google.protobuf.message.Message):
 global___FieldID = FieldID
 
 @typing_extensions.final
-class AllFields(google.protobuf.message.Message):
+class AllFieldIDs(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FIELDS_FIELD_NUMBER: builtins.int
@@ -1962,4 +1962,4 @@ class AllFields(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> None: ...
 
-global___AllFields = AllFields
+global___AllFieldIDs = AllFieldIDs

@@ -463,6 +463,6 @@ message FieldID {
     string field = 2;
 }
 
-message AllFields {
+message AllFieldIDs {
     repeated FieldID fields = 1;
 }

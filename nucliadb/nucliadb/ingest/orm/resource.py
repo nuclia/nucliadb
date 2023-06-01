@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
-from nucliadb_protos.resources_pb2 import AllFields as PBAllFields
+from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -89,7 +89,7 @@ KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
-KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
+KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/AllFieldIDs"
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
 KB_RESOURCE_CONVERSATION = "/kbs/{kbid}/r/{uuid}/c/{page}"
@@ -143,7 +143,7 @@ class Resource:
         self.fields: Dict[Tuple[int, str], Field] = {}
         self.conversations: Dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: List[Tuple[int, str]] = []
+        self.all_fields_keys: List[FieldID] = []
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
         self.modified: bool = False
@@ -548,33 +548,38 @@ class Resource:
     # Fields
     async def get_fields(self, force: bool = False) -> Dict[Tuple[int, str], Field]:
         # Get all fields
-        for type, field in await self.get_fields_ids(force=force):
+        for fid in await self.get_fields_ids(force=force):
+            type, field = fid.field_type, fid.field
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
 
+    async def _inner_scan_fields_keys(self) -> AsyncIterator[FieldID]:
+        fields = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        async for key in self.txn.keys(fields, count=-1):
+            # The [6:8] `slicing purpose is to match exactly the two
+            # splitted parts corresponding to type and field, and nothing else!
+            type, field = key.split("/")[6:8]
+            type_id = KB_REVERSE.get(type)
+            if type_id is None:
+                raise AttributeError("Invalid field type")
+            yield FieldID(field_type=type_id, field=field)
+
     async def _inner_get_fields_ids(self) -> List[Tuple[FieldType.ValueType, str]]:
-        all_fields: Optional[PBAllFields] = await self.get_all_fields_key()
+        all_fields: Optional[PBAllFieldIDs] = await self.get_all_fields_key()
         if all_fields is None:
             # backward compatibility if all fields key is not set
-            all_fields = PBAllFields()
-            fields = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
-            async for key in self.txn.keys(fields, count=-1):
-                # The [6:8] `slicing purpose is to match exactly the two
-                # splitted parts corresponding to type and field, and nothing else!
-                type, field = key.split("/")[6:8]
-                type_id = KB_REVERSE.get(type)
-                if type_id is None:
-                    raise AttributeError("Invalid field type")
-                all_fields.fields.append(FieldID(field_type=type_id, field=field))
-                await self.set_all_fields_key(all_fields)
+            all_fields = PBAllFieldIDs()
+            async for field_id in self._inner_scan_fields_keys():
+                all_fields.fields.append(field_id)
+            await self.set_all_fields_key(all_fields)
 
         result = [(f.field_type, f.field) for f in all_fields.fields]
 
+        # We make sure to add generic fields from basic if they are set
         basic = await self.get_basic()
         if basic is not None:
             for generic in VALID_GENERIC_FIELDS:
-                # We make sure to add generic fields if they are set
                 append = True
                 if generic == "title" and basic.title == "":
                     append = False
@@ -586,7 +591,7 @@ class Resource:
 
     async def get_fields_ids(
         self, force: bool = False
-    ) -> List[Tuple[FieldType.ValueType, str]]:
+    ) -> List[FieldID]:
         if len(self.all_fields_keys) == 0 or force:
             # Get all field ids and cache them in memory
             result = await self._inner_get_fields_ids()
@@ -602,16 +607,16 @@ class Resource:
             self.fields[field] = field_obj
         return self.fields[field]
 
-    async def get_all_fields_key(self) -> Optional[PBAllFields]:
+    async def get_all_fields_key(self) -> Optional[PBAllFieldIDs]:
         key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         payload = await self.txn.get(key)
         if payload is None:
             return None
-        all_fields = PBAllFields()
+        all_fields = PBAllFieldIDs()
         all_fields.ParseFromString(payload)
         return all_fields
 
-    async def set_all_fields_key(self, all_fields: PBAllFields):
+    async def set_all_fields_key(self, all_fields: PBAllFieldIDs):
         key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         await self.txn.set(key, all_fields.SerializeToString())
 
@@ -623,7 +628,7 @@ class Resource:
     ):
         all_fields = await self.get_all_fields_key()
         if all_fields is None:
-            all_fields = PBAllFields()
+            all_fields = PBAllFieldIDs()
 
         needs_update = False
 
@@ -640,7 +645,8 @@ class Resource:
         if needs_update:
             await self.set_all_fields_key(all_fields)
 
-    async def set_field(self, type: int, key: str, payload: Any):
+    async def set_field(self, field_id: FieldID, payload: Any):
+        type, key = field_id.field_type, field_id.field
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -648,12 +654,13 @@ class Resource:
         else:
             field_obj = self.fields[field]
         await field_obj.set_value(payload)
-        self.all_fields_keys.append(field)
+        self.all_fields_keys.append(FieldID(field_type=type, field=key))
 
         self.modified = True
         return field_obj
 
-    async def delete_field(self, type: int, key: str):
+    async def delete_field(self, field_id: FieldID):
+        type, key = field_id.field_type, field_id.field
         field = (type, key)
         if field in self.fields:
             field_obj = self.fields.pop(field)
@@ -680,45 +687,45 @@ class Resource:
         message_updated_fields = []
         for field, layout in message.layouts.items():
             fid = FieldID(field_type=FieldType.LAYOUT, field=field)
-            await self.set_field(fid.field_type, fid.field, layout)
+            await self.set_field(fid, layout)
             message_updated_fields.append(fid)
 
         for field, text in message.texts.items():
             fid = FieldID(field_type=FieldType.TEXT, field=field)
-            await self.set_field(fid.field_type, fid.field, text)
+            await self.set_field(fid, text)
             message_updated_fields.append(fid)
 
         for field, keywordset in message.keywordsets.items():
             fid = FieldID(field_type=FieldType.KEYWORDSET, field=field)
-            await self.set_field(fid.field_type, fid.field, keywordset)
+            await self.set_field(fid, keywordset)
             message_updated_fields.append(fid)
 
         for field, datetimeobj in message.datetimes.items():
             fid = FieldID(field_type=FieldType.DATETIME, field=field)
-            await self.set_field(fid.field_type, fid.field, datetimeobj)
+            await self.set_field(fid, datetimeobj)
             message_updated_fields.append(fid)
 
         for field, link in message.links.items():
             fid = FieldID(field_type=FieldType.LINK, field=field)
-            await self.set_field(fid.field_type, fid.field, link)
+            await self.set_field(fid, link)
             message_updated_fields.append(fid)
 
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
-            await self.set_field(fid.field_type, fid.field, file)
+            await self.set_field(fid, file)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
             fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
-            await self.set_field(fid.field_type, fid.field, conversation)
+            await self.set_field(fid, conversation)
             message_updated_fields.append(fid)
 
         for fieldid in message.delete_fields:
-            await self.delete_field(fieldid.field_type, fieldid.field)
+            await self.delete_field(fieldid)
 
-        if len(message_updated_fields) or len(message.deleted_fields):
+        if len(message_updated_fields) or len(message.delete_fields):
             await self.update_all_fields_key(
-                updated=message_updated_fields, deleted=message.deleted_fields
+                updated=message_updated_fields, deleted=message.delete_fields
             )
 
     @processor_observer.wrap({"type": "apply_extracted"})
@@ -950,15 +957,14 @@ class Resource:
 
         brain.set_processing_status(basic=basic, previous_status=self._previous_status)
         brain.set_global_tags(basic=basic, origin=origin, uuid=self.uuid)
-        for type, field in await self.get_fields_ids(force=True):
-            fieldobj = await self.get_field(field, type, load=False)
-            fieldid = FieldID(field_type=type, field=field)  # type: ignore
+        for fieldid in await self.get_fields_ids(force=True):
+            fieldobj = await self.get_field(fieldid.field, type, load=False)
             fieldkey = self.generate_field_id(fieldid)
             extracted_metadata = await fieldobj.get_field_metadata()
             valid_user_field_metadata = None
             for user_field_metadata in basic.fieldmetadata:
                 if (
-                    user_field_metadata.field.field == field
+                    user_field_metadata.field.field == fieldid.field
                     and user_field_metadata.field.field_type == type
                 ):
                     valid_user_field_metadata = user_field_metadata
@@ -977,8 +983,7 @@ class Resource:
     @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):
         # For each extracted
-        for type, field in await self.get_fields_ids(force=True):
-            fieldid = FieldID(field_type=type, field=field)
+        for fieldid in await self.get_fields_ids(force=True):
             await self.compute_global_text_field(fieldid, self.indexer)
 
     async def compute_global_text_field(self, fieldid: FieldID, brain: ResourceBrain):
