@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
+from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -624,6 +625,19 @@ class Resource:
 
     def has_field(self, type: int, field: str) -> bool:
         return (type, field) in self.fields
+
+    async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
+        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        payload = await self.txn.get(key)
+        if payload is None:
+            return None
+        all_fields = PBAllFieldIDs()
+        all_fields.ParseFromString(payload)
+        return all_fields
+
+    async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
+        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(key, all_fields.SerializeToString())
 
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
