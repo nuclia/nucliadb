@@ -118,7 +118,7 @@ jobs:
         uses: "google-github-actions/setup-gcloud@v1"
 
       - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
 
       - name: Docker - Build
         run: |-
