@@ -702,6 +702,11 @@ pub struct FieldId {
     #[prost(string, tag="2")]
     pub field: ::prost::alloc::string::String,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AllFieldIDs {
+    #[prost(message, repeated, tag="1")]
+    pub field: ::prost::alloc::vec::Vec<FieldId>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum FieldType {
