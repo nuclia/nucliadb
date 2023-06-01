@@ -27,6 +27,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
+use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
@@ -146,11 +147,13 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
 
     info!("Listening for gRPC requests at: {:?}", addr);
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    let metrics_middleware = MetricsLayer::default();
 
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
+        .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))
         .serve(addr)

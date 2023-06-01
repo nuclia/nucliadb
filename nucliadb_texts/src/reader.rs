@@ -23,7 +23,7 @@ use std::fs;
 use std::time::*;
 
 use itertools::Itertools;
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
@@ -132,7 +132,7 @@ impl ReaderChild for TextReaderService {
 
         let result = self.do_search(request);
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::texts("search".to_string());
         metrics.record_request_time(metric, took);
@@ -157,7 +157,7 @@ impl ReaderChild for TextReaderService {
             keys.push(key);
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::texts("stored_ids".to_string());
         metrics.record_request_time(metric, took);

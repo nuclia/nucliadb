@@ -13,34 +13,34 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Affero General Public License for more details.
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::fmt::Debug;
 
-use lazy_static::lazy_static;
+use crate::metrics::meters::Meter;
+use crate::metrics::metric::request_time;
+use crate::{tracing, NodeResult};
 
-use crate::metrics::{self, Metrics};
+pub struct ConsoleMeter;
 
-lazy_static! {
-    static ref METRICS: Arc<dyn Metrics> = create_metrics();
+impl ConsoleMeter {
+    fn record<Metric: Debug, Value: Debug>(&self, metric: Metric, value: Value) {
+        tracing::debug!("{metric:?} : {value:?}")
+    }
 }
 
-#[cfg(prometheus_metrics)]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::PrometheusMetrics::new())
-}
+impl Meter for ConsoleMeter {
+    fn export(&self) -> NodeResult<String> {
+        Ok(Default::default())
+    }
 
-#[cfg(log_metrics)]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::ConsoleLogMetrics)
-}
-
-#[cfg(not(any(prometheus_metrics, log_metrics)))]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::NoMetrics)
-}
-
-pub fn get_metrics() -> Arc<dyn Metrics> {
-    Arc::clone(&METRICS)
+    fn record_request_time(
+        &self,
+        metric: request_time::RequestTimeKey,
+        value: request_time::RequestTimeValue,
+    ) {
+        self.record(metric, value)
+    }
 }
