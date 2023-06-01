@@ -341,16 +341,53 @@ class KnowledgeboxShards(BaseModel):
         return cls(**as_dict)
 
 
+class ParamDefault(BaseModel):
+    default: Any
+    title: str
+    description: str
+
+
+class SearchParamDefaults:
+    query = ParamDefault(
+        default="", title="Query", description="The query to search for"
+    )
+    advanced_query = ParamDefault(
+        default=None,
+        title="Advanced query",
+        description="An advanced query to search for. See https://docs.nuclia.dev/docs/query/#advanced-query for examples of advanced queries.",  # noqa: E501
+    )
+    fields = ParamDefault(
+        default=[],
+        title="Fields",
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details, see: https://docs.nuclia.dev/docs/query/#search-in-a-specific-field",  # noqa: E501
+    )
+    filters = ParamDefault(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+    )
+    faceted = ParamDefault(
+        default=[],
+        title="Faceted",
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+    )
+    min_score = ParamDefault(
+        default=0.70,
+        title="Minimum result score",
+        description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
+    )
+
+
 class SearchRequest(BaseModel):
-    query: str = ""
-    advanced_query: Optional[str] = None
-    fields: List[str] = []
-    filters: List[str] = []
-    faceted: List[str] = []
+    query: str = Field(**SearchParamDefaults.query.dict())
+    advanced_query: Optional[str] = Field(**SearchParamDefaults.advanced_query.dict())
+    fields: List[str] = Field(**SearchParamDefaults.fields.dict())
+    filters: List[str] = Field(**SearchParamDefaults.filters.dict())
+    faceted: List[str] = Field(**SearchParamDefaults.faceted.dict())
     sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
-    min_score: float = 0.70
+    min_score: float = Field(**SearchParamDefaults.min_score.dict())
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
