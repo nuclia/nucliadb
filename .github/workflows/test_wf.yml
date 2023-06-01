@@ -30,8 +30,10 @@ jobs:
         uses: "google-github-actions/setup-gcloud@v1"
 
       # setup docker, as we need to pull the node image to run the tests
+      # - name: Configure Docker
+      #   run: gcloud auth configure-docker eu.gcr.io
       - name: Configure Docker
-        run: gcloud auth configure-docker
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
 
       - name: test push
         run: |
