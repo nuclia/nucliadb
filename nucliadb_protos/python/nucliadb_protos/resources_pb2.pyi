@@ -1947,3 +1947,19 @@ class FieldID(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "field_type", b"field_type"]) -> None: ...
 
 global___FieldID = FieldID
+
+@typing_extensions.final
+class AllFieldIDs(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FIELDS_FIELD_NUMBER: builtins.int
+    @property
+    def fields(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldID]: ...
+    def __init__(
+        self,
+        *,
+        fields: collections.abc.Iterable[global___FieldID] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> None: ...
+
+global___AllFieldIDs = AllFieldIDs

@@ -205,7 +205,7 @@ class Shards(BaseModel):
     shards: Optional[List[str]]
 
 
-FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
+FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {
     resources_pb2.FieldType.FILE: FieldTypeName.FILE,
     resources_pb2.FieldType.LINK: FieldTypeName.LINK,
     resources_pb2.FieldType.DATETIME: FieldTypeName.DATETIME,
@@ -216,6 +216,6 @@ FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
     resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
 }
 
-FIELD_TYPES_MAP_REVERSE: Dict[str, int] = {
+FIELD_TYPES_MAP_REVERSE: Dict[str, resources_pb2.FieldType.ValueType] = {
     y.value: x for x, y in FIELD_TYPES_MAP.items()  # type: ignore
 }
