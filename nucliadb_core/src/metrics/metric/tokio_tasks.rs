@@ -308,7 +308,7 @@ impl TokioTaskMetrics {
     /// Collected metrics must belong to the interval from last `collect` call
     /// until the current call.
     pub fn collect(&self, labels: TaskLabels, metrics: TaskMetrics) {
-        // TODO: rewrite in a more readable way
+        // TODO? Should we add a declarative macro to improve this?
 
         self.instrumented_count
             .get_or_create(&labels)
