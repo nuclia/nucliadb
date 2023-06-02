@@ -192,13 +192,12 @@ class _NucliaSDKBase:
             # auth headers
             headers["X-NUCLIADB-ROLES"] = "MANAGER;WRITER;READER"
         else:
-            if api_key is None:
-                raise ValueError("api_key must be provided for cloud sdk usage")
             if url is None:
                 self.base_url = f"https://{region.value}.nuclia.cloud/api"
             else:
                 self.base_url = url.rstrip("/")
-            headers["X-STF-SERVICEACCOUNT"] = f"Bearer {api_key}"
+            if api_key is not None:
+                headers["X-STF-SERVICEACCOUNT"] = f"Bearer {api_key}"
 
         self.headers = headers
 
