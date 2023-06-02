@@ -305,63 +305,82 @@ impl TokioTaskMetrics {
         }
     }
 
-    // TODO: rewrite in a more readable way
+    /// Collected metrics must belong to the interval from last `collect` call
+    /// until the current call.
     pub fn collect(&self, labels: TaskLabels, metrics: TaskMetrics) {
-        let instrumented_count = self.instrumented_count.get_or_create(&labels);
-        instrumented_count.inc_by(metrics.instrumented_count - instrumented_count.get());
+        // TODO: rewrite in a more readable way
 
-        let dropped_count = self.dropped_count.get_or_create(&labels);
-        dropped_count.inc_by(metrics.dropped_count - dropped_count.get());
+        self.instrumented_count
+            .get_or_create(&labels)
+            .inc_by(metrics.instrumented_count);
 
-        let first_poll_count = self.first_poll_count.get_or_create(&labels);
-        first_poll_count.inc_by(metrics.first_poll_count - first_poll_count.get());
+        self.dropped_count
+            .get_or_create(&labels)
+            .inc_by(metrics.dropped_count);
 
-        let total_first_poll_delay = self.total_first_poll_delay.get_or_create(&labels);
-        total_first_poll_delay.observe(metrics.total_first_poll_delay.as_secs_f64());
+        self.first_poll_count
+            .get_or_create(&labels)
+            .inc_by(metrics.first_poll_count);
 
-        let total_idled_count = self.total_idled_count.get_or_create(&labels);
-        total_idled_count.inc_by(metrics.total_idled_count - total_idled_count.get());
+        self.total_first_poll_delay
+            .get_or_create(&labels)
+            .observe(metrics.total_first_poll_delay.as_secs_f64());
 
-        let total_idle_duration = self.total_idle_duration.get_or_create(&labels);
-        total_idle_duration.observe(metrics.total_idle_duration.as_secs_f64());
+        self.total_idled_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_idled_count);
 
-        let total_scheduled_count = self.total_scheduled_count.get_or_create(&labels);
-        total_scheduled_count.inc_by(metrics.total_scheduled_count - total_scheduled_count.get());
+        self.total_idle_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_idle_duration.as_secs_f64());
 
-        let total_scheduled_duration = self.total_scheduled_duration.get_or_create(&labels);
-        total_scheduled_duration.observe(metrics.total_scheduled_duration.as_secs_f64());
+        self.total_scheduled_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_scheduled_count);
 
-        let total_poll_count = self.total_poll_count.get_or_create(&labels);
-        total_poll_count.inc_by(metrics.total_poll_count - total_poll_count.get());
+        self.total_scheduled_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_scheduled_duration.as_secs_f64());
 
-        let total_poll_duration = self.total_poll_duration.get_or_create(&labels);
-        total_poll_duration.observe(metrics.total_poll_duration.as_secs_f64());
+        self.total_poll_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_poll_count);
 
-        let total_fast_poll_count = self.total_fast_poll_count.get_or_create(&labels);
-        total_fast_poll_count.inc_by(metrics.total_fast_poll_count - total_fast_poll_count.get());
+        self.total_poll_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_poll_duration.as_secs_f64());
 
-        let total_fast_poll_duration = self.total_fast_poll_duration.get_or_create(&labels);
-        total_fast_poll_duration.observe(metrics.total_fast_poll_duration.as_secs_f64());
+        self.total_fast_poll_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_fast_poll_count);
 
-        let total_slow_poll_count = self.total_slow_poll_count.get_or_create(&labels);
-        total_slow_poll_count.inc_by(metrics.total_slow_poll_count - total_slow_poll_count.get());
+        self.total_fast_poll_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_fast_poll_duration.as_secs_f64());
 
-        let total_slow_poll_duration = self.total_slow_poll_duration.get_or_create(&labels);
-        total_slow_poll_duration.observe(metrics.total_slow_poll_duration.as_secs_f64());
+        self.total_slow_poll_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_slow_poll_count);
 
-        let total_short_delay_count = self.total_short_delay_count.get_or_create(&labels);
-        total_short_delay_count
-            .inc_by(metrics.total_short_delay_count - total_short_delay_count.get());
+        self.total_slow_poll_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_slow_poll_duration.as_secs_f64());
 
-        let total_long_delay_count = self.total_long_delay_count.get_or_create(&labels);
-        total_long_delay_count
-            .inc_by(metrics.total_long_delay_count - total_long_delay_count.get());
+        self.total_short_delay_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_short_delay_count);
 
-        let total_short_delay_duration = self.total_short_delay_duration.get_or_create(&labels);
-        total_short_delay_duration.observe(metrics.total_short_delay_duration.as_secs_f64());
+        self.total_long_delay_count
+            .get_or_create(&labels)
+            .inc_by(metrics.total_long_delay_count);
 
-        let total_long_delay_duration = self.total_long_delay_duration.get_or_create(&labels);
-        total_long_delay_duration.observe(metrics.total_long_delay_duration.as_secs_f64());
+        self.total_short_delay_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_short_delay_duration.as_secs_f64());
+
+        self.total_long_delay_duration
+            .get_or_create(&labels)
+            .observe(metrics.total_long_delay_duration.as_secs_f64());
     }
 }
 
