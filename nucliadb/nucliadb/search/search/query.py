@@ -67,6 +67,7 @@ async def global_query_to_pb(
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
     with_synonyms: bool = False,
+    autofilter: bool = False,
 ) -> Tuple[SearchRequest, bool]:
     fields = fields or []
 
@@ -122,7 +123,7 @@ async def global_query_to_pb(
         )
 
     if SearchOptions.RELATIONS in features:
-        await _parse_entities(request, kbid, query)
+        await _parse_entities(request, kbid, query, autofilter=autofilter)
 
     if with_synonyms:
         if advanced_query:
@@ -166,12 +167,17 @@ async def _parse_vectors(
     return incomplete
 
 
-async def _parse_entities(request: SearchRequest, kbid: str, query: str):
+async def _parse_entities(
+    request: SearchRequest, kbid: str, query: str, autofilter: bool = False
+):
     predict = get_predict()
     try:
         detected_entities = await predict.detect_entities(kbid, query)
         request.relation_subgraph.entry_points.extend(detected_entities)
         request.relation_subgraph.depth = 1
+        if autofilter:
+            #  TODO
+            pass
     except SendToPredictError as ex:
         logger.warning(f"Errors on predict api detecting entities: {ex}")
 

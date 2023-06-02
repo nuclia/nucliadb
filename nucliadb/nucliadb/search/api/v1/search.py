@@ -121,6 +121,7 @@ async def search_knowledgebox(
     with_duplicates: bool = Query(default=False),
     with_status: Optional[ResourceProcessingStatus] = Query(default=None),
     with_synonyms: bool = Query(default=False),
+    autofilter: bool = param_to_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -154,6 +155,7 @@ async def search_knowledgebox(
         with_duplicates=with_duplicates,
         with_status=with_status,
         with_synonyms=with_synonyms,
+        autofilter=autofilter,
     )
     try:
         return await search(
@@ -289,6 +291,7 @@ async def search(
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
         with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
     )
 
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
