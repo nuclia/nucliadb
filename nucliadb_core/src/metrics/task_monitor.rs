@@ -38,7 +38,6 @@ impl MultiTaskMonitor {
             task_id,
             monitors: &self.task_monitors,
         }
-        // Monitor::new(task_id, &self.task_monitors)
     }
 
     pub fn export_all(&self) -> impl Iterator<Item = (TaskId, TaskMetrics)> + '_ {
@@ -57,7 +56,7 @@ pub struct Monitor<'a> {
 
 impl<'a> Monitor<'a> {
     // Consuming `self` ensures a short life for the reference inside a DashMap,
-    // avoiding potential deadlocks.
+    // avoiding potential deadlocks. See DashMap docs for more info.
     pub fn instrument<F>(self, task: F) -> Instrumented<F> {
         if !self.monitors.contains_key(&self.task_id) {
             let monitor = TaskMonitor::new();
