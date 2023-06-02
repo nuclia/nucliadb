@@ -28,6 +28,7 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestRequest,
 )
 from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
@@ -175,9 +176,13 @@ async def _parse_entities(
         detected_entities = await predict.detect_entities(kbid, query)
         request.relation_subgraph.entry_points.extend(detected_entities)
         request.relation_subgraph.depth = 1
-        if autofilter:
-            #  TODO
-            pass
+        if autofilter is True:
+            # Add a filter for each detected entity
+            request.filter.tags.extend(
+                f"/e/{relation.klass}/{relation.value}"
+                for relation in detected_entities
+                if relation.ntype == RelationNode.NodeType.ENTITY
+            )
     except SendToPredictError as ex:
         logger.warning(f"Errors on predict api detecting entities: {ex}")
 
