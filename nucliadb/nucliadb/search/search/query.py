@@ -179,7 +179,7 @@ async def _parse_entities(
         if autofilter is True:
             # Add a filter for each detected entity
             request.filter.tags.extend(
-                f"/e/{relation.klass}/{relation.value}"
+                f"/e/{relation.subtype}/{relation.value}"
                 for relation in detected_entities
                 if relation.ntype == RelationNode.NodeType.ENTITY
             )
