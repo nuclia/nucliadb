@@ -377,7 +377,7 @@ class SearchParamDefaults:
         description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
     )
     autofilter = ParamDefault(
-        default=None,
+        default=False,
         title="Automatic search filtering",
         description="If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
     )
