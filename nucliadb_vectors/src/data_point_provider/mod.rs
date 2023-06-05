@@ -273,7 +273,6 @@ pub struct Writer {
     state: RwState,
     state_path: PathBuf,
     readers_path: PathBuf,
-    merger_is_free: Arc<AtomicBool>,
 }
 impl Writer {
     fn new(inner: Index) -> VectorR<Writer> {
@@ -289,7 +288,6 @@ impl Writer {
         let state_path = inner.location().join(STATE);
         let state = RwState::new(&state_path)?;
         let merged_queue = Merged::new();
-        let merge_scheduled = Arc::new(AtomicBool::new(false));
         Ok(Writer {
             inner,
             state,
@@ -297,7 +295,6 @@ impl Writer {
             writer_flag,
             readers_path,
             merged_queue,
-            merger_is_free: merge_scheduled,
             datapoint_buffer: vec![],
             delete_buffer: vec![],
         })
@@ -366,23 +363,22 @@ impl Writer {
 
         // Looking for possible merges
         let state = self.state.read();
-        let merge_is_free = self.merger_is_free.swap(false, Ordering::SeqCst);
-        let work = state.datapoints_to_merge().filter(|_| merge_is_free);
-        if let Some(work_unit) = work {
-            let work: Vec<_> = work_unit
-                .load
-                .iter()
-                .copied()
-                .map(|i| (i.id(), state.creation_time(i)))
-                .collect();
-            merger::send_merge_request(merge_worker::Worker {
-                work,
-                location: self.location().to_path_buf(),
-                similarity: self.metadata().similarity,
-                delete_log: state.delete_log().clone(),
-                result: self.merged_queue.clone(),
-                merger_is_free: self.merger_is_free.clone(),
-            });
+        let merged_queue = self.merged_queue.clone();
+        if let Some(work_unit) = state.datapoints_to_merge() {
+            if merged_queue.reserve_work() {
+                merger::send_merge_request(merge_worker::Worker {
+                    location: self.location().to_path_buf(),
+                    similarity: self.metadata().similarity,
+                    delete_log: state.delete_log().clone(),
+                    result: self.merged_queue.clone(),
+                    work: work_unit
+                        .load
+                        .iter()
+                        .copied()
+                        .map(|i| (i.id(), state.creation_time(i)))
+                        .collect(),
+                });
+            }
         }
 
         Ok(())

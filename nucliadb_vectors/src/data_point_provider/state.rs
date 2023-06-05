@@ -237,7 +237,7 @@ impl State {
         };
         self.delete_log.prune(age_cap);
         unit.load.iter().cloned().for_each(|dp| {
-            // The data_point may be older that the refactor
+            // The data_point may be older than the refactor
             self.data_points.remove(&dp.id());
             self.no_nodes -= dp.no_nodes();
         });

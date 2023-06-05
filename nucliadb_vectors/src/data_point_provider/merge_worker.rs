@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::time::SystemTime;
 
@@ -29,31 +28,56 @@ use crate::data_point::{DataPoint, DpId, Journal, Similarity};
 use crate::data_types::dtrie_ram::{DTrie, TimeSensitiveDTrie};
 use crate::{VectorErr, VectorR};
 
+#[derive(Debug, Clone, Copy, Default)]
+pub enum MergingState {
+    #[default]
+    Empty,
+    Waiting,
+    Done(Journal),
+}
+
 #[derive(Clone, Default)]
 pub struct Merged {
-    inner: Arc<RwLock<Option<Journal>>>,
+    inner: Arc<RwLock<MergingState>>,
 }
 impl Merged {
-    fn write(&self) -> RwLockWriteGuard<'_, Option<Journal>> {
+    fn write(&self) -> RwLockWriteGuard<'_, MergingState> {
         self.inner.write().unwrap_or_else(|e| e.into_inner())
     }
-    fn update(&self, merge: Journal) {
-        *self.write() = Some(merge);
-    }
     fn add_merge(&self, datapoint: Journal) -> VectorR<()> {
-        match *self.write() {
-            Some(_) => Err(VectorErr::MergeLostError(datapoint.id())),
-            None => {
-                self.update(datapoint);
-                Ok(())
-            }
+        let mut writer = self.write();
+        if let MergingState::Done(_) = *writer {
+            Err(VectorErr::MergeLostError(datapoint.id()))
+        } else {
+            *writer = MergingState::Done(datapoint);
+            Ok(())
         }
     }
     pub fn new() -> Merged {
         Self::default()
     }
+    pub fn abort_work(&self) {
+        let mut writer = self.write();
+        if let MergingState::Waiting = *writer {
+            *writer = MergingState::Empty;
+        }
+    }
     pub fn take(&self) -> Option<Journal> {
-        std::mem::take(&mut *self.write())
+        let mut writer = self.write();
+        let MergingState::Done(journal) = *writer else {
+            return None;
+        };
+        *writer = MergingState::Empty;
+        Some(journal)
+    }
+    pub fn reserve_work(&self) -> bool {
+        let mut writer = self.write();
+        if let MergingState::Empty = *writer {
+            *writer = MergingState::Waiting;
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -63,7 +87,6 @@ pub(super) struct Worker {
     pub(super) work: Vec<(DpId, SystemTime)>,
     pub(super) similarity: Similarity,
     pub(super) result: Merged,
-    pub(super) merger_is_free: Arc<AtomicBool>,
 }
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
@@ -87,19 +110,17 @@ impl Worker {
         for (id, ctime) in self.work.iter().copied() {
             work_stack.push((TimeSensitiveDTrie::new(&self.delete_log, ctime), id))
         }
-
-        // Merging can happen offline
         info!("{subscriber:?} is ready to perform a merge");
         match DataPoint::merge(&self.location, &work_stack, self.similarity) {
             Err(err) => {
-                self.merger_is_free.store(true, Ordering::SeqCst);
+                self.result.abort_work();
                 Err(err)
             }
             Ok(merged) => {
                 let report = self.merge_report(self.work.iter().map(|i| i.0), merged.get_id());
                 info!("Merge on {subscriber:?}:\n{report}");
                 info!("Merge request completed");
-                self.merger_is_free.store(true, Ordering::SeqCst);
+                self.result.abort_work();
                 self.result.add_merge(merged.meta())
             }
         }
