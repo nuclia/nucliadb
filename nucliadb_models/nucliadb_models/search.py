@@ -346,7 +346,7 @@ class ParamDefault(BaseModel):
     title: str
     description: str
 
-    def to_field(self) -> Field:
+    def to_field(self) -> Field:  # type: ignore
         return Field(self.default, title=self.title, description=self.description)
 
 
