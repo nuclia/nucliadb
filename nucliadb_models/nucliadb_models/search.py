@@ -376,6 +376,11 @@ class SearchParamDefaults:
         title="Minimum result score",
         description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
     )
+    autofilter = ParamDefault(
+        default=False,
+        title="Automatic search filtering",
+        description="If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
+    )
 
 
 class SearchRequest(BaseModel):
@@ -409,6 +414,7 @@ class SearchRequest(BaseModel):
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
     with_synonyms: bool = False
+    autofilter: bool = Field(**SearchParamDefaults.autofilter.dict())
 
 
 class Author(str, Enum):
