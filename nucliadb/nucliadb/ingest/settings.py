@@ -83,7 +83,7 @@ class Settings(DriverSettings):
 
     # Node limits
     max_shard_paragraphs: int = Field(
-        300_000,
+        500_000,
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
