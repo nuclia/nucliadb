@@ -18,19 +18,52 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
-use nucliadb_core::fs_state;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::time::SystemTime;
+
 use nucliadb_core::tracing::*;
 
-use super::merger::{MergeQuery, MergeRequest};
-use super::State;
-use crate::data_point::{DataPoint, DpId, Similarity};
-use crate::data_point_provider::merger;
-use crate::VectorR;
+use super::merger::MergeQuery;
+use crate::data_point::{DataPoint, DpId, Journal, Similarity};
+use crate::data_types::dtrie_ram::{DTrie, TimeSensitiveDTrie};
+use crate::{VectorErr, VectorR};
 
+#[derive(Clone, Default)]
+pub struct Merged {
+    inner: Arc<RwLock<Option<Journal>>>,
+}
+impl Merged {
+    fn write(&self) -> RwLockWriteGuard<'_, Option<Journal>> {
+        self.inner.write().unwrap_or_else(|e| e.into_inner())
+    }
+    fn update(&self, merge: Journal) {
+        *self.write() = Some(merge);
+    }
+    fn add_merge(&self, datapoint: Journal) -> VectorR<()> {
+        match *self.write() {
+            Some(_) => Err(VectorErr::MergeLostError(datapoint.id())),
+            None => {
+                self.update(datapoint);
+                Ok(())
+            }
+        }
+    }
+    pub fn new() -> Merged {
+        Self::default()
+    }
+    pub fn take(&self) -> Option<Journal> {
+        std::mem::take(&mut *self.write())
+    }
+}
 
-pub(crate) struct Worker {
-    location: PathBuf,
-    similarity: Similarity,
+pub(super) struct Worker {
+    pub(super) location: PathBuf,
+    pub(super) delete_log: DTrie,
+    pub(super) work: Vec<(DpId, SystemTime)>,
+    pub(super) similarity: Similarity,
+    pub(super) result: Merged,
+    pub(super) merger_is_free: Arc<AtomicBool>,
 }
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
@@ -38,12 +71,6 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
-    pub fn request(location: PathBuf, similarity: Similarity) -> MergeRequest {
-        Box::new(Worker {
-            similarity,
-            location,
-        })
-    }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
     where It: Iterator<Item = DpId> {
         use std::fmt::Write;
@@ -55,29 +82,26 @@ impl Worker {
         msg
     }
     fn work(&self) -> VectorR<()> {
+        let mut work_stack = vec![];
         let subscriber = self.location.as_path();
-        // We must ensure that GC does not happen while working.
-        let (_, state) = fs_state::load_state::<State>(subscriber)?;
+        for (id, ctime) in self.work.iter().copied() {
+            work_stack.push((TimeSensitiveDTrie::new(&self.delete_log, ctime), id))
+        }
+
         // Merging can happen offline
         info!("{subscriber:?} is ready to perform a merge");
-        let Some(work) = state.current_work_unit().map(|work|
-            work
-            .iter()
-            .rev()
-            .map(|journal| (state.delete_log(*journal), journal.id()))
-            .collect::<Vec<_>>()
-        ) else { return Ok(());};
-        let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
-        let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
-        let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
-
-        // We are updating the state, but first
-        // synchronize with the writer.
-        let (_, mut state) = fs_state::load_state::<State>(subscriber)?;
-        state.replace_work_unit(new_dp);
-        fs_state::atomic_write(subscriber, &state)?;
-        info!("Merge on {subscriber:?}:\n{report}");
-        info!("Merge request completed");
-        Ok(())
+        match DataPoint::merge(&self.location, &work_stack, self.similarity) {
+            Err(err) => {
+                self.merger_is_free.store(true, Ordering::SeqCst);
+                Err(err)
+            }
+            Ok(merged) => {
+                let report = self.merge_report(self.work.iter().map(|i| i.0), merged.get_id());
+                info!("Merge on {subscriber:?}:\n{report}");
+                info!("Merge request completed");
+                self.merger_is_free.store(true, Ordering::SeqCst);
+                self.result.add_merge(merged.meta())
+            }
+        }
     }
 }

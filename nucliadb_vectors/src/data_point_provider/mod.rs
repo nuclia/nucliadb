@@ -33,7 +33,6 @@ use std::time::SystemTime;
 
 use fs2::FileExt;
 pub use merger::Merger;
-use nucliadb_core::fs_state::{self, Version};
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
@@ -41,7 +40,7 @@ use tempfile::NamedTempFile as TemporalFile;
 
 pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId, Journal, Similarity};
-use crate::data_point_provider::merge_worker::Worker;
+use crate::data_point_provider::merge_worker::Merged;
 use crate::formula::Formula;
 use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
@@ -52,15 +51,17 @@ const STATE: &str = "state.bincode";
 const READERS: &str = "readers";
 const WRITER_FLAG: &str = "writer.flag";
 
-// Atomically update 'path' with the contents that 'serializer'
-// writes into the buffer.
-fn persist_data<F, R>(path: &Path, serializer: F) -> VectorR<R>
+// 'f' will have access to a BufWriter whose contents at the end of
+// f's execution will be atomically persisted in 'path'.
+// After this function is executed 'path' will either only contain the data wrote by
+// 'f' or be on its previous state.
+fn compute_with_atomic_write<F, R>(path: &Path, f: F) -> VectorR<R>
 where for<'a> F: FnOnce(&mut BufWriter<&'a mut TemporalFile>) -> VectorR<R> {
     let mut file = tempfile::NamedTempFile::new()?;
     let mut buffer = BufWriter::new(&mut file);
-    let user_result = serializer(&mut buffer)?;
+    let user_result = f(&mut buffer)?;
     buffer.flush()?;
-    std::mem::drop(buffer);
+    mem::drop(buffer);
     file.persist(path)?;
     Ok(user_result)
 }
@@ -79,7 +80,7 @@ pub struct IndexMetadata {
 }
 impl IndexMetadata {
     pub fn write(&self, path: &Path) -> VectorR<()> {
-        persist_data(&path.join(METADATA), |buffer| {
+        compute_with_atomic_write(&path.join(METADATA), |buffer| {
             Ok(serde_json::to_writer(buffer, self)?)
         })
     }
@@ -119,7 +120,7 @@ impl Index {
         let location = path.to_path_buf();
         std::fs::create_dir_all(&location)?;
         std::fs::create_dir_all(location.join(READERS))?;
-        persist_data(&location.join(STATE), |buffer| {
+        compute_with_atomic_write(&location.join(STATE), |buffer| {
             bincode::serialize_into(buffer, &State::new())?;
             metadata.write(&location)?;
             Ok(Index { metadata, location })
@@ -139,87 +140,64 @@ impl Index {
     }
 }
 
-struct InnerContext {
-    state: State,
-    version: Version,
-}
-impl InnerContext {
-    pub fn new(path: &Path) -> VectorR<InnerContext> {
-        let (version, state) = fs_state::load_state::<State>(path)?;
-        Ok(InnerContext { state, version })
-    }
-}
-
 #[derive(Clone)]
-struct Context {
-    inner: Arc<RwLock<InnerContext>>,
+struct RwState {
+    inner: Arc<RwLock<State>>,
 }
-impl Context {
-    pub fn read(&self) -> RwLockReadGuard<'_, InnerContext> {
+impl RwState {
+    pub fn read(&self) -> RwLockReadGuard<'_, State> {
         self.inner.read().unwrap_or_else(|e| e.into_inner())
     }
-    pub fn new(path: &Path) -> VectorR<Context> {
-        let inner = Arc::new(RwLock::new(InnerContext::new(path)?));
-        Ok(Context { inner })
+    pub fn new(path: &Path) -> VectorR<RwState> {
+        let mut state_buffer = BufReader::new(File::open(path)?);
+        let state: State = bincode::deserialize_from(&mut state_buffer)?;
+        let inner = Arc::new(RwLock::new(state));
+        Ok(RwState { inner })
     }
     pub fn apply<F, R>(&self, transform: F) -> VectorR<R>
-    where F: FnOnce(&mut InnerContext) -> VectorR<R> {
+    where F: FnOnce(&mut State) -> VectorR<R> {
         let mut writer = self.inner.write().unwrap_or_else(|e| e.into_inner());
         transform(&mut writer)
     }
     pub fn persist(&self, path: &Path) -> VectorR<()> {
-        let context = self.read();
-        persist_data(&path.join(STATE), |buffer| {
-            Ok(bincode::serialize_into(buffer, &context.state)?)
+        compute_with_atomic_write(path, |buffer| {
+            Ok(bincode::serialize_into(buffer, &*self.read())?)
         })
     }
 }
 
 pub struct Reader {
-    status: PathBuf,
+    status_path: PathBuf,
+    state_path: PathBuf,
     inner: Index,
-    context: Context,
+    state: RwState,
     update_scheduled: Arc<AtomicBool>,
 }
 impl Drop for Reader {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.status);
+        let _ = std::fs::remove_file(&self.status_path);
     }
 }
 impl Reader {
-    fn open_status_file(location: &Path) -> VectorR<File> {
-        Ok(OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(location)?)
-    }
     fn new(inner: Index) -> VectorR<Reader> {
         let id = uuid::Uuid::new_v4().to_string();
         let update_scheduled = Arc::new(AtomicBool::new(false));
         let status_dir = inner.location().join(READERS);
-        let status = status_dir.join(id).with_extension("json");
-        let context = Context::new(inner.location())?;
-
+        let status_path = status_dir.join(id).with_extension("bincode");
+        let state_path = inner.location().join(STATE);
+        let state = RwState::new(&state_path)?;
+        let watching: Vec<_> = state.read().dpid_iter().collect();
         if !status_dir.exists() {
             std::fs::create_dir_all(&status_dir)?;
         }
-
-        // Creating the reader status
-        let mut status_file = Reader::open_status_file(&status)?;
-        status_file.lock_exclusive()?;
-        let watching = context.read().state.dpid_iter().collect::<Vec<_>>();
-        let mut status_buf = BufWriter::new(&mut status_file);
-        serde_json::to_writer(&mut status_buf, &watching)?;
-        status_buf.flush()?;
-        mem::drop(status_buf);
-        status_file.unlock()?;
-
+        compute_with_atomic_write(&status_path, |buffer| {
+            Ok(bincode::serialize_into(buffer, &watching)?)
+        })?;
         Ok(Reader {
-            status,
+            state_path,
+            status_path,
             inner,
-            context,
+            state,
             update_scheduled,
         })
     }
@@ -227,51 +205,52 @@ impl Reader {
         if self.update_scheduled.swap(true, Ordering::SeqCst) {
             return;
         }
-        // Is important that reader state updates
-        // and status updates are done atomically.
-        // Otherwise data points that are in use may be delete by the GC.
-        let location = self.inner.location().to_path_buf();
-        let status = self.status.clone();
-        let transform = move |state: &mut InnerContext| {
-            let disk_version = fs_state::crnt_version(&location)?;
-            if disk_version > state.version {
-                let mut status_file = Reader::open_status_file(&status)?;
-                status_file.lock_exclusive()?;
-                let (new_version, new_state) = fs_state::load_state(&location)?;
-                state.state = new_state;
-                state.version = new_version;
 
-                let watching = state.state.dpid_iter().collect::<Vec<_>>();
-                let mut status_buf = BufWriter::new(&mut status_file);
-                serde_json::to_writer(&mut status_buf, &watching)?;
-                status_buf.flush()?;
-                mem::drop(status_buf);
-                status_file.unlock()?;
-            }
-            Ok(())
-        };
-        // Updating the state in the background
-        let state = self.context.clone();
         let update_scheduled = self.update_scheduled.clone();
-        let background_update = move || {
-            let _ = state.apply(transform);
-            update_scheduled.swap(false, Ordering::SeqCst);
-        };
-        std::thread::spawn(background_update);
+        let status_path = self.status_path.clone();
+        let state_path = self.state_path.clone();
+        let state = self.state.clone();
+        std::thread::spawn(move || {
+            try_catch::catch! {
+                    try {
+                        let state_file = File::open(&state_path)?;
+                        let mut state_file_buffer = BufReader::new(state_file);
+                        let new_state: State = bincode::deserialize_from(&mut state_file_buffer)?;
+                        let watching = new_state.dpid_iter().collect::<Vec<_>>();
+                        let mut temp_status = TemporalFile::new()?;
+                        let mut temp_status_buffer = BufWriter::new(&mut temp_status);
+                        bincode::serialize_into(&mut temp_status_buffer, &watching)?;
+                        temp_status_buffer.flush()?;
+                        mem::drop(temp_status_buffer);
+                        state.apply(|inner| {
+                            // Is important that reader state updates
+                            // and status updates are done atomically.
+                            // Otherwise data points that are in use may be delete by the GC.
+                            *inner = new_state;
+                            temp_status.persist(status_path)?;
+                            update_scheduled.swap(false, Ordering::SeqCst);
+                            Ok(())
+                        })?;
+                    } catch error {
+                        // Is crucial that upon failure the flag is restored.
+                        // Otherwise updates will not happen again.
+                        error!("Could not update reader due to {error:?}");
+                        update_scheduled.swap(false, Ordering::SeqCst);
+                    }
+            }
+        });
     }
     pub fn keys(&self) -> VectorR<Vec<String>> {
-        let state = self.context.read();
-        state.state.keys(self.location())
+        self.state.read().keys(self.location())
     }
     pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
-        let context = self.context.read();
+        let state = self.state.read();
         let location = self.location();
         let similarity = self.metadata().similarity;
-        context.state.search(location, request, similarity)
+        state.search(location, request, similarity)
     }
     pub fn number_of_nodes(&self) -> usize {
-        let context = self.context.read();
-        context.state.no_nodes()
+        self.state.read().no_nodes()
     }
     pub fn location(&self) -> &Path {
         self.inner.location()
@@ -287,31 +266,16 @@ impl Reader {
 pub struct Writer {
     #[allow(unused)]
     writer_flag: File,
+    merged_queue: Merged,
     datapoint_buffer: Vec<Journal>,
     delete_buffer: Vec<(String, SystemTime)>,
     inner: Index,
-    context: Context,
+    state: RwState,
+    state_path: PathBuf,
+    readers_path: PathBuf,
+    merger_is_free: Arc<AtomicBool>,
 }
 impl Writer {
-    fn update(&self) -> VectorR<()> {
-        let location = self.inner.location().to_path_buf();
-        let transform = move |context: &mut InnerContext| {
-            let disk_version = fs_state::crnt_version(&location)?;
-            if disk_version > context.version {
-                let (new_version, new_state) = fs_state::load_state(&location)?;
-                context.state = new_state;
-                context.version = new_version;
-            }
-            Ok(())
-        };
-        self.context.apply(transform)
-    }
-    fn notify_merger(&self) {
-        let location = self.location().to_path_buf();
-        let similarity = self.metadata().similarity;
-        let worker = Worker::request(location, similarity);
-        merger::send_merge_request(worker);
-    }
     fn new(inner: Index) -> VectorR<Writer> {
         let writer_flag = OpenOptions::new()
             .read(true)
@@ -321,17 +285,22 @@ impl Writer {
         writer_flag
             .try_lock_exclusive()
             .map_err(|_| VectorErr::WriterExistsError)?;
-        let context = Context::new(&inner.location)?;
-        let work_len = context.read().state.work_stack_len();
-        let writer = Writer {
+        let readers_path = inner.location().join(READERS);
+        let state_path = inner.location().join(STATE);
+        let state = RwState::new(&state_path)?;
+        let merged_queue = Merged::new();
+        let merge_scheduled = Arc::new(AtomicBool::new(false));
+        Ok(Writer {
             inner,
+            state,
+            state_path,
             writer_flag,
-            context,
+            readers_path,
+            merged_queue,
+            merger_is_free: merge_scheduled,
             datapoint_buffer: vec![],
             delete_buffer: vec![],
-        };
-        (0..work_len).for_each(|_| writer.notify_merger());
-        Ok(writer)
+        })
     }
     pub fn add(&mut self, datapoint: DataPoint) {
         self.datapoint_buffer.push(datapoint.meta());
@@ -344,19 +313,15 @@ impl Writer {
             return Err(VectorErr::WouldBlockError);
         }
         let location = self.location();
-        let context = self.context.read();
-        let mut in_use_dp: HashSet<_> = context.state.dpid_iter().collect();
+        let state = self.state.read();
+        let mut in_use_dp: HashSet<_> = state.dpid_iter().collect();
         // Loading the readers status
-        for reader_status in std::fs::read_dir(location.join(READERS))? {
+        for reader_status in std::fs::read_dir(&self.readers_path)? {
             let entry = reader_status?;
             let status_file = OpenOptions::new().read(true).open(entry.path())?;
-            status_file.lock_shared()?;
             let mut status_buf = BufReader::new(&status_file);
-            let status: Vec<DpId> = serde_json::from_reader(&mut status_buf)?;
-            status_file.unlock()?;
-            status.into_iter().for_each(|i| {
-                in_use_dp.insert(i);
-            });
+            let status: Vec<DpId> = bincode::deserialize_from(&mut status_buf)?;
+            in_use_dp.extend(status.into_iter());
         }
 
         // Garbage is whatever is not in use
@@ -383,31 +348,47 @@ impl Writer {
         if !self.has_work() {
             return Ok(());
         }
-        let adds = mem::take(&mut self.datapoint_buffer);
-        let deletes = mem::take(&mut self.delete_buffer);
-        let location = self.location();
 
-        // Get the last version of the state, merges may have happen.
-        // Is important to ensure that we are the only ones working on the
-        // state.
-        self.update()?;
+        let adds = mem::take(&mut self.datapoint_buffer).into_iter();
+        let deletes = mem::take(&mut self.delete_buffer).into_iter();
+        let merge_work = self.merged_queue.take().into_iter();
 
         // Modifying the state with the current buffers
-        self.context.apply(move |state: &mut InnerContext| {
-            adds.iter().copied().for_each(|i| state.state.add(i));
-            deletes
-                .iter()
-                .for_each(|(prefix, time)| state.state.remove(prefix, *time));
+        self.state.apply(move |state: &mut State| {
+            adds.for_each(|i| state.add(i));
+            deletes.for_each(|i| state.remove(&i.0, i.1));
+            merge_work.for_each(|i| state.add_merge(i));
             Ok(())
         })?;
 
         // Persisting the new state
-        self.context.persist(location)?;
+        self.state.persist(&self.state_path)?;
+
+        // Looking for possible merges
+        let state = self.state.read();
+        let merge_is_free = self.merger_is_free.swap(false, Ordering::SeqCst);
+        let work = state.datapoints_to_merge().filter(|_| merge_is_free);
+        if let Some(work_unit) = work {
+            let work: Vec<_> = work_unit
+                .load
+                .iter()
+                .copied()
+                .map(|i| (i.id(), state.creation_time(i)))
+                .collect();
+            merger::send_merge_request(merge_worker::Worker {
+                work,
+                location: self.location().to_path_buf(),
+                similarity: self.metadata().similarity,
+                delete_log: state.delete_log().clone(),
+                result: self.merged_queue.clone(),
+                merger_is_free: self.merger_is_free.clone(),
+            });
+        }
+
         Ok(())
     }
     pub fn number_of_nodes(&self) -> usize {
-        let context = self.context.read();
-        context.state.no_nodes()
+        self.state.read().no_nodes()
     }
     pub fn abort(&mut self) {
         self.datapoint_buffer.clear();

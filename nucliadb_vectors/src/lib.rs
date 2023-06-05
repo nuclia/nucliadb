@@ -33,6 +33,10 @@ pub enum VectorErr {
     IoError(#[from] std::io::Error),
     #[error("Serialization error: {0}")]
     BincodeError(#[from] bincode::Error),
+    #[error("A file update could not be performed: {0}")]
+    UpdateError(#[from] PersistError),
+    #[error("Work lost due to inconsistent merges: {0}")]
+    MergeLostError(data_point::DpId),
     #[error("The operation is blocked by another one")]
     WouldBlockError,
     #[error("Merger is already initialized")]
@@ -41,11 +45,6 @@ pub enum VectorErr {
     EmptyMergeError,
     #[error("A writer is already open for this index")]
     WriterExistsError,
-    #[error("A file update could not be performed: {0}")]
-    UpdateError(#[from] PersistError),
-    // Will deprecate
-    #[error("Error in fs: {0}")]
-    FsError(#[from] nucliadb_core::fs_state::FsError),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

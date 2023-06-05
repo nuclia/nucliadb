@@ -19,7 +19,6 @@
 //
 
 pub mod context;
-pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
 pub mod relations;
