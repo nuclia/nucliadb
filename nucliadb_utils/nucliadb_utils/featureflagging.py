@@ -38,15 +38,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     const.Features.WAIT_FOR_INDEX: {
         "rollout": 0,
         "variants": {"environment": ["none"]},
-    },
-    const.Features.SEPARATE_PROCESSED_MESSAGE_WRITES: {
-        "rollout": 0,
-        "variants": {"environment": ["none"]},
-    },
-    const.Features.AUDITING_BW_COMPAT_SHARD_COUNTER: {
-        "rollout": 0,
-        "variants": {"environment": ["none"]},
-    },
+    }
 }
 
 

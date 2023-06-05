@@ -36,7 +36,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_transaction_utility, has_feature
+from nucliadb_utils.utilities import get_transaction_utility
 
 
 class PullWorker:
@@ -85,12 +85,11 @@ class PullWorker:
             transaction_utility = get_transaction_utility()
             if transaction_utility is None:
                 raise Exception("No transaction utility defined")
-            subject = None
-            if has_feature(const.Features.SEPARATE_PROCESSED_MESSAGE_WRITES):
-                # send messsages to queue that is managed by separated consumer
-                subject = const.Streams.INGEST_PROCESSED.subject
             await transaction_utility.commit(
-                writer=pb, partition=int(self.partition), target_subject=subject
+                writer=pb,
+                partition=int(self.partition),
+                # send to separate processor
+                target_subject=const.Streams.INGEST_PROCESSED.subject,
             )
         else:
             # No nats defined == monolitic nucliadb
