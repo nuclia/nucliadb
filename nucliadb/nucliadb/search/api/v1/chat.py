@@ -42,6 +42,7 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     Message,
     NucliaDBClientType,
+    RephraseModel,
     SearchOptions,
 )
 from nucliadb_utils.authentication import requires
@@ -97,12 +98,10 @@ async def chat(
     predict = get_predict()
 
     if item.context is not None and len(item.context) > 0:
-        # There is context lets do a query
-        req = ChatModel(
+        req = RephraseModel(
             question=item.query,
             context=item.context,
             user_id=x_nucliadb_user,
-            retrieval=False,
         )
 
         new_query = await predict.rephrase_query(kbid, req)
