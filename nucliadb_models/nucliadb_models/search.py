@@ -346,6 +346,9 @@ class ParamDefault(BaseModel):
     title: str
     description: str
 
+    def to_field(self) -> Field:  # type: ignore
+        return Field(self.default, title=self.title, description=self.description)
+
 
 class SearchParamDefaults:
     query = ParamDefault(
@@ -384,15 +387,15 @@ class SearchParamDefaults:
 
 
 class SearchRequest(BaseModel):
-    query: str = Field(**SearchParamDefaults.query.dict())
-    advanced_query: Optional[str] = Field(**SearchParamDefaults.advanced_query.dict())
-    fields: List[str] = Field(**SearchParamDefaults.fields.dict())
-    filters: List[str] = Field(**SearchParamDefaults.filters.dict())
-    faceted: List[str] = Field(**SearchParamDefaults.faceted.dict())
+    query: str = SearchParamDefaults.query.to_field()
+    advanced_query: Optional[str] = SearchParamDefaults.advanced_query.to_field()
+    fields: List[str] = SearchParamDefaults.fields.to_field()
+    filters: List[str] = SearchParamDefaults.filters.to_field()
+    faceted: List[str] = SearchParamDefaults.faceted.to_field()
     sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
-    min_score: float = Field(**SearchParamDefaults.min_score.dict())
+    min_score: float = SearchParamDefaults.min_score.to_field()
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
@@ -414,7 +417,7 @@ class SearchRequest(BaseModel):
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
     with_synonyms: bool = False
-    autofilter: bool = Field(**SearchParamDefaults.autofilter.dict())
+    autofilter: bool = SearchParamDefaults.autofilter.to_field()
 
 
 class Author(str, Enum):
@@ -459,6 +462,7 @@ class ChatRequest(BaseModel):
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
     shards: List[str] = []
     context: Optional[List[Message]] = None
+    autofilter: bool = SearchParamDefaults.autofilter.to_field()
 
 
 class FindRequest(SearchRequest):
