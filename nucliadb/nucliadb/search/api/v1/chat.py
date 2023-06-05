@@ -127,6 +127,7 @@ async def chat(
     find_request.show = item.show
     find_request.extracted = item.extracted
     find_request.shards = item.shards
+    find_request.autofilter = item.autofilter
 
     results = await find(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for

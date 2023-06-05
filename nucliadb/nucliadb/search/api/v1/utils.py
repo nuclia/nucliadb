@@ -18,11 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import Query
+from pydantic import Field
 
 from nucliadb_models.search import ParamDefault
 
 
 def param_to_query(param: ParamDefault) -> Query:  # type: ignore
     return Query(
+        default=param.default, title=param.title, description=param.description
+    )
+
+
+def param_to_field(param: ParamDefault) -> Field:  # type: ignore
+    return Field(
         default=param.default, title=param.title, description=param.description
     )
