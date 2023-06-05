@@ -42,7 +42,6 @@ class AuditStorage:
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        counter: Optional[AuditShardCounter] = None,
         kb_counter: Optional[AuditKBCounter] = None,
     ):  # type: ignore
         raise NotImplementedError

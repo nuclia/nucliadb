@@ -49,11 +49,10 @@ class BasicAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        counter: Optional[AuditShardCounter] = None,
         kb_counter: Optional[AuditKBCounter] = None,
     ):  # type: ignore
         logger.debug(
-            f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {counter}"
+            f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}"
         )
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):

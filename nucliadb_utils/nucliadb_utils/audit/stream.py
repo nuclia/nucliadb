@@ -147,7 +147,6 @@ class StreamAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        counter: Optional[AuditShardCounter] = None,
         kb_counter: Optional[AuditKBCounter] = None,
     ):
         # Reports MODIFIED / DELETED / NEW events
@@ -169,9 +168,6 @@ class StreamAuditStorage(AuditStorage):
 
         if kb_counter:
             auditrequest.kb_counter.CopyFrom(kb_counter)
-
-        if counter:
-            auditrequest.counter.CopyFrom(counter)
 
         auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
 
