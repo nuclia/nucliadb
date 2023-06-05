@@ -49,6 +49,7 @@ pub trait DataRetriever: std::marker::Sync {
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
     fn similarity(&self, _: Address, _: Address) -> f32;
     fn get_vector(&self, _: Address) -> &[u8];
+    fn min_score(&self) -> f32;
 }
 
 pub trait Layer {
@@ -164,9 +165,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         loop {
             match (candidates.pop(), ms_neighbours.peek().cloned()) {
                 (None, _) => break,
+                (Some(Cnx(_, cs)), _) if cs < min_score => break,
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
+
                         if !visited.contains(&y) {
                             visited.insert(y);
                             let similarity = self.cosine_similarity(x, y);
@@ -242,6 +245,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: Address,
         hnsw: H,
         k_neighbours: usize,
+        min_score: f32,
         with_filter: &Formula,
         with_duplicates: bool,
     ) -> Neighbours {
@@ -250,14 +254,18 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             let mut neighbours = vec![(entry_point.node, 0.)];
             while crnt_layer != 0 {
                 let layer = hnsw.get_layer(crnt_layer);
-                let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
+                let entry_points: Vec<_> = neighbours.into_iter()
+                    .map(|(node, _)| node)
+                    .collect();
                 let layer_res = self.layer_search(query, layer, 1, &entry_points);
                 neighbours = layer_res;
                 crnt_layer -= 1;
             }
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
+
             let layer = hnsw.get_layer(crnt_layer);
             let result = self.layer_search(query, layer, k_neighbours, &entry_points);
+
             let mut sol_addresses = HashSet::new();
             let mut vec_counter = RepCounter::new(!with_duplicates);
             let mut filtered_result = Vec::new();

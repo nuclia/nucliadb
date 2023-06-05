@@ -346,12 +346,12 @@ impl DataPoint {
             Address(self.journal.nodes),
             self.index.as_ref(),
             results.n_results,
+            results.min_score,
             filter,
             results.with_duplicates,
         );
         neighbours
             .into_iter()
-            .filter(move |(_, dist)| *dist > results.min_score)
             .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
             .take(results.n_results)
     }
