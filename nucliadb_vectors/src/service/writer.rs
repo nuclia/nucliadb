@@ -21,9 +21,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-
 use fs2::FileExt;
-use data_point::{Elem, LabelDictionary};
 use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;

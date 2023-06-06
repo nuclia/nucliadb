@@ -69,7 +69,7 @@ impl VectorReader for VectorReaderService {
         let some_reader = self.get_index(vectorset)?;
         let reader = some_reader.inner();
         let no_nodes = reader.number_of_nodes();
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("count".to_string());
         metrics.record_request_time(metric, took);
