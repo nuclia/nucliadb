@@ -17,8 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Literal, Optional, Union
-from typing import get_args as typing_get_args
+from typing import List, Optional, Union
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
@@ -191,10 +190,6 @@ async def get_resource(
     return result
 
 
-PageShortcuts = Literal["last", "first"]
-PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
-
-
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
     status_code=200,
@@ -229,7 +224,9 @@ async def get_resource_field(
             ExtractedDataTypeName.FILE,
         ]
     ),
-    page: Union[Literal["last", "first"], int] = Query("last"),
+    # not working with latest pydantic/fastapi
+    # page: Union[Literal["last", "first"], int] = Query("last"),
+    page: Union[str, int] = Query("last"),
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = await get_driver()

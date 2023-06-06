@@ -37,6 +37,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     VectorSets as VectorSets,
 )
 from nucliadb_protos.resources_pb2 import (
+    AllFieldIDs as AllFieldIDs,
     Basic as Basic,
     Block as Block,
     CONVERSATION as CONVERSATION,

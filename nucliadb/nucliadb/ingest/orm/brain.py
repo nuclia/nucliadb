@@ -244,16 +244,19 @@ class ResourceBrain:
                 ssentence = sparagraph.sentences[
                     f"{self.rid}/{field_key}/{subfield}/{index}/{vector.start}-{vector.end}"
                 ]
+
+                ssentence.ClearField("vector")  # clear first to prevent duplicates
                 ssentence.vector.extend(vector.vector)
 
         for index, vector in enumerate(vo.vectors.vectors):
-            paragraph = self.brain.paragraphs[field_key].paragraphs[
-                f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
-            ]
-            sentence = paragraph.sentences[
-                f"{self.rid}/{field_key}/{index}/{vector.start}-{vector.end}"
-            ]
+            para_key = f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
+            paragraph = self.brain.paragraphs[field_key].paragraphs[para_key]
+            sent_key = f"{self.rid}/{field_key}/{index}/{vector.start}-{vector.end}"
+            sentence = paragraph.sentences[sent_key]
+
+            sentence.ClearField("vector")  # clear first to prevent duplicates
             sentence.vector.extend(vector.vector)
+
             sentence.metadata.position.start = vector.start
             sentence.metadata.position.end = vector.end
 

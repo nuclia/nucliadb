@@ -22,7 +22,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -74,7 +74,6 @@ impl VectorReader for VectorReaderService {
         let metric = request_time::RequestTimeKey::vectors("count".to_string());
         metrics.record_request_time(metric, took);
         debug!("Ending at {took} ms");
-
         Ok(no_nodes)
     }
 }
@@ -128,7 +127,7 @@ impl ReaderChild for VectorReaderService {
             debug!("{id:?} - Creating results: ends at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("search".to_string());
         metrics.record_request_time(metric, took);

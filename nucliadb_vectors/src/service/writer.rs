@@ -21,8 +21,10 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+
 use fs2::FileExt;
-use nucliadb_core::context;
+use data_point::{Elem, LabelDictionary};
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -59,7 +61,7 @@ impl VectorWriter for VectorWriterService {
             .map(|i| i.to_string_lossy().to_string())
             .collect();
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("list_vectorsets".to_string());
         metrics.record_request_time(metric, took);
@@ -84,7 +86,7 @@ impl VectorWriter for VectorWriterService {
         let index_location = self.rest.join(indexid);
         Index::new(&index_location, metadata)?;
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("add_vectorset".to_string());
         metrics.record_request_time(metric, took);
@@ -103,7 +105,7 @@ impl VectorWriter for VectorWriterService {
         std::fs::remove_dir_all(index_location)?;
         self.rest_lock.unlock()?;
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("remove_vectorset".to_string());
         metrics.record_request_time(metric, took);
@@ -125,7 +127,7 @@ impl WriterChild for VectorWriterService {
 
         let no_nodes = self.default.number_of_nodes();
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("count".to_string());
         metrics.record_request_time(metric, took);
@@ -142,7 +144,7 @@ impl WriterChild for VectorWriterService {
         self.default.delete(resource_id.uuid.clone(), temporal_mark);
         self.default.commit()?;
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("delete_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -252,7 +254,7 @@ impl WriterChild for VectorWriterService {
             debug!("{id:?} - Modifying set: ends {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("set_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -266,7 +268,7 @@ impl WriterChild for VectorWriterService {
 
         self.default.collect_garbage()?;
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("garbage_collection".to_string());
         metrics.record_request_time(metric, took);

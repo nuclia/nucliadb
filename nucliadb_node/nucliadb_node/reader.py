@@ -33,7 +33,6 @@ CACHE = LRU(128)
 
 
 class Reader:
-    _stub: Optional[NodeReaderStub] = None
     lock: asyncio.Lock
 
     def __init__(self, grpc_reader_address: str):

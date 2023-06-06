@@ -47,6 +47,7 @@ from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/search",
     status_code=200,
+    name="Search on Resource",
     description="Search on a Resource",
     tags=["Search"],
     response_model_exclude_unset=True,
@@ -54,6 +55,7 @@ from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/search",
     status_code=200,
+    name="Search on Resource",
     description="Search on a Resource",
     tags=["Search"],
     response_model_exclude_unset=True,

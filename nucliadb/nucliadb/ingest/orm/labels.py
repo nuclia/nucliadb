@@ -26,7 +26,6 @@ BASE_TAGS: Dict[str, List[str]] = {
     "e": [],  # entities e/type/entityid
     "s": [],  # languages p (Principal) s (ALL)
     "u": [],  # contributors s (Source) o (Origin)
-    "p": [],  # paragraph labels
     "f": [],  # field keyword field (field/keyword)
     "fg": [],  # field keyword (keywords) flat
 }

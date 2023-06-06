@@ -13,34 +13,23 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Affero General Public License for more details.
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use crate::metrics::meters::Meter;
+use crate::metrics::metric::request_time;
+use crate::NodeResult;
 
-use lazy_static::lazy_static;
-
-use crate::metrics::{self, Metrics};
-
-lazy_static! {
-    static ref METRICS: Arc<dyn Metrics> = create_metrics();
-}
-
-#[cfg(prometheus_metrics)]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::PrometheusMetrics::new())
-}
-
-#[cfg(log_metrics)]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::ConsoleLogMetrics)
-}
-
-#[cfg(not(any(prometheus_metrics, log_metrics)))]
-fn create_metrics() -> Arc<dyn Metrics> {
-    Arc::new(metrics::NoMetrics)
-}
-
-pub fn get_metrics() -> Arc<dyn Metrics> {
-    Arc::clone(&METRICS)
+pub struct NoOpMeter;
+impl Meter for NoOpMeter {
+    fn export(&self) -> NodeResult<String> {
+        Ok(Default::default())
+    }
+    fn record_request_time(
+        &self,
+        _: request_time::RequestTimeKey,
+        _: request_time::RequestTimeValue,
+    ) {
+    }
 }

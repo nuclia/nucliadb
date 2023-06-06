@@ -22,7 +22,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -79,7 +79,7 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
         metrics.record_request_time(metric, took);
@@ -119,7 +119,7 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("set_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -148,7 +148,7 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("delete_resource".to_string());
         metrics.record_request_time(metric, took);

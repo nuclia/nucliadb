@@ -341,16 +341,61 @@ class KnowledgeboxShards(BaseModel):
         return cls(**as_dict)
 
 
+class ParamDefault(BaseModel):
+    default: Any
+    title: str
+    description: str
+
+    def to_field(self) -> Field:  # type: ignore
+        return Field(self.default, title=self.title, description=self.description)
+
+
+class SearchParamDefaults:
+    query = ParamDefault(
+        default="", title="Query", description="The query to search for"
+    )
+    advanced_query = ParamDefault(
+        default=None,
+        title="Advanced query",
+        description="An advanced query to search for. See https://docs.nuclia.dev/docs/query/#advanced-query for examples of advanced queries.",  # noqa: E501
+    )
+    fields = ParamDefault(
+        default=[],
+        title="Fields",
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details, see: https://docs.nuclia.dev/docs/query/#search-in-a-specific-field",  # noqa: E501
+    )
+    filters = ParamDefault(
+        default=[],
+        title="Filters",
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+    )
+    faceted = ParamDefault(
+        default=[],
+        title="Faceted",
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+    )
+    min_score = ParamDefault(
+        default=0.70,
+        title="Minimum result score",
+        description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
+    )
+    autofilter = ParamDefault(
+        default=False,
+        title="Automatic search filtering",
+        description="If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
+    )
+
+
 class SearchRequest(BaseModel):
-    query: str = ""
-    advanced_query: Optional[str] = None
-    fields: List[str] = []
-    filters: List[str] = []
-    faceted: List[str] = []
+    query: str = SearchParamDefaults.query.to_field()
+    advanced_query: Optional[str] = SearchParamDefaults.advanced_query.to_field()
+    fields: List[str] = SearchParamDefaults.fields.to_field()
+    filters: List[str] = SearchParamDefaults.filters.to_field()
+    faceted: List[str] = SearchParamDefaults.faceted.to_field()
     sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
-    min_score: float = 0.70
+    min_score: float = SearchParamDefaults.min_score.to_field()
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
@@ -372,6 +417,7 @@ class SearchRequest(BaseModel):
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
     with_synonyms: bool = False
+    autofilter: bool = SearchParamDefaults.autofilter.to_field()
 
 
 class Author(str, Enum):
@@ -416,6 +462,7 @@ class ChatRequest(BaseModel):
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
     shards: List[str] = []
     context: Optional[List[Message]] = None
+    autofilter: bool = SearchParamDefaults.autofilter.to_field()
 
 
 class FindRequest(SearchRequest):
@@ -464,6 +511,7 @@ class TempFindParagraph:
     start: int
     end: int
     id: str
+    split: Optional[str] = None
     paragraph: Optional[FindParagraph] = None
     vector_index: Optional[DocumentScored] = None
     paragraph_index: Optional[PBParagraphResult] = None

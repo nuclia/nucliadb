@@ -67,7 +67,6 @@ from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
@@ -353,13 +352,6 @@ async def patch(
     if rslug:
         rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
-    if rid:
-        set_info_on_span(
-            {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.upload_id": upload_id}
-        )
-    else:
-        set_info_on_span({"nuclia.kbid": kbid, "nuclia.upload_id": upload_id})
-
     dm = get_dm()
     await dm.load(upload_id)
     to_upload = None
@@ -630,11 +622,6 @@ async def start_upload_field(
         field = uuid.uuid4().hex
     elif field is None:
         field = md5
-
-    if rid and kbid and field:
-        set_info_on_span(
-            {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.field": field}
-        )
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field

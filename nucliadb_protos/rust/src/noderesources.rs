@@ -238,6 +238,8 @@ pub mod resource {
         Error = 2,
         Delete = 3,
         Pending = 4,
+        Blocked = 5,
+        Expired = 6,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

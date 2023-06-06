@@ -20,10 +20,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Tuple, Type
 
+from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -64,13 +66,14 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.date import Datetime
 from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.fields.generic import VALID_GLOBAL, Generic
+from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.keywordset import Keywordset
 from nucliadb.ingest.fields.layout import Layout
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_models.writer import GENERIC_MIME_TYPE
@@ -79,16 +82,19 @@ from nucliadb_utils.storages.storage import Storage
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
+logger = logging.getLogger(__name__)
+
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
+KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
 KB_RESOURCE_CONVERSATION = "/kbs/{kbid}/r/{uuid}/c/{page}"
 GLOBAL_FIELD = "a"
-KB_FIELDS: Dict[int, Type] = {
+KB_FIELDS: dict[int, Type] = {
     FieldType.LAYOUT: Layout,
     FieldType.TEXT: Text,
     FieldType.FILE: File,
@@ -99,7 +105,7 @@ KB_FIELDS: Dict[int, Type] = {
     FieldType.CONVERSATION: Conversation,
 }
 
-KB_REVERSE: Dict[str, int] = {
+KB_REVERSE: dict[str, FieldType.ValueType] = {
     "l": FieldType.LAYOUT,
     "t": FieldType.TEXT,
     "f": FieldType.FILE,
@@ -120,6 +126,7 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.HTML: "text/html",
     FieldText.Format.RST: "text/x-rst",
     FieldText.Format.MARKDOWN: "text/markdown",
+    FieldText.Format.JSON: "application/json",
 }
 
 
@@ -133,16 +140,16 @@ class Resource:
         basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
     ):
-        self.fields: Dict[Tuple[int, str], Field] = {}
-        self.conversations: Dict[int, PBConversation] = {}
+        self.fields: dict[Tuple[FieldType.ValueType, str], Field] = {}
+        self.conversations: dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: List[Tuple[int, str]] = []
+        self.all_fields_keys: list[Tuple[FieldType.ValueType, str]] = []
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
         self.modified: bool = False
         self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
-        self._modified_extracted_text: List[FieldID] = []
+        self._modified_extracted_text: list[FieldID] = []
 
         self.txn = txn
         self.storage = storage
@@ -199,11 +206,12 @@ class Resource:
         if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
+    @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
         self,
         payload: PBBasic,
         slug: Optional[str] = None,
-        deleted_fields: Optional[List[FieldID]] = None,
+        deleted_fields: Optional[list[FieldID]] = None,
     ):
         """
         Some basic fields are computed off field metadata. This means we need to recompute upon field deletions.
@@ -326,7 +334,7 @@ class Resource:
             self.relations = pb
         return self.relations
 
-    async def set_relations(self, payload: List[PBRelation]):
+    async def set_relations(self, payload: list[PBRelation]):
         relations = PBRelations()
         for relation in payload:
             relations.relations.append(relation)
@@ -337,6 +345,7 @@ class Resource:
         self.modified = True
         self.relations = relations
 
+    @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(self) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
@@ -388,7 +397,11 @@ class Resource:
         return brain
 
     async def generate_field_vectors(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         vo = await field.get_vectors()
         if vo is None:
@@ -400,7 +413,11 @@ class Resource:
         bm.field_vectors.append(evw)
 
     async def generate_user_vectors(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         uv = await field.get_user_vectors()
         if uv is None:
@@ -412,7 +429,11 @@ class Resource:
         bm.user_vectors.append(uvw)
 
     async def generate_field_large_computed_metadata(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         lcm = await field.get_large_field_metadata()
         if lcm is None:
@@ -426,7 +447,7 @@ class Resource:
     async def generate_field_computed_metadata(
         self,
         bm: BrokerMessage,
-        type_id: int,
+        type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
     ):
@@ -443,7 +464,11 @@ class Resource:
             # Make sure cloud files are removed for exporting
 
     async def generate_extracted_text(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         etw = ExtractedTextWrapper()
         etw.field.field = field_id
@@ -456,7 +481,7 @@ class Resource:
     async def generate_field(
         self,
         bm: BrokerMessage,
-        type_id: int,
+        type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
     ):
@@ -537,42 +562,62 @@ class Resource:
         return bm
 
     # Fields
-    async def get_fields(self, force: bool = False) -> Dict[Tuple[int, str], Field]:
+    async def get_fields(
+        self, force: bool = False
+    ) -> dict[Tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
 
-    async def get_fields_ids(self, force: bool = False) -> List[Tuple[int, str]]:
-        # Get all fields
-        basic = await self.get_basic()
-        if len(self.all_fields_keys) == 0 or force:
-            result = []
-            fields = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
-            async for key in self.txn.keys(fields, count=-1):
-                # The [6:8] `slicing purpose is to match exactly the two
-                # splitted parts corresponding to type and field, and nothing else!
-                type, field = key.split("/")[6:8]
-                type_id = KB_REVERSE.get(type)
-                if type_id is None:
-                    raise AttributeError("Invalid field type")
-                result.append((type_id, field))
+    async def _scan_fields_ids(self) -> AsyncIterator[Tuple[FieldType.ValueType, str]]:
+        # TODO: Remove this method when we are sure that all KBs have the `allfields` key set
+        prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        async for key in self.txn.keys(prefix, count=-1):
+            # The [6:8] `slicing purpose is to match exactly the two
+            # splitted parts corresponding to type and field, and nothing else!
+            type, field = key.split("/")[6:8]
+            type_id = KB_REVERSE.get(type)
+            if type_id is None:
+                raise AttributeError("Invalid field type")
+            yield (type_id, field)
 
-            for generic in VALID_GLOBAL:
-                # We make sure that title and summary are set to be added
+    async def _inner_get_fields_ids(self) -> list[Tuple[FieldType.ValueType, str]]:
+        result = []
+        all_fields: Optional[PBAllFieldIDs] = await self.get_all_field_ids()
+        if all_fields is not None:
+            result = [(f.field_type, f.field) for f in all_fields.fields]
+        else:
+            # backward compatibility if all fields key is not set
+            all_fields = PBAllFieldIDs()
+            async for (field_type, field_id) in self._scan_fields_ids():
+                result.append((field_type, field_id))
+                all_fields.fields.append(FieldID(field_type=field_type, field=field_id))
+            await self.set_all_field_ids(all_fields)
+
+        # We make sure that title and summary are set to be added
+        basic = await self.get_basic()
+        if basic is not None:
+            for generic in VALID_GENERIC_FIELDS:
                 append = True
-                if generic == "title" and (basic is None or basic.title == ""):
+                if generic == "title" and basic.title == "":
                     append = False
-                elif generic == "summary" and (basic is None or basic.summary == ""):
+                elif generic == "summary" and basic.summary == "":
                     append = False
                 if append:
                     result.append((FieldType.GENERIC, generic))
+        return result
 
-            self.all_fields_keys = result
+    async def get_fields_ids(
+        self, force: bool = False
+    ) -> list[Tuple[FieldType.ValueType, str]]:
+        # Get all fields
+        if len(self.all_fields_keys) == 0 or force:
+            self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
-    async def get_field(self, key: str, type: int, load: bool = True):
+    async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -581,7 +626,7 @@ class Resource:
             self.fields[field] = field_obj
         return self.fields[field]
 
-    async def set_field(self, type: int, key: str, payload: Any):
+    async def set_field(self, type: FieldType.ValueType, key: str, payload: Any):
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -594,13 +639,16 @@ class Resource:
         self.modified = True
         return field_obj
 
-    async def delete_field(self, type: int, key: str):
+    async def delete_field(self, type: FieldType.ValueType, key: str):
         field = (type, key)
         if field in self.fields:
             field_obj = self.fields[field]
             del self.fields[field]
         else:
             field_obj = KB_FIELDS[type](id=key, resource=self)
+
+        if field in self.all_fields_keys:
+            self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))  # type: ignore
         vo = await field_obj.get_vectors()
@@ -613,31 +661,94 @@ class Resource:
 
         await field_obj.delete()
 
+    def has_field(self, type: FieldType.ValueType, field: str) -> bool:
+        return (type, field) in self.fields
+
+    async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
+        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        payload = await self.txn.get(key)
+        if payload is None:
+            return None
+        all_fields = PBAllFieldIDs()
+        all_fields.ParseFromString(payload)
+        return all_fields
+
+    async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
+        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(key, all_fields.SerializeToString())
+
+    async def update_all_field_ids(
+        self,
+        *,
+        updated: Optional[list[FieldID]] = None,
+        deleted: Optional[list[FieldID]] = None,
+    ):
+        all_fields = await self.get_all_field_ids()
+        if all_fields is None:
+            all_fields = PBAllFieldIDs()
+
+        needs_update = False
+
+        for field in updated or []:
+            if field not in all_fields.fields:
+                all_fields.fields.append(field)
+                needs_update = True
+
+        for field in deleted or []:
+            if field in all_fields.fields:
+                all_fields.fields.remove(field)
+                needs_update = True
+
+        if needs_update:
+            await self.set_all_field_ids(all_fields)
+
+    @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
+        message_updated_fields = []
         for field, layout in message.layouts.items():
-            await self.set_field(FieldType.LAYOUT, field, layout)
+            fid = FieldID(field_type=FieldType.LAYOUT, field=field)
+            await self.set_field(fid.field_type, fid.field, layout)
+            message_updated_fields.append(fid)
 
         for field, text in message.texts.items():
-            await self.set_field(FieldType.TEXT, field, text)
+            fid = FieldID(field_type=FieldType.TEXT, field=field)
+            await self.set_field(fid.field_type, fid.field, text)
+            message_updated_fields.append(fid)
 
         for field, keywordset in message.keywordsets.items():
-            await self.set_field(FieldType.KEYWORDSET, field, keywordset)
+            fid = FieldID(field_type=FieldType.KEYWORDSET, field=field)
+            await self.set_field(fid.field_type, fid.field, keywordset)
+            message_updated_fields.append(fid)
 
         for field, datetimeobj in message.datetimes.items():
-            await self.set_field(FieldType.DATETIME, field, datetimeobj)
+            fid = FieldID(field_type=FieldType.DATETIME, field=field)
+            await self.set_field(fid.field_type, fid.field, datetimeobj)
+            message_updated_fields.append(fid)
 
         for field, link in message.links.items():
-            await self.set_field(FieldType.LINK, field, link)
+            fid = FieldID(field_type=FieldType.LINK, field=field)
+            await self.set_field(fid.field_type, fid.field, link)
+            message_updated_fields.append(fid)
 
         for field, file in message.files.items():
-            await self.set_field(FieldType.FILE, field, file)
+            fid = FieldID(field_type=FieldType.FILE, field=field)
+            await self.set_field(fid.field_type, fid.field, file)
+            message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
-            await self.set_field(FieldType.CONVERSATION, field, conversation)
+            fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
+            await self.set_field(fid.field_type, fid.field, conversation)
+            message_updated_fields.append(fid)
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
+        if len(message_updated_fields) or len(message.delete_fields):
+            await self.update_all_field_ids(
+                updated=message_updated_fields, deleted=message.delete_fields  # type: ignore
+            )
+
+    @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
         field_obj: Field
@@ -790,6 +901,15 @@ class Resource:
         add_field_classifications(self.basic, field_metadata)
 
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
+        if not self.has_field(
+            field_vectors.field.field_type, field_vectors.field.field
+        ):
+            # skipping because field does not exist
+            logger.warning(
+                f'Field "{field_vectors.field.field}" does not exist, skipping vectors'
+            )
+            return
+
         field_obj = await self.get_field(
             field_vectors.field.field,
             field_vectors.field.field_type,
@@ -848,6 +968,7 @@ class Resource:
     def generate_field_id(self, field: FieldID) -> str:
         return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
 
+    @processor_observer.wrap({"type": "compute_global_tags"})
     async def compute_global_tags(self, brain: ResourceBrain):
         origin = await self.get_origin()
         basic = await self.get_basic()
@@ -880,6 +1001,7 @@ class Resource:
                 field_data = await fieldobj.db_get_value()
                 brain.process_keywordset_fields(fieldkey, field_data)
 
+    @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):
         # For each extracted
         for type, field in await self.get_fields_ids(force=True):
@@ -905,7 +1027,7 @@ class Resource:
     ) -> AsyncIterator[TrainSentence]:  # pragma: no cover
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
-        userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
+        userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
         if enabled_metadata.labels:
             if self.basic is None:
                 self.basic = await self.get_basic()
@@ -934,7 +1056,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -945,7 +1067,7 @@ class Resource:
                     metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
 
-                entities: Dict[str, str] = {}
+                entities: dict[str, str] = {}
                 if enabled_metadata.entities:
                     entities.update(field_metadata.ner)
 
@@ -1019,7 +1141,7 @@ class Resource:
     ) -> AsyncIterator[TrainParagraph]:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
-        userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
+        userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
         if enabled_metadata.labels:
             if self.basic is None:
                 self.basic = await self.get_basic()
@@ -1044,7 +1166,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1055,7 +1177,7 @@ class Resource:
                     metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
 
-                entities: Dict[str, str] = {}
+                entities: dict[str, str] = {}
                 if enabled_metadata.entities:
                     entities.update(field_metadata.ner)
 
@@ -1121,7 +1243,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1177,7 +1299,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1212,7 +1334,7 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
     return positions
 
 
-def remove_field_classifications(basic: PBBasic, deleted_fields: List[FieldID]):
+def remove_field_classifications(basic: PBBasic, deleted_fields: list[FieldID]):
     """
     Clean classifications of fields that have been deleted
     """
@@ -1242,7 +1364,7 @@ def add_field_classifications(
 
 
 def add_entities_to_metadata(
-    entities: Dict[str, str], local_text: str, metadata: TrainMetadata
+    entities: dict[str, str], local_text: str, metadata: TrainMetadata
 ) -> None:
     for entity_key, entity_value in entities.items():
         if entity_key not in local_text:

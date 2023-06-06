@@ -286,6 +286,7 @@ message FieldText {
         HTML = 1;
         RST = 2;
         MARKDOWN = 3;
+        JSON = 4;
     }
     string body = 1;
     Format format = 2;
@@ -462,4 +463,6 @@ message FieldID {
     string field = 2;
 }
 
-
+message AllFieldIDs {
+    repeated FieldID fields = 1;
+}

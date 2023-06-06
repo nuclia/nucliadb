@@ -6,7 +6,7 @@
 ![nucliadb_search](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_search.yml/badge.svg)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![License: AGPL V3](https://img.shields.io/badge/license-AGPL%20V3-blue)](LICENCE.md)
-![Twitter Follow](https://img.shields.io/twitter/follow/nuclia_?color=%231DA1F2&logo=Twitter&style=plastic)
+![Twitter Follow](https://img.shields.io/twitter/follow/nucliaAI?color=%231DA1F2&logo=Twitter&style=plastic)
 [![Discord](https://img.shields.io/discord/911636727150575649?logo=Discord&logoColor=%23FFFFFF&style=plastic)](https://discord.gg/6wMQ8a3bHX)
 ![Rust](https://img.shields.io/badge/Rust-black?logo=rust&style=plastic)
 ![Python](https://img.shields.io/badge/Python-black?logo=python&style=plastic)
@@ -15,7 +15,7 @@
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
 </p>
-<h3 align="center">The database for data scientists and machine learning experts working with HuggingFace and other data pipelines platforms.</h3>
+<h3 align="center">The AI Search Database.</h3>
 
 <h4 align="center">
   <a href="https://docs.nuclia.dev/docs/nucliadb/intro">DB Quickstart</a> |
@@ -24,18 +24,21 @@
   <a href="https://discord.gg/AgevjFJUvk">Chat</a>
 </h4>
 
-> Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to learn about what we have been up to.
+NucliaDB is a robust database that allows storing and searching on
+unstructured data.
 
-As a data scientist or NLP engineer your hard-drive is probably full of datasets and corpora. If you have found yourself crashing a notebook trying to load something too big with Pandas, doing gymnastics in your shell just to explore your data or just not really knowing how to perform robust search through your dataset, this is a tool for you.
+It is an out of the box hybrid search database, utilizing vector,
+full text and graph indexes.
 
-NucliaDB is written in Rust and Python and built on top of the [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index large datasets and provide multi-teanant suport.
+NucliaDB is written in Rust and Python. We designed it to index large datasets and provide multi-teanant suport.
+
+When utilizing NucliaDB with Nuclia cloud, you are able to the power
+of an NLP database without the hassle of data extraction, enrichment
+and inference. We do all the hard work for you.
 
 
 # Features
-- Compare the vectors from different models in an easy way
 - Store text, files, vectors, labels and annotations
-- Access and modify your resources efficiently
-- Annotate your resources
 - Perform text searches and given a word or set of words, return resources in our database that contain them.
 - Perform semantic searches with vectors. For example, given a set of vectors, return the closest matches in our database. With NLP, this allows us to look for similar sentences without being constrained by exact keywords.
 - Export your data in a format compatible with most NLP pipelines (HuggingFace datasets, pytorch, etc)
@@ -46,13 +49,8 @@ NucliaDB is written in Rust and Python and built on top of the [tantivy](https:/
 - Role based security system with upstream proxy authentication validation
 - Resources with multiple fields and metadata
 - Text/HTML/Markdown plain fields support
-- File field support with direct upload and TUS upload
-- Link field support
-- Conversation field support
-- Blocks/Layout field support
-- Eventual consistency transactions based on Nats.io
-- Distributed storage layer support with TiKV and Redis support
-- PostgreSQL storage layer support for standalone installs
+- Field types: text, file, link, conversation, layout
+- Storage layer support: TiKV, Redis and PostgreSQL
 - Blob support with S3-compatible API, GCS and PG drivers
 - Replication of index storage
 - Distributed search
@@ -70,13 +68,7 @@ Trying NucliaDB is super easy! You can extend your knowledge with the
 following readings:
 
 - [Quick start!](https://docs.nuclia.dev/docs/nucliadb/intro)
-- [Connect local NucliaDB with Nuclia Cloud](docs/tutorials/local-db-cloud.md)
 - Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/nucliadb/basics) section
-- Dive deeper with our [tutorials](docs/tutorials),
-  [reference](docs/reference) or [internal](docs/internal)
-
-## API Tutorials
-
 - [Upload a file](https://docs.nuclia.dev/docs/quick-start/push)
 
 # 💬 Community
@@ -113,7 +105,6 @@ We are always happy to have contributions: code, documentation, issues, feedback
 
 - [Nuclia Documentation](https://docs.nuclia.dev/)
 - [API Reference](https://docs.nuclia.dev/docs/api)
-- [NucliaDB internal documentation](docs/internal/)
 
 ## Meta
 

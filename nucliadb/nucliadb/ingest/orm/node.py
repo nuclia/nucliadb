@@ -63,16 +63,25 @@ class Node(AbstractNode):
 
     def __init__(
         self,
+        *,
+        id: str,
         address: str,
         type: MemberType,
         shard_count: int,
         dummy: bool = False,
     ):
+        self.id = id
         self.address = address
         self.type = type
         self.label = type.name
         self.shard_count = shard_count
         self.dummy = dummy
+
+    def __str__(self):
+        return f"{self.__class__.__name__}({self.id}, {self.address})"
+
+    def __repr__(self):
+        return self.__str__()
 
     @classmethod
     def create_shard_klass(cls, shard_id: str, pbshard: PBShard):
@@ -178,7 +187,9 @@ class Node(AbstractNode):
         shard_count: int,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, type, shard_count, dummy)
+        NODES[ident] = Node(
+            id=ident, address=address, type=type, shard_count=shard_count, dummy=dummy
+        )
 
     @classmethod
     async def get(cls, ident: str) -> Optional[Node]:
@@ -197,10 +208,11 @@ class Node(AbstractNode):
         members = await stub.ListMembers(request)
         for member in members.members:
             NODES[member.id] = Node(
-                member.listen_address,
-                MemberType.from_pb(member.type),
-                member.shard_count,
-                member.dummy,
+                id=member.id,
+                address=member.listen_address,
+                type=MemberType.from_pb(member.type),
+                shard_count=member.shard_count,
+                dummy=member.dummy,
             )
 
     @classmethod
@@ -228,19 +240,6 @@ class Node(AbstractNode):
         else:
             grpc_address = f"{hostname}:{port}"
         return grpc_address
-
-    def reset_connections(self) -> None:
-        if self.address in SIDECAR_CONNECTIONS:
-            del SIDECAR_CONNECTIONS[self.address]
-        self._sidecar = None
-
-        if self.address in WRITE_CONNECTIONS:
-            del WRITE_CONNECTIONS[self.address]
-        self._writer = None
-
-        if self.address in READ_CONNECTIONS:
-            del READ_CONNECTIONS[self.address]
-        self._reader = None
 
     @property
     def sidecar(self) -> NodeSidecarStub:
@@ -292,23 +291,3 @@ class Node(AbstractNode):
         if self._reader is None:
             self._reader = READ_CONNECTIONS[self.address]
         return self._reader
-
-
-def get_replica(shards: PBShards, replica_id: str) -> Optional[ShardReplica]:
-    for logic_shard in shards.shards:
-        for replica_shard in logic_shard.replicas:
-            if replica_shard.shard.id == replica_id:
-                return replica_shard
-    return None
-
-
-class UpdatingShardsError(Exception):
-    pass
-
-
-class ReplicaShardNotFound(Exception):
-    pass
-
-
-class KBNotFoundError(Exception):
-    pass

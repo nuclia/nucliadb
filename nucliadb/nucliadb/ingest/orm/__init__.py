@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from nucliadb.ingest.orm.exceptions import NodeClusterSmall
 from nucliadb.ingest.settings import settings
-from nucliadb_utils.clandestined import Cluster  # type: ignore
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.node import Node
@@ -41,7 +40,6 @@ class ScoredNode:
 
 class ClusterObject:
     date: datetime
-    cluster: Optional[Cluster] = None
     local_node: Any
 
     def __init__(self):

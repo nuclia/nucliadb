@@ -24,12 +24,7 @@ from nucliadb_protos.writer_pb2 import Member
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest.orm import NODES, NodeClusterSmall
-from nucliadb.ingest.orm.node import (
-    READ_CONNECTIONS,
-    SIDECAR_CONNECTIONS,
-    WRITE_CONNECTIONS,
-    Node,
-)
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.settings import settings
 from nucliadb_models.cluster import MemberType
 from nucliadb_utils.keys import KB_SHARDS
@@ -132,26 +127,8 @@ async def test_create_shard_by_kbid_rolls_back(txn, fake_node, node_errors):
         await Node.create_shard_by_kbid(txn, "foo")
 
 
-def test_reset_connection():
-    READ_CONNECTIONS.clear()
-    WRITE_CONNECTIONS.clear()
-    SIDECAR_CONNECTIONS.clear()
-
-    node = Node("host:1234", MemberType.IO, 0, dummy=True)
-    assert node.reader is not None
-    assert node.writer is not None
-    assert node.sidecar is not None
-
-    assert len(READ_CONNECTIONS) == 1
-    assert len(WRITE_CONNECTIONS) == 1
-    assert len(SIDECAR_CONNECTIONS) == 1
-
-    node.reset_connections()
-
-    assert len(READ_CONNECTIONS) == 0
-    assert len(WRITE_CONNECTIONS) == 0
-    assert len(SIDECAR_CONNECTIONS) == 0
-
-    assert node._reader is None
-    assert node._writer is None
-    assert node._sidecar is None
+def test_node_str():
+    node = Node(
+        id="node-1", address="host:1234", type=MemberType.IO, shard_count=0, dummy=True
+    )
+    assert str(node) == repr(node) == "Node(node-1, host:1234)"

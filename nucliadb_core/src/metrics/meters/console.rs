@@ -16,17 +16,31 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-use std::io;
+use std::fmt::Debug;
 
-use thiserror::Error;
+use crate::metrics::meters::Meter;
+use crate::metrics::metric::request_time;
+use crate::{tracing, NodeResult};
 
-/// The error that may occur when publishing/receiving files/directories.
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("invalid path '{0}': {1}")]
-    InvalidPath(String, String),
-    #[error(transparent)]
-    IoError(#[from] io::Error),
+pub struct ConsoleMeter;
+
+impl ConsoleMeter {
+    fn record<Metric: Debug, Value: Debug>(&self, metric: Metric, value: Value) {
+        tracing::debug!("{metric:?} : {value:?}")
+    }
+}
+
+impl Meter for ConsoleMeter {
+    fn export(&self) -> NodeResult<String> {
+        Ok(Default::default())
+    }
+
+    fn record_request_time(
+        &self,
+        metric: request_time::RequestTimeKey,
+        value: request_time::RequestTimeValue,
+    ) {
+        self.record(metric, value)
+    }
 }

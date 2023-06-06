@@ -48,7 +48,6 @@ from nucliadb.writer.resource.field import (
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -102,8 +101,6 @@ def prepare_field_put(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
-
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     parse_audit(writer.audit, request)
     return writer, toprocess, partition
@@ -456,8 +453,6 @@ async def append_messages_to_conversation_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
-
     parse_audit(writer.audit, request)
 
     field = models.InputConversationField()
@@ -526,8 +521,6 @@ async def append_blocks_to_layout_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
-
     parse_audit(writer.audit, request)
 
     field = models.InputLayoutField(body=models.InputLayoutContent())
@@ -588,8 +581,6 @@ async def delete_resource_field(
     pb_field_id.field_type = FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP[field_type]
     pb_field_id.field = field_id
 
-    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
-
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
@@ -629,8 +620,6 @@ async def reprocess_file_field(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
-
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = await get_driver()

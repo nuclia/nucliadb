@@ -18,11 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_core::{context, tracing};
+use nucliadb_core::{metrics, tracing};
 
 pub async fn metrics_service() -> String {
-    let metrics = context::get_metrics();
-    match metrics.collect() {
+    let metrics = metrics::get_metrics();
+    match metrics.export() {
         Ok(m) => m,
         Err(err) => {
             tracing::error!("Could not collect metrics due to {err:?}");

@@ -28,6 +28,7 @@ from pydantic.error_wrappers import ValidationError
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import param_to_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
@@ -41,6 +42,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
+    SearchParamDefaults,
     SortField,
     SortOptions,
     SortOrder,
@@ -76,17 +78,17 @@ async def find_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    advanced_query: Optional[str] = Query(default=None),
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
+    query: str = param_to_query(SearchParamDefaults.query),
+    advanced_query: Optional[str] = param_to_query(SearchParamDefaults.advanced_query),
+    fields: List[str] = param_to_query(SearchParamDefaults.fields),
+    filters: List[str] = param_to_query(SearchParamDefaults.filters),
+    faceted: List[str] = param_to_query(SearchParamDefaults.faceted),
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: Optional[int] = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
-    min_score: float = Query(default=0.70),
+    min_score: float = param_to_query(SearchParamDefaults.min_score),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
@@ -109,6 +111,7 @@ async def find_knowledgebox(
     with_duplicates: bool = Query(default=False),
     with_status: Optional[ResourceProcessingStatus] = Query(default=None),
     with_synonyms: bool = Query(default=False),
+    autofilter: bool = param_to_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -143,6 +146,7 @@ async def find_knowledgebox(
             with_duplicates=with_duplicates,
             with_status=with_status,
             with_synonyms=with_synonyms,
+            autofilter=autofilter,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())
@@ -225,6 +229,7 @@ async def find(
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
         with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
     )
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(

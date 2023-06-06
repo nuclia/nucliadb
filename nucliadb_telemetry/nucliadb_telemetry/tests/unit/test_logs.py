@@ -17,13 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import logging
 from unittest.mock import MagicMock, patch
 
 import orjson
 import pydantic
+import pytest
 
-from nucliadb_telemetry import logs
+from nucliadb_telemetry import context, logs
 
 
 def test_setup_logging(monkeypatch):
@@ -148,3 +150,46 @@ def test_logger_with_formatter_and_active_span(caplog):
     assert len(outputted_records) == 1
     assert outputted_records[0]["trace_id"] == "9999999999999999999999"
     assert outputted_records[0]["span_id"] == "9999999999999999999999"
+
+
+@pytest.mark.asyncio
+async def test_logger_with_context(caplog):
+    logger = logging.getLogger("test.logger4")
+    formatter = logs.JSONFormatter()
+
+    outputted_records = []
+
+    class Handler(logging.Handler):
+        def emit(self, record):
+            msg = self.format(record)
+            data = orjson.loads(msg)
+            outputted_records.append(data)
+
+    handler = Handler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    logger.setLevel(logging.ERROR)
+    logger.propagate = False
+
+    async def task2():
+        context.add_context({"task2": "value", "foo": "baz"})
+        logger.error("baz")
+
+    async def task1():
+        context.add_context({"task1": "value", "foo": "bar"})
+        logger.error("bar")
+        await asyncio.create_task(task2())
+
+    await asyncio.create_task(task1())
+    assert len(outputted_records) == 2
+
+    assert outputted_records[0]["context"] == {
+        "task1": "value",
+        "foo": "bar",
+    }
+    assert outputted_records[1]["context"] == {
+        "task1": "value",
+        "task2": "value",
+        "foo": "baz",
+    }

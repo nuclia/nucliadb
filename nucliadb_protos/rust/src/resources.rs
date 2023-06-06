@@ -451,6 +451,7 @@ pub mod field_text {
         Html = 1,
         Rst = 2,
         Markdown = 3,
+        Json = 4,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -700,6 +701,11 @@ pub struct FieldId {
     pub field_type: i32,
     #[prost(string, tag="2")]
     pub field: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AllFieldIDs {
+    #[prost(message, repeated, tag="1")]
+    pub fields: ::prost::alloc::vec::Vec<FieldId>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

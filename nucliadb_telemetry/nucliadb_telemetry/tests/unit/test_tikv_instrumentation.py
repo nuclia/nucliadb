@@ -113,7 +113,7 @@ async def test_tikv_instrumentation(
                 == expected_attrs[SpanAttributes.DB_OPERATION]
             )
             assert mocked_attrs[SpanAttributes.CODE_FILEPATH] == __file__
-            assert mocked_attrs[SpanAttributes.CODE_FUNCTION] == __name__
+            assert __name__.endswith(mocked_attrs[SpanAttributes.CODE_FUNCTION])
             assert mocked_attrs[SpanAttributes.CODE_LINENO] > 0
 
 

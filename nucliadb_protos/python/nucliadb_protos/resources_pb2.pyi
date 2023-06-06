@@ -444,8 +444,11 @@ class FieldConversation(google.protobuf.message.Message):
     SIZE_FIELD_NUMBER: builtins.int
     TOTAL_FIELD_NUMBER: builtins.int
     pages: builtins.int
+    """Total number of pages"""
     size: builtins.int
+    """Max page size"""
     total: builtins.int
+    """Total number of messages"""
     def __init__(
         self,
         *,
@@ -1188,12 +1191,14 @@ class FieldText(google.protobuf.message.Message):
         HTML: FieldText._Format.ValueType  # 1
         RST: FieldText._Format.ValueType  # 2
         MARKDOWN: FieldText._Format.ValueType  # 3
+        JSON: FieldText._Format.ValueType  # 4
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: FieldText.Format.ValueType  # 0
     HTML: FieldText.Format.ValueType  # 1
     RST: FieldText.Format.ValueType  # 2
     MARKDOWN: FieldText.Format.ValueType  # 3
+    JSON: FieldText.Format.ValueType  # 4
 
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
@@ -1942,3 +1947,19 @@ class FieldID(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "field_type", b"field_type"]) -> None: ...
 
 global___FieldID = FieldID
+
+@typing_extensions.final
+class AllFieldIDs(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FIELDS_FIELD_NUMBER: builtins.int
+    @property
+    def fields(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldID]: ...
+    def __init__(
+        self,
+        *,
+        fields: collections.abc.Iterable[global___FieldID] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields"]) -> None: ...
+
+global___AllFieldIDs = AllFieldIDs
