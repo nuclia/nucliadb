@@ -30,7 +30,7 @@ use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
-use nucliadb_core::NodeResult;
+use nucliadb_core::{tmp_workspace, NodeResult};
 use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::node_metadata::NodeMetadata;
@@ -56,6 +56,15 @@ pub enum NodeUpdate {
 #[tokio::main]
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
+    let shards_path = env::shards_path();
+    let tmp_workspace = tmp_workspace::path();
+    if !shards_path.exists() {
+        std::fs::create_dir_all(shards_path)?;
+    }
+    if !tmp_workspace.exists() {
+        std::fs::create_dir_all(tmp_workspace)?;
+    }
+
     let _guard = init_telemetry()?;
 
     let start_bootstrap = Instant::now();

@@ -21,29 +21,59 @@
 mod merge_worker;
 mod merger;
 mod state;
-mod work_flag;
-use std::fs::File;
+
+use std::collections::HashSet;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
 use std::mem;
 use std::path::{Path, PathBuf};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::time::SystemTime;
 
+use fs2::FileExt;
 pub use merger::Merger;
-use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::tmp_workspace::path as tmp_path;
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
-use work_flag::MergerWriterSync;
+use tempfile::NamedTempFile as TemporalFile;
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{DataPoint, DpId, Similarity};
-use crate::data_point_provider::merge_worker::Worker;
+use crate::data_point::{DataPoint, DpId, Journal, Similarity};
+use crate::data_point_provider::merge_worker::Merged;
 use crate::formula::Formula;
-use crate::VectorR;
+use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
+// Remain
 const METADATA: &str = "metadata.json";
+const STATE: &str = "state.bincode";
+const READERS: &str = "readers";
+const WRITER_FLAG: &str = "writer.flag";
+
+fn tmp_path_or_default() -> PathBuf {
+    let mut location = tmp_path();
+    if !location.exists() {
+        location = std::env::temp_dir();
+    }
+    location
+}
+
+// 'f' will have access to a BufWriter whose contents at the end of
+// f's execution will be atomically persisted in 'path'.
+// After this function is executed 'path' will either only contain the data wrote by
+// 'f' or be on its previous state.
+fn compute_with_atomic_write<F, R>(path: &Path, f: F) -> VectorR<R>
+where for<'a> F: FnOnce(&mut BufWriter<&'a mut TemporalFile>) -> VectorR<R> {
+    let mut file = TemporalFile::new_in(tmp_path_or_default())?;
+    let mut buffer = BufWriter::new(&mut file);
+    let user_result = f(&mut buffer)?;
+    buffer.flush()?;
+    mem::drop(buffer);
+    file.persist(path)?;
+    Ok(user_result)
+}
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -52,22 +82,16 @@ pub trait SearchRequest {
     fn with_duplicates(&self) -> bool;
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum IndexCheck {
-    None,
-    Sanity,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct IndexMetadata {
     #[serde(default)]
     pub similarity: Similarity,
 }
 impl IndexMetadata {
     pub fn write(&self, path: &Path) -> VectorR<()> {
-        let mut writer = BufWriter::new(File::create(path.join(METADATA))?);
-        serde_json::to_writer(&mut writer, self)?;
-        Ok(writer.flush()?)
+        compute_with_atomic_write(&path.join(METADATA), |buffer| {
+            Ok(serde_json::to_writer(buffer, self)?)
+        })
     }
     pub fn open(path: &Path) -> VectorR<Option<IndexMetadata>> {
         let path = &path.join(METADATA);
@@ -79,109 +103,235 @@ impl IndexMetadata {
     }
 }
 
+#[derive(Clone)]
 pub struct Index {
     metadata: IndexMetadata,
-    work_flag: MergerWriterSync,
-    state: RwLock<State>,
-    date: RwLock<Version>,
     location: PathBuf,
 }
 impl Index {
-    fn read_state(&self) -> RwLockReadGuard<'_, State> {
-        self.state.read().unwrap_or_else(|e| e.into_inner())
-    }
-    fn write_state(&self) -> RwLockWriteGuard<'_, State> {
-        self.state.write().unwrap_or_else(|e| e.into_inner())
-    }
-    fn read_date(&self) -> RwLockReadGuard<'_, Version> {
-        self.date.read().unwrap_or_else(|e| e.into_inner())
-    }
-    fn write_date(&self) -> RwLockWriteGuard<'_, Version> {
-        self.date.write().unwrap_or_else(|e| e.into_inner())
-    }
-    fn update(&self, lock: &Lock) -> VectorR<()> {
-        let disk_v = fs_state::crnt_version(lock)?;
-        let date = self.read_date();
-        if disk_v > *date {
-            mem::drop(date);
-            let new_state = fs_state::load_state(lock)?;
-            let mut state = self.write_state();
-            let mut date = self.write_date();
-            *state = new_state;
-            *date = disk_v;
-            mem::drop(date);
-            mem::drop(state);
+    pub fn open(path: &Path) -> VectorR<Index> {
+        match IndexMetadata::open(path)? {
+            Some(metadata) => Ok(Index {
+                metadata,
+                location: path.to_path_buf(),
+            }),
+            None => {
+                // Old indexes may not have this file so in that case the
+                // metadata file they should have is created.
+                let location = path.to_path_buf();
+                let metadata = IndexMetadata::default();
+                metadata.write(&location)?;
+                Ok(Index { metadata, location })
+            }
         }
-        Ok(())
-    }
-    fn notify_merger(&self) {
-        let worker = Worker::request(
-            self.location.clone(),
-            self.work_flag.clone(),
-            self.metadata.similarity,
-        );
-        merger::send_merge_request(worker);
-    }
-    pub fn open(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
-        let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
-            // Old indexes may not have this file so in that case the
-            // metadata file they should have is created.
-            let metadata = IndexMetadata::default();
-            metadata.write(path).map(|_| metadata)
-        })?;
-        let index = Index {
-            metadata,
-            work_flag: MergerWriterSync::new(),
-            state: RwLock::new(state),
-            date: RwLock::new(date),
-            location: path.to_path_buf(),
-        };
-        if let IndexCheck::Sanity = with_check {
-            let mut state = index.write_state();
-            let merge_work = state.work_stack_len();
-            (0..merge_work).for_each(|_| index.notify_merger());
-        }
-        Ok(index)
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
-        std::fs::create_dir_all(path)?;
-        fs_state::initialize_disk(path, State::new)?;
-        metadata.write(path)?;
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
-        let index = Index {
-            metadata,
-            work_flag: MergerWriterSync::new(),
-            state: RwLock::new(state),
-            date: RwLock::new(date),
-            location: path.to_path_buf(),
-        };
-        Ok(index)
+        let location = path.to_path_buf();
+        std::fs::create_dir_all(&location)?;
+        std::fs::create_dir_all(location.join(READERS))?;
+        compute_with_atomic_write(&location.join(STATE), |buffer| {
+            bincode::serialize_into(buffer, &State::new())?;
+            metadata.write(&location)?;
+            Ok(Index { metadata, location })
+        })
     }
-    pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &ELock) {
-        let mut state = self.write_state();
-        state.remove(prefix.as_ref(), temporal_mark);
+    pub fn writer(&self) -> VectorR<Writer> {
+        Writer::new(self.clone())
     }
-    pub fn get_keys(&self, _: &Lock) -> VectorR<Vec<String>> {
-        self.read_state().keys(&self.location)
+    pub fn reader(&self) -> VectorR<Reader> {
+        Reader::new(self.clone())
     }
-    pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<Neighbour>> {
-        self.read_state()
-            .search(&self.location, request, self.metadata.similarity)
+    pub fn location(&self) -> &Path {
+        &self.location
     }
-    pub fn no_nodes(&self, _: &Lock) -> usize {
-        self.read_state().no_nodes()
+    pub fn metadata(&self) -> &IndexMetadata {
+        &self.metadata
     }
-    pub fn collect_garbage(&self, _: &Lock) -> VectorR<()> {
-        use std::collections::HashSet;
-        let work_flag = self.work_flag.try_to_start_working()?;
-        let state = self.read_state();
-        let in_use_dp: HashSet<_> = state.dpid_iter().collect();
-        for dir_entry in std::fs::read_dir(&self.location)? {
+}
+
+#[derive(Clone)]
+struct RwState {
+    inner: Arc<RwLock<State>>,
+}
+impl RwState {
+    pub fn read(&self) -> RwLockReadGuard<'_, State> {
+        self.inner.read().unwrap_or_else(|e| e.into_inner())
+    }
+    pub fn new(path: &Path) -> VectorR<RwState> {
+        let mut state_buffer = BufReader::new(File::open(path)?);
+        let state: State = bincode::deserialize_from(&mut state_buffer)?;
+        let inner = Arc::new(RwLock::new(state));
+        Ok(RwState { inner })
+    }
+    pub fn apply<F, R>(&self, transform: F) -> VectorR<R>
+    where F: FnOnce(&mut State) -> VectorR<R> {
+        let mut writer = self.inner.write().unwrap_or_else(|e| e.into_inner());
+        transform(&mut writer)
+    }
+    pub fn persist(&self, path: &Path) -> VectorR<()> {
+        compute_with_atomic_write(path, |buffer| {
+            Ok(bincode::serialize_into(buffer, &*self.read())?)
+        })
+    }
+}
+
+pub struct Reader {
+    status_path: PathBuf,
+    state_path: PathBuf,
+    inner: Index,
+    state: RwState,
+    update_scheduled: Arc<AtomicBool>,
+}
+impl Drop for Reader {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.status_path);
+    }
+}
+impl Reader {
+    fn new(inner: Index) -> VectorR<Reader> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let update_scheduled = Arc::new(AtomicBool::new(false));
+        let status_dir = inner.location().join(READERS);
+        let status_path = status_dir.join(id).with_extension("bincode");
+        let state_path = inner.location().join(STATE);
+        let state = RwState::new(&state_path)?;
+        let watching: Vec<_> = state.read().dpid_iter().collect();
+        if !status_dir.exists() {
+            std::fs::create_dir_all(&status_dir)?;
+        }
+        compute_with_atomic_write(&status_path, |buffer| {
+            Ok(bincode::serialize_into(buffer, &watching)?)
+        })?;
+        Ok(Reader {
+            state_path,
+            status_path,
+            inner,
+            state,
+            update_scheduled,
+        })
+    }
+    pub fn schedule_update(&self) {
+        if self.update_scheduled.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        let update_scheduled = self.update_scheduled.clone();
+        let status_path = self.status_path.clone();
+        let state_path = self.state_path.clone();
+        let state = self.state.clone();
+        std::thread::spawn(move || {
+            try_catch::catch! {
+                    try {
+                        let state_file = File::open(&state_path)?;
+                        let mut state_file_buffer = BufReader::new(state_file);
+                        let new_state: State = bincode::deserialize_from(&mut state_file_buffer)?;
+                        let watching = new_state.dpid_iter().collect::<Vec<_>>();
+                        let mut temp_status = TemporalFile::new_in(tmp_path_or_default())?;
+                        let mut temp_status_buffer = BufWriter::new(&mut temp_status);
+                        bincode::serialize_into(&mut temp_status_buffer, &watching)?;
+                        temp_status_buffer.flush()?;
+                        mem::drop(temp_status_buffer);
+                        state.apply(|inner| {
+                            // Is important that reader state updates
+                            // and status updates are done atomically.
+                            // Otherwise data points that are in use may be delete by the GC.
+                            *inner = new_state;
+                            temp_status.persist(status_path)?;
+                            update_scheduled.swap(false, Ordering::SeqCst);
+                            Ok(())
+                        })?;
+                    } catch error {
+                        // Is crucial that upon failure the flag is restored.
+                        // Otherwise updates will not happen again.
+                        error!("Could not update reader due to {error:?}");
+                        update_scheduled.swap(false, Ordering::SeqCst);
+                    }
+            }
+        });
+    }
+    pub fn keys(&self) -> VectorR<Vec<String>> {
+        self.state.read().keys(self.location())
+    }
+    pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
+        let state = self.state.read();
+        let location = self.location();
+        let similarity = self.metadata().similarity;
+        state.search(location, request, similarity)
+    }
+    pub fn number_of_nodes(&self) -> usize {
+        self.state.read().no_nodes()
+    }
+    pub fn location(&self) -> &Path {
+        self.inner.location()
+    }
+    pub fn metadata(&self) -> &IndexMetadata {
+        self.inner.metadata()
+    }
+    pub fn index(&self) -> &Index {
+        &self.inner
+    }
+}
+
+pub struct Writer {
+    #[allow(unused)]
+    writer_flag: File,
+    merged_queue: Merged,
+    datapoint_buffer: Vec<Journal>,
+    delete_buffer: Vec<(String, SystemTime)>,
+    inner: Index,
+    state: RwState,
+    state_path: PathBuf,
+    readers_path: PathBuf,
+}
+impl Writer {
+    fn new(inner: Index) -> VectorR<Writer> {
+        let writer_flag = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(inner.location.join(WRITER_FLAG))?;
+        writer_flag
+            .try_lock_exclusive()
+            .map_err(|_| VectorErr::WriterExistsError)?;
+        let readers_path = inner.location().join(READERS);
+        let state_path = inner.location().join(STATE);
+        let state = RwState::new(&state_path)?;
+        let merged_queue = Merged::new();
+        Ok(Writer {
+            inner,
+            state,
+            state_path,
+            writer_flag,
+            readers_path,
+            merged_queue,
+            datapoint_buffer: vec![],
+            delete_buffer: vec![],
+        })
+    }
+    pub fn add(&mut self, datapoint: DataPoint) {
+        self.datapoint_buffer.push(datapoint.meta());
+    }
+    pub fn delete(&mut self, prefix: String, from: SystemTime) {
+        self.delete_buffer.push((prefix, from));
+    }
+    pub fn collect_garbage(&self) -> VectorR<()> {
+        if self.has_work() {
+            return Err(VectorErr::WouldBlockError);
+        }
+        let location = self.location();
+        let state = self.state.read();
+        let mut in_use_dp: HashSet<_> = state.dpid_iter().collect();
+        // Loading the readers status
+        for reader_status in std::fs::read_dir(&self.readers_path)? {
+            let entry = reader_status?;
+            let status_file = OpenOptions::new().read(true).open(entry.path())?;
+            let mut status_buf = BufReader::new(&status_file);
+            let status: Vec<DpId> = bincode::deserialize_from(&mut status_buf)?;
+            in_use_dp.extend(status.into_iter());
+        }
+
+        // Garbage is whatever is not in use
+        for dir_entry in std::fs::read_dir(location)? {
             let entry = dir_entry?;
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
@@ -194,41 +344,72 @@ impl Index {
             };
             if !in_use_dp.contains(&dpid) {
                 info!("found garbage {name}");
-                let Err(err)  = DataPoint::delete(&self.location, dpid) else { continue };
+                let Err(err)  = DataPoint::delete(location, dpid) else { continue };
                 warn!("{name} is garbage and could not be deleted because of {err}");
             }
         }
-        std::mem::drop(work_flag);
         Ok(())
     }
-    pub fn add(&self, dp: DataPoint, _: &ELock) {
-        let mut state = self.write_state();
-        if state.add(dp) {
-            self.notify_merger()
+    pub fn commit(&mut self) -> VectorR<()> {
+        if !self.has_work() {
+            return Ok(());
         }
-    }
-    pub fn commit(&self, lock: ELock) -> VectorR<()> {
-        let state = self.read_state();
-        let mut date = self.write_date();
-        fs_state::persist_state::<State>(&lock, &state)?;
-        *date = fs_state::crnt_version(&lock)?;
+
+        let adds = mem::take(&mut self.datapoint_buffer).into_iter();
+        let deletes = mem::take(&mut self.delete_buffer).into_iter();
+        let merge_work = self.merged_queue.take().into_iter();
+
+        // Modifying the state with the current buffers
+        self.state.apply(move |state: &mut State| {
+            adds.for_each(|i| state.add(i));
+            deletes.for_each(|i| state.remove(&i.0, i.1));
+            merge_work.for_each(|i| state.add_merge(i));
+            Ok(())
+        })?;
+
+        // Persisting the new state
+        self.state.persist(&self.state_path)?;
+
+        // Looking for possible merges
+        let state = self.state.read();
+        let merged_queue = self.merged_queue.clone();
+        if let Some(work_unit) = state.datapoints_to_merge() {
+            if merged_queue.reserve_work() {
+                merger::send_merge_request(merge_worker::Worker {
+                    location: self.location().to_path_buf(),
+                    similarity: self.metadata().similarity,
+                    delete_log: state.delete_log().clone(),
+                    result: self.merged_queue.clone(),
+                    work: work_unit
+                        .load
+                        .iter()
+                        .copied()
+                        .map(|i| (i.id(), state.creation_time(i)))
+                        .collect(),
+                });
+            }
+        }
+
         Ok(())
     }
-    pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = fs_state::exclusive_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
+    pub fn number_of_nodes(&self) -> usize {
+        self.state.read().no_nodes()
     }
-    pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = fs_state::shared_lock(&self.location)?;
-        self.update(&lock)?;
-        Ok(lock)
+    pub fn abort(&mut self) {
+        self.datapoint_buffer.clear();
+        self.delete_buffer.clear();
+    }
+    pub fn has_work(&self) -> bool {
+        self.datapoint_buffer.len() + self.delete_buffer.len() > 0
     }
     pub fn location(&self) -> &Path {
-        &self.location
+        self.inner.location()
     }
     pub fn metadata(&self) -> &IndexMetadata {
-        &self.metadata
+        self.inner.metadata()
+    }
+    pub fn index(&self) -> &Index {
+        &self.inner
     }
 }
 
@@ -237,17 +418,91 @@ mod test {
     use nucliadb_core::NodeResult;
 
     use super::*;
-    use crate::data_point::Similarity;
+    use crate::data_point::{Elem, LabelDictionary, Similarity};
+
+    #[test]
+    fn test_reader_update() -> NodeResult<()> {
+        let number_of_nodes = 100;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path();
+        let metadata = IndexMetadata::default();
+        let index = Index::new(path, metadata)?;
+        let elems: Vec<_> = (0..number_of_nodes)
+            .map(|i| format!("key_{i}"))
+            .map(|i| Elem::new(i, vec![0.0; 12], LabelDictionary::default(), None))
+            .collect();
+
+        let mut writer = index.writer()?;
+        let reader = index.reader()?;
+        let empty_state_reader = index.reader()?;
+        let timestamp = SystemTime::now();
+        let datapoint = DataPoint::new(path, elems, Some(timestamp), Similarity::Dot)?;
+        writer.add(datapoint);
+        writer.commit()?;
+        // Not updated yet
+        assert_eq!(empty_state_reader.number_of_nodes(), 0);
+        assert_eq!(reader.number_of_nodes(), 0);
+        reader.schedule_update();
+        while reader.update_scheduled.load(Ordering::SeqCst) {}
+        // Now the reader has been updated
+        assert_eq!(reader.number_of_nodes(), number_of_nodes);
+        assert_eq!(empty_state_reader.number_of_nodes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn many_readers() -> VectorR<()> {
+        let dir = tempfile::tempdir()?;
+        let metadata = IndexMetadata::default();
+        let index = Index::new(dir.path(), metadata)?;
+        let readers_status = dir.path().join(READERS);
+        {
+            let _reader1 = index.reader()?;
+            let _reader2 = index.reader()?;
+            let _reader3 = index.reader()?;
+            let _reader4 = index.reader()?;
+            let reader_count = std::fs::read_dir(&readers_status)?.count();
+            assert_eq!(reader_count, 4);
+        }
+        let reader_count = std::fs::read_dir(&readers_status)?.count();
+        assert_eq!(reader_count, 0);
+        Ok(())
+    }
+    #[test]
+    fn only_one_writer() -> VectorR<()> {
+        let dir = tempfile::tempdir()?;
+        let metadata = IndexMetadata::default();
+        let index = Index::new(dir.path(), metadata)?;
+
+        // There is no other writer, so opening a
+        // writer does not fail.
+        let writer = index.writer()?;
+
+        // There is no another writer for this index
+        let Err(VectorErr::WriterExistsError) = index.writer() else {
+            panic!("This should have failed");
+        };
+        mem::drop(writer);
+
+        // Is safe to open a new writer again
+        let _writer = index.writer()?;
+
+        Ok(())
+    }
+
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let index = Index::new(dir.path(), IndexMetadata::default())?;
+        let writer = index.writer()?;
+        let _reader = index.reader()?;
         let empty_no_entries = std::fs::read_dir(dir.path())?.count();
+
         for _ in 0..10 {
             DataPoint::new(dir.path(), vec![], None, Similarity::Cosine).unwrap();
         }
-        let lock = index.get_slock()?;
-        index.collect_garbage(&lock)?;
+
+        writer.collect_garbage()?;
         let no_entries = std::fs::read_dir(dir.path())?.count();
         assert_eq!(no_entries, empty_no_entries);
         Ok(())
