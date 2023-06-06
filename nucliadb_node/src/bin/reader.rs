@@ -41,7 +41,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start_bootstrap = Instant::now();
     let mut node_reader_service = NodeReaderService::new();
 
-    std::fs::create_dir_all(env::shards_path())?;
+    let shards_path = env::shards_path();
+
+    if !shards_path.exists() {
+        std::fs::create_dir_all(shards_path)?;
+    }
     if !env::lazy_loading() {
         node_reader_service.load_shards()?;
     }

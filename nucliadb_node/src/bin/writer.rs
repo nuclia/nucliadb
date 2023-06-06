@@ -63,8 +63,11 @@ async fn main() -> NodeResult<()> {
     let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
     let mut node_writer_service = NodeWriterService::new();
+    let shards_path = env::shards_path();
 
-    std::fs::create_dir_all(env::shards_path())?;
+    if !shards_path.exists() {
+        std::fs::create_dir_all(shards_path)?;
+    }
     if !env::lazy_loading() {
         node_writer_service.load_shards()?;
     }
