@@ -88,12 +88,13 @@ impl NodeReaderService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardReaderService::new(shard_name, &shard_path) else {
-            error!("Shard {shard_path:?} could not be loaded from disk");
-            return;
-        };
-        self.cache.insert(shard_id.id.clone(), shard);
-        debug!("{shard_path:?}: Shard loaded");
+        match ShardReaderService::new(shard_name, &shard_path) {
+            Err(err) => error!("Shard {shard_path:?} could not be loaded from disk: {err:?}"),
+            Ok(shard) => {
+                self.cache.insert(shard_id.id.clone(), shard);
+                debug!("{shard_path:?}: Shard loaded");
+            }
+        }
     }
 
     #[tracing::instrument(skip_all)]
