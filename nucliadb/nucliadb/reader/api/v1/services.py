@@ -122,7 +122,7 @@ async def list_entities_groups(kbid: str):
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
     status_code=200,
-    name="Get Knowledge Box Entities",
+    name="Get a Knowledge Box Entities Group",
     response_model=EntitiesGroup,
     tags=["Knowledge Box Services"],
 )
@@ -155,13 +155,13 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/labelsets",
     status_code=200,
-    name="Get Knowledge Box Labels",
+    name="Get Knowledge Box Label Sets",
     response_model=KnowledgeBoxLabels,
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
+async def get_labelsets(request: Request, kbid: str) -> KnowledgeBoxLabels:
     ingest = get_ingest()
     l_request: GetLabelsRequest = GetLabelsRequest()
     l_request.kb.uuid = kbid
@@ -190,13 +190,13 @@ async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/labelset/{{labelset}}",
     status_code=200,
-    name="Get Knowledge Box Label",
+    name="Get a Knowledge Box Label Set",
     response_model=LabelSet,
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
+async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
     ingest = get_ingest()
     l_request: GetLabelSetRequest = GetLabelSetRequest()
     l_request.kb.uuid = kbid
@@ -223,7 +223,7 @@ async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/vectorsets",
     status_code=200,
-    name="Get Knowledge Box VectorSet",
+    name="Get Knowledge Box Vector Sets",
     tags=["Knowledge Box Services"],
     response_model=VectorSets,
     openapi_extra={"x-operation_order": 1},

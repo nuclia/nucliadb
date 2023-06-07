@@ -372,7 +372,7 @@ class _NucliaSDKBase:
     )
     get_labelsets = _request_builder(
         "get_labelsets",
-        "/v1/kb/{kbid}/labelset",
+        "/v1/kb/{kbid}/labelsets",
         "GET",
         ("kbid", "labelset"),
         None,
@@ -414,25 +414,25 @@ class _NucliaSDKBase:
     )
     delete_entitygroup = _request_builder(
         "delete_entitygroup",
-        "/v1/kb/{kbid}/labelset/{labelset}",
+        "/v1/kb/{kbid}/entitiesgroup/{group}",
         "DELETE",
-        ("kbid", "labelset"),
+        ("kbid", "group"),
         None,
         None,
     )
     get_entitygroups = _request_builder(
         "get_entitygroups",
-        "/v1/kb/{kbid}/labelset",
+        "/v1/kb/{kbid}/entitiesgroups",
         "GET",
-        ("kbid", "labelset"),
+        ("kbid", "show_entities"),
         None,
         KnowledgeBoxLabels,
     )
     get_entitygroup = _request_builder(
         "get_entitygroup",
-        "/v1/kb/{kbid}/labelset/{labelset}",
+        "/v1/kb/{kbid}/entitiesgroup/{group}",
         "GET",
-        ("kbid", "labelset"),
+        ("kbid", "group"),
         None,
         LabelSet,
     )

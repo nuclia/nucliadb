@@ -134,14 +134,6 @@ async def list_resources(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
-    status_code=200,
-    name="Get Resource (by slug)",
-    response_model=Resource,
-    response_model_exclude_unset=True,
-    tags=["Resources"],
-)
-@api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
     name="Get Resource (by id)",
@@ -151,11 +143,50 @@ async def list_resources(
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_resource(
+async def get_resource_by_uuid(
     request: Request,
     kbid: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    rid: str,
+    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
+    field_type_filter: List[FieldTypeName] = Query(
+        list(FieldTypeName), alias="field_type"
+    ),
+    extracted: List[ExtractedDataTypeName] = Query(
+        [
+            ExtractedDataTypeName.TEXT,
+            ExtractedDataTypeName.METADATA,
+            ExtractedDataTypeName.LINK,
+            ExtractedDataTypeName.FILE,
+        ]
+    ),
+    x_nucliadb_user: str = Header(""),
+    x_forwarded_for: str = Header(""),
+):
+    return await _get_resource(
+        rid=rid,
+        kbid=kbid,
+        show=show,
+        field_type_filter=field_type_filter,
+        extracted=extracted,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=200,
+    name="Get Resource (by slug)",
+    response_model=Resource,
+    response_model_exclude_unset=True,
+    tags=["Resources"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_resource_by_slug(
+    request: Request,
+    kbid: str,
+    rslug: str,
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -171,6 +202,31 @@ async def get_resource(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Resource:
+    return await _get_resource(
+        rslug=rslug,
+        kbid=kbid,
+        show=show,
+        field_type_filter=field_type_filter,
+        extracted=extracted,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
+
+
+async def _get_resource(
+    *,
+    rslug: Optional[str] = None,
+    rid: Optional[str] = None,
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+) -> Resource:
+    if all([rslug, rid]) or not any([rslug, rid]):
+        raise ValueError("Either rid or rslug must be provided, but not both")
+
     audit = get_audit()
     if audit is not None:
         audit_id = rid if rid else rslug
