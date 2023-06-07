@@ -411,7 +411,7 @@ class _NodeRunner:
                 [
                     name,
                     "==============================",
-                    container.container_obj.logs().decode("utf-8"),
+                    container.container_obj.logs().decode("utf-8"),  # type: ignore
                     "",
                 ]
             )
