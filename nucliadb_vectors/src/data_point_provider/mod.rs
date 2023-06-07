@@ -120,7 +120,6 @@ impl Index {
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         let location = path.to_path_buf();
         std::fs::create_dir_all(&location)?;
-        std::fs::create_dir_all(location.join(READERS))?;
         compute_with_atomic_write(&location.join(STATE), |buffer| {
             bincode::serialize_into(buffer, &State::new())?;
             metadata.write(&location)?;
