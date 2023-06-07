@@ -274,17 +274,13 @@ pub struct NodeWriter {
     writer: RustWriterService,
 }
 
-impl Default for NodeWriter {
-    fn default() -> NodeWriter {
-        NodeWriter::new()
-    }
-}
 #[pymethods]
 impl NodeWriter {
     #[staticmethod]
-    pub fn new() -> NodeWriter {
-        NodeWriter {
-            writer: RustWriterService::new(),
+    pub fn new() -> PyResult<NodeWriter> {
+        match RustWriterService::new() {
+            Ok(writer) => Ok(NodeWriter { writer }),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }
     }
 

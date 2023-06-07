@@ -72,8 +72,8 @@ async fn start_writer(addr: SocketAddr) {
 
     if !*initialized_lock {
         tokio::spawn(async move {
-            let writer_server =
-                NodeWriterServer::new(NodeWriterGRPCDriver::from(NodeWriterService::new()));
+            let node_writer = NodeWriterService::new().unwrap();
+            let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::from(node_writer));
             Server::builder()
                 .add_service(writer_server)
                 .serve(addr)

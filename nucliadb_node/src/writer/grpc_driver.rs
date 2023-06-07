@@ -481,7 +481,8 @@ mod tests {
     use crate::utils::socket_to_endpoint;
 
     async fn start_test_server(address: SocketAddr) -> anyhow::Result<()> {
-        let node_writer = NodeWriterGRPCDriver::from(NodeWriterService::new());
+        let node_writer = NodeWriterService::new().unwrap();
+        let node_writer = NodeWriterGRPCDriver::from(node_writer);
         std::fs::create_dir_all(env::shards_path())?;
 
         tokio::spawn(async move {
