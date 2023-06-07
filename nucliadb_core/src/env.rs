@@ -37,12 +37,7 @@ pub fn data_path() -> PathBuf {
 }
 
 pub fn tmp_path() -> PathBuf {
-    let tmp_path = data_path().join("tmp");
-    if tmp_path.exists() {
-        tmp_path
-    } else {
-        std::env::temp_dir()
-    }
+    data_path().join("tmp")
 }
 
 /// Path for metadata file inside data folder
