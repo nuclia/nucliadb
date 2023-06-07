@@ -404,12 +404,12 @@ class _NodeRunner:
             ("Reader 2", nucliadb_node_2_reader),
             ("Writer 2", nucliadb_node_2_writer),
         ):
+            logs.extend(["", name, "=============================="])
             logs.extend(
                 [
-                    name,
-                    "==============================",
-                    container.container_obj.logs().decode("utf-8"),  # type: ignore
-                    "",
+                    log
+                    for log in container.container_obj.logs().decode("utf-8").splitlines()  # type: ignore
+                    if "DEBUG" not in log
                 ]
             )
         return "\n".join(logs)
