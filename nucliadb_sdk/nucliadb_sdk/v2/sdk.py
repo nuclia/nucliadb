@@ -115,7 +115,16 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
         return resp.content
 
 
+class MethodParams(BaseModel):
+    name: str
+    path_template: str
+    method: str
+    path_params: Tuple[str, ...]
+    request_type: Optional[Type[BaseModel]]
+
+
 def _request_builder(
+    name: str,
     path_template: str,
     method: str,
     path_params: Tuple[str, ...],
@@ -168,6 +177,15 @@ def _request_builder(
         else:
             return _parse_response(response_type, resp)
 
+    method = MethodParams(
+        name=name,
+        path_template=path_template,
+        method=method,
+        path_params=path_params,
+    )
+    if isinstance(request_type, type) and issubclass(request_type, BaseModel):
+        method.request_type = request_type
+    setattr(_func, "__sdk_method__", method)
     return _func
 
 
@@ -180,6 +198,12 @@ class _NucliaSDKBase:
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
     ):
+        """
+        :param region: The region to connect to
+        :param api_key: The API key to use for authentication
+        :param url: The base URL to use for the NucliaDB API
+        :param headers: Any additional headers to include in the request.
+        """
         self.region = region
         self.api_key = api_key
         headers = headers or {}
@@ -239,23 +263,39 @@ class _NucliaSDKBase:
 
     # Knowledge Box Endpoints
     create_knowledge_box = _request_builder(
-        "/v1/kbs", "POST", (), KnowledgeBoxConfig, KnowledgeBoxObj
+        "create_knowledge_box",
+        "/v1/kbs",
+        "POST",
+        (),
+        KnowledgeBoxConfig,
+        KnowledgeBoxObj,
     )
     delete_knowledge_box = _request_builder(
-        "/v1/kb/{kbid}", "DELETE", ("kbid",), None, KnowledgeBoxObj
+        "delete_knowledge_box",
+        "/v1/kb/{kbid}",
+        "DELETE",
+        ("kbid",),
+        None,
+        KnowledgeBoxObj,
     )
     get_knowledge_box = _request_builder(
-        "/v1/kb/{kbid}", "GET", ("kbid",), None, KnowledgeBoxObj
+        "get_knowledge_box", "/v1/kb/{kbid}", "GET", ("kbid",), None, KnowledgeBoxObj
     )
     get_knowledge_box_by_slug = _request_builder(
-        "/v1/kb/s/{slug}", "GET", ("slug",), None, KnowledgeBoxObj
+        "get_knowledge_box_by_slug",
+        "/v1/kb/s/{slug}",
+        "GET",
+        ("slug",),
+        None,
+        KnowledgeBoxObj,
     )
     list_knowledge_boxes = _request_builder(
-        "/v1/kbs", "GET", (), None, KnowledgeBoxList
+        "list_knowledge_boxes", "/v1/kbs", "GET", (), None, KnowledgeBoxList
     )
 
     # Resource Endpoints
     create_resource = _request_builder(
+        "create_resource",
         "/v1/kb/{kbid}/resources",
         "POST",
         ("kbid",),
@@ -263,6 +303,7 @@ class _NucliaSDKBase:
         ResourceCreated,
     )
     update_resource = _request_builder(
+        "update_resource",
         "/v1/kb/{kbid}/resource/{rid}",
         "PATCH",
         ("kbid", "rid"),
@@ -270,20 +311,41 @@ class _NucliaSDKBase:
         ResourceUpdated,
     )
     delete_resource = _request_builder(
-        "/v1/kb/{kbid}/resource/{rid}", "DELETE", ("kbid", "rid"), None, None
+        "delete_resource",
+        "/v1/kb/{kbid}/resource/{rid}",
+        "DELETE",
+        ("kbid", "rid"),
+        None,
+        None,
     )
     get_resource_by_slug = _request_builder(
-        "/v1/kb/{kbid}/slug/{slug}", "GET", ("kbid", "slug"), None, Resource
+        "get_resource_by_slug",
+        "/v1/kb/{kbid}/slug/{slug}",
+        "GET",
+        ("kbid", "slug"),
+        None,
+        Resource,
     )
     get_resource_by_id = _request_builder(
-        "/v1/kb/{kbid}/resource/{rid}", "GET", ("kbid", "rid"), None, Resource
+        "get_resource_by_id",
+        "/v1/kb/{kbid}/resource/{rid}",
+        "GET",
+        ("kbid", "rid"),
+        None,
+        Resource,
     )
     list_resources = _request_builder(
-        "/v1/kb/{kbid}/resources", "GET", ("kbid",), None, ResourceList
+        "list_resources",
+        "/v1/kb/{kbid}/resources",
+        "GET",
+        ("kbid",),
+        None,
+        ResourceList,
     )
 
     # Conversation endpoints
     add_conversation_message = _request_builder(
+        "add_conversation_message",
         "/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
         "PUT",
         ("kbid", "rid", "field_id"),
@@ -293,6 +355,7 @@ class _NucliaSDKBase:
 
     # Labels
     set_labelset = _request_builder(
+        "set_labelset",
         "/v1/kb/{kbid}/labelset/{labelset}",
         "POST",
         ("kbid", "labelset"),
@@ -300,17 +363,33 @@ class _NucliaSDKBase:
         None,
     )
     delete_labelset = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "DELETE", ("kbid", "labelset"), None, None
+        "delete_labelset",
+        "/v1/kb/{kbid}/labelset/{labelset}",
+        "DELETE",
+        ("kbid", "labelset"),
+        None,
+        None,
     )
     get_labelsets = _request_builder(
-        "/v1/kb/{kbid}/labelset", "GET", ("kbid", "labelset"), None, KnowledgeBoxLabels
+        "get_labelsets",
+        "/v1/kb/{kbid}/labelset",
+        "GET",
+        ("kbid", "labelset"),
+        None,
+        KnowledgeBoxLabels,
     )
     get_labelset = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "GET", ("kbid", "labelset"), None, LabelSet
+        "get_labelset",
+        "/v1/kb/{kbid}/labelset/{labelset}",
+        "GET",
+        ("kbid", "labelset"),
+        None,
+        LabelSet,
     )
 
     # Entity Groups
     create_entitygroup = _request_builder(
+        "create_entitygroup",
         "/v1/kb/{kbid}/entitiesgroups",
         "POST",
         ("kbid",),
@@ -318,6 +397,7 @@ class _NucliaSDKBase:
         None,
     )
     update_entitygroup = _request_builder(
+        "update_entitygroup",
         "/v1/kb/{kbid}/entitiesgroup/{group}",
         "PATCH",
         ("kbid", "group"),
@@ -325,6 +405,7 @@ class _NucliaSDKBase:
         None,
     )
     set_entitygroup_entities = _request_builder(
+        "set_entitygroup_entities",
         "/v1/kb/{kbid}/entitiesgroup/{group}",
         "POST",
         ("kbid", "group"),
@@ -332,17 +413,33 @@ class _NucliaSDKBase:
         None,
     )
     delete_entitygroup = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "DELETE", ("kbid", "labelset"), None, None
+        "delete_entitygroup",
+        "/v1/kb/{kbid}/labelset/{labelset}",
+        "DELETE",
+        ("kbid", "labelset"),
+        None,
+        None,
     )
     get_entitygroups = _request_builder(
-        "/v1/kb/{kbid}/labelset", "GET", ("kbid", "labelset"), None, KnowledgeBoxLabels
+        "get_entitygroups",
+        "/v1/kb/{kbid}/labelset",
+        "GET",
+        ("kbid", "labelset"),
+        None,
+        KnowledgeBoxLabels,
     )
     get_entitygroup = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "GET", ("kbid", "labelset"), None, LabelSet
+        "get_entitygroup",
+        "/v1/kb/{kbid}/labelset/{labelset}",
+        "GET",
+        ("kbid", "labelset"),
+        None,
+        LabelSet,
     )
 
     # Vectorsets
     create_vectorset = _request_builder(
+        "create_vectorset",
         "/v1/kb/{kbid}/vectorset/{vectorset}",
         "POST",
         ("kbid", "vectorset"),
@@ -350,17 +447,33 @@ class _NucliaSDKBase:
         None,
     )
     delete_vectorset = _request_builder(
-        "/v1/kb/{kbid}/vectorset/{vectorset}", "POST", ("kbid", "vectorset"), None, None
+        "delete_vectorset",
+        "/v1/kb/{kbid}/vectorset/{vectorset}",
+        "POST",
+        ("kbid", "vectorset"),
+        None,
+        None,
     )
     list_vectorsets = _request_builder(
-        "/v1/kb/{kbid}/vectorsets", "GET", ("kbid",), None, VectorSets
+        "list_vectorsets",
+        "/v1/kb/{kbid}/vectorsets",
+        "GET",
+        ("kbid",),
+        None,
+        VectorSets,
     )
 
     # Search / Find Endpoints
     find = _request_builder(
-        "/v1/kb/{kbid}/find", "POST", ("kbid",), FindRequest, KnowledgeboxFindResults
+        "find",
+        "/v1/kb/{kbid}/find",
+        "POST",
+        ("kbid",),
+        FindRequest,
+        KnowledgeboxFindResults,
     )
     search = _request_builder(
+        "search",
         "/v1/kb/{kbid}/search",
         "POST",
         ("kbid",),
@@ -368,7 +481,12 @@ class _NucliaSDKBase:
         KnowledgeboxSearchResults,
     )
     chat = _request_builder(
-        "/v1/kb/{kbid}/chat", "POST", ("kbid",), ChatRequest, chat_response_parser
+        "chat",
+        "/v1/kb/{kbid}/chat",
+        "POST",
+        ("kbid",),
+        ChatRequest,
+        chat_response_parser,
     )
 
 
