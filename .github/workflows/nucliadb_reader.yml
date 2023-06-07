@@ -194,4 +194,4 @@ jobs:
 
       - name: Upload docs
         run: |
-          gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/regional/v$API_VERSION/$COMPONENT/spec.json
+          gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/nucliadb/v$API_VERSION/$COMPONENT/spec.json
