@@ -403,9 +403,6 @@ class _NodeRunner:
             ("Writer 1", nucliadb_node_1_writer),
             ("Reader 2", nucliadb_node_2_reader),
             ("Writer 2", nucliadb_node_2_writer),
-            ("Sidecar 1", nucliadb_node_2_sidecar),
-            ("Sidecar 2", nucliadb_node_2_sidecar),
-            ("Cluster manager(chitchat)", nucliadb_cluster_mgr),
         ):
             logs.extend(
                 [
