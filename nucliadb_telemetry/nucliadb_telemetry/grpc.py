@@ -21,8 +21,7 @@ import functools
 from collections import OrderedDict
 from concurrent import futures
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, List, Optional
-
+from typing import Any, Awaitable, Callable, List, Optional, Tuple
 import grpc
 from grpc import ChannelCredentials, ClientCallDetails, aio  # type: ignore
 from grpc.experimental import wrap_server_method_handler  # type: ignore
@@ -360,11 +359,12 @@ class GRPCTelemetry:
         server_addr: str,
         max_send_message: int = 100,
         credentials: Optional[ChannelCredentials] = None,
+        options: Optional[List[Tuple[str, Any]]] = None,
     ):
         options = [
             ("grpc.max_receive_message_length", max_send_message * 1024 * 1024),
             ("grpc.max_send_message_length", max_send_message * 1024 * 1024),
-        ]
+        ] + (options or [])
         interceptors = (
             get_client_interceptors(self.service_name, self.tracer_provider)
             + grpc_metrics.CLIENT_INTERCEPTORS
@@ -387,6 +387,7 @@ class GRPCTelemetry:
         concurrency: int = 4,
         max_receive_message: int = 100,
         interceptors: Optional[List[aio.ServerInterceptor]] = None,
+        options: Optional[List[Tuple[str, Any]]] = None,
     ):
         _interceptors = (
             get_server_interceptors(self.service_name, self.tracer_provider)
@@ -397,7 +398,7 @@ class GRPCTelemetry:
         options = [
             ("grpc.max_send_message_length", max_receive_message * 1024 * 1024),
             ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
-        ]
+        ] + (options or [])
         server = aio.server(
             futures.ThreadPoolExecutor(max_workers=concurrency),
             interceptors=_interceptors,
