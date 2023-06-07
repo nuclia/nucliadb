@@ -102,7 +102,6 @@ images.settings["nucliadb_node_sidecar"] = {
             "node_sidecar",
         ],
         "ports": {"4447": None},
-        "platform": "linux/amd64",
     },
 }
 
