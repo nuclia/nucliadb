@@ -19,7 +19,9 @@
 import asyncio
 import base64
 import enum
+import inspect
 import io
+from pydoc import doc
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import httpx
@@ -56,7 +58,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_sdk.v2 import exceptions
+from nucliadb_sdk.v2 import docstrings, exceptions
 
 
 class Region(enum.Enum):
@@ -132,6 +134,7 @@ def _request_builder(
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
+    docstring: Optional[docstrings.Docstring] = None,
 ):
     def _func(self: "NucliaSDK", content: Optional[Any] = None, **kwargs):
         path_data = {}
@@ -177,15 +180,42 @@ def _request_builder(
         else:
             return _parse_response(response_type, resp)
 
-    method = MethodParams(
-        name=name,
-        path_template=path_template,
-        method=method,
-        path_params=path_params,
-    )
-    if isinstance(request_type, type) and issubclass(request_type, BaseModel):
-        method.request_type = request_type
-    setattr(_func, "__sdk_method__", method)
+    if docstring is not None:
+        _func.__name__ = docstring.name
+        _func.__doc__ = docstring.doc
+        # Add path params as signature parameters
+        parameters = []
+        parameters.append(
+            inspect.Parameter(
+                "self", kind=inspect.Parameter.POSITIONAL_ONLY, annotation="NucliaSDK"
+            )
+        )
+        # Path params
+        parameters.append(
+            inspect.Parameter(
+                "kbid", kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
+            )
+        )
+        # Required query params.
+        # Required body params (that have no references to other models)
+        parameters.append(
+            inspect.Parameter(
+                "query",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                annotation=Optional[str],
+                default=None,
+            )
+        )
+        parameters.append(
+            inspect.Parameter(
+                "content",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                annotation=Optional[ChatRequest],
+                default=None,
+            )
+        )
+        _func.__signature__ = inspect.Signature(parameters=parameters)
+
     return _func
 
 
@@ -396,6 +426,7 @@ class _NucliaSDKBase:
         CreateEntitiesGroupPayload,
         None,
     )
+
     update_entitygroup = _request_builder(
         "update_entitygroup",
         "/v1/kb/{kbid}/entitiesgroup/{group}",
@@ -487,6 +518,7 @@ class _NucliaSDKBase:
         ("kbid",),
         ChatRequest,
         chat_response_parser,
+        docstring=docstrings.CHAT,
     )
 
 

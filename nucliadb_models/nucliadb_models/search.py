@@ -445,7 +445,7 @@ class RephraseModel(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    query: str = ""
+    query: str
     fields: List[str] = []
     filters: List[str] = []
     min_score: float = 0.70
