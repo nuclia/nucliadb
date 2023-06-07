@@ -19,9 +19,9 @@
 
 use std::io::Cursor;
 
+use nucliadb_core::env;
 use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::texts::DocumentIterator;
-use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{

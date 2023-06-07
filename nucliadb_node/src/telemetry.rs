@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use nucliadb_core::tracing::{Level, Span};
-use nucliadb_core::{Context, NodeResult};
+use nucliadb_core::{env, Context, NodeResult};
 use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
@@ -27,8 +27,6 @@ use tracing_subscriber::filter::{FilterFn, LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
-
-use crate::env;
 
 const TRACE_ID: &str = "trace-id";
 

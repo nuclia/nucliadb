@@ -19,6 +19,7 @@
 //
 
 use async_std::sync::RwLock;
+use nucliadb_core::env;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
@@ -27,7 +28,6 @@ use opentelemetry::global;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use Shard as ShardPB;
 
-use crate::env;
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
 

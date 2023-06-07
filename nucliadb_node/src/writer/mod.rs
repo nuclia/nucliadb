@@ -21,6 +21,7 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
+use nucliadb_core::env;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, NewShardRequest, NewVectorSetRequest, OpStatus, Resource,
@@ -31,7 +32,6 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use uuid::Uuid;
 
-use crate::env;
 use crate::services::writer::ShardWriterService;
 
 #[derive(Debug)]

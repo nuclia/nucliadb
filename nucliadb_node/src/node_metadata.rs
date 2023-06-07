@@ -23,10 +23,8 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
 use nucliadb_core::tracing::*;
-use nucliadb_core::NodeResult;
+use nucliadb_core::{env, NodeResult};
 use serde::{Deserialize, Serialize};
-
-use crate::env;
 
 fn number_of_shards() -> NodeResult<usize> {
     Ok(std::fs::read_dir(env::shards_path())?

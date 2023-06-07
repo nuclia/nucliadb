@@ -30,11 +30,11 @@ use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
-use nucliadb_core::{tmp_workspace, NodeResult};
-use nucliadb_node::env;
+use nucliadb_core::{env, NodeResult};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
+use nucliadb_node::utils;
 use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::writer::NodeWriterService;
 use tokio::signal::unix::SignalKind;
@@ -57,7 +57,7 @@ pub enum NodeUpdate {
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let shards_path = env::shards_path();
-    let tmp_workspace = tmp_workspace::path();
+    let tmp_workspace = env::tmp_path();
     if !shards_path.exists() {
         std::fs::create_dir_all(shards_path)?;
     }
@@ -82,7 +82,7 @@ async fn main() -> NodeResult<()> {
     let grpc_sender = metadata_sender.clone();
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(grpc_sender);
     let host_key_path = env::host_key_path();
-    let public_ip = env::public_ip().await;
+    let public_ip = utils::reliable_lookup_host(&env::public_ip()).await;
     let chitchat_port = env::chitchat_port();
     let seed_nodes = env::seed_nodes();
 
