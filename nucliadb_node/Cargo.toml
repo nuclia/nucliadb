@@ -52,6 +52,8 @@ time = "0.3.3"
 itertools = "0.10"
 anyhow = "1"
 http = "0.2"
+hyper = "0.14.26"
+tower = "0.4.13"
 thiserror = "1"
 opentelemetry = { version = "0.17", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.17.2"

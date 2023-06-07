@@ -29,12 +29,9 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
-use opentelemetry::global;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,13 +74,6 @@ impl NodeWriterGRPCDriver {
         }
     }
 
-    // Instrumentation utilities for telemetry
-    fn instrument<T>(&self, request: &tonic::Request<T>) {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-    }
-
     #[tracing::instrument(skip_all)]
     fn emit_event(&self, event: NodeWriterEvent) {
         if let Some(sender) = &self.sender {
@@ -94,10 +84,7 @@ impl NodeWriterGRPCDriver {
 
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
-    #[tracing::instrument(skip_all)]
     async fn get_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
-        self.instrument(&request);
-
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.load_shard(&shard_id).await;
@@ -116,13 +103,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn new_shard(
         &self,
         request: Request<NewShardRequest>,
     ) -> Result<Response<ShardCreated>, Status> {
-        self.instrument(&request);
-
         debug!("Creating new shard");
         let request = request.into_inner();
         send_telemetry_event(TelemetryEvent::Create).await;
@@ -132,10 +116,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Ok(tonic::Response::new(result))
     }
 
-    #[tracing::instrument(skip_all)]
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
-        self.instrument(&request);
-
         debug!("gRPC delete_shard {:?}", request);
         send_telemetry_event(TelemetryEvent::Delete).await;
         // Deletion does not require for the shard
@@ -157,13 +138,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn clean_and_upgrade_shard(
         &self,
         request: Request<ShardId>,
     ) -> Result<Response<ShardCleaned>, Status> {
-        self.instrument(&request);
-
         debug!("gRPC delete_shard {:?}", request);
 
         // Deletion and upgrade do not require for the shard
@@ -182,20 +160,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn list_shards(
         &self,
-        request: Request<EmptyQuery>,
+        _request: Request<EmptyQuery>,
     ) -> Result<Response<ShardIds>, Status> {
-        self.instrument(&request);
         let ids = self.inner.read().await.get_shard_ids();
         Ok(tonic::Response::new(ids))
     }
 
     // Incremental call that can be call multiple times for the same resource
-    #[tracing::instrument(skip_all)]
     async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
-        self.instrument(&request);
         let resource = request.into_inner();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
@@ -230,12 +204,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn delete_relation_nodes(
         &self,
         request: Request<DeleteGraphNodes>,
     ) -> Result<Response<OpStatus>, Status> {
-        self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
         self.load_shard(shard_id).await;
@@ -260,9 +232,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
-        self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
@@ -288,12 +258,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn remove_resource(
         &self,
         request: Request<ResourceId>,
     ) -> Result<Response<OpStatus>, Status> {
-        self.instrument(&request);
         let resource = request.into_inner();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
@@ -328,12 +296,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(skip_all)]
+
     async fn add_vector_set(
         &self,
         request: Request<NewVectorSetRequest>,
     ) -> Result<Response<OpStatus>, Status> {
-        self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.id.as_ref().and_then(|i| i.shard.clone()).unwrap();
         self.load_shard(&shard_id).await;
@@ -357,12 +324,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(skip_all)]
+
     async fn remove_vector_set(
         &self,
         request: Request<VectorSetId>,
     ) -> Result<Response<OpStatus>, Status> {
-        self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
         self.load_shard(shard_id).await;
@@ -386,12 +352,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(skip_all)]
+
     async fn list_vector_sets(
         &self,
         request: Request<ShardId>,
     ) -> Result<Response<VectorSetList>, Status> {
-        self.instrument(&request);
         let shard_id = request.into_inner();
         let reader = self.inner.read().await;
         match reader.list_vectorsets(&shard_id).transpose() {
@@ -415,13 +380,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn get_metadata(
         &self,
-        request: Request<EmptyQuery>,
+        _request: Request<EmptyQuery>,
     ) -> Result<Response<NodeMetadata>, Status> {
-        self.instrument(&request);
-
         match crate::node_metadata::NodeMetadata::load(&env::metadata_path()) {
             Ok(node_metadata) => Ok(tonic::Response::new(node_metadata.into())),
             Err(e) => {
@@ -434,10 +396,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
-        self.instrument(&request);
-
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         debug!("Running garbage collection at {}", shard_id.id);
