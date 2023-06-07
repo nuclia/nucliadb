@@ -102,6 +102,7 @@ images.settings["nucliadb_node_sidecar"] = {
             "node_sidecar",
         ],
         "ports": {"4447": None},
+        "platform": "linux/amd64",
     },
 }
 
@@ -396,6 +397,27 @@ class _NodeRunner:
         self.stop()
         return self.start()
 
+    def logs(self) -> str:
+        logs = []
+        for name, container in (
+            ("Reader 1", nucliadb_node_1_reader),
+            ("Writer 1", nucliadb_node_1_writer),
+            ("Reader 2", nucliadb_node_2_reader),
+            ("Writer 2", nucliadb_node_2_writer),
+            ("Sidecar 1", nucliadb_node_2_sidecar),
+            ("Sidecar 2", nucliadb_node_2_sidecar),
+            ("Cluster manager(chitchat)", nucliadb_cluster_mgr),
+        ):
+            logs.extend(
+                [
+                    name,
+                    "==============================",
+                    container.container_obj.logs().decode("utf-8"),
+                    "",
+                ]
+            )
+        return "\n".join(logs)
+
     def setup_env(self):
         # reset on every test run in case something touches it
         settings.writer_port_map = {
@@ -458,6 +480,7 @@ def node(_node, _node_runner: _NodeRunner, request):
     _test_failed_statuses = getattr(request.node, "_test_failed_statuses", {})
     if len(_test_failed_statuses) > 0 and any(_test_failed_statuses.values()):
         logger.warning(
-            "Test failed with rerun, restarting node in case it's related to a node crash"
+            "Test failed with rerun, restarting nodes in case "
+            f"it's related to a node crash. Cluster logs: \n{_node_runner.logs()}"
         )
         _node_runner.restart()
