@@ -65,7 +65,7 @@ fn tmp_or_default() -> PathBuf {
 // After this function is executed 'path' will either only contain the data wrote by
 // 'f' or be on its previous state.
 fn compute_with_atomic_write<F, R>(path: &Path, f: F) -> VectorR<R>
-where for<'a> F: FnOnce(&mut BufWriter<&'a mut TemporalFile>) -> VectorR<R> {
+where F: FnOnce(&mut BufWriter<&mut TemporalFile>) -> VectorR<R> {
     let mut file = TemporalFile::new_in(tmp_or_default())?;
     let mut buffer = BufWriter::new(&mut file);
     let user_result = f(&mut buffer)?;
