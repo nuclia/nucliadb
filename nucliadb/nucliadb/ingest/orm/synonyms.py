@@ -21,7 +21,7 @@ from typing import Optional
 
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 
-from nucliadb.ingest.maindb.driver import Transaction
+from nucliadb.common.maindb.driver import Transaction
 
 KB_SYNONYMS = "/kbs/{kbid}/synonyms"
 

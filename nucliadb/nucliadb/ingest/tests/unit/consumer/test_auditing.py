@@ -44,12 +44,16 @@ def sidecar():
 
 
 @pytest.fixture()
-def nodes_manager(sidecar):
+def shard_manager(sidecar):
     nm = MagicMock()
     node = MagicMock(sidecar=sidecar)
-    nm.choose_node.return_value = node, "shard_id", None
     nm.get_shards_by_kbid = AsyncMock(return_value=[ShardObject()])
-    with patch("nucliadb.ingest.consumer.auditing.NodesManager", return_value=nm):
+    with patch(
+        "nucliadb.ingest.consumer.auditing.get_shard_manager", return_value=nm
+    ), patch(
+        "nucliadb.ingest.consumer.auditing.choose_node",
+        return_value=(node, "shard_id", None),
+    ):
         yield nm
 
 
@@ -59,7 +63,7 @@ def audit():
 
 
 @pytest.fixture()
-async def index_audit_handler(pubsub, audit, nodes_manager):
+async def index_audit_handler(pubsub, audit, shard_manager):
     iah = auditing.IndexAuditHandler(
         driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
         audit=audit,

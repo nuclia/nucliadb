@@ -24,7 +24,7 @@ from typing import Any, AsyncGenerator, List, Optional
 
 import asyncpg
 
-from nucliadb.ingest.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
+from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS resources (

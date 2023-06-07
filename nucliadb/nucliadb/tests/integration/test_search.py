@@ -20,7 +20,7 @@
 import asyncio
 import math
 from datetime import datetime
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import nats
 import pytest
@@ -32,10 +32,10 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.consumer import shard_creator
-from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.ingest.tests.vectors import V1
-from nucliadb.ingest.utils import get_driver
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
@@ -1296,12 +1296,8 @@ async def kb_with_one_logic_shard(
 
 @pytest.fixture(scope="function")
 def max_shard_paragraphs():
-    prev = ingest_settings.max_shard_paragraphs
-    ingest_settings.max_shard_paragraphs = 20
-
-    yield
-
-    ingest_settings.max_shard_paragraphs = prev
+    with patch.object(cluster_settings, "max_shard_paragraphs", 20):
+        yield
 
 
 @pytest.fixture(scope="function")
@@ -1312,7 +1308,7 @@ async def kb_with_two_logic_shards(
     nucliadb_grpc: WriterStub,
 ):
     sc = shard_creator.ShardCreatorHandler(
-        driver=await get_driver(), storage=await get_storage(), pubsub=None  # type: ignore
+        driver=get_driver(), storage=await get_storage(), pubsub=None  # type: ignore
     )
     resp = await nucliadb_manager.post("/kbs", json={})
     assert resp.status_code == 201

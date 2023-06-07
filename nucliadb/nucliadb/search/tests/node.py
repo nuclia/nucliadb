@@ -31,7 +31,7 @@ from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb.ingest.settings import settings
+from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_utils.tests import free_port
 
 logger = logging.getLogger(__name__)
@@ -265,13 +265,12 @@ class _NodeRunner:
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
 
-        settings.chitchat_binding_host = "0.0.0.0"
-        settings.chitchat_binding_port = free_port()
-        settings.chitchat_enabled = True
+        cluster_settings.chitchat_binding_host = "0.0.0.0"
+        cluster_settings.chitchat_binding_port = free_port()
 
         images.settings["nucliadb_cluster_manager"]["env"][
             "MONITOR_ADDR"
-        ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
+        ] = f"{docker_internal_host}:{cluster_settings.chitchat_binding_port}"
         images.settings["nucliadb_cluster_manager"]["env"]["UPDATE_INTERVAL"] = "1s"
 
         cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
@@ -398,22 +397,22 @@ class _NodeRunner:
 
     def setup_env(self):
         # reset on every test run in case something touches it
-        settings.writer_port_map = {
+        cluster_settings.writer_port_map = {
             self.data["writer1_internal_host"]: self.data["writer1"]["port"],
             self.data["writer2_internal_host"]: self.data["writer2"]["port"],
         }
-        settings.reader_port_map = {
+        cluster_settings.reader_port_map = {
             self.data["writer1_internal_host"]: self.data["reader1"]["port"],
             self.data["writer2_internal_host"]: self.data["reader2"]["port"],
         }
-        settings.sidecar_port_map = {
+        cluster_settings.sidecar_port_map = {
             self.data["writer1_internal_host"]: self.data["sidecar1"]["port"],
             self.data["writer2_internal_host"]: self.data["sidecar2"]["port"],
         }
 
-        settings.node_writer_port = None  # type: ignore
-        settings.node_reader_port = None  # type: ignore
-        settings.node_sidecar_port = None  # type: ignore
+        cluster_settings.node_writer_port = None  # type: ignore
+        cluster_settings.node_reader_port = None  # type: ignore
+        cluster_settings.node_sidecar_port = None  # type: ignore
 
 
 @pytest.fixture(scope="session", autouse=False)

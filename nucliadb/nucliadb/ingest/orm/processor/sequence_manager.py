@@ -19,7 +19,7 @@
 #
 from typing import Optional
 
-from nucliadb.ingest.maindb.driver import Driver, Transaction
+from nucliadb.common.maindb.driver import Driver, Transaction
 
 TXNID = "/internal/worker/{worker}"
 

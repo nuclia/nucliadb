@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.utils import get_driver
 
 
 async def resource_slug_exists(kbid: str, slug: str) -> bool:
-    driver = await get_driver()
+    driver = get_driver()
     async with driver.transaction() as txn:
         return await KnowledgeBox.resource_slug_exists(txn, kbid, slug)

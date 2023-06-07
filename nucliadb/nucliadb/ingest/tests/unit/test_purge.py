@@ -21,8 +21,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest import purge
-from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 
 pytestmark = pytest.mark.asyncio
 
@@ -115,7 +115,7 @@ async def test_main(driver, storage):
     ) as purge_kb_storage, patch(
         "nucliadb.ingest.purge.get_storage", return_value=storage
     ), patch(
-        "nucliadb.ingest.purge.get_driver", return_value=driver
+        "nucliadb.ingest.purge.setup_driver", return_value=driver
     ):
         await purge.main()
 

@@ -40,14 +40,14 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.train.settings import settings
-from nucliadb.train.utils import get_nodes_manager
+from nucliadb.train.utils import get_shard_manager
 from nucliadb_protos import train_pb2_grpc
 from nucliadb_telemetry import errors
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
     async def initialize(self):
-        self.proc = get_nodes_manager()
+        self.proc = get_shard_manager()  # XXX this is odd use here
 
     async def finalize(self):
         pass

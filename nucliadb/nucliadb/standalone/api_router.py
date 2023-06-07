@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from fastapi_versioning import version
 
-from nucliadb.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.settings import nuclia_settings

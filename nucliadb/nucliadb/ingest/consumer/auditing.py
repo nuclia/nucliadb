@@ -25,15 +25,16 @@ from functools import partial
 
 from nucliadb_protos.resources_pb2 import FieldType
 
-from nucliadb.ingest.maindb.driver import Driver
+from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.cluster.manager import choose_node
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import audit_pb2, noderesources_pb2, nodesidecar_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
 
 from . import metrics
@@ -69,7 +70,7 @@ class IndexAuditHandler:
         self.driver = driver
         self.audit = audit
         self.pubsub = pubsub
-        self.node_manager = NodesManager(driver)
+        self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
 
     async def initialize(self) -> None:
@@ -107,7 +108,7 @@ class IndexAuditHandler:
         try:
             shard_groups: list[
                 writer_pb2.ShardObject
-            ] = await self.node_manager.get_shards_by_kbid(kbid)
+            ] = await self.shard_manager.get_shards_by_kbid(kbid)
         except ShardsNotFound:
             logger.warning(f"No shards found for kbid {kbid}, skipping")
             return
@@ -118,7 +119,7 @@ class IndexAuditHandler:
         total_paragraphs = 0
 
         for shard_obj in shard_groups:
-            node, shard_id, _ = self.node_manager.choose_node(shard_obj)
+            node, shard_id, _ = choose_node(shard_obj)
             shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
                 noderesources_pb2.ShardId(id=shard_id)  # type: ignore
             )
@@ -155,7 +156,6 @@ class ResourceWritesAuditHandler:
         self.storage = storage
         self.audit = audit
         self.pubsub = pubsub
-        self.node_manager = NodesManager(driver)
 
     async def initialize(self) -> None:
         self.subscription_id = str(uuid.uuid4())

@@ -81,8 +81,8 @@ def config_nucliadb(nucliadb_args: Settings):
     use some specific settings.
     """
 
-    from nucliadb.ingest.orm import NODE_CLUSTER
-    from nucliadb.ingest.orm.local_node import LocalNode
+    from nucliadb.common.cluster import manager
+    from nucliadb.common.cluster.settings import settings as cluster_settings
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb.train.settings import settings as train_settings
     from nucliadb.writer.settings import settings as writer_settings
@@ -90,13 +90,13 @@ def config_nucliadb(nucliadb_args: Settings):
     from nucliadb_utils.settings import (
         audit_settings,
         http_settings,
-        indexing_settings,
         nuclia_settings,
         nucliadb_settings,
         transaction_settings,
     )
 
-    ingest_settings.chitchat_enabled = False
+    cluster_settings.standalone_mode = True
+    cluster_settings.node_replicas = 1
     ingest_settings.nuclia_partitions = 1
     ingest_settings.total_replicas = 1
     ingest_settings.replica_number = 0
@@ -106,7 +106,6 @@ def config_nucliadb(nucliadb_args: Settings):
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"
-    indexing_settings.index_local = True
     cache_settings.cache_enabled = False
     writer_settings.dm_enabled = False
 
@@ -127,5 +126,4 @@ def config_nucliadb(nucliadb_args: Settings):
     elif os.environ.get("NUA_ZONE"):
         nuclia_settings.nuclia_zone = os.environ.get("NUA_ZONE", "dev")
 
-    local_node = LocalNode()
-    NODE_CLUSTER.local_node = local_node
+    manager.setup_standalone_cluster()

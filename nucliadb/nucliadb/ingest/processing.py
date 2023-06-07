@@ -126,7 +126,7 @@ async def start_processing_engine():
 
 class DummyProcessingEngine:
     def __init__(self):
-        self.calls: list[list[Any]] = []
+        self.calls: list[list[Any]] = []  # type: ignore
 
     async def initialize(self):
         pass

@@ -23,7 +23,7 @@ from typing import Dict, Optional
 
 from lru import LRU  # type: ignore
 
-from nucliadb.ingest.maindb.driver import Transaction
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.txn_utils import get_transaction

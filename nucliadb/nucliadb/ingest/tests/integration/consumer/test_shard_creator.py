@@ -36,7 +36,7 @@ async def test_shard_auto_create(
     fake_node,
     knowledgebox_ingest,
 ):
-    from nucliadb.ingest.settings import settings
+    from nucliadb.common.cluster.settings import settings
 
     settings.max_shard_paragraphs = 1
 
@@ -48,7 +48,7 @@ async def test_shard_auto_create(
     )
     await sc.initialize()
 
-    original_kb_shards = await sc.node_manager.get_shards_by_kbid_inner(
+    original_kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(
         knowledgebox_ingest
     )
 
@@ -64,5 +64,5 @@ async def test_shard_auto_create(
 
     await sc.finalize()
 
-    kb_shards = await sc.node_manager.get_shards_by_kbid_inner(knowledgebox_ingest)
+    kb_shards = await sc.shard_manager.get_shards_by_kbid_inner(knowledgebox_ingest)
     assert len(kb_shards.shards) == len(original_kb_shards.shards) + 1

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Sequence, Tuple, Union
+from typing import AsyncGenerator, AsyncIterator, Optional, Sequence, Tuple
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -28,35 +28,24 @@ from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import GetLabelSetResponse, GetVectorSetsResponse
-from nucliadb_protos.writer_pb2 import Shards
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
+from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
+from nucliadb.common.cluster.manager import get_index_node, load_active_nodes
+from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.maindb.driver import Driver, Transaction
-from nucliadb.ingest.orm.abc import AbstractNode
-from nucliadb.ingest.orm.exceptions import (
-    KnowledgeBoxConflict,
-    KnowledgeBoxNotFound,
-    ShardNotFound,
-)
-from nucliadb.ingest.orm.local_node import LocalNode
-from nucliadb.ingest.orm.node import KB_SHARDS, Node
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.resource import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
     Resource,
 )
-from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.synonyms import Synonyms
-from nucliadb.ingest.orm.utils import (
-    compute_paragraph_key,
-    get_basic,
-    get_node_klass,
-    set_basic,
-)
-from nucliadb_utils.exceptions import ShardsNotFound
-from nucliadb_utils.settings import indexing_settings
+from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
+from nucliadb_protos import writer_pb2
+from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
@@ -216,9 +205,11 @@ class KnowledgeBox:
             failed = True
 
         if failed is False:
+            shard_manager = get_shard_manager()
             try:
-                node_klass = get_node_klass()
-                await node_klass.create_shard_by_kbid(txn, uuid, similarity=similarity)
+                await shard_manager.create_shard_by_kbid(
+                    txn, uuid, similarity=similarity
+                )
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e
@@ -269,20 +260,17 @@ class KnowledgeBox:
 
         return uuid
 
-    async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractNode, str]]:
+    async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractIndexNode, str]]:
         shards_obj = await self.get_shards_object()
 
         for shard in shards_obj.shards:
             for replica in shard.replicas:
-                node_klass = get_node_klass()
-                node: Optional[Union[LocalNode, Node]] = await node_klass.get(
-                    replica.node
-                )
+                node = get_index_node(replica.node)
                 if node is not None:
                     yield node, replica.shard.id
 
     # Vectorset
-    async def get_vectorsets(self, response: GetVectorSetsResponse):
+    async def get_vectorsets(self, response: writer_pb2.GetVectorSetsResponse):
         vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
         payload = await self.txn.get(vectorset_key)
         if payload is not None:
@@ -331,7 +319,9 @@ class KnowledgeBox:
                 labels.labelset[id].CopyFrom(ls)
         return labels
 
-    async def get_labelset(self, labelset: str, labelset_response: GetLabelSetResponse):
+    async def get_labelset(
+        self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
+    ):
         labelset_key = KB_LABELSET.format(kbid=self.kbid, id=labelset)
         payload = await self.txn.get(labelset_key)
         if payload is not None:
@@ -382,19 +372,16 @@ class KnowledgeBox:
         if payload is None:
             logger.warning(f"Shards not found for kbid={kbid}")
         else:
-            shards_obj = Shards()
+            shards_obj = writer_pb2.Shards()
             shards_obj.ParseFromString(payload)  # type: ignore
 
-            if not indexing_settings.index_local:
-                await Node.load_active_nodes()
+            if cluster_settings.standalone_mode:
+                await load_active_nodes()
 
             for shard in shards_obj.shards:
                 # Delete the shard on nodes
                 for replica in shard.replicas:
-                    node_klass = get_node_klass()
-                    node: Optional[Union[LocalNode, Node]] = await node_klass.get(
-                        replica.node
-                    )
+                    node = get_index_node(replica.node)
                     if node is None:
                         logger.info(f"No node {replica.node} found lets continue")
                         continue
@@ -433,20 +420,22 @@ class KnowledgeBox:
                     await txn.delete(key)
                 await txn.commit()
 
-    async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
+    async def get_resource_shard(
+        self, shard_id: str
+    ) -> Optional[writer_pb2.ShardObject]:
         pb = await self.get_shards_object()
         for shard in pb.shards:
             if shard.shard == shard_id:
-                return node_klass.create_shard_klass(shard_id, shard)
+                return shard
         return None
 
-    async def get_shards_object(self) -> PBShards:
+    async def get_shards_object(self) -> writer_pb2.Shards:
         key = KB_SHARDS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
         if payload is None:
             await self.txn.abort()
             raise ShardsNotFound(self.kbid)
-        pb = PBShards()
+        pb = writer_pb2.Shards()
         pb.ParseFromString(payload)
         return pb
 

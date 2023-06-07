@@ -22,8 +22,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from nucliadb.ingest.chitchat import ChitchatMonitor, update_available_nodes
-from nucliadb.ingest.orm.node import NODES
+from nucliadb.common.cluster.chitchat import ChitchatMonitor, update_available_nodes
+from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb_models.cluster import ClusterMember, MemberType
 
 
@@ -31,7 +31,7 @@ from nucliadb_models.cluster import ClusterMember, MemberType
 def start_server():
     task = unittest.mock.MagicMock()
     with unittest.mock.patch(
-        "nucliadb.ingest.chitchat.start_server", return_value=task
+        "nucliadb.common.cluster.chitchat.start_server", return_value=task
     ) as mock:
         yield mock
 
@@ -63,26 +63,26 @@ async def test_chitchat_monitor(start_server):
 
 @pytest.mark.asyncio
 async def test_update_available_nodes():
-    NODES.clear()
-    assert NODES == {}
+    INDEX_NODES.clear()
+    assert INDEX_NODES == {}
     await update_available_nodes([])
-    assert len(NODES) == 0
+    assert len(INDEX_NODES) == 0
 
     # Check that it ignores itself
     member = get_cluster_member(is_self=True)
     await update_available_nodes([member])
-    assert len(NODES) == 0
+    assert len(INDEX_NODES) == 0
 
     # Check that it ignores types other than node_type=MemberType.IO
     member = get_cluster_member(type=MemberType.INGEST)
     await update_available_nodes([member])
-    assert len(NODES) == 0
+    assert len(INDEX_NODES) == 0
 
     # Check it registers new members
     member = get_cluster_member(node_id="node1")
     await update_available_nodes([member])
-    assert len(NODES) == 1
-    node = NODES["node1"]
+    assert len(INDEX_NODES) == 1
+    node = INDEX_NODES["node1"]
     assert node.address == member.listen_addr
 
     assert node.shard_count == member.shard_count
@@ -92,16 +92,16 @@ async def test_update_available_nodes():
     member.listen_addr = "0.0.0.0:7777"
     member2 = get_cluster_member(node_id="node2", shard_count=1)
     await update_available_nodes([member, member2])
-    assert len(NODES) == 2
-    node = NODES["node1"]
+    assert len(INDEX_NODES) == 2
+    node = INDEX_NODES["node1"]
     assert node.shard_count == 2
     assert node.address == "0.0.0.0:7777"
-    node2 = NODES["node2"]
+    node2 = INDEX_NODES["node2"]
     assert node2.shard_count == 1
 
     # Check that it removes members that are no longer reported
     await update_available_nodes([])
-    assert len(NODES) == 0
+    assert len(INDEX_NODES) == 0
 
 
 @pytest.mark.asyncio
@@ -132,4 +132,4 @@ async def test_update_node_metrics(metrics_registry):
         is None
     )
 
-    NODES.clear()
+    INDEX_NODES.clear()

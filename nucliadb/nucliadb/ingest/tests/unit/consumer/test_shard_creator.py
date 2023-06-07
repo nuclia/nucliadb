@@ -25,8 +25,8 @@ import pytest
 from nucliadb_protos.nodesidecar_pb2 import Counter
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
+from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.consumer import shard_creator
-from nucliadb.ingest.settings import settings
 
 pytestmark = pytest.mark.asyncio
 
@@ -44,23 +44,18 @@ def sidecar():
 
 
 @pytest.fixture()
-def nodes_manager(sidecar):
+def shard_manager(sidecar):
     nm = MagicMock()
     node = MagicMock(sidecar=sidecar)
-    nm.choose_node.return_value = node, "shard_id", None
     shards = Shards(shards=[ShardObject()], actual=0)
     nm.get_shards_by_kbid_inner = AsyncMock(return_value=shards)
-    with patch("nucliadb.ingest.consumer.shard_creator.NodesManager", return_value=nm):
-        yield nm
-
-
-@pytest.fixture()
-def node_klass():
-    nc = AsyncMock()
     with patch(
-        "nucliadb.ingest.consumer.shard_creator.get_node_klass", return_value=nc
+        "nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=nm
+    ), patch(
+        "nucliadb.ingest.consumer.shard_creator.choose_node",
+        return_value=(node, "shard_id", None),
     ):
-        yield nc
+        yield nm
 
 
 @pytest.fixture()
@@ -71,7 +66,7 @@ def kb():
 
 
 @pytest.fixture()
-async def shard_creator_handler(pubsub, nodes_manager, node_klass, kb):
+async def shard_creator_handler(pubsub, shard_manager, kb):
     sc = shard_creator.ShardCreatorHandler(
         driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
         storage=AsyncMock(),
@@ -84,7 +79,7 @@ async def shard_creator_handler(pubsub, nodes_manager, node_klass, kb):
 
 
 async def test_handle_message_create_new_shard(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, node_klass, kb
+    shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, kb, shard_manager
 ):
     sidecar.GetCount.return_value = Counter(
         paragraphs=settings.max_shard_paragraphs + 1
@@ -98,13 +93,13 @@ async def test_handle_message_create_new_shard(
 
     await asyncio.sleep(0.06)
 
-    node_klass.create_shard_by_kbid.assert_called_with(
+    shard_manager.create_shard_by_kbid.assert_called_with(
         ANY, "kbid", similarity=kb.get_similarity.return_value
     )
 
 
 async def test_handle_message_do_not_create(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, node_klass, kb
+    shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, kb, shard_manager
 ):
     sidecar.GetCount.return_value = Counter(
         paragraphs=settings.max_shard_paragraphs - 1
@@ -118,11 +113,11 @@ async def test_handle_message_do_not_create(
 
     await shard_creator_handler.finalize()
 
-    node_klass.create_shard_by_kbid.assert_not_called()
+    shard_manager.create_shard_by_kbid.assert_not_called()
 
 
 async def test_handle_message_ignore_not_indexed(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, node_klass
+    shard_creator_handler: shard_creator.ShardCreatorHandler, shard_manager
 ):
     notif = Notification(
         kbid="kbid",
@@ -132,7 +127,7 @@ async def test_handle_message_ignore_not_indexed(
 
     await shard_creator_handler.finalize()
 
-    node_klass.create_shard_by_kbid.assert_not_called()
+    shard_manager.create_shard_by_kbid.assert_not_called()
 
 
 def test_should_create_new_shard():

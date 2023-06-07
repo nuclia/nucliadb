@@ -1,12 +1,12 @@
 .PHONY: install-dev
 install-dev:
-## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
-	pip install --upgrade "pip<23.1"
-	pip install -r ../test-requirements.txt
-	pip install -r ../code-requirements.txt
-	cd .. && pip install -r nucliadb_sdk/requirements-sources.txt
-	pip install -r requirements.txt
-	pip install -r requirements-test.txt
+	pip install --upgrade pip wheel
+	cd .. && pip install \
+		-r test-requirements.txt \
+		-r code-requirements.txt \
+		-r nucliadb_sdk/requirements-sources.txt \
+		-r nucliadb_sdk/requirements.txt \
+		-r nucliadb_sdk/requirements-test.txt
 	pip install -e ../nucliadb_client/
 	pip install -e .
 

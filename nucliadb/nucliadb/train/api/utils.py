@@ -23,12 +23,12 @@ from typing import Optional
 
 from nucliadb_protos.dataset_pb2 import TrainSet
 
-from nucliadb.train.utils import get_nodes_manager
+from nucliadb.train.utils import get_shard_manager
 
 
 async def get_kb_partitions(kbid: str, prefix: Optional[str] = None):
-    nodes_manager = get_nodes_manager()
-    shards = await nodes_manager.get_shards_by_kbid_inner(kbid=kbid)
+    shard_manager = get_shard_manager()
+    shards = await shard_manager.get_shards_by_kbid_inner(kbid=kbid)
     valid_shards = []
     if prefix is None:
         prefix = ""

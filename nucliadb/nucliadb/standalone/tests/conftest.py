@@ -19,7 +19,9 @@
 #
 pytest_plugins = [
     "pytest_docker_fixtures",
-    "nucliadb.ingest.tests.fixtures",
+    "nucliadb.tests.fixtures",
+    "nucliadb.tests.tikv",
+    "nucliadb.ingest.tests.fixtures",  # should be refactored out
     "nucliadb.search.tests.fixtures",
     "nucliadb.search.tests.node",
     "nucliadb.standalone.tests.fixtures",

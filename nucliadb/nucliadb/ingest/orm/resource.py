@@ -62,6 +62,7 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.date import Datetime
@@ -71,7 +72,6 @@ from nucliadb.ingest.fields.keywordset import Keywordset
 from nucliadb.ingest.fields.layout import Layout
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic

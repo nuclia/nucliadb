@@ -5,11 +5,8 @@ protos:
 
 .PHONY: install-dev
 install-dev:
-## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
-	pip install --upgrade "pip<23.1"
-	pip install -r ../test-requirements.txt
-	pip install -r ../code-requirements.txt
-	pip install -r requirements.txt
+	pip install --upgrade pip wheel
+	pip install -r ../test-requirements.txt -r ../code-requirements.txt -r requirements.txt
 # utils dep required for test fixtures for nats
 # NEEDS TO BE DECOUPLED EVENTUALLY
 	pip install -e ../nucliadb_protos/python
