@@ -21,7 +21,7 @@ import base64
 import enum
 import inspect
 import io
-from pydoc import doc
+import typing
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import httpx
@@ -125,6 +125,57 @@ class MethodParams(BaseModel):
     request_type: Optional[Type[BaseModel]]
 
 
+def _inject_signature(
+    func,
+    path_params: Tuple[str, ...],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    response_type: Optional[
+        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+    ],
+):
+    parameters = []
+    # The first parameter is always self
+    parameters.append(
+        inspect.Parameter(
+            "self", kind=inspect.Parameter.POSITIONAL_ONLY, annotation="NucliaSDK"
+        )
+    )
+    # Path params
+    for path_param in path_params:
+        parameters.append(
+            inspect.Parameter(
+                path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
+            )
+        )
+    # Body params
+    if request_type is not None:
+        if isinstance(request_type, type) and issubclass(request_type, BaseModel):
+            for field in request_type.__fields__.values():
+                parameters.append(
+                    inspect.Parameter(
+                        field.name,
+                        kind=inspect.Parameter.KEYWORD_ONLY,
+                        annotation=field.outer_type_,
+                        default=field.default,
+                    )
+                )
+        parameters.append(
+            inspect.Parameter(
+                "content",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                annotation=request_type,
+            )
+        )
+    if inspect.isroutine(response_type):
+        # Get return annotation from the callable if it's a function
+        return_annotation = typing.get_type_hints(response_type).get("return")
+    else:
+        return_annotation = response_type
+    func.__signature__ = inspect.Signature(
+        parameters=parameters, return_annotation=return_annotation
+    )
+
+
 def _request_builder(
     name: str,
     path_template: str,
@@ -180,41 +231,11 @@ def _request_builder(
         else:
             return _parse_response(response_type, resp)
 
+    _inject_signature(_func, path_params, request_type, response_type)
+
     if docstring is not None:
         _func.__name__ = docstring.name
         _func.__doc__ = docstring.doc
-        # Add path params as signature parameters
-        parameters = []
-        parameters.append(
-            inspect.Parameter(
-                "self", kind=inspect.Parameter.POSITIONAL_ONLY, annotation="NucliaSDK"
-            )
-        )
-        # Path params
-        parameters.append(
-            inspect.Parameter(
-                "kbid", kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
-            )
-        )
-        # Required query params.
-        # Required body params (that have no references to other models)
-        parameters.append(
-            inspect.Parameter(
-                "query",
-                kind=inspect.Parameter.KEYWORD_ONLY,
-                annotation=Optional[str],
-                default=None,
-            )
-        )
-        parameters.append(
-            inspect.Parameter(
-                "content",
-                kind=inspect.Parameter.KEYWORD_ONLY,
-                annotation=Optional[ChatRequest],
-                default=None,
-            )
-        )
-        _func.__signature__ = inspect.Signature(parameters=parameters)
 
     return _func
 

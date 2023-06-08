@@ -384,6 +384,11 @@ class SearchParamDefaults:
         title="Automatic search filtering",
         description="If set to true, the search will automatically add filters to the query. For example, it will filter results containing the entities detected in the query",  # noqa: E501
     )
+    chat_query = ParamDefault(
+        default=...,
+        title="Query",
+        description="The query to get a generative answer for",
+    )
 
 
 class SearchRequest(BaseModel):
@@ -445,10 +450,10 @@ class RephraseModel(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    query: str
-    fields: List[str] = []
-    filters: List[str] = []
-    min_score: float = 0.70
+    query: str = SearchParamDefaults.chat_query.to_field()
+    fields: List[str] = SearchParamDefaults.fields.to_field()
+    filters: List[str] = SearchParamDefaults.filters.to_field()
+    min_score: float = SearchParamDefaults.min_score.to_field()
     features: List[ChatOptions] = [
         ChatOptions.PARAGRAPHS,
         ChatOptions.RELATIONS,
