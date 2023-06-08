@@ -44,7 +44,6 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_suggest_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:
