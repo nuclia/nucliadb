@@ -70,6 +70,13 @@ async def migration(kbid: str) -> None:
 ```
 
 
+#### Execution context
+
+The migrations will be run in the context of:
+- active database initialized
+- blob storage driver initialized
+- index node cluster available
+
 #### Observability
 
 - Provide metrics for every migration
@@ -80,7 +87,7 @@ async def migration(kbid: str) -> None:
 
 #### Implementation
 
-Running migrations will be done through a command line utility.
+Running migrations will be done through a command line utility `nucliadb-run-migrations`.
 
 This utility will be run automatically with a post release helm/argo hook.
 
