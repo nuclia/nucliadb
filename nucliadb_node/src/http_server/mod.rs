@@ -24,8 +24,7 @@ use std::net::SocketAddr;
 
 use axum::routing::get;
 use axum::Router;
-
-use crate::env::metrics_http_port;
+use nucliadb_core::env::metrics_http_port;
 
 pub struct MetricsServerOptions {
     pub default_http_port: u16,

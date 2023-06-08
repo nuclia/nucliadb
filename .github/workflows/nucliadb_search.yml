@@ -110,7 +110,7 @@ jobs:
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         run: |
-          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+          docker build --build-arg CARGO_PROFILE=debug -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
       - name: Build local Sidecar for testing
         if: steps.filter.outputs.sidecar_modified == 'true'
@@ -303,4 +303,4 @@ jobs:
 
       - name: Upload docs
         run: |
-          gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/regional/v$API_VERSION/$COMPONENT/spec.json
+          gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/nucliadb/v$API_VERSION/$COMPONENT/spec.json

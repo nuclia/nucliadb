@@ -21,6 +21,7 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
+use nucliadb_core::env;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, NewShardRequest, NewVectorSetRequest, OpStatus, Resource,
@@ -31,27 +32,26 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use uuid::Uuid;
 
-use crate::env;
 use crate::services::writer::ShardWriterService;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NodeWriterService {
     pub cache: HashMap<String, ShardWriterService>,
 }
-
-impl Default for NodeWriterService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 impl NodeWriterService {
-    pub fn new() -> Self {
+    pub fn new() -> NodeResult<Self> {
+        let shards_path = env::shards_path();
+        let tmp_workspace = env::tmp_path();
+        if !shards_path.exists() {
+            std::fs::create_dir_all(shards_path)?;
+        }
+        if !tmp_workspace.exists() {
+            std::fs::create_dir_all(tmp_workspace)?;
+        }
         // We shallow the error if the threadpools were already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
         let _ = VectorsMerger::install_global().map(std::thread::spawn);
-        Self {
-            cache: HashMap::new(),
-        }
+        Ok(Self::default())
     }
 
     #[tracing::instrument(skip_all)]
