@@ -34,6 +34,7 @@ use nucliadb_core::{env, NodeResult};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
+use nucliadb_node::telemetry::middleware::GrpcInstrumentorLayer;
 use nucliadb_node::utils;
 use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::writer::NodeWriterService;
@@ -56,10 +57,13 @@ pub enum NodeUpdate {
 #[tokio::main]
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
+    let data_path = env::data_path();
+    if !data_path.exists() {
+        std::fs::create_dir_all(data_path)?;
+    }
+
     let _guard = init_telemetry()?;
-
     let start_bootstrap = Instant::now();
-
     let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
     let mut node_writer_service = NodeWriterService::new()?;
@@ -146,12 +150,14 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
 
     info!("Listening for gRPC requests at: {:?}", addr);
 
+    let tracing_middleware = GrpcInstrumentorLayer::default();
     let metrics_middleware = MetricsLayer::default();
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
+        .layer(tracing_middleware)
         .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))

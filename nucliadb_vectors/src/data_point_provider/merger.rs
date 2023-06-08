@@ -49,7 +49,7 @@ pub fn send_merge_request(request: impl MergeQuery + 'static) {
     // MERGER_NOTIFIER_SET is protected by the type Once so we avoid concurrency problems.
     match unsafe { &MERGER_NOTIFIER } {
         Some(merger) => merger.send(Box::new(request)),
-        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
+        None => tracing::warn!("Merge requests are being sent without a merger installed"),
     }
 }
 
