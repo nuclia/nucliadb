@@ -16,8 +16,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional
+import inspect
+import typing
+from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
+import httpx
 from pydantic import BaseModel
 
 
@@ -68,3 +71,112 @@ You can use the `content` parameter to pass a `ChatRequest` object
 France won the 2018 football World Cup.
 """,
 )
+
+
+def inject_documentation(
+    func,
+    name: str,
+    method: str,
+    path_template: str,
+    path_params: Tuple[str, ...],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    response_type: Optional[
+        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+    ],
+    docstring: Optional[Docstring] = None,
+):
+    func.__name__ = name
+    _inject_signature(func, path_params, request_type, response_type)
+    _inject_docstring(func, method, path_template, path_params, request_type, docstring)
+
+
+def _inject_signature(
+    func,
+    path_params: Tuple[str, ...],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    response_type: Optional[
+        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+    ],
+):
+    # TODO: Fix signature for methods of NucliaDBAsync
+    parameters = []
+    # The first parameter is always self
+    parameters.append(
+        inspect.Parameter(
+            "self", kind=inspect.Parameter.POSITIONAL_ONLY, annotation="NucliaSDK"
+        )
+    )
+
+    # Path params
+    for path_param in path_params:
+        parameters.append(
+            inspect.Parameter(
+                path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
+            )
+        )
+
+    # Body params
+    if request_type is not None:
+        if isinstance(request_type, type) and issubclass(request_type, BaseModel):
+            for field in request_type.__fields__.values():
+                parameters.append(
+                    inspect.Parameter(
+                        field.name,
+                        kind=inspect.Parameter.KEYWORD_ONLY,
+                        annotation=field.outer_type_,
+                        default=field.default,
+                    )
+                )
+        parameters.append(
+            inspect.Parameter(
+                "content",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                annotation=request_type,
+                default=None,
+            )
+        )
+    # Response type
+    if inspect.isroutine(response_type):
+        return_annotation = typing.get_type_hints(response_type).get("return")
+    else:
+        return_annotation = response_type
+
+    func.__signature__ = inspect.Signature(
+        parameters=parameters, return_annotation=return_annotation
+    )
+
+
+def _inject_docstring(
+    func,
+    method: str,
+    path_template: str,
+    path_params: Tuple[str, ...],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    docstring: Optional[Docstring] = None,
+):
+    # Initial description section
+    func_doc = f"Wrapper around the api endpoint {method.upper()} {path_template}\n\n"
+    if docstring:
+        func_doc += docstring.doc + "\n\n"
+
+    # Add params section
+    params = []
+    for path_param in path_params:
+        params.append(f":param <class 'str'> {path_param}:")
+    if request_type is not None:
+        if isinstance(request_type, type) and issubclass(request_type, BaseModel):
+            for field in request_type.__fields__.values():
+                try:
+                    type_name = field.outer_type_.__name__
+                except AttributeError:
+                    type_name = typing.get_origin(field.outer_type_).__name__
+                type_name = field.outer_type_
+                params.append(
+                    f":param {type_name} {field.name}: {field.field_info.description or ''}"
+                )
+    func_doc += "\n".join(params) + "\n\n"
+
+    # Examples section
+    if docstring and docstring.examples:
+        func_doc += "Example usage:\n" + docstring.examples
+    func.__doc__ = func_doc
