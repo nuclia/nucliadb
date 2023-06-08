@@ -22,8 +22,7 @@ use std::time::Instant;
 use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
-use nucliadb_core::{tmp_workspace, NodeResult};
-use nucliadb_node::env;
+use nucliadb_core::{env, NodeResult};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
@@ -38,7 +37,7 @@ type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Reader Node starting...");
     let shards_path = env::shards_path();
-    let tmp_workspace = tmp_workspace::path();
+    let tmp_workspace = env::tmp_path();
     if !shards_path.exists() {
         std::fs::create_dir_all(shards_path)?;
     }
