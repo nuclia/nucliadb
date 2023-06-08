@@ -143,8 +143,8 @@ async def test_multiple_search_resource_all(
         assert resp.json()["fulltext"]["next_page"] is False
 
 
+@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 @pytest.mark.asyncio
-@pytest.mark.flaky(reruns=3)
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:
