@@ -28,6 +28,8 @@ pub mod node_metadata;
 
 pub mod services;
 
+mod shards;
+
 /// Global configuration enviromental variables
 pub mod env;
 
