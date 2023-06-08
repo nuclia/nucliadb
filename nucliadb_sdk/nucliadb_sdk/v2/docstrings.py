@@ -24,52 +24,72 @@ import httpx
 from pydantic import BaseModel
 
 
+class Example(BaseModel):
+    description: str
+    code: str
+
+
 class Docstring(BaseModel):
     doc: str
-    examples: Optional[str] = None
+    examples: List[Example] = []
 
 
 SEARCH = Docstring(
     doc="""Search in your Knowledge Box""",
-    examples="""
-Advanced search on the full text index
+    examples=[
+        Example(
+            description="Advanced search on the full text index",
+            code="""
 >>> resp = sdk.search(kbid="mykbid", advanced_query="text:SRE OR text:DevOps", features=["document"])
 >>> rid = resp.fulltext.results[0].rid
 >>> resp.resources[rid].title
 The Site Reliability Workbook.pdf
 """,
+        )
+    ],
 )
 
 FIND = Docstring(
     doc="""Find documents in your Knowledge Box""",
-    examples="""
-Find documents matching a query
+    examples=[
+        Example(
+            description="Find documents matching a query",
+            code="""
 >>> resp = sdk.find(kbid="mykbid", query="Very experienced candidates with Rust experience")
 >>> resp.resources.popitem().title
 Graydon_Hoare.cv.pdf
-
-Filter down by country and increase accuracy of results
+""",
+        ),
+        Example(
+            description="Filter down by country and increase accuracy of results",
+            code="""
 >>> content = FindRequest(query="Very experienced candidates with Rust experience", filters=["/l/country/Spain"], min_score=2.5)
 >>> resp = sdk.find(kbid="mykbid", content=content)
 >>> resp.resources.popitem().title
 http://github.com/hermeGarcia
 """,  # noqa
+        ),
+    ],
 )
 
 CHAT = Docstring(
     doc="""Chat with your Knowledge Box""",
-    examples="""
-Get an answer for a question that is part of the data in the Knowledge Box
->>> resp = sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?")
->>> print(resp.answer)
-Yes, according to the provided context, France is expected to be in recession in 2023.
-
-You can use the `content` parameter to pass a `ChatRequest` object
+    examples=[
+        Example(
+            description="Get an answer for a question that is part of the data in the Knowledge Box",
+            code="""
+>>> sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?").answer
+Yes, according to the provided context, France is expected to be in recession in 2023.""",
+        ),
+        Example(
+            description="You can use the `content` parameter to pass a `ChatRequest` object",
+            code="""
 >>> content = ChatRequest(query="Who won the 2018 football World Cup?")
->>> resp = sdk.chat(kbid="mykbid", content=content)
->>> print(resp.answer)
+>>> sdk.chat(kbid="mykbid", content=content).answer
 France won the 2018 football World Cup.
 """,
+        ),
+    ],
 )
 
 
@@ -174,9 +194,12 @@ def _inject_docstring(
                 params.append(
                     f":param {type_name} {field.name}: {field.field_info.description or ''}"
                 )
-    func_doc += "\n".join(params) + "\n\n"
+    func_doc += "\n".join(params)
 
     # Examples section
-    if docstring and docstring.examples:
-        func_doc += "Example usage:\n" + docstring.examples
+    # if docstring and len(docstring.examples):
+    #     func_doc += "\n\nExample usage:\n"
+    #     for example in docstring.examples:
+    #         func_doc += f"\n{example.description}\n{example.code}\n"
+    func.__nucliadb_sdk_doc__ = docstring
     func.__doc__ = func_doc
