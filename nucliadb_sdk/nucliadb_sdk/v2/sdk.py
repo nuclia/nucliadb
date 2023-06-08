@@ -117,12 +117,21 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
         return resp.content
 
 
-class MethodParams(BaseModel):
-    name: str
-    path_template: str
-    method: str
-    path_params: Tuple[str, ...]
-    request_type: Optional[Type[BaseModel]]
+def _inject_documentation(
+    func,
+    name: str,
+    method: str,
+    path_template: str,
+    path_params: Tuple[str, ...],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    response_type: Optional[
+        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+    ],
+    docstring: Optional[docstrings.Docstring] = None,
+):
+    func.__name__ = name
+    _inject_signature(func, path_params, request_type, response_type)
+    _inject_docstring(func, method, path_template, path_params, request_type, docstring)
 
 
 def _inject_signature(
@@ -134,7 +143,6 @@ def _inject_signature(
     ],
 ):
     # TODO: Fix signature for methods of NucliaDBAsync
-
     parameters = []
     # The first parameter is always self
     parameters.append(
@@ -179,17 +187,47 @@ def _inject_signature(
     )
 
 
-def _inject_docstring(func, docstring: docstrings.Docstring):
-    doc = docstring.doc
-    if docstring.examples:
-        doc += "\n\nExample usage:\n" + docstring.examples
-    func.__doc__ = doc
+def _inject_docstring(
+    func,
+    method: str,
+    path_template: str,
+    path_params: Tuple[str, ...],
+    request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    docstring: Optional[docstrings.Docstring] = None,
+):
+    # Initial description section
+    func_doc = f"Wrapper around the api endpoint {method.upper()} {path_template}\n\n"
+    if docstring:
+        func_doc += docstring.doc + "\n\n"
+
+    # Add params section
+    params = []
+    for path_param in path_params:
+        params.append(f":param <class 'str'> {path_param}:")
+    if request_type is not None:
+        if isinstance(request_type, type) and issubclass(request_type, BaseModel):
+            for field in request_type.__fields__.values():
+                try:
+                    type_name = field.outer_type_.__name__
+                except AttributeError:
+                    type_name = typing.get_origin(field.outer_type_).__name__
+                type_name = field.outer_type_
+                params.append(
+                    f":param {type_name} {field.name}: {field.field_info.description or ''}"
+                )
+    func_doc += "\n".join(params) + "\n\n"
+
+    # Examples section
+    if docstring and docstring.examples:
+        func_doc += "Example usage:\n" + docstring.examples
+    func.__doc__ = func_doc
 
 
 def _request_builder(
+    *,
     name: str,
-    path_template: str,
     method: str,
+    path_template: str,
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
@@ -241,10 +279,16 @@ def _request_builder(
         else:
             return _parse_response(response_type, resp)
 
-    _func.__name__ = name
-    _inject_signature(_func, path_params, request_type, response_type)
-    if docstring is not None:
-        _inject_docstring(_func, docstring)
+    _inject_documentation(
+        _func,
+        name,
+        method,
+        path_template,
+        path_params,
+        request_type,
+        response_type,
+        docstring,
+    )
 
     return _func
 
@@ -323,233 +367,243 @@ class _NucliaSDKBase:
 
     # Knowledge Box Endpoints
     create_knowledge_box = _request_builder(
-        "create_knowledge_box",
-        "/v1/kbs",
-        "POST",
-        (),
-        KnowledgeBoxConfig,
-        KnowledgeBoxObj,
+        name="create_knowledge_box",
+        path_template="/v1/kbs",
+        method="POST",
+        path_params=(),
+        request_type=KnowledgeBoxConfig,
+        response_type=KnowledgeBoxObj,
     )
     delete_knowledge_box = _request_builder(
-        "delete_knowledge_box",
-        "/v1/kb/{kbid}",
-        "DELETE",
-        ("kbid",),
-        None,
-        KnowledgeBoxObj,
+        name="delete_knowledge_box",
+        path_template="/v1/kb/{kbid}",
+        method="DELETE",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
     )
     get_knowledge_box = _request_builder(
-        "get_knowledge_box", "/v1/kb/{kbid}", "GET", ("kbid",), None, KnowledgeBoxObj
+        name="get_knowledge_box",
+        path_template="/v1/kb/{kbid}",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
     )
     get_knowledge_box_by_slug = _request_builder(
-        "get_knowledge_box_by_slug",
-        "/v1/kb/s/{slug}",
-        "GET",
-        ("slug",),
-        None,
-        KnowledgeBoxObj,
+        name="get_knowledge_box_by_slug",
+        path_template="/v1/kb/s/{slug}",
+        method="GET",
+        path_params=("slug",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
     )
     list_knowledge_boxes = _request_builder(
-        "list_knowledge_boxes", "/v1/kbs", "GET", (), None, KnowledgeBoxList
+        name="list_knowledge_boxes",
+        path_template="/v1/kbs",
+        method="GET",
+        path_params=(),
+        request_type=None,
+        response_type=KnowledgeBoxList,
     )
 
     # Resource Endpoints
     create_resource = _request_builder(
-        "create_resource",
-        "/v1/kb/{kbid}/resources",
-        "POST",
-        ("kbid",),
-        CreateResourcePayload,
-        ResourceCreated,
+        name="create_resource",
+        path_template="/v1/kb/{kbid}/resources",
+        method="POST",
+        path_params=("kbid",),
+        request_type=CreateResourcePayload,
+        response_type=ResourceCreated,
     )
     update_resource = _request_builder(
-        "update_resource",
-        "/v1/kb/{kbid}/resource/{rid}",
-        "PATCH",
-        ("kbid", "rid"),
-        UpdateResourcePayload,
-        ResourceUpdated,
+        name="update_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="PATCH",
+        path_params=("kbid", "rid"),
+        request_type=UpdateResourcePayload,
+        response_type=ResourceUpdated,
     )
     delete_resource = _request_builder(
-        "delete_resource",
-        "/v1/kb/{kbid}/resource/{rid}",
-        "DELETE",
-        ("kbid", "rid"),
-        None,
-        None,
+        name="delete_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="DELETE",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
     )
     get_resource_by_slug = _request_builder(
-        "get_resource_by_slug",
-        "/v1/kb/{kbid}/slug/{slug}",
-        "GET",
-        ("kbid", "slug"),
-        None,
-        Resource,
+        name="get_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}",
+        method="GET",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=Resource,
     )
     get_resource_by_id = _request_builder(
-        "get_resource_by_id",
-        "/v1/kb/{kbid}/resource/{rid}",
-        "GET",
-        ("kbid", "rid"),
-        None,
-        Resource,
+        name="get_resource_by_id",
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="GET",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=Resource,
     )
     list_resources = _request_builder(
-        "list_resources",
-        "/v1/kb/{kbid}/resources",
-        "GET",
-        ("kbid",),
-        None,
-        ResourceList,
+        name="list_resources",
+        path_template="/v1/kb/{kbid}/resources",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=ResourceList,
     )
 
     # Conversation endpoints
     add_conversation_message = _request_builder(
-        "add_conversation_message",
-        "/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
-        "PUT",
-        ("kbid", "rid", "field_id"),
-        List[InputMessage],  # type: ignore
-        ResourceFieldAdded,
+        name="add_conversation_message",
+        path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
+        method="PUT",
+        path_params=("kbid", "rid", "field_id"),
+        request_type=List[InputMessage],  # type: ignore
+        response_type=ResourceFieldAdded,
     )
 
     # Labels
     set_labelset = _request_builder(
-        "set_labelset",
-        "/v1/kb/{kbid}/labelset/{labelset}",
-        "POST",
-        ("kbid", "labelset"),
-        LabelSet,
-        None,
+        name="set_labelset",
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="POST",
+        path_params=("kbid", "labelset"),
+        request_type=LabelSet,
+        response_type=None,
     )
     delete_labelset = _request_builder(
-        "delete_labelset",
-        "/v1/kb/{kbid}/labelset/{labelset}",
-        "DELETE",
-        ("kbid", "labelset"),
-        None,
-        None,
+        name="delete_labelset",
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="DELETE",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=None,
     )
     get_labelsets = _request_builder(
-        "get_labelsets",
-        "/v1/kb/{kbid}/labelsets",
-        "GET",
-        ("kbid", "labelset"),
-        None,
-        KnowledgeBoxLabels,
+        name="get_labelsets",
+        path_template="/v1/kb/{kbid}/labelsets",
+        method="GET",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=KnowledgeBoxLabels,
     )
     get_labelset = _request_builder(
-        "get_labelset",
-        "/v1/kb/{kbid}/labelset/{labelset}",
-        "GET",
-        ("kbid", "labelset"),
-        None,
-        LabelSet,
+        name="get_labelset",
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="GET",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=LabelSet,
     )
 
     # Entity Groups
     create_entitygroup = _request_builder(
-        "create_entitygroup",
-        "/v1/kb/{kbid}/entitiesgroups",
-        "POST",
-        ("kbid",),
-        CreateEntitiesGroupPayload,
-        None,
+        name="create_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroups",
+        method="POST",
+        path_params=("kbid",),
+        request_type=CreateEntitiesGroupPayload,
+        response_type=None,
     )
 
     update_entitygroup = _request_builder(
-        "update_entitygroup",
-        "/v1/kb/{kbid}/entitiesgroup/{group}",
-        "PATCH",
-        ("kbid", "group"),
-        UpdateEntitiesGroupPayload,
-        None,
+        name="update_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="PATCH",
+        path_params=("kbid", "group"),
+        request_type=UpdateEntitiesGroupPayload,
+        response_type=None,
     )
     set_entitygroup_entities = _request_builder(
-        "set_entitygroup_entities",
-        "/v1/kb/{kbid}/entitiesgroup/{group}",
-        "POST",
-        ("kbid", "group"),
-        EntitiesGroup,
-        None,
+        name="set_entitygroup_entities",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="POST",
+        path_params=("kbid", "group"),
+        request_type=EntitiesGroup,
+        response_type=None,
     )
     delete_entitygroup = _request_builder(
-        "delete_entitygroup",
-        "/v1/kb/{kbid}/entitiesgroup/{group}",
-        "DELETE",
-        ("kbid", "group"),
-        None,
-        None,
+        name="delete_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="DELETE",
+        path_params=("kbid", "group"),
+        request_type=None,
+        response_type=None,
     )
     get_entitygroups = _request_builder(
-        "get_entitygroups",
-        "/v1/kb/{kbid}/entitiesgroups",
-        "GET",
-        ("kbid", "show_entities"),
-        None,
-        KnowledgeBoxLabels,
+        name="get_entitygroups",
+        path_template="/v1/kb/{kbid}/entitiesgroups",
+        method="GET",
+        path_params=("kbid", "show_entities"),
+        request_type=None,
+        response_type=KnowledgeBoxLabels,
     )
     get_entitygroup = _request_builder(
-        "get_entitygroup",
-        "/v1/kb/{kbid}/entitiesgroup/{group}",
-        "GET",
-        ("kbid", "group"),
-        None,
-        LabelSet,
+        name="get_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="GET",
+        path_params=("kbid", "group"),
+        request_type=None,
+        response_type=LabelSet,
     )
 
     # Vectorsets
     create_vectorset = _request_builder(
-        "create_vectorset",
-        "/v1/kb/{kbid}/vectorset/{vectorset}",
-        "POST",
-        ("kbid", "vectorset"),
-        VectorSet,
-        None,
+        name="create_vectorset",
+        path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
+        method="POST",
+        path_params=("kbid", "vectorset"),
+        request_type=VectorSet,
+        response_type=None,
     )
     delete_vectorset = _request_builder(
-        "delete_vectorset",
-        "/v1/kb/{kbid}/vectorset/{vectorset}",
-        "POST",
-        ("kbid", "vectorset"),
-        None,
-        None,
+        name="delete_vectorset",
+        path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
+        method="POST",
+        path_params=("kbid", "vectorset"),
+        request_type=None,
+        response_type=None,
     )
     list_vectorsets = _request_builder(
-        "list_vectorsets",
-        "/v1/kb/{kbid}/vectorsets",
-        "GET",
-        ("kbid",),
-        None,
-        VectorSets,
+        name="list_vectorsets",
+        path_template="/v1/kb/{kbid}/vectorsets",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=VectorSets,
     )
 
     # Search / Find Endpoints
     find = _request_builder(
-        "find",
-        "/v1/kb/{kbid}/find",
-        "POST",
-        ("kbid",),
-        FindRequest,
-        KnowledgeboxFindResults,
+        name="find",
+        path_template="/v1/kb/{kbid}/find",
+        method="POST",
+        path_params=("kbid",),
+        request_type=FindRequest,
+        response_type=KnowledgeboxFindResults,
         docstring=docstrings.FIND,
     )
     search = _request_builder(
-        "search",
-        "/v1/kb/{kbid}/search",
-        "POST",
-        ("kbid",),
-        SearchRequest,
-        KnowledgeboxSearchResults,
+        name="search",
+        path_template="/v1/kb/{kbid}/search",
+        method="POST",
+        path_params=("kbid",),
+        request_type=SearchRequest,
+        response_type=KnowledgeboxSearchResults,
         docstring=docstrings.SEARCH,
     )
     chat = _request_builder(
-        "chat",
-        "/v1/kb/{kbid}/chat",
-        "POST",
-        ("kbid",),
-        ChatRequest,
-        chat_response_parser,
+        name="chat",
+        path_template="/v1/kb/{kbid}/chat",
+        method="POST",
+        path_params=("kbid",),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
         docstring=docstrings.CHAT,
     )
 
