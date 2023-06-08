@@ -57,10 +57,13 @@ pub enum NodeUpdate {
 #[tokio::main]
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
+    let data_path = env::data_path();
+    if !data_path.exists() {
+        std::fs::create_dir_all(data_path)?;
+    }
+
     let _guard = init_telemetry()?;
-
     let start_bootstrap = Instant::now();
-
     let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
     let mut node_writer_service = NodeWriterService::new()?;
