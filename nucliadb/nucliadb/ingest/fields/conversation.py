@@ -109,7 +109,7 @@ class Conversation(Field):
         # If now page was requested, force fetch of metadata
         # and set the page to the last page
         if page is None and self.metadata is None:
-            await self.db_get_metadata()
+            await self.get_metadata()
 
         try:
             if page is not None and page > 0:
@@ -121,9 +121,6 @@ class Conversation(Field):
             return None
 
     async def get_metadata(self) -> FieldConversation:
-        return await self.db_get_metadata()
-
-    async def db_get_metadata(self) -> FieldConversation:
         if self.metadata is None:
             payload = await self.resource.txn.get(
                 KB_RESOURCE_FIELD_METADATA.format(

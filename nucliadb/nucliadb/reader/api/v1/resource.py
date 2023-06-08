@@ -289,7 +289,8 @@ async def get_resource_field(
                 page_to_fetch = int(page)
 
             value = await field.get_value(page=page_to_fetch)
-            resource_field.value = models.Conversation.from_message(value)
+            if value is not None:
+                resource_field.value = models.Conversation.from_message(value)
 
     if ResourceFieldProperties.EXTRACTED in show and extracted:
         resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
