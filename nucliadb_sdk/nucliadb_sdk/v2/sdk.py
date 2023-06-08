@@ -501,7 +501,7 @@ class NucliaSDK(_NucliaSDKBase):
 
     from nucliadb_sdk.v2.sdk import *
     sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
-    sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
+    sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
@@ -513,22 +513,12 @@ class NucliaSDK(_NucliaSDKBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
-        """
+        """Create a new instance of the NucliaSDK client
         :param region: The region to connect to
         :param api_key: The API key to use for authentication
         :param url: The base URL to use for the NucliaDB API
         :param headers: Any additional headers to include in each request
         :param timeout: The timeout in seconds to use for requests
-
-        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
-        >>> from nucliadb_sdk import *
-        >>> sdk = NucliaSDK(api_key="my-api-key")
-
-        You can specify the region with the `region` argument, which by default is `EUROPE1`.
-        >>> sdk = NucliaSDK(region=Region.EUROPE1, api_key="my-api-key")
-
-        If you are connecting to an on-premise installation of NucliaDB, you will need to configure the SDK with the URL of your NucliaDB instance.
-        >>> sdk = nucliadb_sdk.NucliaSDK(region=Region.ON_PREM, url="http://localhost:8080/api")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.Client(
@@ -558,7 +548,7 @@ class NucliaSDKAsync(_NucliaSDKBase):
 
     from nucliadb_sdk.v2.sdk import *
     sdk = NucliaSDKAsync(region=Region.EUROPE1, api_key="api-key")
-    await sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
+    await sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
@@ -593,3 +583,6 @@ class NucliaSDKAsync(_NucliaSDKBase):
         )
         self._check_response(response)
         return response
+
+
+docstrings.inject_class(NucliaSDK)

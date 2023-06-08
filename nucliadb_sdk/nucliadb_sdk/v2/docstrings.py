@@ -182,24 +182,42 @@ def _inject_docstring(
     # Add params section
     params = []
     for path_param in path_params:
-        params.append(f":param <class 'str'> {path_param}:")
+        params.append(f":param {path_param}:")
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
             for field in request_type.__fields__.values():
-                try:
-                    type_name = field.outer_type_.__name__
-                except AttributeError:
-                    type_name = typing.get_origin(field.outer_type_).__name__
-                type_name = field.outer_type_
                 params.append(
-                    f":param {type_name} {field.name}: {field.field_info.description or ''}"
+                    f":param {field.name}: {field.field_info.description or ''}"
                 )
     func_doc += "\n".join(params)
-
-    # Examples section
-    # if docstring and len(docstring.examples):
-    #     func_doc += "\n\nExample usage:\n"
-    #     for example in docstring.examples:
-    #         func_doc += f"\n{example.description}\n{example.code}\n"
     func.__nucliadb_sdk_doc__ = docstring
     func.__doc__ = func_doc
+
+
+def inject_class(klass):
+    doc = Docstring(
+        doc="",
+        examples=[
+            Example(
+                description="When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key",  # noqa
+                code="""
+>>> from nucliadb_sdk import *
+>>> sdk = NucliaSDK(api_key="my-api-key")
+""",
+            ),
+            Example(
+                description="You can specify the region with the `region` argument, which by default is `EUROPE1`.",
+                code="""
+>>> sdk = NucliaSDK(region=Region.EUROPE1, api_key="my-api-key")
+""",
+            ),
+            Example(
+                description="If you are connecting to an on-premise installation of NucliaDB, you will need to configure the SDK with the URL of your NucliaDB instance.",  # noqa
+                code="""
+>>> sdk = NucliaSDK(region=Region.ON_PREM, url="http://localhost:8080/api")
+""",
+            ),
+        ],
+    )
+    klass.__doc__ = doc.doc
+    klass.__nuclia_sdk_doc__ = doc
