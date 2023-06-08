@@ -16,16 +16,55 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from typing import Optional
+
 from pydantic import BaseModel
 
 
 class Docstring(BaseModel):
-    name: str
     doc: str
+    examples: Optional[str] = None
 
+
+SEARCH = Docstring(
+    doc="""Search in your Knowledge Box""",
+    examples="""
+Advanced search on the full text index
+>>> resp = sdk.search(kbid="mykbid", advanced_query="text:SRE OR text:DevOps", features=["document"])
+>>> rid = resp.fulltext.results[0].rid
+>>> resp.resources[rid].title
+The Site Reliability Workbook.pdf
+""",
+)
+
+FIND = Docstring(
+    doc="""Find documents in your Knowledge Box""",
+    examples="""
+Find documents matching a query
+>>> resp = sdk.find(kbid="mykbid", query="Very experienced candidates with Rust experience")
+>>> resp.resources.popitem().title
+Graydon_Hoare.cv.pdf
+
+Filter down by country and increase accuracy of results
+>>> content = FindRequest(query="Very experienced candidates with Rust experience", filters=["/l/country/Spain"], min_score=2.5)
+>>> resp = sdk.find(kbid="mykbid", content=content)
+>>> resp.resources.popitem().title
+http://github.com/hermeGarcia
+""",  # noqa
+)
 
 CHAT = Docstring(
-    name="chat",
-    doc="""Chat with the Knowledge Box.
-    """,
+    doc="""Chat with your Knowledge Box""",
+    examples="""
+Get an answer for a question that is part of the data in the Knowledge Box
+>>> resp = sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?")
+>>> print(resp.answer)
+Yes, according to the provided context, France is expected to be in recession in 2023.
+
+You can use the `content` parameter to pass a `ChatRequest` object
+>>> content = ChatRequest(query="Who won the 2018 football World Cup?")
+>>> resp = sdk.chat(kbid="mykbid", content=content)
+>>> print(resp.answer)
+France won the 2018 football World Cup.
+""",
 )

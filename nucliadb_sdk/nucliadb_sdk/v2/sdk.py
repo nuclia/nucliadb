@@ -133,6 +133,8 @@ def _inject_signature(
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
 ):
+    # TODO: Fix signature for methods of NucliaDBAsync
+
     parameters = []
     # The first parameter is always self
     parameters.append(
@@ -164,6 +166,7 @@ def _inject_signature(
                 "content",
                 kind=inspect.Parameter.KEYWORD_ONLY,
                 annotation=request_type,
+                default=None,
             )
         )
     if inspect.isroutine(response_type):
@@ -174,6 +177,13 @@ def _inject_signature(
     func.__signature__ = inspect.Signature(
         parameters=parameters, return_annotation=return_annotation
     )
+
+
+def _inject_docstring(func, docstring: docstrings.Docstring):
+    doc = docstring.doc
+    if docstring.examples:
+        doc += "\n\nExample usage:\n" + docstring.examples
+    func.__doc__ = doc
 
 
 def _request_builder(
@@ -231,11 +241,10 @@ def _request_builder(
         else:
             return _parse_response(response_type, resp)
 
+    _func.__name__ = name
     _inject_signature(_func, path_params, request_type, response_type)
-
     if docstring is not None:
-        _func.__name__ = docstring.name
-        _func.__doc__ = docstring.doc
+        _inject_docstring(_func, docstring)
 
     return _func
 
@@ -523,6 +532,7 @@ class _NucliaSDKBase:
         ("kbid",),
         FindRequest,
         KnowledgeboxFindResults,
+        docstring=docstrings.FIND,
     )
     search = _request_builder(
         "search",
@@ -531,6 +541,7 @@ class _NucliaSDKBase:
         ("kbid",),
         SearchRequest,
         KnowledgeboxSearchResults,
+        docstring=docstrings.SEARCH,
     )
     chat = _request_builder(
         "chat",
