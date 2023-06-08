@@ -25,7 +25,7 @@ use nucliadb_node::writer::NodeWriterService;
 use prost::Message;
 
 fn main() -> anyhow::Result<()> {
-    let writer = NodeWriterService::new();
+    let writer = NodeWriterService::new()?;
     let reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");

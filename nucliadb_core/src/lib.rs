@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod env;
 pub mod metrics;
 pub mod paragraphs;
 pub mod relations;
@@ -28,20 +29,6 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use anyhow::{anyhow as node_error, Context};
 use nucliadb_protos::{Resource, ResourceId};
 pub type NodeResult<O> = anyhow::Result<O>;
-
-pub mod tmp_workspace {
-    use std::env;
-    use std::path::PathBuf;
-    fn data_path() -> PathBuf {
-        match env::var("DATA_PATH") {
-            Ok(var) => PathBuf::from(var),
-            Err(_) => PathBuf::from("data"),
-        }
-    }
-    pub fn path() -> PathBuf {
-        data_path().join("tmp")
-    }
-}
 
 pub fn paragraph_write(
     x: &paragraphs::ParagraphsWriterPointer,
