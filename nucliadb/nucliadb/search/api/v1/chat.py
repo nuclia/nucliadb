@@ -38,6 +38,7 @@ from nucliadb_models.search import (
     ChatModel,
     ChatOptions,
     ChatRequest,
+    FindParagraph,
     FindRequest,
     KnowledgeboxFindResults,
     Message,
@@ -133,14 +134,8 @@ async def chat(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
-    flattened_text = " \n\n ".join(
-        [
-            paragraph.text
-            for result in results.resources.values()
-            for field in result.fields.values()
-            for paragraph in field.paragraphs.values()
-        ]
-    )
+    flattened_text = _extract_text(results)
+
     if item.context is None:
         context = []
     else:
@@ -207,3 +202,27 @@ async def chat(
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
+
+
+def _extract_text(results: KnowledgeboxFindResults) -> str:
+    """
+    Returns a flattened text of all the paragraphs in the results, sorted by decreasing score.
+
+    :param results: the find request results to extract the text from
+    """
+
+    def by_score(paragraph: FindParagraph) -> float:
+        return paragraph.score
+
+    paragraphs = sorted(
+        [
+            paragraph
+            for result in results.resources.values()
+            for field in result.fields.values()
+            for paragraph in field.paragraphs.values()
+        ],
+        key=by_score,
+        reverse=True,
+    )
+    flattened_text = " \n\n ".join([paragraph.text for paragraph in paragraphs])
+    return flattened_text
