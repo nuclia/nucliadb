@@ -102,12 +102,18 @@ jobs:
               - 'nucliadb_node/nucliadb_node/**'
             cluster_modified:
               - 'nucliadb_cluster/**'
+      
+      - name: Get safe branch name
+        id: branch_name
+        run: |-
+          BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Wait for node image
         if: steps.filter.outputs.node_modified == 'true'
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ steps.branch_name.outputs.branch_name }}
           check-name: DevNodeImage
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
@@ -121,7 +127,7 @@ jobs:
         if: steps.filter.outputs.sidecar_modified == 'true'
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ steps.branch_name.outputs.branch_name }}
           check-name: DevSidecarImage
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
@@ -135,7 +141,7 @@ jobs:
         if: steps.filter.outputs.cluster_modified == 'true'
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ steps.branch_name.outputs.branch_name }}
           check-name: DevClusterMonitorImage
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
