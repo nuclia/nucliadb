@@ -123,13 +123,12 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         loop {
             match candidates.pop() {
                 None => break None,
+                Some(Cnx(_, score)) if  score < self.tracker.min_score() => break None,
                 Some(Cnx(n, score))
                         // The vector was deleted at some point and will be removed in a future merge
                         if !self.tracker.is_deleted(n)
                         // A score may be invalid if the index contains zero vectors 
                         && !score.is_nan()
-                        // The score is lower than the requested minimum score
-                        && score >= self.tracker.min_score()
                         // The vector is blocked, meaning that its key is part of the current version of the solution
                         && !blocked_addresses.contains(&n)
                         // The number of times this vector appears is 0
