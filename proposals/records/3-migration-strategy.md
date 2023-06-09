@@ -31,7 +31,7 @@ done manually.
 ### Types of migrations supported
 
 - IndexNode shard rollovers: create new shards, index all data to new shards, swap active shards over
-- manual: manually run a snippet of code against every knowledge box
+- custom: run custom snippets of code against every knowledge box
 
 ### Migration framework
 
@@ -89,8 +89,13 @@ The migrations will be run in the context of:
 
 Running migrations will be done through a command line utility `nucliadb-run-migrations`.
 
+Command options:
+- migrate 1 particular knowledge box
+- dry-run: this won't actually run any migration but find all KBs and which migrations will be run against them
+
 This utility will be run automatically with a post release helm/argo hook.
 
+New KBs should not have migrations run against them.
 
 ## Rollout plan
 
