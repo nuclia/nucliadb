@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::sync::Arc;
+
 use async_std::sync::RwLock;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
@@ -26,20 +28,30 @@ use nucliadb_core::tracing::{self, *};
 use Shard as ShardPB;
 
 use crate::env;
+use crate::shards::{
+    ShardReaderRef,
+    ReaderShardsProvider,
+    UnboundedShardReaderCache,
+};
 use crate::reader::NodeReaderService;
+use crate::utils::nonblocking;
 
 pub struct NodeReaderGRPCDriver {
     lazy_loading: bool,
     inner: RwLock<NodeReaderService>,
+    shards: Arc<UnboundedShardReaderCache>,
 }
+
 impl From<NodeReaderService> for NodeReaderGRPCDriver {
     fn from(node: NodeReaderService) -> NodeReaderGRPCDriver {
         NodeReaderGRPCDriver {
             lazy_loading: env::lazy_loading(),
             inner: RwLock::new(node),
+            shards: Arc::new(UnboundedShardReaderCache::new()),
         }
     }
 }
+
 impl NodeReaderGRPCDriver {
     // The GRPC reader will only request the reader to bring a shard
     // to memory if lazy loading is enabled. Otherwise all the
@@ -47,13 +59,27 @@ impl NodeReaderGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
         if self.lazy_loading {
-            let mut writer = self.inner.write().await;
-            writer.load_shard(id);
+            // let mut writer = self.inner.write().await;
+            // writer.load_shard(id).await;
+
+            let shards = Arc::clone(&self.shards);
+            let shard_id = id.id.clone();
+            nonblocking!({
+                shards.load(shard_id).expect("WORK");
+            })
+        }
+    }
+
+    fn _get_shard(&self, id: String) -> Result<ShardReaderRef, tonic::Status>{
+        match self.shards.get(id.clone()) {
+            Some(shard) => Ok(shard),
+            None => Err(tonic::Status::not_found(format!("Error loading shard {id}: shard not found")))
         }
     }
 }
 
 pub struct GrpcStreaming<T>(T);
+
 impl futures_core::Stream for GrpcStreaming<ParagraphIterator> {
     type Item = Result<ParagraphItem, tonic::Status>;
 
@@ -64,6 +90,7 @@ impl futures_core::Stream for GrpcStreaming<ParagraphIterator> {
         std::task::Poll::Ready(self.0.next().map(Ok))
     }
 }
+
 impl futures_core::Stream for GrpcStreaming<DocumentIterator> {
     type Item = Result<DocumentItem, tonic::Status>;
 
@@ -79,6 +106,7 @@ impl futures_core::Stream for GrpcStreaming<DocumentIterator> {
 impl NodeReader for NodeReaderGRPCDriver {
     type ParagraphsStream = GrpcStreaming<ParagraphIterator>;
     type DocumentsStream = GrpcStreaming<DocumentIterator>;
+
     async fn paragraphs(
         &self,
         request: tonic::Request<StreamRequest>,
@@ -88,8 +116,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(tonic::Status::not_found("Shard ID not present"));
         };
+
         let shard_id = ShardId { id: shard_id.id };
         self.shard_loading(&shard_id).await;
+
         let reader = self.inner.read().await;
         match reader.paragraph_iterator(&shard_id, request).transpose() {
             Some(Ok(response)) => {
@@ -116,8 +146,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(tonic::Status::not_found("Shard ID not present"));
         };
+
         let shard_id = ShardId { id: shard_id.id };
         self.shard_loading(&shard_id).await;
+
         let reader = self.inner.read().await;
         match reader.document_iterator(&shard_id, request).transpose() {
             Some(Ok(response)) => {
@@ -141,21 +173,20 @@ impl NodeReader for NodeReaderGRPCDriver {
     ) -> Result<tonic::Response<ShardPB>, tonic::Status> {
         debug!("{:?}: gRPC get_shard", request);
         let request = request.into_inner();
+
         let shard_id = &request.shard_id.clone().unwrap();
         self.shard_loading(shard_id).await;
-        let reader = self.inner.read().await;
-        match reader.get_info(shard_id, request).transpose() {
-            Some(Ok(shard)) => {
+
+        let shard = self._get_shard(shard_id.id.clone())?;
+
+        match shard.get_info(&request) {
+            Ok(shard) => {
                 debug!("Get shard ends {}:{}", file!(), line!());
                 Ok(tonic::Response::new(shard))
             }
-            Some(Err(e)) => {
+            Err(e) => {
                 debug!("get_shard ended incorrectly");
                 Err(tonic::Status::internal(e.to_string()))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
             }
         }
     }
@@ -185,6 +216,7 @@ impl NodeReader for NodeReaderGRPCDriver {
                 Err(tonic::Status::not_found(message))
             }
         }
+
     }
 
     async fn suggest(
