@@ -2012,7 +2012,6 @@ dependencies = [
  "axum-server",
  "backoff",
  "bincode",
- "dashmap",
  "dotenvy",
  "futures",
  "futures-core",

@@ -17,100 +17,96 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
+use std::collections::HashMap;
 use std::slice::Iter;
-use dashmap::DashMap;
-use anyhow::anyhow;
+use std::sync::Arc;
 
-use nucliadb_core::NodeResult;
-use nucliadb_core::env;
+use anyhow::anyhow;
+use async_std::sync::RwLock;
+use async_trait::async_trait;
 use nucliadb_core::tracing::debug;
+use nucliadb_core::{env, NodeResult};
 use nucliadb_vectors::data_point::Similarity;
 
-use crate::services::reader::ShardReaderService as ShardReader;
-use crate::services::writer::ShardWriterService as ShardWriter;
+pub use crate::services::reader::ShardReaderService as ShardReader;
+pub use crate::services::writer::ShardWriterService as ShardWriter;
+use crate::utils::nonblocking;
 
 pub type ShardId = String;
 
-
+#[async_trait]
 pub trait ReaderShardsProvider: Send + Sync {
-    fn load(&self, id: ShardId) -> NodeResult<()>;
-    fn load_all(&self) -> NodeResult<()>;
+    async fn load(&self, id: ShardId) -> NodeResult<()>;
+    async fn load_all(&self) -> NodeResult<()>;
 
-    fn get(&self, id: ShardId) -> Option<ShardReaderRef>;
+    async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
 
-    fn iter(&self) -> Iter<'_, ShardReader>;
+    // fn iter(&self) -> Iter<'_, ShardReader>;
 }
 
-pub trait WriterShardsProvider {
-    fn create(&self, id: ShardId, kbid: String, similarity: Similarity);
+// pub trait WriterShardsProvider {
+//     fn create(&self, id: ShardId, kbid: String, similarity: Similarity);
 
-    fn load(&self, id: ShardId) -> NodeResult<()>;
-    fn load_all(&mut self) -> NodeResult<()>;
+//     fn load(&self, id: ShardId) -> NodeResult<()>;
+//     fn load_all(&mut self) -> NodeResult<()>;
 
-    fn get(&self, id: ShardId) -> Option<&ShardWriter>;
-    fn get_mut(&self, id: ShardId) -> Option<&mut ShardWriter>;
+//     fn get(&self, id: ShardId) -> Option<&ShardWriter>;
+//     fn get_mut(&self, id: ShardId) -> Option<&mut ShardWriter>;
 
-    fn delete(&self, id: ShardId) -> NodeResult<()>;
-}
-
-pub enum ShardReaderRef<'a> {
-    DashMap(dashmap::mapref::one::Ref<'a, ShardId, ShardReader>)
-}
-
-impl std::ops::Deref for ShardReaderRef<'_> {
-    type Target = ShardReader;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::DashMap(r) => r.value(),
-        }
-    }
-}
+//     fn delete(&self, id: ShardId) -> NodeResult<()>;
+// }
 
 pub struct UnboundedShardReaderCache {
-    cache: DashMap<ShardId, ShardReader>
+    cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
 }
 
 impl UnboundedShardReaderCache {
     pub fn new() -> Self {
         Self {
-            cache: DashMap::new(),
+            cache: RwLock::new(HashMap::with_capacity(env::max_shards_per_node())),
         }
     }
-}
+    // }
 
-impl ReaderShardsProvider for UnboundedShardReaderCache {
-   fn load(&self, id: ShardId) -> NodeResult<()> {
-       let shard_path = env::shards_path_id(&id);
+    // #[async_trait]
+    // impl ReaderShardsProvider for UnboundedShardReaderCache {
+    pub async fn load(&self, id: ShardId) -> NodeResult<()> {
+        let shard_path = env::shards_path_id(&id);
 
-       if self.cache.contains_key(&id) {
-           debug!("Shard {shard_path:?} is already on memory");
-           return Ok(());
-       }
+        if self.cache.read().await.contains_key(&id) {
+            debug!("Shard {shard_path:?} is already on memory");
+            return Ok(());
+        }
 
-       if !shard_path.is_dir() {
-           return Err(anyhow!("Shard {shard_path:?} is not on disk"))
-       }
+        // Avoid blocking while interacting with the file system (reads and
+        // writes to disk)
+        let _id = id.clone();
+        let shard = nonblocking!({
+            if !shard_path.is_dir() {
+                return Err(anyhow!("Shard {shard_path:?} is not on disk"));
+            }
+            let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
+                anyhow!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+            })?;
 
-       let shard = ShardReader::new(id.clone(), &shard_path)
-           .map_err(|error| {
-               anyhow!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-           })?;
+            Ok(shard)
+        })?;
 
-       self.cache.insert(id, shard);
-       Ok(())
-   }
+        self.cache.write().await.insert(_id, Arc::new(shard));
+        Ok(())
+    }
 
-    fn load_all(&self) -> NodeResult<()> {
+    async fn load_all(&self) -> NodeResult<()> {
         todo!()
     }
 
-    fn get(&self, id: ShardId) -> Option<ShardReaderRef> {
-        self.cache.get(&id).map(|item| ShardReaderRef::DashMap(item))
+    /// ATENTION: do not hold this reference across await points as it may
+    /// deadlock
+    pub async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>> {
+        self.cache.read().await.get(&id).map(Arc::clone)
     }
 
-    fn iter(&self) -> Iter<'_, ShardReader> {
-        todo!()
-    }
+    // fn iter(&self) -> Iter<'_, ShardReader> {
+    //     todo!()
+    // }
 }

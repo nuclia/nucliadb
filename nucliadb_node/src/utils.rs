@@ -27,6 +27,21 @@ use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
 
+macro_rules! nonblocking {
+    ($code:block) => {{
+        let (send, recv) = tokio::sync::oneshot::channel();
+        tokio::task::spawn_blocking(move || {
+            let fun = || $code;
+            let result = fun();
+            let _ = send.send(result);
+        });
+
+        recv.await.expect("Panic in nonblocking tokio task")
+    }};
+}
+
+pub(crate) use nonblocking;
+
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
     let uri = Uri::builder()
