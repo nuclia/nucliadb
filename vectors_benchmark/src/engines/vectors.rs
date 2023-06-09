@@ -44,6 +44,9 @@ impl<'a> SearchRequest for Request<'a> {
     fn no_results(&self) -> usize {
         self.0
     }
+    fn min_score(&self) -> f32 {
+        -1.0
+    }
 }
 impl VectorEngine for Index {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>) {

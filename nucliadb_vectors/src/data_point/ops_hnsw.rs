@@ -49,6 +49,7 @@ pub trait DataRetriever: std::marker::Sync {
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
     fn similarity(&self, _: Address, _: Address) -> f32;
     fn get_vector(&self, _: Address) -> &[u8];
+    fn min_score(&self) -> f32;
 }
 
 pub trait Layer {
@@ -127,6 +128,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                         if !self.tracker.is_deleted(n)
                         // A score may be invalid if the index contains zero vectors 
                         && !score.is_nan()
+                        // The score is lower than the requested minimum score
+                        && score >= self.tracker.min_score()
                         // The vector is blocked, meaning that its key is part of the current version of the solution
                         && !blocked_addresses.contains(&n)
                         // The number of times this vector appears is 0
@@ -164,6 +167,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         loop {
             match (candidates.pop(), ms_neighbours.peek().cloned()) {
                 (None, _) => break,
+                (Some(Cnx(_, cs)), _) if cs < self.tracker.min_score() => break,
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {

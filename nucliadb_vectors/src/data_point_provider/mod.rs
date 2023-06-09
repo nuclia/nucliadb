@@ -80,6 +80,7 @@ pub trait SearchRequest {
     fn get_filter(&self) -> &Formula;
     fn no_results(&self) -> usize;
     fn with_duplicates(&self) -> bool;
+    fn min_score(&self) -> f32;
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]

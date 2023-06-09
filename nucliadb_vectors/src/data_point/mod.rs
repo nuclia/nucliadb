@@ -109,6 +109,7 @@ pub struct Retriever<'a, Dlog> {
     temp: &'a [u8],
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
+    min_score: f32,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
     pub fn new(
@@ -116,6 +117,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
         nodes: &'a Mmap,
         delete_log: &'a Dlog,
         similarity: Similarity,
+        min_score: f32,
     ) -> Retriever<'a, Dlog> {
         Retriever {
             temp,
@@ -123,6 +125,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
             delete_log,
             similarity,
             no_nodes: key_value::get_no_elems(nodes),
+            min_score,
         }
     }
     fn find_node(&self, Address(x): Address) -> &[u8] {
@@ -176,6 +179,9 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             let y = Node::vector(y);
             self.similarity.compute(x, y)
         }
+    }
+    fn min_score(&self) -> f32 {
+        self.min_score
     }
 }
 
@@ -324,6 +330,7 @@ impl DataPoint {
             .map(|s| s.to_string())
             .collect()
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn search<Dlog: DeleteLog>(
         &self,
         delete_log: &Dlog,
@@ -332,9 +339,16 @@ impl DataPoint {
         with_duplicates: bool,
         results: usize,
         similarity: Similarity,
+        min_score: f32,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity);
+        let tracker = Retriever::new(
+            &encoded_query,
+            &self.nodes,
+            delete_log,
+            similarity,
+            min_score,
+        );
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(
             Address(self.journal.nodes),
@@ -389,7 +403,7 @@ impl DataPoint {
 
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = key_value::get_no_elems(&nodes);
-        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity);
+        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
         let mut ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();
         for id in 0..no_nodes {
@@ -490,7 +504,7 @@ impl DataPoint {
         let no_nodes = key_value::get_no_elems(&nodes);
 
         // Creating the HNSW using the mmaped nodes
-        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity);
+        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
         let mut ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();
         for id in 0..no_nodes {
