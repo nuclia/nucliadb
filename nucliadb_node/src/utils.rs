@@ -26,7 +26,7 @@ use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
 
-/// Prepares a socket addr for a grpc endpoint to connect to
+/// Prepares a socket addr for a grpc endpoint to connect to.
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
     let uri = Uri::builder()
         .scheme("http")
