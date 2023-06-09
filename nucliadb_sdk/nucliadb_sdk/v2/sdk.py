@@ -127,7 +127,7 @@ def _request_builder(
     ],
     docstring: Optional[docstrings.Docstring] = None,
 ):
-    def _func(self: "NucliaSDK", content: Optional[Any] = None, **kwargs):
+    def _func(self: "NucliaDBSDK", content: Optional[Any] = None, **kwargs):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -185,7 +185,7 @@ def _request_builder(
     return _func
 
 
-class _NucliaSDKBase:
+class _NucliaDBSDKBase:
     def __init__(
         self,
         *,
@@ -495,12 +495,12 @@ class _NucliaSDKBase:
     )
 
 
-class NucliaSDK(_NucliaSDKBase):
+class NucliaDBSDK(_NucliaDBSDKBase):
     """
     Example usage:
 
-    from nucliadb_sdk.v2.sdk import *
-    sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
+    from nucliadb_sdk import *
+    sdk = NucliaDBSDK(region=Region.EUROPE1, api_key="api-key")
     sdk.list_resources(kbid='my-kbid')
     """
 
@@ -513,7 +513,7 @@ class NucliaSDK(_NucliaSDKBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
-        """Create a new instance of the NucliaSDK client
+        """Create a new instance of the NucliaDBSDK client
         :param region: The region to connect to
         :param api_key: The API key to use for authentication
         :param url: The base URL to use for the NucliaDB API
@@ -542,12 +542,12 @@ class NucliaSDK(_NucliaSDKBase):
         return self._check_response(response)
 
 
-class NucliaSDKAsync(_NucliaSDKBase):
+class NucliaDBSDKAsync(_NucliaDBSDKBase):
     """
     Example usage:
 
-    from nucliadb_sdk.v2.sdk import *
-    sdk = NucliaSDKAsync(region=Region.EUROPE1, api_key="api-key")
+    from nucliadb_sdk import *
+    sdk = NucliaDBSDKAsync(region=Region.EUROPE1, api_key="api-key")
     await sdk.list_resources(kbid='my-kbid')
     """
 
@@ -585,4 +585,4 @@ class NucliaSDKAsync(_NucliaSDKBase):
         return response
 
 
-docstrings.inject_class(NucliaSDK)
+docstrings.inject_class(NucliaDBSDK)

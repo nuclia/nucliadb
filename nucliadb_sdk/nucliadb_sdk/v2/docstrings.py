@@ -122,9 +122,7 @@ def _inject_signature(
     parameters = []
     # The first parameter is always self
     parameters.append(
-        inspect.Parameter(
-            "self", kind=inspect.Parameter.POSITIONAL_ONLY, annotation="NucliaSDK"
-        )
+        inspect.Parameter("self", kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
     )
 
     # Path params
@@ -202,19 +200,23 @@ def inject_class(klass):
                 description="When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key",  # noqa
                 code="""
 >>> from nucliadb_sdk import *
->>> sdk = NucliaSDK(api_key="my-api-key")
+>>> sdk = NucliaDBSDK(api_key="my-api-key")
 """,
+            ),
+            Example(
+                description="If the Knowledge Box you are interacting with is public, you don't even need the api key",
+                code=""">>> sdk = NucliaDBSDK()""",
             ),
             Example(
                 description="You can specify the region with the `region` argument, which by default is `EUROPE1`.",
                 code="""
->>> sdk = NucliaSDK(region=Region.EUROPE1, api_key="my-api-key")
+>>> sdk = NucliaDBSDK(region=Region.EUROPE1, api_key="my-api-key")
 """,
             ),
             Example(
                 description="If you are connecting to an on-premise installation of NucliaDB, you will need to configure the SDK with the URL of your NucliaDB instance.",  # noqa
                 code="""
->>> sdk = NucliaSDK(region=Region.ON_PREM, url="http://localhost:8080/api")
+>>> sdk = NucliaDBSDK(region=Region.ON_PREM, url="http://localhost:8080/api")
 """,
             ),
         ],
