@@ -30,9 +30,9 @@ from nucliadb_utils.utilities import get_storage
 MAX_WORDS = 4000 * 0.75  # less than real because of prompt text size
 
 
-CONVERSATION_MESSAGE_CONTEXT_EXPANSION = (
-    20  # number of messages to pull after a match in a message
-)
+# Number of messages to pull after a match in a message
+# The hope here is it will be enough to get the answer to the question.
+CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 30
 
 
 async def get_next_conversation_messages(

@@ -56,6 +56,7 @@ class MessageContent(BaseModel):
 
 
 class MessageType(Enum):
+    UNSET = "UNSET"
     QUESTION = "QUESTION"
     ANSWER = "ANSWER"
 
