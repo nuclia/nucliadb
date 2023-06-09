@@ -97,6 +97,8 @@ This utility will be run automatically with a post release helm/argo hook.
 
 New KBs should not have migrations run against them.
 
+Each KB should have a "data_version" property that is exposed.
+
 ## Rollout plan
 
 1. Build framework
