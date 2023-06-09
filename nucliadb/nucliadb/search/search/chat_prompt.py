@@ -27,7 +27,9 @@ from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
-MAX_WORDS = 4000 * 0.75  # less than real because of prompt text size
+# less than real because of prompt text size, understanding api isn't truncating
+# and hard fails when we're over the limit
+MAX_WORDS = 4000 * 0.75
 
 
 # Number of messages to pull after a match in a message
@@ -139,4 +141,5 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
                     words += text.count(" ")  # very imperfect but fast
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
+
     return " \n\n ".join(output.values())
