@@ -40,6 +40,8 @@ SEARCH = Docstring(
         Example(
             description="Advanced search on the full text index",
             code="""
+>>> from nucliadb_sdk import *
+>>> sdk = NucliaDB(api_key="api-key")
 >>> resp = sdk.search(kbid="mykbid", advanced_query="text:SRE OR text:DevOps", features=["document"])
 >>> rid = resp.fulltext.results[0].rid
 >>> resp.resources[rid].title
@@ -55,6 +57,8 @@ FIND = Docstring(
         Example(
             description="Find documents matching a query",
             code="""
+>>> from nucliadb_sdk import *
+>>> sdk = NucliaDB(api_key="api-key")
 >>> resp = sdk.find(kbid="mykbid", query="Very experienced candidates with Rust experience")
 >>> resp.resources.popitem().title
 Graydon_Hoare.cv.pdf
@@ -78,6 +82,8 @@ CHAT = Docstring(
         Example(
             description="Get an answer for a question that is part of the data in the Knowledge Box",
             code="""
+>>> from nucliadb_sdk import *
+>>> sdk = NucliaDB(api_key="api-key")
 >>> sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?").answer
 Yes, according to the provided context, France is expected to be in recession in 2023.""",
         ),
@@ -188,38 +194,11 @@ def _inject_docstring(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
     func_doc += "\n".join(params)
-    func.__nucliadb_sdk_doc__ = docstring
+
+    # Add examples
+    if docstring:
+        for example in docstring.examples or []:
+            description = example.description or ""
+            code = example.code or ""
+            func_doc += f"\n{description}\n{code}\n"
     func.__doc__ = func_doc
-
-
-def inject_class(klass):
-    doc = Docstring(
-        doc="",
-        examples=[
-            Example(
-                description="When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key",  # noqa
-                code="""
->>> from nucliadb_sdk import *
->>> sdk = NucliaDBSDK(api_key="my-api-key")
-""",
-            ),
-            Example(
-                description="If the Knowledge Box you are interacting with is public, you don't even need the api key",
-                code=""">>> sdk = NucliaDBSDK()""",
-            ),
-            Example(
-                description="You can specify the region with the `region` argument, which by default is `EUROPE1`.",
-                code="""
->>> sdk = NucliaDBSDK(region=Region.EUROPE1, api_key="my-api-key")
-""",
-            ),
-            Example(
-                description="If you are connecting to an on-premise installation of NucliaDB, you will need to configure the SDK with the URL of your NucliaDB instance.",  # noqa
-                code="""
->>> sdk = NucliaDBSDK(region=Region.ON_PREM, url="http://localhost:8080/api")
-""",
-            ),
-        ],
-    )
-    klass.__doc__ = doc.doc
-    klass.__nuclia_sdk_doc__ = doc

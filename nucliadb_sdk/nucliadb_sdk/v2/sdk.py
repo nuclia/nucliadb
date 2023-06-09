@@ -497,11 +497,10 @@ class _NucliaDBSDKBase:
 
 class NucliaDBSDK(_NucliaDBSDKBase):
     """
-    Example usage:
-
-    from nucliadb_sdk import *
-    sdk = NucliaDBSDK(region=Region.EUROPE1, api_key="api-key")
-    sdk.list_resources(kbid='my-kbid')
+    Example usage
+    >>> from nucliadb_sdk import *
+    >>> sdk = NucliaDBSDK(region=Region.EUROPE1, api_key="api-key")
+    >>> sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
@@ -519,6 +518,16 @@ class NucliaDBSDK(_NucliaDBSDKBase):
         :param url: The base URL to use for the NucliaDB API
         :param headers: Any additional headers to include in each request
         :param timeout: The timeout in seconds to use for requests
+
+        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+        >>> from nucliadb_sdk import *
+        >>> sdk = NucliaDBSDK(api_key="api-key")
+
+        If the Knowledge Box you are interacting with is public, you don't even need the api key
+        >>> sdk = NucliaDBSDK()
+
+        If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
+        >>> sdk = NucliaDBSDK(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.Client(
@@ -545,10 +554,9 @@ class NucliaDBSDK(_NucliaDBSDKBase):
 class NucliaDBSDKAsync(_NucliaDBSDKBase):
     """
     Example usage:
-
-    from nucliadb_sdk import *
-    sdk = NucliaDBSDKAsync(region=Region.EUROPE1, api_key="api-key")
-    await sdk.list_resources(kbid='my-kbid')
+    >>> from nucliadb_sdk import *
+    >>> sdk = NucliaDBSDKAsync(region=Region.EUROPE1, api_key="api-key")
+    >>> await sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
@@ -560,6 +568,23 @@ class NucliaDBSDKAsync(_NucliaDBSDKBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
+        """Create a new instance of the NucliaDBSDK client
+        :param region: The region to connect to
+        :param api_key: The API key to use for authentication
+        :param url: The base URL to use for the NucliaDB API
+        :param headers: Any additional headers to include in each request
+        :param timeout: The timeout in seconds to use for requests
+
+        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+        >>> from nucliadb_sdk import *
+        >>> sdk = NucliaDBSDKAsync(api_key="api-key")
+
+        If the Knowledge Box you are interacting with is public, you don't even need the api key
+        >>> sdk = NucliaDBSDKAsync()
+
+        If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
+        >>> sdk = NucliaDBSDKAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
+        """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.AsyncClient(
             headers=self.headers, base_url=self.base_url, timeout=timeout
@@ -583,6 +608,3 @@ class NucliaDBSDKAsync(_NucliaDBSDKBase):
         )
         self._check_response(response)
         return response
-
-
-docstrings.inject_class(NucliaDBSDK)
