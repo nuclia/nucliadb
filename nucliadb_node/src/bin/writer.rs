@@ -64,9 +64,9 @@ async fn main() -> NodeResult<()> {
 
     let _guard = init_telemetry()?;
     let start_bootstrap = Instant::now();
+    let mut node_writer_service = NodeWriterService::new()?;
     let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
-    let mut node_writer_service = NodeWriterService::new()?;
 
     if !env::lazy_loading() {
         node_writer_service.load_shards()?;
