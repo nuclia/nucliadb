@@ -206,7 +206,7 @@ async def chat(
 
 def flatten_results(results: KnowledgeboxFindResults) -> str:
     """
-    Returns a flattened text of all the paragraphs in the results, sorted by decreasing score.
+    Returns a flattened text of all the paragraphs in the results, sorted by the order attribute.
 
     :param results: the find request results to extract the text from
     """
