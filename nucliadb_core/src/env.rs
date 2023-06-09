@@ -203,7 +203,7 @@ pub fn sentry_url() -> String {
 }
 
 pub fn log_level() -> Vec<(String, Level)> {
-    let default = "nucliadb_node=WARN,nucliadb_cluster=WARN,nucliadb_cluster=WARN".to_string();
+    let default = "nucliadb_node=WARN,nucliadb_cluster=WARN".to_string();
     match env::var("RUST_LOG") {
         Ok(levels) => parse_log_level(&levels),
         Err(_) => {
@@ -214,7 +214,7 @@ pub fn log_level() -> Vec<(String, Level)> {
 }
 
 pub fn span_levels() -> Vec<(String, Level)> {
-    let default = "nucliadb_node=INFO,nucliadb_cluster=INFO".to_string();
+    let default = "nucliadb_node=INFO,nucliadb_cluster=INFO,nucliadb_core=INFO".to_string();
     parse_log_level(&default)
 }
 

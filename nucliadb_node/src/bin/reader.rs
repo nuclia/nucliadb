@@ -27,6 +27,7 @@ use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
+use nucliadb_node::telemetry::middleware::GrpcInstrumentorLayer;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
@@ -90,12 +91,14 @@ pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver) {
 
     info!("Reader listening for gRPC requests at: {:?}", addr);
 
+    let tracing_middleware = GrpcInstrumentorLayer::default();
     let metrics_middleware = MetricsLayer::default();
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
+        .layer(tracing_middleware)
         .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))

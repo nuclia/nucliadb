@@ -24,12 +24,9 @@ use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::{self, *};
-use opentelemetry::global;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 use Shard as ShardPB;
 
 use crate::reader::NodeReaderService;
-use crate::utils::MetadataMap;
 
 pub struct NodeReaderGRPCDriver {
     lazy_loading: bool,
@@ -53,13 +50,6 @@ impl NodeReaderGRPCDriver {
             let mut writer = self.inner.write().await;
             writer.load_shard(id);
         }
-    }
-
-    // Instrumentation utilities for telemetry
-    fn instrument<T>(&self, request: &tonic::Request<T>) {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
     }
 }
 
@@ -94,7 +84,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<StreamRequest>,
     ) -> Result<tonic::Response<Self::ParagraphsStream>, tonic::Status> {
         debug!("Starting paragraph streaming");
-        self.instrument(&request);
         let request = request.into_inner();
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(tonic::Status::not_found("Shard ID not present"));
@@ -123,7 +112,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<StreamRequest>,
     ) -> Result<tonic::Response<Self::DocumentsStream>, tonic::Status> {
         debug!("Starting document streaming");
-        self.instrument(&request);
         let request = request.into_inner();
         let Some(shard_id) = request.shard_id.clone() else {
             return Err(tonic::Status::not_found("Shard ID not present"));
@@ -147,12 +135,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn get_shard(
         &self,
         request: tonic::Request<GetShardRequest>,
     ) -> Result<tonic::Response<ShardPB>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let request = request.into_inner();
         let shard_id = &request.shard_id.clone().unwrap();
@@ -174,13 +160,11 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn get_shards(
         &self,
-        request: tonic::Request<EmptyQuery>,
+        _request: tonic::Request<EmptyQuery>,
     ) -> Result<tonic::Response<ShardList>, tonic::Status> {
         debug!("Get shards starts");
-        self.instrument(&request);
         self.inner
             .read()
             .await
@@ -189,13 +173,11 @@ impl NodeReader for NodeReaderGRPCDriver {
             .map_err(|e| tonic::Status::internal(e.to_string()))
     }
 
-    #[tracing::instrument(skip_all)]
     async fn vector_search(
         &self,
         request: tonic::Request<VectorSearchRequest>,
     ) -> Result<tonic::Response<VectorSearchResponse>, tonic::Status> {
         debug!("Vector search starts");
-        self.instrument(&request);
         let vector_request = request.into_inner();
         let shard_id = ShardId {
             id: vector_request.id.clone(),
@@ -218,13 +200,11 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn relation_search(
         &self,
         request: tonic::Request<RelationSearchRequest>,
     ) -> Result<tonic::Response<RelationSearchResponse>, tonic::Status> {
         debug!("Relation search starts");
-        self.instrument(&request);
         let relation_request = request.into_inner();
         let shard_id = ShardId {
             id: relation_request.shard_id.clone(),
@@ -250,13 +230,11 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn search(
         &self,
         request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
         debug!("Search starts");
-        self.instrument(&request);
         let search_request = request.into_inner();
         let shard_id = ShardId {
             id: search_request.shard.clone(),
@@ -279,13 +257,11 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn suggest(
         &self,
         request: tonic::Request<SuggestRequest>,
     ) -> Result<tonic::Response<SuggestResponse>, tonic::Status> {
         debug!("Suggest starts");
-        self.instrument(&request);
         let suggest_request = request.into_inner();
         let shard_id = ShardId {
             id: suggest_request.shard.clone(),
@@ -308,13 +284,11 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn document_search(
         &self,
         request: tonic::Request<DocumentSearchRequest>,
     ) -> Result<tonic::Response<DocumentSearchResponse>, tonic::Status> {
         debug!("Document search starts");
-        self.instrument(&request);
 
         let document_request = request.into_inner();
         let shard_id = ShardId {
@@ -341,13 +315,11 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn paragraph_search(
         &self,
         request: tonic::Request<ParagraphSearchRequest>,
     ) -> Result<tonic::Response<ParagraphSearchResponse>, tonic::Status> {
         debug!("Paragraph search starts");
-        self.instrument(&request);
         let paragraph_request = request.into_inner();
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
@@ -373,12 +345,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn document_ids(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -393,12 +363,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn paragraph_ids(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -413,12 +381,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn vector_ids(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -432,12 +398,11 @@ impl NodeReader for NodeReaderGRPCDriver {
             ))),
         }
     }
-    #[tracing::instrument(skip_all)]
+
     async fn relation_ids(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -452,12 +417,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn relation_edges(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<EdgeList>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -472,12 +435,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(skip_all)]
     async fn relation_types(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<TypeList>, tonic::Status> {
-        self.instrument(&request);
         debug!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
