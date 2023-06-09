@@ -42,6 +42,8 @@ async def test_chat_handles_limits_exceeded_error(
 ):
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         kb = knowledgebox_ingest
-        resp = await client.post(f"/{KB_PREFIX}/{kb}/chat", json={})
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/chat", json={"query": "dummy query"}
+        )
         assert resp.status_code == 402
         assert resp.json() == {"detail": "over the quota"}

@@ -238,7 +238,7 @@ DATA: Dict[str, Any] = {
 }
 
 
-def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
+def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDBSDK):
     # Lets create a bunch of resources
     text: str
     for index, text in enumerate(DATA["text"]):
@@ -298,7 +298,7 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
 
 # can fail in CI due to HuggingFace API
 @pytest.mark.xfail
-def test_standard_examples(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
+def test_standard_examples(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDBSDK):
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
     sdk.create_resource(
         kbid=kb.uuid,
