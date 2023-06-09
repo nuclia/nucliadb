@@ -66,11 +66,11 @@ impl UnboundedShardReaderCache {
             cache: RwLock::new(HashMap::with_capacity(env::max_shards_per_node())),
         }
     }
-    // }
+}
 
-    // #[async_trait]
-    // impl ReaderShardsProvider for UnboundedShardReaderCache {
-    pub async fn load(&self, id: ShardId) -> NodeResult<()> {
+#[async_trait]
+impl ReaderShardsProvider for UnboundedShardReaderCache {
+    async fn load(&self, id: ShardId) -> NodeResult<()> {
         let shard_path = env::shards_path_id(&id);
 
         if self.cache.read().await.contains_key(&id) {
@@ -100,9 +100,7 @@ impl UnboundedShardReaderCache {
         todo!()
     }
 
-    /// ATENTION: do not hold this reference across await points as it may
-    /// deadlock
-    pub async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>> {
+    async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>> {
         self.cache.read().await.get(&id).map(Arc::clone)
     }
 
