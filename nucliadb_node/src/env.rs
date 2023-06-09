@@ -298,3 +298,26 @@ pub fn metrics_http_port(default: u16) -> u16 {
         Err(_) => default,
     }
 }
+
+fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
+    levels
+        .split(',')
+        .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
+        .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
+        .collect()
+}
+
+pub fn max_shards_per_node() -> usize {
+    let default = 800;
+    match env::var("MAX_NODE_REPLICAS") {
+        Ok(max_shards) => {
+            if let Ok(max_shards) = max_shards.parse() {
+                max_shards
+            } else {
+                error!("MAX_NODE_REPLICAS defined incorrectly. Using default: {default}");
+                default
+            }
+        }
+        Err(_) => default,
+    }
+}
