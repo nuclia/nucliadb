@@ -18,72 +18,70 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-use std::collections::HashMap;
 use std::slice::Iter;
-use std::sync::Arc;
-
-use tokio::sync::RwLock;
+use dashmap::DashMap;
 use anyhow::anyhow;
-use lazy_static::lazy_static;
 
 use nucliadb_core::NodeResult;
 use nucliadb_core::env;
 use nucliadb_core::tracing::debug;
+use nucliadb_vectors::data_point::Similarity;
 
 use crate::services::reader::ShardReaderService as ShardReader;
 use crate::services::writer::ShardWriterService as ShardWriter;
 
-pub enum ShardMode {
-    Read,
-    Write,
-}
-
 pub type ShardId = String;
 
-lazy_static! {
-    static ref READER_SHARDS_PROVIDER: Arc<RwLock<UnboundedShardReaderCache>> = Arc::new(RwLock::new(UnboundedShardReaderCache::new()));
-}
 
-fn reader_shards_provider() -> Arc<RwLock<impl ReaderShardsProvider>> {
-    READER_SHARDS_PROVIDER.clone()
-}
+pub trait ReaderShardsProvider: Send + Sync {
+    fn load(&self, id: ShardId) -> NodeResult<()>;
+    fn load_all(&self) -> NodeResult<()>;
 
-// fn writer_shards_provider() -> RwLock<impl WriterShardsProvider> {
-
-// }
-
-pub trait ReaderShardsProvider {
-    fn load(&mut self, id: ShardId) -> NodeResult<()>;
-    fn load_all(&mut self) -> NodeResult<()>;
-
-    fn get(&self, id: ShardId) -> Option<&ShardReader>;
+    fn get(&self, id: ShardId) -> Option<ShardReaderRef>;
 
     fn iter(&self) -> Iter<'_, ShardReader>;
 }
 
 pub trait WriterShardsProvider {
-    fn load(&mut self, id: ShardId) -> NodeResult<()>;
+    fn create(&self, id: ShardId, kbid: String, similarity: Similarity);
+
+    fn load(&self, id: ShardId) -> NodeResult<()>;
     fn load_all(&mut self) -> NodeResult<()>;
 
     fn get(&self, id: ShardId) -> Option<&ShardWriter>;
     fn get_mut(&self, id: ShardId) -> Option<&mut ShardWriter>;
 
+    fn delete(&self, id: ShardId) -> NodeResult<()>;
 }
 
-struct UnboundedShardReaderCache {
-    cache: HashMap<ShardId, ShardReader>
+pub enum ShardReaderRef<'a> {
+    DashMap(dashmap::mapref::one::Ref<'a, ShardId, ShardReader>)
+}
+
+impl std::ops::Deref for ShardReaderRef<'_> {
+    type Target = ShardReader;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::DashMap(r) => r.value(),
+        }
+    }
+}
+
+pub struct UnboundedShardReaderCache {
+    cache: DashMap<ShardId, ShardReader>
 }
 
 impl UnboundedShardReaderCache {
     pub fn new() -> Self {
         Self {
-            cache: HashMap::new(),
+            cache: DashMap::new(),
         }
     }
 }
 
 impl ReaderShardsProvider for UnboundedShardReaderCache {
-   fn load(&mut self, id: ShardId) -> NodeResult<()> {
+   fn load(&self, id: ShardId) -> NodeResult<()> {
        let shard_path = env::shards_path_id(&id);
 
        if self.cache.contains_key(&id) {
@@ -104,12 +102,12 @@ impl ReaderShardsProvider for UnboundedShardReaderCache {
        Ok(())
    }
 
-    fn load_all(&mut self) -> NodeResult<()> {
+    fn load_all(&self) -> NodeResult<()> {
         todo!()
     }
 
-    fn get(&self, id: ShardId) -> Option<&ShardReader> {
-        todo!()
+    fn get(&self, id: ShardId) -> Option<ShardReaderRef> {
+        self.cache.get(&id).map(|item| ShardReaderRef::DashMap(item))
     }
 
     fn iter(&self) -> Iter<'_, ShardReader> {
