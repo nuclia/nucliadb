@@ -41,7 +41,7 @@ SEARCH = Docstring(
             description="Advanced search on the full text index",
             code="""
 >>> from nucliadb_sdk import *
->>> sdk = NucliaDB(api_key="api-key")
+>>> sdk = NucliaDBSDK(api_key="api-key")
 >>> resp = sdk.search(kbid="mykbid", advanced_query="text:SRE OR text:DevOps", features=["document"])
 >>> rid = resp.fulltext.results[0].rid
 >>> resp.resources[rid].title
@@ -58,7 +58,7 @@ FIND = Docstring(
             description="Find documents matching a query",
             code="""
 >>> from nucliadb_sdk import *
->>> sdk = NucliaDB(api_key="api-key")
+>>> sdk = NucliaDBSDK(api_key="api-key")
 >>> resp = sdk.find(kbid="mykbid", query="Very experienced candidates with Rust experience")
 >>> resp.resources.popitem().title
 Graydon_Hoare.cv.pdf
@@ -83,7 +83,7 @@ CHAT = Docstring(
             description="Get an answer for a question that is part of the data in the Knowledge Box",
             code="""
 >>> from nucliadb_sdk import *
->>> sdk = NucliaDB(api_key="api-key")
+>>> sdk = NucliaDBSDK(api_key="api-key")
 >>> sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?").answer
 Yes, according to the provided context, France is expected to be in recession in 2023.""",
         ),
@@ -194,6 +194,7 @@ def _inject_docstring(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
     func_doc += "\n".join(params)
+    func_doc += "\n"
 
     # Add examples
     if docstring:
