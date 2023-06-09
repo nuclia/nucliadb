@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.search.api.v1.chat import _extract_text
+from nucliadb.search.api.v1.chat import flatten_results
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
@@ -27,22 +27,34 @@ from nucliadb_models.search import (
 )
 
 
-def find_resource(*, rid, fid, pid, text, score):
-    p = FindParagraph(id=pid, text=text, score=score, score_type=SCORE_TYPE.BOTH)
+def find_resource(*, rid, fid, pid, text, score, order):
+    p = FindParagraph(
+        id=pid, text=text, score=score, score_type=SCORE_TYPE.BOTH, order=order
+    )
     f = FindField(id=fid, paragraphs={pid: p})
     r = FindResource(id=rid, fields={fid: f})
     return r
 
 
-def test_extract_text():
+def test_flatten_results():
     r1 = find_resource(
-        rid="r1", fid="f1", pid="p1", text="Second most relevant paragraph", score=5
+        rid="r1",
+        fid="f1",
+        pid="p1",
+        text="Second most relevant paragraph",
+        score=5,
+        order=1,
     )
     r2 = find_resource(
-        rid="r2", fid="f2", pid="p2", text="Third most relevant paragraph", score=1
+        rid="r2",
+        fid="f2",
+        pid="p2",
+        text="Third most relevant paragraph",
+        score=1,
+        order=2,
     )
     r3 = find_resource(
-        rid="r3", fid="f3", pid="p3", text="Most relevant paragraph", score=20
+        rid="r3", fid="f3", pid="p3", text="Most relevant paragraph", score=0.9, order=0
     )
     find_results = KnowledgeboxFindResults(
         facets=[],
@@ -52,7 +64,7 @@ def test_extract_text():
             "r3": r3,
         },
     )
-    flattened_text = _extract_text(find_results)
+    flattened_text = flatten_results(find_results)
     assert flattened_text.split(" \n\n ") == [
         "Most relevant paragraph",
         "Second most relevant paragraph",

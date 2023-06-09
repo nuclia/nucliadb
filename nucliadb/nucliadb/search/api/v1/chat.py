@@ -134,7 +134,7 @@ async def chat(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
-    flattened_text = _extract_text(results)
+    flattened_text = flatten_results(results)
 
     if item.context is None:
         context = []
@@ -204,15 +204,15 @@ async def chat(
     )
 
 
-def _extract_text(results: KnowledgeboxFindResults) -> str:
+def flatten_results(results: KnowledgeboxFindResults) -> str:
     """
     Returns a flattened text of all the paragraphs in the results, sorted by decreasing score.
 
     :param results: the find request results to extract the text from
     """
 
-    def by_score(paragraph: FindParagraph) -> float:
-        return paragraph.score
+    def by_order(paragraph: FindParagraph) -> int:
+        return paragraph.order
 
     paragraphs = sorted(
         [
@@ -221,8 +221,7 @@ def _extract_text(results: KnowledgeboxFindResults) -> str:
             for field in result.fields.values()
             for paragraph in field.paragraphs.values()
         ],
-        key=by_score,
-        reverse=True,
+        key=by_order,
     )
     flattened_text = " \n\n ".join([paragraph.text for paragraph in paragraphs])
     return flattened_text
