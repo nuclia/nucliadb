@@ -117,6 +117,13 @@ message Message {
     repeated string to = 3;
     MessageContent content = 4;
     string ident = 5;
+
+    enum MessageType {
+        UNSET = 0;
+        QUESTION = 1;
+        ANSWER = 2;
+    }
+    MessageType type = 6;
 }
 
 message Conversation {

@@ -171,6 +171,18 @@ pub struct Message {
     pub content: ::core::option::Option<MessageContent>,
     #[prost(string, tag="5")]
     pub ident: ::prost::alloc::string::String,
+    #[prost(enumeration="message::MessageType", tag="6")]
+    pub r#type: i32,
+}
+/// Nested message and enum types in `Message`.
+pub mod message {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum MessageType {
+        Unset = 0,
+        Question = 1,
+        Answer = 2,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Conversation {

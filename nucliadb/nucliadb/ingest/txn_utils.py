@@ -66,3 +66,4 @@ async def abort_transaction() -> None:
     if transaction is not None:
         async with _get_transaction_lock():
             await transaction.abort()
+            txn.set(None)

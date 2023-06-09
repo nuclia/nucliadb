@@ -23,6 +23,7 @@ from typing import Dict, Optional
 
 from lru import LRU  # type: ignore
 
+from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.txn_utils import get_transaction
@@ -45,7 +46,9 @@ def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
     return value
 
 
-async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
+async def get_resource_from_cache(
+    kbid: str, uuid: str, txn: Optional[Transaction] = None
+) -> Optional[ResourceORM]:
     orm_resource: Optional[ResourceORM] = None
 
     resource_cache = get_resource_cache()
@@ -55,9 +58,10 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
 
     async with RESOURCE_LOCKS[uuid]:
         if uuid not in resource_cache:
-            transaction = await get_transaction()
+            if txn is None:
+                txn = await get_transaction()
             storage = await get_storage(service_name=SERVICE_NAME)
-            kb = KnowledgeBoxORM(transaction, storage, kbid)
+            kb = KnowledgeBoxORM(txn, storage, kbid)
             orm_resource = await kb.get(uuid)
 
         if orm_resource is not None:

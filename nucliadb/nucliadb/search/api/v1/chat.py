@@ -25,15 +25,20 @@ from fastapi_versioning import version
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.utils import get_driver
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.cache import get_resource_from_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
+    SCORE_TYPE,
     Author,
     ChatModel,
     ChatOptions,
@@ -46,6 +51,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.utilities import get_storage
 
 END_OF_STREAM = "_END_"
 
@@ -58,6 +64,47 @@ CHAT_EXAMPLES = {
         },
     },
 }
+
+MAX_TOKENS = 4000  # less than real because of prompt text size
+
+
+async def format_prompt_text(kbid: str, results: KnowledgeboxFindResults):
+    ordered_paras = []
+    for result in results.resources.values():
+        for field_path, field in result.fields.items():
+            for paragraph in field.paragraphs.values():
+                ordered_paras.append((field_path, paragraph))
+
+    ordered_paras.sort(key=lambda x: x[1].score, reverse=True)
+
+    driver = await get_driver()
+    storage = await get_storage()
+    output = []
+    count = 0
+    async with driver.transaction() as txn:
+        kb = KnowledgeBoxORM(txn, storage, kbid)
+        for field_path, paragraph in ordered_paras:
+            if count > MAX_TOKENS:
+                break
+            _, field_type, field_id = field_path.split("/")[:3]
+            if field_type == "c" and paragraph.score_type == SCORE_TYPE.VECTOR:
+                # pull entire conversation for vector matches
+                rid = paragraph.id.split("/")[0]
+                resource = await kb.get(rid)
+                field_obj = await resource.get_field(
+                    field_id, KB_REVERSE[field_type], load=True
+                )
+                cmetadata = await field_obj.get_metadata()
+                for page in range(0, cmetadata.pages):
+                    conv = await field_obj.db_get_value(page + 1)
+                    for message in conv.messages:
+                        count += len(message.content.text)
+                        output.append(message.content.text)
+            else:
+                count += len(paragraph.text)
+                output.append(paragraph.text)
+
+    return " \n\n ".join(output)[:MAX_TOKENS]
 
 
 @api.post(
@@ -133,22 +180,18 @@ async def chat(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
-    flattened_text = " \n\n ".join(
-        [
-            paragraph.text
-            for result in results.resources.values()
-            for field in result.fields.values()
-            for paragraph in field.paragraphs.values()
-        ]
-    )
     if item.context is None:
         context = []
     else:
         context = item.context
-    context.append(Message(author=Author.NUCLIA, text=flattened_text))
+    context.append(
+        Message(author=Author.NUCLIA, text=await format_prompt_text(kbid, results))
+    )
 
     chat_model = ChatModel(
-        user_id=x_nucliadb_user, context=context, question=item.query
+        user_id=x_nucliadb_user,
+        context=context,
+        question=item.query,
     )
 
     ident, generator = await predict.chat_query(kbid, chat_model)
@@ -203,7 +246,7 @@ async def chat(
         generate_answer(results, kbid, predict, generator, item.features),
         media_type="plain/text",
         headers={
-            "NUCLIA-LEARNING-ID": ident,
+            "NUCLIA-LEARNING-ID": ident or "unknown",
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
