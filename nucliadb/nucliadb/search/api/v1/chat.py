@@ -65,6 +65,7 @@ CHAT_EXAMPLES = {
     f"/{KB_PREFIX}/{{kbid}}/chat",
     status_code=200,
     name="Chat Knowledge Box",
+    summary="Chat on a Knowledge Box",
     description="Chat on a Knowledge Box",
     tags=["Search"],
 )

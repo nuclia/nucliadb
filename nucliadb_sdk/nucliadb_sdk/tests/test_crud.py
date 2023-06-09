@@ -26,7 +26,7 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.search import ResourceProperties
 
 
-def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaSDK):
+def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDBSDK):
     with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
         sdk.get_resource_by_slug(kbid=kb.uuid, slug="mykey1")
 
