@@ -19,6 +19,7 @@
 #
 
 import logging
+import os
 import time
 
 import docker  # type: ignore
@@ -36,9 +37,15 @@ from nucliadb_utils.tests import free_port
 
 logger = logging.getLogger(__name__)
 
+NODE_IMAGE_VERSION = os.environ.get("NODE_IMAGE_VERSION") or "main"
+SIDECAR_IMAGE_VERSION = os.environ.get("SIDECAR_IMAGE_VERSION") or "main"
+CLUSTER_MONITOR_IMAGE_VERSION = (
+    os.environ.get("CLUSTER_MONITOR_IMAGE_VERSION") or "main"
+)
+
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
+    "version": NODE_IMAGE_VERSION,
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
@@ -61,7 +68,7 @@ images.settings["nucliadb_node_reader"] = {
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
+    "version": NODE_IMAGE_VERSION,
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
@@ -85,7 +92,7 @@ images.settings["nucliadb_node_writer"] = {
 
 images.settings["nucliadb_node_sidecar"] = {
     "image": "eu.gcr.io/stashify-218417/node_sidecar",
-    "version": "main",
+    "version": SIDECAR_IMAGE_VERSION,
     "env": {
         "INDEX_JETSTREAM_SERVERS": "[]",
         "CACHE_PUBSUB_NATS_URL": "",
@@ -107,7 +114,7 @@ images.settings["nucliadb_node_sidecar"] = {
 
 images.settings["nucliadb_cluster_manager"] = {
     "image": "eu.gcr.io/stashify-218417/cluster_manager",
-    "version": "main",
+    "version": CLUSTER_MONITOR_IMAGE_VERSION,
     "network": "host",
     "env": {
         "LISTEN_PORT": "4444",

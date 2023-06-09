@@ -1,0 +1,159 @@
+name: nucliadb Search (py)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "nucliadb_protos/python/**"
+      - "nucliadb_cluster/**"
+      - "nucliadb_node/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "nucliadb_protos/python/**"
+      - "nucliadb_cluster/**"
+      - "nucliadb_node/**"
+
+jobs:
+  dev-node-image:
+    runs-on: ubuntu-latest
+    name: DevNodeImage
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            node_modified:
+              - 'nucliadb_node/src/**'
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/auth@v1
+        if: steps.filter.outputs.node_modified == 'true'
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        if: steps.filter.outputs.node_modified == 'true'
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        if: steps.filter.outputs.node_modified == 'true'
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+
+
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.node_modified == 'true'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push
+        if: steps.filter.outputs.node_modified == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.node
+          platforms: linux/amd64
+          push: true
+          tags: eu.gcr.io/stashify-218417/node:dev-${{ steps.branch_name.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          build-args: CARGO_PROFILE=debug
+
+
+  dev-sidecar-image:
+    runs-on: ubuntu-latest
+    name: DevSidecarImage
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            sidecar_modified:
+              - 'nucliadb_node/nucliadb_node/**'
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/auth@v1
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.node_sidecar
+          platforms: linux/amd64
+          push: true
+          tags: eu.gcr.io/stashify-218417/node_sidecar:dev-${{ steps.branch_name.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+
+  dev-cm-image:
+    runs-on: ubuntu-latest
+    name: DevClusterMonitorImage
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            cluster_modified:
+              - 'nucliadb_cluster/**'
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/auth@v1
+        if: steps.filter.outputs.cluster_modified == 'true'
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        if: steps.filter.outputs.cluster_modified == 'true'
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        if: steps.filter.outputs.cluster_modified == 'true'
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.cluster_modified == 'true'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push
+        if: steps.filter.outputs.cluster_modified == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.cluster_monitor
+          platforms: linux/amd64
+          push: true
+          tags: eu.gcr.io/stashify-218417/cluster_manager:dev-${{ steps.branch_name.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
