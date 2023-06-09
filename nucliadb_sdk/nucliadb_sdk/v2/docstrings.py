@@ -186,10 +186,12 @@ def _inject_docstring(
     # Add params section
     params = []
     for path_param in path_params:
+        # TODO add :type param_name: param_type
         params.append(f":param {path_param}:")
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
             for field in request_type.__fields__.values():
+                # TODO add :type param_name: param_type
                 params.append(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
