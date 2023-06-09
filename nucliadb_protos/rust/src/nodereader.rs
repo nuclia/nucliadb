@@ -256,6 +256,8 @@ pub struct VectorSearchRequest {
     pub with_duplicates: bool,
     #[prost(bool, tag="13")]
     pub reload: bool,
+    #[prost(float, tag="16")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentVectorIdentifier {

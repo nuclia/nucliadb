@@ -601,6 +601,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
+    MIN_SCORE_FIELD_NUMBER: builtins.int
     id: builtins.str
     """Shard ID"""
     vector_set: builtins.str
@@ -619,6 +620,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
     """How many results are in this page."""
     with_duplicates: builtins.bool
     reload: builtins.bool
+    min_score: builtins.float
     def __init__(
         self,
         *,
@@ -630,8 +632,9 @@ class VectorSearchRequest(google.protobuf.message.Message):
         result_per_page: builtins.int = ...,
         with_duplicates: builtins.bool = ...,
         reload: builtins.bool = ...,
+        min_score: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "min_score", b"min_score", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 

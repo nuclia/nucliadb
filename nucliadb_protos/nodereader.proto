@@ -200,6 +200,7 @@ message VectorSearchRequest {
     int32 result_per_page = 5;
     bool with_duplicates = 14;
     bool reload = 13;
+    float min_score = 16;
 }
 
 message DocumentVectorIdentifier {
