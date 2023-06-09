@@ -56,7 +56,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_sdk.v2 import exceptions
+from nucliadb_sdk.v2 import docstrings, exceptions
 
 
 class Region(enum.Enum):
@@ -116,15 +116,18 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
 
 
 def _request_builder(
-    path_template: str,
+    *,
+    name: str,
     method: str,
+    path_template: str,
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
+    docstring: Optional[docstrings.Docstring] = None,
 ):
-    def _func(self: "NucliaSDK", content: Optional[Any] = None, **kwargs):
+    def _func(self: "NucliaDBSDK", content: Optional[Any] = None, **kwargs):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -168,10 +171,21 @@ def _request_builder(
         else:
             return _parse_response(response_type, resp)
 
+    docstrings.inject_documentation(
+        _func,
+        name,
+        method,
+        path_template,
+        path_params,
+        request_type,
+        response_type,
+        docstring,
+    )
+
     return _func
 
 
-class _NucliaSDKBase:
+class _NucliaDBSDKBase:
     def __init__(
         self,
         *,
@@ -179,6 +193,7 @@ class _NucliaSDKBase:
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
     ):
         self.region = region
         self.api_key = api_key
@@ -239,146 +254,253 @@ class _NucliaSDKBase:
 
     # Knowledge Box Endpoints
     create_knowledge_box = _request_builder(
-        "/v1/kbs", "POST", (), KnowledgeBoxConfig, KnowledgeBoxObj
+        name="create_knowledge_box",
+        path_template="/v1/kbs",
+        method="POST",
+        path_params=(),
+        request_type=KnowledgeBoxConfig,
+        response_type=KnowledgeBoxObj,
     )
     delete_knowledge_box = _request_builder(
-        "/v1/kb/{kbid}", "DELETE", ("kbid",), None, KnowledgeBoxObj
+        name="delete_knowledge_box",
+        path_template="/v1/kb/{kbid}",
+        method="DELETE",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
     )
     get_knowledge_box = _request_builder(
-        "/v1/kb/{kbid}", "GET", ("kbid",), None, KnowledgeBoxObj
+        name="get_knowledge_box",
+        path_template="/v1/kb/{kbid}",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
     )
     get_knowledge_box_by_slug = _request_builder(
-        "/v1/kb/s/{slug}", "GET", ("slug",), None, KnowledgeBoxObj
+        name="get_knowledge_box_by_slug",
+        path_template="/v1/kb/s/{slug}",
+        method="GET",
+        path_params=("slug",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
     )
     list_knowledge_boxes = _request_builder(
-        "/v1/kbs", "GET", (), None, KnowledgeBoxList
+        name="list_knowledge_boxes",
+        path_template="/v1/kbs",
+        method="GET",
+        path_params=(),
+        request_type=None,
+        response_type=KnowledgeBoxList,
     )
 
     # Resource Endpoints
     create_resource = _request_builder(
-        "/v1/kb/{kbid}/resources",
-        "POST",
-        ("kbid",),
-        CreateResourcePayload,
-        ResourceCreated,
+        name="create_resource",
+        path_template="/v1/kb/{kbid}/resources",
+        method="POST",
+        path_params=("kbid",),
+        request_type=CreateResourcePayload,
+        response_type=ResourceCreated,
     )
     update_resource = _request_builder(
-        "/v1/kb/{kbid}/resource/{rid}",
-        "PATCH",
-        ("kbid", "rid"),
-        UpdateResourcePayload,
-        ResourceUpdated,
+        name="update_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="PATCH",
+        path_params=("kbid", "rid"),
+        request_type=UpdateResourcePayload,
+        response_type=ResourceUpdated,
     )
     delete_resource = _request_builder(
-        "/v1/kb/{kbid}/resource/{rid}", "DELETE", ("kbid", "rid"), None, None
+        name="delete_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="DELETE",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
     )
     get_resource_by_slug = _request_builder(
-        "/v1/kb/{kbid}/slug/{slug}", "GET", ("kbid", "slug"), None, Resource
+        name="get_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}",
+        method="GET",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=Resource,
     )
     get_resource_by_id = _request_builder(
-        "/v1/kb/{kbid}/resource/{rid}", "GET", ("kbid", "rid"), None, Resource
+        name="get_resource_by_id",
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="GET",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=Resource,
     )
     list_resources = _request_builder(
-        "/v1/kb/{kbid}/resources", "GET", ("kbid",), None, ResourceList
+        name="list_resources",
+        path_template="/v1/kb/{kbid}/resources",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=ResourceList,
     )
 
     # Conversation endpoints
     add_conversation_message = _request_builder(
-        "/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
-        "PUT",
-        ("kbid", "rid", "field_id"),
-        List[InputMessage],  # type: ignore
-        ResourceFieldAdded,
+        name="add_conversation_message",
+        path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
+        method="PUT",
+        path_params=("kbid", "rid", "field_id"),
+        request_type=List[InputMessage],  # type: ignore
+        response_type=ResourceFieldAdded,
     )
 
     # Labels
     set_labelset = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}",
-        "POST",
-        ("kbid", "labelset"),
-        LabelSet,
-        None,
+        name="set_labelset",
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="POST",
+        path_params=("kbid", "labelset"),
+        request_type=LabelSet,
+        response_type=None,
     )
     delete_labelset = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "DELETE", ("kbid", "labelset"), None, None
+        name="delete_labelset",
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="DELETE",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=None,
     )
     get_labelsets = _request_builder(
-        "/v1/kb/{kbid}/labelset", "GET", ("kbid", "labelset"), None, KnowledgeBoxLabels
+        name="get_labelsets",
+        path_template="/v1/kb/{kbid}/labelsets",
+        method="GET",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=KnowledgeBoxLabels,
     )
     get_labelset = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "GET", ("kbid", "labelset"), None, LabelSet
+        name="get_labelset",
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="GET",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=LabelSet,
     )
 
     # Entity Groups
     create_entitygroup = _request_builder(
-        "/v1/kb/{kbid}/entitiesgroups",
-        "POST",
-        ("kbid",),
-        CreateEntitiesGroupPayload,
-        None,
+        name="create_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroups",
+        method="POST",
+        path_params=("kbid",),
+        request_type=CreateEntitiesGroupPayload,
+        response_type=None,
     )
+
     update_entitygroup = _request_builder(
-        "/v1/kb/{kbid}/entitiesgroup/{group}",
-        "PATCH",
-        ("kbid", "group"),
-        UpdateEntitiesGroupPayload,
-        None,
+        name="update_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="PATCH",
+        path_params=("kbid", "group"),
+        request_type=UpdateEntitiesGroupPayload,
+        response_type=None,
     )
     set_entitygroup_entities = _request_builder(
-        "/v1/kb/{kbid}/entitiesgroup/{group}",
-        "POST",
-        ("kbid", "group"),
-        EntitiesGroup,
-        None,
+        name="set_entitygroup_entities",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="POST",
+        path_params=("kbid", "group"),
+        request_type=EntitiesGroup,
+        response_type=None,
     )
     delete_entitygroup = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "DELETE", ("kbid", "labelset"), None, None
+        name="delete_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="DELETE",
+        path_params=("kbid", "group"),
+        request_type=None,
+        response_type=None,
     )
     get_entitygroups = _request_builder(
-        "/v1/kb/{kbid}/labelset", "GET", ("kbid", "labelset"), None, KnowledgeBoxLabels
+        name="get_entitygroups",
+        path_template="/v1/kb/{kbid}/entitiesgroups",
+        method="GET",
+        path_params=("kbid", "show_entities"),
+        request_type=None,
+        response_type=KnowledgeBoxLabels,
     )
     get_entitygroup = _request_builder(
-        "/v1/kb/{kbid}/labelset/{labelset}", "GET", ("kbid", "labelset"), None, LabelSet
+        name="get_entitygroup",
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="GET",
+        path_params=("kbid", "group"),
+        request_type=None,
+        response_type=LabelSet,
     )
 
     # Vectorsets
     create_vectorset = _request_builder(
-        "/v1/kb/{kbid}/vectorset/{vectorset}",
-        "POST",
-        ("kbid", "vectorset"),
-        VectorSet,
-        None,
+        name="create_vectorset",
+        path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
+        method="POST",
+        path_params=("kbid", "vectorset"),
+        request_type=VectorSet,
+        response_type=None,
     )
     delete_vectorset = _request_builder(
-        "/v1/kb/{kbid}/vectorset/{vectorset}", "POST", ("kbid", "vectorset"), None, None
+        name="delete_vectorset",
+        path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
+        method="POST",
+        path_params=("kbid", "vectorset"),
+        request_type=None,
+        response_type=None,
     )
     list_vectorsets = _request_builder(
-        "/v1/kb/{kbid}/vectorsets", "GET", ("kbid",), None, VectorSets
+        name="list_vectorsets",
+        path_template="/v1/kb/{kbid}/vectorsets",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=VectorSets,
     )
 
     # Search / Find Endpoints
     find = _request_builder(
-        "/v1/kb/{kbid}/find", "POST", ("kbid",), FindRequest, KnowledgeboxFindResults
+        name="find",
+        path_template="/v1/kb/{kbid}/find",
+        method="POST",
+        path_params=("kbid",),
+        request_type=FindRequest,
+        response_type=KnowledgeboxFindResults,
+        docstring=docstrings.FIND,
     )
     search = _request_builder(
-        "/v1/kb/{kbid}/search",
-        "POST",
-        ("kbid",),
-        SearchRequest,
-        KnowledgeboxSearchResults,
+        name="search",
+        path_template="/v1/kb/{kbid}/search",
+        method="POST",
+        path_params=("kbid",),
+        request_type=SearchRequest,
+        response_type=KnowledgeboxSearchResults,
+        docstring=docstrings.SEARCH,
     )
     chat = _request_builder(
-        "/v1/kb/{kbid}/chat", "POST", ("kbid",), ChatRequest, chat_response_parser
+        name="chat",
+        path_template="/v1/kb/{kbid}/chat",
+        method="POST",
+        path_params=("kbid",),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+        docstring=docstrings.CHAT,
     )
 
 
-class NucliaSDK(_NucliaSDKBase):
+class NucliaDBSDK(_NucliaDBSDKBase):
     """
-    Example usage:
-
-    from nucliadb_sdk.v2.sdk import *
-    sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
-    sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
+    Example usage
+    >>> from nucliadb_sdk import *
+    >>> sdk = NucliaDBSDK(region=Region.EUROPE1, api_key="api-key")
+    >>> sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
@@ -390,6 +512,23 @@ class NucliaSDK(_NucliaSDKBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
+        """Create a new instance of the NucliaDBSDK client
+        :param region: The region to connect to
+        :param api_key: The API key to use for authentication
+        :param url: The base URL to use for the NucliaDB API
+        :param headers: Any additional headers to include in each request
+        :param timeout: The timeout in seconds to use for requests
+
+        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+        >>> from nucliadb_sdk import *
+        >>> sdk = NucliaDBSDK(api_key="api-key")
+
+        If the Knowledge Box you are interacting with is public, you don't even need the api key
+        >>> sdk = NucliaDBSDK()
+
+        If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
+        >>> sdk = NucliaDBSDK(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
+        """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.Client(
             headers=self.headers, base_url=self.base_url, timeout=timeout
@@ -412,13 +551,12 @@ class NucliaSDK(_NucliaSDKBase):
         return self._check_response(response)
 
 
-class NucliaSDKAsync(_NucliaSDKBase):
+class NucliaDBSDKAsync(_NucliaDBSDKBase):
     """
     Example usage:
-
-    from nucliadb_sdk.v2.sdk import *
-    sdk = NucliaSDK(region=Region.EUROPE1, api_key="api-key")
-    sdk.list_resources(kbid='70a2530a-5863-41ec-b42b-bfe795bef2eb')
+    >>> from nucliadb_sdk import *
+    >>> sdk = NucliaDBSDKAsync(region=Region.EUROPE1, api_key="api-key")
+    >>> await sdk.list_resources(kbid='my-kbid')
     """
 
     def __init__(
@@ -430,6 +568,23 @@ class NucliaSDKAsync(_NucliaSDKBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
+        """Create a new instance of the NucliaDBSDK client
+        :param region: The region to connect to
+        :param api_key: The API key to use for authentication
+        :param url: The base URL to use for the NucliaDB API
+        :param headers: Any additional headers to include in each request
+        :param timeout: The timeout in seconds to use for requests
+
+        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+        >>> from nucliadb_sdk import *
+        >>> sdk = NucliaDBSDKAsync(api_key="api-key")
+
+        If the Knowledge Box you are interacting with is public, you don't even need the api key
+        >>> sdk = NucliaDBSDKAsync()
+
+        If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
+        >>> sdk = NucliaDBSDKAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
+        """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.AsyncClient(
             headers=self.headers, base_url=self.base_url, timeout=timeout
