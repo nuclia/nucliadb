@@ -133,7 +133,7 @@ jobs:
           wait-interval: 10
       
       - name: Set sidecar image tag
-        if: steps.filter.outputs.node_modified == 'true'
+        if: steps.filter.outputs.sidecar_modified == 'true'
         run: |
           echo "SIDECAR_IMAGE_VERSION=dev-${{ steps.branch_name.outputs.branch_name }}" >> $GITHUB_ENV
 
@@ -147,7 +147,7 @@ jobs:
           wait-interval: 10
       
       - name: Set cm image tag
-        if: steps.filter.outputs.node_modified == 'true'
+        if: steps.filter.outputs.cluster_modified == 'true'
         run: |
           echo "CLUSTER_MONITOR_IMAGE_VERSION=dev-${{ steps.branch_name.outputs.branch_name }}" >> $GITHUB_ENV
 
