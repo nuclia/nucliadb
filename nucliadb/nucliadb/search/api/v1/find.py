@@ -34,7 +34,6 @@ from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.utils import parse_sort_options
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     FindRequest,
@@ -86,8 +85,8 @@ async def find_knowledgebox(
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: Optional[int] = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
+    page_number: int = param_to_query(SearchParamDefaults.page_number),
+    page_size: int = param_to_query(SearchParamDefaults.page_size),
     min_score: float = param_to_query(SearchParamDefaults.min_score),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
@@ -101,16 +100,15 @@ async def find_knowledgebox(
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
-    highlight: bool = Query(default=False),
+    highlight: bool = param_to_query(SearchParamDefaults.highlight),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = Query([]),
-    with_duplicates: bool = Query(default=False),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    with_synonyms: bool = Query(default=False),
+    shards: List[str] = param_to_query(SearchParamDefaults.shards),
+    with_duplicates: bool = param_to_query(SearchParamDefaults.with_duplicates),
+    with_synonyms: bool = param_to_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = param_to_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
@@ -144,7 +142,6 @@ async def find_knowledgebox(
             extracted=extracted,
             shards=shards,
             with_duplicates=with_duplicates,
-            with_status=with_status,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
         )
@@ -227,7 +224,6 @@ async def find(
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
-        with_status=item.with_status,
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )

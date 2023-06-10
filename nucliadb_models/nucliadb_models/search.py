@@ -32,7 +32,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, validator
 
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
+from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.vectors import VectorSimilarity
 
@@ -389,6 +389,62 @@ class SearchParamDefaults:
         title="Query",
         description="The query to get a generative answer for",
     )
+    shards = ParamDefault(
+        default=[],
+        title="Shards",
+        description="The list of shards to search in. If empty, all shards will be searched",
+    )
+    page_number = ParamDefault(
+        default=0,
+        title="Page number",
+        description="The page number of the results to return",
+    )
+    page_size = ParamDefault(
+        default=20,
+        title="Page size",
+        description="The number of results to return per page",
+    )
+    highlight = ParamDefault(
+        default=False,
+        title="Highlight",
+        description="If set to true, the query terms will be highlighted in the results between <mark>...</mark> tags",  # noqa: E501
+    )
+    with_duplicates = ParamDefault(
+        default=False,
+        title="With duplicate paragraphs",
+        description="Whether to return duplicate paragraphs on the same document",  # noqa: E501
+    )
+    with_status = ParamDefault(
+        default=None,
+        title="With processing status",
+        description="Filter results by resource processing status",
+    )
+    with_synonyms = ParamDefault(
+        default=False,
+        title="With custom synonyms",
+        description="Whether to return matches for synonyms of the query terms (it works only for text search)",  # noqa: E501
+    )
+    # sort_field: Optional[SortField] = Query(default=None),
+    # sort_limit: Optional[int] = Query(default=None, gt=0),
+    # sort_order: SortOrder = Query(default=SortOrder.DESC),
+    # range_creation_start: Optional[datetime] = Query(default=None),
+    # range_creation_end: Optional[datetime] = Query(default=None),
+    # range_modification_start: Optional[datetime] = Query(default=None),
+    # range_modification_end: Optional[datetime] = Query(default=None),
+    # features: List[SearchOptions] = Query(
+    #     default=[
+    #         SearchOptions.PARAGRAPH,
+    #         SearchOptions.DOCUMENT,
+    #         SearchOptions.VECTOR,
+    #     ]
+    # ),
+    # reload: bool = Query(default=True),
+    # debug: bool = Query(False),
+    # show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
+    # field_type_filter: List[FieldTypeName] = Query(
+    #     list(FieldTypeName), alias="field_type"
+    # ),
+    # extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
 
 
 class SearchRequest(BaseModel):
@@ -398,8 +454,8 @@ class SearchRequest(BaseModel):
     filters: List[str] = SearchParamDefaults.filters.to_field()
     faceted: List[str] = SearchParamDefaults.faceted.to_field()
     sort: Optional[SortOptions] = None
-    page_number: int = 0
-    page_size: int = 20
+    page_number: int = SearchParamDefaults.page_number.to_field()
+    page_size: int = SearchParamDefaults.page_size.to_field()
     min_score: float = SearchParamDefaults.min_score.to_field()
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
@@ -412,16 +468,15 @@ class SearchRequest(BaseModel):
     ]
     reload: bool = True
     debug: bool = False
-    highlight: bool = False
+    highlight: bool = SearchParamDefaults.highlight.to_field()
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shards: List[str] = []
+    shards: List[str] = SearchParamDefaults.shards.to_field()
     vector: Optional[List[float]] = None
     vectorset: Optional[str] = None
-    with_duplicates: bool = False
-    with_status: Optional[ResourceProcessingStatus] = None
-    with_synonyms: bool = False
+    with_duplicates: bool = SearchParamDefaults.with_duplicates.to_field()
+    with_synonyms: bool = SearchParamDefaults.with_synonyms.to_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_field()
 
 
@@ -465,7 +520,7 @@ class ChatRequest(BaseModel):
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shards: List[str] = []
+    shards: List[str] = SearchParamDefaults.shards.to_field()
     context: Optional[List[Message]] = None
     autofilter: bool = SearchParamDefaults.autofilter.to_field()
 

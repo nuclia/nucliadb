@@ -95,8 +95,8 @@ async def search_knowledgebox(
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: Optional[int] = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
+    page_number: int = param_to_query(SearchParamDefaults.page_number),
+    page_size: int = param_to_query(SearchParamDefaults.page_size),
     min_score: float = param_to_query(SearchParamDefaults.min_score),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
@@ -111,16 +111,15 @@ async def search_knowledgebox(
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
-    highlight: bool = Query(default=False),
+    highlight: bool = param_to_query(SearchParamDefaults.highlight),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = Query([]),
-    with_duplicates: bool = Query(default=False),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    with_synonyms: bool = Query(default=False),
+    shards: List[str] = param_to_query(SearchParamDefaults.shards),
+    with_duplicates: bool = param_to_query(SearchParamDefaults.with_duplicates),
+    with_synonyms: bool = param_to_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = param_to_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
@@ -153,7 +152,6 @@ async def search_knowledgebox(
         extracted=extracted,
         shards=shards,
         with_duplicates=with_duplicates,
-        with_status=with_status,
         with_synonyms=with_synonyms,
         autofilter=autofilter,
     )
@@ -180,16 +178,18 @@ async def catalog(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
+    query: str = param_to_query(SearchParamDefaults.query),
+    filters: List[str] = param_to_query(SearchParamDefaults.filters),
+    faceted: List[str] = param_to_query(SearchParamDefaults.faceted),
     sort_field: Optional[SortField] = Query(default=None),
     sort_limit: int = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    shards: List[str] = Query([]),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
+    page_number: int = param_to_query(SearchParamDefaults.page_number),
+    page_size: int = param_to_query(SearchParamDefaults.page_size),
+    shards: List[str] = param_to_query(SearchParamDefaults.shards),
+    with_status: Optional[ResourceProcessingStatus] = param_to_query(
+        SearchParamDefaults.with_status
+    ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -208,7 +208,6 @@ async def catalog(
         features=[SearchOptions.DOCUMENT],
         show=[ResourceProperties.BASIC],
         shards=shards,
-        with_status=with_status,
     )
     return await search(
         response,
@@ -218,6 +217,7 @@ async def catalog(
         x_nucliadb_user,
         x_forwarded_for,
         do_audit=False,
+        with_status=with_status,
     )
 
 
@@ -257,6 +257,7 @@ async def search(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
+    with_status: Optional[ResourceProcessingStatus] = None,
 ) -> KnowledgeboxSearchResults:
     audit = get_audit()
     start_time = time()
@@ -289,7 +290,7 @@ async def search(
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
-        with_status=item.with_status,
+        with_status=with_status,
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
