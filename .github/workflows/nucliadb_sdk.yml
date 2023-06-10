@@ -67,15 +67,30 @@ jobs:
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
 
-      - name: Build local NucliaDB for testing
-        if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'false'
-        run: |
-          docker build -t nuclia/nucliadb:latest -f Dockerfile .
+      - name: Get safe branch name
+        id: branch_name
+        run: |-
+          BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      - name: Build local NucliaDB with Binding for testing
-        if: steps.filter.outputs.nucliadb_node_modified == 'true'
+      - name: Wait for nucliadb image
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ steps.branch_name.outputs.branch_name }}
+          check-name: DevNucliaImage
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      
+      - name: Set node image tag
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
         run: |
-          docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding --build-arg RUST_BUILD_PROFILE=dev .
+          echo "NUCLIADB_IMAGE_VERSION=dev-${{ steps.branch_name.outputs.branch_name }}" >> $GITHUB_ENV
+      
+      - name: Set node image tag
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        run: |
+          echo "NUCLIADB_IMAGE_NAME=eu.gcr.io/stashify-218417/nucliadb" >> $GITHUB_ENV"
 
       - name: Run tests
         run: |

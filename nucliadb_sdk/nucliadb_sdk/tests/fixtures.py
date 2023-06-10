@@ -34,9 +34,12 @@ from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
+NUCLIADB_IMAGE_NAME = os.environ.get("NUCLIADB_IMAGE_NAME") or "nuclia/nucliadb"
+NUCLIADB_IMAGE_VERSION = os.environ.get("NUCLIADB_IMAGE_VERSION") or "latest"
+
 images.settings["nucliadb"] = {
-    "image": "nuclia/nucliadb",
-    "version": "latest",
+    "image": NUCLIADB_IMAGE_NAME,
+    "version": NUCLIADB_IMAGE_VERSION,
     "env": {
         "DRIVER": "local",
         "NUCLIADB_DISABLE_TELEMETRY": "True",

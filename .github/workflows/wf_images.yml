@@ -72,6 +72,74 @@ jobs:
           cache-to: type=gha,mode=min
           build-args: CARGO_PROFILE=debug
 
+  dev-nucliadb-binding-image:
+    runs-on: ubuntu-latest
+    name: DevNucliaImage
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            nucliadb_node_modified:
+              - 'nucliadb_node/**'
+            nucliadb_modified:
+              - 'nucliadb/**'
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/auth@v1
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+
+
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        uses: docker/setup-buildx-action@v2
+
+      - name: Get safe branch name
+        if: ${{ steps.filter.outputs.nucliadb_node_modified == 'true' || steps.filter.outputs.nucliadb_modified == 'true' }}
+        id: branch_name
+        run: |-
+          BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Build and push with bindings
+        if: steps.filter.outputs.nucliadb_node_modified == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.withbinding
+          platforms: linux/amd64
+          push: true
+          tags: eu.gcr.io/stashify-218417/nucliadb:dev-${{ steps.branch_name.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          build-args: RUST_BUILD_PROFILE=debug
+      
+      - name: Build and push
+        if: ${{ steps.filter.outputs.nucliadb_node_modified != 'true' && steps.filter.outputs.nucliadb_modified == 'true' }}
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: eu.gcr.io/stashify-218417/nucliadb:dev-${{ steps.branch_name.outputs.branch_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
   dev-sidecar-image:
     runs-on: ubuntu-latest
