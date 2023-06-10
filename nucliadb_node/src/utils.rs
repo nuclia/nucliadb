@@ -33,7 +33,7 @@ pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
         .authority(grpc_addr.to_string().as_str())
         .path_and_query("/")
         .build()?;
-    // Create a channel with connect_lazy to automatically reconnect to the node.
+    // Create a channel with connect_lazy to automatically reconnect to the node
     let channel = Endpoint::from(uri);
     Ok(channel)
 }
