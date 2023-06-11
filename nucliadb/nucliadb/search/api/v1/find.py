@@ -100,13 +100,15 @@ async def find_knowledgebox(
         ],
     ),
     reload: bool = Query(default=True),
-    debug: bool = Query(False),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
+    show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
+    extracted: List[ExtractedDataTypeName] = fastapi_query(
+        SearchParamDefaults.extracted
+    ),
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),

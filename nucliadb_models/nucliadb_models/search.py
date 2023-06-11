@@ -31,7 +31,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, validator
 
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.vectors import VectorSimilarity
@@ -341,19 +341,6 @@ class KnowledgeboxShards(BaseModel):
         return cls(**as_dict)
 
 
-class ParamDefault(BaseModel):
-    default: Any
-    title: str
-    description: str
-    gt: Optional[float] = None
-
-    def to_pydantic_field(self, **kw) -> Field:  # type: ignore
-        default = self.default or kw.pop("default", None)
-        return Field(
-            default, title=self.title, description=self.description, gt=self.gt, **kw
-        )
-
-
 class SearchParamDefaults:
     query = ParamDefault(
         default="", title="Query", description="The query to search for"
@@ -444,12 +431,12 @@ class SearchParamDefaults:
     )
     sort_field = ParamDefault(
         default=None,
-        title="Sort Field",
+        title="Sort field",
         description="Field to sort results with",
     )
     sort = ParamDefault(
         default=None,
-        title="Sort Options",
+        title="Sort options",
         description="Options for results sorting",
     )
     search_features = ParamDefault(
@@ -457,18 +444,31 @@ class SearchParamDefaults:
         title="Search features",
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes.",  # noqa
     )
+    debug = ParamDefault(
+        default=False,
+        title="Debug mode",
+        description="If set, the response will include some extra metadata for debugging purposes, like the list of queried nodes.",  # noqa
+    )
+    show = ParamDefault(
+        default=[ResourceProperties.BASIC],
+        title="Show metadata",
+        description="Controls which types of metadata are serialized on resources of search results",
+    )
+    extracted = ParamDefault(
+        default=list(ExtractedDataTypeName),
+        title="Extracted metadata",
+        description="Controls which parts of the extracted metadata are serialized on search results",
+    )
+    field_type_filter = ParamDefault(
+        default=list(FieldTypeName),
+        title="Field type filter",
+        description="Filter search results to match paragraphs of a specific field type",
+    )
 
     # range_creation_start: Optional[datetime] = Query(default=None),
     # range_creation_end: Optional[datetime] = Query(default=None),
     # range_modification_start: Optional[datetime] = Query(default=None),
     # range_modification_end: Optional[datetime] = Query(default=None),
-    # reload: bool = Query(default=True),
-    # debug: bool = Query(False),
-    # show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    # field_type_filter: List[FieldTypeName] = Query(
-    #     list(FieldTypeName), alias="field_type"
-    # ),
-    # extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
 
 
 class SearchRequest(BaseModel):
@@ -497,11 +497,15 @@ class SearchRequest(BaseModel):
         ]
     )
     reload: bool = True
-    debug: bool = False
+    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
-    show: List[ResourceProperties] = [ResourceProperties.BASIC]
-    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
-    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
+    show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    field_type_filter: List[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = None
     vectorset: Optional[str] = None
@@ -547,9 +551,13 @@ class ChatRequest(BaseModel):
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
     range_modification_end: Optional[datetime] = None
-    show: List[ResourceProperties] = [ResourceProperties.BASIC]
-    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
-    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
+    show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    field_type_filter: List[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     context: Optional[List[Message]] = None
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()

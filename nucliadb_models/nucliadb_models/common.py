@@ -21,7 +21,7 @@ import base64
 import hashlib
 import re
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, root_validator
 
@@ -45,6 +45,26 @@ DOWNLOAD_TYPE_MAP = {"f": "field", "e": "extracted"}
 DOWNLOAD_URI = (
     "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
 )
+
+
+class ParamDefault(BaseModel):
+    default: Any
+    title: str
+    description: str
+    gt: Optional[float] = None
+
+    def to_pydantic_field(self, default: Optional[Any] = None) -> Field:  # type: ignore
+        """
+        :param default: to be able to override default value - as some params
+        are reused but they will have different default values depending on the endpoint.
+        """
+
+        return Field(
+            self.default or default,
+            title=self.title,
+            description=self.description,
+            gt=self.gt,
+        )
 
 
 class FieldID(BaseModel):

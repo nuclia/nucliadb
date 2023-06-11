@@ -33,11 +33,16 @@ from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_driver, get_nodes
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards
+from nucliadb_models.search import (
+    KnowledgeboxCounters,
+    KnowledgeboxShards,
+    SearchParamDefaults,
+)
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.cache import KB_COUNTER_CACHE
@@ -81,7 +86,7 @@ async def knowledgebox_counters(
     request: Request,
     kbid: str,
     vectorset: str = Query(None),
-    debug: bool = Query(False),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> KnowledgeboxCounters:
     cache = await get_cache()
 

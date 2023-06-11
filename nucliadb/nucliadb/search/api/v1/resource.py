@@ -86,13 +86,17 @@ async def search(
     range_modification_end: Optional[datetime] = None,
     reload: bool = Query(False),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show: List[ResourceProperties] = Query(list(ResourceProperties)),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
+    show: List[ResourceProperties] = fastapi_query(
+        SearchParamDefaults.show, default=list(ResourceProperties)
     ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
+    ),
+    extracted: List[ExtractedDataTypeName] = fastapi_query(
+        SearchParamDefaults.extracted
+    ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    debug: bool = Query(False),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> ResourceSearchResults:
     if not rid:
