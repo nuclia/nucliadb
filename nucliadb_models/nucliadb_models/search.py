@@ -462,27 +462,27 @@ class SearchParamDefaults:
     field_type_filter = ParamDefault(
         default=list(FieldTypeName),
         title="Field type filter",
-        description="Filter search results to match paragraphs of a specific field type",
+        description="Filter search results to match paragraphs of a specific field type.",
     )
     range_creation_start = ParamDefault(
         default=None,
-        title="",
-        description="",
+        title="Resource creation range start",
+        description="Resources created before this date will be filtered out of search results.",
     )
     range_creation_end = ParamDefault(
         default=None,
-        title="",
-        description="",
+        title="Resource creation range end",
+        description="Resources created after this date will be filtered out of search results.",
     )
     range_modification_start = ParamDefault(
         default=None,
-        title="",
-        description="",
+        title="Resource modification range start",
+        description="Resources modified after this date will be filtered out of search results.",
     )
     range_modification_end = ParamDefault(
         default=None,
-        title="",
-        description="",
+        title="Resource modification range end",
+        description="Resources modified after this date will be filtered out of search results.",
     )
     # vector: Optional[List[float]] = None
     # vectorset: Optional[str] = None
