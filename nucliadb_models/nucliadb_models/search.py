@@ -464,11 +464,28 @@ class SearchParamDefaults:
         title="Field type filter",
         description="Filter search results to match paragraphs of a specific field type",
     )
-
-    # range_creation_start: Optional[datetime] = Query(default=None),
-    # range_creation_end: Optional[datetime] = Query(default=None),
-    # range_modification_start: Optional[datetime] = Query(default=None),
-    # range_modification_end: Optional[datetime] = Query(default=None),
+    range_creation_start = ParamDefault(
+        default=None,
+        title="",
+        description="",
+    )
+    range_creation_end = ParamDefault(
+        default=None,
+        title="",
+        description="",
+    )
+    range_modification_start = ParamDefault(
+        default=None,
+        title="",
+        description="",
+    )
+    range_modification_end = ParamDefault(
+        default=None,
+        title="",
+        description="",
+    )
+    # vector: Optional[List[float]] = None
+    # vectorset: Optional[str] = None
 
 
 class SearchRequest(BaseModel):
@@ -483,10 +500,18 @@ class SearchRequest(BaseModel):
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
     min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
-    range_creation_start: Optional[datetime] = None
-    range_creation_end: Optional[datetime] = None
-    range_modification_start: Optional[datetime] = None
-    range_modification_end: Optional[datetime] = None
+    range_creation_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
     features: List[
         SearchOptions
     ] = SearchParamDefaults.search_features.to_pydantic_field(
@@ -547,10 +572,18 @@ class ChatRequest(BaseModel):
         ChatOptions.PARAGRAPHS,
         ChatOptions.RELATIONS,
     ]
-    range_creation_start: Optional[datetime] = None
-    range_creation_end: Optional[datetime] = None
-    range_modification_start: Optional[datetime] = None
-    range_modification_end: Optional[datetime] = None
+    range_creation_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
     field_type_filter: List[
         FieldTypeName

@@ -61,10 +61,18 @@ async def suggest_knowledgebox(
     fields: List[str] = fastapi_query(SearchParamDefaults.fields),
     filters: List[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
-    range_creation_start: Optional[datetime] = Query(default=None),
-    range_creation_end: Optional[datetime] = Query(default=None),
-    range_modification_start: Optional[datetime] = Query(default=None),
-    range_modification_end: Optional[datetime] = Query(default=None),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
+    ),
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
     features: List[SuggestOptions] = Query(
         default=[
             SuggestOptions.PARAGRAPH,
