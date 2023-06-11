@@ -23,8 +23,9 @@ from nucliadb_models.search import ParamDefault
 
 
 def param_to_query(param: ParamDefault, **kw) -> Query:  # type: ignore
+    default = param.default or kw.pop("default", None)
     return Query(
-        default=param.default,
+        default=default,
         title=param.title,
         description=param.description,
         gt=param.gt,

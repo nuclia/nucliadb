@@ -347,9 +347,10 @@ class ParamDefault(BaseModel):
     description: str
     gt: Optional[float] = None
 
-    def to_field(self) -> Field:  # type: ignore
+    def to_field(self, **kw) -> Field:  # type: ignore
+        default = self.default or kw.pop("default", None)
         return Field(
-            self.default, title=self.title, description=self.description, gt=self.gt
+            default, title=self.title, description=self.description, gt=self.gt, **kw
         )
 
 
@@ -448,18 +449,16 @@ class SearchParamDefaults:
         title="Sort Options",
         description="Options for results sorting",
     )
+    search_features = ParamDefault(
+        default=SearchOptions,
+        title="Search features",
+        description="List of features to launch the search with. Each value corresponds to a lookup into on of the different indexes.",  # noqa
+    )
 
     # range_creation_start: Optional[datetime] = Query(default=None),
     # range_creation_end: Optional[datetime] = Query(default=None),
     # range_modification_start: Optional[datetime] = Query(default=None),
     # range_modification_end: Optional[datetime] = Query(default=None),
-    # features: List[SearchOptions] = Query(
-    #     default=[
-    #         SearchOptions.PARAGRAPH,
-    #         SearchOptions.DOCUMENT,
-    #         SearchOptions.VECTOR,
-    #     ]
-    # ),
     # reload: bool = Query(default=True),
     # debug: bool = Query(False),
     # show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
@@ -483,11 +482,13 @@ class SearchRequest(BaseModel):
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
     range_modification_end: Optional[datetime] = None
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.DOCUMENT,
-        SearchOptions.VECTOR,
-    ]
+    features: List[SearchOptions] = SearchParamDefaults.search_features.to_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.DOCUMENT,
+            SearchOptions.VECTOR,
+        ]
+    )
     reload: bool = True
     debug: bool = False
     highlight: bool = SearchParamDefaults.highlight.to_field()
@@ -548,10 +549,12 @@ class ChatRequest(BaseModel):
 
 
 class FindRequest(SearchRequest):
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.VECTOR,
-    ]
+    features: List[SearchOptions] = SearchParamDefaults.to_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.VECTOR,
+        ]
+    )
 
     @validator("features")
     def fulltext_not_supported(cls, v):

@@ -92,7 +92,8 @@ async def find_knowledgebox(
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
     range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = Query(
+    features: List[SearchOptions] = param_to_query(
+        SearchParamDefaults.search_features,
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.VECTOR,
@@ -224,7 +225,6 @@ async def find(
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
-        with_status=item.with_status,
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )

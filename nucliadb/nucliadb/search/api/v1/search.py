@@ -102,12 +102,13 @@ async def search_knowledgebox(
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
     range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = Query(
+    features: List[SearchOptions] = param_to_query(
+        SearchParamDefaults.search_features,
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.DOCUMENT,
             SearchOptions.VECTOR,
-        ]
+        ],
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
