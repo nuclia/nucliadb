@@ -27,7 +27,7 @@ from fastapi_versioning import version
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.api.v1.utils import param_to_query
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
@@ -87,22 +87,22 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = param_to_query(SearchParamDefaults.query),
-    advanced_query: Optional[str] = param_to_query(SearchParamDefaults.advanced_query),
-    fields: List[str] = param_to_query(SearchParamDefaults.fields),
-    filters: List[str] = param_to_query(SearchParamDefaults.filters),
-    faceted: List[str] = param_to_query(SearchParamDefaults.faceted),
-    sort_field: SortField = param_to_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = param_to_query(SearchParamDefaults.sort_limit),
-    sort_order: SortOrder = param_to_query(SearchParamDefaults.sort_order),
-    page_number: int = param_to_query(SearchParamDefaults.page_number),
-    page_size: int = param_to_query(SearchParamDefaults.page_size),
-    min_score: float = param_to_query(SearchParamDefaults.min_score),
+    query: str = fastapi_query(SearchParamDefaults.query),
+    advanced_query: Optional[str] = fastapi_query(SearchParamDefaults.advanced_query),
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
+    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
+    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    min_score: float = fastapi_query(SearchParamDefaults.min_score),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
     range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = param_to_query(
+    features: List[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
             SearchOptions.PARAGRAPH,
@@ -112,16 +112,16 @@ async def search_knowledgebox(
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
-    highlight: bool = param_to_query(SearchParamDefaults.highlight),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = param_to_query(SearchParamDefaults.shards),
-    with_duplicates: bool = param_to_query(SearchParamDefaults.with_duplicates),
-    with_synonyms: bool = param_to_query(SearchParamDefaults.with_synonyms),
-    autofilter: bool = param_to_query(SearchParamDefaults.autofilter),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+    with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
+    with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
+    autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -179,16 +179,16 @@ async def catalog(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = param_to_query(SearchParamDefaults.query),
-    filters: List[str] = param_to_query(SearchParamDefaults.filters),
-    faceted: List[str] = param_to_query(SearchParamDefaults.faceted),
-    sort_field: SortField = param_to_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = param_to_query(SearchParamDefaults.sort_limit),
-    sort_order: SortOrder = param_to_query(SearchParamDefaults.sort_order),
-    page_number: int = param_to_query(SearchParamDefaults.page_number),
-    page_size: int = param_to_query(SearchParamDefaults.page_size),
-    shards: List[str] = param_to_query(SearchParamDefaults.shards),
-    with_status: Optional[ResourceProcessingStatus] = param_to_query(
+    query: str = fastapi_query(SearchParamDefaults.query),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
+    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
+    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+    with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),

@@ -26,6 +26,7 @@ from fastapi_versioning import version
 
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
@@ -35,6 +36,7 @@ from nucliadb_models.search import (
     KnowledgeboxSuggestResults,
     NucliaDBClientType,
     ResourceProperties,
+    SearchParamDefaults,
     SuggestOptions,
 )
 from nucliadb_utils.authentication import requires
@@ -55,10 +57,10 @@ async def suggest_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str,
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
+    query: str = fastapi_query(SearchParamDefaults.suggest_query),
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
@@ -78,7 +80,7 @@ async def suggest_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
     debug: bool = Query(False),
-    highlight: bool = Query(False),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     audit = get_audit()

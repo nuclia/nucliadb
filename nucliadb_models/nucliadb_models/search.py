@@ -347,7 +347,7 @@ class ParamDefault(BaseModel):
     description: str
     gt: Optional[float] = None
 
-    def to_field(self, **kw) -> Field:  # type: ignore
+    def to_pydantic_field(self, **kw) -> Field:  # type: ignore
         default = self.default or kw.pop("default", None)
         return Field(
             default, title=self.title, description=self.description, gt=self.gt, **kw
@@ -357,6 +357,9 @@ class ParamDefault(BaseModel):
 class SearchParamDefaults:
     query = ParamDefault(
         default="", title="Query", description="The query to search for"
+    )
+    suggest_query = ParamDefault(
+        default=..., title="Query", description="The query to get suggestions for"
     )
     advanced_query = ParamDefault(
         default=None,
@@ -450,9 +453,9 @@ class SearchParamDefaults:
         description="Options for results sorting",
     )
     search_features = ParamDefault(
-        default=SearchOptions,
+        default=None,
         title="Search features",
-        description="List of features to launch the search with. Each value corresponds to a lookup into on of the different indexes.",  # noqa
+        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes.",  # noqa
     )
 
     # range_creation_start: Optional[datetime] = Query(default=None),
@@ -469,20 +472,24 @@ class SearchParamDefaults:
 
 
 class SearchRequest(BaseModel):
-    query: str = SearchParamDefaults.query.to_field()
-    advanced_query: Optional[str] = SearchParamDefaults.advanced_query.to_field()
-    fields: List[str] = SearchParamDefaults.fields.to_field()
-    filters: List[str] = SearchParamDefaults.filters.to_field()
-    faceted: List[str] = SearchParamDefaults.faceted.to_field()
-    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_field()
-    page_number: int = SearchParamDefaults.page_number.to_field()
-    page_size: int = SearchParamDefaults.page_size.to_field()
-    min_score: float = SearchParamDefaults.min_score.to_field()
+    query: str = SearchParamDefaults.query.to_pydantic_field()
+    advanced_query: Optional[
+        str
+    ] = SearchParamDefaults.advanced_query.to_pydantic_field()
+    fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
+    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
+    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
     range_modification_end: Optional[datetime] = None
-    features: List[SearchOptions] = SearchParamDefaults.search_features.to_field(
+    features: List[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.DOCUMENT,
@@ -491,16 +498,16 @@ class SearchRequest(BaseModel):
     )
     reload: bool = True
     debug: bool = False
-    highlight: bool = SearchParamDefaults.highlight.to_field()
+    highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shards: List[str] = SearchParamDefaults.shards.to_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = None
     vectorset: Optional[str] = None
-    with_duplicates: bool = SearchParamDefaults.with_duplicates.to_field()
-    with_synonyms: bool = SearchParamDefaults.with_synonyms.to_field()
-    autofilter: bool = SearchParamDefaults.autofilter.to_field()
+    with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
+    with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
+    autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
 
 
 class Author(str, Enum):
@@ -528,10 +535,10 @@ class RephraseModel(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    query: str = SearchParamDefaults.chat_query.to_field()
-    fields: List[str] = SearchParamDefaults.fields.to_field()
-    filters: List[str] = SearchParamDefaults.filters.to_field()
-    min_score: float = SearchParamDefaults.min_score.to_field()
+    query: str = SearchParamDefaults.chat_query.to_pydantic_field()
+    fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
+    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
     features: List[ChatOptions] = [
         ChatOptions.PARAGRAPHS,
         ChatOptions.RELATIONS,
@@ -543,13 +550,13 @@ class ChatRequest(BaseModel):
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shards: List[str] = SearchParamDefaults.shards.to_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     context: Optional[List[Message]] = None
-    autofilter: bool = SearchParamDefaults.autofilter.to_field()
+    autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
 
 
 class FindRequest(SearchRequest):
-    features: List[SearchOptions] = SearchParamDefaults.to_field(
+    features: List[SearchOptions] = SearchParamDefaults.to_pydantic_field(
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.VECTOR,
