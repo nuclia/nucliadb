@@ -345,9 +345,12 @@ class ParamDefault(BaseModel):
     default: Any
     title: str
     description: str
+    gt: Optional[float] = None
 
     def to_field(self) -> Field:  # type: ignore
-        return Field(self.default, title=self.title, description=self.description)
+        return Field(
+            self.default, title=self.title, description=self.description, gt=self.gt
+        )
 
 
 class SearchParamDefaults:
@@ -424,9 +427,28 @@ class SearchParamDefaults:
         title="With custom synonyms",
         description="Whether to return matches for synonyms of the query terms (it works only for text search)",  # noqa: E501
     )
-    # sort_field: Optional[SortField] = Query(default=None),
-    # sort_limit: Optional[int] = Query(default=None, gt=0),
-    # sort_order: SortOrder = Query(default=SortOrder.DESC),
+    sort_order = ParamDefault(
+        default=SortOrder.DESC,
+        title="Sort order",
+        description="Order to sort results with",
+    )
+    sort_limit = ParamDefault(
+        default=None,
+        title="Sort limit",
+        description="",
+        gt=0,
+    )
+    sort_field = ParamDefault(
+        default=None,
+        title="Sort Field",
+        description="Field to sort results with",
+    )
+    sort = ParamDefault(
+        default=None,
+        title="Sort Options",
+        description="Options for results sorting",
+    )
+
     # range_creation_start: Optional[datetime] = Query(default=None),
     # range_creation_end: Optional[datetime] = Query(default=None),
     # range_modification_start: Optional[datetime] = Query(default=None),
@@ -453,7 +475,7 @@ class SearchRequest(BaseModel):
     fields: List[str] = SearchParamDefaults.fields.to_field()
     filters: List[str] = SearchParamDefaults.filters.to_field()
     faceted: List[str] = SearchParamDefaults.faceted.to_field()
-    sort: Optional[SortOptions] = None
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_field()
     page_number: int = SearchParamDefaults.page_number.to_field()
     page_size: int = SearchParamDefaults.page_size.to_field()
     min_score: float = SearchParamDefaults.min_score.to_field()

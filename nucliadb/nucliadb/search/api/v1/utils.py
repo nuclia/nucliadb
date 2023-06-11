@@ -22,7 +22,11 @@ from fastapi import Query
 from nucliadb_models.search import ParamDefault
 
 
-def param_to_query(param: ParamDefault) -> Query:  # type: ignore
+def param_to_query(param: ParamDefault, **kw) -> Query:  # type: ignore
     return Query(
-        default=param.default, title=param.title, description=param.description
+        default=param.default,
+        title=param.title,
+        description=param.description,
+        gt=param.gt,
+        **kw
     )
