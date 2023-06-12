@@ -218,7 +218,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: eu.gcr.io/stashify-218417/node:main
-          build-args: CARGO_PROFILE=debug
 
       - name: Run tests
         run: |

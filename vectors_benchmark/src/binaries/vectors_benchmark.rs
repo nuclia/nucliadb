@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use nucliadb_vectors::data_point_provider::{Index, IndexMetadata, Merger};
+use nucliadb_vectors::data_point_provider::{Index, IndexCheck, IndexMetadata, Merger};
 use vectors_benchmark::cli_interface::*;
 fn main() {
     let _ = Merger::install_global().map(std::thread::spawn);
@@ -37,7 +37,7 @@ fn main() {
         thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 
     let stop = stop_point.clone();
-    let reader = Index::open(at.path()).unwrap();
+    let reader = Index::open(at.path(), IndexCheck::None).unwrap();
     let no_results = args.neighbours();
     let plotw = PlotWriter::new(args.reader_plot().unwrap());
     let query_it = RandomVectors::new(args.embedding_dim());

@@ -21,7 +21,6 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
-use nucliadb_core::env;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, IdCollection,
@@ -32,6 +31,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 
+use crate::env;
 use crate::services::reader::ShardReaderService;
 
 #[derive(Default)]
