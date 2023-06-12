@@ -137,22 +137,7 @@ async def test_pull_full_integration(
     await wait_for_messages(pull_processor_api.messages)
 
     consumer_info1 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")
+        const.Streams.INGEST.name, const.Streams.INGEST_PROCESSED.group
     )
 
     assert consumer_info1.delivered.stream_seq == 1
-
-    # check next message goes to other consumer when ff is enabled
-    # remove this type of test when ff removed
-    with patch("nucliadb.ingest.consumer.pull.has_feature", return_value=True):
-        pull_processor_api.messages.append(create_broker_message(knowledgebox_ingest))
-        await wait_for_messages(pull_processor_api.messages)
-
-    consumer_info1 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")
-    )
-    consumer_info2 = await nats_manager.js.consumer_info(
-        const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group
-    )
-    assert consumer_info1.delivered.stream_seq == 1  # still on first
-    assert consumer_info2.delivered.stream_seq == 2
