@@ -25,7 +25,7 @@ use nucliadb_core::env;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
-use nucliadb_core::tracing::{self, *};
+use nucliadb_core::tracing::*;
 use Shard as ShardPB;
 
 use crate::reader::NodeReaderService;
@@ -49,27 +49,21 @@ impl From<NodeReaderService> for NodeReaderGRPCDriver {
 }
 
 impl NodeReaderGRPCDriver {
-    // The GRPC reader will only request the reader to bring a shard
-    // to memory if lazy loading is enabled. Otherwise all the
-    // shards on disk would have been brought to memory before the driver is online.
-    #[tracing::instrument(skip_all)]
-    async fn shard_loading(&self, id: &ShardId) {
-        if self.lazy_loading {
-            let mut writer = self.inner.write().await;
-            writer.load_shard(id);
+    async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
+        let id = id.into();
 
-            let loaded = self.shards.load(id.id.clone()).await;
+        // NOTE: Taking into account we use an unbounded shard cache, we only request
+        // loading a shard into memory when lazy loading is enabled. Otherwise,
+        // we rely on all shards (stored on disk) been brought to memory before
+        // the driver is online.
+        if self.lazy_loading {
+            let loaded = self.shards.load(id.clone()).await;
             if let Err(error) = loaded {
                 // REVIEW if shard can't be loaded, why aren't we returning
                 // an error?
                 error!("Error lazy loading shard: {error:?}");
             }
         }
-    }
-
-    async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
-        let id = id.into();
-        self.shard_loading(&ShardId { id: id.clone() }).await;
 
         match self.shards.get(id.clone()).await {
             Some(shard) => Ok(shard),
@@ -123,7 +117,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             Ok(shard) => Ok(tonic::Response::new(GrpcStreaming(shard))),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
-     }
+    }
 
     async fn documents(
         &self,
@@ -247,9 +241,7 @@ impl NodeReader for NodeReaderGRPCDriver {
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = nonblocking!({
-            shard.get_text_keys().map(|ids| IdCollection { ids })
-        });
+        let response = nonblocking!({ shard.get_text_keys().map(|ids| IdCollection { ids }) });
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -262,9 +254,8 @@ impl NodeReader for NodeReaderGRPCDriver {
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = nonblocking!({
-            shard.get_paragraphs_keys().map(|ids| IdCollection { ids } )
-        });
+        let response =
+            nonblocking!({ shard.get_paragraphs_keys().map(|ids| IdCollection { ids }) });
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -277,9 +268,7 @@ impl NodeReader for NodeReaderGRPCDriver {
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = nonblocking!({
-            shard.get_vectors_keys().map(|ids| IdCollection { ids } )
-        });
+        let response = nonblocking!({ shard.get_vectors_keys().map(|ids| IdCollection { ids }) });
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -292,9 +281,7 @@ impl NodeReader for NodeReaderGRPCDriver {
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = nonblocking!({
-            shard.get_relations_keys().map(|ids| IdCollection { ids } )
-        });
+        let response = nonblocking!({ shard.get_relations_keys().map(|ids| IdCollection { ids }) });
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

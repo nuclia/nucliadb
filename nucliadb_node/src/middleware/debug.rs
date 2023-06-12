@@ -21,10 +21,9 @@ use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
 use hyper::Body;
-use nucliadb_core::tracing::{debug};
+use nucliadb_core::tracing::debug;
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
-
 
 #[derive(Debug, Clone, Default)]
 pub struct GrpcDebugLogsLayer;
