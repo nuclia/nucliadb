@@ -39,9 +39,8 @@ SEARCH = Docstring(
     examples=[
         Example(
             description="Advanced search on the full text index",
-            code="""
->>> from nucliadb_sdk import *
->>> sdk = NucliaDB(api_key="api-key")
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
 >>> resp = sdk.search(kbid="mykbid", advanced_query="text:SRE OR text:DevOps", features=["document"])
 >>> rid = resp.fulltext.results[0].rid
 >>> resp.resources[rid].title
@@ -56,9 +55,8 @@ FIND = Docstring(
     examples=[
         Example(
             description="Find documents matching a query",
-            code="""
->>> from nucliadb_sdk import *
->>> sdk = NucliaDB(api_key="api-key")
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
 >>> resp = sdk.find(kbid="mykbid", query="Very experienced candidates with Rust experience")
 >>> resp.resources.popitem().title
 Graydon_Hoare.cv.pdf
@@ -66,8 +64,7 @@ Graydon_Hoare.cv.pdf
         ),
         Example(
             description="Filter down by country and increase accuracy of results",
-            code="""
->>> content = FindRequest(query="Very experienced candidates with Rust experience", filters=["/l/country/Spain"], min_score=2.5)
+            code=""">>> content = FindRequest(query="Very experienced candidates with Rust experience", filters=["/l/country/Spain"], min_score=2.5)
 >>> resp = sdk.find(kbid="mykbid", content=content)
 >>> resp.resources.popitem().title
 http://github.com/hermeGarcia
@@ -81,16 +78,14 @@ CHAT = Docstring(
     examples=[
         Example(
             description="Get an answer for a question that is part of the data in the Knowledge Box",
-            code="""
->>> from nucliadb_sdk import *
->>> sdk = NucliaDB(api_key="api-key")
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
 >>> sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?").answer
 Yes, according to the provided context, France is expected to be in recession in 2023.""",
         ),
         Example(
             description="You can use the `content` parameter to pass a `ChatRequest` object",
-            code="""
->>> content = ChatRequest(query="Who won the 2018 football World Cup?")
+            code=""">>> content = ChatRequest(query="Who won the 2018 football World Cup?")
 >>> sdk.chat(kbid="mykbid", content=content).answer
 France won the 2018 football World Cup.
 """,
@@ -203,5 +198,5 @@ def _inject_docstring(
         for example in docstring.examples or []:
             description = example.description or ""
             code = example.code or ""
-            func_doc += f"\n{description}\n{code}\n"
+            func_doc += f"\n{description}\n\n{code}\n"
     func.__doc__ = func_doc
