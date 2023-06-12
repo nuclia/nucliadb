@@ -28,7 +28,7 @@ use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::telemetry::middleware::GrpcInstrumentorLayer;
+use nucliadb_node::middleware::telemetry::GrpcInstrumentorLayer;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
