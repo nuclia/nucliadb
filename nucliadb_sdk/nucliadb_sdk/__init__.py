@@ -29,18 +29,18 @@ from nucliadb_sdk.utils import (
     get_or_create,
     list_kbs,
 )
-from nucliadb_sdk.v2 import NucliaDBSDK, NucliaDBSDKAsync, Region, exceptions
+from nucliadb_sdk.v2 import NucliaDB, NucliaDBAsync, Region, exceptions
 from nucliadb_sdk.vectors import Vector
 
 # backward compatibility
-NucliaSDK = NucliaDBSDK
-NucliaSDKAsync = NucliaDBSDKAsync
+NucliaSDK = NucliaDB
+NucliaSDKAsync = NucliaDBAsync
 
 __all__ = (
     "NucliaSDK",
     "NucliaSDKAsync",
-    "NucliaDBSDK",
-    "NucliaDBSDKAsync",
+    "NucliaDB",
+    "NucliaDBAsync",
     "Region",
     "exceptions",
     # OLD support APIs

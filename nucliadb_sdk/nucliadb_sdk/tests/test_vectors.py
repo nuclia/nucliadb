@@ -19,7 +19,7 @@
 import nucliadb_sdk
 
 
-def test_similarity(sdk: nucliadb_sdk.NucliaDBSDK):
+def test_similarity(sdk: nucliadb_sdk.NucliaDB):
     # Create a KB with dot similarity
     kb = sdk.create_knowledge_box(slug="dot", similarity="dot")
     assert kb is not None

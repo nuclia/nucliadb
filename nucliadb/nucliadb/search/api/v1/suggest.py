@@ -21,11 +21,12 @@ from datetime import datetime
 from time import time
 from typing import List, Optional
 
-from fastapi import Header, Query, Request, Response
+from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
@@ -35,6 +36,7 @@ from nucliadb_models.search import (
     KnowledgeboxSuggestResults,
     NucliaDBClientType,
     ResourceProperties,
+    SearchParamDefaults,
     SuggestOptions,
 )
 from nucliadb_utils.authentication import requires
@@ -55,30 +57,34 @@ async def suggest_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str,
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    range_creation_start: Optional[datetime] = Query(default=None),
-    range_creation_end: Optional[datetime] = Query(default=None),
-    range_modification_start: Optional[datetime] = Query(default=None),
-    range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SuggestOptions] = Query(
-        default=[
-            SuggestOptions.PARAGRAPH,
-            SuggestOptions.ENTITIES,
-            SuggestOptions.INTENT,
-        ]
+    query: str = fastapi_query(SearchParamDefaults.suggest_query),
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
     ),
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
+    features: List[SuggestOptions] = fastapi_query(
+        SearchParamDefaults.suggest_features
+    ),
+    show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-    debug: bool = Query(False),
-    highlight: bool = Query(False),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     audit = get_audit()

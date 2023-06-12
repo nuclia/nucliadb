@@ -26,6 +26,7 @@ from fastapi_versioning import version
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import SERVICE_NAME
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
@@ -36,6 +37,7 @@ from nucliadb_models.search import (
     ResourceProperties,
     ResourceSearchResults,
     SearchOptions,
+    SearchParamDefaults,
     SortField,
     SortOrder,
 )
@@ -69,28 +71,41 @@ async def search(
     query: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort: Optional[SortField] = Query(default=None, alias="sort_field"),
-    sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = 0,
-    page_size: int = 20,
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-    reload: bool = Query(False),
-    highlight: bool = Query(False),
-    split: bool = Query(False),
-    show: List[ResourceProperties] = Query(list(ResourceProperties)),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    sort: Optional[SortField] = fastapi_query(
+        SearchParamDefaults.sort_field, alias="sort_field"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
+    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
+    ),
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
+    reload: bool = Query(False),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
+    show: List[ResourceProperties] = fastapi_query(
+        SearchParamDefaults.show, default=list(ResourceProperties)
+    ),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
+    ),
+    extracted: List[ExtractedDataTypeName] = fastapi_query(
+        SearchParamDefaults.extracted
+    ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    debug: bool = Query(False),
-    shards: List[str] = Query(default=[]),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> ResourceSearchResults:
     if not rid:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore

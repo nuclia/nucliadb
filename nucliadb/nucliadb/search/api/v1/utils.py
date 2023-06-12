@@ -17,12 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Any, Optional
+
 from fastapi import Query
 
 from nucliadb_models.search import ParamDefault
 
+_NOT_SET = object()
 
-def param_to_query(param: ParamDefault) -> Query:  # type: ignore
+
+def fastapi_query(param: ParamDefault, default: Optional[Any] = _NOT_SET, **kw) -> Query:  # type: ignore
+    # Be able to override default value
+    if default is _NOT_SET:
+        default_value = param.default
+    else:
+        default_value = default
     return Query(
-        default=param.default, title=param.title, description=param.description
+        default=default_value,
+        title=param.title,
+        description=param.description,
+        gt=param.gt,
+        **kw
     )

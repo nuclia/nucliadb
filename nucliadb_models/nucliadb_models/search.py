@@ -31,8 +31,8 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field, validator
 
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
+from nucliadb_models.common import FieldTypeName, ParamDefault
+from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.vectors import VectorSimilarity
 
@@ -341,18 +341,12 @@ class KnowledgeboxShards(BaseModel):
         return cls(**as_dict)
 
 
-class ParamDefault(BaseModel):
-    default: Any
-    title: str
-    description: str
-
-    def to_field(self) -> Field:  # type: ignore
-        return Field(self.default, title=self.title, description=self.description)
-
-
 class SearchParamDefaults:
     query = ParamDefault(
         default="", title="Query", description="The query to search for"
+    )
+    suggest_query = ParamDefault(
+        default=..., title="Query", description="The query to get suggestions for"
     )
     advanced_query = ParamDefault(
         default=None,
@@ -389,40 +383,188 @@ class SearchParamDefaults:
         title="Query",
         description="The query to get a generative answer for",
     )
+    shards = ParamDefault(
+        default=[],
+        title="Shards",
+        description="The list of shards to search in. If empty, all shards will be searched",
+    )
+    page_number = ParamDefault(
+        default=0,
+        title="Page number",
+        description="The page number of the results to return",
+    )
+    page_size = ParamDefault(
+        default=20,
+        title="Page size",
+        description="The number of results to return per page",
+    )
+    highlight = ParamDefault(
+        default=False,
+        title="Highlight",
+        description="If set to true, the query terms will be highlighted in the results between <mark>...</mark> tags",  # noqa: E501
+    )
+    with_duplicates = ParamDefault(
+        default=False,
+        title="With duplicate paragraphs",
+        description="Whether to return duplicate paragraphs on the same document",  # noqa: E501
+    )
+    with_status = ParamDefault(
+        default=None,
+        title="With processing status",
+        description="Filter results by resource processing status",
+    )
+    with_synonyms = ParamDefault(
+        default=False,
+        title="With custom synonyms",
+        description="Whether to return matches for custom knowledge box synonyms of the query terms. Note: only supported for `paragraph` and `document` search options.",  # noqa: E501
+    )
+    sort_order = ParamDefault(
+        default=SortOrder.DESC,
+        title="Sort order",
+        description="Order to sort results with",
+    )
+    sort_limit = ParamDefault(
+        default=None,
+        title="Sort limit",
+        description="",
+        gt=0,
+    )
+    sort_field = ParamDefault(
+        default=None,
+        title="Sort field",
+        description="Field to sort results with",
+    )
+    sort = ParamDefault(
+        default=None,
+        title="Sort options",
+        description="Options for results sorting",
+    )
+    search_features = ParamDefault(
+        default=None,
+        title="Search features",
+        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes.",  # noqa
+    )
+    debug = ParamDefault(
+        default=False,
+        title="Debug mode",
+        description="If set, the response will include some extra metadata for debugging purposes, like the list of queried nodes.",  # noqa
+    )
+    show = ParamDefault(
+        default=[ResourceProperties.BASIC],
+        title="Show metadata",
+        description="Controls which types of metadata are serialized on resources of search results",
+    )
+    extracted = ParamDefault(
+        default=list(ExtractedDataTypeName),
+        title="Extracted metadata",
+        description="Controls which parts of the extracted metadata are serialized on search results",
+    )
+    field_type_filter = ParamDefault(
+        default=list(FieldTypeName),
+        title="Field type filter",
+        description="Filter search results to match paragraphs of a specific field type.",
+    )
+    range_creation_start = ParamDefault(
+        default=None,
+        title="Resource creation range start",
+        description="Resources created before this date will be filtered out of search results.",
+    )
+    range_creation_end = ParamDefault(
+        default=None,
+        title="Resource creation range end",
+        description="Resources created after this date will be filtered out of search results.",
+    )
+    range_modification_start = ParamDefault(
+        default=None,
+        title="Resource modification range start",
+        description="Resources modified before this date will be filtered out of search results.",
+    )
+    range_modification_end = ParamDefault(
+        default=None,
+        title="Resource modification range end",
+        description="Resources modified after this date will be filtered out of search results.",
+    )
+    vector = ParamDefault(
+        default=None,
+        title="Search Vector",
+        description="The vector to perform the search with. If not provided, NucliaDB will use Nuclia Predict API to create the vector off from the query.",  # noqa
+    )
+    vectorset = ParamDefault(
+        default=None,
+        title="Vectorset id",
+        description="Id of the vectorset to perform the vector search into.",
+    )
+    chat_context = ParamDefault(
+        default=None,
+        title="Chat context",
+        description="Use to control the context that is passed as input to the Generative AI model. If not specified, it is generated automatically.",  # noqa
+    )
+
+    chat_features = ParamDefault(
+        default=[ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
+        title="Chat features",
+        description="Features enabled for the chat endpoint. If `paragraphs` is included, the paragraphs from which the answer is generated are returned. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+    )
+    suggest_features = ParamDefault(
+        default=[
+            SuggestOptions.PARAGRAPH,
+            SuggestOptions.ENTITIES,
+            SuggestOptions.INTENT,
+        ],
+        title="Suggest features",
+        description="Features enabled for the suggest endpoint.",
+    )
 
 
 class SearchRequest(BaseModel):
-    query: str = SearchParamDefaults.query.to_field()
-    advanced_query: Optional[str] = SearchParamDefaults.advanced_query.to_field()
-    fields: List[str] = SearchParamDefaults.fields.to_field()
-    filters: List[str] = SearchParamDefaults.filters.to_field()
-    faceted: List[str] = SearchParamDefaults.faceted.to_field()
-    sort: Optional[SortOptions] = None
-    page_number: int = 0
-    page_size: int = 20
-    min_score: float = SearchParamDefaults.min_score.to_field()
-    range_creation_start: Optional[datetime] = None
-    range_creation_end: Optional[datetime] = None
-    range_modification_start: Optional[datetime] = None
-    range_modification_end: Optional[datetime] = None
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.DOCUMENT,
-        SearchOptions.VECTOR,
-    ]
+    query: str = SearchParamDefaults.query.to_pydantic_field()
+    advanced_query: Optional[
+        str
+    ] = SearchParamDefaults.advanced_query.to_pydantic_field()
+    fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
+    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
+    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
+    range_creation_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
+    features: List[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.DOCUMENT,
+            SearchOptions.VECTOR,
+        ]
+    )
     reload: bool = True
-    debug: bool = False
-    highlight: bool = False
-    show: List[ResourceProperties] = [ResourceProperties.BASIC]
-    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
-    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shards: List[str] = []
-    vector: Optional[List[float]] = None
-    vectorset: Optional[str] = None
-    with_duplicates: bool = False
-    with_status: Optional[ResourceProcessingStatus] = None
-    with_synonyms: bool = False
-    autofilter: bool = SearchParamDefaults.autofilter.to_field()
+    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
+    highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
+    show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    field_type_filter: List[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
+    vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
+    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
+    with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
+    with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
+    autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
 
 
 class Author(str, Enum):
@@ -450,31 +592,47 @@ class RephraseModel(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    query: str = SearchParamDefaults.chat_query.to_field()
-    fields: List[str] = SearchParamDefaults.fields.to_field()
-    filters: List[str] = SearchParamDefaults.filters.to_field()
-    min_score: float = SearchParamDefaults.min_score.to_field()
-    features: List[ChatOptions] = [
-        ChatOptions.PARAGRAPHS,
-        ChatOptions.RELATIONS,
-    ]
-    range_creation_start: Optional[datetime] = None
-    range_creation_end: Optional[datetime] = None
-    range_modification_start: Optional[datetime] = None
-    range_modification_end: Optional[datetime] = None
-    show: List[ResourceProperties] = [ResourceProperties.BASIC]
-    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
-    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shards: List[str] = []
-    context: Optional[List[Message]] = None
-    autofilter: bool = SearchParamDefaults.autofilter.to_field()
+    query: str = SearchParamDefaults.chat_query.to_pydantic_field()
+    fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
+    filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
+    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
+    features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
+    range_creation_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        datetime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
+    show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    field_type_filter: List[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: List[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
+    context: Optional[
+        List[Message]
+    ] = SearchParamDefaults.chat_context.to_pydantic_field()
+    autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
+    highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
 
 
 class FindRequest(SearchRequest):
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.VECTOR,
-    ]
+    features: List[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
+        default=[
+            SearchOptions.PARAGRAPH,
+            SearchOptions.VECTOR,
+        ]
+    )
 
     @validator("features")
     def fulltext_not_supported(cls, v):
