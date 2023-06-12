@@ -416,7 +416,7 @@ class SearchParamDefaults:
     with_synonyms = ParamDefault(
         default=False,
         title="With custom synonyms",
-        description="Whether to return matches for synonyms of the query terms (it works only for text search)",  # noqa: E501
+        description="Whether to return matches for custom knowledge box synonyms of the query terms. Note: only supported for `paragraph` and `document` search options.",  # noqa: E501
     )
     sort_order = ParamDefault(
         default=SortOrder.DESC,
@@ -477,15 +477,43 @@ class SearchParamDefaults:
     range_modification_start = ParamDefault(
         default=None,
         title="Resource modification range start",
-        description="Resources modified after this date will be filtered out of search results.",
+        description="Resources modified before this date will be filtered out of search results.",
     )
     range_modification_end = ParamDefault(
         default=None,
         title="Resource modification range end",
         description="Resources modified after this date will be filtered out of search results.",
     )
-    # vector: Optional[List[float]] = None
-    # vectorset: Optional[str] = None
+    vector = ParamDefault(
+        default=None,
+        title="Search Vector",
+        description="The vector to perform the search with. If not provided, NucliaDB will use Nuclia Predict API to create the vector off from the query.",  # noqa
+    )
+    vectorset = ParamDefault(
+        default=None,
+        title="Vectorset id",
+        description="Id of the vectorset to perform the vector search into.",
+    )
+    chat_context = ParamDefault(
+        default=None,
+        title="Chat context",
+        description="Use to control the context that is passed as input to the Generative AI model. If not specified, it is generated automatically.",  # noqa
+    )
+
+    chat_features = ParamDefault(
+        default=[ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
+        title="Chat features",
+        description="Features enabled for the chat endpoint. If `paragraphs` is included, the paragraphs from which the answer is generated are returned. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+    )
+    suggest_features = ParamDefault(
+        default=[
+            SuggestOptions.PARAGRAPH,
+            SuggestOptions.ENTITIES,
+            SuggestOptions.INTENT,
+        ],
+        title="Suggest features",
+        description="Features enabled for the suggest endpoint.",
+    )
 
 
 class SearchRequest(BaseModel):
@@ -532,8 +560,8 @@ class SearchRequest(BaseModel):
         ExtractedDataTypeName
     ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    vector: Optional[List[float]] = None
-    vectorset: Optional[str] = None
+    vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
+    vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
@@ -568,10 +596,7 @@ class ChatRequest(BaseModel):
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
     min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
-    features: List[ChatOptions] = [
-        ChatOptions.PARAGRAPHS,
-        ChatOptions.RELATIONS,
-    ]
+    features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
         datetime
     ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
@@ -592,12 +617,16 @@ class ChatRequest(BaseModel):
         ExtractedDataTypeName
     ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    context: Optional[List[Message]] = None
+    context: Optional[
+        List[Message]
+    ] = SearchParamDefaults.chat_context.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
 
 
 class FindRequest(SearchRequest):
-    features: List[SearchOptions] = SearchParamDefaults.to_pydantic_field(
+    features: List[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.VECTOR,

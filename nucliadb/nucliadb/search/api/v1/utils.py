@@ -23,17 +23,17 @@ from fastapi import Query
 
 from nucliadb_models.search import ParamDefault
 
-NOT_SET = object()
+_NOT_SET = object()
 
 
-def fastapi_query(param: ParamDefault, default: Optional[Any] = NOT_SET, **kw) -> Query:  # type: ignore
+def fastapi_query(param: ParamDefault, default: Optional[Any] = _NOT_SET, **kw) -> Query:  # type: ignore
     # Be able to override default value
-    if default is NOT_SET:
-        default = param.default or ...
+    if default is _NOT_SET:
+        default_value = param.default
     else:
-        default = default
+        default_value = default
     return Query(
-        default=default,
+        default=default_value,
         title=param.title,
         description=param.description,
         gt=param.gt,

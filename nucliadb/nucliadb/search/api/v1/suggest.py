@@ -21,7 +21,7 @@ from datetime import datetime
 from time import time
 from typing import List, Optional
 
-from fastapi import Header, Query, Request, Response
+from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.txn_utils import abort_transaction
@@ -73,12 +73,8 @@ async def suggest_knowledgebox(
     range_modification_end: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    features: List[SuggestOptions] = Query(
-        default=[
-            SuggestOptions.PARAGRAPH,
-            SuggestOptions.ENTITIES,
-            SuggestOptions.INTENT,
-        ]
+    features: List[SuggestOptions] = fastapi_query(
+        SearchParamDefaults.suggest_features
     ),
     show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
     field_type_filter: List[FieldTypeName] = fastapi_query(

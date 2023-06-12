@@ -21,7 +21,7 @@ import asyncio
 import json
 from typing import List, Optional
 
-from fastapi import HTTPException, Query, Request
+from fastapi import HTTPException, Request
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -85,7 +85,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
 async def knowledgebox_counters(
     request: Request,
     kbid: str,
-    vectorset: str = Query(None),
+    vectorset: str = fastapi_query(SearchParamDefaults.vectorset),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> KnowledgeboxCounters:
     cache = await get_cache()

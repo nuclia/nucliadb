@@ -46,6 +46,8 @@ DOWNLOAD_URI = (
     "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
 )
 
+_NOT_SET = object()
+
 
 class ParamDefault(BaseModel):
     default: Any
@@ -53,14 +55,13 @@ class ParamDefault(BaseModel):
     description: str
     gt: Optional[float] = None
 
-    def to_pydantic_field(self, default: Optional[Any] = None) -> Field:  # type: ignore
+    def to_pydantic_field(self, default=_NOT_SET) -> Field:  # type: ignore
         """
         :param default: to be able to override default value - as some params
         are reused but they will have different default values depending on the endpoint.
         """
-
         return Field(
-            self.default or default,
+            default=self.default if default is _NOT_SET else default,
             title=self.title,
             description=self.description,
             gt=self.gt,

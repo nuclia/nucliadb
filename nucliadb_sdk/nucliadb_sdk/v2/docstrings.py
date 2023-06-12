@@ -39,8 +39,7 @@ SEARCH = Docstring(
     examples=[
         Example(
             description="Advanced search on the full text index",
-            code="""
->>> from nucliadb_sdk import *
+            code=""">>> from nucliadb_sdk import *
 >>> sdk = NucliaDBSDK(api_key="api-key")
 >>> resp = sdk.search(kbid="mykbid", advanced_query="text:SRE OR text:DevOps", features=["document"])
 >>> rid = resp.fulltext.results[0].rid
@@ -56,8 +55,7 @@ FIND = Docstring(
     examples=[
         Example(
             description="Find documents matching a query",
-            code="""
->>> from nucliadb_sdk import *
+            code=""">>> from nucliadb_sdk import *
 >>> sdk = NucliaDBSDK(api_key="api-key")
 >>> resp = sdk.find(kbid="mykbid", query="Very experienced candidates with Rust experience")
 >>> resp.resources.popitem().title
@@ -66,8 +64,7 @@ Graydon_Hoare.cv.pdf
         ),
         Example(
             description="Filter down by country and increase accuracy of results",
-            code="""
->>> content = FindRequest(query="Very experienced candidates with Rust experience", filters=["/l/country/Spain"], min_score=2.5)
+            code=""">>> content = FindRequest(query="Very experienced candidates with Rust experience", filters=["/l/country/Spain"], min_score=2.5)
 >>> resp = sdk.find(kbid="mykbid", content=content)
 >>> resp.resources.popitem().title
 http://github.com/hermeGarcia
@@ -81,16 +78,14 @@ CHAT = Docstring(
     examples=[
         Example(
             description="Get an answer for a question that is part of the data in the Knowledge Box",
-            code="""
->>> from nucliadb_sdk import *
+            code=""">>> from nucliadb_sdk import *
 >>> sdk = NucliaDBSDK(api_key="api-key")
 >>> sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?").answer
 Yes, according to the provided context, France is expected to be in recession in 2023.""",
         ),
         Example(
             description="You can use the `content` parameter to pass a `ChatRequest` object",
-            code="""
->>> content = ChatRequest(query="Who won the 2018 football World Cup?")
+            code=""">>> content = ChatRequest(query="Who won the 2018 football World Cup?")
 >>> sdk.chat(kbid="mykbid", content=content).answer
 France won the 2018 football World Cup.
 """,
@@ -124,7 +119,6 @@ def _inject_signature(
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
 ):
-    # TODO: Fix signature for methods of NucliaDBAsync
     parameters = []
     # The first parameter is always self
     parameters.append(
@@ -147,7 +141,7 @@ def _inject_signature(
                     inspect.Parameter(
                         field.name,
                         kind=inspect.Parameter.KEYWORD_ONLY,
-                        annotation=field.outer_type_,
+                        annotation=field.annotation,
                         default=field.default,
                     )
                 )
@@ -155,7 +149,7 @@ def _inject_signature(
             inspect.Parameter(
                 "content",
                 kind=inspect.Parameter.KEYWORD_ONLY,
-                annotation=request_type,
+                annotation=typing.Optional[request_type],
                 default=None,
             )
         )
@@ -186,12 +180,13 @@ def _inject_docstring(
     # Add params section
     params = []
     for path_param in path_params:
-        # TODO add :type param_name: param_type
-        params.append(f":param {path_param}:")
+        description = ""
+        if path_param == "kbid":
+            description = "The id of the knowledge box"
+        params.append(f":param {path_param}: {description}")
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
             for field in request_type.__fields__.values():
-                # TODO add :type param_name: param_type
                 params.append(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
