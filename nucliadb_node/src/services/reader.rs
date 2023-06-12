@@ -163,10 +163,6 @@ impl ShardReaderService {
         self.reload_policy(true);
         self.relation_reader.get_node_types()
     }
-    #[tracing::instrument(skip_all)]
-    pub fn get_resources(&self) -> NodeResult<usize> {
-        self.text_reader.count()
-    }
 
     #[tracing::instrument(skip_all)]
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {

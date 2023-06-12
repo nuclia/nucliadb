@@ -22,11 +22,6 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.GetShardRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
                 )
-        self.GetShards = channel.unary_unary(
-                '/nodereader.NodeReader/GetShards',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardList.FromString,
-                )
         self.DocumentSearch = channel.unary_unary(
                 '/nodereader.NodeReader/DocumentSearch',
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.SerializeToString,
@@ -105,12 +100,6 @@ class NodeReaderServicer(object):
     """
 
     def GetShard(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetShards(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -209,11 +198,6 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.GetShardRequest.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.Shard.SerializeToString,
             ),
-            'GetShards': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetShards,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
-                    response_serializer=nucliadb__protos_dot_noderesources__pb2.ShardList.SerializeToString,
-            ),
             'DocumentSearch': grpc.unary_unary_rpc_method_handler(
                     servicer.DocumentSearch,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.FromString,
@@ -310,23 +294,6 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/GetShard',
             nucliadb__protos_dot_nodereader__pb2.GetShardRequest.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetShards(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/GetShards',
-            nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
-            nucliadb__protos_dot_noderesources__pb2.ShardList.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

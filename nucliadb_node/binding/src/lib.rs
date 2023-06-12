@@ -135,13 +135,6 @@ impl NodeReader {
         }
     }
 
-    pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        match self.reader.get_shards() {
-            Ok(r) => Ok(PyList::new(py, r.encode_to_vec())),
-            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-        }
-    }
-
     pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let search_request = SearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {

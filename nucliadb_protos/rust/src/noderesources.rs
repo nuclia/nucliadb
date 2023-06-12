@@ -96,11 +96,6 @@ pub struct Shard {
     pub sentences: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ShardList {
-    #[prost(message, repeated, tag="1")]
-    pub shards: ::prost::alloc::vec::Vec<Shard>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EmptyResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
