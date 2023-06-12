@@ -130,9 +130,8 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
             words += text.count(" ")  # very imperfect but fast
             output[paragraph.id] = text
 
-            _, field_type, field_id, mident = paragraph.id.split("/")[:4]
+            rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
             if field_type == "c" and paragraph.score_type == SCORE_TYPE.VECTOR:
-                rid = paragraph.id.split("/")[0]
                 expanded_msgs = await get_expanded_conversation_messages(
                     kb=kb, rid=rid, field_id=field_id, mident=mident
                 )
