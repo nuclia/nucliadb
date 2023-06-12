@@ -18,16 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::slice::Iter;
+// use std::slice::Iter;
 use std::sync::Arc;
 
 use anyhow::anyhow;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use nucliadb_core::tracing::debug;
-use nucliadb_core::{env, NodeResult};
-use nucliadb_vectors::data_point::Similarity;
+use nucliadb_core::NodeResult;
 
+// use nucliadb_vectors::data_point::Similarity;
+pub use crate::env;
 pub use crate::services::reader::ShardReaderService as ShardReader;
 pub use crate::services::writer::ShardWriterService as ShardWriter;
 use crate::utils::nonblocking;

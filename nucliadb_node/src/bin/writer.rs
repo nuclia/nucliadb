@@ -36,7 +36,6 @@ use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::telemetry::middleware::GrpcInstrumentorLayer;
 use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::writer::NodeWriterService;
 use tokio::signal::unix::SignalKind;
