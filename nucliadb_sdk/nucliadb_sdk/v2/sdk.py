@@ -527,7 +527,7 @@ class NucliaDB(_NucliaDBBase):
         >>> sdk = NucliaDB()
 
         If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
-        >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
+        >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
         self.session = httpx.Client(
