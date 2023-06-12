@@ -25,8 +25,8 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, IdCollection,
     ParagraphSearchRequest, ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse,
-    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest,
-    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, StreamRequest, SuggestRequest,
+    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
@@ -101,28 +101,7 @@ impl NodeReaderService {
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardReaderService> {
         self.cache.get(&shard_id.id)
     }
-    #[tracing::instrument(skip_all)]
-    pub fn get_shards(&self) -> NodeResult<ShardList> {
-        use crate::telemetry::run_with_telemetry;
-        let span = tracing::Span::current();
-        let task = move |shard_id: &str, shard: &ShardReaderService| {
-            run_with_telemetry(info_span!(parent: &span, "get shards"), || {
-                shard.get_resources().map(|count| ShardPB {
-                    metadata: Some(shard.metadata.clone().into()),
-                    shard_id: shard_id.to_string(),
-                    resources: count as u64,
-                    paragraphs: 0_u64,
-                    sentences: 0_u64,
-                })
-            })
-        };
-        let shards = self
-            .cache
-            .par_iter()
-            .map(|(id, shard)| task(id, shard))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(ShardList { shards })
-    }
+
     #[tracing::instrument(skip_all)]
     pub fn suggest(
         &self,

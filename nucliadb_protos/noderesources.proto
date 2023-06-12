@@ -68,10 +68,6 @@ message Shard {
     uint64 sentences = 4;
 }
 
-message ShardList {
-    repeated Shard shards = 1;
-}
-
 message EmptyResponse {}
 message EmptyQuery {}
 

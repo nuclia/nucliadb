@@ -160,19 +160,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    async fn get_shards(
-        &self,
-        _request: tonic::Request<EmptyQuery>,
-    ) -> Result<tonic::Response<ShardList>, tonic::Status> {
-        debug!("Get shards starts");
-        self.inner
-            .read()
-            .await
-            .get_shards()
-            .map(tonic::Response::new)
-            .map_err(|e| tonic::Status::internal(e.to_string()))
-    }
-
     async fn vector_search(
         &self,
         request: tonic::Request<VectorSearchRequest>,

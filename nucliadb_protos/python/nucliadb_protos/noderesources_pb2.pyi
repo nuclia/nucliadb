@@ -262,22 +262,6 @@ class Shard(google.protobuf.message.Message):
 global___Shard = Shard
 
 @typing_extensions.final
-class ShardList(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARDS_FIELD_NUMBER: builtins.int
-    @property
-    def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Shard]: ...
-    def __init__(
-        self,
-        *,
-        shards: collections.abc.Iterable[global___Shard] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["shards", b"shards"]) -> None: ...
-
-global___ShardList = ShardList
-
-@typing_extensions.final
 class EmptyResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

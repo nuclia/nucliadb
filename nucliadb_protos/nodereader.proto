@@ -422,7 +422,6 @@ message StreamRequest {
 
 service NodeReader {
     rpc GetShard(GetShardRequest) returns (noderesources.Shard) {}
-    rpc GetShards(noderesources.EmptyQuery) returns (noderesources.ShardList) {}
 
     rpc DocumentSearch(DocumentSearchRequest) returns (DocumentSearchResponse) {}
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
