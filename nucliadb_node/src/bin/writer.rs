@@ -33,6 +33,7 @@ use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
+use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::telemetry::middleware::GrpcInstrumentorLayer;
@@ -147,6 +148,7 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
     info!("Listening for gRPC requests at: {:?}", addr);
 
     let tracing_middleware = GrpcInstrumentorLayer::default();
+    let debug_logs_middleware = GrpcDebugLogsLayer::default();
     let metrics_middleware = MetricsLayer::default();
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
@@ -154,6 +156,7 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
 
     Server::builder()
         .layer(tracing_middleware)
+        .layer(debug_logs_middleware)
         .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))
