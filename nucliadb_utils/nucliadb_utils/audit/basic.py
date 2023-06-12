@@ -20,12 +20,7 @@
 from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
-from nucliadb_protos.audit_pb2 import (
-    AuditField,
-    AuditKBCounter,
-    AuditRequest,
-    AuditShardCounter,
-)
+from nucliadb_protos.audit_pb2 import AuditField, AuditKBCounter, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -49,11 +44,10 @@ class BasicAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        counter: Optional[AuditShardCounter] = None,
         kb_counter: Optional[AuditKBCounter] = None,
     ):  # type: ignore
         logger.debug(
-            f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {counter}"
+            f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}"
         )
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):

@@ -489,7 +489,7 @@ async def test_ingest_audit_stream_files_only(
         assert False, "Invalid trace ID"
 
     # Currently where not updating audit counters on delete operations
-    assert not auditreq.HasField("counter")
+    assert not auditreq.HasField("kb_counter")
 
     await txn.abort()
 
