@@ -67,11 +67,10 @@ impl NodeReaderGRPCDriver {
         }
     }
 
-    async fn ensure_shard_loaded(&self, id: String) {
-        self.shard_loading(&ShardId { id }).await
-    }
+    async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
+        let id = id.into();
+        self.shard_loading(&ShardId { id: id.clone() }).await;
 
-    async fn _get_shard(&self, id: String) -> Result<Arc<ShardReader>, tonic::Status> {
         match self.shards.get(id.clone()).await {
             Some(shard) => Ok(shard),
             None => Err(tonic::Status::not_found(format!(
@@ -110,6 +109,7 @@ impl NodeReader for NodeReaderGRPCDriver {
     type ParagraphsStream = GrpcStreaming<ParagraphIterator>;
     type DocumentsStream = GrpcStreaming<DocumentIterator>;
 
+    // TODO
     async fn paragraphs(
         &self,
         request: tonic::Request<StreamRequest>,
@@ -140,6 +140,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    // TODO
     async fn documents(
         &self,
         request: tonic::Request<StreamRequest>,
@@ -174,23 +175,16 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<GetShardRequest>,
     ) -> Result<tonic::Response<ShardPB>, tonic::Status> {
-        debug!("{:?}: gRPC get_shard", request);
         let request = request.into_inner();
+        let shard_id = match request.shard_id {
+            Some(ref shard_id) => shard_id.id.clone(),
+            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
+        };
 
-        let shard_id = &request.shard_id.clone().unwrap();
-        self.shard_loading(shard_id).await;
-
-        let shard = self._get_shard(shard_id.id.clone()).await?;
-
+        let shard = self.obtain_shard(shard_id).await?;
         match shard.get_info(&request) {
-            Ok(shard) => {
-                debug!("Get shard ends {}:{}", file!(), line!());
-                Ok(tonic::Response::new(shard))
-            }
-            Err(e) => {
-                debug!("get_shard ended incorrectly");
-                Err(tonic::Status::internal(e.to_string()))
-            }
+            Ok(shard) => Ok(tonic::Response::new(shard)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
@@ -198,21 +192,13 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
-        debug!("Search starts");
         let search_request = request.into_inner();
         let shard_id = search_request.shard.clone();
-        self.ensure_shard_loaded(shard_id.clone()).await;
-        let shard = self._get_shard(shard_id).await?;
+        let shard = self.obtain_shard(shard_id).await?;
         let response = nonblocking!({ shard.search(search_request) });
         match response {
-            Ok(response) => {
-                debug!("Document search ended correctly");
-                Ok(tonic::Response::new(response))
-            }
-            Err(e) => {
-                debug!("Document search ended incorrectly {:?}", e.to_string());
-                Err(tonic::Status::internal(e.to_string()))
-            }
+            Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
@@ -220,26 +206,13 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<SuggestRequest>,
     ) -> Result<tonic::Response<SuggestResponse>, tonic::Status> {
-        debug!("Suggest starts");
         let suggest_request = request.into_inner();
-        let shard_id = ShardId {
-            id: suggest_request.shard.clone(),
-        };
-        self.shard_loading(&shard_id).await;
-        let reader = self.inner.read().await;
-        match reader.suggest(&shard_id, suggest_request).transpose() {
-            Some(Ok(response)) => {
-                debug!("Suggest ended correctly");
-                Ok(tonic::Response::new(response))
-            }
-            Some(Err(e)) => {
-                debug!("Suggest ended incorrectly");
-                Err(tonic::Status::internal(e.to_string()))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
+        let shard_id = suggest_request.shard.clone();
+        let shard = self.obtain_shard(shard_id).await?;
+        let response = nonblocking!({ shard.suggest(suggest_request) });
+        match response {
+            Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
@@ -247,26 +220,13 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<VectorSearchRequest>,
     ) -> Result<tonic::Response<VectorSearchResponse>, tonic::Status> {
-        debug!("Vector search starts");
         let vector_request = request.into_inner();
-        let shard_id = ShardId {
-            id: vector_request.id.clone(),
-        };
-        self.shard_loading(&shard_id).await;
-        let reader = self.inner.read().await;
-        match reader.vector_search(&shard_id, vector_request).transpose() {
-            Some(Ok(response)) => {
-                debug!("Vector search ended correctly");
-                Ok(tonic::Response::new(response))
-            }
-            Some(Err(e)) => {
-                debug!("Vector search ended incorrectly");
-                Err(tonic::Status::internal(e.to_string()))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
+        let shard_id = vector_request.id.clone();
+        let shard = self.obtain_shard(shard_id).await?;
+        let response = nonblocking!({ shard.vector_search(vector_request) });
+        match response {
+            Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
@@ -274,29 +234,13 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<RelationSearchRequest>,
     ) -> Result<tonic::Response<RelationSearchResponse>, tonic::Status> {
-        debug!("Relation search starts");
         let relation_request = request.into_inner();
-        let shard_id = ShardId {
-            id: relation_request.shard_id.clone(),
-        };
-        self.shard_loading(&shard_id).await;
-        let reader = self.inner.read().await;
-        match reader
-            .relation_search(&shard_id, relation_request)
-            .transpose()
-        {
-            Some(Ok(response)) => {
-                debug!("Relation search ended correctly");
-                Ok(tonic::Response::new(response))
-            }
-            Some(Err(e)) => {
-                debug!("Relation search ended incorrectly");
-                Err(tonic::Status::internal(e.to_string()))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
+        let shard_id = relation_request.shard_id.clone();
+        let shard = self.obtain_shard(shard_id).await?;
+        let response = nonblocking!({ shard.relation_search(relation_request) });
+        match response {
+            Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
@@ -304,30 +248,13 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<DocumentSearchRequest>,
     ) -> Result<tonic::Response<DocumentSearchResponse>, tonic::Status> {
-        debug!("Document search starts");
-
         let document_request = request.into_inner();
-        let shard_id = ShardId {
-            id: document_request.id.clone(),
-        };
-        self.shard_loading(&shard_id).await;
-        let reader = self.inner.read().await;
-        match reader
-            .document_search(&shard_id, document_request)
-            .transpose()
-        {
-            Some(Ok(response)) => {
-                debug!("Document search ended correctly");
-                Ok(tonic::Response::new(response))
-            }
-            Some(Err(e)) => {
-                debug!("Document search ended incorrectly {:?}", e.to_string());
-                Err(tonic::Status::internal(e.to_string()))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
+        let shard_id = document_request.id.clone();
+        let shard = self.obtain_shard(shard_id).await?;
+        let response = nonblocking!({ shard.document_search(document_request) });
+        match response {
+            Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
@@ -335,32 +262,17 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ParagraphSearchRequest>,
     ) -> Result<tonic::Response<ParagraphSearchResponse>, tonic::Status> {
-        debug!("Paragraph search starts");
         let paragraph_request = request.into_inner();
-        let shard_id = ShardId {
-            id: paragraph_request.id.clone(),
-        };
-        self.shard_loading(&shard_id).await;
-        let reader = self.inner.read().await;
-        match reader
-            .paragraph_search(&shard_id, paragraph_request)
-            .transpose()
-        {
-            Some(Ok(response)) => {
-                debug!("Paragraph search ended correctly");
-                Ok(tonic::Response::new(response))
-            }
-            Some(Err(e)) => {
-                debug!("Paragraph search ended incorrectly");
-                Err(tonic::Status::internal(e.to_string()))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
+        let shard_id = paragraph_request.id.clone();
+        let shard = self.obtain_shard(shard_id).await?;
+        let response = nonblocking!({ shard.paragraph_search(paragraph_request) });
+        match response {
+            Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 
+    // TODO
     async fn document_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -379,6 +291,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    // TODO
     async fn paragraph_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -397,6 +310,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    // TODO
     async fn vector_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -415,6 +329,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    // TODO
     async fn relation_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -433,6 +348,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    // TODO
     async fn relation_edges(
         &self,
         request: tonic::Request<ShardId>,
@@ -451,6 +367,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    // TODO
     async fn relation_types(
         &self,
         request: tonic::Request<ShardId>,
