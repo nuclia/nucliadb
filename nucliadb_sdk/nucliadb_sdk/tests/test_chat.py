@@ -20,7 +20,7 @@
 import nucliadb_sdk
 
 
-def test_chat_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDBSDK):
+def test_chat_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result = sdk.chat(kbid=docs_dataset, query="Nuclia loves Semantic Search")
     assert result.learning_id == "00"
     assert result.answer == "valid answer  to"

@@ -20,7 +20,7 @@ import nucliadb_sdk
 from nucliadb_models.search import KnowledgeboxFindResults
 
 
-def test_find_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDBSDK):
+def test_find_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     results: KnowledgeboxFindResults = sdk.find(kbid=docs_dataset, query="love")
     assert results.total == 10
     paragraphs = 0
