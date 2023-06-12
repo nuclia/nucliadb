@@ -621,6 +621,7 @@ class ChatRequest(BaseModel):
         List[Message]
     ] = SearchParamDefaults.chat_context.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
+    highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
 
 
 class FindRequest(SearchRequest):

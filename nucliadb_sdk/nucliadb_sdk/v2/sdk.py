@@ -498,6 +498,7 @@ class _NucliaDBBase:
 class NucliaDB(_NucliaDBBase):
     """
     Example usage
+
     >>> from nucliadb_sdk import *
     >>> sdk = NucliaDB(region=Region.EUROPE1, api_key="api-key")
     >>> sdk.list_resources(kbid='my-kbid')
@@ -556,7 +557,8 @@ class NucliaDB(_NucliaDBBase):
 
 class NucliaDBAsync(_NucliaDBBase):
     """
-    Example usage:
+    Example usage
+
     >>> from nucliadb_sdk import *
     >>> sdk = NucliaDBAsync(region=Region.EUROPE1, api_key="api-key")
     >>> await sdk.list_resources(kbid='my-kbid')
