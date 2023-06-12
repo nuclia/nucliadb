@@ -29,14 +29,9 @@ use tonic::transport::Endpoint;
 
 macro_rules! nonblocking {
     ($code:block) => {{
-        let (send, recv) = tokio::sync::oneshot::channel();
-        tokio::task::spawn_blocking(move || {
-            let fun = || $code;
-            let result = fun();
-            let _ = send.send(result);
-        });
-
-        recv.await.expect("Panic in nonblocking tokio task")
+        tokio::task::spawn_blocking(move || $code)
+            .await
+            .expect("Panic in nonblocking tokio task")
     }};
 }
 
