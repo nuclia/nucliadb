@@ -19,13 +19,13 @@
 //
 
 use async_std::sync::RwLock;
-use nucliadb_core::env;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::{self, *};
 use Shard as ShardPB;
 
+use crate::env;
 use crate::reader::NodeReaderService;
 
 pub struct NodeReaderGRPCDriver {

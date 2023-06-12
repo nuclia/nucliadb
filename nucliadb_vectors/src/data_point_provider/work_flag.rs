@@ -17,31 +17,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
-/// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
+use crate::{VectorErr, VectorR};
 
-pub mod node_metadata;
-
-pub mod services;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
-pub mod utils;
-
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// Node's http service
-pub mod http_server;
+#[derive(Clone)]
+pub struct MergerWriterSync(Arc<Mutex<()>>);
+impl MergerWriterSync {
+    pub fn new() -> MergerWriterSync {
+        MergerWriterSync(Arc::new(Mutex::new(())))
+    }
+    pub fn try_to_start_working(&self) -> VectorR<MutexGuard<'_, ()>> {
+        match self.0.try_lock() {
+            Ok(lock) => Ok(lock),
+            Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
+            Err(TryLockError::WouldBlock) => Err(VectorErr::WorkDelayed),
+        }
+    }
+}
