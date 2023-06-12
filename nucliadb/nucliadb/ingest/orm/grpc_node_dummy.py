@@ -32,7 +32,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
     ShardCreated,
     ShardId,
-    ShardList,
+    ShardIds,
     VectorSetList,
 )
 from nucliadb_protos.nodesidecar_pb2 import Counter
@@ -68,10 +68,10 @@ class DummyWriterStub:  # pragma: no cover
 
     async def ListShards(self, data):
         self.calls.setdefault("ListShards", []).append(data)
-        sl = ShardList()
-        sl.shards.append(NodeResourcesShard(shard_id="shard", resources=2))
-        sl.shards.append(NodeResourcesShard(shard_id="shard2", resources=4))
-        return sl
+        shards = ShardIds()
+        shards.append(ShardId(shard_id="shard"))
+        shards.append(ShardId(shard_id="shard2"))
+        return shards
 
     async def SetResource(self, data):
         self.calls.setdefault("SetResource", []).append(data)
