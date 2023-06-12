@@ -1,0 +1,63 @@
+FROM python:alpine as base
+
+RUN apk --no-cache add rustup \
+  && rustup-init -yq --target nightly \
+  && source "$HOME/.cargo/env"
+
+FROM base as tikv_client
+
+RUN apk --no-cache add \
+    git \
+    linux-headers \
+    gcc g++ \
+    cmake \
+    make \
+    clang14 \
+    openssl-dev \
+    openssl-libs-static \
+    protoc \
+    patchelf \
+  && git clone https://github.com/tikv/client-py /root/client-py \
+  && pip install maturin
+
+ENV CARGO_ENCODED_RUSTFLAGS="-L/usr/lib" \
+    OPENSSL_NO_VENDOR=1
+
+WORKDIR /root/client-py
+RUN source "$HOME/.cargo/env" \
+  && maturin build --release \
+  && pip install target/wheels/*.whl
+
+FROM base as nucliadb
+
+RUN apk --no-cache add \
+    git \
+    gcc g++ \
+    cmake \
+    make \
+    openssl-dev \
+    openssl-libs-static \
+    patchelf \
+  && git clone https://github.com/nuclia/nucliadb /root/nucliadb \
+  && pip install maturin
+
+ENV OPENSSL_NO_VENDOR=1
+
+WORKDIR /root/nucliadb
+RUN source "$HOME/.cargo/env" \
+  && maturin build -m nucliadb_node/binding/Cargo.toml --release \
+  && pip install target/wheels/*.whl
+
+FROM python:alpine
+
+COPY --from=tikv_client \
+  /root/client-py/target/wheels/*.whl /root/
+COPY --from=nucliadb \
+  /root/nucliadb/target/wheels/*.whl /root/
+
+RUN apk --no-cache add \
+    gcc g++ \
+  && pip install /root/*.whl \
+  && pip install nucliadb
+
+ENTRYPOINT ["/usr/local/bin/nucliadb"]
