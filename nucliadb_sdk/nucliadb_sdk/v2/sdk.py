@@ -579,13 +579,16 @@ class NucliaDBAsync(_NucliaDBBase):
         :param timeout: The timeout in seconds to use for requests
 
         When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+
         >>> from nucliadb_sdk import *
         >>> sdk = NucliaDBAsync(api_key="api-key")
 
         If the Knowledge Box you are interacting with is public, you don't even need the api key
+
         >>> sdk = NucliaDBAsync()
 
         If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
+
         >>> sdk = NucliaDBAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
