@@ -28,6 +28,9 @@ pub mod node_metadata;
 
 pub mod services;
 
+/// Global configuration enviromental variables
+pub mod env;
+
 /// GRPC reading service
 pub mod reader;
 

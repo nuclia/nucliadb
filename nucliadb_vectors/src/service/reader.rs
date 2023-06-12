@@ -203,12 +203,10 @@ impl VectorReaderService {
         if config.path.exists() {
             return Err(node_error!("Shard does exist".to_string()));
         }
-        if !config.vectorset.exists() {
-            std::fs::create_dir_all(&config.vectorset)?;
-        }
         let Some(similarity) = config.similarity.map(|i| i.into()) else {
             return Err(node_error!("A similarity must be specified"));
         };
+        std::fs::create_dir_all(&config.vectorset)?;
         let path = &config.path;
         let rest = config.vectorset.clone();
         let metadata = IndexMetadata { similarity };

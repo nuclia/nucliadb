@@ -33,7 +33,7 @@ use std::time::SystemTime;
 
 use fs2::FileExt;
 pub use merger::Merger;
-use nucliadb_core::env;
+use nucliadb_core::tmp_workspace::path as tmp_path;
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
@@ -52,12 +52,12 @@ const STATE: &str = "state.bincode";
 const READERS: &str = "readers";
 const WRITER_FLAG: &str = "writer.flag";
 
-fn tmp_or_default() -> PathBuf {
-    let mut temp_path = env::tmp_path();
-    if !temp_path.exists() {
-        temp_path = std::env::temp_dir();
+fn tmp_path_or_default() -> PathBuf {
+    let mut location = tmp_path();
+    if !location.exists() {
+        location = std::env::temp_dir();
     }
-    temp_path
+    location
 }
 
 // 'f' will have access to a BufWriter whose contents at the end of
@@ -65,8 +65,8 @@ fn tmp_or_default() -> PathBuf {
 // After this function is executed 'path' will either only contain the data wrote by
 // 'f' or be on its previous state.
 fn compute_with_atomic_write<F, R>(path: &Path, f: F) -> VectorR<R>
-where F: FnOnce(&mut BufWriter<&mut TemporalFile>) -> VectorR<R> {
-    let mut file = TemporalFile::new_in(tmp_or_default())?;
+where for<'a> F: FnOnce(&mut BufWriter<&'a mut TemporalFile>) -> VectorR<R> {
+    let mut file = TemporalFile::new_in(tmp_path_or_default())?;
     let mut buffer = BufWriter::new(&mut file);
     let user_result = f(&mut buffer)?;
     buffer.flush()?;
@@ -128,6 +128,7 @@ impl Index {
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         let location = path.to_path_buf();
         std::fs::create_dir_all(&location)?;
+        std::fs::create_dir_all(location.join(READERS))?;
         compute_with_atomic_write(&location.join(STATE), |buffer| {
             bincode::serialize_into(buffer, &State::new())?;
             metadata.write(&location)?;
@@ -225,7 +226,7 @@ impl Reader {
                         let mut state_file_buffer = BufReader::new(state_file);
                         let new_state: State = bincode::deserialize_from(&mut state_file_buffer)?;
                         let watching = new_state.dpid_iter().collect::<Vec<_>>();
-                        let mut temp_status = TemporalFile::new_in(tmp_or_default())?;
+                        let mut temp_status = TemporalFile::new_in(tmp_path_or_default())?;
                         let mut temp_status_buffer = BufWriter::new(&mut temp_status);
                         bincode::serialize_into(&mut temp_status_buffer, &watching)?;
                         temp_status_buffer.flush()?;
