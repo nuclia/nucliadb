@@ -393,11 +393,27 @@ global___MessageContent = MessageContent
 class Message(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _MessageType:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _MessageTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Message._MessageType.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        UNSET: Message._MessageType.ValueType  # 0
+        QUESTION: Message._MessageType.ValueType  # 1
+        ANSWER: Message._MessageType.ValueType  # 2
+
+    class MessageType(_MessageType, metaclass=_MessageTypeEnumTypeWrapper): ...
+    UNSET: Message.MessageType.ValueType  # 0
+    QUESTION: Message.MessageType.ValueType  # 1
+    ANSWER: Message.MessageType.ValueType  # 2
+
     TIMESTAMP_FIELD_NUMBER: builtins.int
     WHO_FIELD_NUMBER: builtins.int
     TO_FIELD_NUMBER: builtins.int
     CONTENT_FIELD_NUMBER: builtins.int
     IDENT_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
     @property
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     who: builtins.str
@@ -406,6 +422,7 @@ class Message(google.protobuf.message.Message):
     @property
     def content(self) -> global___MessageContent: ...
     ident: builtins.str
+    type: global___Message.MessageType.ValueType
     def __init__(
         self,
         *,
@@ -414,9 +431,10 @@ class Message(google.protobuf.message.Message):
         to: collections.abc.Iterable[builtins.str] | None = ...,
         content: global___MessageContent | None = ...,
         ident: builtins.str = ...,
+        type: global___Message.MessageType.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["content", b"content", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["content", b"content", "ident", b"ident", "timestamp", b"timestamp", "to", b"to", "who", b"who"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["content", b"content", "ident", b"ident", "timestamp", b"timestamp", "to", b"to", "type", b"type", "who", b"who"]) -> None: ...
 
 global___Message = Message
 

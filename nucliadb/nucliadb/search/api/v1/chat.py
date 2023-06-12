@@ -30,6 +30,7 @@ from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.chat_prompt import format_chat_prompt_content
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
@@ -134,22 +135,20 @@ async def chat(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
-    flattened_text = " \n\n ".join(
-        [
-            paragraph.text
-            for result in results.resources.values()
-            for field in result.fields.values()
-            for paragraph in field.paragraphs.values()
-        ]
-    )
     if item.context is None:
         context = []
     else:
         context = item.context
-    context.append(Message(author=Author.NUCLIA, text=flattened_text))
+    context.append(
+        Message(
+            author=Author.NUCLIA, text=await format_chat_prompt_content(kbid, results)
+        )
+    )
 
     chat_model = ChatModel(
-        user_id=x_nucliadb_user, context=context, question=item.query
+        user_id=x_nucliadb_user,
+        context=context,
+        question=item.query,
     )
 
     ident, generator = await predict.chat_query(kbid, chat_model)
@@ -204,7 +203,7 @@ async def chat(
         generate_answer(results, kbid, predict, generator, item.features),
         media_type="plain/text",
         headers={
-            "NUCLIA-LEARNING-ID": ident,
+            "NUCLIA-LEARNING-ID": ident or "unknown",
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
