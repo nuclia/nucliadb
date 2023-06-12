@@ -23,7 +23,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-use crate::tracing::*;
+use nucliadb_core::tracing::*;
+
+use crate::utils::{parse_log_level, reliable_lookup_host};
 
 const SENTRY_PROD: &str = "prod";
 const SENTRY_DEV: &str = "stage";
@@ -34,10 +36,6 @@ pub fn data_path() -> PathBuf {
         Ok(var) => PathBuf::from(var),
         Err(_) => PathBuf::from("data"),
     }
-}
-
-pub fn tmp_path() -> PathBuf {
-    data_path().join("tmp")
 }
 
 /// Path for metadata file inside data folder
@@ -166,10 +164,13 @@ pub fn chitchat_port() -> u16 {
     }
 }
 
-pub fn public_ip() -> String {
-    let default = String::from("::1");
+pub async fn public_ip() -> IpAddr {
+    let default = IpAddr::from_str("::1").unwrap();
     match env::var("HOSTNAME") {
-        Ok(v) => format!("{}:4444", &v),
+        Ok(v) => {
+            let host = format!("{}:4444", &v);
+            reliable_lookup_host(&host).await
+        }
         Err(e) => {
             error!("HOSTNAME node defined. Defaulting to: {default}. Error details: {e}");
             default
@@ -296,12 +297,4 @@ pub fn metrics_http_port(default: u16) -> u16 {
         }
         Err(_) => default,
     }
-}
-
-fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
-    levels
-        .split(',')
-        .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
-        .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
-        .collect()
 }

@@ -18,75 +18,24 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
-use std::time::SystemTime;
+use std::sync::MutexGuard;
+use std::time::Duration;
 
+use nucliadb_core::fs_state;
 use nucliadb_core::tracing::*;
 
-use super::merger::MergeQuery;
-use crate::data_point::{DataPoint, DpId, Journal, Similarity};
-use crate::data_types::dtrie_ram::{DTrie, TimeSensitiveDTrie};
-use crate::{VectorErr, VectorR};
+use super::merger::{MergeQuery, MergeRequest};
+use super::work_flag::MergerWriterSync;
+use super::State;
+use crate::data_point::{DataPoint, DpId, Similarity};
+use crate::data_point_provider::merger;
+use crate::VectorR;
 
-#[derive(Debug, Clone, Copy, Default)]
-pub enum MergingState {
-    #[default]
-    Empty,
-    Waiting,
-    Done(Journal),
-}
-
-#[derive(Clone, Default)]
-pub struct Merged {
-    inner: Arc<RwLock<MergingState>>,
-}
-impl Merged {
-    fn write(&self) -> RwLockWriteGuard<'_, MergingState> {
-        self.inner.write().unwrap_or_else(|e| e.into_inner())
-    }
-    fn add_merge(&self, datapoint: Journal) -> VectorR<()> {
-        let mut writer = self.write();
-        if let MergingState::Done(_) = *writer {
-            Err(VectorErr::MergeLostError(datapoint.id()))
-        } else {
-            *writer = MergingState::Done(datapoint);
-            Ok(())
-        }
-    }
-    pub fn new() -> Merged {
-        Self::default()
-    }
-    pub fn abort_work(&self) {
-        let mut writer = self.write();
-        if let MergingState::Waiting = *writer {
-            *writer = MergingState::Empty;
-        }
-    }
-    pub fn take(&self) -> Option<Journal> {
-        let mut writer = self.write();
-        let MergingState::Done(journal) = *writer else {
-            return None;
-        };
-        *writer = MergingState::Empty;
-        Some(journal)
-    }
-    pub fn reserve_work(&self) -> bool {
-        let mut writer = self.write();
-        if let MergingState::Empty = *writer {
-            *writer = MergingState::Waiting;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-pub(super) struct Worker {
-    pub(super) location: PathBuf,
-    pub(super) delete_log: DTrie,
-    pub(super) work: Vec<(DpId, SystemTime)>,
-    pub(super) similarity: Similarity,
-    pub(super) result: Merged,
+const SLEEP_TIME: Duration = Duration::from_millis(100);
+pub(crate) struct Worker {
+    location: PathBuf,
+    work_flag: MergerWriterSync,
+    similarity: Similarity,
 }
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
@@ -94,6 +43,17 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
+    pub(crate) fn request(
+        location: PathBuf,
+        work_flag: MergerWriterSync,
+        similarity: Similarity,
+    ) -> MergeRequest {
+        Box::new(Worker {
+            similarity,
+            location,
+            work_flag,
+        })
+    }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
     where It: Iterator<Item = DpId> {
         use std::fmt::Write;
@@ -104,25 +64,65 @@ impl Worker {
         write!(msg, "==> {new}").unwrap();
         msg
     }
+    fn notify_merger(&self) {
+        let worker = Worker::request(
+            self.location.clone(),
+            self.work_flag.clone(),
+            self.similarity,
+        );
+        merger::send_merge_request(worker);
+    }
+    fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
+        loop {
+            match self.work_flag.try_to_start_working() {
+                Ok(lock) => break lock,
+                Err(_) => {
+                    info!("Merge delayed at: {:?}", self.location);
+                    std::thread::sleep(SLEEP_TIME);
+                }
+            }
+        }
+    }
     fn work(&self) -> VectorR<()> {
-        let mut work_stack = vec![];
+        let work_flag = self.try_to_work_or_delay();
+
         let subscriber = self.location.as_path();
-        for (id, ctime) in self.work.iter().copied() {
-            work_stack.push((TimeSensitiveDTrie::new(&self.delete_log, ctime), id))
-        }
         info!("{subscriber:?} is ready to perform a merge");
-        match DataPoint::merge(&self.location, &work_stack, self.similarity) {
-            Err(err) => {
-                self.result.abort_work();
-                Err(err)
-            }
-            Ok(merged) => {
-                let report = self.merge_report(self.work.iter().map(|i| i.0), merged.get_id());
-                info!("Merge on {subscriber:?}:\n{report}");
-                info!("Merge request completed");
-                self.result.abort_work();
-                self.result.add_merge(merged.meta())
-            }
+        let lock = fs_state::shared_lock(subscriber)?;
+        let state: State = fs_state::load_state(&lock)?;
+        std::mem::drop(lock);
+
+        let Some(work) = state.current_work_unit().map(|work|
+            work
+            .iter()
+            .rev()
+            .map(|journal| (state.delete_log(*journal), journal.id()))
+            .collect::<Vec<_>>()
+        ) else { return Ok(());};
+        let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
+        let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
+        std::mem::drop(state);
+
+        let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
+
+        let lock = fs_state::exclusive_lock(subscriber)?;
+        let mut state: State = fs_state::load_state(&lock)?;
+        let creates_work = state.replace_work_unit(new_dp);
+        fs_state::persist_state(&lock, &state)?;
+        std::mem::drop(lock);
+        info!("Merge on {subscriber:?}:\n{report}");
+        if creates_work {
+            self.notify_merger();
         }
+
+        info!("Removing deprecated datapoints");
+        ids.into_iter()
+            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
+            .filter(|(.., r)| r.is_err())
+            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
+        std::mem::drop(work_flag);
+
+        info!("Merge request completed");
+        Ok(())
     }
 }
