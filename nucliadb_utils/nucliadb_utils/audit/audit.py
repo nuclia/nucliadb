@@ -20,12 +20,7 @@
 from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
-from nucliadb_protos.audit_pb2 import (
-    AuditField,
-    AuditKBCounter,
-    AuditRequest,
-    AuditShardCounter,
-)
+from nucliadb_protos.audit_pb2 import AuditField, AuditKBCounter, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 
