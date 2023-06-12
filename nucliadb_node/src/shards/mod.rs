@@ -63,6 +63,12 @@ pub struct UnboundedShardReaderCache {
 impl UnboundedShardReaderCache {
     pub fn new() -> Self {
         Self {
+            // NOTE: we use max shards per node as initial capacity to avoid
+            // hashmap resizing, as it would block the current thread while
+            // doing it.
+            //
+            // REVIEW: if resize don't take more than 10µs, it's acceptable
+            // (blocking in tokio means CPU bound during 10-100µs)
             cache: RwLock::new(HashMap::with_capacity(env::max_shards_per_node())),
         }
     }
