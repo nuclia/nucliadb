@@ -49,12 +49,6 @@ impl DeleteLog for dtrie_ram::DTrie {
     }
 }
 
-impl<'a> DeleteLog for dtrie_ram::TimeSensitiveDTrie<'a> {
-    fn is_deleted(&self, key: &[u8]) -> bool {
-        self.deleted(key)
-    }
-}
-
 impl<Dl: DeleteLog, S: key_value::Slot> key_value::Slot for (Dl, S) {
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         self.1.get_key(x)

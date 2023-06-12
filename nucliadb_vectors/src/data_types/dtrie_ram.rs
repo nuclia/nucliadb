@@ -23,23 +23,6 @@ use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy)]
-pub struct TimeSensitiveDTrie<'a> {
-    dlog: &'a DTrie,
-    time: SystemTime,
-}
-impl<'a> TimeSensitiveDTrie<'a> {
-    pub fn new(dlog: &'a DTrie, time: SystemTime) -> TimeSensitiveDTrie<'a> {
-        TimeSensitiveDTrie { dlog, time }
-    }
-    pub fn deleted(&self, key: &[u8]) -> bool {
-        self.dlog
-            .get(key)
-            .map(|t| t > self.time)
-            .unwrap_or_default()
-    }
-}
-
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct DTrie {
     value: Option<SystemTime>,

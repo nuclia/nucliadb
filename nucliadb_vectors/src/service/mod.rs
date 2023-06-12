@@ -21,45 +21,11 @@
 pub mod reader;
 pub mod writer;
 
-use std::fs::File;
-
-use fs2::FileExt;
 use nucliadb_core::protos::VectorSimilarity as GrpcSimilarity;
 pub use reader::*;
 pub use writer::*;
 
 use crate::data_point::Similarity;
-use crate::VectorR;
-
-const SET_LOCK: &str = "rest.lock";
-
-enum MaybeLocked<'service, V> {
-    NoLock(&'service V),
-    WithLock(&'service File, V),
-}
-impl<'service, V> Drop for MaybeLocked<'service, V> {
-    fn drop(&mut self) {
-        let MaybeLocked::WithLock(lock, _) = self else {
-            return;
-        };
-        let _ = lock.unlock();
-    }
-}
-impl<'service, V> MaybeLocked<'service, V> {
-    pub fn no_lock(inner: &'service V) -> MaybeLocked<'service, V> {
-        Self::NoLock(inner)
-    }
-    pub fn with_shared_lock(inner: V, lock: &'service File) -> VectorR<MaybeLocked<'service, V>> {
-        lock.lock_shared()?;
-        Ok(Self::WithLock(lock, inner))
-    }
-    pub fn inner(&self) -> &V {
-        match self {
-            Self::WithLock(_, inner) => inner,
-            Self::NoLock(inner) => inner,
-        }
-    }
-}
 
 impl From<GrpcSimilarity> for Similarity {
     fn from(value: GrpcSimilarity) -> Self {
