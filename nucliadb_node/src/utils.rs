@@ -22,7 +22,6 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use http::Uri;
-use nucliadb_core::tracing::Level;
 use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
@@ -42,21 +41,12 @@ pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
 pub async fn reliable_lookup_host(host: &str) -> IpAddr {
     let mut tries = 5;
     while tries != 0 {
-        if let Ok(mut addr_iter) = net::lookup_host(host).await {
-            if let Some(addr) = addr_iter.next() {
-                return addr.ip();
-            }
+        let dns_resolution = net::lookup_host(host).await;
+        if let Ok(Some(addr)) = dns_resolution.map(|mut i| i.next()) {
+            return addr.ip();
         }
         tries -= 1;
         sleep(Duration::from_secs(1)).await;
     }
     IpAddr::from_str(host).unwrap()
-}
-
-pub fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
-    levels
-        .split(',')
-        .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
-        .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
-        .collect()
 }

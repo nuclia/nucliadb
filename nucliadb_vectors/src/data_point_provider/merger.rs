@@ -43,13 +43,13 @@ impl MergerHandle {
 static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
 static MERGER_NOTIFIER_SET: Once = Once::new();
 
-pub fn send_merge_request(request: MergeRequest) {
+pub fn send_merge_request(request: impl MergeQuery + 'static) {
     // It is always safe to read from MERGER_NOTIFIER since
     // it can only be writen through MERGER_NOTIFIER_SET and is not exposed in the public interface.
     // MERGER_NOTIFIER_SET is protected by the type Once so we avoid concurrency problems.
     match unsafe { &MERGER_NOTIFIER } {
-        Some(merger) => merger.send(request),
-        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
+        Some(merger) => merger.send(Box::new(request)),
+        None => tracing::warn!("Merge requests are being sent without a merger installed"),
     }
 }
 
@@ -59,7 +59,7 @@ pub struct Merger {
 
 impl Merger {
     pub fn install_global() -> VectorR<impl FnOnce()> {
-        let mut status = Err(VectorErr::MergerAlreadyInitialized);
+        let mut status = Err(VectorErr::MergerExistsError);
         MERGER_NOTIFIER_SET.call_once(|| unsafe {
             let (stxn, rtxn) = mpsc::channel();
             let handler = MergerHandle(stxn);

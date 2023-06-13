@@ -19,9 +19,9 @@
 
 use std::io::Cursor;
 
+use nucliadb_core::env;
 use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::texts::DocumentIterator;
-use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
@@ -267,17 +267,13 @@ pub struct NodeWriter {
     writer: RustWriterService,
 }
 
-impl Default for NodeWriter {
-    fn default() -> NodeWriter {
-        NodeWriter::new()
-    }
-}
 #[pymethods]
 impl NodeWriter {
     #[staticmethod]
-    pub fn new() -> NodeWriter {
-        NodeWriter {
-            writer: RustWriterService::new(),
+    pub fn new() -> PyResult<NodeWriter> {
+        match RustWriterService::new() {
+            Ok(writer) => Ok(NodeWriter { writer }),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }
     }
 

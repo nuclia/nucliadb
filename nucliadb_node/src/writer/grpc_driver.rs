@@ -19,6 +19,7 @@
 //
 
 use async_std::sync::RwLock;
+use nucliadb_core::env;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest,
@@ -31,7 +32,6 @@ use nucliadb_telemetry::sync::send_telemetry_event;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
-use crate::env;
 use crate::writer::NodeWriterService;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -429,6 +429,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 mod tests {
     use std::net::SocketAddr;
 
+    use nucliadb_core::env;
     use nucliadb_core::protos::node_writer_client::NodeWriterClient;
     use nucliadb_core::protos::node_writer_server::NodeWriterServer;
     use portpicker::pick_unused_port;
@@ -436,11 +437,11 @@ mod tests {
     use tonic::Request;
 
     use super::*;
-    use crate::env;
     use crate::utils::socket_to_endpoint;
 
     async fn start_test_server(address: SocketAddr) -> anyhow::Result<()> {
-        let node_writer = NodeWriterGRPCDriver::from(NodeWriterService::new());
+        let node_writer = NodeWriterService::new().unwrap();
+        let node_writer = NodeWriterGRPCDriver::from(node_writer);
         std::fs::create_dir_all(env::shards_path())?;
 
         tokio::spawn(async move {

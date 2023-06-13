@@ -37,18 +37,18 @@ fn label_set(batch_id: usize) -> Vec<String> {
     (0..NO_LABELS).map(|l| format!("L{batch_id}_{l}")).collect()
 }
 
-fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {
+fn add_batch(writer: &mut Writer, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {
     let temporal_mark = TemporalMark::now();
+    let location = writer.index().location();
     let similarity = Similarity::Cosine;
     let labels = LabelDictionary::new(labels);
     let elems = elems
         .into_iter()
         .map(|(key, vector)| Elem::new(key, vector, labels.clone(), None))
         .collect();
-    let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity).unwrap();
-    let lock = writer.get_elock().unwrap();
-    writer.add(new_dp, &lock);
-    writer.commit(lock).unwrap();
+    let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity).unwrap();
+    writer.add(new_dp);
+    writer.commit().unwrap();
 }
 fn main() {
     let _ = Merger::install_global().map(std::thread::spawn);
@@ -60,7 +60,9 @@ fn main() {
     };
     println!("Writing starts..");
     let mut possible_tag = vec![];
-    let mut writer = Index::new(at.path(), IndexMetadata::default()).unwrap();
+    let index = Index::new(at.path(), IndexMetadata::default()).unwrap();
+
+    let mut writer = index.writer().unwrap();
     for i in 0..(INDEX_SIZE / BATCH_SIZE) {
         let labels = label_set(i);
         let elems = RandomVectors::new(VECTOR_DIM)
@@ -76,8 +78,7 @@ fn main() {
     }
     possible_tag.truncate(1);
 
-    let reader = Index::open(at.path(), IndexCheck::None).unwrap();
-    let lock = reader.get_slock().unwrap();
+    let reader = index.reader().unwrap();
     let queries = possible_tag;
 
     println!("Unfiltered search..");
@@ -86,7 +87,7 @@ fn main() {
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
-    reader.search(&request, &lock).unwrap();
+    reader.search(&request).unwrap();
     stats.read_time += now.elapsed().unwrap().as_millis();
     let formula = queries.into_iter().fold(Formula::new(), |mut acc, i| {
         acc.extend(i);
@@ -98,10 +99,10 @@ fn main() {
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
-    reader.search(&request, &lock).unwrap();
+    reader.search(&request).unwrap();
     stats.tagged_time += now.elapsed().unwrap().as_millis();
     println!("Cleaning garbage..");
-    writer.collect_garbage(&lock).unwrap();
+    writer.collect_garbage().unwrap();
     println!("Garbage cleaned");
     println!("{stats}");
 }

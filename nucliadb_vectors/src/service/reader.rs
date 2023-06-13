@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt::Debug;
+use std::fs::File;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics;
@@ -30,9 +32,9 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, *};
 
+use super::{MaybeLocked, SET_LOCK};
 use crate::data_point_provider::*;
 use crate::formula::{Formula, LabelClause};
-use crate::indexset::IndexSet;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
@@ -50,8 +52,9 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
 }
 
 pub struct VectorReaderService {
-    index: Index,
-    indexset: IndexSet,
+    rest_lock: File,
+    rest: PathBuf,
+    default: Reader,
 }
 impl Debug for VectorReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -63,38 +66,15 @@ impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
         let time = SystemTime::now();
-
-        let indexet_slock = self.indexset.get_slock()?;
-        if vectorset.is_empty() {
-            debug!("Id for the vectorset is empty");
-            let index_slock = self.index.get_slock()?;
-            let no_nodes = self.index.no_nodes(&index_slock);
-            std::mem::drop(index_slock);
-
-            let metrics = metrics::get_metrics();
-            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors("count".to_string());
-            metrics.record_request_time(metric, took);
-            debug!("Ending at {took} ms");
-
-            Ok(no_nodes)
-        } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-            debug!("Counting nodes for {vectorset}");
-            let lock = index.get_slock()?;
-            let no_nodes = index.no_nodes(&lock);
-            std::mem::drop(lock);
-
-            let metrics = metrics::get_metrics();
-            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors("count".to_string());
-            metrics.record_request_time(metric, took);
-            debug!("Ending at {took} ms");
-
-            Ok(no_nodes)
-        } else {
-            debug!("There was not a set called {vectorset}");
-            Ok(0)
-        }
+        let some_reader = self.get_index(vectorset)?;
+        let reader = some_reader.inner();
+        let no_nodes = reader.number_of_nodes();
+        let metrics = metrics::get_metrics();
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        let metric = request_time::RequestTimeKey::vectors("count".to_string());
+        metrics.record_request_time(metric, took);
+        debug!("Ending at {took} ms");
+        Ok(no_nodes)
     }
 }
 impl ReaderChild for VectorReaderService {
@@ -113,8 +93,6 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
-        let indexet_slock = self.indexset.get_slock()?;
-        let index_slock = self.index.get_slock()?;
         let mut formula = Formula::new();
         request
             .tags
@@ -122,33 +100,18 @@ impl ReaderChild for VectorReaderService {
             .cloned()
             .map(LabelClause::new)
             .for_each(|c| formula.extend(c));
-        let search_request = (total_to_get, request, formula);
+
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
         }
-        let result = if request.vector_set.is_empty() {
-            debug!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&search_request, &index_slock)?
-        } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
-            debug!(
-                "{id:?} - vectorset specified and found, searching on {}",
-                request.vector_set
-            );
-            let lock = index.get_slock()?;
-            index.search(&search_request, &lock)?
-        } else {
-            debug!(
-                "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
-                request.vector_set
-            );
-            vec![]
-        };
+        let search_request = (total_to_get, request, formula);
+        let some_reader = self.get_index(&request.vector_set)?;
+        let reader = some_reader.inner();
+        let result = reader.search(&search_request)?;
+        reader.schedule_update();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
         }
-
-        std::mem::drop(indexet_slock);
-        std::mem::drop(index_slock);
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Creating results: starts at {v} ms");
@@ -179,8 +142,7 @@ impl ReaderChild for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
         let time = SystemTime::now();
-        let lock = self.index.get_slock().unwrap();
-        let result = self.index.get_keys(&lock)?;
+        let result = self.default.keys()?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("Ending at {v} ms")
         }
@@ -211,6 +173,15 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl VectorReaderService {
+    fn get_index<'a>(&'a self, name: &str) -> NodeResult<MaybeLocked<'a, Reader>> {
+        if name.is_empty() {
+            Ok(MaybeLocked::no_lock(&self.default))
+        } else {
+            let path = self.rest.join(name);
+            let reader = Index::open(&path).and_then(|i| i.reader())?;
+            Ok(MaybeLocked::with_shared_lock(reader, &self.rest_lock)?)
+        }
+    }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
@@ -229,32 +200,41 @@ impl VectorReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let path_indexset = std::path::Path::new(&config.vectorset);
-        if path.exists() {
-            Err(node_error!("Shard does exist".to_string()))
-        } else {
-            let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified"));
-            };
-            Ok(VectorReaderService {
-                index: Index::new(path, IndexMetadata { similarity })?,
-                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
-            })
+        if config.path.exists() {
+            return Err(node_error!("Shard does exist".to_string()));
         }
+        if !config.vectorset.exists() {
+            std::fs::create_dir_all(&config.vectorset)?;
+        }
+        let Some(similarity) = config.similarity.map(|i| i.into()) else {
+            return Err(node_error!("A similarity must be specified"));
+        };
+        let path = &config.path;
+        let rest = config.vectorset.clone();
+        let metadata = IndexMetadata { similarity };
+        let default = Index::new(path, metadata).and_then(|i| Index::reader(&i))?;
+        let rest_lock = File::create(rest.join(SET_LOCK))?;
+        Ok(VectorReaderService {
+            default,
+            rest,
+            rest_lock,
+        })
     }
     #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let path_indexset = std::path::Path::new(&config.vectorset);
-        if !path.exists() {
-            Err(node_error!("Shard does not exist".to_string()))
-        } else {
-            Ok(VectorReaderService {
-                index: Index::open(path, IndexCheck::None)?,
-                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
-            })
+        if !config.path.exists() {
+            return Err(node_error!("Shard does not exist".to_string()));
         }
+        let path = &config.path;
+        let rest = config.vectorset.clone();
+        let rest_path = rest.join(SET_LOCK);
+        let default = Index::open(path).and_then(|i| Index::reader(&i))?;
+        let rest_lock = File::open(&rest_path).or_else(|_| File::create(&rest_path))?;
+        Ok(VectorReaderService {
+            default,
+            rest,
+            rest_lock,
+        })
     }
 }
 
