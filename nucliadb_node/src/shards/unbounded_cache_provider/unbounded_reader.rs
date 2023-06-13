@@ -28,6 +28,7 @@ pub use crate::env;
 use crate::shards::shards_provider::{ReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
 
+#[derive(Default)]
 pub struct UnboundedShardReaderCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
 }

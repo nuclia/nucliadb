@@ -31,6 +31,7 @@ use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
 use crate::utils::nonblocking;
 
+#[derive(Default)]
 pub struct AsyncUnboundedShardReaderCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
 }

@@ -30,7 +30,7 @@ pub mod services;
 
 pub mod middleware;
 
-mod shards;
+pub mod shards;
 
 /// Global configuration enviromental variables
 pub mod env;

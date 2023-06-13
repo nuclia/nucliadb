@@ -23,7 +23,8 @@ use async_trait::async_trait;
 // use nucliadb_vectors::data_point::Similarity;
 use nucliadb_core::NodeResult;
 
-use super::{ShardReader, ShardWriter};
+use super::ShardReader;
+// use super::ShardWriter;
 
 pub type ShardId = String;
 
