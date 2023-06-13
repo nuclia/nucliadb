@@ -50,7 +50,7 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatMonitor]:
         # already loaded
         return util
 
-    if settings.load_cluster:  # pragma: no cover
+    if settings.manual_load_cluster_nodes:  # pragma: no cover
         await manager.load_active_nodes()
         return None
 

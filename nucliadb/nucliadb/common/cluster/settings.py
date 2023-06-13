@@ -56,7 +56,9 @@ class Settings(BaseSettings):
     local_reader_threads: int = 5
     local_writer_threads: int = 5
 
-    load_cluster: bool = False
+    # if you're running locally without chitchat but want
+    # to load cluster remote nodes manually, set this to True
+    manual_load_cluster_nodes: bool = False
 
 
 settings = Settings()
