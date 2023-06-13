@@ -370,12 +370,13 @@ class _NucliaDBBase:
         path_params=("kbid", "labelset"),
         request_type=None,
         response_type=None,
+        docstring=docstrings.DELETE_LABELSET,
     )
     get_labelsets = _request_builder(
         name="get_labelsets",
         path_template="/v1/kb/{kbid}/labelsets",
         method="GET",
-        path_params=("kbid", "labelset"),
+        path_params=("kbid",),
         request_type=None,
         response_type=KnowledgeBoxLabels,
     )
@@ -513,24 +514,33 @@ class NucliaDB(_NucliaDBBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
-        """Create a new instance of the NucliaDB client
-        :param region: The region to connect to
+        """
+        Create a new instance of the NucliaDB client
+
+        :param region: The region to connect to.
+        :type region: nucliadb_sdk.Region
         :param api_key: The API key to use for authentication
+        :type api_key: str
         :param url: The base URL to use for the NucliaDB API
+        :type url: str
         :param headers: Any additional headers to include in each request
+        :type headers: Dict[str, str]
         :param timeout: The timeout in seconds to use for requests
+        :type timeout: float
 
-        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+        When connecting to the managed NucliaDB service, you can simply configure the client with your API key:
 
-        >>> from nucliadb_sdk import *
+        >>> from nucliadb_sdk import NucliaDB
         >>> sdk = NucliaDB(api_key="api-key")
 
-        If the Knowledge Box you are interacting with is public, you don't even need the api key
+        If the Knowledge Box you are interacting with is public, you don't even need the api key:
 
+        >>> from nucliadb_sdk import NucliaDB
         >>> sdk = NucliaDB()
 
-        If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL
+        If you are connecting to a NucliaDB on-prem instance, you will need to specify the URL as follows:
 
+        >>> from nucliadb_sdk import NucliaDB, Region
         >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
@@ -573,14 +583,21 @@ class NucliaDBAsync(_NucliaDBBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
-        """Create a new instance of the NucliaDB client
-        :param region: The region to connect to
-        :param api_key: The API key to use for authentication
-        :param url: The base URL to use for the NucliaDB API
-        :param headers: Any additional headers to include in each request
-        :param timeout: The timeout in seconds to use for requests
+        """
+        Create a new instance of the NucliaDB client
 
-        When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
+        :param region: The region to connect to.
+        :type region: nucliadb_sdk.Region
+        :param api_key: The API key to use for authentication
+        :type api_key: str
+        :param url: The base URL to use for the NucliaDB API
+        :type url: str
+        :param headers: Any additional headers to include in each request
+        :type headers: Dict[str, str]
+        :param timeout: The timeout in seconds to use for requests
+        :type timeout: float
+
+        When connecting to the managed NucliaDB cloud service, you can simply configure the SDK with your API key
 
         >>> from nucliadb_sdk import *
         >>> sdk = NucliaDBAsync(api_key="api-key")

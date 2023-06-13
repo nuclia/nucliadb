@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import inspect
 import typing
-from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import httpx
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ class Example(BaseModel):
 class Docstring(BaseModel):
     doc: str
     examples: List[Example] = []
+    path_param_doc: Dict[str, str] = {}
 
 
 SEARCH = Docstring(
@@ -91,6 +92,11 @@ France won the 2018 football World Cup.
 """,
         ),
     ],
+)
+
+DELETE_LABELSET = Docstring(
+    doc="Delete a specific set of labels",
+    path_param_doc={"labelset": "Id of the labelset to delete"},
 )
 
 
@@ -183,13 +189,21 @@ def _inject_docstring(
         description = ""
         if path_param == "kbid":
             description = "The id of the knowledge box"
+        elif path_param == "rid":
+            description = "The id of the resource"
+        elif path_param == "field_id":
+            description = "The id of the field"
+        elif docstring and path_param in docstring.path_param_doc:
+            description = docstring.path_param_doc[path_param]
         params.append(f":param {path_param}: {description}")
+        params.append(f":type {path_param}: <class 'str'>")
     if request_type is not None:
         if isinstance(request_type, type) and issubclass(request_type, BaseModel):
             for field in request_type.__fields__.values():
                 params.append(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
+                params.append(f":type {field.name}: {field.outer_type_}")
     func_doc += "\n".join(params)
     func_doc += "\n"
 
