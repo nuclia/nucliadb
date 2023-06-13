@@ -370,12 +370,13 @@ class _NucliaDBBase:
         path_params=("kbid", "labelset"),
         request_type=None,
         response_type=None,
+        docstring=docstrings.DELETE_LABELSET,
     )
     get_labelsets = _request_builder(
         name="get_labelsets",
         path_template="/v1/kb/{kbid}/labelsets",
         method="GET",
-        path_params=("kbid", "labelset"),
+        path_params=("kbid",),
         request_type=None,
         response_type=KnowledgeBoxLabels,
     )

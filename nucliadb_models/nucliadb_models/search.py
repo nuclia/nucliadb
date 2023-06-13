@@ -462,7 +462,7 @@ class SearchParamDefaults:
     field_type_filter = ParamDefault(
         default=list(FieldTypeName),
         title="Field type filter",
-        description="Filter search results to match paragraphs of a specific field type. E.g: `['conversation', 'text']",  # noqa
+        description="Filter search results to match paragraphs of a specific field type. E.g: `['conversation', 'text']`",  # noqa
     )
     range_creation_start = ParamDefault(
         default=None,
