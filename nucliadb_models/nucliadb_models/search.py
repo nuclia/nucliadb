@@ -351,12 +351,12 @@ class SearchParamDefaults:
     advanced_query = ParamDefault(
         default=None,
         title="Advanced query",
-        description="An advanced query to search for. See https://docs.nuclia.dev/docs/query/#advanced-query for examples of advanced queries.",  # noqa: E501
+        description="An advanced query to search for. See https://docs.nuclia.dev/docs/query/#advanced-query for examples of advanced queries syntax.",  # noqa: E501
     )
     fields = ParamDefault(
         default=[],
         title="Fields",
-        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details, see: https://docs.nuclia.dev/docs/query/#search-in-a-specific-field",  # noqa: E501
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/query/#search-in-a-specific-field",  # noqa: E501
     )
     filters = ParamDefault(
         default=[],
@@ -462,27 +462,27 @@ class SearchParamDefaults:
     field_type_filter = ParamDefault(
         default=list(FieldTypeName),
         title="Field type filter",
-        description="Filter search results to match paragraphs of a specific field type.",
+        description="Filter search results to match paragraphs of a specific field type. E.g: `['conversation', 'text']",  # noqa
     )
     range_creation_start = ParamDefault(
         default=None,
         title="Resource creation range start",
-        description="Resources created before this date will be filtered out of search results.",
+        description="Resources created before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa
     )
     range_creation_end = ParamDefault(
         default=None,
         title="Resource creation range end",
-        description="Resources created after this date will be filtered out of search results.",
+        description="Resources created after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa
     )
     range_modification_start = ParamDefault(
         default=None,
         title="Resource modification range start",
-        description="Resources modified before this date will be filtered out of search results.",
+        description="Resources modified before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa
     )
     range_modification_end = ParamDefault(
         default=None,
         title="Resource modification range end",
-        description="Resources modified after this date will be filtered out of search results.",
+        description="Resources modified after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",  # noqa
     )
     vector = ParamDefault(
         default=None,
