@@ -22,17 +22,9 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 import aiohttp.client_exceptions
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBoxConfig,
-    KnowledgeBoxID,
-    KnowledgeBoxResponseStatus,
-)
-from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
-from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
-from nucliadb.ingest.maindb.driver import Driver, Transaction
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     KnowledgeBoxConflict,
@@ -43,8 +35,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.orm.shard import Shard
-from nucliadb.ingest.orm.utils import get_node_klass
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
@@ -67,7 +58,7 @@ class Processor:
     and can not use the txn id
     """
 
-    messages: Dict[str, List[BrokerMessage]]
+    messages: Dict[str, List[writer_pb2.BrokerMessage]]
 
     def __init__(
         self,
@@ -81,10 +72,11 @@ class Processor:
         self.storage = storage
         self.partition = partition
         self.cache = cache
+        self.shard_manager = get_shard_manager()
 
     async def process(
         self,
-        message: BrokerMessage,
+        message: writer_pb2.BrokerMessage,
         seqid: int,
         partition: Optional[str] = None,
         transaction_check: bool = True,
@@ -101,23 +93,25 @@ class Processor:
             if last_seqid is not None and seqid <= last_seqid:
                 raise SequenceOrderViolation(last_seqid)
 
-        if message.type == BrokerMessage.MessageType.DELETE:
+        if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition, transaction_check)
-        elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
+        elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
             await self.txn([message], seqid, partition, transaction_check)
-        elif message.type == BrokerMessage.MessageType.MULTI:
+        elif message.type == writer_pb2.BrokerMessage.MessageType.MULTI:
             # XXX Not supported right now
             # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
             # This concept is probably not tenable with current architecture because
             # of how nats works and how we would need to manage rollbacks.
             # XXX Should this be removed?
             await self.multi(message, seqid)
-        elif message.type == BrokerMessage.MessageType.COMMIT:
+        elif message.type == writer_pb2.BrokerMessage.MessageType.COMMIT:
             await self.commit(message, seqid, partition)
-        elif message.type == BrokerMessage.MessageType.ROLLBACK:
+        elif message.type == writer_pb2.BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
 
-    async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:
+    async def get_resource_uuid(
+        self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage
+    ) -> str:
         if message.uuid is None:
             uuid = await kb.get_resource_uuid_by_slug(message.slug)
         else:
@@ -127,7 +121,7 @@ class Processor:
     @processor_observer.wrap({"type": "delete_resource"})
     async def delete_resource(
         self,
-        message: BrokerMessage,
+        message: writer_pb2.BrokerMessage,
         seqid: int,
         partition: str,
         transaction_check: bool = True,
@@ -140,11 +134,13 @@ class Processor:
         if shard_id is None:
             logger.warning(f"Resource {uuid} does not exist")
         else:
-            node_klass = get_node_klass()
-            shard: Optional[Shard] = await kb.get_resource_shard(shard_id, node_klass)
+            shard = await kb.get_resource_shard(shard_id)
             if shard is None:
                 raise AttributeError("Shard not available")
-            await shard.delete_resource(message.uuid, seqid, partition, message.kbid)
+
+            await self.shard_manager.delete_resource(
+                shard, message.uuid, seqid, partition, message.kbid
+            )
             try:
                 await kb.delete_resource(message.uuid)
             except Exception as exc:
@@ -166,7 +162,7 @@ class Processor:
             seqid=seqid,
             multi=message.multiid,
             message=message,
-            write_type=Notification.WriteType.DELETED,
+            write_type=writer_pb2.Notification.WriteType.DELETED,
         )
 
     @processor_observer.wrap({"type": "commit_slug"})
@@ -185,7 +181,7 @@ class Processor:
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
-        messages: List[BrokerMessage],
+        messages: List[writer_pb2.BrokerMessage],
         seqid: int,
         partition: str,
         transaction_check: bool = True,
@@ -208,7 +204,6 @@ class Processor:
         resource: Optional[Resource] = None
         handled_exception = None
         created = False
-        shard: Optional[Shard] = None
 
         try:
             for message in messages:
@@ -230,7 +225,7 @@ class Processor:
                     resource.replace_indexer(await resource.generate_index_message())
 
             if resource and resource.modified:
-                shard = await self.index_resource(  # noqa
+                await self.index_resource(  # noqa
                     resource=resource,
                     txn=txn,
                     uuid=uuid,
@@ -252,9 +247,9 @@ class Processor:
                     seqid=seqid,
                     multi=multi,
                     message=message,
-                    write_type=Notification.WriteType.CREATED
+                    write_type=writer_pb2.Notification.WriteType.CREATED
                     if created
-                    else Notification.WriteType.MODIFIED,
+                    else writer_pb2.Notification.WriteType.MODIFIED,
                 )
             elif resource and resource.modified is False:
                 await txn.abort()
@@ -294,8 +289,6 @@ class Processor:
             if seqid == -1:
                 raise handled_exception
             else:
-                # Removing this until we figure out how to properly index the error state
-                # await self._mark_resource_error(resource, partition, seqid, shard, kbid)
                 raise DeadletteredError() from handled_exception
 
         return None
@@ -310,76 +303,38 @@ class Processor:
         seqid: int,
         partition: str,
         kb: KnowledgeBox,
-    ) -> Shard:
+    ) -> None:
         shard_id = await kb.get_resource_shard_id(uuid)
-        node_klass = get_node_klass()
 
         shard = None
         if shard_id is not None:
-            shard = await kb.get_resource_shard(shard_id, node_klass)
+            shard = await kb.get_resource_shard(shard_id)
 
         if shard is None:
             # It's a new resource, get current active shard to place
             # new resource on
-            shard = await node_klass.get_current_active_shard(txn, kbid)
+            shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
                 similarity = await kb.get_similarity()
-                shard = await node_klass.create_shard_by_kbid(
+                shard = await self.shard_manager.create_shard_by_kbid(
                     txn, kbid, similarity=similarity
                 )
-            await kb.set_resource_shard_id(uuid, shard.sharduuid)
+            await kb.set_resource_shard_id(uuid, shard.shard)
 
         if shard is not None:
-            await shard.add_resource(
-                resource.indexer.brain, seqid, partition=partition, kb=kbid
+            await self.shard_manager.add_resource(
+                shard, resource.indexer.brain, seqid, partition=partition, kb=kbid
             )
         else:
             raise AttributeError("Shard is not available")
-        return shard
 
-    async def _mark_resource_error(
-        self,
-        resource: Optional[Resource],
-        partition: str,
-        seqid: int,
-        shard: Optional[Shard],
-        kbid: str,
-    ) -> None:
-        """
-        Unhandled error processing, try to mark resource as error
-        """
-        if shard is None:
-            logger.warning(
-                "Unable to mark resource as error, shard is None. "
-                "This should not happen so you did something special to get here."
-            )
-            return
-        if resource is None or resource.basic is None:
-            logger.info(
-                f"Skip when resource does not even have basic metadata: {resource}"
-            )
-            return
-        prev_txn = resource.txn
-        try:
-            async with self.driver.transaction() as txn:
-                resource.txn = txn
-                resource.basic.metadata.status = PBMetadata.Status.ERROR
-                await resource.set_basic(resource.basic)
-                await txn.commit()
-
-            await shard.add_resource(
-                resource.indexer.brain, seqid, partition=partition, kb=kbid
-            )
-        except Exception:
-            logger.warning("Error while marking resource as error", exc_info=True)
-        finally:
-            resource.txn = prev_txn
-
-    async def multi(self, message: BrokerMessage, seqid: int) -> None:
+    async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)
 
-    async def commit(self, message: BrokerMessage, seqid: int, partition: str) -> None:
+    async def commit(
+        self, message: writer_pb2.BrokerMessage, seqid: int, partition: str
+    ) -> None:
         if message.multiid not in self.messages:
             # Error
             logger.error(f"Closed multi {message.multiid}")
@@ -388,7 +343,7 @@ class Processor:
             await self.txn(self.messages[message.multiid], seqid, partition)
 
     async def rollback(
-        self, message: BrokerMessage, seqid: int, partition: str
+        self, message: writer_pb2.BrokerMessage, seqid: int, partition: str
     ) -> None:
         # Error
         logger.error(f"Closed multi {message.multiid}")
@@ -402,7 +357,7 @@ class Processor:
         )
 
     async def deadletter(
-        self, messages: List[BrokerMessage], partition: str, seqid: int
+        self, messages: List[writer_pb2.BrokerMessage], partition: str, seqid: int
     ) -> None:
         for seq, message in enumerate(messages):
             await self.storage.deadletter(message, seq, seqid, partition)
@@ -410,7 +365,7 @@ class Processor:
     @processor_observer.wrap({"type": "apply_resource"})
     async def apply_resource(
         self,
-        message: BrokerMessage,
+        message: writer_pb2.BrokerMessage,
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
     ) -> Optional[Tuple[Resource, bool]]:
@@ -468,16 +423,16 @@ class Processor:
         partition: str,
         seqid: int,
         multi: str,
-        message: BrokerMessage,
-        write_type: Notification.WriteType.Value,  # type: ignore
+        message: writer_pb2.BrokerMessage,
+        write_type: writer_pb2.Notification.WriteType.Value,  # type: ignore
     ):
-        notification = Notification(
+        notification = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
             multi=multi,
             uuid=message.uuid,
             kbid=message.kbid,
-            action=Notification.Action.COMMIT,
+            action=writer_pb2.Notification.Action.COMMIT,
             # including the message here again might feel a bit unusual but allows
             # us to react to these notifications with the original payload
             write_type=write_type,
@@ -492,13 +447,13 @@ class Processor:
     async def notify_abort(
         self, *, partition: str, seqid: int, multi: str, kbid: str, rid: str
     ):
-        message = Notification(
+        message = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
             multi=multi,
             uuid=rid,
             kbid=kbid,
-            action=Notification.ABORT,
+            action=writer_pb2.Notification.ABORT,
         )
         await self.notify(
             const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
@@ -512,7 +467,7 @@ class Processor:
     # KB tools
     # XXX: Why are these utility functions here?
     async def get_kb_obj(
-        self, txn: Transaction, kbid: KnowledgeBoxID
+        self, txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
     ) -> Optional[KnowledgeBox]:
         uuid: Optional[str] = kbid.uuid
         if uuid == "":
@@ -528,15 +483,17 @@ class Processor:
         kbobj = KnowledgeBox(txn, storage, uuid)
         return kbobj
 
-    async def get_kb(self, slug: str = "", uuid: Optional[str] = "") -> KnowledgeBoxPB:
+    async def get_kb(
+        self, slug: str = "", uuid: Optional[str] = ""
+    ) -> knowledgebox_pb2.KnowledgeBox:
         txn = await self.driver.begin()
 
         if uuid == "" and slug != "":
             uuid = await KnowledgeBox.get_kb_uuid(txn, slug)
 
-        response = KnowledgeBoxPB()
+        response = knowledgebox_pb2.KnowledgeBox()
         if uuid is None:
-            response.status = KnowledgeBoxResponseStatus.NOTFOUND
+            response.status = knowledgebox_pb2.KnowledgeBoxResponseStatus.NOTFOUND
             await txn.abort()
             return response
 
@@ -545,7 +502,7 @@ class Processor:
         await txn.abort()
 
         if config is None:
-            response.status = KnowledgeBoxResponseStatus.NOTFOUND
+            response.status = knowledgebox_pb2.KnowledgeBoxResponseStatus.NOTFOUND
             return response
 
         response.uuid = uuid
@@ -562,9 +519,9 @@ class Processor:
     async def create_kb(
         self,
         slug: str,
-        config: Optional[KnowledgeBoxConfig],
+        config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
         forceuuid: Optional[str] = None,
-        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
+        similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
     ) -> str:
         async with self.driver.transaction() as txn:
             try:
@@ -582,7 +539,10 @@ class Processor:
                 raise e
 
     async def update_kb(
-        self, kbid: str, slug: str, config: Optional[KnowledgeBoxConfig]
+        self,
+        kbid: str,
+        slug: str,
+        config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
     ) -> str:
         txn = await self.driver.begin()
         try:

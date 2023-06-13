@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb.common.cluster.index_node import READ_CONNECTIONS, WRITE_CONNECTIONS
 from nucliadb.ingest.cache import clear_ingest_cache
-from nucliadb.ingest.orm.node import READ_CONNECTIONS, WRITE_CONNECTIONS
 
 
 def test_clear_ingest_cache():

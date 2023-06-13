@@ -32,9 +32,9 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.ingest.orm import NODES
+from nucliadb.common.cluster.manager import INDEX_NODES
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.tests.vectors import Q
-from nucliadb.ingest.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -168,7 +168,7 @@ async def test_search_resource_all(
 
     # get shards ids
 
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
     key = KB_SHARDS.format(kbid=kbid)
     async for key in txn.keys(key):
@@ -177,7 +177,7 @@ async def test_search_resource_all(
         shards = PBShards()
         shards.ParseFromString(value)
         for replica in shards.shards[0].replicas:
-            node_obj = NODES.get(replica.node)
+            node_obj = INDEX_NODES.get(replica.node)
 
             if node_obj is not None:
                 shard = await node_obj.get_shard(replica.shard.id)

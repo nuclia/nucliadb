@@ -28,7 +28,7 @@ from nucliadb_protos.dataset_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.ingest.orm.node import Node
+from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import get_resource_from_cache
@@ -88,7 +88,7 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
 async def generate_sentence_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: Node,
+    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncIterator[SentenceClassificationBatch]:
     labelsets = []

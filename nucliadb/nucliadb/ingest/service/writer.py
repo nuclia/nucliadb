@@ -87,25 +87,20 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse,
 )
 
+from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
+from nucliadb.common.cluster.manager import clean_and_upgrade, get_index_nodes
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.exceptions import (
-    AlreadyExists,
-    EntitiesGroupNotFound,
-    KnowledgeBoxConflict,
-    KnowledgeBoxNotFound,
-)
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
-from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.orm.shard import Shard
-from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb.ingest.settings import settings
-from nucliadb.ingest.utils import get_driver
-from nucliadb_protos import writer_pb2_grpc
+from nucliadb_protos import writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.keys import KB_SHARDS
@@ -124,9 +119,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def initialize(self):
         storage = await get_storage(service_name=SERVICE_NAME)
-        driver = await get_driver()
+        driver = await setup_driver()
         cache = await get_cache()
         self.proc = Processor(driver=driver, storage=storage, cache=cache)
+        self.shards_manager = get_shard_manager()
 
     async def finalize(self):
         ...
@@ -142,15 +138,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> CleanedKnowledgeBoxResponse:
         try:
             txn = await self.proc.driver.begin()
-            node_klass = get_node_klass()
-            all_shards = await node_klass.get_all_shards(txn, request.uuid)
+            all_shards = await self.shards_manager.get_all_shards(txn, request.uuid)
 
             updated_shards = PBShards()
             updated_shards.CopyFrom(all_shards)
 
             for logic_shard in all_shards.shards:
-                shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
-                replicas_cleaned = await shard.clean_and_upgrade()
+                replicas_cleaned = await clean_and_upgrade(logic_shard)
                 for replica_id, shard_cleaned in replicas_cleaned.items():
                     update_shards_with_updated_replica(
                         updated_shards, replica_id, shard_cleaned
@@ -657,7 +651,18 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListMembersRequest, context=None
     ) -> ListMembersResponse:
         response = ListMembersResponse()
-        response.members.extend(await Node.list_members())
+        response.members.extend(
+            [
+                writer_pb2.Member(
+                    id=n.id,
+                    listen_address=n.address,
+                    is_self=False,
+                    dummy=n.dummy,
+                    shard_count=n.shard_count,
+                )
+                for n in get_index_nodes()
+            ]
+        )
         return response
 
     async def GetResourceId(  # type: ignore
@@ -742,24 +747,26 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             brain = await resobj.generate_index_message()
             shard_id = await kbobj.get_resource_shard_id(request.rid)
-            shard: Optional[Shard] = None
-            node_klass = get_node_klass()
+            shard: Optional[writer_pb2.ShardObject] = None
             if shard_id is not None:
-                shard = await kbobj.get_resource_shard(shard_id, node_klass)
+                shard = await kbobj.get_resource_shard(shard_id)
 
             if shard is None:
-                shard = await node_klass.get_current_active_shard(txn, request.kbid)
+                shard = await self.shards_manager.get_current_active_shard(
+                    txn, request.kbid
+                )
                 if shard is None:
                     # no shard currently exists, create one
                     similarity = await kbobj.get_similarity()
-                    shard = await node_klass.create_shard_by_kbid(
+                    shard = await self.shards_manager.create_shard_by_kbid(
                         txn, request.kbid, similarity=similarity
                     )
 
-                await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
+                await kbobj.set_resource_shard_id(request.rid, shard.shard)
 
             if shard is not None:
-                await shard.add_resource(
+                await self.shards_manager.add_resource(
+                    shard,
                     brain.brain,
                     0,
                     partition=self.partitions[0],

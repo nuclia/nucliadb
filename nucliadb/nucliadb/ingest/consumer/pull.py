@@ -26,9 +26,9 @@ from aiohttp.client_exceptions import ClientConnectorError
 from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common.http_clients.processing import ProcessingHTTPClient
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import logger, logger_activity
-from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors

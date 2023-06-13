@@ -22,8 +22,8 @@ from typing import List, Optional
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.synonyms import Synonyms
-from nucliadb.ingest.utils import get_driver
 
 
 async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
@@ -52,6 +52,6 @@ async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
 
 
 async def get_kb_synonyms(kbid: str) -> Optional[PBSynonyms]:
-    driver = await get_driver()
+    driver = get_driver()
     async with driver.transaction() as txn:
         return await Synonyms(txn, kbid).get()

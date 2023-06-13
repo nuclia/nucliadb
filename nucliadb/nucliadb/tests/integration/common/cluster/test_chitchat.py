@@ -20,8 +20,8 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.ingest.chitchat import chitchat_app
-from nucliadb.ingest.orm.node import NODES
+from nucliadb.common.cluster.chitchat import chitchat_app
+from nucliadb.common.cluster.manager import INDEX_NODES
 
 
 @pytest.fixture(scope="function")
@@ -36,7 +36,7 @@ async def chitchat_monitor_client():
 
 @pytest.mark.asyncio
 async def test_chitchat_monitor(chitchat_monitor_client):
-    assert len(NODES) == 0
+    INDEX_NODES.clear()
     async with chitchat_monitor_client() as client:
         member = dict(
             node_id=f"node",
@@ -48,4 +48,4 @@ async def test_chitchat_monitor(chitchat_monitor_client):
         )
         response = await client.patch("/members", json=[member])
         assert response.status_code == 204
-    assert len(NODES) == 1
+    assert len(INDEX_NODES) == 1

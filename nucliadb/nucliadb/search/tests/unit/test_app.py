@@ -27,24 +27,24 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_alive():
-    with patch.object(app, "NODES", {"node1": "node1"}):
+    with patch.object(app.manager, "get_index_nodes", return_value={"node1": "node1"}):
         resp = await app.alive(None)
         assert resp.status_code == 200
 
 
 async def test_not_alive():
-    with patch.object(app, "NODES", {}):
+    with patch.object(app.manager, "get_index_nodes", return_value={}):
         resp = await app.alive(None)
         assert resp.status_code == 503
 
 
 async def test_ready():
-    with patch.object(app, "NODES", {"node1": "node1"}):
+    with patch.object(app.manager, "get_index_nodes", return_value={"node1": "node1"}):
         resp = await app.ready(None)
         assert resp.status_code == 200
 
 
 async def test_not_ready():
-    with patch.object(app, "NODES", {}):
+    with patch.object(app.manager, "get_index_nodes", return_value={}):
         resp = await app.ready(None)
         assert resp.status_code == 503

@@ -18,34 +18,29 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from shutil import rmtree
-from tempfile import mkdtemp
-from typing import AsyncIterator, List, Optional
+from typing import List, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
 from grpc import aio  # type: ignore
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from redis import asyncio as aioredis
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.ingest.consumer import service as consumer_service
-from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.maindb.local import LocalDriver
-from nucliadb.ingest.maindb.redis import RedisDriver
-from nucliadb.ingest.maindb.tikv import TiKVDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import NODES, Node
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import DriverConfig, settings
+from nucliadb.ingest.settings import settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
-from nucliadb_models.cluster import MemberType
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
@@ -53,16 +48,13 @@ from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
-from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    clear_global_cache,
     get_utility,
     set_utility,
     start_nats_manager,
@@ -97,35 +89,6 @@ class IngestFixture:
     channel: aio.Channel
     host: str
     serv: aio.Server
-
-
-@pytest.fixture(scope="function")
-async def redis_config(redis):
-    settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
-    cache_settings.cache_pubsub_redis_url = f"redis://{redis[0]}:{redis[1]}"
-    default_driver = settings.driver
-    default_driver_pubsub = cache_settings.cache_pubsub_driver
-
-    cache_settings.cache_pubsub_driver = "redis"
-    settings.driver = "redis"
-
-    storage_settings.local_testing_files = f"{dirname(__file__)}"
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-    await driver.flushall()
-
-    yield
-
-    settings.driver_redis_url = None
-    cache_settings.cache_pubsub_redis_url = None
-    settings.driver = default_driver
-    cache_settings.cache_pubsub_driver = default_driver_pubsub
-    await driver.flushall()
-    await driver.close(close_connection_pool=True)
-
-    pubsub = get_utility(Utility.PUBSUB)
-    if pubsub is not None:
-        await pubsub.finalize()
-    clear_global_cache()
 
 
 @pytest.fixture(scope="function")
@@ -172,75 +135,6 @@ async def grpc_servicer(redis_config, ingest_consumers, ingest_processed_consume
 
 
 @pytest.fixture(scope="function")
-async def local_driver() -> AsyncIterator[Driver]:
-    path = mkdtemp()
-    settings.driver = DriverConfig.LOCAL
-    settings.driver_local_url = path
-    driver: Driver = LocalDriver(url=path)
-    await driver.initialize()
-    yield driver
-    await driver.finalize()
-    rmtree(path)
-    settings.driver_local_url = None
-    MAIN.pop("driver", None)
-
-
-@pytest.fixture(scope="function")
-async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
-    if os.environ.get("TESTING_TIKV_LOCAL", None):
-        url = "localhost:2379"
-    else:
-        url = f"{tikvd[0]}:{tikvd[2]}"
-    settings.driver = DriverConfig.TIKV
-    settings.driver_tikv_url = [url]
-
-    driver: Driver = TiKVDriver(url=[url])
-    await driver.initialize()
-
-    yield driver
-
-    txn = await driver.begin()
-    async for key in txn.keys(""):
-        await txn.delete(key)
-    await txn.commit()
-    await driver.finalize()
-    settings.driver_tikv_url = []
-    MAIN.pop("driver", None)
-
-
-@pytest.fixture(scope="function")
-async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
-    url = f"redis://{redis[0]}:{redis[1]}"
-    settings.driver = DriverConfig.REDIS
-    settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
-
-    driver = RedisDriver(url=url)
-    await driver.initialize()
-
-    assert driver.redis is not None
-    await driver.redis.flushall()
-    logging.info(f"Redis driver ready at {url}")
-
-    yield driver
-
-    await driver.finalize()
-    settings.driver_redis_url = None
-    MAIN.pop("driver", None)
-
-
-@pytest.fixture(scope="function")
-async def maindb_driver(redis_driver):
-    yield redis_driver
-
-
-@pytest.fixture(scope="function")
-async def txn(maindb_driver):
-    txn = await maindb_driver.begin()
-    yield txn
-    await txn.abort()
-
-
-@pytest.fixture(scope="function")
 async def pubsub(natsd):
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is None:
@@ -262,23 +156,25 @@ async def cache(pubsub):
 
 
 @pytest.fixture(scope="function")
-async def fake_node(_natsd_reset, indexing_utility_ingest):
-    NODES.clear()
+async def fake_node(_natsd_reset, indexing_utility_ingest, shard_manager):
+    manager.INDEX_NODES.clear()
     uuid1 = str(uuid.uuid4())
     uuid2 = str(uuid.uuid4())
-    await Node.set(
-        uuid1,
-        address="nohost:9999",
-        type=MemberType.IO,
-        shard_count=0,
-        dummy=True,
+    manager.add_index_node(
+        IndexNode(
+            id=uuid1,
+            address="nohost:9999",
+            shard_count=0,
+            dummy=True,
+        )
     )
-    await Node.set(
-        uuid2,
-        address="nohost:9999",
-        type=MemberType.IO,
-        shard_count=0,
-        dummy=True,
+    manager.add_index_node(
+        IndexNode(
+            id=uuid2,
+            address="nohost:9999",
+            shard_count=0,
+            dummy=True,
+        )
     )
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
@@ -286,20 +182,16 @@ async def fake_node(_natsd_reset, indexing_utility_ingest):
         dummy=True,
     )
 
-    old_index_local = indexing_settings.index_local
-    indexing_settings.index_local = False
-    set_utility(Utility.INDEXING, indexing_utility)
-    yield
-    clean_utility(Utility.INDEXING)
-    indexing_settings.index_local = old_index_local
-    if await Node.get(uuid1):
-        await Node.destroy(uuid1)
-    if await Node.get(uuid2):
-        await Node.destroy(uuid2)
+    with patch.object(cluster_settings, "standalone_mode", False):
+        set_utility(Utility.INDEXING, indexing_utility)
+        yield
+        clean_utility(Utility.INDEXING)
+
+    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(gcs_storage, redis_driver: RedisDriver):
+async def knowledgebox_ingest(gcs_storage, redis_driver: RedisDriver, shard_manager):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     txn = await redis_driver.begin()
@@ -811,17 +703,6 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
 
 
 @pytest.fixture(scope="function")
-def metrics_registry():
-    import prometheus_client.registry  # type: ignore
-
-    for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
-        if not hasattr(collector, "_metrics"):
-            continue
-        collector._metrics.clear()
-    yield prometheus_client.registry.REGISTRY
-
-
-@pytest.fixture(scope="function")
 async def entities_manager_mock():
     """EntitiesManager mock for ingest gRPC API disabling indexed entities
     functionality. As tests doesn't startup a node, with this mock we allow
@@ -833,7 +714,7 @@ async def entities_manager_mock():
     with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
         with patch(f"{klass}.index_entities_group", AsyncMock(return_value=None)):
             with patch(
-                f"nucliadb.ingest.orm.entities.NodesManager.apply_for_all_shards",
+                f"nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
                 AsyncMock(return_value=[]),
             ):
                 yield

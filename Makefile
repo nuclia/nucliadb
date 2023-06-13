@@ -93,11 +93,9 @@ venv:  ## Initializes an environment
 	pyenv local nucliadb
 
 install: ## Install dependencies (on the active environment)
-## TODO: remove pip version install when pip is fixed. Right now it was making mypy fail.
-	pip install --upgrade "pip<23.1"
-	pip install Cython==0.29.24
-	pip install grpcio-tools
-	pip install -r code-requirements.txt
+	pip install --upgrade pip wheel
+	pip install Cython==0.29.24 grpcio-tools
+	pip install -r code-requirements.txt -r test-requirements.txt
 	pip install -e ./nucliadb_protos/python
 	pip install -e ./nucliadb_telemetry
 	pip install -e ./nucliadb_utils
@@ -106,7 +104,6 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_client
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
-	pip install -r test-requirements.txt
 
 base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode

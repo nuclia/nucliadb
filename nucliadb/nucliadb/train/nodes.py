@@ -17,8 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import random
-from typing import AsyncIterator, List, Optional, Tuple
+from typing import AsyncIterator, Optional, Tuple
 
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
@@ -31,25 +30,23 @@ from nucliadb_protos.train_pb2 import (
     TrainSentence,
 )
 from nucliadb_protos.writer_pb2 import ShardObject
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.ingest.maindb.driver import Driver, Transaction
-from nucliadb.ingest.orm import NODE_CLUSTER, NODES
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb_utils.exceptions import ShardsNotFound
-from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage
 
 
-class TrainNodesManager:
+class TrainShardManager(manager.KBShardManager):
     def __init__(self, driver: Driver, storage: Storage):
+        super().__init__()
         self.driver = driver
         self.storage = storage
 
-    async def get_reader(self, kbid: str, shard: str) -> Tuple[Node, str]:
+    async def get_reader(self, kbid: str, shard: str) -> Tuple[AbstractIndexNode, str]:
         shards = await self.get_shards_by_kbid_inner(kbid)
         try:
             shard_object: ShardObject = next(
@@ -58,75 +55,8 @@ class TrainNodesManager:
         except StopIteration:
             raise KeyError("Shard not found")
 
-        if NODE_CLUSTER.local_node:
-            return (
-                NODE_CLUSTER.get_local_node(),
-                shard_object.replicas[0].shard.id,
-            )
-        nodes = [x for x in range(len(shard_object.replicas))]
-        random.shuffle(nodes)
-        node_obj = None
-        shard_id = None
-        for node in nodes:
-            node_id = shard_object.replicas[node].node
-            if node_id in NODES:
-                node_obj = NODES[node_id]
-                shard_id = shard_object.replicas[node].shard.id
-                break
-
-        if node_obj is None or node_id is None or shard_id is None:
-            raise KeyError("Could not find a node to query")
-
+        node_obj, shard_id, _ = manager.choose_node(shard_object)
         return node_obj, shard_id
-
-    async def get_shards_by_kbid_inner(self, kbid: str) -> PBShards:
-        key = KB_SHARDS.format(kbid=kbid)
-        txn = await self.driver.begin()
-        payload = await txn.get(key)
-        await txn.abort()
-        if payload is None:
-            # could be None because /shards doesn't exist, or beacause the whole KB does not exist.
-            # In any case, this should not happen
-            raise ShardsNotFound(kbid)
-
-        pb = PBShards()
-        pb.ParseFromString(payload)
-        return pb
-
-    async def get_shards_by_kbid(self, kbid: str) -> List[ShardObject]:
-        shards = await self.get_shards_by_kbid_inner(kbid)
-        return [x for x in shards.shards]
-
-    def choose_node(
-        self, shard: ShardObject, shards: Optional[List[str]] = None
-    ) -> Tuple[Node, Optional[str], str]:
-        shards = shards or []
-
-        if NODE_CLUSTER.local_node:
-            return (
-                NODE_CLUSTER.get_local_node(),
-                shard.replicas[0].shard.id,
-                shard.replicas[0].node,
-            )
-        nodes = [x for x in range(len(shard.replicas))]
-        random.shuffle(nodes)
-        node_obj = None
-        shard_id = None
-        for node in nodes:
-            node_id = shard.replicas[node].node
-            if node_id in NODES:
-                node_obj = NODES[node_id]
-                shard_id = shard.replicas[node].shard.id
-                if len(shards) > 0 and shard_id not in shards:
-                    node_obj = None
-                    shard_id = None
-                else:
-                    break
-
-        if node_obj is None or node_id is None:
-            raise KeyError("Could not find a node to query")
-
-        return node_obj, shard_id, node_id
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
         if kbid is None:

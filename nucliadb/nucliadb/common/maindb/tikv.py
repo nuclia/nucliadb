@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from nucliadb.ingest.maindb.driver import (
+from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
     DEFAULT_SCAN_LIMIT,
     Driver,

@@ -26,7 +26,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.ingest.orm import NODES
+from nucliadb.common.cluster import manager
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
@@ -109,19 +109,19 @@ async def chitchat_members(request: Request) -> JSONResponse:
     return JSONResponse(
         [
             {
-                "id": node_id,
+                "id": node.id,
                 "listen_address": node.address,
                 "type": node.label,
                 "shard_count": node.shard_count,
                 "dummy": node.dummy,
             }
-            for node_id, node in NODES.items()
+            for node in manager.get_index_nodes()
         ]
     )
 
 
 async def alive(request: Request) -> JSONResponse:
-    if len(NODES) == 0 and settings.driver != "local":
+    if len(manager.get_index_nodes()) == 0 and settings.driver != "local":
         return JSONResponse({"status": "error"}, status_code=503)
     else:
         return JSONResponse({"status": "ok"})

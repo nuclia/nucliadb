@@ -19,10 +19,10 @@
 #
 from typing import Optional
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.ingest.utils import get_driver
 from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
@@ -115,7 +115,7 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
 
     ordered_paras.sort(key=lambda x: x[1].order, reverse=False)
 
-    driver = await get_driver()
+    driver = get_driver()
     storage = await get_storage()
     # ordered dict that prevents duplicates pulled in through conversation expansion
     output = {}

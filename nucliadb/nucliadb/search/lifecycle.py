@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
-from nucliadb.ingest.orm.nodes_manager import NodesManager
-from nucliadb.ingest.utils import get_driver  # type: ignore
+from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
+from nucliadb.common.maindb.utils import setup_driver  # type: ignore
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import start_predict_engine
@@ -30,7 +29,6 @@ from nucliadb_utils.utilities import (
     clean_utility,
     finalize_utilities,
     get_utility,
-    set_utility,
     start_audit_utility,
     stop_audit_utility,
 )
@@ -42,9 +40,8 @@ async def initialize() -> None:
     await start_ingest(SERVICE_NAME)
     await start_predict_engine()
 
-    driver = await get_driver()
-    set_utility(Utility.NODES, NodesManager(driver=driver))
-    await start_chitchat(SERVICE_NAME)
+    await setup_driver()
+    await setup_cluster(SERVICE_NAME)
 
     await paragraphs.initialize_cache()
 
@@ -57,10 +54,8 @@ async def finalize() -> None:
         clean_utility(Utility.PARTITION)
     if get_utility(Utility.PREDICT):
         clean_utility(Utility.PREDICT)
-    if get_utility(Utility.NODES):
-        clean_utility(Utility.NODES)
 
     await finalize_utilities()
     await stop_audit_utility()
-    await stop_chitchat()
+    await teardown_cluster()
     await clean_telemetry(SERVICE_NAME)

@@ -21,7 +21,7 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.ingest.maindb.driver import Driver
+from nucliadb.common.maindb.driver import Driver
 
 
 class TransactionTest:

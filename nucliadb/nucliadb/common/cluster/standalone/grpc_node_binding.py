@@ -54,7 +54,7 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 
-from nucliadb.ingest.settings import settings
+from ..settings import settings
 
 logger = logging.getLogger(__name__)
 try:
@@ -65,7 +65,7 @@ except ImportError:  # pragma: no cover
     NodeWriter = None
 
 
-class LocalReaderWrapper:
+class StandaloneReaderWrapper:
     reader: NodeReader
 
     def __init__(self):
@@ -245,7 +245,7 @@ class LocalReaderWrapper:
         return type_list
 
 
-class LocalWriterWrapper:
+class StandaloneWriterWrapper:
     writer: NodeWriter
 
     def __init__(self):

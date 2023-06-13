@@ -20,9 +20,9 @@
 import asyncpg
 import pytest
 
-from nucliadb.ingest.maindb.pg import PGDriver
-from nucliadb.ingest.maindb.redis import RedisDriver
-from nucliadb.ingest.maindb.tikv import TiKVDriver
+from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.redis import RedisDriver
+from nucliadb.common.maindb.tikv import TiKVDriver
 
 
 @pytest.mark.asyncio
