@@ -514,12 +514,19 @@ class NucliaDB(_NucliaDBBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
-        """Create a new instance of the NucliaDB client
-        :param region: The region to connect to
+        """
+        Create a new instance of the NucliaDB client
+
+        :param region: The region to connect to.
+        :type region: nucliadb_sdk.Region
         :param api_key: The API key to use for authentication
+        :type api_key: str
         :param url: The base URL to use for the NucliaDB API
+        :type url: str
         :param headers: Any additional headers to include in each request
+        :type headers: Dict[str, str]
         :param timeout: The timeout in seconds to use for requests
+        :type timeout: float
 
         When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
 
@@ -574,12 +581,19 @@ class NucliaDBAsync(_NucliaDBBase):
         headers: Optional[Dict[str, str]] = None,
         timeout: Optional[float] = 60.0,
     ):
-        """Create a new instance of the NucliaDB client
-        :param region: The region to connect to
+        """
+        Create a new instance of the NucliaDB client
+
+        :param region: The region to connect to.
+        :type region: nucliadb_sdk.Region
         :param api_key: The API key to use for authentication
+        :type api_key: str
         :param url: The base URL to use for the NucliaDB API
+        :type url: str
         :param headers: Any additional headers to include in each request
+        :type headers: Dict[str, str]
         :param timeout: The timeout in seconds to use for requests
+        :type timeout: float
 
         When connecting to the NucliaDB cloud service, you can simply configure the SDK with your API key
 
