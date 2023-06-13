@@ -41,7 +41,6 @@ from nucliadb_models.search import (
     FindResource,
     KnowledgeboxFindResults,
     ResourceProperties,
-    SortOptions,
     TempFindParagraph,
     TextPosition,
 )
@@ -337,7 +336,6 @@ async def find_merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-    sort: SortOptions,
     requested_relations: EntitiesSubgraphRequest,
     min_score: float = 0.85,
     highlight: bool = False,
