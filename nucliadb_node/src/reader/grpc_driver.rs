@@ -20,35 +20,43 @@
 
 use std::sync::Arc;
 
-use async_std::sync::RwLock;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::*;
+use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
-use crate::env;
-use crate::reader::NodeReaderService;
-use crate::shards::{ReaderShardsProvider, ShardReader, UnboundedShardReaderCache};
+use crate::shards::{AsyncReaderShardsProvider, AsyncUnboundedShardReaderCache, ShardReader};
 use crate::utils::nonblocking;
 
 pub struct NodeReaderGRPCDriver {
-    lazy_loading: bool,
-    inner: RwLock<NodeReaderService>,
-    shards: UnboundedShardReaderCache,
+    shards: AsyncUnboundedShardReaderCache,
+    options: GrpcReaderOptions,
 }
 
-impl From<NodeReaderService> for NodeReaderGRPCDriver {
-    fn from(node: NodeReaderService) -> NodeReaderGRPCDriver {
-        NodeReaderGRPCDriver {
-            lazy_loading: env::lazy_loading(),
-            inner: RwLock::new(node),
-            shards: UnboundedShardReaderCache::new(),
-        }
-    }
+pub struct GrpcReaderOptions {
+    pub lazy_loading: bool,
 }
 
 impl NodeReaderGRPCDriver {
+    pub fn new(options: GrpcReaderOptions) -> Self {
+        Self {
+            shards: AsyncUnboundedShardReaderCache::new(),
+            options,
+        }
+    }
+
+    /// This function must be called before using this service
+    pub async fn initialize(&self) -> NodeResult<()> {
+        if !self.options.lazy_loading {
+            // If lazy loading is disabled, load
+            self.shards.load_all().await?
+        }
+
+        Ok(())
+    }
+
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
         let id = id.into();
 
@@ -56,7 +64,7 @@ impl NodeReaderGRPCDriver {
         // loading a shard into memory when lazy loading is enabled. Otherwise,
         // we rely on all shards (stored on disk) been brought to memory before
         // the driver is online.
-        if self.lazy_loading {
+        if self.options.lazy_loading {
             let loaded = self.shards.load(id.clone()).await;
             if let Err(error) = loaded {
                 // REVIEW if shard can't be loaded, why aren't we returning

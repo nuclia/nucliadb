@@ -17,11 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-mod shards_provider;
-mod unbounded_cache_provider;
+mod async_unbounded_reader;
+mod async_unbounded_writer;
+/// Shard provider using an unbounded cache. It can contain all shard
+/// readers/writers from an index node, so it could be memory expensive.
+/// However, it's an easy implementation that speeds up operations (as shards
+/// can be preloaded)
+mod unbounded_reader;
+mod unbounded_writer;
 
-pub use shards_provider::{AsyncReaderShardsProvider, ReaderShardsProvider, ShardId};
-pub use unbounded_cache_provider::{AsyncUnboundedShardReaderCache, UnboundedShardReaderCache};
-
-pub use crate::services::reader::ShardReaderService as ShardReader;
-pub use crate::services::writer::ShardWriterService as ShardWriter;
+pub use async_unbounded_reader::AsyncUnboundedShardReaderCache;
+pub use unbounded_reader::UnboundedShardReaderCache;

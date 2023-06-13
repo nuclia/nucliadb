@@ -16,12 +16,3 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-mod shards_provider;
-mod unbounded_cache_provider;
-
-pub use shards_provider::{AsyncReaderShardsProvider, ReaderShardsProvider, ShardId};
-pub use unbounded_cache_provider::{AsyncUnboundedShardReaderCache, UnboundedShardReaderCache};
-
-pub use crate::services::reader::ShardReaderService as ShardReader;
-pub use crate::services::writer::ShardWriterService as ShardWriter;
