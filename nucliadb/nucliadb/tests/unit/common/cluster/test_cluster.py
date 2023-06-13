@@ -51,13 +51,14 @@ def test_find_nodes_orders_by_shard_count(nodes):
 
 
 def test_find_nodes_exclude_nodes(nodes):
-    excluded_node = "node-0"
-    nodes_found = manager.find_nodes(avoid_nodes=[excluded_node])
-    assert nodes_found == ["node-30", "node-40"]
+    with mock.patch.object(settings, "node_replicas", 2):
+        excluded_node = "node-0"
+        nodes_found = manager.find_nodes(avoid_nodes=[excluded_node])
+        assert nodes_found == ["node-30", "node-40"]
 
-    # even if all are used, still should find nodes
-    all_nodes = list(nodes.keys())
-    assert manager.find_nodes(avoid_nodes=all_nodes) == ["node-0", "node-30"]
+        # even if all are used, still should find nodes
+        all_nodes = list(nodes.keys())
+        assert manager.find_nodes(avoid_nodes=all_nodes) == ["node-0", "node-30"]
 
 
 def test_find_nodes_raises_error_if_not_enough_nodes_are_found(nodes):
