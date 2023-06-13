@@ -516,7 +516,7 @@ class SearchParamDefaults:
     )
 
 
-class SearchRequest(BaseModel):
+class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     advanced_query: Optional[
         str
@@ -524,7 +524,6 @@ class SearchRequest(BaseModel):
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
-    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
     min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
@@ -565,6 +564,10 @@ class SearchRequest(BaseModel):
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
+
+
+class SearchRequest(BaseSearchRequest):
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
 
 
 class Author(str, Enum):
@@ -624,7 +627,7 @@ class ChatRequest(BaseModel):
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
 
 
-class FindRequest(SearchRequest):
+class FindRequest(BaseSearchRequest):
     features: List[
         SearchOptions
     ] = SearchParamDefaults.search_features.to_pydantic_field(
