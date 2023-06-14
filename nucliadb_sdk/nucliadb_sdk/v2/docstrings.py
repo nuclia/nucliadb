@@ -143,7 +143,7 @@ def _inject_signature_and_annotations(
                 path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
             )
         )
-        annotations[path_param] = str
+        annotations[path_param] = str  # type: ignore
 
     # Body params
     if request_type is not None:
@@ -157,7 +157,7 @@ def _inject_signature_and_annotations(
                         default=field.default,
                     )
                 )
-                annotations[field.name] = field.annotation
+                annotations[field.name] = field.annotation  # type: ignore
         parameters.append(
             inspect.Parameter(
                 "content",
@@ -166,14 +166,14 @@ def _inject_signature_and_annotations(
                 default=None,
             )
         )
-        annotations["content"] = request_type
+        annotations["content"] = request_type  # type: ignore
 
     # Response type
     if inspect.isroutine(response_type):
         return_annotation = typing.get_type_hints(response_type).get("return")
     else:
         return_annotation = response_type
-    annotations["return"] = return_annotation
+    annotations["return"] = return_annotation  # type: ignore
 
     func.__signature__ = inspect.Signature(
         parameters=parameters, return_annotation=return_annotation
