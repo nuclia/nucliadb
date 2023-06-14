@@ -24,7 +24,7 @@ use anyhow::anyhow;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
-use nucliadb_core::NodeResult;
+use nucliadb_core::{Context, NodeResult};
 
 pub use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
@@ -71,7 +71,7 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
             })
         })
         .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))??;
+        .context("Blocking task panicked")??;
 
         self.cache.write().await.insert(_id, Arc::new(shard));
         Ok(())
@@ -96,7 +96,8 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
             Ok::<HashMap<String, ShardReader>, anyhow::Error>(shards)
         })
         .await
-        .map_err(|error| tonic::Status::internal(format!("{error:?}")))??;
+        .context("Blocking task panicked")??;
+
         {
             let mut cache = self.cache.write().await;
             shards.drain().for_each(|(k, v)| {
