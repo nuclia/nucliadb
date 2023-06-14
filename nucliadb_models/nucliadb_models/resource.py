@@ -118,6 +118,10 @@ class KnowledgeBoxObjID(BaseModel):
 
 
 class KnowledgeBoxObj(BaseModel):
+    """
+    The API representation of a Knowledge Box object.
+    """
+
     slug: Optional[SlugString] = None
     uuid: str
     config: Optional[KnowledgeBoxConfig] = None

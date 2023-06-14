@@ -113,19 +113,24 @@ def inject_documentation(
     docstring: Optional[Docstring] = None,
 ):
     func.__name__ = name
-    _inject_signature(func, path_params, request_type, response_type)
-    _inject_docstring(func, method, path_template, path_params, request_type, docstring)
+    _inject_signature_and_annotations(func, path_params, request_type, response_type)
+    _inject_docstring(
+        func, method, path_template, path_params, request_type, response_type, docstring
+    )
 
 
-def _inject_signature(
+def _inject_signature_and_annotations(
     func,
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
-):
+) -> None:
+    """Dynamically generate and inject the function signature and its annotations"""
     parameters = []
+    annotations = {}
+
     # The first parameter is always self
     parameters.append(
         inspect.Parameter("self", kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
@@ -138,6 +143,7 @@ def _inject_signature(
                 path_param, kind=inspect.Parameter.KEYWORD_ONLY, annotation=str
             )
         )
+        annotations[path_param] = str  # type: ignore
 
     # Body params
     if request_type is not None:
@@ -151,23 +157,28 @@ def _inject_signature(
                         default=field.default,
                     )
                 )
+                annotations[field.name] = field.annotation  # type: ignore
         parameters.append(
             inspect.Parameter(
                 "content",
                 kind=inspect.Parameter.KEYWORD_ONLY,
-                annotation=typing.Optional[request_type],
+                annotation=request_type,
                 default=None,
             )
         )
+        annotations["content"] = request_type  # type: ignore
+
     # Response type
     if inspect.isroutine(response_type):
         return_annotation = typing.get_type_hints(response_type).get("return")
     else:
         return_annotation = response_type
+    annotations["return"] = return_annotation  # type: ignore
 
     func.__signature__ = inspect.Signature(
         parameters=parameters, return_annotation=return_annotation
     )
+    func.__annotations__.update(annotations)
 
 
 def _inject_docstring(
@@ -176,8 +187,14 @@ def _inject_docstring(
     path_template: str,
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
+    response_type: Optional[
+        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+    ],
     docstring: Optional[Docstring] = None,
 ):
+    """
+    Dynamically generate the docstring of the sdk method based on the ._request_build parameters.
+    """
     # Initial description section
     func_doc = f"Wrapper around the api endpoint {method.upper()} {path_template}\n\n"
     if docstring:
@@ -204,10 +221,31 @@ def _inject_docstring(
                     f":param {field.name}: {field.field_info.description or ''}"
                 )
                 params.append(f":type {field.name}: {field.outer_type_}")
+            params.append(f":param content: the request content model")
+            params.append(f":type content: {request_type}")
+        elif typing.get_origin(request_type) == list:
+            model = typing.get_args(request_type)[0]
+            params.append(f":param content: the request content model")
+            params.append(f":type content: <class '{model}'>")
+
+    if response_type is not None:
+        if inspect.isroutine(response_type):
+            return_annotation = typing.get_type_hints(response_type).get("return")
+            return_doc = (
+                f"Parsed response for the {method.upper()} {path_template} endpoint"
+            )
+        else:
+            return_annotation = response_type
+            if response_type.__doc__:
+                return_doc = response_type.__doc__.strip("\n").strip()
+            else:
+                return_doc = f"The response model for the {method.upper()} {path_template} endpoint"
+        params.append(f":return: {return_doc}")
+        params.append(f":rtype: {return_annotation}")
+
     func_doc += "\n".join(params)
     func_doc += "\n"
-
-    # Add examples
+    # Add examples section
     if docstring:
         for example in docstring.examples or []:
             description = example.description or ""
