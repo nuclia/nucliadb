@@ -24,7 +24,9 @@ import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.tests.integration.test_search import broker_resource_with_classifications
+from nucliadb.tests.integration.search.test_search import (
+    broker_resource_with_classifications,
+)
 from nucliadb.tests.utils import inject_message
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 from nucliadb_utils.utilities import Utility, set_utility
