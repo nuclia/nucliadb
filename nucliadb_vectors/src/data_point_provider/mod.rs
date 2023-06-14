@@ -40,7 +40,7 @@ pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId, Similarity};
 use crate::data_point_provider::merge_worker::Worker;
 use crate::formula::Formula;
-use crate::VectorR;
+use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
@@ -85,6 +85,7 @@ pub struct Index {
     state: RwLock<State>,
     date: RwLock<Version>,
     location: PathBuf,
+    dimension_used: Option<u64>,
 }
 impl Index {
     fn read_state(&self) -> RwLockReadGuard<'_, State> {
@@ -126,6 +127,7 @@ impl Index {
         let lock = fs_state::shared_lock(path)?;
         let state = fs_state::load_state::<State>(&lock)?;
         let date = fs_state::crnt_version(&lock)?;
+        let dimension_used = state.stored_len(path)?;
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
             // Old indexes may not have this file so in that case the
             // metadata file they should have is created.
@@ -134,6 +136,7 @@ impl Index {
         })?;
         let index = Index {
             metadata,
+            dimension_used,
             work_flag: MergerWriterSync::new(),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -155,6 +158,7 @@ impl Index {
         let date = fs_state::crnt_version(&lock)?;
         let index = Index {
             metadata,
+            dimension_used: None,
             work_flag: MergerWriterSync::new(),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -170,8 +174,13 @@ impl Index {
         self.read_state().keys(&self.location)
     }
     pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<Neighbour>> {
-        self.read_state()
-            .search(&self.location, request, self.metadata.similarity)
+        let state = self.read_state();
+        let given_len = request.get_query().len() as u64;
+        match self.dimension_used {
+            Some(expected) if expected != given_len => Err(VectorErr::InconsistentDimensions),
+            None => Ok(Vec::with_capacity(0)),
+            Some(_) => state.search(&self.location, request, self.metadata.similarity),
+        }
     }
     pub fn no_nodes(&self, _: &Lock) -> usize {
         self.read_state().no_nodes()
@@ -201,11 +210,27 @@ impl Index {
         std::mem::drop(work_flag);
         Ok(())
     }
-    pub fn add(&self, dp: DataPoint, _: &ELock) {
+    pub fn add(&mut self, dp: DataPoint, _: &ELock) -> VectorR<()> {
         let mut state = self.write_state();
+        let Some(new_dp_vector_len) = dp.stored_len() else {
+            return Ok(());
+        };
+        let Some(state_vector_len) = self.dimension_used else {
+            // There is not a len in the state, therefore adding the datapoint can not
+            // create a merging requirement.
+            let dp_dimension = dp.stored_len();
+            let _ = state.add(dp);
+            std::mem::drop(state);
+            self.dimension_used = dp_dimension;
+            return Ok(());
+        };
+        if state_vector_len != new_dp_vector_len {
+            return Err(VectorErr::InconsistentDimensions);
+        }
         if state.add(dp) {
             self.notify_merger()
         }
+        Ok(())
     }
     pub fn commit(&self, lock: ELock) -> VectorR<()> {
         let state = self.read_state();
