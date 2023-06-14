@@ -26,10 +26,10 @@ use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::NodeResult;
 
+use crate::constants::BLOCKING_TASK_PANICKED;
 pub use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
-use crate::utils::nonblocking;
 
 #[derive(Default)]
 pub struct AsyncUnboundedShardReaderCache {
@@ -63,16 +63,16 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
         // Avoid blocking while interacting with the file system (reads and
         // writes to disk)
         let _id = id.clone();
-        let shard = nonblocking!({
+        let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
                 return Err(anyhow!("Shard {shard_path:?} is not on disk"));
             }
-            let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
+            ShardReader::new(id.clone(), &shard_path).map_err(|error| {
                 anyhow!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-            })?;
-
-            Ok(shard)
-        })?;
+            })
+        })
+        .await
+        .expect(BLOCKING_TASK_PANICKED)?;
 
         self.cache.write().await.insert(_id, Arc::new(shard));
         Ok(())
@@ -80,7 +80,7 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
 
     async fn load_all(&self) -> NodeResult<()> {
         let shards_path = env::shards_path();
-        let mut shards = nonblocking!({
+        let mut shards = tokio::task::spawn_blocking(move || {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {
                 let entry = entry?;
@@ -95,7 +95,9 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
                 }
             }
             Ok::<HashMap<String, ShardReader>, anyhow::Error>(shards)
-        })?;
+        })
+        .await
+        .expect(BLOCKING_TASK_PANICKED)?;
         {
             let mut cache = self.cache.write().await;
             shards.drain().for_each(|(k, v)| {

@@ -17,37 +17,5 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
-
-/// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
-
-pub mod node_metadata;
-
-pub mod services;
-
-pub mod middleware;
-
-mod constants;
-
-pub mod shards;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
-pub mod utils;
-
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// Node's http service
-pub mod http_server;
+pub const BLOCKING_TASK_PANICKED: &str = "Blocking task spawned to another thread panicked!";
