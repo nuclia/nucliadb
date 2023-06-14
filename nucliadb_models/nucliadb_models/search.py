@@ -207,6 +207,8 @@ class RelatedEntities(BaseModel):
 
 
 class ResourceSearchResults(BaseModel):
+    """Search on resource results"""
+
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
@@ -215,6 +217,8 @@ class ResourceSearchResults(BaseModel):
 
 
 class KnowledgeboxSearchResults(BaseModel):
+    """Search on knowledgebox results"""
+
     resources: Dict[str, Resource] = {}
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
@@ -225,6 +229,8 @@ class KnowledgeboxSearchResults(BaseModel):
 
 
 class KnowledgeboxSuggestResults(BaseModel):
+    """Suggest on resource results"""
+
     paragraphs: Optional[Paragraphs] = None
     entities: Optional[RelatedEntities] = None
     shards: Optional[List[str]]
@@ -693,6 +699,8 @@ class FindResource(Resource):
 
 
 class KnowledgeboxFindResults(BaseModel):
+    """Find on knowledgebox results"""
+
     resources: Dict[str, FindResource]
     relations: Optional[Relations] = None
     facets: FacetsResult
