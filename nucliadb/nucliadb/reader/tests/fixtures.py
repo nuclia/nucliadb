@@ -123,9 +123,9 @@ async def test_pagination_resources(
 
     from time import time
 
-    from nucliadb.ingest.utils import get_driver
+    from nucliadb.common.maindb.utils import get_driver
 
-    driver = await get_driver()
+    driver = get_driver()
 
     t0 = time()
 

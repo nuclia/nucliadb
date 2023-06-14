@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from __future__ import annotations
-
 from typing import Any, Dict, List
 
 from nucliadb_protos.nodereader_pb2 import (
@@ -42,12 +40,6 @@ from nucliadb_protos.utils_pb2 import Relation
 
 class DummyWriterStub:  # pragma: no cover
     calls: Dict[str, List[Any]] = {}
-
-    async def GetShard(self, data):
-        self.calls.setdefault("GetShard", []).append(data)
-        return NodeResourcesShard(
-            shard_id="shard", resources=2, paragraphs=2, sentences=2
-        )
 
     async def NewShard(self, data):
         self.calls.setdefault("NewShard", []).append(data)

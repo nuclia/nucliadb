@@ -21,9 +21,10 @@ pytest_plugins = [
     "pytest_mock",
     "pytest_docker_fixtures",
     "nucliadb_utils.tests.nats",
-    "nucliadb.ingest.tests.fixtures",
+    "nucliadb.tests.fixtures",
+    "nucliadb.tests.tikv",
+    "nucliadb.ingest.tests.fixtures",  # should be refactored out
     "nucliadb.writer.tests.fixtures",
-    "nucliadb.ingest.tests.tikv",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
     "nucliadb.writer.tests.tus",

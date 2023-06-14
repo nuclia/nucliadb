@@ -19,7 +19,7 @@
 #
 from typing import Any, Dict, List, Optional
 
-from nucliadb.ingest.maindb.driver import (
+from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
     DEFAULT_SCAN_LIMIT,
     Driver,

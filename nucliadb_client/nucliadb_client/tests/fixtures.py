@@ -40,6 +40,7 @@ images.settings["nucliadb"] = {
         "HTTP_PORT": "8080",
         "INGEST_GRPC_PORT": "8030",
         "TRAIN_GRPC_PORT": "8040",
+        "DEBUG": "True",
     },
     "options": {
         "ports": {"8080": None, "8030": None, "8040": None},

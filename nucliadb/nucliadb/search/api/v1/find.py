@@ -32,7 +32,6 @@ from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
-from nucliadb.search.search.utils import parse_sort_options
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -42,9 +41,6 @@ from nucliadb_models.search import (
     ResourceProperties,
     SearchOptions,
     SearchParamDefaults,
-    SortField,
-    SortOptions,
-    SortOrder,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -82,9 +78,6 @@ async def find_knowledgebox(
     fields: List[str] = fastapi_query(SearchParamDefaults.fields),
     filters: List[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
-    sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
-    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: float = fastapi_query(SearchParamDefaults.min_score),
@@ -132,11 +125,6 @@ async def find_knowledgebox(
             fields=fields,
             filters=filters,
             faceted=faceted,
-            sort=(
-                SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-                if sort_field is not None
-                else None
-            ),
             page_number=page_number,
             page_size=page_size,
             min_score=min_score,
@@ -207,8 +195,6 @@ async def find(
     audit = get_audit()
     start_time = time()
 
-    sort_options = parse_sort_options(item)
-
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
         if SearchOptions.VECTOR in item.features:
@@ -223,7 +209,7 @@ async def find(
         advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
-        sort=sort_options,
+        sort=None,
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
@@ -252,7 +238,6 @@ async def find(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=sort_options,
         requested_relations=pb_query.relation_subgraph,
         min_score=item.min_score,
         highlight=item.highlight,

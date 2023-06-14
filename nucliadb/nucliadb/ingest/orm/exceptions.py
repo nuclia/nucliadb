@@ -19,15 +19,7 @@
 #
 
 
-class AlreadyExists(Exception):
-    pass
-
-
 class NotFound(Exception):
-    pass
-
-
-class NodeClusterSmall(Exception):
     pass
 
 
@@ -35,19 +27,7 @@ class KnowledgeBoxConflict(Exception):
     pass
 
 
-class ShardNotFound(NotFound):
-    pass
-
-
 class KnowledgeBoxNotFound(NotFound):
-    pass
-
-
-class NodesUnsync(Exception):
-    pass
-
-
-class NodeError(Exception):
     pass
 
 
@@ -62,7 +42,3 @@ class ReallyStopPulling(Exception):
 class SequenceOrderViolation(Exception):
     def __init__(self, last_seqid: int):
         self.last_seqid = last_seqid
-
-
-class EntitiesGroupNotFound(NotFound):
-    pass

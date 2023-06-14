@@ -21,14 +21,14 @@
 from typing import List, Optional
 
 import nucliadb_models as models
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb.ingest.utils import get_driver
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldData,
@@ -129,7 +129,7 @@ async def serialize(
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
 
     orm_resource = await get_orm_resource(
@@ -461,7 +461,7 @@ async def get_resource_uuid_by_slug(
     kbid: str, slug: str, service_name: Optional[str] = None
 ) -> Optional[str]:
     storage = await get_storage(service_name=service_name)
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
     kb = KnowledgeBox(txn, storage, kbid)
     return await kb.get_resource_uuid_by_slug(slug)

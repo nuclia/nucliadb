@@ -23,8 +23,10 @@ from typing import Awaitable, Callable, Optional
 import pkg_resources
 
 from nucliadb import health
+from nucliadb.common.cluster.chitchat import start_chitchat, stop_chitchat
+from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.ingest import SERVICE_NAME
-from nucliadb.ingest.chitchat import start_chitchat, stop_chitchat
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
@@ -52,7 +54,7 @@ from nucliadb_utils.utilities import (
 
 async def start_indexing_utility(service_name: Optional[str] = None):
     if (
-        not indexing_settings.index_local
+        not cluster_settings.standalone_mode
         and indexing_settings.index_jetstream_servers is not None
     ):
         indexing_utility = IndexingUtility(
@@ -73,6 +75,7 @@ async def stop_indexing_utility():
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await setup_telemetry(SERVICE_NAME)
 
+    await setup_cluster(SERVICE_NAME)
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
@@ -97,7 +100,12 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         finalizers.append(stop_chitchat)
 
     health.register_health_checks(
-        [health.nats_manager_healthy, health.nodes_health_check, health.pubsub_check]
+        [
+            health.nats_manager_healthy,
+            health.nodes_health_check,
+            health.pubsub_check,
+            teardown_cluster,
+        ]
     )
 
     return finalizers

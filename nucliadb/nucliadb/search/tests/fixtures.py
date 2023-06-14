@@ -29,11 +29,10 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from redis import asyncio as aioredis
 from starlette.routing import Mount
 
+from nucliadb.common.cluster.manager import KBShardManager, get_index_node
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.cache import clear_ingest_cache
-from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.tests.fixtures import broker_resource
-from nucliadb.ingest.utils import get_driver
 from nucliadb.search import API_PREFIX
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import clear_global_cache
@@ -83,7 +82,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
 @pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def search_api(test_settings_search, transaction_utility, redis):  # type: ignore
-    from nucliadb.ingest.orm import NODES
+    from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
 
     async def handler(req, exc):  # type: ignore
@@ -102,7 +101,7 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
     # Make sure is clean
     await asyncio.sleep(1)
     count = 0
-    while len(NODES) < 2:
+    while len(manager.INDEX_NODES) < 2:
         print("awaiting cluster nodes - search fixtures.py")
         await asyncio.sleep(1)
         if count == 40:
@@ -143,10 +142,7 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
     await driver.close(close_connection_pool=True)
     clear_ingest_cache()
     clear_global_cache()
-    for node in NODES.values():
-        node._reader = None
-        node._writer = None
-        node._sidecar = None
+    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture(scope="function")
@@ -204,21 +200,22 @@ async def inject_message(
 
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
-    shard = await Node.get_current_active_shard(txn, knowledgebox_ingest)
+    shard_manager = KBShardManager()
+    shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
     if shard is None:
         raise Exception("Could not find shard")
     await txn.abort()
 
     checks: Dict[str, bool] = {}
-    for replica in shard.shard.replicas:
+    for replica in shard.replicas:
         if replica.shard.id not in checks:
             checks[replica.shard.id] = False
 
     for i in range(30):
-        for replica in shard.shard.replicas:
-            node_obj = NODES.get(replica.node)
+        for replica in shard.replicas:
+            node_obj = get_index_node(replica.node)
             if node_obj is not None:
                 req = GetShardRequest()
                 req.shard_id.id = replica.shard.id

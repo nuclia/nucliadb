@@ -29,6 +29,10 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 
+from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.cluster.manager import choose_node
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
@@ -36,7 +40,6 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_driver, get_nodes
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxCounters,
@@ -46,7 +49,6 @@ from nucliadb_models.search import (
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.cache import KB_COUNTER_CACHE
-from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_cache
 
 
@@ -61,9 +63,9 @@ from nucliadb_utils.utilities import get_cache
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
-    nodemanager = get_nodes()
+    shard_manager = get_shard_manager()
     try:
-        shards: Shards = await nodemanager.get_shards_by_kbid_inner(kbid)
+        shards: Shards = await shard_manager.get_shards_by_kbid_inner(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
@@ -100,10 +102,10 @@ async def knowledgebox_counters(
                 cached_counters_obj.pop("shards", None)
             return KnowledgeboxCounters.parse_obj(cached_counters_obj)
 
-    nodemanager = get_nodes()
+    shard_manager = get_shard_manager()
 
     try:
-        shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
+        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
@@ -114,7 +116,7 @@ async def knowledgebox_counters(
     queried_shards = []
     for shard_object in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_object)
+            node, shard_id, _ = choose_node(shard_object)
         except KeyError:
             raise HTTPException(
                 status_code=500,
@@ -170,7 +172,7 @@ async def knowledgebox_counters(
         sentence_count += shard.sentences
 
     # Get counters from maindb
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
 
     try:

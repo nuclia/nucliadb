@@ -22,8 +22,8 @@ from typing import Optional
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
 
-from nucliadb.ingest.utils import get_driver
-from nucliadb.train.nodes import TrainNodesManager  # type: ignore
+from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.train.nodes import TrainShardManager  # type: ignore
 from nucliadb.train.settings import settings
 from nucliadb_protos import train_pb2_grpc
 from nucliadb_telemetry.utils import setup_telemetry
@@ -72,19 +72,24 @@ async def stop_train_grpc():
         clean_utility(Utility.TRAIN)
 
 
-async def start_nodes_manager():
-    driver = await get_driver()
+async def start_shard_manager():
+    """
+    XXX this is weird but too much to untangle right now
+    """
+    driver = await setup_driver()
     storage = await get_storage()
-    set_utility(Utility.NODES, TrainNodesManager(driver=driver, storage=storage))
+    set_utility(
+        Utility.SHARD_MANAGER, TrainShardManager(driver=driver, storage=storage)
+    )
 
 
-async def stop_nodes_manager():
-    if get_utility(Utility.NODES):
-        clean_utility(Utility.NODES)
+async def stop_shard_manager():
+    if get_utility(Utility.SHARD_MANAGER):
+        clean_utility(Utility.SHARD_MANAGER)
 
 
-def get_nodes_manager() -> TrainNodesManager:
-    util = get_utility(Utility.NODES)
+def get_shard_manager() -> TrainShardManager:
+    util = get_utility(Utility.SHARD_MANAGER)
     if util is None:
         raise AttributeError("No Node Manager defined")
     return util

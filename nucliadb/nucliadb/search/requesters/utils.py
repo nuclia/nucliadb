@@ -36,6 +36,9 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
+from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.cluster.manager import choose_node
+from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
@@ -45,9 +48,7 @@ from nucliadb.search.search.shards import (
     suggest_shard,
 )
 from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_nodes
 from nucliadb_telemetry import errors
-from nucliadb_utils.exceptions import ShardsNotFound
 
 
 class Method(Enum):
@@ -123,10 +124,10 @@ async def node_query(
     pb_query: REQUEST_TYPE,
     shards: Optional[List[str]] = None,
 ) -> Tuple[List[T], bool, List[Tuple[str, str, str]], List[str]]:
-    nodemanager = get_nodes()
+    shard_manager = get_shard_manager()
 
     try:
-        shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
+        shard_groups: List[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
@@ -140,7 +141,7 @@ async def node_query(
 
     for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_obj, shards)
+            node, shard_id, node_id = choose_node(shard_obj, shards)
         except KeyError:
             incomplete_results = True
         else:

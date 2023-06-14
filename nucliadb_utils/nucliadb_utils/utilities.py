@@ -68,7 +68,7 @@ class Utility(str, Enum):
     PROCESSING = "processing"
     TRANSACTION = "transaction"
     CACHE = "cache"
-    NODES = "nodes"
+    SHARD_MANAGER = "shard_manager"
     COUNTER = "counter"
     CHITCHAT = "chitchat"
     PUBSUB = "pubsub"

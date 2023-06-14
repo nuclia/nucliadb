@@ -20,19 +20,21 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
 from fastapi import FastAPI, Response
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
+from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.node import NODES, Node
-from nucliadb.ingest.settings import settings
 from nucliadb_models.cluster import ClusterMember, MemberType
 from nucliadb_telemetry import metrics
 from nucliadb_utils.fastapi.run import start_server
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+from . import manager
+from .index_node import IndexNode
 
 AVAILABLE_NODES = metrics.Gauge("nucliadb_nodes_available")
 
@@ -48,11 +50,11 @@ async def start_chitchat(service_name: str) -> Optional[ChitchatMonitor]:
         # already loaded
         return util
 
-    if settings.nodes_load_ingest:  # pragma: no cover
-        await Node.load_active_nodes()
+    if settings.manual_load_cluster_nodes:  # pragma: no cover
+        await manager.load_active_nodes()
         return None
 
-    if settings.chitchat_enabled is False:
+    if settings.standalone_mode:
         logger.debug(f"Chitchat not enabled - {service_name}")
         return None
 
@@ -77,7 +79,7 @@ chitchat_app = FastAPI(title="Chitchat monitor server")
 
 
 @chitchat_app.patch("/members", status_code=204)
-async def update_members(members: List[ClusterMember]) -> Response:
+async def update_members(members: list[ClusterMember]) -> Response:
     await update_available_nodes(members)
     return Response(status_code=204)
 
@@ -126,7 +128,7 @@ class ChitchatMonitor:
         self.task.cancel()
 
 
-async def update_available_nodes(members: List[ClusterMember]) -> None:
+async def update_available_nodes(members: list[ClusterMember]) -> None:
     # First add new nodes or update existing ones
     valid_ids = []
     for member in members:
@@ -139,48 +141,50 @@ async def update_available_nodes(members: List[ClusterMember]) -> None:
             shard_count = 0
             logger.warning(f"Node {member.node_id} has no shard_count")
 
-        node = NODES.get(member.node_id)
+        node = manager.get_index_node(member.node_id)
         if node is None:
-            logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
-            await Node.set(
-                member.node_id,
-                address=member.listen_addr,
-                type=member.type,
-                shard_count=shard_count,
+            logger.debug(f"{member.node_id} add {member.listen_addr}")
+            manager.add_index_node(
+                IndexNode(
+                    id=member.node_id,
+                    address=member.listen_addr,
+                    shard_count=shard_count,
+                )
             )
             logger.debug("Node added")
         else:
-            logger.debug(f"{member.node_id}/{member.type} update")
+            logger.debug(f"{member.node_id} update")
             node.address = member.listen_addr
             node.shard_count = shard_count
             logger.debug("Node updated")
 
     # Then cleanup nodes that are no longer reported
-    node_ids = [x for x in NODES.keys()]
-    destroyed_node_ids = []
+    node_ids = [x.id for x in manager.get_index_nodes()]
+    removed_node_ids = []
     for key in node_ids:
         if key not in valid_ids:
-            node = NODES.get(key)
+            node = manager.get_index_node(key)
             if node is not None:
-                destroyed_node_ids.append(key)
-                logger.warning(f"{key}/{node.type} remove {node.address}")
-                await Node.destroy(key)
+                removed_node_ids.append(key)
+                logger.warning(f"{key} remove {node.address}")
+                manager.remove_index_node(key)
 
-    if len(destroyed_node_ids) > 1:
+    if len(removed_node_ids) > 1:
         logger.warning(
-            f"{len(destroyed_node_ids)} nodes are down simultaneously. This should never happen!"
+            f"{len(removed_node_ids)} nodes are down simultaneously. This should never happen!"
         )
 
-    update_node_metrics(NODES, destroyed_node_ids)
+    update_node_metrics(removed_node_ids)
 
 
-def update_node_metrics(nodes: Dict[str, Node], destroyed_node_ids: List[str]):
-    AVAILABLE_NODES.set(len(nodes))
+def update_node_metrics(removed_node_ids: list[str]):
+    all_nodes = manager.get_index_nodes()
+    AVAILABLE_NODES.set(len(all_nodes))
 
-    for node_id, node in nodes.items():
-        SHARD_COUNT.set(node.shard_count, labels=dict(node=node_id))
+    for node in all_nodes:
+        SHARD_COUNT.set(node.shard_count, labels=dict(node=node.id))
 
-    for node_id in destroyed_node_ids:
+    for node_id in removed_node_ids:
         for gauge in (SHARD_COUNT,):
             try:
                 gauge.remove(labels=dict(node=node_id))

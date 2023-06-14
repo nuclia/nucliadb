@@ -41,7 +41,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.standalone.settings import Settings
-from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
+from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
@@ -193,9 +193,9 @@ async def test_pagination_resources(
 
     from time import time
 
-    from nucliadb.ingest.utils import get_driver
+    from nucliadb.common.maindb.utils import get_driver
 
-    driver = await get_driver()
+    driver = get_driver()
 
     t0 = time()
 
@@ -267,11 +267,11 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
 async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
     from nucliadb.train.utils import start_train_grpc, stop_train_grpc
 
-    await start_nodes_manager()
+    await start_shard_manager()
     await start_train_grpc("testing_train")
     yield
     await stop_train_grpc()
-    await stop_nodes_manager()
+    await stop_shard_manager()
 
 
 @pytest.fixture(scope="function")

@@ -21,7 +21,7 @@ import glob
 import os
 from typing import Dict, List, Optional
 
-from nucliadb.ingest.maindb.driver import (
+from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
     DEFAULT_SCAN_LIMIT,
     Driver,

@@ -38,22 +38,21 @@ from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
-from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.maindb.keys import (
-    KB_DELETED_ENTITIES_GROUPS,
-    KB_ENTITIES,
-    KB_ENTITIES_GROUP,
-)
-from nucliadb.ingest.orm.exceptions import (
+from nucliadb.common.cluster.exceptions import (
     AlreadyExists,
     EntitiesGroupNotFound,
     NodeError,
 )
+from nucliadb.common.cluster.index_node import AbstractIndexNode
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.keys import (
+    KB_DELETED_ENTITIES_GROUPS,
+    KB_ENTITIES,
+    KB_ENTITIES_GROUP,
+)
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node
-from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.settings import settings
-from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
 
 
@@ -203,11 +202,10 @@ class EntitiesManager:
         return eg
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        driver = await get_driver()
-        nodes_manager = NodesManager(driver=driver)
+        shard_manager = get_shard_manager()
 
         async def do_entities_search(
-            node: Node, shard_id: str, node_id: str
+            node: AbstractIndexNode, shard_id: str, node_id: str
         ) -> RelationSearchResponse:
             request = RelationSearchRequest(
                 shard_id=shard_id,
@@ -222,7 +220,7 @@ class EntitiesManager:
             )
             return await node.reader.RelationSearch(request)  # type: ignore
 
-        results = await nodes_manager.apply_for_all_shards(
+        results = await shard_manager.apply_for_all_shards(
             self.kbid, do_entities_search, settings.relation_search_timeout
         )
         for result in results:
@@ -297,15 +295,14 @@ class EntitiesManager:
             visited_groups.add(group)
 
     async def get_indexed_entities_groups_names(self) -> Set[str]:
-        driver = await get_driver()
-        nodes_manager = NodesManager(driver=driver)
+        shard_manager = get_shard_manager()
 
         async def query_indexed_entities_group_names(
-            node: Node, shard_id: str, node_id: str
+            node: AbstractIndexNode, shard_id: str, node_id: str
         ) -> TypeList:
             return await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
 
-        results = await nodes_manager.apply_for_all_shards(
+        results = await shard_manager.apply_for_all_shards(
             self.kbid,
             query_indexed_entities_group_names,
             settings.relation_types_timeout,

@@ -17,23 +17,39 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 import os
 import tempfile
+from os.path import dirname
+from shutil import rmtree
+from tempfile import mkdtemp
+from typing import AsyncIterator, List
 from unittest.mock import Mock
 
 import pytest
-from grpc import aio
+from grpc import aio  # type: ignore
 from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from redis import asyncio as aioredis
 
+from nucliadb.common.cluster import manager as cluster_manager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.local import LocalDriver
+from nucliadb.common.maindb.redis import RedisDriver
+from nucliadb.common.maindb.tikv import TiKVDriver
+from nucliadb.ingest.settings import DriverConfig
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
+from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.storages.settings import settings as storage_settings
+from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
@@ -42,6 +58,8 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
@@ -60,7 +78,6 @@ def telemetry_disabled():
 
 def reset_config():
     from nucliadb.ingest import settings as ingest_settings
-    from nucliadb.ingest.orm import NODE_CLUSTER
     from nucliadb.train import settings as train_settings
     from nucliadb.writer import settings as writer_settings
     from nucliadb_utils import settings as utils_settings
@@ -78,7 +95,11 @@ def reset_config():
     utils_settings.nuclia_settings.parse_obj(utils_settings.NucliaSettings())
     utils_settings.storage_settings.parse_obj(utils_settings.StorageSettings())
 
-    NODE_CLUSTER.local_node = None
+    yield
+
+    from nucliadb.common.cluster import manager
+
+    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture(scope="function")
@@ -356,3 +377,122 @@ def predict_mock() -> Mock:  # type: ignore
         clean_utility(Utility.PREDICT)
     else:
         set_utility(Utility.PREDICT, predict)
+
+
+@pytest.fixture(scope="function")
+def metrics_registry():
+    import prometheus_client.registry  # type: ignore
+
+    for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
+        if not hasattr(collector, "_metrics"):
+            continue
+        collector._metrics.clear()
+    yield prometheus_client.registry.REGISTRY
+
+
+@pytest.fixture(scope="function")
+async def redis_config(redis):
+    ingest_settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
+    cache_settings.cache_pubsub_redis_url = f"redis://{redis[0]}:{redis[1]}"
+    default_driver = ingest_settings.driver
+    default_driver_pubsub = cache_settings.cache_pubsub_driver
+
+    cache_settings.cache_pubsub_driver = "redis"
+    ingest_settings.driver = "redis"
+
+    storage_settings.local_testing_files = f"{dirname(__file__)}"
+    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
+    await driver.flushall()
+
+    yield
+
+    ingest_settings.driver_redis_url = None
+    cache_settings.cache_pubsub_redis_url = None
+    ingest_settings.driver = default_driver
+    cache_settings.cache_pubsub_driver = default_driver_pubsub
+    await driver.flushall()
+    await driver.close(close_connection_pool=True)
+
+    pubsub = get_utility(Utility.PUBSUB)
+    if pubsub is not None:
+        await pubsub.finalize()
+    clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def local_driver() -> AsyncIterator[Driver]:
+    path = mkdtemp()
+    ingest_settings.driver = DriverConfig.LOCAL
+    ingest_settings.driver_local_url = path
+    driver: Driver = LocalDriver(url=path)
+    await driver.initialize()
+    yield driver
+    await driver.finalize()
+    rmtree(path)
+    ingest_settings.driver_local_url = None
+    MAIN.pop("driver", None)
+
+
+@pytest.fixture(scope="function")
+async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
+    if os.environ.get("TESTING_TIKV_LOCAL", None):
+        url = "localhost:2379"
+    else:
+        url = f"{tikvd[0]}:{tikvd[2]}"
+    ingest_settings.driver = DriverConfig.TIKV
+    ingest_settings.driver_tikv_url = [url]
+
+    driver: Driver = TiKVDriver(url=[url])
+    await driver.initialize()
+
+    yield driver
+
+    txn = await driver.begin()
+    async for key in txn.keys(""):
+        await txn.delete(key)
+    await txn.commit()
+    await driver.finalize()
+    ingest_settings.driver_tikv_url = []
+    MAIN.pop("driver", None)
+
+
+@pytest.fixture(scope="function")
+async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
+    url = f"redis://{redis[0]}:{redis[1]}"
+    ingest_settings.driver = DriverConfig.REDIS
+    ingest_settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
+
+    driver = RedisDriver(url=url)
+    await driver.initialize()
+
+    assert driver.redis is not None
+    await driver.redis.flushall()
+    logging.info(f"Redis driver ready at {url}")
+
+    set_utility("driver", driver)
+
+    yield driver
+
+    await driver.finalize()
+    ingest_settings.driver_redis_url = None
+    MAIN.pop("driver", None)
+
+
+@pytest.fixture(scope="function")
+async def maindb_driver(redis_driver):
+    yield redis_driver
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver):
+    txn = await maindb_driver.begin()
+    yield txn
+    await txn.abort()
+
+
+@pytest.fixture(scope="function")
+async def shard_manager(gcs_storage, maindb_driver):
+    mng = cluster_manager.KBShardManager()
+    set_utility(Utility.SHARD_MANAGER, mng)
+    yield mng
+    clean_utility(Utility.SHARD_MANAGER)

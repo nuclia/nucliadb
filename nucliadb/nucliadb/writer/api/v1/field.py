@@ -27,9 +27,9 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 import nucliadb_models as models
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.ingest.utils import get_driver
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -622,7 +622,7 @@ async def reprocess_file_field(
     toprocess.source = Source.HTTP
 
     storage = await get_storage(service_name=SERVICE_NAME)
-    driver = await get_driver()
+    driver = get_driver()
 
     async with driver.transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)

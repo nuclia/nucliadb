@@ -37,9 +37,9 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.ingest.utils import get_driver
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -334,7 +334,7 @@ async def reprocess_resource(
     toprocess.source = Source.HTTP
 
     storage = await get_storage(service_name=SERVICE_NAME)
-    driver = await get_driver()
+    driver = get_driver()
 
     txn = await driver.begin()
     kb = KnowledgeBox(txn, storage, kbid)

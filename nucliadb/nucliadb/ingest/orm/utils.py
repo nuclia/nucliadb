@@ -30,23 +30,13 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm.local_node import LocalNode
-from nucliadb.ingest.orm.node import Node
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_models.text import PushTextFormat, Text
-from nucliadb_utils.settings import indexing_settings
 
 KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
 KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
-
-
-def get_node_klass():
-    if indexing_settings.index_local:
-        return LocalNode
-    else:
-        return Node
 
 
 async def set_basic(txn: Transaction, kbid: str, uuid: str, basic: Basic):

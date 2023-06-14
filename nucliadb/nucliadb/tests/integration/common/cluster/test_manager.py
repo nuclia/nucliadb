@@ -23,10 +23,10 @@ from typing import AsyncIterable
 import pytest
 from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
 
-from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm.node import Node
-from nucliadb.ingest.orm.nodes_manager import NodesManager
-from nucliadb_models.cluster import MemberType
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.common.maindb.driver import Driver
 from nucliadb_utils.keys import KB_SHARDS
 
 
@@ -37,26 +37,29 @@ async def fake_kbid() -> AsyncIterable[str]:
 
 @pytest.fixture(scope="function")
 async def fake_nodes():
-    await Node.set(
-        "node-0",
-        address="nohost:9999",
-        type=MemberType.IO,
-        shard_count=0,
-        dummy=True,
+    manager.add_index_node(
+        IndexNode(
+            id="node-0",
+            address="nohost:9999",
+            shard_count=0,
+            dummy=True,
+        )
     )
-    await Node.set(
-        "node-1",
-        address="nohost:9999",
-        type=MemberType.IO,
-        shard_count=0,
-        dummy=True,
+    manager.add_index_node(
+        IndexNode(
+            id="node-1",
+            address="nohost:9999",
+            shard_count=0,
+            dummy=True,
+        )
     )
-    await Node.set(
-        "node-2",
-        address="nohost:9999",
-        type=MemberType.IO,
-        shard_count=0,
-        dummy=True,
+    manager.add_index_node(
+        IndexNode(
+            id="node-2",
+            address="nohost:9999",
+            shard_count=0,
+            dummy=True,
+        )
     )
     yield
 
@@ -135,13 +138,10 @@ async def shards(fake_nodes, fake_kbid: str, redis_driver: Driver):
 )
 @pytest.mark.asyncio
 async def test_choose_node(shards, redis_driver: Driver, shard_index: int, nodes: set):
-    driver = redis_driver
-
-    nodes_manager = NodesManager(driver=driver)
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):
-        _, _, node_id = nodes_manager.choose_node(shard)
+        _, _, node_id = manager.choose_node(shard)
         node_ids.add(node_id)
     assert node_ids == nodes, "Random numbers have defeat this test"
 
@@ -149,16 +149,15 @@ async def test_choose_node(shards, redis_driver: Driver, shard_index: int, nodes
 @pytest.mark.asyncio
 async def test_apply_for_all_shards(fake_kbid: str, shards, redis_driver: Driver):
     kbid = fake_kbid
-    driver = redis_driver
 
-    nodes_manager = NodesManager(driver=driver)
+    shard_manager = manager.KBShardManager()
 
     nodes = []
 
-    async def fun(node: Node, shard_id: str, node_id: str):
+    async def fun(node: AbstractIndexNode, shard_id: str, node_id: str):
         nodes.append((shard_id, node_id))
 
-    await nodes_manager.apply_for_all_shards(kbid, fun, timeout=10)
+    await shard_manager.apply_for_all_shards(kbid, fun, timeout=10)
 
     nodes.sort()
     assert len(nodes) == 2

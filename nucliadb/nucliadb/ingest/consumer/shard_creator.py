@@ -22,11 +22,11 @@ import logging
 import uuid
 from functools import partial
 
-from nucliadb.ingest.maindb.driver import Driver
+from nucliadb.common.cluster.manager import choose_node
+from nucliadb.common.cluster.settings import settings
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.nodes_manager import NodesManager
-from nucliadb.ingest.orm.utils import get_node_klass
-from nucliadb.ingest.settings import settings
 from nucliadb_protos import noderesources_pb2, nodesidecar_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -57,7 +57,7 @@ class ShardCreatorHandler:
         self.driver = driver
         self.storage = storage
         self.pubsub = pubsub
-        self.node_manager = NodesManager(driver)
+        self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
 
     async def initialize(self) -> None:
@@ -94,12 +94,10 @@ class ShardCreatorHandler:
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
-        kb_shards = await self.node_manager.get_shards_by_kbid_inner(kbid)
+        kb_shards = await self.shard_manager.get_shards_by_kbid_inner(kbid)
         current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
 
-        node_klass = get_node_klass()
-
-        node, shard_id, _ = self.node_manager.choose_node(current_shard)
+        node, shard_id, _ = choose_node(current_shard)
         shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
@@ -109,5 +107,7 @@ class ShardCreatorHandler:
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 similarity = await kb.get_similarity()
 
-                await node_klass.create_shard_by_kbid(txn, kbid, similarity=similarity)
+                await self.shard_manager.create_shard_by_kbid(
+                    txn, kbid, similarity=similarity
+                )
                 await txn.commit()

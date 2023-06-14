@@ -22,12 +22,12 @@ import sys
 from functools import partial
 from typing import Awaitable, Callable, Optional
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
 from nucliadb.ingest.consumer.pull import PullWorker
-from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.settings import settings
-from nucliadb.ingest.utils import get_driver
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import running_settings, transaction_settings
 from nucliadb_utils.utilities import (
@@ -60,7 +60,7 @@ async def _exit_tasks(tasks: list[asyncio.Task]) -> None:
 async def start_pull_workers(
     service_name: Optional[str] = None,
 ) -> Callable[[], Awaitable[None]]:
-    driver = await get_driver()
+    driver = await setup_driver()
     cache = await get_cache()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     tasks = []
@@ -86,14 +86,16 @@ async def start_ingest_consumers(
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
 
-    while len(NODES) == 0 and running_settings.running_environment not in (
+    while len(
+        manager.get_index_nodes()
+    ) == 0 and running_settings.running_environment not in (
         "local",
         "test",
     ):
         logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
         await asyncio.sleep(1)
 
-    driver = await get_driver()
+    driver = await setup_driver()
     cache = await get_cache()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     nats_connection_manager = get_nats_manager()
@@ -124,14 +126,16 @@ async def start_ingest_processed_consumer(
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
 
-    while len(NODES) == 0 and running_settings.running_environment not in (
+    while len(
+        manager.get_index_nodes()
+    ) == 0 and running_settings.running_environment not in (
         "local",
         "test",
     ):
         logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
         await asyncio.sleep(1)
 
-    driver = await get_driver()
+    driver = await setup_driver()
     cache = await get_cache()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     nats_connection_manager = get_nats_manager()
@@ -149,7 +153,7 @@ async def start_ingest_processed_consumer(
 
 
 async def start_auditor() -> Callable[[], Awaitable[None]]:
-    driver = await get_driver()
+    driver = await setup_driver()
     audit = get_audit()
     assert audit is not None
     pubsub = await get_pubsub()
@@ -168,7 +172,7 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
 
 
 async def start_shard_creator() -> Callable[[], Awaitable[None]]:
-    driver = await get_driver()
+    driver = await setup_driver()
     pubsub = await get_pubsub()
     storage = await get_storage(service_name=SERVICE_NAME)
 

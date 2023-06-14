@@ -54,7 +54,7 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 
-from nucliadb.ingest.settings import settings
+from ..settings import settings
 
 logger = logging.getLogger(__name__)
 try:
@@ -65,7 +65,7 @@ except ImportError:  # pragma: no cover
     NodeWriter = None
 
 
-class LocalReaderWrapper:
+class StandaloneReaderWrapper:
     reader: NodeReader
 
     def __init__(self):
@@ -245,22 +245,12 @@ class LocalReaderWrapper:
         return type_list
 
 
-class LocalWriterWrapper:
+class StandaloneWriterWrapper:
     writer: NodeWriter
 
     def __init__(self):
         self.writer = NodeWriter.new()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
-
-    async def GetShard(self, request: ShardId) -> ShardId:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            self.executor, self.writer.get_shard, request.SerializeToString()
-        )
-        pb_bytes = bytes(result)
-        pb = ShardId()
-        pb.ParseFromString(pb_bytes)
-        return pb
 
     async def NewShard(self, request: ShardMetadata) -> ShardCreated:
         loop = asyncio.get_running_loop()

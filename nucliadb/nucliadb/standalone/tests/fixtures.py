@@ -46,7 +46,7 @@ async def nucliadb_api(
     test_settings_search: None,
     event_loop,
 ):  # type: ignore
-    from nucliadb.ingest.orm import NODES
+    from nucliadb.common.cluster import manager
     from nucliadb.standalone.run import get_server
 
     app, _ = get_server(Settings())
@@ -64,7 +64,7 @@ async def nucliadb_api(
     await app.router.startup()
 
     await asyncio.sleep(1)
-    while len(NODES) < 2:
+    while len(manager.get_index_nodes()) < 2:
         print("awaiting cluster nodes - one fixtures.py")
         await asyncio.sleep(1)
 
@@ -94,10 +94,10 @@ async def nucliadb_api(
 
     clear_ingest_cache()
     clear_global_cache()
-    for node in NODES.values():
-        node._reader = None
-        node._writer = None
-        node._sidecar = None
+    for node in manager.get_index_nodes():
+        node._reader = None  # type: ignore
+        node._writer = None  # type: ignore
+        node._sidecar = None  # type: ignore
 
 
 @pytest.fixture(scope="function")

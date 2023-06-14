@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseSettings, Field
 
@@ -58,51 +58,16 @@ class Settings(DriverSettings):
     pull_time_error_backoff: int = 100
     disable_pull_worker: bool = False
 
+    # ingest consumer sts replica settings
     replica_number: int = -1
     total_replicas: int = 1
     nuclia_partitions: int = 50
-
-    # NODE INFORMATION
-
-    node_replicas: int = 2  # TODO discuss default value
-
-    chitchat_binding_host: str = "0.0.0.0"
-    chitchat_binding_port: int = 31337
-    chitchat_enabled: bool = True
-
-    logging_config: Optional[str] = None
-
-    node_writer_port: int = 10000
-    node_reader_port: int = 10001
-    node_sidecar_port: int = 10002
-
-    # Only for testing proposes
-    writer_port_map: Dict[str, int] = {}
-    reader_port_map: Dict[str, int] = {}
-    sidecar_port_map: Dict[str, int] = {}
-
-    # Node limits
-    max_shard_paragraphs: int = Field(
-        500_000,
-        title="Max shard paragraphs",
-        description="Maximum number of paragraphs to target per shard",
-    )
-    max_node_replicas: int = Field(
-        650,
-        title="Max node replicas",
-        description="Maximum number of shard replicas a single node will manage",
-    )
-
-    local_reader_threads: int = 5
-    local_writer_threads: int = 5
 
     max_receive_message_length: int = 4
 
     # Search query timeouts
     relation_search_timeout: float = 10.0
     relation_types_timeout: float = 10.0
-
-    nodes_load_ingest: bool = False
 
 
 settings = Settings()

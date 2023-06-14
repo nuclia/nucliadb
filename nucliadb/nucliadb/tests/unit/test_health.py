@@ -24,7 +24,7 @@ import pytest
 from grpc_health.v1 import health_pb2
 
 from nucliadb import health
-from nucliadb.ingest import orm
+from nucliadb.common.cluster import manager
 from nucliadb.ingest.settings import DriverConfig, settings
 
 pytestmark = pytest.mark.asyncio
@@ -48,7 +48,7 @@ def nats_manager():
 
 async def test_grpc_health_check():
     servicer = AsyncMock()
-    with patch.object(orm, "NODES", {"node1": "node1"}), patch.object(
+    with patch.object(manager, "INDEX_NODES", {"node1": "node1"}), patch.object(
         settings, "driver", DriverConfig.PG
     ):
         task = asyncio.create_task(health.grpc_health_check(servicer))
@@ -61,7 +61,7 @@ async def test_grpc_health_check():
 
 async def test_health_check_fail():
     servicer = AsyncMock()
-    with patch.object(orm, "NODES", {}), patch.object(
+    with patch.object(manager, "INDEX_NODES", {}), patch.object(
         settings, "driver", DriverConfig.PG
     ):
         task = asyncio.create_task(health.grpc_health_check(servicer))
@@ -75,7 +75,7 @@ async def test_health_check_fail():
 async def test_health_check_fail_unhealthy_nats(nats_manager):
     nats_manager.healthy.return_value = False
     servicer = AsyncMock()
-    with patch.object(orm, "NODES", {"node1": "node1"}):  # has nodes
+    with patch.object(manager, "INDEX_NODES", {"node1": "node1"}):  # has nodes
         task = asyncio.create_task(health.grpc_health_check(servicer))
         await asyncio.sleep(0.05)
 

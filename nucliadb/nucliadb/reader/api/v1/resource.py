@@ -23,12 +23,12 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 import nucliadb_models as models
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.serialize import serialize, set_resource_field_extracted_data
-from nucliadb.ingest.utils import get_driver
 from nucliadb.reader import SERVICE_NAME  # type: ignore
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
@@ -72,7 +72,7 @@ async def list_resources(
     # Get all resource id's fast by scanning all existing slugs
 
     # Get counters from maindb
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
 
     # Filter parameters for serializer
@@ -285,7 +285,7 @@ async def get_resource_field(
     page: Union[str, int] = Query("last"),
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
-    driver = await get_driver()
+    driver = get_driver()
 
     txn = await driver.begin()
 

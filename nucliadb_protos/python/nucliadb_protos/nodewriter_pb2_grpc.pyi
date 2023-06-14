@@ -32,10 +32,6 @@ from nucliadb_protos.noderesources_pb2 import (
 
 class NodeWriterStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
-    GetShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardId,
-    ]
     NewShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodewriter_pb2.NewShardRequest,
         nucliadb_protos.noderesources_pb2.ShardCreated,
@@ -90,12 +86,6 @@ class NodeWriterStub:
     ]
 
 class NodeWriterServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def GetShard(
-        self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.ShardId: ...
     @abc.abstractmethod
     def NewShard(
         self,

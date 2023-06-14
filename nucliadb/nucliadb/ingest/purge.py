@@ -21,16 +21,16 @@ import asyncio
 
 import pkg_resources
 
+from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE,
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
-from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
@@ -133,7 +133,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
 async def main():
     # Clean up all kb marked to delete
-    driver = await get_driver()
+    driver = await setup_driver()
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
         service_name=SERVICE_NAME,

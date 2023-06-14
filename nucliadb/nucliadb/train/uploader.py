@@ -35,9 +35,9 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.utils import get_driver
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.models import RequestData
 from nucliadb.train.settings import settings
@@ -47,7 +47,7 @@ from nucliadb_utils.utilities import get_cache, get_storage
 class UploadServicer:
     async def initialize(self):
         storage = await get_storage(service_name=SERVICE_NAME)
-        driver = await get_driver()
+        driver = await setup_driver()
         cache = await get_cache()
         self.proc = Processor(driver=driver, storage=storage, cache=cache)
 
