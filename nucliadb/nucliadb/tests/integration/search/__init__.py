@@ -16,21 +16,4 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.utils_pb2 import RelationNode
-
-from nucliadb.search.search.query import parse_entities_to_filters
-
-
-def test_parse_entities_to_filters():
-    detected_entities = [
-        RelationNode(value="John", ntype=RelationNode.NodeType.ENTITY, subtype="person")
-    ]
-
-    request = SearchRequest()
-    assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
-    assert request.filter.tags == ["/e/person/John"]
-
-    assert parse_entities_to_filters(request, detected_entities) == []
-    assert request.filter.tags == ["/e/person/John"]
+#
