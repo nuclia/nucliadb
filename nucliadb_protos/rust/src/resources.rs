@@ -680,9 +680,35 @@ pub struct PagePositions {
     pub end: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageStructurePage {
+    #[prost(int64, tag="1")]
+    pub width: i64,
+    #[prost(int64, tag="2")]
+    pub height: i64,
+    #[prost(int64, tag="3")]
+    pub index: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageStructureToken {
+    #[prost(int64, tag="1")]
+    pub x: i64,
+    #[prost(int64, tag="2")]
+    pub y: i64,
+    #[prost(int64, tag="3")]
+    pub width: i64,
+    #[prost(int64, tag="4")]
+    pub height: i64,
+    #[prost(string, tag="5")]
+    pub text: ::prost::alloc::string::String,
+    #[prost(float, tag="6")]
+    pub line: f32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PageStructure {
-    #[prost(string, tag="1")]
-    pub structure: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="1")]
+    pub page: ::core::option::Option<PageStructurePage>,
+    #[prost(message, repeated, tag="2")]
+    pub tokens: ::prost::alloc::vec::Vec<PageStructureToken>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FilePages {
