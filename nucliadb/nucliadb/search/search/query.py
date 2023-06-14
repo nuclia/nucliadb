@@ -131,11 +131,15 @@ async def global_query_to_pb(
             request, kbid, query, user_vector=user_vector, vectorset=vectorset
         )
 
-    if (SearchOptions.RELATIONS in features) or (autofilter is True):
-        entity_filters = await _parse_entities(
-            request, kbid, query, autofilter=autofilter
-        )
-        autofilters.extend(entity_filters)
+    relations_search = SearchOptions.RELATIONS in features
+    if relations_search or autofilter:
+        detected_entities = await detect_entities(kbid, query)
+        if relations_search:
+            request.relation_subgraph.entry_points.extend(detected_entities)
+            request.relation_subgraph.depth = 1
+        if autofilter:
+            entity_filters = parse_entities_to_filters(request, detected_entities)
+            autofilters.extend(entity_filters)
 
     if with_synonyms:
         if advanced_query:
@@ -179,32 +183,28 @@ async def _parse_vectors(
     return incomplete
 
 
-def _get_entity_filters(detected_entities: List[RelationNode]) -> List[str]:
-    return [
+async def detect_entities(kbid: str, query: str) -> List[RelationNode]:
+    predict = get_predict()
+    try:
+        return await predict.detect_entities(kbid, query)
+    except SendToPredictError as ex:
+        logger.warning(f"Errors on predict api detecting entities: {ex}")
+        return []
+
+
+def parse_entities_to_filters(
+    request: SearchRequest, detected_entities: List[RelationNode]
+) -> List[str]:
+    added_filters = []
+    for entity_filter in [
         f"/e/{entity.subtype}/{entity.value}"
         for entity in detected_entities
         if entity.ntype == RelationNode.NodeType.ENTITY
-    ]
-
-
-async def _parse_entities(
-    request: SearchRequest, kbid: str, query: str, autofilter: bool = False
-) -> List[str]:
-    predict = get_predict()
-    filters_added = []
-    try:
-        detected_entities = await predict.detect_entities(kbid, query)
-        request.relation_subgraph.entry_points.extend(detected_entities)
-        request.relation_subgraph.depth = 1
-        if autofilter is True:
-            for entity_filter in _get_entity_filters(detected_entities):
-                if entity_filter not in request.filter.tags:
-                    request.filter.tags.append(entity_filter)
-                    filters_added.append(entity_filter)
-    except SendToPredictError as ex:
-        logger.warning(f"Errors on predict api detecting entities: {ex}")
-    finally:
-        return filters_added
+    ]:
+        if entity_filter not in request.filter.tags:
+            request.filter.tags.append(entity_filter)
+            added_filters.append(entity_filter)
+    return added_filters
 
 
 async def suggest_query_to_pb(
