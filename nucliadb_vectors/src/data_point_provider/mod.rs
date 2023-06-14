@@ -33,7 +33,6 @@ use std::time::SystemTime;
 
 use fs2::FileExt;
 pub use merger::Merger;
-use nucliadb_core::env;
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
@@ -52,27 +51,32 @@ const STATE: &str = "state.bincode";
 const READERS: &str = "readers";
 const WRITER_FLAG: &str = "writer.flag";
 
-fn tmp_or_default() -> PathBuf {
-    let mut temp_path = env::tmp_path();
-    if !temp_path.exists() {
-        temp_path = std::env::temp_dir();
-    }
-    temp_path
+#[derive(Clone)]
+struct AtomicWriter {
+    tmp_path: PathBuf,
 }
+impl AtomicWriter {
+    pub fn new(tmp_path: PathBuf) -> AtomicWriter {
+        AtomicWriter { tmp_path }
+    }
+    pub fn path(&self) -> &Path {
+        &self.tmp_path
+    }
 
-// 'f' will have access to a BufWriter whose contents at the end of
-// f's execution will be atomically persisted in 'path'.
-// After this function is executed 'path' will either only contain the data wrote by
-// 'f' or be on its previous state.
-fn compute_with_atomic_write<F, R>(path: &Path, f: F) -> VectorR<R>
-where F: FnOnce(&mut BufWriter<&mut TemporalFile>) -> VectorR<R> {
-    let mut file = TemporalFile::new_in(tmp_or_default())?;
-    let mut buffer = BufWriter::new(&mut file);
-    let user_result = f(&mut buffer)?;
-    buffer.flush()?;
-    mem::drop(buffer);
-    file.persist(path)?;
-    Ok(user_result)
+    // 'f' will have access to a BufWriter whose contents at the end of
+    // f's execution will be atomically persisted in 'path'.
+    // After this function is executed 'path' will either only contain the data wrote by
+    // 'f' or be on its previous state.
+    pub fn compute_with_atomic_write<F, R>(&self, path: &Path, f: F) -> VectorR<R>
+    where F: FnOnce(&mut BufWriter<&mut TemporalFile>) -> VectorR<R> {
+        let mut file = TemporalFile::new_in(&self.tmp_path)?;
+        let mut buffer = BufWriter::new(&mut file);
+        let user_result = f(&mut buffer)?;
+        buffer.flush()?;
+        mem::drop(buffer);
+        file.persist(path)?;
+        Ok(user_result)
+    }
 }
 
 pub trait SearchRequest {
@@ -105,33 +109,44 @@ impl IndexMetadata {
 
 #[derive(Clone)]
 pub struct Index {
+    atomic_writer: AtomicWriter,
     metadata: IndexMetadata,
     location: PathBuf,
 }
 impl Index {
-    pub fn open(path: &Path) -> VectorR<Index> {
+    pub fn open(path: &Path, tmp_path: &Path) -> VectorR<Index> {
         match IndexMetadata::open(path)? {
             Some(metadata) => Ok(Index {
                 metadata,
                 location: path.to_path_buf(),
+                atomic_writer: AtomicWriter::new(tmp_path.to_path_buf()),
             }),
             None => {
                 // Old indexes may not have this file so in that case the
                 // metadata file they should have is created.
                 let location = path.to_path_buf();
+                let atomic_writer = AtomicWriter::new(tmp_path.to_path_buf());
                 let metadata = IndexMetadata::default();
                 metadata.write(&location)?;
-                Ok(Index { metadata, location })
+                Ok(Index {
+                    metadata,
+                    location,
+                    atomic_writer,
+                })
             }
         }
     }
-    pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
-        let location = path.to_path_buf();
+    pub fn new(path: &Path, tmp_path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         std::fs::create_dir_all(&location)?;
-        compute_with_atomic_write(&location.join(STATE), |buffer| {
-            bincode::serialize_into(buffer, &State::new())?;
-            metadata.write(&location)?;
-            Ok(Index { metadata, location })
+        let atomic_writer = AtomicWriter::new(tmp_path.to_path_buf());
+        metadata.write(location)?;
+        atomic_writer.compute_with_atomic_write(location.join(STATE), |buffer| {
+            Ok(bincode::serialize_into(buffer, &State::new())?)
+        })?;
+        Ok(Index {
+            metadata,
+            atomic_writer,
+            location: location.to_path_buf(),
         })
     }
     pub fn writer(&self) -> VectorR<Writer> {
@@ -145,6 +160,9 @@ impl Index {
     }
     pub fn metadata(&self) -> &IndexMetadata {
         &self.metadata
+    }
+    pub fn atomic_writer(&self) -> &AtomicWriter {
+        &self.atomic_writer
     }
 }
 
@@ -166,11 +184,6 @@ impl RwState {
     where F: FnOnce(&mut State) -> VectorR<R> {
         let mut writer = self.inner.write().unwrap_or_else(|e| e.into_inner());
         transform(&mut writer)
-    }
-    pub fn persist(&self, path: &Path) -> VectorR<()> {
-        compute_with_atomic_write(path, |buffer| {
-            Ok(bincode::serialize_into(buffer, &*self.read())?)
-        })
     }
 }
 
@@ -218,6 +231,7 @@ impl Reader {
         let status_path = self.status_path.clone();
         let state_path = self.state_path.clone();
         let state = self.state.clone();
+        let tmp_path = self.atomic_writer().path().to_path_buf();
         std::thread::spawn(move || {
             try_catch::catch! {
                     try {
@@ -225,7 +239,7 @@ impl Reader {
                         let mut state_file_buffer = BufReader::new(state_file);
                         let new_state: State = bincode::deserialize_from(&mut state_file_buffer)?;
                         let watching = new_state.dpid_iter().collect::<Vec<_>>();
-                        let mut temp_status = TemporalFile::new_in(tmp_or_default())?;
+                        let mut temp_status = TemporalFile::new_in(tmp_path)?;
                         let mut temp_status_buffer = BufWriter::new(&mut temp_status);
                         bincode::serialize_into(&mut temp_status_buffer, &watching)?;
                         temp_status_buffer.flush()?;
@@ -268,6 +282,9 @@ impl Reader {
     }
     pub fn index(&self) -> &Index {
         &self.inner
+    }
+    fn atomic_writer(&self) -> &AtomicWriter {
+        self.inner.atomic_writer()
     }
 }
 
@@ -367,7 +384,11 @@ impl Writer {
         })?;
 
         // Persisting the new state
-        self.state.persist(&self.state_path)?;
+        let state = self.state.read();
+        self.atomic_writer()
+            .compute_with_atomic_write(&self.state_path, |buffer| {
+                Ok(bincode::serialize_into(buffer, &state)?)
+            })?;
 
         // Looking for possible merges
         let state = self.state.read();
@@ -410,6 +431,9 @@ impl Writer {
     pub fn index(&self) -> &Index {
         &self.inner
     }
+    fn atomic_writer(&self) -> &AtomicWriter {
+        self.inner.atomic_writer()
+    }
 }
 
 #[cfg(test)]
@@ -424,8 +448,9 @@ mod test {
         let number_of_nodes = 100;
         let dir = tempfile::tempdir()?;
         let path = dir.path();
+        let tmp_path = path.join("tmp");
         let metadata = IndexMetadata::default();
-        let index = Index::new(path, metadata)?;
+        let index = Index::new(path, &tmp_path, metadata)?;
         let elems: Vec<_> = (0..number_of_nodes)
             .map(|i| format!("key_{i}"))
             .map(|i| Elem::new(i, vec![0.0; 12], LabelDictionary::default(), None))
@@ -452,8 +477,10 @@ mod test {
     #[test]
     fn many_readers() -> VectorR<()> {
         let dir = tempfile::tempdir()?;
+        let path = dir.path();
+        let tmp_path = path.join("tmp");
         let metadata = IndexMetadata::default();
-        let index = Index::new(dir.path(), metadata)?;
+        let index = Index::new(path, &tmp_path, metadata)?;
         let readers_status = dir.path().join(READERS);
         {
             let _reader1 = index.reader()?;
@@ -470,8 +497,10 @@ mod test {
     #[test]
     fn only_one_writer() -> VectorR<()> {
         let dir = tempfile::tempdir()?;
+        let path = dir.path();
+        let tmp_path = path.join("tmp");
         let metadata = IndexMetadata::default();
-        let index = Index::new(dir.path(), metadata)?;
+        let index = Index::new(path, &tmp_path, metadata)?;
 
         // There is no other writer, so opening a
         // writer does not fail.
@@ -492,7 +521,9 @@ mod test {
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
-        let index = Index::new(dir.path(), IndexMetadata::default())?;
+        let path = dir.path();
+        let tmp_path = path.join("tmp");
+        let index = Index::new(path, &tmp_path, IndexMetadata::default())?;
         let writer = index.writer()?;
         let _reader = index.reader()?;
         let empty_no_entries = std::fs::read_dir(dir.path())?.count();
