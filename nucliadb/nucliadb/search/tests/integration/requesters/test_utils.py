@@ -34,7 +34,7 @@ async def test_vector_result_metadata(
 ) -> None:
     kbid = multiple_search_resource
 
-    pb_query, _ = await global_query_to_pb(
+    pb_query, _, _ = await global_query_to_pb(
         kbid,
         query="own text",
         features=[SearchOptions.VECTOR],
