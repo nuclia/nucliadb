@@ -166,10 +166,11 @@ impl WriterChild for VectorWriterService {
         }
 
         let temporal_mark = TemporalMark::now();
+        let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
-            for (field, paragraph) in resource.paragraphs.iter() {
-                let field = &[field.clone()];
+            for (paragraph_field, paragraph) in resource.paragraphs.iter() {
+                let field = &[paragraph_field.clone()];
                 for index in paragraph.paragraphs.values() {
                     let labels = LabelDictionary::new(
                         resource
@@ -185,7 +186,9 @@ impl WriterChild for VectorWriterService {
                         let labels = labels.clone();
                         let vector = sentence.vector.clone();
                         let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
+                        let bucket = lengths.entry(vector.len()).or_default();
                         elems.push(Elem::new(key, vector, labels, metadata));
+                        bucket.push(paragraph_field);
                     }
                 }
             }
@@ -198,13 +201,16 @@ impl WriterChild for VectorWriterService {
             debug!("{id:?} - Datapoint creation: starts {v} ms");
         }
 
-        let similarity = self.index.metadata().similarity;
+        if lengths.len() > 1 {
+            return Ok(tracing::error!("{}", self.dimensions_report(lengths)));
+        }
+
         let new_dp = if !elems.is_empty() {
             Some(DataPoint::new(
                 self.index.location(),
                 elems,
                 Some(temporal_mark),
-                similarity,
+                self.index.metadata().similarity,
             )?)
         } else {
             None
@@ -228,13 +234,9 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Indexing datapoint: starts {v} ms");
         }
-        if let Some(new_dp) = new_dp {
-            debug!("{id:?} - The datapoint is not empty, adding it");
-            self.index.add(new_dp, &lock);
-            self.index.commit(lock)?;
-        } else {
-            debug!("{id:?} - The datapoint is empty, no need to add it");
-            self.index.commit(lock)?;
+        match new_dp.map(|i| self.index.add(i, &lock)).unwrap_or(Ok(())) {
+            Ok(_) => self.index.commit(lock)?,
+            Err(e) => tracing::error!("{id:?}/default could insert vectors: {e:?}"),
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Indexing datapoint: ends {v} ms");
@@ -280,21 +282,28 @@ impl WriterChild for VectorWriterService {
         self.indexset.commit(indexset_elock)?;
 
         // Inner indexes are updated
-        for (index_key, index) in indexes.into_iter().flat_map(|i| i.1.map(|j| (i.0, j))) {
+        for (index_key, mut index) in indexes.into_iter().flat_map(|i| i.1.map(|j| (i.0, j))) {
+            let mut lengths: HashMap<usize, Vec<_>> = HashMap::new();
             let mut elems = vec![];
-            for (key, user_vector) in resource.vectors[index_key].vectors.iter() {
-                let key = key.clone();
+            for (vectorset, user_vector) in resource.vectors[index_key].vectors.iter() {
+                let key = vectorset.clone();
                 let vector = user_vector.vector.clone();
+                let bucket = lengths.entry(vector.len()).or_default();
                 let labels = LabelDictionary::new(user_vector.labels.clone());
                 elems.push(Elem::new(key, vector, labels, None));
+                bucket.push(vectorset);
             }
-            if !elems.is_empty() {
+            if lengths.len() > 1 {
+                tracing::error!("vectorsets report: {}", self.dimensions_report(lengths));
+            } else if !elems.is_empty() {
                 let similarity = index.metadata().similarity;
-                let new_dp =
-                    DataPoint::new(index.location(), elems, Some(temporal_mark), similarity)?;
+                let location = index.location();
+                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
                 let lock = index.get_elock()?;
-                index.add(new_dp, &lock);
-                index.commit(lock)?;
+                match index.add(new_dp, &lock) {
+                    Ok(_) => index.commit(lock)?,
+                    Err(e) => tracing::error!("Could not insert at {id:?}/{index_key}: {e:?}"),
+                }
             }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -335,6 +344,15 @@ impl WriterChild for VectorWriterService {
 }
 
 impl VectorWriterService {
+    fn dimensions_report<'a>(&'a self, dimensions: HashMap<usize, Vec<&'a String>>) -> String {
+        let mut report = String::new();
+        for (dimension, bucket) in dimensions {
+            let partial = format!("{dimension} : {bucket:?}\n");
+            report.push_str(&partial);
+        }
+        report.pop();
+        report
+    }
     fn collect_garbage_for(&self, index: &Index) -> NodeResult<()> {
         debug!("Collecting garbage for index: {:?}", index.location());
         let slock = index.get_slock()?;
