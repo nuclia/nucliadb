@@ -95,7 +95,6 @@ async def get_expanded_conversation_messages(
             start_idx=found_idx + 1,
             num_messages=1,
             message_type=resources_pb2.Message.MessageType.ANSWER,
-            msg_to=found_message.who,
         )
     else:
         return await get_next_conversation_messages(
