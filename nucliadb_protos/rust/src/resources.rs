@@ -685,8 +685,6 @@ pub struct PageStructurePage {
     pub width: i64,
     #[prost(int64, tag="2")]
     pub height: i64,
-    #[prost(int64, tag="3")]
-    pub index: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PageStructureToken {
