@@ -680,11 +680,18 @@ pub struct PagePositions {
     pub end: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageStructure {
+    #[prost(string, tag="1")]
+    pub structure: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FilePages {
     #[prost(message, repeated, tag="1")]
     pub pages: ::prost::alloc::vec::Vec<CloudFile>,
     #[prost(message, repeated, tag="2")]
     pub positions: ::prost::alloc::vec::Vec<PagePositions>,
+    #[prost(message, repeated, tag="3")]
+    pub structures: ::prost::alloc::vec::Vec<PageStructure>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RowsPreview {

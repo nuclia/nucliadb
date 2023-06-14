@@ -106,6 +106,7 @@ from nucliadb_protos.resources_pb2 import (
     NestedPosition as NestedPosition,
     Origin as Origin,
     PagePositions as PagePositions,
+    PageStructure as PageStructure,
     Paragraph as Paragraph,
     ParagraphAnnotation as ParagraphAnnotation,
     Position as Position,

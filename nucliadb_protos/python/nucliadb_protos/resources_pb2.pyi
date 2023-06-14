@@ -1867,22 +1867,41 @@ class PagePositions(google.protobuf.message.Message):
 global___PagePositions = PagePositions
 
 @typing_extensions.final
+class PageStructure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STRUCTURE_FIELD_NUMBER: builtins.int
+    structure: builtins.str
+    def __init__(
+        self,
+        *,
+        structure: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["structure", b"structure"]) -> None: ...
+
+global___PageStructure = PageStructure
+
+@typing_extensions.final
 class FilePages(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PAGES_FIELD_NUMBER: builtins.int
     POSITIONS_FIELD_NUMBER: builtins.int
+    STRUCTURES_FIELD_NUMBER: builtins.int
     @property
     def pages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CloudFile]: ...
     @property
     def positions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PagePositions]: ...
+    @property
+    def structures(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PageStructure]: ...
     def __init__(
         self,
         *,
         pages: collections.abc.Iterable[global___CloudFile] | None = ...,
         positions: collections.abc.Iterable[global___PagePositions] | None = ...,
+        structures: collections.abc.Iterable[global___PageStructure] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "positions", b"positions"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "positions", b"positions", "structures", b"structures"]) -> None: ...
 
 global___FilePages = FilePages
 

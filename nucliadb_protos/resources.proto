@@ -439,9 +439,14 @@ message PagePositions {
     int64 end = 2;
 }
 
+message PageStructure {
+    string structure = 1;
+}
+
 message FilePages {
     repeated CloudFile pages = 1;
     repeated PagePositions positions = 2;
+    repeated PageStructure structures = 3;
 }
 
 message RowsPreview {
