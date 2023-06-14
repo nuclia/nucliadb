@@ -145,28 +145,6 @@ pub mod node_writer_client {
             self.inner = self.inner.accept_gzip();
             self
         }
-        pub async fn get_shard(
-            &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::ShardId>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/GetShard",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
         pub async fn new_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::NewShardRequest>,
@@ -442,13 +420,6 @@ pub mod node_writer_server {
     ///Generated trait containing gRPC methods that should be implemented for use with NodeWriterServer.
     #[async_trait]
     pub trait NodeWriter: Send + Sync + 'static {
-        async fn get_shard(
-            &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::ShardId>,
-            tonic::Status,
-        >;
         async fn new_shard(
             &self,
             request: tonic::Request<super::NewShardRequest>,
@@ -570,44 +541,6 @@ pub mod node_writer_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/nodewriter.NodeWriter/GetShard" => {
-                    #[allow(non_camel_case_types)]
-                    struct GetShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<
-                        T: NodeWriter,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for GetShardSvc<T> {
-                        type Response = super::super::noderesources::ShardId;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).get_shard(request).await };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = GetShardSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
                 "/nodewriter.NodeWriter/NewShard" => {
                     #[allow(non_camel_case_types)]
                     struct NewShardSvc<T: NodeWriter>(pub Arc<T>);

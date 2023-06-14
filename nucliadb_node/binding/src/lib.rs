@@ -281,15 +281,6 @@ impl NodeWriter {
         }
     }
 
-    pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-        self.writer.load_shard(&shard_id);
-        match self.writer.get_shard(&shard_id) {
-            Some(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
-            None => Err(exceptions::PyTypeError::new_err("Not found")),
-        }
-    }
-
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_telemetry_event(TelemetryEvent::Create);
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).unwrap();

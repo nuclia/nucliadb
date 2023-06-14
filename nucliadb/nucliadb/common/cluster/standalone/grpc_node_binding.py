@@ -252,16 +252,6 @@ class StandaloneWriterWrapper:
         self.writer = NodeWriter.new()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
-    async def GetShard(self, request: ShardId) -> ShardId:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            self.executor, self.writer.get_shard, request.SerializeToString()
-        )
-        pb_bytes = bytes(result)
-        pb = ShardId()
-        pb.ParseFromString(pb_bytes)
-        return pb
-
     async def NewShard(self, request: ShardMetadata) -> ShardCreated:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(

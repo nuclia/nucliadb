@@ -59,7 +59,6 @@ message NewVectorSetRequest {
 }
 
 service NodeWriter {
-    rpc GetShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc NewShard(NewShardRequest) returns (noderesources.ShardCreated) {}
     rpc CleanAndUpgradeShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}

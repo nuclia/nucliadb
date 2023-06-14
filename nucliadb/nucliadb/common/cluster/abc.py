@@ -81,7 +81,7 @@ class AbstractIndexNode(metaclass=ABCMeta):
         async for idandfacets in self.reader.Paragraphs(stream_request):  # type: ignore
             yield idandfacets
 
-    async def get_reader_shard(
+    async def get_shard(
         self, shard_id: str, vectorset: Optional[str] = None
     ) -> noderesources_pb2.Shard:
         req = nodereader_pb2.GetShardRequest()
@@ -89,11 +89,6 @@ class AbstractIndexNode(metaclass=ABCMeta):
         if vectorset is not None:
             req.vectorset = vectorset
         return await self.reader.GetShard(req)  # type: ignore
-
-    async def get_shard(self, id: str) -> noderesources_pb2.ShardId:
-        req = noderesources_pb2.ShardId(id=id)
-        resp = await self.writer.GetShard(req)  # type: ignore
-        return resp
 
     async def new_shard(
         self,
