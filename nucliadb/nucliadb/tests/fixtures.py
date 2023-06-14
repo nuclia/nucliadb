@@ -104,6 +104,10 @@ def reset_config():
 
 @pytest.fixture(scope="function")
 async def nucliadb(dummy_processing, telemetry_disabled):
+    from nucliadb.common.cluster import manager
+
+    manager.INDEX_NODES.clear()
+
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = Settings(
             driver="local",
