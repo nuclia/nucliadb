@@ -270,6 +270,13 @@ impl State {
     pub fn current_work_unit(&self) -> Option<&[Journal]> {
         self.work_stack.back().map(|wu| wu.load.as_slice())
     }
+    pub fn stored_len(&self, location: &Path) -> VectorR<Option<u64>> {
+        let Some(journal) = self.data_point_iterator().next() else {
+            return Ok(None);
+        };
+        let data_point = DataPoint::open(location, journal.id())?;
+        Ok(data_point.stored_len())
+    }
 }
 
 #[cfg(test)]
