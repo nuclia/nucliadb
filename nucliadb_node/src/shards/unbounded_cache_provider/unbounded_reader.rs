@@ -20,9 +20,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use anyhow::anyhow;
 use nucliadb_core::tracing::{debug, error};
-use nucliadb_core::NodeResult;
+use nucliadb_core::{node_error, NodeResult};
 
 pub use crate::env;
 use crate::shards::shards_provider::{ReaderShardsProvider, ShardId};
@@ -59,10 +58,10 @@ impl ReaderShardsProvider for UnboundedShardReaderCache {
         }
 
         if !shard_path.is_dir() {
-            return Err(anyhow!("Shard {shard_path:?} is not on disk"));
+            return Err(node_error!("Shard {shard_path:?} is not on disk"));
         }
         let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
-            anyhow!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
         })?;
 
         self.write().insert(id, Arc::new(shard));

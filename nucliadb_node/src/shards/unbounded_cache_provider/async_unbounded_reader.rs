@@ -20,11 +20,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
-use nucliadb_core::{Context, NodeResult};
+use nucliadb_core::{node_error, Context, Error, NodeResult};
 
 pub use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
@@ -64,10 +63,10 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
         let _id = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
-                return Err(anyhow!("Shard {shard_path:?} is not on disk"));
+                return Err(node_error!("Shard {shard_path:?} is not on disk"));
             }
             ShardReader::new(id.clone(), &shard_path).map_err(|error| {
-                anyhow!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+                node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
             })
         })
         .await
@@ -93,7 +92,7 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
                     }
                 }
             }
-            Ok::<HashMap<String, ShardReader>, anyhow::Error>(shards)
+            Ok::<HashMap<String, ShardReader>, Error>(shards)
         })
         .await
         .context("Blocking task panicked")??;
