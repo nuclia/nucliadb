@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from collections import OrderedDict
 from typing import Optional
 
 from nucliadb.common.maindb.utils import get_driver
@@ -118,7 +119,7 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
     driver = get_driver()
     storage = await get_storage()
     # ordered dict that prevents duplicates pulled in through conversation expansion
-    output = {}
+    output = OrderedDict()
     words = 0
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
