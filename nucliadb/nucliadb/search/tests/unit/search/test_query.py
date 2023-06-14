@@ -17,34 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, Mock
-
-import pytest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode
 
-from nucliadb.search.search.query import _parse_entities
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb.search.search.query import parse_entities_to_filters
 
 
-@pytest.fixture(scope="function")
-def predict():
-    predict_mock = Mock()
-    set_utility(Utility.PREDICT, predict_mock)
-    predict_mock.detect_entities = AsyncMock(
-        return_value=[
-            RelationNode(
-                value="John", ntype=RelationNode.NodeType.ENTITY, subtype="person"
-            )
-        ]
-    )
-    yield predict_mock
+async def test_parse_entities_to_filters():
+    detected_entities = [
+        RelationNode(value="John", ntype=RelationNode.NodeType.ENTITY, subtype="person")
+    ]
 
-
-async def test_parse_entities_autofilter(predict):
     request = SearchRequest()
-    await _parse_entities(request, "kbid", "John", autofilter=False)
-    assert request.filter.tags == []
+    assert await parse_entities_to_filters(request, detected_entities) == [
+        "/e/person/John"
+    ]
+    assert request.filter.tags == ["/e/person/John"]
 
-    await _parse_entities(request, "kbid", "John", autofilter=True)
+    assert await parse_entities_to_filters(request, detected_entities) == []
     assert request.filter.tags == ["/e/person/John"]
