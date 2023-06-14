@@ -23,16 +23,14 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb.search.search.query import parse_entities_to_filters
 
 
-async def test_parse_entities_to_filters():
+def test_parse_entities_to_filters():
     detected_entities = [
         RelationNode(value="John", ntype=RelationNode.NodeType.ENTITY, subtype="person")
     ]
 
     request = SearchRequest()
-    assert await parse_entities_to_filters(request, detected_entities) == [
-        "/e/person/John"
-    ]
+    assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
     assert request.filter.tags == ["/e/person/John"]
 
-    assert await parse_entities_to_filters(request, detected_entities) == []
+    assert parse_entities_to_filters(request, detected_entities) == []
     assert request.filter.tags == ["/e/person/John"]
