@@ -1867,22 +1867,98 @@ class PagePositions(google.protobuf.message.Message):
 global___PagePositions = PagePositions
 
 @typing_extensions.final
+class PageStructurePage(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WIDTH_FIELD_NUMBER: builtins.int
+    HEIGHT_FIELD_NUMBER: builtins.int
+    INDEX_FIELD_NUMBER: builtins.int
+    width: builtins.int
+    height: builtins.int
+    index: builtins.int
+    def __init__(
+        self,
+        *,
+        width: builtins.int = ...,
+        height: builtins.int = ...,
+        index: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["height", b"height", "index", b"index", "width", b"width"]) -> None: ...
+
+global___PageStructurePage = PageStructurePage
+
+@typing_extensions.final
+class PageStructureToken(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    X_FIELD_NUMBER: builtins.int
+    Y_FIELD_NUMBER: builtins.int
+    WIDTH_FIELD_NUMBER: builtins.int
+    HEIGHT_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    LINE_FIELD_NUMBER: builtins.int
+    x: builtins.int
+    y: builtins.int
+    width: builtins.int
+    height: builtins.int
+    text: builtins.str
+    line: builtins.float
+    def __init__(
+        self,
+        *,
+        x: builtins.int = ...,
+        y: builtins.int = ...,
+        width: builtins.int = ...,
+        height: builtins.int = ...,
+        text: builtins.str = ...,
+        line: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["height", b"height", "line", b"line", "text", b"text", "width", b"width", "x", b"x", "y", b"y"]) -> None: ...
+
+global___PageStructureToken = PageStructureToken
+
+@typing_extensions.final
+class PageStructure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_FIELD_NUMBER: builtins.int
+    TOKENS_FIELD_NUMBER: builtins.int
+    @property
+    def page(self) -> global___PageStructurePage: ...
+    @property
+    def tokens(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PageStructureToken]: ...
+    def __init__(
+        self,
+        *,
+        page: global___PageStructurePage | None = ...,
+        tokens: collections.abc.Iterable[global___PageStructureToken] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["page", b"page"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page", b"page", "tokens", b"tokens"]) -> None: ...
+
+global___PageStructure = PageStructure
+
+@typing_extensions.final
 class FilePages(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PAGES_FIELD_NUMBER: builtins.int
     POSITIONS_FIELD_NUMBER: builtins.int
+    STRUCTURES_FIELD_NUMBER: builtins.int
     @property
     def pages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CloudFile]: ...
     @property
     def positions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PagePositions]: ...
+    @property
+    def structures(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PageStructure]: ...
     def __init__(
         self,
         *,
         pages: collections.abc.Iterable[global___CloudFile] | None = ...,
         positions: collections.abc.Iterable[global___PagePositions] | None = ...,
+        structures: collections.abc.Iterable[global___PageStructure] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "positions", b"positions"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "positions", b"positions", "structures", b"structures"]) -> None: ...
 
 global___FilePages = FilePages
 
