@@ -39,6 +39,14 @@ from nucliadb_models.vectors import VectorSimilarity
 _T = TypeVar("_T")
 
 
+class ModelParamDefaults:
+    applied_autofilters = ParamDefault(
+        default=[],
+        title="Autofilters",
+        description="List of filters automatically applied to the search query",
+    )
+
+
 class ResourceProperties(str, Enum):
     BASIC = "basic"
     ORIGIN = "origin"
@@ -222,6 +230,7 @@ class KnowledgeboxSearchResults(BaseModel):
     relations: Optional[Relations] = None
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
+    autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
 class KnowledgeboxSuggestResults(BaseModel):
@@ -706,6 +715,7 @@ class KnowledgeboxFindResults(BaseModel):
     next_page: bool = False
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
+    autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
 class FeedbackTasks(str, Enum):

@@ -69,12 +69,28 @@ async def global_query_to_pb(
     with_status: Optional[ResourceProcessingStatus] = None,
     with_synonyms: bool = False,
     autofilter: bool = False,
-) -> Tuple[SearchRequest, bool]:
+) -> Tuple[SearchRequest, bool, List[str]]:
+    """
+    Converts the pydantic query to a protobuf query
+
+    :return: (request, incomplete, autofilters)
+        where:
+            - request: protobuf SearchRequest object
+            - incomplete: If the query is incomplete (missing vectors)
+            - autofilters: The autofilters that were applied
+    """
     fields = fields or []
+    autofilters = []
 
     request = SearchRequest()
+    request.body = query
+    if advanced_query is not None:
+        request.advanced_query = advanced_query
     request.reload = reload
     request.with_duplicates = with_duplicates
+    request.filter.tags.extend(filters)
+    request.faceted.tags.extend(faceted)
+    request.fields.extend(fields)
 
     if with_status is not None:
         request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]
@@ -101,18 +117,10 @@ async def global_query_to_pb(
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
     if SearchOptions.DOCUMENT in features or SearchOptions.PARAGRAPH in features:
-        request.body = query
-        if advanced_query is not None:
-            request.advanced_query = advanced_query
-        request.filter.tags.extend(filters)
-        request.faceted.tags.extend(faceted)
-
         sort_field = SortFieldMap[sort.field] if sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[sort.order]  # type: ignore
-
-        request.fields.extend(fields)
 
     request.document = SearchOptions.DOCUMENT in features
     request.paragraph = SearchOptions.PARAGRAPH in features
@@ -123,8 +131,15 @@ async def global_query_to_pb(
             request, kbid, query, user_vector=user_vector, vectorset=vectorset
         )
 
-    if SearchOptions.RELATIONS in features:
-        await _parse_entities(request, kbid, query, autofilter=autofilter)
+    relations_search = SearchOptions.RELATIONS in features
+    if relations_search or autofilter:
+        detected_entities = await detect_entities(kbid, query)
+        if relations_search:
+            request.relation_subgraph.entry_points.extend(detected_entities)
+            request.relation_subgraph.depth = 1
+        if autofilter:
+            entity_filters = parse_entities_to_filters(request, detected_entities)
+            autofilters.extend(entity_filters)
 
     if with_synonyms:
         if advanced_query:
@@ -139,7 +154,7 @@ async def global_query_to_pb(
             )
         await apply_synonyms_to_request(request, kbid)
 
-    return request, incomplete
+    return request, incomplete, autofilters
 
 
 async def _parse_vectors(
@@ -168,23 +183,28 @@ async def _parse_vectors(
     return incomplete
 
 
-async def _parse_entities(
-    request: SearchRequest, kbid: str, query: str, autofilter: bool = False
-):
+async def detect_entities(kbid: str, query: str) -> List[RelationNode]:
     predict = get_predict()
     try:
-        detected_entities = await predict.detect_entities(kbid, query)
-        request.relation_subgraph.entry_points.extend(detected_entities)
-        request.relation_subgraph.depth = 1
-        if autofilter is True:
-            # Add a filter for each detected entity
-            request.filter.tags.extend(
-                f"/e/{relation.subtype}/{relation.value}"
-                for relation in detected_entities
-                if relation.ntype == RelationNode.NodeType.ENTITY
-            )
+        return await predict.detect_entities(kbid, query)
     except SendToPredictError as ex:
         logger.warning(f"Errors on predict api detecting entities: {ex}")
+        return []
+
+
+def parse_entities_to_filters(
+    request: SearchRequest, detected_entities: List[RelationNode]
+) -> List[str]:
+    added_filters = []
+    for entity_filter in [
+        f"/e/{entity.subtype}/{entity.value}"
+        for entity in detected_entities
+        if entity.ntype == RelationNode.NodeType.ENTITY
+    ]:
+        if entity_filter not in request.filter.tags:
+            request.filter.tags.append(entity_filter)
+            added_filters.append(entity_filter)
+    return added_filters
 
 
 async def suggest_query_to_pb(
