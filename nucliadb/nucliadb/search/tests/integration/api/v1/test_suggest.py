@@ -69,11 +69,10 @@ async def test_suggest_resource_all(
 
             if node_obj is not None:
                 shard = await node_obj.get_shard(replica.shard.id)
-                assert shard.id == replica.shard.id
-                shard_reader = await node_obj.get_reader_shard(replica.shard.id)
-                assert shard_reader.resources == 3
-                assert shard_reader.paragraphs == 2
-                assert shard_reader.sentences == 3
+                assert shard.shard_id == replica.shard.id
+                assert shard.resources == 3
+                assert shard.paragraphs == 2
+                assert shard.sentences == 3
 
                 prequest = SuggestRequest()
                 prequest.shard = replica.shard.id

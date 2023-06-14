@@ -81,7 +81,7 @@ impl WriterChild for TextWriterService {
         let time = SystemTime::now();
 
         let id = Some(&resource.shard_id);
-        let resource_id = resource.resource.as_ref().unwrap();
+        let resource_id = resource.resource.as_ref().expect("Missing resource ID");
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Delete existing uuid: starts at {v} ms");
@@ -212,13 +212,21 @@ impl TextWriterService {
     }
 
     fn index_document(&mut self, resource: &Resource) {
-        let metadata = resource.metadata.as_ref().unwrap();
-
-        let modified = metadata.modified.as_ref().unwrap();
-        let created = metadata.created.as_ref().unwrap();
+        let metadata = resource
+            .metadata
+            .as_ref()
+            .expect("Missing resource metadata");
+        let modified = metadata
+            .modified
+            .as_ref()
+            .expect("Missing resource modified date in metadata");
+        let created = metadata
+            .created
+            .as_ref()
+            .expect("Missing resource created date in metadata");
 
         let mut doc = doc!(
-            self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
+            self.schema.uuid => resource.resource.as_ref().expect("Missing resource details").uuid.as_str(),
             self.schema.modified => timestamp_to_datetime_utc(modified),
             self.schema.created => timestamp_to_datetime_utc(created),
             self.schema.status => resource.status as u64,

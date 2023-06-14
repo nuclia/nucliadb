@@ -41,12 +41,6 @@ from nucliadb_protos.utils_pb2 import Relation
 class DummyWriterStub:  # pragma: no cover
     calls: Dict[str, List[Any]] = {}
 
-    async def GetShard(self, data):
-        self.calls.setdefault("GetShard", []).append(data)
-        return NodeResourcesShard(
-            shard_id="shard", resources=2, paragraphs=2, sentences=2
-        )
-
     async def NewShard(self, data):
         self.calls.setdefault("NewShard", []).append(data)
         return ShardCreated(id="shard")
