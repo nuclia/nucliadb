@@ -51,7 +51,6 @@ async def test_autofilters_are_returned(
         params={
             "query": "What relates Newton and Becquer?",
         },
-        timeout=None,
     )
     assert resp.status_code == 200
     assert resp.json()["autofilters"] == []
@@ -62,7 +61,6 @@ async def test_autofilters_are_returned(
             "autofilter": True,
             "query": "What relates Newton and Becquer?",
         },
-        timeout=None,
     )
     assert resp.status_code == 200
     autofilters = resp.json()["autofilters"]
