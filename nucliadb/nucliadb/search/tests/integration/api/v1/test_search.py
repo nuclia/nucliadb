@@ -181,26 +181,25 @@ async def test_search_resource_all(
 
             if node_obj is not None:
                 shard = await node_obj.get_shard(replica.shard.id)
-                assert shard.id == replica.shard.id
-                shard_reader = await node_obj.get_reader_shard(replica.shard.id)
-                assert shard_reader.resources == 3
-                assert shard_reader.paragraphs == 2
-                assert shard_reader.sentences == 3
+                assert shard.shard_id == replica.shard.id
+                assert shard.resources == 3
+                assert shard.paragraphs == 2
+                assert shard.sentences == 3
 
                 prequest = ParagraphSearchRequest()
-                prequest.id = shard.id
+                prequest.id = replica.shard.id
                 prequest.body = "Ramon"
                 prequest.result_per_page = 10
                 prequest.reload = True
 
                 drequest = DocumentSearchRequest()
-                drequest.id = shard.id
+                drequest.id = replica.shard.id
                 drequest.body = "Ramon"
                 drequest.result_per_page = 10
                 drequest.reload = True
 
                 vrequest = VectorSearchRequest()
-                vrequest.id = shard.id
+                vrequest.id = replica.shard.id
                 vrequest.vector.extend(Q)
                 vrequest.result_per_page = 20
                 vrequest.reload = True
