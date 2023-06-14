@@ -23,7 +23,6 @@ use std::sync::Arc;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
-use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
@@ -61,14 +60,11 @@ impl NodeReaderGRPCDriver {
         // NOTE: Taking into account we use an unbounded shard cache, we only request
         // loading a shard into memory when lazy loading is enabled. Otherwise,
         // we rely on all shards (stored on disk) been brought to memory before
-        // the driver is online.
+        // the driver is online on `initialize`.
         if self.options.lazy_loading {
-            let loaded = self.shards.load(id.clone()).await;
-            if let Err(error) = loaded {
-                // REVIEW if shard can't be loaded, why aren't we returning
-                // an error?
-                error!("Error lazy loading shard: {error:?}");
-            }
+            self.shards.load(id.clone()).await.map_err(|error| {
+                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+            })?;
         }
 
         match self.shards.get(id.clone()).await {

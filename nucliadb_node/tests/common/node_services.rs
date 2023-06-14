@@ -27,8 +27,7 @@ use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
-use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
-use nucliadb_node::writer::NodeWriterService;
+use nucliadb_node::writer::grpc_driver::{GrpcWriterOptions, NodeWriterGRPCDriver};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Server};
@@ -76,13 +75,13 @@ async fn start_writer(addr: SocketAddr) {
     if *initialized_lock {
         return;
     }
+    let data_path = nucliadb_node::env::data_path();
+    if !data_path.exists() {
+        std::fs::create_dir(&data_path).expect("Can not create data directory");
+    }
     tokio::spawn(async move {
-        let data_path = nucliadb_node::env::data_path();
-        if !data_path.exists() {
-            std::fs::create_dir(&data_path).expect("Can not create data directory");
-        }
-        let writer = NodeWriterService::new().expect("Can not create writer");
-        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::from(writer));
+        let options = GrpcWriterOptions { lazy_loading: true };
+        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(options));
         Server::builder()
             .add_service(writer_server)
             .serve(addr)

@@ -25,8 +25,7 @@ use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, NewShardRequest, OpStatus, Resource, ResourceId, VectorSetId,
-    VectorSimilarity,
+    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{metrics, thread};
@@ -163,17 +162,10 @@ impl ShardWriterService {
         };
         ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
-    pub fn new(
-        id: String,
-        path: &Path,
-        request: &NewShardRequest,
-    ) -> NodeResult<ShardWriterService> {
+
+    pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriterService> {
         let time = SystemTime::now();
 
-        std::fs::create_dir(path)?;
-        let metadata_path = path.join(METADATA_FILE);
-        let similarity = request.similarity();
-        let metadata = ShardMetadata::from(request.clone());
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -183,7 +175,7 @@ impl ShardWriterService {
         };
 
         let vsc = VectorConfig {
-            similarity: Some(similarity),
+            similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
         };
@@ -191,8 +183,11 @@ impl ShardWriterService {
             path: path.join(RELATIONS_DIR),
         };
 
+        std::fs::create_dir(path)?;
+        let metadata_path = path.join(METADATA_FILE);
         metadata.serialize(&metadata_path)?;
         let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
+
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/new".to_string());
