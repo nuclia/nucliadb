@@ -20,7 +20,7 @@
 import json
 from datetime import datetime
 from time import time
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
@@ -56,10 +56,6 @@ FIND_EXAMPLES = {
         },
     }
 }
-
-
-class IncompleteFindResultsError(Exception):
-    pass
 
 
 @api.get(
@@ -152,9 +148,10 @@ async def find_knowledgebox(
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
     try:
-        return await find(
+        results, _ = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -180,9 +177,10 @@ async def find_post_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        return await find(
+        results, _ = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -195,8 +193,7 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-    raise_on_incomplete_results: bool = False,
-) -> KnowledgeboxFindResults:
+) -> Tuple[KnowledgeboxFindResults, bool]:
     audit = get_audit()
     start_time = time()
 
@@ -229,9 +226,6 @@ async def find(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
-
-    if incomplete_results and raise_on_incomplete_results:
-        raise IncompleteFindResultsError()
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
@@ -267,4 +261,4 @@ async def find(
         search_results.nodes = queried_nodes
 
     search_results.shards = queried_shards
-    return search_results
+    return search_results, incomplete_results

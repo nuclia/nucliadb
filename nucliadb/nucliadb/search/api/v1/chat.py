@@ -26,7 +26,7 @@ from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearch
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search.api.v1.find import IncompleteFindResultsError, find
+from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
@@ -59,6 +59,10 @@ CHAT_EXAMPLES = {
         },
     },
 }
+
+
+class IncompleteFindResultsError(Exception):
+    pass
 
 
 @api.post(
@@ -137,15 +141,16 @@ async def chat(
     find_request.autofilter = item.autofilter
     find_request.highlight = item.highlight
 
-    results = await find(
+    results, incomplete = await find(
         response,
         kbid,
         find_request,
         x_ndb_client,
         x_nucliadb_user,
         x_forwarded_for,
-        raise_on_incomplete_results=True,
     )
+    if incomplete:
+        raise IncompleteFindResultsError()
 
     if item.context is None:
         context = []
