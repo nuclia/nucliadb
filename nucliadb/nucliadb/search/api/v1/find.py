@@ -20,7 +20,7 @@
 import json
 from datetime import datetime
 from time import time
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
@@ -148,9 +148,10 @@ async def find_knowledgebox(
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
     try:
-        return await find(
+        results, _ = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -176,9 +177,10 @@ async def find_post_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        return await find(
+        results, _ = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -191,7 +193,7 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-) -> KnowledgeboxFindResults:
+) -> Tuple[KnowledgeboxFindResults, bool]:
     audit = get_audit()
     start_time = time()
 
@@ -259,4 +261,5 @@ async def find(
 
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
+    return search_results, incomplete_results
     return search_results

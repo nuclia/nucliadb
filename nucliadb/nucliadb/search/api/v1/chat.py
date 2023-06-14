@@ -61,6 +61,10 @@ CHAT_EXAMPLES = {
 }
 
 
+class IncompleteFindResultsError(Exception):
+    pass
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/chat",
     status_code=200,
@@ -86,6 +90,11 @@ async def chat_post_knowledgebox(
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except IncompleteFindResultsError:
+        return HTTPClientError(
+            status_code=529,
+            detail="Temporary error on information retrieval. Please try again.",
+        )
 
 
 async def chat(
@@ -132,9 +141,16 @@ async def chat(
     find_request.autofilter = item.autofilter
     find_request.highlight = item.highlight
 
-    results = await find(
-        response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    results, incomplete = await find(
+        response,
+        kbid,
+        find_request,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
     )
+    if incomplete:
+        raise IncompleteFindResultsError()
 
     if item.context is None:
         context = []
