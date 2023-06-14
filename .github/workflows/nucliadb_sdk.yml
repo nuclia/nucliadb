@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9]
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
       - name: Checkout the repository
@@ -38,7 +38,8 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        # tests pull in telemetry which is not 3.8 compat
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
       - name: Checkout the repository
