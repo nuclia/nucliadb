@@ -58,6 +58,10 @@ FIND_EXAMPLES = {
 }
 
 
+class IncompleteFindResultsError(Exception):
+    pass
+
+
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/find",
     status_code=200,
@@ -191,6 +195,7 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
+    raise_on_incomplete_results: bool = False,
 ) -> KnowledgeboxFindResults:
     audit = get_audit()
     start_time = time()
@@ -224,6 +229,9 @@ async def find(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
+
+    if incomplete_results and raise_on_incomplete_results:
+        raise IncompleteFindResultsError()
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards

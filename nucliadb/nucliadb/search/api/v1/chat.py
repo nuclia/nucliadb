@@ -26,7 +26,7 @@ from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearch
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search.api.v1.find import find
+from nucliadb.search.api.v1.find import IncompleteFindResultsError, find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
@@ -86,6 +86,11 @@ async def chat_post_knowledgebox(
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except IncompleteFindResultsError:
+        return HTTPClientError(
+            status_code=529,
+            detail="Temporary error on information retrieval. Please try again.",
+        )
 
 
 async def chat(
@@ -133,7 +138,13 @@ async def chat(
     find_request.highlight = item.highlight
 
     results = await find(
-        response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        response,
+        kbid,
+        find_request,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
+        raise_on_incomplete_results=True,
     )
 
     if item.context is None:
