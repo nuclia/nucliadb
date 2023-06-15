@@ -88,6 +88,7 @@ async def get_expanded_conversation_messages(
     if found_message is None:
         return []
     elif found_message.type == resources_pb2.Message.MessageType.QUESTION:
+        breakpoint()
         # only try to get answer if it was a question
         return await get_next_conversation_messages(
             field_obj=field_obj,

@@ -189,6 +189,9 @@ class KnowledgeBox:
         if config is None:
             config = KnowledgeBoxConfig()
 
+        from nucliadb.migrations.tool.utils import get_latest_version
+
+        config.migration_version = get_latest_version()
         config.slug = slug
         await txn.set(
             KB_UUID.format(
