@@ -77,7 +77,7 @@ async def find_conversation_message(
 
 async def get_expanded_conversation_messages(
     *, kb: KnowledgeBoxORM, rid: str, field_id: str, mident: str
-) -> list[resources_pb2.Message]:
+) -> tuple[bool, list[resources_pb2.Message]]:
     resource = await kb.get(rid)
     if resource is None:
         return []
@@ -86,10 +86,10 @@ async def get_expanded_conversation_messages(
         field_obj=field_obj, mident=mident
     )
     if found_message is None:
-        return []
+        return False, []
     elif found_message.type == resources_pb2.Message.MessageType.QUESTION:
         # only try to get answer if it was a question
-        return await get_next_conversation_messages(
+        return True, await get_next_conversation_messages(
             field_obj=field_obj,
             page=found_page,
             start_idx=found_idx + 1,
@@ -97,7 +97,7 @@ async def get_expanded_conversation_messages(
             message_type=resources_pb2.Message.MessageType.ANSWER,
         )
     else:
-        return await get_next_conversation_messages(
+        return False, await get_next_conversation_messages(
             field_obj=field_obj,
             page=found_page,
             start_idx=found_idx + 1,
@@ -131,9 +131,14 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
 
             rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
             if field_type == "c" and paragraph.score_type == SCORE_TYPE.VECTOR:
-                expanded_msgs = await get_expanded_conversation_messages(
+                is_qa, expanded_msgs = await get_expanded_conversation_messages(
                     kb=kb, rid=rid, field_id=field_id, mident=mident
                 )
+                if is_qa:
+                    return "\n\n".join(
+                        [text] + [msg.content.text.strip() for msg in expanded_msgs]
+                    )
+
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
                     words += text.count(" ")  # very imperfect but fast
