@@ -20,38 +20,61 @@
 
 use crate::data_point::{Address, DataRetriever};
 
-/// Is a singleton clause formed by label. It will be satisfied only if the address
-/// is applied to has the label.
+#[derive(Debug, Clone, Copy)]
+pub enum AtomKind {
+    KeyPrefix,
+    Label,
+}
+
+/// Is a singleton clause.
 #[derive(Debug, Clone)]
-pub struct LabelClause {
+pub struct AtomClause {
+    kind: AtomKind,
     value: String,
 }
-impl LabelClause {
-    pub fn new(labels: String) -> LabelClause {
-        LabelClause { value: labels }
+impl AtomClause {
+    pub fn new(value: String, kind: AtomKind) -> AtomClause {
+        AtomClause { kind, value }
+    }
+    pub fn label(value: String) -> AtomClause {
+        AtomClause::new(value, AtomKind::Label)
+    }
+    pub fn key_prefix(value: String) -> AtomClause {
+        AtomClause::new(value, AtomKind::KeyPrefix)
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        retriever.has_label(x, self.value.as_bytes())
+        match self.kind {
+            AtomKind::KeyPrefix => retriever.get_key(x).starts_with(self.value.as_bytes()),
+            AtomKind::Label => retriever.has_label(x, self.value.as_bytes()),
+        }
     }
 }
 
 /// Is a clause formed by the conjuction of several LabelClauses. Additionally this
-/// clause has a threshold that specifies the minimum number of LabelClauses that have to
+/// clause has a threshold that specifies the minimum number of AtomClauses that have to
 /// succeed in order for the overall conjuction to be satisfied.
 #[derive(Debug, Clone)]
 pub struct CompoundClause {
     threshold: usize,
-    labels: Vec<LabelClause>,
+    labels: Vec<AtomClause>,
 }
 impl CompoundClause {
-    pub fn new(threshold: usize, labels: Vec<LabelClause>) -> CompoundClause {
+    pub fn len(&self) -> usize {
+        self.labels.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.labels.is_empty()
+    }
+    pub fn new(threshold: usize, labels: Vec<AtomClause>) -> CompoundClause {
         CompoundClause { threshold, labels }
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        let number_of_subqueries = self.labels.len();
+        if self.is_empty() {
+            return true;
+        }
         let mut threshold = self.threshold;
         let mut i = 0;
-        while threshold > 0 && i <= number_of_subqueries {
+        while threshold > 0 && i < self.len() {
             let is_valid = self.labels[i].run(x, retriever);
             threshold -= is_valid as usize;
             i += 1;
@@ -63,7 +86,7 @@ impl CompoundClause {
 /// Wrapper that unifies the different types of clauses a formula may have.
 #[derive(Debug, Clone)]
 pub enum Clause {
-    Label(LabelClause),
+    Atom(AtomClause),
     Compound(CompoundClause),
 }
 
@@ -71,14 +94,14 @@ impl Clause {
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         match self {
             Clause::Compound(q) => q.run(x, retriever),
-            Clause::Label(q) => q.run(x, retriever),
+            Clause::Atom(q) => q.run(x, retriever),
         }
     }
 }
 
-impl From<LabelClause> for Clause {
-    fn from(value: LabelClause) -> Self {
-        Clause::Label(value)
+impl From<AtomClause> for Clause {
+    fn from(value: AtomClause) -> Self {
+        Clause::Atom(value)
     }
 }
 
@@ -116,9 +139,13 @@ mod tests {
     use super::*;
     use crate::data_point::Address;
     struct DummyRetriever {
+        key: &'static [u8],
         labels: HashSet<&'static [u8]>,
     }
     impl DataRetriever for DummyRetriever {
+        fn get_key(&self, _: Address) -> &[u8] {
+            self.key
+        }
         fn has_label(&self, _: Address, label: &[u8]) -> bool {
             self.labels.contains(label)
         }
@@ -134,29 +161,41 @@ mod tests {
     }
     #[test]
     fn test_query() {
+        const KEY: &str = "/This/is/a/key";
         const L1: &str = "Label1";
         const L2: &str = "Label2";
         const L3: &str = "Label3";
         const ADDRESS: Address = Address::dummy();
         let retriever = DummyRetriever {
+            key: KEY.as_bytes(),
             labels: [L1.as_bytes(), L3.as_bytes()].into_iter().collect(),
         };
         let mut formula = Formula::new();
-        formula.extend(LabelClause::new(L1.to_string()));
-        formula.extend(LabelClause::new(L3.to_string()));
+        formula.extend(AtomClause::label(L1.to_string()));
+        formula.extend(AtomClause::label(L3.to_string()));
         assert!(formula.run(ADDRESS, &retriever));
 
         let mut formula = Formula::new();
-        formula.extend(LabelClause::new(L1.to_string()));
-        formula.extend(LabelClause::new(L2.to_string()));
+        formula.extend(AtomClause::label(L1.to_string()));
+        formula.extend(AtomClause::label(L2.to_string()));
         assert!(!formula.run(ADDRESS, &retriever));
 
         let mut formula = Formula::new();
         let inner = vec![
-            LabelClause::new(L1.to_string()),
-            LabelClause::new(L2.to_string()),
+            AtomClause::label(L1.to_string()),
+            AtomClause::label(L2.to_string()),
         ];
         formula.extend(CompoundClause::new(1, inner));
         assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        let inner = vec![AtomClause::key_prefix("/This/is".to_string())];
+        formula.extend(CompoundClause::new(1, inner));
+        assert!(formula.run(ADDRESS, &retriever));
+        let mut formula = Formula::new();
+
+        let inner = vec![AtomClause::key_prefix("/This/is/not".to_string())];
+        formula.extend(CompoundClause::new(1, inner));
+        assert!(!formula.run(ADDRESS, &retriever));
     }
 }

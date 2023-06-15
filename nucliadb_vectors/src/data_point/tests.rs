@@ -21,7 +21,7 @@
 use std::collections::HashSet;
 
 use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary, Similarity};
-use crate::formula::{Formula, LabelClause};
+use crate::formula::{AtomClause, Formula};
 
 const SIMILARITY: Similarity = Similarity::Cosine;
 
@@ -47,7 +47,7 @@ fn simple_flow() {
     let mut queries = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
-        queries.push(LabelClause::new(format!("LABEL_{}", i)));
+        queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let mut expected_keys = vec![];
     let label_dictionary = LabelDictionary::new(labels.clone());
@@ -88,7 +88,7 @@ fn accuracy_test() {
     let mut queries = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
-        queries.push(LabelClause::new(format!("LABEL_{}", i)));
+        queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let labels_dictionary = LabelDictionary::new(labels.clone());
     let mut elems = Vec::new();
