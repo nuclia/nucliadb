@@ -76,6 +76,7 @@ setup(
             # utilities
             "nucliadb-purge = nucliadb.purge:purge",
             "nucliadb-ingest-purge = nucliadb.ingest.purge:run",
+            "nucliadb-migrate = nucliadb.migrations.tool.command:main",
             "nucliadb-extract-openapi-reader = nucliadb.reader.openapi:command_extract_openapi",
             "nucliadb-extract-openapi-search = nucliadb.search.openapi:command_extract_openapi",
             "nucliadb-extract-openapi-writer = nucliadb.writer.openapi:command_extract_openapi",
