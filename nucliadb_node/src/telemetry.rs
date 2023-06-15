@@ -17,8 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-pub mod middleware;
-
 use nucliadb_core::tracing::{Level, Span};
 use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;

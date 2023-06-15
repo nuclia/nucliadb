@@ -16,36 +16,15 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
+mod async_unbounded_reader;
+mod async_unbounded_writer;
+/// Shard provider using an unbounded cache. It can contain all shard
+/// readers/writers from an index node, so it could be memory expensive.
+/// However, it's an easy implementation that speeds up operations (as shards
+/// can be preloaded)
+mod unbounded_reader;
+mod unbounded_writer;
 
-/// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
-
-pub mod node_metadata;
-
-pub mod services;
-
-pub mod middleware;
-
-pub mod shards;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
-pub mod utils;
-
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// Node's http service
-pub mod http_server;
+pub use async_unbounded_reader::AsyncUnboundedShardReaderCache;
+pub use unbounded_reader::UnboundedShardReaderCache;
