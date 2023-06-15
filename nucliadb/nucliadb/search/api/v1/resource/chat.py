@@ -79,26 +79,16 @@ async def chat_post_resource_by_id(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[StreamingResponse, HTTPClientError]:
-    try:
-        return await chat_on_resource(
-            response,
-            kbid,
-            rid,
-            None,
-            item,
-            x_ndb_client,
-            x_nucliadb_user,
-            x_forwarded_for,
-        )
-    except LimitsExceededError as exc:
-        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except ResourceNotFoundError:
-        return HTTPClientError(status_code=404, detail="Resource not found")
-    except IncompleteFindResourceResults:
-        return HTTPClientError(
-            status_code=529,
-            detail="Temporary error on information retrieval. Please try again.",
-        )
+    return await chat_on_resource_endpoint(
+        response,
+        kbid,
+        rid=rid,
+        rslug=None,
+        item=item,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
 
 
 @api.post(
@@ -121,17 +111,21 @@ async def chat_post_resource_by_slug(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[StreamingResponse, HTTPClientError]:
+    return await chat_on_resource_endpoint(
+        response,
+        kbid,
+        rid=None,
+        rslug=rslug,
+        item=item,
+        x_ndb_client=x_ndb_client,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
+
+
+async def chat_on_resource_endpoint(*args, **kwargs):
     try:
-        return await chat_on_resource(
-            response,
-            kbid,
-            None,
-            rslug,
-            item,
-            x_ndb_client,
-            x_nucliadb_user,
-            x_forwarded_for,
-        )
+        return await chat_on_resource(*args, **kwargs)
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except ResourceNotFoundError:
