@@ -118,10 +118,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.partitions = settings.partitions
 
     async def initialize(self):
-        storage = await get_storage(service_name=SERVICE_NAME)
-        driver = await setup_driver()
-        cache = await get_cache()
-        self.proc = Processor(driver=driver, storage=storage, cache=cache)
+        self.storage = await get_storage(service_name=SERVICE_NAME)
+        self.driver = await setup_driver()
+        self.cache = await get_cache()
+        self.proc = Processor(
+            driver=self.driver, storage=self.storage, cache=self.cache
+        )
         self.shards_manager = get_shard_manager()
 
     async def finalize(self):
@@ -168,8 +170,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         txn = await self.proc.driver.begin()
 
-        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
-        resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
+        kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+        resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
 
         field = await resobj.get_field(
             request.field.field, request.field.field_type, load=True
@@ -256,7 +258,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         response = OpStatusWriter()
-        cache = await get_cache()
         async for message in request_stream:
             try:
                 await self.proc.process(
@@ -268,8 +269,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 break
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
-            if cache is not None:
-                await cache.delete(
+            if self.cache is not None:
+                await self.cache.delete(
                     KB_COUNTER_CACHE.format(kbid=message.kbid), invalidate=True
                 )
         return response
@@ -671,7 +672,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response.uuid = ""
         txn = await self.proc.driver.begin()
 
-        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
+        kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
         rid = await kbobj.get_resource_uuid_by_slug(request.slug)
         if rid:
             response.uuid = rid
@@ -686,8 +687,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         resobj = None
         txn = await self.proc.driver.begin()
 
-        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
-        resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
+        kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+        resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
 
         if request.field != "":
             field = await resobj.get_field(request.field, request.field_type, load=True)
@@ -721,8 +722,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
 
-        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
-        resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
+        kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+        resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
         bm = await resobj.generate_broker_message()
         transaction = get_transaction_utility()
         partitioning = get_partitioning()
@@ -736,8 +737,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
             txn = await self.proc.driver.begin()
-            kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
-            resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
+            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
             resobj.disable_vectors = not request.reindex_vectors
 
             brain = await resobj.generate_index_message()
@@ -782,7 +783,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             txn = await self.proc.driver.begin()
 
-            kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
+            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
             async for resource in kbobj.iterate_resources():
                 yield await resource.generate_broker_message()
             await txn.abort()
@@ -791,20 +792,19 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             raise
 
     async def DownloadFile(self, request: FileRequest, context=None):
-        async for data in self.proc.storage.download(request.bucket, request.key):
+        async for data in self.storage.download(request.bucket, request.key):
             yield BinaryData(data=data)
 
     async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
-        storage = self.proc.storage
         data: UploadBinaryData
 
         destination: Optional[StorageField] = None
         cf = CloudFile()
         data = await request.__anext__()
         if data.HasField("metadata"):
-            bucket = storage.get_bucket_name(data.metadata.kbid)
-            destination = storage.field_klass(
-                storage=storage, bucket=bucket, fullkey=data.metadata.key
+            bucket = self.storage.get_bucket_name(data.metadata.kbid)
+            destination = self.storage.field_klass(
+                storage=self.storage, bucket=bucket, fullkey=data.metadata.key
             )
             cf.content_type = data.metadata.content_type
             cf.filename = data.metadata.filename
@@ -837,7 +837,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         if destination is None:
             raise AttributeError("No destination file")
-        await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
+        await self.storage.uploaditerator(
+            generate_buffer(self.storage, request), destination, cf
+        )
         result = FileUploaded()
         return result
 
