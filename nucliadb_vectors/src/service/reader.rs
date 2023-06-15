@@ -379,6 +379,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         assert!(reader.search(&bad_request).is_err());
     }
