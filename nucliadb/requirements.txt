@@ -40,7 +40,7 @@ types-orjson
 nucliadb-telemetry>=1.11.1
 nucliadb-utils[storages,fastapi,cache]
 nucliadb-protos
-nucliadb-models
+nucliadb-models>=2.15.1.post353
 nucliadb-contributor-assets~=1.0.0
 
 tikv-client>=0.0.3
