@@ -30,7 +30,7 @@ from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.chat_prompt import format_chat_prompt_content
+from nucliadb.search.search.chat.prompt import format_chat_prompt_content
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles

@@ -25,15 +25,13 @@ from fastapi_versioning import version
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.utils import get_driver
+from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import SERVICE_NAME
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.chat_prompt import format_chat_prompt_content
+from nucliadb.search.search.chat.prompt import format_chat_prompt_content
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
@@ -50,14 +48,13 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_storage
 
 END_OF_STREAM = "_END_"
 
 CHAT_RESOURCE_EXAMPLES = {
     "search_and_chat": {
         "summary": "Ask who won the league final",
-        "description": "You can ask a question to your knowledge box",  # noqa
+        "description": "You can ask a question to your document",  # noqa
         "value": {
             "query": "Who won the league final?",
         },
@@ -157,7 +154,7 @@ async def chat_on_resource(
         raise ValueError("You must provide either rid or rslug")
 
     if rid is None:
-        rid = await get_resource_uuid_from_slug(kbid, rslug)  # type: ignore
+        rid = await get_resource_uuid_by_slug(kbid, rslug)  # type: ignore
         if rid is None:
             raise ResourceNotFoundError()
 
@@ -273,11 +270,3 @@ async def chat_on_resource(
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
-
-
-async def get_resource_uuid_from_slug(kbid: str, slug: str) -> Optional[str]:
-    driver = await get_driver()
-    storage = await get_storage(service_name=SERVICE_NAME)
-    async with driver.transaction() as txn:
-        kbobj = KnowledgeBoxORM(txn, storage, kbid)
-        return await kbobj.get_resource_uuid_by_slug(slug)
