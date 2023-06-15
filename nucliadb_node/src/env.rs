@@ -298,3 +298,18 @@ pub fn metrics_http_port(default: u16) -> u16 {
         Err(_) => default,
     }
 }
+
+pub fn max_shards_per_node() -> usize {
+    let default = 800;
+    match env::var("MAX_NODE_REPLICAS") {
+        Ok(max_shards) => {
+            if let Ok(max_shards) = max_shards.parse() {
+                max_shards
+            } else {
+                error!("MAX_NODE_REPLICAS defined incorrectly. Using default: {default}");
+                default
+            }
+        }
+        Err(_) => default,
+    }
+}
