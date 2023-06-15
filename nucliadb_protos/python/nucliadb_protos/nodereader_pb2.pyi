@@ -593,19 +593,16 @@ class VectorSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
-    VECTOR_SET_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
     TAGS_FIELD_NUMBER: builtins.int
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
-    WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
+    WITH_DUPLICATES_FIELD_NUMBER: builtins.int
+    VECTOR_SET_FIELD_NUMBER: builtins.int
+    KEYS_FIELD_NUMBER: builtins.int
     id: builtins.str
     """Shard ID"""
-    vector_set: builtins.str
-    """ID for the vector set.
-    Empty for searching on the original index
-    """
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
         """Embedded vector search."""
@@ -616,21 +613,28 @@ class VectorSearchRequest(google.protobuf.message.Message):
     """What page is the answer."""
     result_per_page: builtins.int
     """How many results are in this page."""
-    with_duplicates: builtins.bool
     reload: builtins.bool
+    with_duplicates: builtins.bool
+    vector_set: builtins.str
+    """ID for the vector set.
+    Empty for searching on the original index
+    """
+    @property
+    def keys(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         id: builtins.str = ...,
-        vector_set: builtins.str = ...,
         vector: collections.abc.Iterable[builtins.float] | None = ...,
         tags: collections.abc.Iterable[builtins.str] | None = ...,
         page_number: builtins.int = ...,
         result_per_page: builtins.int = ...,
-        with_duplicates: builtins.bool = ...,
         reload: builtins.bool = ...,
+        with_duplicates: builtins.bool = ...,
+        vector_set: builtins.str = ...,
+        keys: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "keys", b"keys", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 
@@ -927,6 +931,7 @@ class SearchRequest(google.protobuf.message.Message):
     RELATIONS_FIELD_NUMBER: builtins.int
     RELATION_PREFIX_FIELD_NUMBER: builtins.int
     RELATION_SUBGRAPH_FIELD_NUMBER: builtins.int
+    KEYS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
@@ -963,6 +968,8 @@ class SearchRequest(google.protobuf.message.Message):
     def relation_prefix(self) -> global___RelationPrefixSearchRequest: ...
     @property
     def relation_subgraph(self) -> global___EntitiesSubgraphRequest: ...
+    @property
+    def keys(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -987,9 +994,10 @@ class SearchRequest(google.protobuf.message.Message):
         relations: global___RelationSearchRequest | None = ...,
         relation_prefix: global___RelationPrefixSearchRequest | None = ...,
         relation_subgraph: global___EntitiesSubgraphRequest | None = ...,
+        keys: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "keys", b"keys", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "relations", b"relations", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
     @typing.overload

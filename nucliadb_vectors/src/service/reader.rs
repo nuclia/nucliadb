@@ -343,6 +343,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: true,
+            ..Default::default()
         };
         let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 4);
@@ -356,6 +357,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = reader.search(&request).unwrap();
         let no_nodes = reader.count("").unwrap();
@@ -371,6 +373,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         assert!(reader.search(&bad_request).is_err());
     }

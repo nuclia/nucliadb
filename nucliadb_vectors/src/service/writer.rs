@@ -479,6 +479,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let results = reader.search(&request).unwrap();
         let id = results.documents[0].doc_id.clone().unwrap().id;
