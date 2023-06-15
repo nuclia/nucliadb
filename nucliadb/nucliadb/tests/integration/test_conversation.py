@@ -36,6 +36,7 @@ from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
     InputMessageContent,
+    MessageType,
 )
 from nucliadb_models.resource import ConversationFieldData, FieldConversation
 from nucliadb_models.resource import Resource
@@ -55,6 +56,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
                 timestamp=datetime.now(),
                 content=InputMessageContent(text="What is the meaning of life?"),
                 ident=str(i),
+                type=MessageType.QUESTION.value,
             )
         )
     resp = await nucliadb_writer.post(
@@ -65,7 +67,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
             conversations={
                 "faq": InputConversationField(messages=messages),
             },
-        ).json(),
+        ).json(by_alias=True),
     )
 
     assert resp.status_code == 201
@@ -79,7 +81,8 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
             to=[f"computer"],
             content=InputMessageContent(text="42"),
             ident="computer",
-        ).json()
+            type=MessageType.ANSWER.value,
+        ).json(by_alias=True)
         + "]",
     )
 
@@ -140,6 +143,7 @@ async def test_conversations(
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 200
     assert [m["ident"] for m in msgs] == [str(i) for i in range(200)]
+    assert msgs[0]["type"] == MessageType.QUESTION.value
 
     # get second page
     resp = await nucliadb_reader.get(
@@ -152,6 +156,7 @@ async def test_conversations(
     assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + [
         "computer"
     ]
+    assert msgs[-1]["type"] == MessageType.ANSWER.value
 
 
 @pytest.mark.asyncio
