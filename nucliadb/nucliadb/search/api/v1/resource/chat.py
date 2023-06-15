@@ -155,12 +155,11 @@ async def chat_on_resource(
         if rid is None:
             raise ResourceNotFoundError()
 
-    if item.context is not None and len(item.context) > 0:
+    new_query = item.query
+    if item.context and len(item.context) > 0:
         new_query = await rephrase_query_from_context(
             kbid, item.context, item.query, x_nucliadb_user
         )
-    else:
-        new_query = item.query
 
     find_request = FindRequest()
     find_request.resource_filters = [rid]
