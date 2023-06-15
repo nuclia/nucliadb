@@ -17,32 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import base64
-from typing import AsyncIterator, List, Optional, Union
+from typing import Optional, Union
 
 from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
-from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.predict import PredictEngine
-from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.chat.prompt import format_chat_prompt_content
-from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.utilities import get_predict
+from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
-    Author,
-    ChatModel,
-    ChatOptions,
     ChatRequest,
     FindRequest,
-    KnowledgeboxFindResults,
-    Message,
     NucliaDBClientType,
     SearchOptions,
 )
@@ -63,6 +52,10 @@ CHAT_RESOURCE_EXAMPLES = {
 
 
 class ResourceNotFoundError(Exception):
+    pass
+
+
+class IncompleteFindResourceResults(Exception):
     pass
 
 
@@ -101,6 +94,11 @@ async def chat_post_resource_by_id(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except ResourceNotFoundError:
         return HTTPClientError(status_code=404, detail="Resource not found")
+    except IncompleteFindResourceResults:
+        return HTTPClientError(
+            status_code=529,
+            detail="Temporary error on information retrieval. Please try again.",
+        )
 
 
 @api.post(
@@ -138,6 +136,11 @@ async def chat_post_resource_by_slug(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except ResourceNotFoundError:
         return HTTPClientError(status_code=404, detail="Resource not found")
+    except IncompleteFindResourceResults:
+        return HTTPClientError(
+            status_code=529,
+            detail="Temporary error on information retrieval. Please try again.",
+        )
 
 
 async def chat_on_resource(
@@ -158,18 +161,10 @@ async def chat_on_resource(
         if rid is None:
             raise ResourceNotFoundError()
 
-    predict = get_predict()
-
     if item.context is not None and len(item.context) > 0:
-        # There is context lets do a query
-        req = ChatModel(
-            question=item.query,
-            context=item.context,
-            user_id=x_nucliadb_user,
-            retrieval=False,
+        new_query = await rephrase_query_from_context(
+            kbid, item.context, item.query, x_nucliadb_user
         )
-
-        new_query = await predict.rephrase_query(kbid, req)
     else:
         new_query = item.query
 
@@ -194,79 +189,9 @@ async def chat_on_resource(
     find_request.autofilter = item.autofilter
     find_request.highlight = item.highlight
 
-    results = await find(
+    find_results, incomplete = await find(
         response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
-
-    if item.context is None:
-        context = []
-    else:
-        context = item.context
-    context.append(
-        Message(
-            author=Author.NUCLIA, text=await format_chat_prompt_content(kbid, results)
-        )
-    )
-
-    chat_model = ChatModel(
-        user_id=x_nucliadb_user,
-        context=context,
-        question=item.query,
-    )
-
-    ident, generator = await predict.chat_query(kbid, chat_model)
-
-    async def generate_answer(
-        results: KnowledgeboxFindResults,
-        kbid: str,
-        predict: PredictEngine,
-        generator: AsyncIterator[bytes],
-        features: List[ChatOptions],
-    ):
-        if ChatOptions.PARAGRAPHS in features:
-            bytes_results = base64.b64encode(results.json().encode())
-            yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
-            yield bytes_results
-
-        answer = []
-        async for data in generator:
-            answer.append(data)
-            yield data
-
-        if ChatOptions.RELATIONS in features:
-            yield END_OF_STREAM
-
-            text_answer = b"".join(answer)
-
-            detected_entities = await predict.detect_entities(
-                kbid, text_answer.decode()
-            )
-            relation_request = RelationSearchRequest()
-            relation_request.subgraph.entry_points.extend(detected_entities)
-            relation_request.subgraph.depth = 1
-
-            relations_results: List[RelationSearchResponse]
-            (
-                relations_results,
-                incomplete_results,
-                queried_nodes,
-                queried_shards,
-            ) = await node_query(kbid, Method.RELATIONS, relation_request, item.shards)
-            yield base64.b64encode(
-                (
-                    await merge_relations_results(
-                        relations_results, relation_request.subgraph
-                    )
-                )
-                .json()
-                .encode()
-            )
-
-    return StreamingResponse(
-        generate_answer(results, kbid, predict, generator, item.features),
-        media_type="plain/text",
-        headers={
-            "NUCLIA-LEARNING-ID": ident or "unknown",
-            "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
-        },
-    )
+    if incomplete:
+        raise IncompleteFindResourceResults()
+    return await chat(kbid, find_results, item, x_nucliadb_user)
