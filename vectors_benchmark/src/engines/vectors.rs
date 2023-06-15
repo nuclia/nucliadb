@@ -57,7 +57,7 @@ impl VectorEngine for Index {
         let new_dp =
             DataPoint::new(self.location(), elems, Some(temporal_mark), similarity).unwrap();
         let lock = self.get_elock().unwrap();
-        self.add(new_dp, &lock);
+        self.add(new_dp, &lock).unwrap();
         self.delete(batch_id, temporal_mark, &lock);
         self.commit(lock).unwrap();
     }

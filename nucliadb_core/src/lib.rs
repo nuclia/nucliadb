@@ -26,7 +26,7 @@ pub mod texts;
 pub mod vectors;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-pub use anyhow::{anyhow as node_error, Context};
+pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::{Resource, ResourceId};
 pub type NodeResult<O> = anyhow::Result<O>;
 

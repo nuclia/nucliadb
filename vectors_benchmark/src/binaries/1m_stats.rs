@@ -47,7 +47,7 @@ fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<Str
         .collect();
     let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity).unwrap();
     let lock = writer.get_elock().unwrap();
-    writer.add(new_dp, &lock);
+    writer.add(new_dp, &lock).unwrap();
     writer.commit(lock).unwrap();
 }
 fn main() {
