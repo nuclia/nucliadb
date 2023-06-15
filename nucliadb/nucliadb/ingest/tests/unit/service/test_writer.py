@@ -169,7 +169,9 @@ class TestWriterServicer:
         )
 
         resp = await writer.SetVectors(request)
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
+
+        txn = writer.driver.transaction.return_value.__aenter__.return_value
+        txn.commit.assert_called_once()
 
         assert resp.found
 
@@ -196,7 +198,6 @@ class TestWriterServicer:
         resp = await writer.SetVectors(request)
 
         assert resp.found
-        writer.proc.driver.begin.return_value.abort.assert_called_once()
 
     async def test_NewKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxNew(slug="slug")
@@ -278,7 +279,8 @@ class TestWriterServicer:
         resp = await writer.SetLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
+        txn = writer.driver.transaction.return_value.__aenter__.return_value
+        txn.commit.assert_called_once()
 
     async def test_SetLabels_missing(self, writer: WriterServicer):
         request = writer_pb2.SetLabelsRequest(
@@ -301,7 +303,6 @@ class TestWriterServicer:
         resp = await writer.SetLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
-        writer.proc.driver.begin.return_value.abort.assert_called_once()
 
     async def test_DelLabels(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
@@ -311,7 +312,8 @@ class TestWriterServicer:
         resp = await writer.DelLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
+        txn = writer.driver.transaction.return_value.__aenter__.return_value
+        txn.commit.assert_called_once()
 
     async def test_DelLabels_missing(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
@@ -334,7 +336,6 @@ class TestWriterServicer:
         resp = await writer.DelLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
-        writer.proc.driver.begin.return_value.abort.assert_called_once()
 
     async def test_GetLabelSet(self, writer: WriterServicer):
         request = writer_pb2.GetLabelSetRequest(
