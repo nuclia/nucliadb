@@ -442,7 +442,6 @@ message PagePositions {
 message PageStructurePage {
     int64 width = 1;
     int64 height = 2;
-    int64 index = 3;
 }
 
 message PageStructureToken {

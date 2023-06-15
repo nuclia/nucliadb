@@ -1872,18 +1872,15 @@ class PageStructurePage(google.protobuf.message.Message):
 
     WIDTH_FIELD_NUMBER: builtins.int
     HEIGHT_FIELD_NUMBER: builtins.int
-    INDEX_FIELD_NUMBER: builtins.int
     width: builtins.int
     height: builtins.int
-    index: builtins.int
     def __init__(
         self,
         *,
         width: builtins.int = ...,
         height: builtins.int = ...,
-        index: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["height", b"height", "index", b"index", "width", b"width"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["height", b"height", "width", b"width"]) -> None: ...
 
 global___PageStructurePage = PageStructurePage
 
