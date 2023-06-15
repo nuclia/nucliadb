@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from lib2to3.pgen2.token import OP
 from typing import AsyncIterator, List, Optional, Union
 
 from fastapi import Body, Header, Request, Response
@@ -26,7 +25,10 @@ from fastapi_versioning import version
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.ingest.utils import get_driver
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import SERVICE_NAME
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
@@ -48,6 +50,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.utilities import get_storage
 
 END_OF_STREAM = "_END_"
 
@@ -60,6 +63,10 @@ CHAT_RESOURCE_EXAMPLES = {
         },
     },
 }
+
+
+class ResourceNotFoundError(Exception):
+    pass
 
 
 @api.post(
@@ -84,10 +91,19 @@ async def chat_post_resource_by_id(
 ) -> Union[StreamingResponse, HTTPClientError]:
     try:
         return await chat_on_resource(
-            response, kbid, rid, None, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            response,
+            kbid,
+            rid,
+            None,
+            item,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except ResourceNotFoundError:
+        return HTTPClientError(status_code=404, detail="Resource not found")
 
 
 @api.post(
@@ -112,10 +128,19 @@ async def chat_post_resource_by_slug(
 ) -> Union[StreamingResponse, HTTPClientError]:
     try:
         return await chat_on_resource(
-            response, kbid, None, rslug, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            response,
+            kbid,
+            None,
+            rslug,
+            item,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except ResourceNotFoundError:
+        return HTTPClientError(status_code=404, detail="Resource not found")
 
 
 async def chat_on_resource(
@@ -130,6 +155,11 @@ async def chat_on_resource(
 ):
     if all([rid, rslug]) or not any([rid, rslug]):
         raise ValueError("You must provide either rid or rslug")
+
+    if rid is None:
+        rid = await get_resource_uuid_from_slug(kbid, rslug)  # type: ignore
+        if rid is None:
+            raise ResourceNotFoundError()
 
     predict = get_predict()
 
@@ -146,8 +176,8 @@ async def chat_on_resource(
     else:
         new_query = item.query
 
-    # ONLY PARAGRAPHS I VECTORS
     find_request = FindRequest()
+    find_request.resource_filters = [rid]
     find_request.features = [
         SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
@@ -244,6 +274,10 @@ async def chat_on_resource(
         },
     )
 
-# TODO:
-# - Allow any prompt to be used
-# - Chat on resource or field?
+
+async def get_resource_uuid_from_slug(kbid: str, slug: str) -> Optional[str]:
+    driver = await get_driver()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    async with driver.transaction() as txn:
+        kbobj = KnowledgeBoxORM(txn, storage, kbid)
+        return await kbobj.get_resource_uuid_by_slug(slug)

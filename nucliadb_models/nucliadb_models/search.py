@@ -383,6 +383,11 @@ class SearchParamDefaults:
         title="Faceted",
         description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
     )
+    resource_filters = ParamDefault(
+        default=[],
+        title="Resource filters",
+        description="List of resource ids to filter search results for. Only paragraphs from the specified resources will be returned.",  # noqa: E501
+    )
     min_score = ParamDefault(
         default=0.70,
         title="Minimum result score",
@@ -539,6 +544,10 @@ class BaseSearchRequest(BaseModel):
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    resource_filters: List[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
     min_score: float = SearchParamDefaults.min_score.to_pydantic_field()

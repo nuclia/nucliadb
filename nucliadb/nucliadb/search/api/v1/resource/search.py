@@ -26,6 +26,7 @@ from fastapi_versioning import version
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import SERVICE_NAME
+from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_paragraphs_results
@@ -42,8 +43,6 @@ from nucliadb_models.search import (
     SortOrder,
 )
 from nucliadb_utils.authentication import requires_one
-
-from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 
 
 @api.get(
