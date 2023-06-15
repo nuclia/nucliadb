@@ -167,10 +167,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response.found = True
 
         txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
+        resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
 
         field = await resobj.get_field(
             request.field.field, request.field.field_type, load=True
@@ -671,9 +670,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = ResourceIdResponse()
         response.uuid = ""
         txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
+        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
         rid = await kbobj.get_resource_uuid_by_slug(request.slug)
         if rid:
             response.uuid = rid
@@ -687,10 +685,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response.found = False
         resobj = None
         txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
+        resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
 
         if request.field != "":
             field = await resobj.get_field(request.field, request.field_type, load=True)
@@ -723,10 +720,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+        kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
+        resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
         bm = await resobj.generate_broker_message()
         transaction = get_transaction_utility()
         partitioning = get_partitioning()
@@ -740,9 +736,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
             txn = await self.proc.driver.begin()
-            storage = await get_storage(service_name=SERVICE_NAME)
-            kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-            resobj = ResourceORM(txn, storage, kbobj, request.rid)
+            kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
+            resobj = ResourceORM(txn, self.proc.storage, kbobj, request.rid)
             resobj.disable_vectors = not request.reindex_vectors
 
             brain = await resobj.generate_index_message()
@@ -786,9 +781,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def Export(self, request: ExportRequest, context=None):
         try:
             txn = await self.proc.driver.begin()
-            storage = await get_storage(service_name=SERVICE_NAME)
 
-            kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
+            kbobj = KnowledgeBoxORM(txn, self.proc.storage, request.kbid)
             async for resource in kbobj.iterate_resources():
                 yield await resource.generate_broker_message()
             await txn.abort()
@@ -797,12 +791,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             raise
 
     async def DownloadFile(self, request: FileRequest, context=None):
-        storage = await get_storage(service_name=SERVICE_NAME)
-        async for data in storage.download(request.bucket, request.key):
+        async for data in self.proc.storage.download(request.bucket, request.key):
             yield BinaryData(data=data)
 
     async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
-        storage = await get_storage(service_name=SERVICE_NAME)
+        storage = self.proc.storage
         data: UploadBinaryData
 
         destination: Optional[StorageField] = None
