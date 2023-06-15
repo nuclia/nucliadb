@@ -1,4 +1,8 @@
 # Changelog
+## 0.7.7
+
+- Be able to filter by key in vectors
+
 ## 0.7.6
 
 - Properly compute total search results for document and paragaph
