@@ -127,6 +127,7 @@ class InputMessage(BaseModel):
     to: List[str] = []
     content: InputMessageContent
     ident: str
+    type_: Optional[MessageType] = Field(None, alias="type")
 
 
 class InputConversationField(BaseModel):
