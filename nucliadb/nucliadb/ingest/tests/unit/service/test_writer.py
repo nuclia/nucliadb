@@ -128,9 +128,10 @@ class TestWriterServicer:
     @pytest.fixture
     def writer(self):
         servicer = WriterServicer()
+        servicer.driver = AsyncMock()
+        servicer.driver.transaction = MagicMock(return_value=AsyncMock())
         servicer.proc = AsyncMock()
-        servicer.proc.driver = AsyncMock()
-        servicer.proc.driver.transaction = MagicMock(return_value=AsyncMock())
+        servicer.proc.driver = servicer.driver
         yield servicer
 
     @pytest.fixture(autouse=True)
