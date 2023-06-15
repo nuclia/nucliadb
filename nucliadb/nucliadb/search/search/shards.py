@@ -41,9 +41,11 @@ node_observer = metrics.Observer("node_client", labels={"type": ""})
 async def query_shard(
     node: AbstractIndexNode, shard: str, query: SearchRequest
 ) -> SearchResponse:
-    query.shard = shard
+    query_copy = SearchRequest()
+    query_copy.CopyFrom(query)
+    query_copy.shard = shard
     with node_observer({"type": "search"}):
-        return await node.reader.Search(query)  # type: ignore
+        return await node.reader.Search(query_copy)  # type: ignore
 
 
 async def get_shard(
