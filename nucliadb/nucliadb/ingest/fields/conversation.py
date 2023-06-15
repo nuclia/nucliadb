@@ -56,15 +56,15 @@ class Conversation(Field):
         self.metadata = None
 
     async def set_value(self, payload: PBConversation):
-        await self.db_get_metadata()
         last_page: Optional[PBConversation] = None
-        if self._created is False and self.metadata:
+        metadata = await self.get_metadata()
+        if self._created is False:
             try:
-                last_page = await self.db_get_value(page=self.metadata.pages)
+                last_page = await self.db_get_value(page=metadata.pages)
             except PageNotFound:
                 pass
 
-        # Make sure files are on our region
+        # Make sure message attachment files are on our region
         for message in payload.messages:
             new_message_files = []
             for count, file in enumerate(message.content.attachments):
@@ -86,37 +86,33 @@ class Conversation(Field):
             for message_file in new_message_files:
                 message.content.attachments.append(message_file)
 
-        # Merge on last page
-        space_on_last_page = 0
-        need_new_page = True
-        if last_page and self.metadata is not None:
-            space_on_last_page = self.metadata.size - len(last_page.messages)
-            if space_on_last_page > len(payload.messages):
-                last_page.messages.extend(payload.messages)
-                need_new_page = False
-            else:
-                last_page.messages.extend(payload.messages[:space_on_last_page])
-            await self.db_set_value(last_page, self.metadata.pages)
+        if last_page is None:
+            last_page = PBConversation()
+            metadata.pages += 1
 
-        # Create a new page
-        if need_new_page and self.metadata is not None:
-            new_page = PBConversation()
-            new_page.messages.extend(payload.messages[space_on_last_page:])
-            self.metadata.pages += 1
-            await self.db_set_value(new_page, self.metadata.pages)
-            await self.db_set_metadata(self.metadata)
+        # Merge on last page
+        messages = list(payload.messages)
+        metadata.total += len(messages)
+        while len(messages) > 0:
+            count = metadata.size - len(last_page.messages)
+            last_page.messages.extend(messages[:count])
+            await self.db_set_value(last_page, metadata.pages)
+
+            messages = messages[count:]
+            if len(messages) > 0:
+                metadata.pages += 1
+                last_page = PBConversation()
+
+        await self.db_set_metadata(metadata)
 
     async def get_value(self, page: Optional[int] = None) -> Optional[PBConversation]:
         # If now page was requested, force fetch of metadata
         # and set the page to the last page
         if page is None and self.metadata is None:
-            await self.db_get_metadata()
-
-        if page is None and self.metadata is not None:
-            page = self.metadata.pages
+            await self.get_metadata()
 
         try:
-            if page is not None:
+            if page is not None and page > 0:
                 pageobj = await self.db_get_value(page)
             else:
                 pageobj = None
@@ -125,9 +121,6 @@ class Conversation(Field):
             return None
 
     async def get_metadata(self) -> FieldConversation:
-        return await self.db_get_metadata()
-
-    async def db_get_metadata(self) -> FieldConversation:
         if self.metadata is None:
             payload = await self.resource.txn.get(
                 KB_RESOURCE_FIELD_METADATA.format(
@@ -140,20 +133,20 @@ class Conversation(Field):
             else:
                 self.metadata.size = PAGE_SIZE
                 self.metadata.pages = 0
+                self.metadata.total = 0
                 self._created = True
         return self.metadata
 
     async def db_get_value(self, page: int = 1):
         if self.value.get(page) is None:
-            payload = await self.resource.txn.get(
-                KB_RESOURCE_FIELD.format(
-                    kbid=self.kbid,
-                    uuid=self.uuid,
-                    type=self.type,
-                    field=self.id,
-                    page=page,
-                )
+            field_key = KB_RESOURCE_FIELD.format(
+                kbid=self.kbid,
+                uuid=self.uuid,
+                type=self.type,
+                field=self.id,
+                page=page,
             )
+            payload = await self.resource.txn.get(field_key)
             if payload:
                 self.value[page] = PBConversation()
                 self.value[page].ParseFromString(payload)
@@ -162,10 +155,11 @@ class Conversation(Field):
         return self.value[page]
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
+        field_key = KB_RESOURCE_FIELD.format(
+            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
+        )
         await self.resource.txn.set(
-            KB_RESOURCE_FIELD.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
-            ),
+            field_key,
             payload.SerializeToString(),
         )
         self.value[page] = payload

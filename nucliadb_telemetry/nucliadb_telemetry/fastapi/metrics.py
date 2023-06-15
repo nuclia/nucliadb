@@ -18,15 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import time
-from typing import Optional, Tuple
 
 from prometheus_client import Counter, Gauge, Histogram
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.routing import Match, Mount, Route
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
-from starlette.types import ASGIApp, Scope
+
+from .utils import get_path_template
 
 try:
     from starlette_prometheus.middleware import (
@@ -67,18 +66,16 @@ except ImportError:  # pragma: no cover
 
 
 class PrometheusMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, filter_unhandled_paths: bool = False) -> None:
-        super().__init__(app)
-        self.filter_unhandled_paths = filter_unhandled_paths
-
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         method = request.method
-        path_template, is_handled_path = self.get_path_template(request)
+        found_path_template = get_path_template(request.scope)
 
-        if self._is_path_filtered(is_handled_path):
+        if not found_path_template.match:
             return await call_next(request)
+
+        path_template = found_path_template.path
 
         REQUESTS_IN_PROGRESS.labels(method=method, path_template=path_template).inc()
         REQUESTS.labels(method=method, path_template=path_template).inc()
@@ -108,33 +105,3 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
             ).dec()
 
         return response
-
-    @staticmethod
-    def get_path_template(request: Request) -> Tuple[str, bool]:
-        path, found = PrometheusMiddleware._find_route(
-            request.scope, request.app.routes
-        )
-        return path or request.url.path, found
-
-    @staticmethod
-    def _find_route(scope: Scope, routes: list[Route]) -> Tuple[Optional[str], bool]:
-        # we mutate scope, so we need a copy
-        scope = scope.copy()  # type:ignore
-        for route in routes:
-            if isinstance(route, Mount):
-                mount_match, child_scope = route.matches(scope)
-                if mount_match == Match.FULL:
-                    scope.update(child_scope)
-                    sub_path, sub_match = PrometheusMiddleware._find_route(
-                        scope, route.routes
-                    )
-                    if sub_match:
-                        return route.path + sub_path, sub_match
-            elif isinstance(route, Route):
-                match, child_scope = route.matches(scope)
-                if match == Match.FULL:
-                    return route.path, True
-        return None, False
-
-    def _is_path_filtered(self, is_handled_path: bool) -> bool:
-        return self.filter_unhandled_paths and not is_handled_path

@@ -1,0 +1,35 @@
+# NucliaDB Settings
+
+# image settings
+imagePullPolicy: IfNotPresent
+image: nuclia/nucliadb
+imageVersion: latest
+
+# app settings
+env:
+  NUCLIA_ZONE: "europe1"
+  CORS_ORIGINS: '["http://localhost:8080"]'
+  #NUA_API_KEY: "..."
+
+envSecrets:
+  - name: NUA_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: nuclia-api-key
+        key: api-key
+
+affinity: {}
+nodeSelector: {}
+tolerations: []
+topologySpreadConstraints: []
+
+resources: {}
+#  limits:
+#    memory: "2600Mi"
+#  requests:
+#    memory: "600Mi"
+#    cpu: 1
+
+storage:
+  class: ssd
+  size: 100Gi

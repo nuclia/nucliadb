@@ -4,6 +4,7 @@ package resources;
 
 import public "nucliadb_protos/utils.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 message CloudFile {
     string uri = 1;
@@ -90,6 +91,10 @@ message Origin {
     repeated string related = 10;
 }
 
+message Extra {
+    google.protobuf.Struct metadata = 1;
+}
+
 message Relations {
     repeated utils.Relation relations = 1;
 }
@@ -112,6 +117,13 @@ message Message {
     repeated string to = 3;
     MessageContent content = 4;
     string ident = 5;
+
+    enum MessageType {
+        UNSET = 0;
+        QUESTION = 1;
+        ANSWER = 2;
+    }
+    MessageType type = 6;
 }
 
 message Conversation {
@@ -119,8 +131,12 @@ message Conversation {
 }
 
 message FieldConversation {
+    // Total number of pages
     int32 pages = 1;
+    // Max page size
     int32 size = 2;
+    // Total number of messages
+    int32 total = 3;
 }
 
 message NestedPosition {
@@ -277,6 +293,7 @@ message FieldText {
         HTML = 1;
         RST = 2;
         MARKDOWN = 3;
+        JSON = 4;
     }
     string body = 1;
     Format format = 2;
@@ -422,9 +439,29 @@ message PagePositions {
     int64 end = 2;
 }
 
+message PageStructurePage {
+    int64 width = 1;
+    int64 height = 2;
+}
+
+message PageStructureToken {
+    int64 x = 1;
+    int64 y = 2;
+    int64 width = 3;
+    int64 height = 4;
+    string text = 5;
+    float line = 6;
+}
+
+message PageStructure {
+    PageStructurePage page = 1;
+    repeated PageStructureToken tokens = 2;
+}
+
 message FilePages {
     repeated CloudFile pages = 1;
     repeated PagePositions positions = 2;
+    repeated PageStructure structures = 3;
 }
 
 message RowsPreview {
@@ -451,4 +488,8 @@ enum FieldType {
 message FieldID {
     FieldType field_type = 1;
     string field = 2;
+}
+
+message AllFieldIDs {
+    repeated FieldID fields = 1;
 }

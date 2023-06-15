@@ -20,8 +20,7 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
-use nucliadb_core::metrics::request_time;
+use nucliadb_core::metrics::{self, request_time};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -119,7 +118,7 @@ impl ShardReaderService {
             s.spawn(|_| vector_result = vector_task());
         });
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("reader/get_info".to_string());
         metrics.record_request_time(metric, took);
@@ -163,10 +162,6 @@ impl ShardReaderService {
     pub fn get_relations_types(&self) -> NodeResult<TypeList> {
         self.reload_policy(true);
         self.relation_reader.get_node_types()
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn get_resources(&self) -> NodeResult<usize> {
-        self.text_reader.count()
     }
 
     #[tracing::instrument(skip_all)]
@@ -222,7 +217,7 @@ impl ShardReaderService {
         let vectors = vector_result.transpose()?;
         let relations = relation_result.transpose()?;
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("reader/new".to_string());
         metrics.record_request_time(metric, took);
@@ -290,7 +285,7 @@ impl ShardReaderService {
             error!("Error stopping the Relation reader service: {}", e);
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("reader/stop".to_string());
         metrics.record_request_time(metric, took);
@@ -371,7 +366,7 @@ impl ShardReaderService {
             })
             .collect::<Vec<String>>();
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("reader/suggest".to_string());
         metrics.record_request_time(metric, took);
@@ -502,7 +497,7 @@ impl ShardReaderService {
             s.spawn(|_| rrelation = relation_task());
         });
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("reader/search".to_string());
         metrics.record_request_time(metric, took);

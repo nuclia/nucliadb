@@ -27,11 +27,13 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
+use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
+use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
@@ -43,7 +45,6 @@ use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use uuid::Uuid;
 
-const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
 
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
@@ -51,16 +52,13 @@ type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
 #[derive(Debug)]
 pub enum NodeUpdate {
     ShardCount(u64),
-    LoadScore(f32),
 }
 
 #[tokio::main]
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let _guard = init_telemetry()?;
-
     let start_bootstrap = Instant::now();
-
     let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
     let mut node_writer_service = NodeWriterService::new();
@@ -88,7 +86,6 @@ async fn main() -> NodeResult<()> {
         .on_local_network(chitchat_addr)
         .with_id(host_key.to_string())
         .with_seed_nodes(seed_nodes)
-        .insert_to_initial_state(LOAD_SCORE_KEY, node_metadata.load_score())
         .insert_to_initial_state(SHARD_COUNT_KEY, node_metadata.shard_count())
         .build()?;
     let node = node.start().await?;
@@ -149,11 +146,17 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
 
     info!("Listening for gRPC requests at: {:?}", addr);
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    let tracing_middleware = GrpcInstrumentorLayer::default();
+    let debug_logs_middleware = GrpcDebugLogsLayer::default();
+    let metrics_middleware = MetricsLayer::default();
 
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
+        .layer(tracing_middleware)
+        .layer(debug_logs_middleware)
+        .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))
         .serve(addr)
@@ -189,9 +192,6 @@ async fn update_node_state(node: NodeHandle, mut metadata_receiver: UnboundedRec
 
         match event {
             NodeUpdate::ShardCount(count) => node.update_state(SHARD_COUNT_KEY, count).await,
-            NodeUpdate::LoadScore(load_score) => {
-                node.update_state(LOAD_SCORE_KEY, load_score).await
-            }
         }
     }
 }
@@ -208,21 +208,13 @@ pub async fn update_node_metadata(
         debug!("Receive metadata update event: {event:?}");
 
         let result = match event {
-            NodeWriterEvent::ShardCreation(id, knowledge_box) => {
-                node_metadata.new_shard(id, knowledge_box, 0.0);
+            NodeWriterEvent::ShardCreation => {
+                node_metadata.new_shard();
                 update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
             }
-            NodeWriterEvent::ShardDeletion(id) => {
-                node_metadata.delete_shard(id);
-                update_sender
-                    .send(NodeUpdate::ShardCount(node_metadata.shard_count()))
-                    .and_then(|_| {
-                        update_sender.send(NodeUpdate::LoadScore(node_metadata.load_score()))
-                    })
-            }
-            NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
-                node_metadata.update_shard(id, paragraph_count);
-                update_sender.send(NodeUpdate::LoadScore(node_metadata.load_score()))
+            NodeWriterEvent::ShardDeletion => {
+                node_metadata.delete_shard();
+                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
             }
         };
 

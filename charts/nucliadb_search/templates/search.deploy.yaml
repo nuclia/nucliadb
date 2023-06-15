@@ -59,12 +59,18 @@ spec:
           httpGet:
             path: /health/ready
             port: {{ .Values.serving.port }}
-          initialDelaySeconds: 20
+          initialDelaySeconds: 2
           timeoutSeconds: 10
-          periodSeconds: 20
+          periodSeconds: 10
         command: [
           "nucliadb-search"
         ]
+        lifecycle:
+          preStop:
+            exec:
+              # in order to avoid latent load balancer routing/update issues, arbitrarily throw
+              # some delay in the shutdown process
+              command: ["sleep", "15"]
         envFrom:
         - configMapRef:
             name: nucliadb-config
@@ -75,6 +81,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
+        {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+        {{- end }}
         ports:
         - name: http-search
           containerPort: {{ .Values.serving.port }}
@@ -98,8 +108,7 @@ spec:
       - name: cluster-manager
         image: "{{ .Values.containerRegistry }}/{{ .Values.image_other }}"
         imagePullPolicy: {{ .Values.imageOtherPullPolicy }}
-        command: ["/entrypoint.sh"]
-        args: ["/nucliadb_cluster/cluster_manager"]
+        command: ["/nucliadb_cluster/cluster_manager"]
         envFrom:
         - configMapRef:
             name: nucliadb-config

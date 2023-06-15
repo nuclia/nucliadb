@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod context;
 pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
@@ -27,7 +26,7 @@ pub mod texts;
 pub mod vectors;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-pub use anyhow::{anyhow as node_error, Context};
+pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::{Resource, ResourceId};
 pub type NodeResult<O> = anyhow::Result<O>;
 

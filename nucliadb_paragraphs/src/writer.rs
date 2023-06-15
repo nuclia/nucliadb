@@ -22,7 +22,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -79,7 +79,7 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
         metrics.record_request_time(metric, took);
@@ -119,7 +119,7 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("set_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -148,7 +148,7 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("delete_resource".to_string());
         metrics.record_request_time(metric, took);
@@ -220,9 +220,19 @@ impl ParagraphWriterService {
     }
 
     fn index_paragraph(&mut self, resource: &Resource) -> tantivy::Result<()> {
-        let metadata = resource.metadata.as_ref().unwrap();
-        let modified = metadata.modified.as_ref().unwrap();
-        let created = metadata.created.as_ref().unwrap();
+        let metadata = resource
+            .metadata
+            .as_ref()
+            .expect("Missing resource metadata");
+        let modified = metadata
+            .modified
+            .as_ref()
+            .expect("Missing resource modified date in metadata");
+        let created = metadata
+            .created
+            .as_ref()
+            .expect("Missing resource created date in metadata");
+
         let empty_paragraph = HashMap::with_capacity(0);
         let inspect_paragraph = |field: &str| {
             resource
@@ -264,7 +274,7 @@ impl ParagraphWriterService {
                     .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
 
                 let mut doc = doc!(
-                    self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
+                    self.schema.uuid => resource.resource.as_ref().expect("Missing resource details").uuid.as_str(),
                     self.schema.modified => timestamp_to_datetime_utc(modified),
                     self.schema.created => timestamp_to_datetime_utc(created),
                     self.schema.status => resource.status as u64,

@@ -18,22 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import logging
-import sys
 
 import pkg_resources
 
+from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE,
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
-from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
@@ -78,7 +77,7 @@ async def purge_kb(driver: Driver):
             txn = await driver.begin()
             key_to_purge = KB_TO_DELETE.format(kbid=kbid)
             await txn.delete(key_to_purge)
-            await txn.commit(resource=False)
+            await txn.commit()
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
@@ -127,14 +126,14 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
                 logger.info(f"  X Error while deleting key {key}")
                 await txn.abort()
             else:
-                await txn.commit(resource=False)
+                await txn.commit()
 
     logger.info("FINISH PURGING KB STORAGE")
 
 
 async def main():
     # Clean up all kb marked to delete
-    driver = await get_driver()
+    driver = await setup_driver()
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
         service_name=SERVICE_NAME,
@@ -146,12 +145,8 @@ async def main():
 
 
 def run() -> int:  # pragma: no cover
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    setup_logging()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
-        stream=sys.stderr,
-    )
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     return asyncio.run(main())

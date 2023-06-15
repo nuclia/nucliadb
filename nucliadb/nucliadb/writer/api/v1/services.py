@@ -53,7 +53,6 @@ from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -86,8 +85,6 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
         entitypb.merged = entity.merged
         entitypb.deleted = False
         entitypb.represents.extend(entity.represents)
-
-    set_info_on_span({"nuclia.kbid": kbid})
 
     status: OpStatusWriter = await ingest.SetEntities(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
@@ -130,8 +127,6 @@ async def create_entities_group(
         entitypb.deleted = False
         entitypb.represents.extend(entity.represents)
 
-    set_info_on_span({"nuclia.kbid": kbid})
-
     status: NewEntitiesGroupResponse = await ingest.NewEntitiesGroup(pbrequest)  # type: ignore
     if status.status == NewEntitiesGroupResponse.Status.OK:
         return
@@ -164,6 +159,8 @@ async def update_entities_group(
     pbrequest: UpdateEntitiesGroupRequest = UpdateEntitiesGroupRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.group = group
+    pbrequest.title = item.title or ""
+    pbrequest.color = item.color or ""
 
     for name, entity in item.add.items():
         entitypb = pbrequest.add[name]
@@ -178,8 +175,6 @@ async def update_entities_group(
         entitypb.represents.extend(entity.represents)
 
     pbrequest.delete.extend(item.delete)
-
-    set_info_on_span({"nuclia.kbid": kbid})
 
     status: UpdateEntitiesGroupResponse = await ingest.UpdateEntitiesGroup(pbrequest)  # type: ignore
     if status.status == UpdateEntitiesGroupResponse.Status.OK:
@@ -209,8 +204,6 @@ async def delete_entities(request: Request, kbid: str, group: str):
     pbrequest.kb.uuid = kbid
     pbrequest.group = group
 
-    set_info_on_span({"nuclia.kbid": kbid})
-
     status: OpStatusWriter = await ingest.DelEntities(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
@@ -237,8 +230,6 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
     ingest = get_ingest()
     pbrequest: SetLabelsRequest = SetLabelsRequest(id=labelset)
     pbrequest.kb.uuid = kbid
-
-    set_info_on_span({"nuclia.kbid": kbid})
 
     if item.title:
         pbrequest.labelset.title = item.title
@@ -286,7 +277,6 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
     pbrequest: DelLabelsRequest = DelLabelsRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.id = labelset
-    set_info_on_span({"nuclia.kbid": kbid})
     status: OpStatusWriter = await ingest.DelLabels(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
@@ -326,7 +316,6 @@ async def delete_vectorset(request: Request, kbid: str, vectorset: str):
     pbrequest: DelVectorSetRequest = DelVectorSetRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.vectorset = vectorset
-    set_info_on_span({"nuclia.kbid": kbid})
     status: OpStatusWriter = await ingest.DelVectorSet(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
@@ -349,7 +338,6 @@ async def delete_vectorset(request: Request, kbid: str, vectorset: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
-    set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = SetSynonymsRequest()
     pbrequest.kbid.uuid = kbid
@@ -375,7 +363,6 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_custom_synonyms(request: Request, kbid: str):
-    set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = KnowledgeBoxID(uuid=kbid)
     status: OpStatusWriter = await ingest.DelSynonyms(pbrequest)  # type: ignore

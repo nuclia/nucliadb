@@ -18,12 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
@@ -33,9 +32,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, *};
 use search_query::{search_query, suggest_query};
-use tantivy::collector::{
-    Collector, Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs,
-};
+use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
@@ -49,6 +46,7 @@ use crate::search_query::SharedTermC;
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 const FUZZY_DISTANCE: u8 = 1;
+const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
 
 pub struct ParagraphReaderService {
     index: Index,
@@ -77,7 +75,7 @@ impl ParagraphReader for ParagraphReaderService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
         metrics.record_request_time(metric, took);
@@ -93,7 +91,6 @@ impl ParagraphReader for ParagraphReaderService {
             debug!("{id:?} - Creating query: starts at {v} ms");
         }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
-        let no_results = 10;
         let text = self.adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
             suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
@@ -105,7 +102,7 @@ impl ParagraphReader for ParagraphReaderService {
             debug!("{id:?} - Searching: starts at {v} ms");
         }
         let searcher = self.reader.searcher();
-        let topdocs = TopDocs::with_limit(no_results);
+        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
         let mut results = searcher.search(&original, &topdocs).unwrap();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
@@ -115,7 +112,7 @@ impl ParagraphReader for ParagraphReaderService {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
                 debug!("{id:?} - Trying fuzzy: starts at {v} ms");
             }
-            let topdocs = TopDocs::with_limit(no_results);
+            let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
             match searcher.search(&fuzzied, &topdocs) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
                 Err(err) => error!("{err:?} during suggest"),
@@ -127,16 +124,16 @@ impl ParagraphReader for ParagraphReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Ending at: {v} ms");
         }
-
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("suggest".to_string());
         metrics.record_request_time(metric, took);
 
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
+            total: results.len(),
+            top_docs: results,
             facets_count: None,
             facets: vec![],
-            top_docs: results,
             termc: termc.get_termc(),
             text_service: self,
             query: &text,
@@ -205,7 +202,7 @@ impl ReaderChild for ParagraphReaderService {
             FUZZY_DISTANCE,
             advanced,
         );
-        let mut searcher = Searcher {
+        let searcher = Searcher {
             request,
             results,
             offset,
@@ -214,28 +211,17 @@ impl ReaderChild for ParagraphReaderService {
             text: &text,
             only_faceted: request.only_faceted,
         };
-        let mut response = searcher.do_search(termc.clone(), original, self);
+        let mut response = searcher.do_search(termc.clone(), original, self)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
         }
 
-        if response.results.is_empty() {
+        if response.results.is_empty() && request.result_per_page > 0 {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
                 debug!("{id:?} - Applying fuzzy: starts at {v} ms");
             }
-            searcher.results -= response.results.len();
-            let fuzzied = searcher.do_search(termc, fuzzied, self);
-            let filter = response
-                .results
-                .iter()
-                .map(|r| r.paragraph.clone())
-                .collect::<HashSet<_>>();
-            fuzzied
-                .results
-                .into_iter()
-                .filter(|r| !filter.contains(&r.paragraph))
-                .for_each(|r| response.results.push(r));
-            response.total = response.results.len() as i32;
+            let fuzzied = searcher.do_search(termc, fuzzied, self)?;
+            response = fuzzied;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
                 debug!("{id:?} - Applying fuzzy: ends at {v} ms");
@@ -258,7 +244,7 @@ impl ReaderChild for ParagraphReaderService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("search".to_string());
         metrics.record_request_time(metric, took);
@@ -283,7 +269,7 @@ impl ReaderChild for ParagraphReaderService {
             keys.push(key);
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::paragraphs("stored_ids".to_string());
         metrics.record_request_time(metric, took);
@@ -485,7 +471,7 @@ impl<'a> Searcher<'a> {
         termc: SharedTermC,
         query: Box<dyn Query>,
         service: &ParagraphReaderService,
-    ) -> ParagraphSearchResponse {
+    ) -> NodeResult<ParagraphSearchResponse> {
         let searcher = service.reader.searcher();
         let facet_collector = self.facets.iter().fold(
             FacetCollector::for_field(service.schema.facets),
@@ -497,19 +483,22 @@ impl<'a> Searcher<'a> {
         if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
-            ParagraphSearchResponse::from(SearchFacetsResponse {
+            Ok(ParagraphSearchResponse::from(SearchFacetsResponse {
                 text_service: service,
                 facets_count: Some(facets_count),
                 facets: self.facets.to_vec(),
-            })
+            }))
         } else if self.facets.is_empty() {
             // Only query no facets
             let extra_result = self.results + 1;
             match self.request.order.clone() {
                 Some(order) => {
-                    let collector = self.custom_order_collector(order, extra_result, self.offset);
-                    let top_docs = searcher.search(&query, &collector).unwrap();
-                    ParagraphSearchResponse::from(SearchIntResponse {
+                    let custom_collector =
+                        self.custom_order_collector(order, extra_result, self.offset);
+                    let collector = &(Count, custom_collector);
+                    let (total, top_docs) = searcher.search(&query, collector)?;
+                    Ok(ParagraphSearchResponse::from(SearchIntResponse {
+                        total,
                         facets_count: None,
                         facets: self.facets.to_vec(),
                         top_docs,
@@ -518,12 +507,15 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
                 None => {
-                    let topdocs = TopDocs::with_limit(extra_result).and_offset(self.offset);
-                    let top_docs = searcher.search(&query, &topdocs).unwrap();
-                    ParagraphSearchResponse::from(SearchBm25Response {
+                    let topdocs_collector =
+                        TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let collector = &(Count, topdocs_collector);
+                    let (total, top_docs) = searcher.search(&query, collector)?;
+                    Ok(ParagraphSearchResponse::from(SearchBm25Response {
+                        total,
                         facets_count: None,
                         facets: self.facets.to_vec(),
                         top_docs,
@@ -532,7 +524,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
             }
         } else {
@@ -542,41 +534,36 @@ impl<'a> Searcher<'a> {
                 Some(order) => {
                     let custom_collector =
                         self.custom_order_collector(order, extra_result, self.offset);
-                    let mut multicollector = MultiCollector::new();
-                    let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(custom_collector);
-                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                    let facets_count = facet_handler.extract(&mut multi_fruit);
-                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                    ParagraphSearchResponse::from(SearchIntResponse {
+                    let collector = &(Count, facet_collector, custom_collector);
+                    let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
+                    Ok(ParagraphSearchResponse::from(SearchIntResponse {
+                        total,
+                        top_docs,
                         facets_count: Some(facets_count),
                         facets: self.facets.to_vec(),
-                        top_docs,
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
                 None => {
-                    let topdocs = TopDocs::with_limit(extra_result).and_offset(self.offset);
-                    let mut multicollector = MultiCollector::new();
-                    let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(topdocs);
-                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                    let facets_count = facet_handler.extract(&mut multi_fruit);
-                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                    ParagraphSearchResponse::from(SearchBm25Response {
+                    let topdocs_collector =
+                        TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let collector = &(Count, facet_collector, topdocs_collector);
+                    let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
+                    Ok(ParagraphSearchResponse::from(SearchBm25Response {
+                        total,
+                        top_docs,
                         facets_count: Some(facets_count),
                         facets: self.facets.to_vec(),
-                        top_docs,
                         termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
-                    })
+                    }))
                 }
             }
         }
@@ -742,6 +729,61 @@ mod tests {
             vectors_to_delete: HashMap::default(),
             shard_id,
         }
+    }
+    #[test]
+    fn test_total_number_of_results() -> NodeResult<()> {
+        const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
+        let dir = TempDir::new().unwrap();
+        let psc = ParagraphConfig {
+            path: dir.path().join("paragraphs"),
+        };
+        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let resource1 = create_resource("shard1".to_string());
+        let _ = paragraph_writer_service.set_resource(&resource1);
+        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+
+        // Search on all paragraphs faceted
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: UUID.to_string(),
+            body: "".to_string(),
+            fields: vec!["body".to_string(), "title".to_string()],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+            with_duplicates: false,
+            only_faceted: false,
+            ..Default::default()
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 4);
+        assert_eq!(result.results.len(), 4);
+
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: UUID.to_string(),
+            body: "".to_string(),
+            fields: vec!["body".to_string(), "title".to_string()],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 0,
+            timestamps: None,
+            reload: false,
+            with_duplicates: false,
+            only_faceted: false,
+            ..Default::default()
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert!(result.results.is_empty());
+        assert_eq!(result.total, 4);
+
+        Ok(())
     }
 
     #[test]
@@ -1063,6 +1105,7 @@ mod tests {
             shard_id: None,
             filter: None,
             reload: false,
+            ..Default::default()
         };
         let iter = paragraph_reader_service.iterator(&request).unwrap();
         let count = iter.count();

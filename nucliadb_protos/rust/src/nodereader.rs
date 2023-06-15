@@ -4,6 +4,23 @@ pub struct Filter {
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StreamFilter {
+    #[prost(enumeration="stream_filter::Conjunction", tag="1")]
+    pub conjunction: i32,
+    #[prost(string, repeated, tag="2")]
+    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+/// Nested message and enum types in `StreamFilter`.
+pub mod stream_filter {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Conjunction {
+        And = 0,
+        Or = 1,
+        Not = 2,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Faceted {
     #[prost(string, repeated, tag="1")]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
@@ -509,12 +526,15 @@ pub struct DocumentItem {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StreamRequest {
+    #[deprecated]
     #[prost(message, optional, tag="1")]
-    pub filter: ::core::option::Option<Filter>,
+    pub filter_deprecated: ::core::option::Option<Filter>,
     #[prost(bool, tag="2")]
     pub reload: bool,
     #[prost(message, optional, tag="3")]
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
+    #[prost(message, optional, tag="4")]
+    pub filter: ::core::option::Option<StreamFilter>,
 }
 /// Generated client implementations.
 pub mod node_reader_client {
@@ -596,28 +616,6 @@ pub mod node_reader_client {
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/nodereader.NodeReader/GetShard",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
-        pub async fn get_shards(
-            &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodereader.NodeReader/GetShards",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -907,13 +905,6 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::GetShardRequest>,
         ) -> Result<tonic::Response<super::super::noderesources::Shard>, tonic::Status>;
-        async fn get_shards(
-            &self,
-            request: tonic::Request<super::super::noderesources::EmptyQuery>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        >;
         async fn document_search(
             &self,
             request: tonic::Request<super::DocumentSearchRequest>,
@@ -1058,47 +1049,6 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = GetShardSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodereader.NodeReader/GetShards" => {
-                    #[allow(non_camel_case_types)]
-                    struct GetShardsSvc<T: NodeReader>(pub Arc<T>);
-                    impl<
-                        T: NodeReader,
-                    > tonic::server::UnaryService<
-                        super::super::noderesources::EmptyQuery,
-                    > for GetShardsSvc<T> {
-                        type Response = super::super::noderesources::ShardList;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<
-                                super::super::noderesources::EmptyQuery,
-                            >,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).get_shards(request).await };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = GetShardsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

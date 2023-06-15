@@ -20,7 +20,7 @@
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::context;
+use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
@@ -71,7 +71,7 @@ impl VectorReader for VectorReaderService {
             let no_nodes = self.index.no_nodes(&index_slock);
             std::mem::drop(index_slock);
 
-            let metrics = context::get_metrics();
+            let metrics = metrics::get_metrics();
             let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
             let metric = request_time::RequestTimeKey::vectors("count".to_string());
             metrics.record_request_time(metric, took);
@@ -84,7 +84,7 @@ impl VectorReader for VectorReaderService {
             let no_nodes = index.no_nodes(&lock);
             std::mem::drop(lock);
 
-            let metrics = context::get_metrics();
+            let metrics = metrics::get_metrics();
             let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
             let metric = request_time::RequestTimeKey::vectors("count".to_string());
             metrics.record_request_time(metric, took);
@@ -170,7 +170,7 @@ impl ReaderChild for VectorReaderService {
             debug!("{id:?} - Creating results: ends at {v} ms");
         }
 
-        let metrics = context::get_metrics();
+        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("search".to_string());
         metrics.record_request_time(metric, took);
@@ -369,5 +369,17 @@ mod tests {
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
+
+        let bad_request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0],
+            tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            reload: false,
+            with_duplicates: false,
+        };
+        assert!(reader.search(&bad_request).is_err());
     }
 }

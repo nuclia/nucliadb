@@ -27,15 +27,10 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
-from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.fetch import (
-    get_resource_cache,
-    get_resource_from_cache,
-    highlight_paragraph,
-)
+from nucliadb.search import SERVICE_NAME
+from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -46,14 +41,13 @@ from nucliadb_models.search import (
     FindResource,
     KnowledgeboxFindResults,
     ResourceProperties,
-    SortOptions,
     TempFindParagraph,
     TextPosition,
 )
 from nucliadb_telemetry import metrics
-from nucliadb_utils.utilities import has_feature
 
 from .metrics import merge_observer
+from .paragraphs import get_paragraph_text
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
@@ -61,65 +55,25 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
 )
 
 
-async def get_text_find_paragraph(
-    rid: str,
-    kbid: str,
-    field: str,
-    start: int,
-    end: int,
-    split: Optional[str] = None,
-    highlight: bool = False,
-    ematches: Optional[List[str]] = None,
-    matches: Optional[List[str]] = None,
-) -> str:
-    orm_resource = await get_resource_from_cache(kbid, rid)
-
-    if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
-        return ""
-
-    _, field_type, field = field.split("/")
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return ""
-
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
-
-    if highlight:
-        splitted_text = highlight_paragraph(
-            splitted_text, words=matches, ematches=ematches  # type: ignore
-        )
-    return splitted_text
-
-
 async def set_text_value(
     kbid: str,
     result_paragraph: TempFindParagraph,
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
-    ematches: List[str] = [],
+    ematches: Optional[List[str]] = None,
 ):
     # TODO: Improve
     await max_operations.acquire()
     try:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
-        result_paragraph.paragraph.text = await get_text_find_paragraph(
-            rid=result_paragraph.rid,
+        result_paragraph.paragraph.text = await get_paragraph_text(
             kbid=kbid,
+            rid=result_paragraph.rid,
             field=result_paragraph.field,
             start=result_paragraph.paragraph.position.start,
             end=result_paragraph.paragraph.position.end,
-            split=None,  # TODO
+            split=result_paragraph.split,
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
@@ -166,9 +120,17 @@ class Orderer:
         self.boosted_items.append(key)
 
     def sorted_by_insertion(self) -> Iterator[Any]:
+        returned = set()
         for key in self.boosted_items:
+            if key in returned:
+                continue
+            returned.add(key)
             yield key
+
         for key in self.items:
+            if key in returned:
+                continue
+            returned.add(key)
             yield key
 
 
@@ -180,14 +142,11 @@ async def fetch_find_metadata(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     highlight: bool = False,
-    ematches: List[str] = [],
+    ematches: Optional[List[str]] = None,
 ):
     resources = set()
     operations = []
-    if has_feature("nucliadb_find_merge_parallelisation"):
-        max_operations = asyncio.Semaphore(100)
-    else:
-        max_operations = asyncio.Semaphore(10)
+    max_operations = asyncio.Semaphore(50)
 
     orderer = Orderer()
 
@@ -278,6 +237,7 @@ async def merge_paragraphs_vectors(
                     rid=paragraph.uuid,
                     score=paragraph.score.bm25,
                     start=paragraph.start,
+                    split=paragraph.split,
                     end=paragraph.end,
                     id=paragraph.paragraph,
                 )
@@ -290,6 +250,7 @@ async def merge_paragraphs_vectors(
         for vector in vectors_shard:
             if vector.score >= min_score:
                 doc_id_split = vector.doc_id.id.split("/")
+                split = None
                 if len(doc_id_split) == 5:
                     rid, field_type, field, index, position = doc_id_split
                     paragraph_id = f"{rid}/{field_type}/{field}/{position}"
@@ -306,6 +267,7 @@ async def merge_paragraphs_vectors(
                         score=vector.score,
                         start=int(start),
                         end=int(end),
+                        split=split,
                         id=paragraph_id,
                     ),
                 )
@@ -374,7 +336,6 @@ async def find_merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-    sort: SortOptions,
     requested_relations: EntitiesSubgraphRequest,
     min_score: float = 0.85,
     highlight: bool = False,
@@ -392,6 +353,7 @@ async def find_merge_results(
     next_page = True
     ematches: List[str] = []
     real_query = ""
+    total_paragraphs = 0
     for response in search_responses:
         # Iterate over answers from different logic shards
 
@@ -401,6 +363,7 @@ async def find_merge_results(
         ematches.extend(response.paragraph.ematches)
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
+        total_paragraphs += response.paragraph.total
 
         paragraphs.append(cast(List[ParagraphResult], response.paragraph.results))
         vectors.append(cast(List[DocumentScored], response.vector.documents))
@@ -418,7 +381,7 @@ async def find_merge_results(
         resources={},
         facets={},
         query=real_query,
-        total=len(result_paragraphs),
+        total=total_paragraphs,
         page_number=page,
         page_size=count,
         next_page=next_page,

@@ -28,7 +28,7 @@ from nucliadb_protos.dataset_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.ingest.orm.node import Node
+from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import get_resource_from_cache
@@ -62,7 +62,7 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> st
 async def generate_field_classification_payloads(
     kbid: str,
     trainset: TrainSet,
-    node: Node,
+    node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncIterator[FieldClassificationBatch]:
     labelset = f"/l/{trainset.filter.labels[0]}"

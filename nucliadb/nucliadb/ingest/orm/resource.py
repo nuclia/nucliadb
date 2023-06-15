@@ -19,10 +19,18 @@
 #
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
+import asyncio
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Tuple, Type
 
+from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
+from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -30,8 +38,11 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
+    FieldText,
     FieldType,
+    FileExtractedData,
     LargeComputedMetadataWrapper,
+    LinkExtractedData,
 )
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
@@ -51,33 +62,39 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.date import Datetime
 from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.fields.generic import VALID_GLOBAL, Generic
+from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.keywordset import Keywordset
 from nucliadb.ingest.fields.layout import Layout
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
+from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
+from nucliadb_models.writer import GENERIC_MIME_TYPE
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
+logger = logging.getLogger(__name__)
+
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
+KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
+KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
 KB_RESOURCE_CONVERSATION = "/kbs/{kbid}/r/{uuid}/c/{page}"
 GLOBAL_FIELD = "a"
-KB_FIELDS: Dict[int, Type] = {
+KB_FIELDS: dict[int, Type] = {
     FieldType.LAYOUT: Layout,
     FieldType.TEXT: Text,
     FieldType.FILE: File,
@@ -88,7 +105,7 @@ KB_FIELDS: Dict[int, Type] = {
     FieldType.CONVERSATION: Conversation,
 }
 
-KB_REVERSE: Dict[str, int] = {
+KB_REVERSE: dict[str, FieldType.ValueType] = {
     "l": FieldType.LAYOUT,
     "t": FieldType.TEXT,
     "f": FieldType.FILE,
@@ -101,6 +118,17 @@ KB_REVERSE: Dict[str, int] = {
 
 KB_REVERSE_REVERSE = {v: k for k, v in KB_REVERSE.items()}
 
+_executor = ThreadPoolExecutor(10)
+
+
+PB_TEXT_FORMAT_TO_MIMETYPE = {
+    FieldText.Format.PLAIN: "text/plain",
+    FieldText.Format.HTML: "text/html",
+    FieldText.Format.RST: "text/x-rst",
+    FieldText.Format.MARKDOWN: "text/markdown",
+    FieldText.Format.JSON: "application/json",
+}
+
 
 class Resource:
     def __init__(
@@ -112,14 +140,16 @@ class Resource:
         basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
     ):
-        self.fields: Dict[Tuple[int, str], Field] = {}
-        self.conversations: Dict[int, PBConversation] = {}
+        self.fields: dict[Tuple[FieldType.ValueType, str], Field] = {}
+        self.conversations: dict[int, PBConversation] = {}
         self.relations: Optional[PBRelations] = None
-        self.all_fields_keys: List[Tuple[int, str]] = []
+        self.all_fields_keys: list[Tuple[FieldType.ValueType, str]] = []
         self.origin: Optional[PBOrigin] = None
+        self.extra: Optional[PBExtra] = None
         self.modified: bool = False
+        self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
-        self._modified_extracted_text: List[FieldID] = []
+        self._modified_extracted_text: list[FieldID] = []
 
         self.txn = txn
         self.storage = storage
@@ -176,11 +206,12 @@ class Resource:
         if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
             current_basic.metadata.status = basic_in_payload.metadata.status
 
+    @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(
         self,
         payload: PBBasic,
         slug: Optional[str] = None,
-        deleted_fields: Optional[List[FieldID]] = None,
+        deleted_fields: Optional[list[FieldID]] = None,
     ):
         """
         Some basic fields are computed off field metadata. This means we need to recompute upon field deletions.
@@ -241,6 +272,7 @@ class Resource:
         if slug is not None and slug != "":
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
+            self.slug_modified = True
         if deleted_fields is not None and len(deleted_fields) > 0:
             remove_field_classifications(self.basic, deleted_fields=deleted_fields)
         await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
@@ -267,6 +299,28 @@ class Resource:
         self.modified = True
         self.origin = payload
 
+    # Extra
+    async def get_extra(self) -> Optional[PBExtra]:
+        if self.extra is None:
+            pb = PBExtra()
+            payload = await self.txn.get(
+                KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
+            )
+            if payload is None:
+                return None
+            pb.ParseFromString(payload)
+            self.extra = pb
+        return self.extra
+
+    async def set_extra(self, payload: PBExtra):
+        key = KB_RESOURCE_EXTRA.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(
+            key,
+            payload.SerializeToString(),
+        )
+        self.modified = True
+        self.extra = payload
+
     # Relations
     async def get_relations(self) -> Optional[PBRelations]:
         if self.relations is None:
@@ -280,7 +334,7 @@ class Resource:
             self.relations = pb
         return self.relations
 
-    async def set_relations(self, payload: List[PBRelation]):
+    async def set_relations(self, payload: list[PBRelation]):
         relations = PBRelations()
         for relation in payload:
             relations.relations.append(relation)
@@ -291,6 +345,7 @@ class Resource:
         self.modified = True
         self.relations = relations
 
+    @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(self) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
@@ -342,7 +397,11 @@ class Resource:
         return brain
 
     async def generate_field_vectors(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         vo = await field.get_vectors()
         if vo is None:
@@ -354,7 +413,11 @@ class Resource:
         bm.field_vectors.append(evw)
 
     async def generate_user_vectors(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         uv = await field.get_user_vectors()
         if uv is None:
@@ -366,7 +429,11 @@ class Resource:
         bm.user_vectors.append(uvw)
 
     async def generate_field_large_computed_metadata(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         lcm = await field.get_large_field_metadata()
         if lcm is None:
@@ -380,7 +447,7 @@ class Resource:
     async def generate_field_computed_metadata(
         self,
         bm: BrokerMessage,
-        type_id: int,
+        type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
     ):
@@ -397,7 +464,11 @@ class Resource:
             # Make sure cloud files are removed for exporting
 
     async def generate_extracted_text(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: FieldType.ValueType,
+        field_id: str,
+        field: Field,
     ):
         etw = ExtractedTextWrapper()
         etw.field.field = field_id
@@ -410,7 +481,7 @@ class Resource:
     async def generate_field(
         self,
         bm: BrokerMessage,
-        type_id: int,
+        type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
     ):
@@ -491,42 +562,62 @@ class Resource:
         return bm
 
     # Fields
-    async def get_fields(self, force: bool = False) -> Dict[Tuple[int, str], Field]:
+    async def get_fields(
+        self, force: bool = False
+    ) -> dict[Tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
 
-    async def get_fields_ids(self, force: bool = False) -> List[Tuple[int, str]]:
-        # Get all fields
-        basic = await self.get_basic()
-        if len(self.all_fields_keys) == 0 or force:
-            result = []
-            fields = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
-            async for key in self.txn.keys(fields, count=-1):
-                # The [6:8] `slicing purpose is to match exactly the two
-                # splitted parts corresponding to type and field, and nothing else!
-                type, field = key.split("/")[6:8]
-                type_id = KB_REVERSE.get(type)
-                if type_id is None:
-                    raise AttributeError("Invalid field type")
-                result.append((type_id, field))
+    async def _scan_fields_ids(self) -> AsyncIterator[Tuple[FieldType.ValueType, str]]:
+        # TODO: Remove this method when we are sure that all KBs have the `allfields` key set
+        prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        async for key in self.txn.keys(prefix, count=-1):
+            # The [6:8] `slicing purpose is to match exactly the two
+            # splitted parts corresponding to type and field, and nothing else!
+            type, field = key.split("/")[6:8]
+            type_id = KB_REVERSE.get(type)
+            if type_id is None:
+                raise AttributeError("Invalid field type")
+            yield (type_id, field)
 
-            for generic in VALID_GLOBAL:
-                # We make sure that title and summary are set to be added
+    async def _inner_get_fields_ids(self) -> list[Tuple[FieldType.ValueType, str]]:
+        result = []
+        all_fields: Optional[PBAllFieldIDs] = await self.get_all_field_ids()
+        if all_fields is not None:
+            result = [(f.field_type, f.field) for f in all_fields.fields]
+        else:
+            # backward compatibility if all fields key is not set
+            all_fields = PBAllFieldIDs()
+            async for (field_type, field_id) in self._scan_fields_ids():
+                result.append((field_type, field_id))
+                all_fields.fields.append(FieldID(field_type=field_type, field=field_id))
+            await self.set_all_field_ids(all_fields)
+
+        # We make sure that title and summary are set to be added
+        basic = await self.get_basic()
+        if basic is not None:
+            for generic in VALID_GENERIC_FIELDS:
                 append = True
-                if generic == "title" and (basic is None or basic.title == ""):
+                if generic == "title" and basic.title == "":
                     append = False
-                elif generic == "summary" and (basic is None or basic.summary == ""):
+                elif generic == "summary" and basic.summary == "":
                     append = False
                 if append:
                     result.append((FieldType.GENERIC, generic))
+        return result
 
-            self.all_fields_keys = result
+    async def get_fields_ids(
+        self, force: bool = False
+    ) -> list[Tuple[FieldType.ValueType, str]]:
+        # Get all fields
+        if len(self.all_fields_keys) == 0 or force:
+            self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
-    async def get_field(self, key: str, type: int, load: bool = True):
+    async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -535,7 +626,7 @@ class Resource:
             self.fields[field] = field_obj
         return self.fields[field]
 
-    async def set_field(self, type: int, key: str, payload: Any):
+    async def set_field(self, type: FieldType.ValueType, key: str, payload: Any):
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -548,13 +639,16 @@ class Resource:
         self.modified = True
         return field_obj
 
-    async def delete_field(self, type: int, key: str):
+    async def delete_field(self, type: FieldType.ValueType, key: str):
         field = (type, key)
         if field in self.fields:
             field_obj = self.fields[field]
             del self.fields[field]
         else:
             field_obj = KB_FIELDS[type](id=key, resource=self)
+
+        if field in self.all_fields_keys:
+            self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))  # type: ignore
         vo = await field_obj.get_vectors()
@@ -567,35 +661,97 @@ class Resource:
 
         await field_obj.delete()
 
+    def has_field(self, type: FieldType.ValueType, field: str) -> bool:
+        return (type, field) in self.fields
+
+    async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
+        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        payload = await self.txn.get(key)
+        if payload is None:
+            return None
+        all_fields = PBAllFieldIDs()
+        all_fields.ParseFromString(payload)
+        return all_fields
+
+    async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
+        key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
+        await self.txn.set(key, all_fields.SerializeToString())
+
+    async def update_all_field_ids(
+        self,
+        *,
+        updated: Optional[list[FieldID]] = None,
+        deleted: Optional[list[FieldID]] = None,
+    ):
+        all_fields = await self.get_all_field_ids()
+        if all_fields is None:
+            all_fields = PBAllFieldIDs()
+
+        needs_update = False
+
+        for field in updated or []:
+            if field not in all_fields.fields:
+                all_fields.fields.append(field)
+                needs_update = True
+
+        for field in deleted or []:
+            if field in all_fields.fields:
+                all_fields.fields.remove(field)
+                needs_update = True
+
+        if needs_update:
+            await self.set_all_field_ids(all_fields)
+
+    @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
+        message_updated_fields = []
         for field, layout in message.layouts.items():
-            await self.set_field(FieldType.LAYOUT, field, layout)
+            fid = FieldID(field_type=FieldType.LAYOUT, field=field)
+            await self.set_field(fid.field_type, fid.field, layout)
+            message_updated_fields.append(fid)
 
         for field, text in message.texts.items():
-            await self.set_field(FieldType.TEXT, field, text)
+            fid = FieldID(field_type=FieldType.TEXT, field=field)
+            await self.set_field(fid.field_type, fid.field, text)
+            message_updated_fields.append(fid)
 
         for field, keywordset in message.keywordsets.items():
-            await self.set_field(FieldType.KEYWORDSET, field, keywordset)
+            fid = FieldID(field_type=FieldType.KEYWORDSET, field=field)
+            await self.set_field(fid.field_type, fid.field, keywordset)
+            message_updated_fields.append(fid)
 
         for field, datetimeobj in message.datetimes.items():
-            await self.set_field(FieldType.DATETIME, field, datetimeobj)
+            fid = FieldID(field_type=FieldType.DATETIME, field=field)
+            await self.set_field(fid.field_type, fid.field, datetimeobj)
+            message_updated_fields.append(fid)
 
         for field, link in message.links.items():
-            await self.set_field(FieldType.LINK, field, link)
+            fid = FieldID(field_type=FieldType.LINK, field=field)
+            await self.set_field(fid.field_type, fid.field, link)
+            message_updated_fields.append(fid)
 
         for field, file in message.files.items():
-            await self.set_field(FieldType.FILE, field, file)
+            fid = FieldID(field_type=FieldType.FILE, field=field)
+            await self.set_field(fid.field_type, fid.field, file)
+            message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
-            await self.set_field(FieldType.CONVERSATION, field, conversation)
+            fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
+            await self.set_field(fid.field_type, fid.field, conversation)
+            message_updated_fields.append(fid)
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
+        if len(message_updated_fields) or len(message.delete_fields):
+            await self.update_all_field_ids(
+                updated=message_updated_fields, deleted=message.delete_fields  # type: ignore
+            )
+
+    @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
         field_obj: Field
-        basic_modified = False
         for error in message.errors:
             field_obj = await self.get_field(error.field, error.field_type, load=False)
             await field_obj.set_error(error)
@@ -605,184 +761,214 @@ class Resource:
         if self.basic is None:
             raise KeyError("Resource Not Found")
 
+        previous_basic = Basic()
+        previous_basic.CopyFrom(self.basic)
+
         if errors:
             self.basic.metadata.status = PBMetadata.Status.ERROR
-            basic_modified = True
         elif errors is False and message.source is message.MessageSource.PROCESSOR:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
-            basic_modified = True
+
+        maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
         for extracted_text in message.extracted_text:
-            field_obj = await self.get_field(
-                extracted_text.field.field, extracted_text.field.field_type, load=False
-            )
-            await field_obj.set_extracted_text(extracted_text)
-            self._modified_extracted_text.append(
-                extracted_text.field,
-            )
+            await self._apply_extracted_text(extracted_text)
 
         for link_extracted_data in message.link_extracted_data:
-            field_link: Link = await self.get_field(
-                link_extracted_data.field,
-                FieldType.LINK,
-                load=False,
-            )
-            if link_extracted_data.link_thumbnail and self.basic.thumbnail == "":
-                self.basic.thumbnail = CloudLink.format_reader_download_uri(
-                    link_extracted_data.link_thumbnail.uri
-                )
-                basic_modified = True
-            await field_link.set_link_extracted_data(link_extracted_data)
-
-            if self.basic.icon == "":
-                self.basic.icon = "application/stf-link"
-                basic_modified = True
-            if (
-                self.basic.title.startswith("http") and link_extracted_data.title != ""
-            ) or (self.basic.title == "" and link_extracted_data.title != ""):
-                # If the title was http something or empty replace
-                self.basic.title = link_extracted_data.title
-                basic_modified = True
-            if self.basic.summary == "" and link_extracted_data.description != "":
-                self.basic.summary = link_extracted_data.description
-                basic_modified = True
+            await self._apply_link_extracted_data(link_extracted_data)
 
         for file_extracted_data in message.file_extracted_data:
-            field_file: File = await self.get_field(
-                file_extracted_data.field,
-                FieldType.FILE,
-                load=False,
-            )
-            if file_extracted_data.icon != "" and (
-                self.basic.icon == "" or self.basic.icon == "application/octet-stream"
-            ):
-                self.basic.icon = file_extracted_data.icon
-                basic_modified = True
-            if file_extracted_data.file_thumbnail and self.basic.thumbnail == "":
-                self.basic.thumbnail = CloudLink.format_reader_download_uri(
-                    file_extracted_data.file_thumbnail.uri
-                )
-                basic_modified = True
-            await field_file.set_file_extracted_data(file_extracted_data)
+            await self._apply_file_extracted_data(file_extracted_data)
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
-            field_obj = await self.get_field(
-                field_metadata.field.field,
-                field_metadata.field.field_type,
-                load=False,
-            )
-            (
-                metadata,
-                replace_field,
-                replace_splits,
-            ) = await field_obj.set_field_metadata(field_metadata)
-            field_key = self.generate_field_id(field_metadata.field)
-
-            page_positions: Optional[FilePagePositions] = None
-            if field_metadata.field.field_type == FieldType.FILE and isinstance(
-                field_obj, File
-            ):
-                page_positions = await get_file_page_positions(field_obj)
-
-            user_field_metadata = next(
-                (
-                    fm
-                    for fm in self.basic.fieldmetadata
-                    if fm.field.field == field_metadata.field.field
-                    and fm.field.field_type == field_metadata.field.field_type
-                ),
-                None,
-            )
-
-            self.indexer.apply_field_metadata(
-                field_key,
-                metadata,
-                replace_field=replace_field,
-                replace_splits=replace_splits,
-                page_positions=page_positions,
-                extracted_text=await field_obj.get_extracted_text(),
-                basic_user_field_metadata=user_field_metadata,
-            )
-
-            if (
-                field_metadata.metadata.metadata.thumbnail
-                and self.basic.thumbnail == ""
-            ):
-                self.basic.thumbnail = CloudLink.format_reader_download_uri(
-                    field_metadata.metadata.metadata.thumbnail.uri
-                )
-                basic_modified = True
-
-            if add_field_classifications(self.basic, field_metadata):
-                basic_modified = True
+            await self._apply_field_computed_metadata(field_metadata)
 
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
-                field_obj = await self.get_field(
-                    field_vectors.field.field,
-                    field_vectors.field.field_type,
-                    load=False,
-                )
-                (
-                    vo,
-                    replace_field_sentences,
-                    replace_splits_sentences,
-                ) = await field_obj.set_vectors(field_vectors)
-                field_key = self.generate_field_id(field_vectors.field)
-                if vo is not None:
-                    self.indexer.apply_field_vectors(
-                        field_key, vo, replace_field_sentences, replace_splits_sentences
-                    )
-                else:
-                    raise AttributeError("VO not found on set")
+                await self._apply_extracted_vectors(field_vectors)
             for user_vectors in message.user_vectors:
-                field_obj = await self.get_field(
-                    user_vectors.field.field,
-                    user_vectors.field.field_type,
-                    load=False,
-                )
-                uv, vectors_to_delete = await field_obj.set_user_vectors(user_vectors)
-                field_key = self.generate_field_id(user_vectors.field)
-                if uv is not None:
-                    # We need to make sure that the vectors replaced are not on the new vectors
-                    # So we extend the vectors to delete with the one replaced by the update
-                    for vectorset, vectors in vectors_to_delete.items():
-                        for vector in vectors.vectors:
-                            if (
-                                vector
-                                not in user_vectors.vectors_to_delete[vectorset].vectors
-                            ):
-                                user_vectors.vectors_to_delete[
-                                    vectorset
-                                ].vectors.append(vector)
-                    self.indexer.apply_user_vectors(
-                        field_key, uv, user_vectors.vectors_to_delete
-                    )
-                else:
-                    raise AttributeError("User Vectors not found on set")
+                await self._apply_user_vectors(user_vectors)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
-            field_obj = await self.get_field(
-                field_large_metadata.field.field,
-                field_large_metadata.field.field_type,
-                load=False,
-            )
-            await field_obj.set_large_field_metadata(field_large_metadata)
+            await self._apply_field_large_metadata(field_large_metadata)
 
         for relation in message.relations:
             self.indexer.brain.relations.append(relation)
         await self.set_relations(message.relations)  # type: ignore
 
-        if basic_modified:
+        # Basic proto may have been modified in some apply functions but we only
+        # want to set it once
+        if self.basic != previous_basic:
             await self.set_basic(self.basic)
+
+    async def _apply_extracted_text(self, extracted_text: ExtractedTextWrapper):
+        field_obj = await self.get_field(
+            extracted_text.field.field, extracted_text.field.field_type, load=False
+        )
+        await field_obj.set_extracted_text(extracted_text)
+        self._modified_extracted_text.append(
+            extracted_text.field,
+        )
+
+    async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
+        assert self.basic is not None
+        field_link: Link = await self.get_field(
+            link_extracted_data.field,
+            FieldType.LINK,
+            load=False,
+        )
+        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail)
+
+        await field_link.set_link_extracted_data(link_extracted_data)
+
+        maybe_update_basic_icon(self.basic, "application/stf-link")
+
+        if (
+            self.basic.title.startswith("http") and link_extracted_data.title != ""
+        ) or (self.basic.title == "" and link_extracted_data.title != ""):
+            # If the title was http something or empty replace
+            self.basic.title = link_extracted_data.title
+
+        maybe_update_basic_summary(self.basic, link_extracted_data.description)
+
+    async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
+        assert self.basic is not None
+        field_file: File = await self.get_field(
+            file_extracted_data.field,
+            FieldType.FILE,
+            load=False,
+        )
+        maybe_update_basic_icon(self.basic, file_extracted_data.icon)
+        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
+        await field_file.set_file_extracted_data(file_extracted_data)
+
+    async def _apply_field_computed_metadata(
+        self, field_metadata: FieldComputedMetadataWrapper
+    ):
+        assert self.basic is not None
+        maybe_update_basic_summary(self.basic, field_metadata.metadata.metadata.summary)
+
+        field_obj = await self.get_field(
+            field_metadata.field.field,
+            field_metadata.field.field_type,
+            load=False,
+        )
+        (
+            metadata,
+            replace_field,
+            replace_splits,
+        ) = await field_obj.set_field_metadata(field_metadata)
+        field_key = self.generate_field_id(field_metadata.field)
+
+        page_positions: Optional[FilePagePositions] = None
+        if field_metadata.field.field_type == FieldType.FILE and isinstance(
+            field_obj, File
+        ):
+            page_positions = await get_file_page_positions(field_obj)
+
+        user_field_metadata = next(
+            (
+                fm
+                for fm in self.basic.fieldmetadata
+                if fm.field.field == field_metadata.field.field
+                and fm.field.field_type == field_metadata.field.field_type
+            ),
+            None,
+        )
+
+        extracted_text = await field_obj.get_extracted_text()
+        apply_field_metadata = partial(
+            self.indexer.apply_field_metadata,
+            field_key,
+            metadata,
+            replace_field=replace_field,
+            replace_splits=replace_splits,
+            page_positions=page_positions,
+            extracted_text=extracted_text,
+            basic_user_field_metadata=user_field_metadata,
+        )
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(_executor, apply_field_metadata)
+
+        maybe_update_basic_thumbnail(
+            self.basic, field_metadata.metadata.metadata.thumbnail
+        )
+
+        add_field_classifications(self.basic, field_metadata)
+
+    async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
+        if not self.has_field(
+            field_vectors.field.field_type, field_vectors.field.field
+        ):
+            # skipping because field does not exist
+            logger.warning(
+                f'Field "{field_vectors.field.field}" does not exist, skipping vectors'
+            )
+            return
+
+        field_obj = await self.get_field(
+            field_vectors.field.field,
+            field_vectors.field.field_type,
+            load=False,
+        )
+        (
+            vo,
+            replace_field_sentences,
+            replace_splits_sentences,
+        ) = await field_obj.set_vectors(field_vectors)
+        field_key = self.generate_field_id(field_vectors.field)
+        if vo is not None:
+            apply_field_vectors = partial(
+                self.indexer.apply_field_vectors,
+                field_key,
+                vo,
+                replace_field_sentences,
+                replace_splits_sentences,
+            )
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(_executor, apply_field_vectors)
+        else:
+            raise AttributeError("VO not found on set")
+
+    async def _apply_user_vectors(self, user_vectors: UserVectorsWrapper):
+        field_obj = await self.get_field(
+            user_vectors.field.field,
+            user_vectors.field.field_type,
+            load=False,
+        )
+        uv, vectors_to_delete = await field_obj.set_user_vectors(user_vectors)
+        field_key = self.generate_field_id(user_vectors.field)
+        if uv is not None:
+            # We need to make sure that the vectors replaced are not on the new vectors
+            # So we extend the vectors to delete with the one replaced by the update
+            for vectorset, vectors in vectors_to_delete.items():
+                for vector in vectors.vectors:
+                    if vector not in user_vectors.vectors_to_delete[vectorset].vectors:
+                        user_vectors.vectors_to_delete[vectorset].vectors.append(vector)
+            self.indexer.apply_user_vectors(
+                field_key, uv, user_vectors.vectors_to_delete
+            )
+        else:
+            raise AttributeError("User Vectors not found on set")
+
+    async def _apply_field_large_metadata(
+        self, field_large_metadata: LargeComputedMetadataWrapper
+    ):
+        field_obj = await self.get_field(
+            field_large_metadata.field.field,
+            field_large_metadata.field.field_type,
+            load=False,
+        )
+        await field_obj.set_large_field_metadata(field_large_metadata)
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
 
+    @processor_observer.wrap({"type": "compute_global_tags"})
     async def compute_global_tags(self, brain: ResourceBrain):
         origin = await self.get_origin()
         basic = await self.get_basic()
@@ -815,6 +1001,7 @@ class Resource:
                 field_data = await fieldobj.db_get_value()
                 brain.process_keywordset_fields(fieldkey, field_data)
 
+    @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):
         # For each extracted
         for type, field in await self.get_fields_ids(force=True):
@@ -832,16 +1019,6 @@ class Resource:
             field_text += f" {split} "
         brain.apply_field_text(fieldkey, field_text)
 
-    async def get_all(self):
-        if self.basic is None:
-            self.basic = await self.get_basic()
-
-        if self.origin is None:
-            self.origin = await self.get_origin()
-
-        if self.relations is None:
-            self.relations = await self.get_relations()
-
     def clean(self):
         self._indexer = None
 
@@ -850,7 +1027,7 @@ class Resource:
     ) -> AsyncIterator[TrainSentence]:  # pragma: no cover
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
-        userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
+        userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
         if enabled_metadata.labels:
             if self.basic is None:
                 self.basic = await self.get_basic()
@@ -879,7 +1056,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -890,7 +1067,7 @@ class Resource:
                     metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
 
-                entities: Dict[str, str] = {}
+                entities: dict[str, str] = {}
                 if enabled_metadata.entities:
                     entities.update(field_metadata.ner)
 
@@ -964,7 +1141,7 @@ class Resource:
     ) -> AsyncIterator[TrainParagraph]:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
-        userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
+        userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
         if enabled_metadata.labels:
             if self.basic is None:
                 self.basic = await self.get_basic()
@@ -989,7 +1166,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1000,7 +1177,7 @@ class Resource:
                     metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
 
-                entities: Dict[str, str] = {}
+                entities: dict[str, str] = {}
                 if enabled_metadata.entities:
                     entities.update(field_metadata.ner)
 
@@ -1066,7 +1243,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1093,7 +1270,9 @@ class Resource:
                 pb_field.metadata.CopyFrom(metadata)
                 yield pb_field
 
-    async def get_resource(self, enabled_metadata: EnabledMetadata) -> TrainResource:
+    async def generate_train_resource(
+        self, enabled_metadata: EnabledMetadata
+    ) -> TrainResource:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         if enabled_metadata.labels:
@@ -1120,7 +1299,7 @@ class Resource:
             if fm is None:
                 continue
 
-            field_metadatas: List[Tuple[Optional[str], FieldMetadata]] = [
+            field_metadatas: list[Tuple[Optional[str], FieldMetadata]] = [
                 (None, fm.metadata)
             ]
             for subfield_metadata, splitted_metadata in fm.split_metadata.items():
@@ -1155,7 +1334,7 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
     return positions
 
 
-def remove_field_classifications(basic: PBBasic, deleted_fields: List[FieldID]):
+def remove_field_classifications(basic: PBBasic, deleted_fields: list[FieldID]):
     """
     Clean classifications of fields that have been deleted
     """
@@ -1185,7 +1364,7 @@ def add_field_classifications(
 
 
 def add_entities_to_metadata(
-    entities: Dict[str, str], local_text: str, metadata: TrainMetadata
+    entities: dict[str, str], local_text: str, metadata: TrainMetadata
 ) -> None:
     for entity_key, entity_value in entities.items():
         if entity_key not in local_text:
@@ -1204,3 +1383,36 @@ def add_entities_to_metadata(
                 TrainPosition(start=start, end=end)
             )
             last_occurrence_end = end
+
+
+def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
+    if basic.summary or not summary_text:
+        return False
+    basic.summary = summary_text
+    return True
+
+
+def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
+    if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
+        # Icon already set or detected
+        return False
+    if not mimetype:
+        return False
+    basic.icon = mimetype
+    return True
+
+
+def maybe_update_basic_thumbnail(
+    basic: PBBasic, thumbnail: Optional[CloudFile]
+) -> bool:
+    if basic.thumbnail or thumbnail is None:
+        return False
+    basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
+    return True
+
+
+def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
+    if len(bm.texts) == 0:
+        return None
+    text_format = next(iter(bm.texts.values())).format
+    return PB_TEXT_FORMAT_TO_MIMETYPE[text_format]

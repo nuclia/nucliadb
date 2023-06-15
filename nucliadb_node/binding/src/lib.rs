@@ -135,13 +135,6 @@ impl NodeReader {
         }
     }
 
-    pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        match self.reader.get_shards() {
-            Ok(r) => Ok(PyList::new(py, r.encode_to_vec())),
-            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-        }
-    }
-
     pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let search_request = SearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
@@ -288,19 +281,10 @@ impl NodeWriter {
         }
     }
 
-    pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-        self.writer.load_shard(&shard_id);
-        match self.writer.get_shard(&shard_id) {
-            Some(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
-            None => Err(exceptions::PyTypeError::new_err("Not found")),
-        }
-    }
-
-    pub fn new_shard<'p>(&mut self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_telemetry_event(TelemetryEvent::Create);
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).unwrap();
-        match self.writer.new_shard(&request) {
+        match RustWriterService::new_shard(&request) {
             Ok(shard) => Ok(PyList::new(py, shard.encode_to_vec())),
             Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }

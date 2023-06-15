@@ -35,21 +35,18 @@ STARTUP_FAILURE = 3
 
 def metrics_app() -> tuple[Server, Config]:
     loop_setup = "auto"
-    log_level = running_settings.log_level.lower()
-    if log_level == "warn":
-        log_level = "warning"
 
     metrics_config = Config(
         application_metrics,
         host=running_settings.metrics_host,
         port=running_settings.metrics_port,
-        debug=running_settings.debug,
+        debug=False,
         loop=loop_setup,
         http="auto",
         reload=False,
         workers=1,
         use_colors=False,
-        log_level=log_level,
+        log_config=None,
         limit_concurrency=None,
         backlog=2047,
         limit_max_requests=None,
@@ -67,10 +64,6 @@ async def serve_metrics() -> Server:
 
 def run_fastapi_with_metrics(application: FastAPI) -> None:
     loop_setup = "auto"
-    log_level = running_settings.log_level.lower()
-    if log_level == "warn":
-        log_level = "warning"
-
     metrics_server, metrics_config = metrics_app()
     config = Config(
         application,
@@ -82,7 +75,7 @@ def run_fastapi_with_metrics(application: FastAPI) -> None:
         reload=False,
         workers=1,
         use_colors=False,
-        log_level=log_level,
+        log_config=None,
         limit_concurrency=None,
         backlog=2047,
         limit_max_requests=None,

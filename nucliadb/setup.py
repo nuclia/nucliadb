@@ -55,10 +55,16 @@ setup(
         "console_scripts": [
             # Service commands
             # Standalone
-            "nucliadb = nucliadb.run:run",
+            "nucliadb = nucliadb.standalone.run:run",
             # Ingest
+            #   - This command runs pull workers + ingest write consumer
             "nucliadb-ingest = nucliadb.ingest.app:run_consumer",
+            #   - Only runs processed resources write consumer
+            "nucliadb-ingest-processed-consumer = nucliadb.ingest.app:run_processed_consumer",
+            #   - Only runs GRPC Service
             "nucliadb-ingest-orm-grpc = nucliadb.ingest.app:run_orm_grpc",
+            #   - Subscriber workers: auditing and shard creator
+            "nucliadb-ingest-subscriber-workers = nucliadb.ingest.app:run_subscriber_workers",
             # Reader
             "nucliadb-reader = nucliadb.reader.run:run",
             # Writer

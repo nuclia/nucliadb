@@ -21,13 +21,14 @@ from dataclasses import dataclass
 from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
-from nucliadb.writer.tus.dm import FileDataMangaer, RedisFileDataManager
+from nucliadb.writer.tus.dm import FileDataMangaer, RedisFileDataManagerFactory
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
-from nucliadb_utils.settings import storage_settings
+from nucliadb_utils.exceptions import ConfigurationError
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 
 TUSUPLOAD = "tusupload"
 UPLOAD = "upload"
@@ -40,13 +41,13 @@ class TusStorageDriver:
 
 
 DRIVER: Optional[TusStorageDriver] = None
-FDM: Optional[FileDataMangaer] = None
+REDIS_FILE_DATA_MANAGER_FACTORY: Optional[RedisFileDataManagerFactory] = None
 
 
 async def initialize():
     global DRIVER
 
-    if storage_settings.file_backend == "gcs":
+    if storage_settings.file_backend == FileBackendConfig.GCS:
         storage_backend = GCloudBlobStore()
 
         await storage_backend.initialize(
@@ -62,7 +63,7 @@ async def initialize():
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
-    if storage_settings.file_backend == "s3":
+    elif storage_settings.file_backend == FileBackendConfig.S3:
         storage_backend = S3BlobStore()
 
         await storage_backend.initialize(
@@ -80,7 +81,7 @@ async def initialize():
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
-    if storage_settings.file_backend == "local":
+    elif storage_settings.file_backend == FileBackendConfig.LOCAL:
         storage_backend = LocalBlobStore(storage_settings.local_files)
 
         await storage_backend.initialize()
@@ -89,31 +90,34 @@ async def initialize():
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
+    elif storage_settings.file_backend == FileBackendConfig.NOT_SET:
+        raise ConfigurationError("FILE_BACKEND env variable not configured")
+
 
 async def finalize():
     global DRIVER
-    global FDM
+    global REDIS_FILE_DATA_MANAGER_FACTORY
 
     if DRIVER is not None:
         await DRIVER.backend.finalize()
         DRIVER = None
 
-    if FDM is not None:
-        await FDM.finalize()
-        FDM = None
+    if REDIS_FILE_DATA_MANAGER_FACTORY is not None:
+        await REDIS_FILE_DATA_MANAGER_FACTORY.finalize()
+        REDIS_FILE_DATA_MANAGER_FACTORY = None
 
 
 def get_dm() -> FileDataMangaer:  # type: ignore
-    global FDM
-    if FDM is None:
-        if writer_settings.dm_enabled:
-            FDM = RedisFileDataManager(
+    if writer_settings.dm_enabled:
+        global REDIS_FILE_DATA_MANAGER_FACTORY
+        if REDIS_FILE_DATA_MANAGER_FACTORY is None:
+            REDIS_FILE_DATA_MANAGER_FACTORY = RedisFileDataManagerFactory(
                 f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
             )
-        else:
-            FDM = FileDataMangaer()
-
-    return FDM
+        dm_driver: FileDataMangaer = REDIS_FILE_DATA_MANAGER_FACTORY()
+    else:
+        dm_driver = FileDataMangaer()
+    return dm_driver
 
 
 def get_storage_manager() -> FileStorageManager:
@@ -126,7 +130,5 @@ def get_storage_manager() -> FileStorageManager:
 
 def clear_storage():
     global DRIVER
-    global FDM
 
     DRIVER = None
-    FDM = None

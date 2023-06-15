@@ -17,19 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-import sys
 
-from nucliadb.train import SERVICE_NAME, logger
-from nucliadb.train.chitchat import start_chitchat, stop_chitchat
+from nucliadb.common.cluster.chitchat import start_chitchat, stop_chitchat
+from nucliadb.train import SERVICE_NAME
 from nucliadb.train.utils import (
-    start_nodes_manager,
+    start_shard_manager,
     start_train_grpc,
-    stop_nodes_manager,
+    stop_shard_manager,
     stop_train_grpc,
 )
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
-from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
 
 
@@ -37,23 +34,14 @@ async def initialize() -> None:
     await setup_telemetry(SERVICE_NAME)
 
     await start_chitchat(SERVICE_NAME)
-    await start_nodes_manager()
+    await start_shard_manager()
     await start_train_grpc(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
-    )
-
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
 
 
 async def finalize() -> None:
     await stop_audit_utility()
     await stop_train_grpc()
-    await stop_nodes_manager()
+    await stop_shard_manager()
     await stop_chitchat()
     await clean_telemetry(SERVICE_NAME)

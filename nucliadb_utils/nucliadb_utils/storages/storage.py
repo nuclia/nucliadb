@@ -79,6 +79,13 @@ class StorageField:
     async def iter_data(self, headers=None):
         raise NotImplementedError()
 
+    async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
+        """
+        Iterate through ranges of data
+        """
+        raise NotImplementedError()
+        yield b""  # pragma: no cover
+
     async def delete(self) -> bool:
         deleted = False
         if self.field is not None:
@@ -182,6 +189,7 @@ class Storage:
         response.txid = txid
         response.typemessage = TypeMessage.CREATION
         response.storage_key = key
+        response.kbid = kb
         if partition:
             response.partition = partition
         return response
@@ -211,6 +219,7 @@ class Storage:
         response.reindex_id = reindex_id
         response.typemessage = TypeMessage.CREATION
         response.storage_key = key
+        response.kbid = kb
         if partition:
             response.partition = partition
         return response

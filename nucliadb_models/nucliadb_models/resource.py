@@ -43,6 +43,7 @@ from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
     ComputedMetadata,
+    Extra,
     Metadata,
     Origin,
     Relation,
@@ -117,6 +118,10 @@ class KnowledgeBoxObjID(BaseModel):
 
 
 class KnowledgeBoxObj(BaseModel):
+    """
+    The API representation of a Knowledge Box object.
+    """
+
     slug: Optional[SlugString] = None
     uuid: str
     config: Optional[KnowledgeBoxConfig] = None
@@ -229,6 +234,12 @@ class DatetimeFieldData(BaseModel):
     error: Optional[Error]
 
 
+class GenericFieldData(BaseModel):
+    value: Optional[str]
+    extracted: Optional[TextFieldExtractedData]
+    error: Optional[Error]
+
+
 class ResourceData(BaseModel):
     texts: Optional[Dict[str, TextFieldData]]
     files: Optional[Dict[str, FileFieldData]]
@@ -237,6 +248,7 @@ class ResourceData(BaseModel):
     conversations: Optional[Dict[str, ConversationFieldData]]
     keywordsets: Optional[Dict[str, KeywordsetFieldData]]
     datetimes: Optional[Dict[str, DatetimeFieldData]]
+    generics: Optional[Dict[str, GenericFieldData]]
 
 
 class QueueType(str, Enum):  # type: ignore
@@ -265,6 +277,7 @@ class Resource(BaseModel):
     queue: Optional[QueueType]
 
     origin: Optional[Origin]
+    extra: Optional[Extra]
     relations: Optional[List[Relation]]
 
     data: Optional[ResourceData]

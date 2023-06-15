@@ -70,12 +70,13 @@ impl NodeWriterService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let Ok(shard) = ShardWriterService::open(file_name.clone(), &shard_path) else {
-                error!("Shard {shard_path:?} could not be loaded from disk");
-                continue;
-            };
-            self.cache.insert(file_name, shard);
-            debug!("Shard loaded: {shard_path:?}");
+            match ShardWriterService::open(file_name.clone(), &shard_path) {
+                Err(err) => error!("Shard {shard_path:?} could not be loaded from disk: {err:?}"),
+                Ok(shard) => {
+                    debug!("{shard_path:?}: Shard loaded");
+                    self.cache.insert(file_name, shard);
+                }
+            }
         }
         Ok(())
     }
@@ -92,12 +93,13 @@ impl NodeWriterService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardWriterService::open(shard_name, &shard_path) else {
-            error!("Shard {shard_path:?} could not be loaded from disk");
-            return;
-        };
-        self.cache.insert(shard_id.id.clone(), shard);
-        debug!("{shard_path:?}: Shard loaded");
+        match ShardWriterService::open(shard_name, &shard_path) {
+            Err(err) => error!("Shard {shard_path:?} could not be loaded from disk: {err:?}"),
+            Ok(shard) => {
+                self.cache.insert(shard_id.id.clone(), shard);
+                debug!("{shard_path:?}: Shard loaded");
+            }
+        }
     }
     #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardWriterService> {
@@ -109,19 +111,17 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new_shard(&mut self, request: &NewShardRequest) -> NodeResult<ShardCreated> {
+    pub fn new_shard(request: &NewShardRequest) -> NodeResult<ShardCreated> {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = env::shards_path_id(&shard_id);
         let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path, request)?;
-        let data = ShardCreated {
-            id: new_shard.id.clone(),
+        Ok(ShardCreated {
+            id: shard_id,
             document_service: new_shard.document_version() as i32,
             paragraph_service: new_shard.paragraph_version() as i32,
             vector_service: new_shard.vector_version() as i32,
             relation_service: new_shard.relation_version() as i32,
-        };
-        self.cache.insert(shard_id, new_shard);
-        Ok(data)
+        })
     }
 
     #[tracing::instrument(skip_all)]

@@ -72,6 +72,7 @@ class AuditField(google.protobuf.message.Message):
     action: global___AuditField.FieldAction.ValueType
     size: builtins.int
     size_delta: builtins.int
+    """no longer calculated"""
     field_id: builtins.str
     field_type: nucliadb_protos.resources_pb2.FieldType.ValueType
     filename: builtins.str
@@ -90,25 +91,22 @@ class AuditField(google.protobuf.message.Message):
 global___AuditField = AuditField
 
 @typing_extensions.final
-class AuditShardCounter(google.protobuf.message.Message):
+class AuditKBCounter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SHARD_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
-    shard: builtins.str
     paragraphs: builtins.int
     fields: builtins.int
     def __init__(
         self,
         *,
-        shard: builtins.str = ...,
         paragraphs: builtins.int = ...,
         fields: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "paragraphs", b"paragraphs", "shard", b"shard"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "paragraphs", b"paragraphs"]) -> None: ...
 
-global___AuditShardCounter = AuditShardCounter
+global___AuditKBCounter = AuditKBCounter
 
 @typing_extensions.final
 class AuditRequest(google.protobuf.message.Message):
@@ -130,6 +128,7 @@ class AuditRequest(google.protobuf.message.Message):
         PROCESSED: AuditRequest._AuditType.ValueType  # 7
         KB_DELETED: AuditRequest._AuditType.ValueType  # 8
         SUGGEST: AuditRequest._AuditType.ValueType  # 9
+        INDEXED: AuditRequest._AuditType.ValueType  # 10
 
     class AuditType(_AuditType, metaclass=_AuditTypeEnumTypeWrapper): ...
     VISITED: AuditRequest.AuditType.ValueType  # 0
@@ -142,6 +141,7 @@ class AuditRequest(google.protobuf.message.Message):
     PROCESSED: AuditRequest.AuditType.ValueType  # 7
     KB_DELETED: AuditRequest.AuditType.ValueType  # 8
     SUGGEST: AuditRequest.AuditType.ValueType  # 9
+    INDEXED: AuditRequest.AuditType.ValueType  # 10
 
     TYPE_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
@@ -156,9 +156,9 @@ class AuditRequest(google.protobuf.message.Message):
     RESOURCES_FIELD_NUMBER: builtins.int
     FIELD_METADATA_FIELD_NUMBER: builtins.int
     FIELDS_AUDIT_FIELD_NUMBER: builtins.int
-    COUNTER_FIELD_NUMBER: builtins.int
     CLIENT_TYPE_FIELD_NUMBER: builtins.int
     TRACE_ID_FIELD_NUMBER: builtins.int
+    KB_COUNTER_FIELD_NUMBER: builtins.int
     type: global___AuditRequest.AuditType.ValueType
     kbid: builtins.str
     userid: builtins.str
@@ -177,10 +177,10 @@ class AuditRequest(google.protobuf.message.Message):
     def field_metadata(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldID]: ...
     @property
     def fields_audit(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AuditField]: ...
-    @property
-    def counter(self) -> global___AuditShardCounter: ...
     client_type: global___ClientType.ValueType
     trace_id: builtins.str
+    @property
+    def kb_counter(self) -> global___AuditKBCounter: ...
     def __init__(
         self,
         *,
@@ -197,11 +197,11 @@ class AuditRequest(google.protobuf.message.Message):
         resources: builtins.int = ...,
         field_metadata: collections.abc.Iterable[nucliadb_protos.resources_pb2.FieldID] | None = ...,
         fields_audit: collections.abc.Iterable[global___AuditField] | None = ...,
-        counter: global___AuditShardCounter | None = ...,
         client_type: global___ClientType.ValueType = ...,
         trace_id: builtins.str = ...,
+        kb_counter: global___AuditKBCounter | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["counter", b"counter", "search", b"search", "time", b"time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["client_type", b"client_type", "counter", b"counter", "field_metadata", b"field_metadata", "fields", b"fields", "fields_audit", b"fields_audit", "kbid", b"kbid", "origin", b"origin", "resources", b"resources", "rid", b"rid", "search", b"search", "task", b"task", "time", b"time", "timeit", b"timeit", "trace_id", b"trace_id", "type", b"type", "userid", b"userid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb_counter", b"kb_counter", "search", b"search", "time", b"time"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["client_type", b"client_type", "field_metadata", b"field_metadata", "fields", b"fields", "fields_audit", b"fields_audit", "kb_counter", b"kb_counter", "kbid", b"kbid", "origin", b"origin", "resources", b"resources", "rid", b"rid", "search", b"search", "task", b"task", "time", b"time", "timeit", b"timeit", "trace_id", b"trace_id", "type", b"type", "userid", b"userid"]) -> None: ...
 
 global___AuditRequest = AuditRequest

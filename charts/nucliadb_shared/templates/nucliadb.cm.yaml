@@ -13,7 +13,6 @@ data:
   DEBUG: "True"
 {{- end }}
   RUNNING_ENVIRONMENT: {{ .Values.running.running_environment }}
-  LOGGING_INTEGRATION: {{ .Values.running.logging_integration | quote }}
   LOG_LEVEL: {{ .Values.running.log_level }}
   CORS: {{ toJson .Values.http.cors | quote }}
   FILE_BACKEND: {{ .Values.storage.file_backend }}
@@ -67,11 +66,7 @@ data:
   CACHE_PUBSUB_CHANNEL: {{ .Values.cache.cache_pubsub_channel }}
   TRANSACTION_JETSTREAM_AUTH: {{ .Values.transaction.transaction_jetstream_auth }}
   TRANSACTION_JETSTREAM_SERVERS: {{ toJson .Values.transaction.transaction_jetstream_servers | quote }}
-  TRANSACTION_JETSTREAM_TARGET: {{ .Values.transaction.transaction_jetstream_target }}
-  TRANSACTION_JETSTREAM_GROUP: {{ .Values.transaction.transaction_jetstream_group }}
-  TRANSACTION_JETSTREAM_STREAM: {{ .Values.transaction.transaction_jetstream_stream }}
   DRIVER: {{ .Values.maindb.driver }}
-
 {{- if eq .Values.maindb.driver "redis" }}
   DRIVER_REDIS_URL: {{ .Values.maindb.driver_redis_url }}
 {{- else if eq .Values.maindb.driver "tikv" }}

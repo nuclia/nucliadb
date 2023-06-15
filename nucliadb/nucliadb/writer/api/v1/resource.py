@@ -37,9 +37,9 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.ingest.utils import get_driver
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -58,7 +58,7 @@ from nucliadb.writer.resource.basic import (
     set_status_modify,
 )
 from nucliadb.writer.resource.field import extract_fields, parse_fields
-from nucliadb.writer.resource.origin import parse_origin
+from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.resource.slug import resource_slug_exists
 from nucliadb.writer.resource.vectors import (
     create_vectorset,
@@ -73,11 +73,9 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
-    get_cache,
     get_ingest,
     get_partitioning,
     get_storage,
@@ -146,6 +144,8 @@ async def create_resource(
 
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
+    if item.extra is not None:
+        parse_extra(writer.extra, item.extra)
 
     await parse_fields(
         writer=writer,
@@ -182,8 +182,6 @@ async def create_resource(
             parse_vectors(writer, item.uservectors, vectorsets)
 
     set_status(writer.basic, item)
-
-    set_info_on_span({"nuclia.rid": uuid, "nuclia.kbid": kbid})
 
     try:
         processing_info = await processing.send_to_process(toprocess, partition)
@@ -255,12 +253,12 @@ async def modify_resource(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
-
     parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
+    if item.extra is not None:
+        parse_extra(writer.extra, item.extra)
 
     await parse_fields(
         writer=writer,
@@ -335,14 +333,11 @@ async def reprocess_resource(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
-
     storage = await get_storage(service_name=SERVICE_NAME)
-    cache = await get_cache()
-    driver = await get_driver()
+    driver = get_driver()
 
     txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, cache, kbid)
+    kb = KnowledgeBox(txn, storage, kbid)
 
     resource = await kb.get(rid)
     if resource is None:
@@ -400,8 +395,6 @@ async def delete_resource(
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
-    set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
-
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()
 
@@ -445,8 +438,6 @@ async def reindex_resource(
     index_req.kbid = kbid
     index_req.rid = rid
     index_req.reindex_vectors = reindex_vectors
-
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     await ingest.ReIndex(index_req)  # type: ignore
     return Response(status_code=200)

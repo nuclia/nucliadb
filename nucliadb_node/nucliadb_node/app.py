@@ -19,12 +19,11 @@
 #
 
 import asyncio
-import logging
-import sys
 import uuid
 
 import pkg_resources
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
@@ -33,7 +32,7 @@ from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
 from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
-from nucliadb_node.settings import running_settings, settings
+from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
 
 
@@ -90,16 +89,8 @@ async def main():
 
 
 def run():  # pragma: no cover
+    setup_logging()
+
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb_node").version)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
-    )
-
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
-    logging.getLogger("asyncio").setLevel(logging.ERROR)
 
     asyncio.run(main())

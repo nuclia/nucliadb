@@ -16,6 +16,8 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import asyncio
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -76,6 +78,7 @@ class TestObserver:
         histogram.observe.assert_called_once()
         counter.labels().inc.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_async_decorator(self, histogram, counter):
         observer = metrics.Observer("my_metric")
 
@@ -86,6 +89,39 @@ class TestObserver:
         await my_func()
 
         histogram.observe.assert_called_once()
+        counter.labels().inc.assert_called_once()
+
+    def test_gen_decorator(self, histogram, counter):
+        observer = metrics.Observer("my_metric")
+
+        @observer.wrap()
+        def my_func():
+            for i in range(1):
+                time.sleep(0.2)
+                yield i
+
+        for _ in my_func():
+            pass
+
+        histogram.observe.assert_called_once()
+        assert histogram.observe.call_args[0][0] >= 0.2
+        counter.labels().inc.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_async_gen_decorator(self, histogram, counter):
+        observer = metrics.Observer("my_metric")
+
+        @observer.wrap()
+        async def my_func():
+            for i in range(1):
+                await asyncio.sleep(0.2)
+                yield i
+
+        async for _ in my_func():
+            pass
+
+        histogram.observe.assert_called_once()
+        assert histogram.observe.call_args[0][0] >= 0.2
         counter.labels().inc.assert_called_once()
 
     def test_observer_with_env(self, histogram, counter, monkeypatch):

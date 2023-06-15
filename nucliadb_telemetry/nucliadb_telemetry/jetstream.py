@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional
 
@@ -30,8 +31,33 @@ from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
 
-from nucliadb_telemetry import logger
+from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
+
+msg_time_histo = metrics.Histogram(
+    # time it takes from when msg was queue to when it finished processing
+    "nuclia_nats_msg_op_time",
+    labels={
+        "stream": "",
+        "consumer": "",
+        "acked": "no",
+    },
+    buckets=[
+        0.005,
+        0.025,
+        0.05,
+        0.1,
+        0.5,
+        1.0,
+        5.0,
+        10.0,
+        30.0,
+        60.0,
+        120.0,
+        600.0,
+        metrics.INF,
+    ],
+)
 
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
@@ -98,6 +124,15 @@ class JetStreamContextTelemetry:
                 except Exception as error:
                     set_span_exception(span, error)
                     raise error
+                finally:
+                    msg_time_histo.observe(
+                        (datetime.now() - msg.metadata.timestamp).total_seconds(),
+                        {
+                            "stream": msg.metadata.stream,
+                            "consumer": msg.metadata.consumer or "",
+                            "acked": "yes" if msg._ackd else "no",  # type: ignore
+                        },
+                    )
 
         wrapped_cb = partial(wrapper, cb, tracer)
         return await self.js.subscribe(cb=wrapped_cb, **kwargs)
@@ -116,8 +151,7 @@ class JetStreamContextTelemetry:
             try:
                 result = await self.js.publish(subject, body, headers=headers, **kwargs)
             except Exception as error:
-                if type(error) != Exception:
-                    set_span_exception(span, error)
+                set_span_exception(span, error)
                 raise error
 
         return result
@@ -158,6 +192,15 @@ class JetStreamContextTelemetry:
             except Exception as error:
                 set_span_exception(span, error)
                 raise error
+            finally:
+                msg_time_histo.observe(
+                    (datetime.now() - message.metadata.timestamp).total_seconds(),
+                    {
+                        "stream": message.metadata.stream,
+                        "consumer": message.metadata.consumer or "",
+                        "acked": "yes" if message._ackd else "no",
+                    },
+                )
 
 
 class NatsClientTelemetry:
@@ -201,8 +244,7 @@ class NatsClientTelemetry:
             try:
                 result = await self.nc.publish(subject, body, headers=headers, **kwargs)
             except Exception as error:
-                if type(error) != Exception:
-                    set_span_exception(span, error)
+                set_span_exception(span, error)
                 raise error
 
         return result
@@ -224,8 +266,7 @@ class NatsClientTelemetry:
                     subject, payload, timeout, old_style, headers  # type: ignore
                 )
             except Exception as error:
-                if type(error) != Exception:
-                    set_span_exception(span, error)
+                set_span_exception(span, error)
                 raise error
 
         return result

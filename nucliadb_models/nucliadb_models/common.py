@@ -21,7 +21,7 @@ import base64
 import hashlib
 import re
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, root_validator
 
@@ -45,6 +45,27 @@ DOWNLOAD_TYPE_MAP = {"f": "field", "e": "extracted"}
 DOWNLOAD_URI = (
     "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
 )
+
+_NOT_SET = object()
+
+
+class ParamDefault(BaseModel):
+    default: Any
+    title: str
+    description: str
+    gt: Optional[float] = None
+
+    def to_pydantic_field(self, default=_NOT_SET) -> Field:  # type: ignore
+        """
+        :param default: to be able to override default value - as some params
+        are reused but they will have different default values depending on the endpoint.
+        """
+        return Field(
+            default=self.default if default is _NOT_SET else default,
+            title=self.title,
+            description=self.description,
+            gt=self.gt,
+        )
 
 
 class FieldID(BaseModel):
@@ -205,7 +226,7 @@ class Shards(BaseModel):
     shards: Optional[List[str]]
 
 
-FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
+FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {
     resources_pb2.FieldType.FILE: FieldTypeName.FILE,
     resources_pb2.FieldType.LINK: FieldTypeName.LINK,
     resources_pb2.FieldType.DATETIME: FieldTypeName.DATETIME,
@@ -216,6 +237,6 @@ FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
     resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
 }
 
-FIELD_TYPES_MAP_REVERSE: Dict[str, int] = {
+FIELD_TYPES_MAP_REVERSE: Dict[str, resources_pb2.FieldType.ValueType] = {
     y.value: x for x, y in FIELD_TYPES_MAP.items()  # type: ignore
 }

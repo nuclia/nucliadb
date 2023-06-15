@@ -25,7 +25,7 @@ from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 
-from nucliadb_utils import logger
+from nucliadb_utils import const, logger
 from nucliadb_utils.nats import get_traced_jetstream
 
 
@@ -36,13 +36,11 @@ class IndexingUtility:
     def __init__(
         self,
         nats_servers: List[str],
-        nats_target: str,
         nats_creds: Optional[str] = None,
         dummy: bool = False,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
-        self.nats_target = nats_target
         self.dummy = dummy
         self._calls: List[Tuple[str, IndexMessage]] = []
 
@@ -79,7 +77,7 @@ class IndexingUtility:
             options["servers"] = self.nats_servers
 
         self.nc = await nats.connect(**options)
-        self.js = get_traced_jetstream(self.nc, service_name or "nucalidb_indexing")
+        self.js = get_traced_jetstream(self.nc, service_name or "nucliadb_indexing")
 
     async def finalize(self):
         if self.nc:
@@ -92,13 +90,12 @@ class IndexingUtility:
             self._calls.append((node, writer))
             return 0
 
-        if self.js is None or self.nats_target is None:
+        if self.js is None:
             raise AttributeError()
 
-        res = await self.js.publish(
-            self.nats_target.format(node=node), writer.SerializeToString()
-        )
+        subject = const.Streams.INDEX.subject.format(node=node)
+        res = await self.js.publish(subject, writer.SerializeToString())
         logger.info(
-            f" - Pushed message to index {self.nats_target.format(node=node)}.  shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"  # noqa
+            f" - Pushed message to index {subject}.  shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"  # noqa
         )
         return res.seq

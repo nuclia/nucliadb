@@ -21,9 +21,7 @@
 from copy import deepcopy
 from datetime import datetime
 from os.path import dirname
-from unittest.mock import patch
 
-import jwt
 import pytest
 
 from nucliadb.writer.api.v1.router import (
@@ -379,16 +377,8 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
         assert resp.status_code in (201, 200)
 
 
-@pytest.fixture(scope="function")
-def jwt_encode_mock():
-    with patch.object(jwt, attribute="encode") as mock:
-        yield mock
-
-
 @pytest.mark.asyncio
-async def test_external_file_field_sends_correct_processing_payload(
-    writer_api, knowledgebox_writer, jwt_encode_mock
-):
+async def test_external_file_field(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
@@ -406,15 +396,6 @@ async def test_external_file_field_sends_correct_processing_payload(
             headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
-
-        # Check that the payload sent to processing is correct
-        decoded_payload = jwt_encode_mock.call_args[0][0]
-        assert decoded_payload["uri"] == TEST_EXTERNAL_FILE_PAYLOAD["file"]["uri"]
-        assert decoded_payload["driver"] == 3
-        assert (
-            decoded_payload["extra_headers"]
-            == TEST_EXTERNAL_FILE_PAYLOAD["file"]["extra_headers"]
-        )
 
 
 @pytest.mark.asyncio

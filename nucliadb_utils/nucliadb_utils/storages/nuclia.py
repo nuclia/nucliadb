@@ -58,4 +58,4 @@ class NucliaStorage:
         self.session = aiohttp.ClientSession()
 
     async def finalize(self):
-        self.session.close()
+        await self.session.close()

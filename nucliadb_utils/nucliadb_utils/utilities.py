@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb_utils import featureflagging, logger
+from nucliadb_utils import featureflagging
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -36,17 +37,27 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.redis import RedisPubsub
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import audit_settings, nuclia_settings, storage_settings
+from nucliadb_utils.settings import (
+    FileBackendConfig,
+    audit_settings,
+    nuclia_settings,
+    storage_settings,
+    transaction_settings,
+)
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
-from nucliadb_utils.transaction import TransactionUtility
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb_utils.storages.local import LocalStorage
     from nucliadb_utils.storages.nuclia import NucliaStorage
     from nucliadb_utils.storages.storage import Storage
+    from nucliadb_utils.transaction import TransactionUtility
+
+logger = logging.getLogger(__name__)
 
 
 class Utility(str, Enum):
@@ -57,7 +68,7 @@ class Utility(str, Enum):
     PROCESSING = "processing"
     TRANSACTION = "transaction"
     CACHE = "cache"
-    NODES = "nodes"
+    SHARD_MANAGER = "shard_manager"
     COUNTER = "counter"
     CHITCHAT = "chitchat"
     PUBSUB = "pubsub"
@@ -67,17 +78,18 @@ class Utility(str, Enum):
     TRAIN = "train"
     TRAIN_SERVER = "train_server"
     FEATURE_FLAGS = "feature_flags"
+    NATS_MANAGER = "nats_manager"
 
 
-def get_utility(ident: Utility):
+def get_utility(ident: Union[Utility, str]):
     return MAIN.get(ident)
 
 
-def set_utility(ident: Utility, util: Any):
+def set_utility(ident: Union[Utility, str], util: Any):
     MAIN[ident] = util
 
 
-def clean_utility(ident: Utility):
+def clean_utility(ident: Union[Utility, str]):
     if ident in MAIN:
         del MAIN[ident]
 
@@ -85,7 +97,10 @@ def clean_utility(ident: Utility):
 async def get_storage(
     gcs_scopes: Optional[List[str]] = None, service_name: Optional[str] = None
 ) -> Storage:
-    if storage_settings.file_backend == "s3" and Utility.STORAGE not in MAIN:
+    if Utility.STORAGE in MAIN:
+        return MAIN[Utility.STORAGE]
+
+    if storage_settings.file_backend == FileBackendConfig.S3:
         from nucliadb_utils.storages.s3 import S3Storage
 
         s3util = S3Storage(
@@ -104,7 +119,7 @@ async def get_storage(
         await s3util.initialize()
         logger.info("Configuring S3 Storage")
 
-    elif storage_settings.file_backend == "gcs" and Utility.STORAGE not in MAIN:
+    elif storage_settings.file_backend == FileBackendConfig.GCS:
         from nucliadb_utils.storages.gcs import GCSStorage
 
         gcsutil = GCSStorage(
@@ -123,19 +138,17 @@ async def get_storage(
         await gcsutil.initialize(service_name)
         logger.info("Configuring GCS Storage")
 
-    elif storage_settings.file_backend == "pg" and Utility.STORAGE not in MAIN:
+    elif storage_settings.file_backend == FileBackendConfig.PG:
         from nucliadb_utils.storages.pg import PostgresStorage
 
         pgutil = PostgresStorage(storage_settings.driver_pg_url)  # type: ignore
         set_utility(Utility.STORAGE, pgutil)
         await pgutil.initialize()
-        logger.info("Configuring GCS Storage")
+        logger.info("Configuring Postgres Storage")
 
-    elif (
-        storage_settings.file_backend == "local"
-        and Utility.STORAGE not in MAIN
-        and storage_settings.local_files
-    ):
+    elif storage_settings.file_backend == FileBackendConfig.LOCAL:
+        if storage_settings.local_files is None:
+            raise ConfigurationError("LOCAL_FILES env var not configured")
         from nucliadb_utils.storages.local import LocalStorage
 
         localutil = LocalStorage(
@@ -144,9 +157,10 @@ async def get_storage(
         set_utility(Utility.STORAGE, localutil)
         await localutil.initialize()
         logger.info("Configuring Local Storage")
-
-    if MAIN.get(Utility.STORAGE) is None:
-        raise AttributeError()
+    else:
+        raise ConfigurationError(
+            "Invalid storage settings, please configure FILE_BACKEND"
+        )
 
     return MAIN[Utility.STORAGE]
 
@@ -234,8 +248,34 @@ async def finalize_utilities():
         clean_utility(util)
 
 
+async def start_transaction_utility(
+    service_name: Optional[str] = None,
+) -> TransactionUtility:
+    from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
+
+    if transaction_settings.transaction_local:
+        transaction_utility: Union[
+            LocalTransactionUtility, TransactionUtility
+        ] = LocalTransactionUtility()
+    elif transaction_settings.transaction_jetstream_servers is not None:
+        transaction_utility = TransactionUtility(
+            nats_creds=transaction_settings.transaction_jetstream_auth,
+            nats_servers=transaction_settings.transaction_jetstream_servers,
+        )
+        await transaction_utility.initialize(service_name)
+    set_utility(Utility.TRANSACTION, transaction_utility)
+    return transaction_utility  # type: ignore
+
+
 def get_transaction_utility() -> TransactionUtility:
     return get_utility(Utility.TRANSACTION)
+
+
+async def stop_transaction_utility() -> None:
+    transaction_utility = get_transaction_utility()
+    if transaction_utility:
+        await transaction_utility.finalize()
+        clean_utility(Utility.TRANSACTION)
 
 
 def get_indexing() -> IndexingUtility:
@@ -247,7 +287,10 @@ def get_audit() -> Optional[AuditStorage]:
 
 
 async def start_audit_utility(service: str):
-    audit_utility: Optional[AuditStorage] = None
+    audit_utility: Optional[AuditStorage] = get_utility(Utility.AUDIT)
+    if audit_utility is not None:
+        return
+
     if audit_settings.audit_driver == "basic":
         audit_utility = BasicAuditStorage()
         logger.info("Configuring basic audit log")
@@ -263,8 +306,9 @@ async def start_audit_utility(service: str):
         logger.info(
             f"Configuring stream audit log {audit_settings.audit_jetstream_target}"
         )
-    if audit_utility:
-        await audit_utility.initialize()
+    else:
+        raise ConfigurationError("Invalid audit driver")
+    await audit_utility.initialize()
     set_utility(Utility.AUDIT, audit_utility)
 
 
@@ -273,6 +317,35 @@ async def stop_audit_utility():
     if audit_utility:
         await audit_utility.finalize()
         clean_utility(Utility.AUDIT)
+
+
+async def start_nats_manager(
+    service_name: str, nats_servers: list[str], nats_creds: Optional[str] = None
+) -> NatsConnectionManager:
+    nats_manager = NatsConnectionManager(
+        service_name=service_name,
+        nats_servers=nats_servers,
+        nats_creds=nats_creds,
+    )
+    await nats_manager.initialize()
+    set_utility(Utility.NATS_MANAGER, nats_manager)
+    return nats_manager
+
+
+def get_nats_manager() -> NatsConnectionManager:
+    nats_manager = get_utility(Utility.NATS_MANAGER)
+    if nats_manager is None:
+        raise ConfigurationError("Nats manager not configured")
+    return nats_manager
+
+
+async def stop_nats_manager() -> None:
+    try:
+        nats_manager = get_nats_manager()
+    except ConfigurationError:
+        return
+    await nats_manager.finalize()
+    clean_utility(Utility.NATS_MANAGER)
 
 
 def get_feature_flags() -> featureflagging.FlagService:

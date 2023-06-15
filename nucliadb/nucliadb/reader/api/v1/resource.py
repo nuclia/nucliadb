@@ -17,19 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Literal, Optional, Union
-from typing import get_args as typing_get_args
+from typing import List, Optional, Union
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 import nucliadb_models as models
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.serialize import serialize, set_resource_field_extracted_data
-from nucliadb.ingest.utils import get_driver
 from nucliadb.reader import SERVICE_NAME  # type: ignore
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
@@ -52,7 +51,7 @@ from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
-from nucliadb_utils.utilities import get_audit, get_cache, get_storage
+from nucliadb_utils.utilities import get_audit, get_storage
 
 
 @api.get(
@@ -73,7 +72,7 @@ async def list_resources(
     # Get all resource id's fast by scanning all existing slugs
 
     # Get counters from maindb
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
 
     # Filter parameters for serializer
@@ -135,14 +134,6 @@ async def list_resources(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
-    status_code=200,
-    name="Get Resource (by slug)",
-    response_model=Resource,
-    response_model_exclude_unset=True,
-    tags=["Resources"],
-)
-@api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
     name="Get Resource (by id)",
@@ -152,11 +143,50 @@ async def list_resources(
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_resource(
+async def get_resource_by_uuid(
     request: Request,
     kbid: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    rid: str,
+    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
+    field_type_filter: List[FieldTypeName] = Query(
+        list(FieldTypeName), alias="field_type"
+    ),
+    extracted: List[ExtractedDataTypeName] = Query(
+        [
+            ExtractedDataTypeName.TEXT,
+            ExtractedDataTypeName.METADATA,
+            ExtractedDataTypeName.LINK,
+            ExtractedDataTypeName.FILE,
+        ]
+    ),
+    x_nucliadb_user: str = Header(""),
+    x_forwarded_for: str = Header(""),
+):
+    return await _get_resource(
+        rid=rid,
+        kbid=kbid,
+        show=show,
+        field_type_filter=field_type_filter,
+        extracted=extracted,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=200,
+    name="Get Resource (by slug)",
+    response_model=Resource,
+    response_model_exclude_unset=True,
+    tags=["Resources"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_resource_by_slug(
+    request: Request,
+    kbid: str,
+    rslug: str,
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -172,6 +202,31 @@ async def get_resource(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Resource:
+    return await _get_resource(
+        rslug=rslug,
+        kbid=kbid,
+        show=show,
+        field_type_filter=field_type_filter,
+        extracted=extracted,
+        x_nucliadb_user=x_nucliadb_user,
+        x_forwarded_for=x_forwarded_for,
+    )
+
+
+async def _get_resource(
+    *,
+    rslug: Optional[str] = None,
+    rid: Optional[str] = None,
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+) -> Resource:
+    if all([rslug, rid]) or not any([rslug, rid]):
+        raise ValueError("Either rid or rslug must be provided, but not both")
+
     audit = get_audit()
     if audit is not None:
         audit_id = rid if rid else rslug
@@ -189,10 +244,6 @@ async def get_resource(
     if result is None:
         raise HTTPException(status_code=404, detail="Resource does not exist")
     return result
-
-
-PageShortcuts = Literal["last", "first"]
-PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 
 
 @api.get(
@@ -229,17 +280,18 @@ async def get_resource_field(
             ExtractedDataTypeName.FILE,
         ]
     ),
-    page: Union[Literal["last", "first"], int] = Query("last"),
+    # not working with latest pydantic/fastapi
+    # page: Union[Literal["last", "first"], int] = Query("last"),
+    page: Union[str, int] = Query("last"),
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
-    cache = await get_cache()
-    driver = await get_driver()
+    driver = get_driver()
 
     txn = await driver.begin()
 
     pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
 
-    kb = ORMKnowledgeBox(txn, storage, cache, kbid)
+    kb = ORMKnowledgeBox(txn, storage, kbid)
 
     if rid is None:
         assert rslug is not None, "Either rid or rslug must be defined"
@@ -285,13 +337,16 @@ async def get_resource_field(
 
         if isinstance(field, Conversation):
             if page == "first":
-                page = 1
+                page_to_fetch = 1
             elif page == "last":
                 conversation_metadata = await field.get_metadata()
-                page = conversation_metadata.pages
+                page_to_fetch = conversation_metadata.pages
+            else:
+                page_to_fetch = int(page)
 
-            value = await field.get_value(page=page)
-            resource_field.value = models.Conversation.from_message(value)
+            value = await field.get_value(page=page_to_fetch)
+            if value is not None:
+                resource_field.value = models.Conversation.from_message(value)
 
     if ResourceFieldProperties.EXTRACTED in show and extracted:
         resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
@@ -309,5 +364,6 @@ async def get_resource_field(
 
     await txn.abort()
     return Response(
-        content=resource_field.json(exclude_unset=True), media_type="application/json"
+        content=resource_field.json(exclude_unset=True, by_alias=True),
+        media_type="application/json",
     )

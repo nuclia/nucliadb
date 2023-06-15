@@ -5,4 +5,5 @@ grpcio>=1.44.0
 aiofiles
 nucliadb-protos
 nucliadb-models
-nucliadb-telemetry>=1.8.0
+nucliadb-telemetry>=1.11.1
+urllib3<1.27,>=1.21.1

@@ -29,19 +29,23 @@ from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
-from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.settings import nuclia_settings, nucliadb_settings, storage_settings
+from nucliadb_utils.settings import (
+    FileBackendConfig,
+    nuclia_settings,
+    nucliadb_settings,
+    storage_settings,
+)
 
 
 @pytest.fixture(scope="function")
 async def writer_api(
     redis,
+    grpc_servicer: IngestFixture,
     gcs_storage_writer,
     transaction_utility,
     processing_utility,
     tus_manager,
-    grpc_servicer: IngestFixture,
     event_loop,
 ) -> AsyncIterator[Callable[[List[Enum], str, str], AsyncClient]]:
     nucliadb_settings.nucliadb_ingest = grpc_servicer.host
@@ -71,17 +75,15 @@ async def writer_api(
     yield make_client_fixture
     await application.router.shutdown()
     clear_storage()
-    processing = get_processing()
-    processing.calls = []
 
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
+    await driver.close(close_connection_pool=True)
 
 
 @pytest.fixture(scope="function")
 async def gcs_storage_writer(gcs):
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
 
 

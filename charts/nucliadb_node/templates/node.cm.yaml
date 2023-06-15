@@ -13,7 +13,7 @@ data:
 {{- if .Values.debug }}
   RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs=DEBUG,nucliadb_vectors=DEBUG,nucliadb_texts=DEBUG,nucliadb_cluster=DEBUG,nucliadb_relations=DEBUG"
 {{- else }}
-  RUST_LOG: "nucliadb_node=WARN,nucliadb_cluster=WARN,nucliadb_cluster=WARN"
+  RUST_LOG: "nucliadb_node=WARN,nucliadb_cluster=WARN"
 {{- end }}
   RUST_LIB_BACKTRACE: "1"
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
@@ -32,9 +32,6 @@ data:
 
   INDEX_JETSTREAM_AUTH: {{ .Values.indexing.index_jetstream_auth }}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
-  INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}
-  INDEX_JETSTREAM_GROUP: {{ .Values.indexing.index_jetstream_group }}
-  INDEX_JETSTREAM_STREAM: {{ .Values.indexing.index_jetstream_stream }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
 

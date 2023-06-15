@@ -23,7 +23,6 @@ use std::time::Duration;
 
 use http::Uri;
 use nucliadb_core::tracing::Level;
-use opentelemetry::propagation::Extractor;
 use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
@@ -38,28 +37,6 @@ pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
     // Create a channel with connect_lazy to automatically reconnect to the node.
     let channel = Endpoint::from(uri);
     Ok(channel)
-}
-
-/// Metadata mapping
-pub struct MetadataMap<'a>(pub &'a tonic::metadata::MetadataMap);
-
-impl<'a> Extractor for MetadataMap<'a> {
-    /// Gets a value for a key from the MetadataMap.  If the value can't be converted to &str,
-    /// returns None
-    fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).and_then(|metadata| metadata.to_str().ok())
-    }
-
-    /// Collect all the keys from the MetadataMap.
-    fn keys(&self) -> Vec<&str> {
-        self.0
-            .keys()
-            .map(|key| match key {
-                tonic::metadata::KeyRef::Ascii(v) => v.as_str(),
-                tonic::metadata::KeyRef::Binary(v) => v.as_str(),
-            })
-            .collect::<Vec<_>>()
-    }
 }
 
 pub async fn reliable_lookup_host(host: &str) -> IpAddr {

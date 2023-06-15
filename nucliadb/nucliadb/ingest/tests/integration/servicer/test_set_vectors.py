@@ -24,7 +24,7 @@ from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.utils_pb2 import Vector, VectorObject
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetVectorsRequest
 
-from nucliadb.ingest.fields.base import FIELD_VECTORS
+from nucliadb.ingest.fields.base import FieldTypes
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
@@ -74,6 +74,8 @@ async def test_set_vectors(grpc_servicer, gcs_storage):
     assert result.found is True
 
     # Check that vectors were updated at gcs storage
-    sf = gcs_storage.file_extracted(kb_id, rid, "t", field_id, FIELD_VECTORS)
+    sf = gcs_storage.file_extracted(
+        kb_id, rid, "t", field_id, FieldTypes.FIELD_VECTORS.value
+    )
     vo = await gcs_storage.download_pb(sf, VectorObject)
     assert vo == req.vectors

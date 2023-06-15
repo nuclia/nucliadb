@@ -17,13 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import re
 
 import pydantic
 
 
 class FieldIdString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[^/]+$")
+    regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
+
+    @classmethod
+    def validate(cls, value: str) -> str:
+        try:
+            return super().validate(value)
+        except pydantic.errors.StrRegexError:
+            raise InvalidFieldIdError(value=value)
+
+
+class InvalidFieldIdError(pydantic.errors.PydanticValueError):
+    code = "wrong_field_id"
+    msg_template = (
+        "Invalid field id: '{value}'. Field ids must be a string with only "
+        "letters, numbers, underscores, colons and dashes."
+    )
 
 
 class InvalidSlugError(pydantic.errors.PydanticValueError):
@@ -43,3 +59,10 @@ class SlugString(pydantic.ConstrainedStr):
             return super().validate(value)
         except pydantic.errors.StrRegexError:
             raise InvalidSlugError(value=value)
+
+
+def validate_json(value: str):
+    try:
+        json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON") from exc

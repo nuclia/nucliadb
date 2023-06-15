@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import logging
 from typing import Optional
 
@@ -26,6 +27,30 @@ from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
+
+RETRY_OPTIONS = [
+    (
+        "grpc.service_config",
+        json.dumps(
+            {
+                "name": [{}],  # require to enable retrying all methods
+                "retryPolicy": {
+                    "maxAttempts": 4,
+                    "initialBackoff": "0.02s",
+                    "maxBackoff": "2s",
+                    "backoffMultiplier": 2,
+                    "retryableStatusCodes": [
+                        "UNAVAILABLE",
+                        "DEADLINE_EXCEEDED",
+                        "ABORTED",
+                        "CANCELLED",
+                    ],
+                },
+                "waitForReady": True,
+            }
+        ),
+    ),
+]
 
 
 def get_traced_grpc_channel(
@@ -39,10 +64,13 @@ def get_traced_grpc_channel(
     if tracer_provider is not None:  # pragma: no cover
         telemetry_grpc = GRPCTelemetry(service_name + variant, tracer_provider)
         channel = telemetry_grpc.init_client(
-            address, max_send_message=max_send_message, credentials=credentials
+            address,
+            max_send_message=max_send_message,
+            credentials=credentials,
+            options=RETRY_OPTIONS,
         )
     else:
-        channel = aio.insecure_channel(address)
+        channel = aio.insecure_channel(address, options=RETRY_OPTIONS)
     return channel
 
 
@@ -53,7 +81,7 @@ def get_traced_grpc_server(service_name: str, max_receive_message: int = 100):
         server = otgrpc.init_server(max_receive_message=max_receive_message)
     else:
         options = [
-            ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
+            ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024)
         ]
         server = aio.server(options=options)
     return server

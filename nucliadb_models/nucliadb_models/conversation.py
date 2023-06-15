@@ -22,7 +22,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models import CloudLink, FileB64
 from nucliadb_protos import resources_pb2
@@ -55,12 +55,19 @@ class MessageContent(BaseModel):
     attachments: Optional[List[CloudLink]]
 
 
+class MessageType(Enum):
+    UNSET = "UNSET"
+    QUESTION = "QUESTION"
+    ANSWER = "ANSWER"
+
+
 class Message(BaseModel):
     timestamp: Optional[datetime] = None
     who: Optional[str] = None
     to: Optional[List[str]] = []
     content: MessageContent
     ident: Optional[str]
+    type_: Optional[MessageType] = Field(None, alias="type")
 
 
 class Conversation(BaseModel):
@@ -92,6 +99,7 @@ class FieldConversation(BaseModel):
 
     pages: Optional[int]
     size: Optional[int]
+    total: Optional[int]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldConversation) -> _T:

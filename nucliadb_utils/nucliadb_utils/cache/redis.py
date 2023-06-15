@@ -53,7 +53,7 @@ class RedisPubsub(PubSubDriver):
         if self.task:
             self.task.cancel()
         if self.driver:
-            await self.driver.close()
+            await self.driver.close(close_connection_pool=True)
         self.initialized = False
 
     async def publish(self, key: str, value: bytes):

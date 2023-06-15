@@ -24,6 +24,7 @@ from uuid import uuid4
 import pytest
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
+from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper
 from nucliadb_protos.resources_pb2 import FieldID as PBFieldID
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
@@ -42,6 +43,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos import utils_pb2
 
 
 @pytest.mark.asyncio
@@ -78,7 +80,7 @@ async def test_create_resource_orm_with_basic(
 
     basic.fieldmetadata.append(ufm1)
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -119,7 +121,7 @@ async def test_iterate_paragraphs(
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -147,3 +149,69 @@ async def test_iterate_paragraphs(
     async for paragraph in r.iterate_paragraphs(EnabledMetadata(labels=True)):
         assert len(paragraph.metadata.labels.paragraph) == 1
         assert paragraph.metadata.labels.paragraph[0].label in ("label1", "label2")
+
+
+@pytest.mark.asyncio
+async def test_vector_duplicate_fields(
+    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+):
+    basic = PBBasic(title="My title", summary="My summary")
+    basic.metadata.status = PBMetadata.Status.PROCESSED
+
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
+    assert r is not None
+
+    # Add some labelled paragraphs to it
+    bm = BrokerMessage()
+    field = FieldID(field="field1", field_type=FieldType.TEXT)
+    fcmw = FieldComputedMetadataWrapper(field=field)
+    p1 = Paragraph(
+        start=0,
+        end=82,
+        classifications=[Classification(labelset="ls1", label="label1")],
+    )
+    p2 = Paragraph(
+        start=84,
+        end=103,
+        classifications=[Classification(labelset="ls1", label="label2")],
+    )
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    fcmw.metadata.metadata.paragraphs.append(p2)
+    bm.field_metadata.append(fcmw)
+    bm.texts["field1"].body = "My text1"
+
+    for i in range(5):
+        bm.field_vectors.append(
+            ExtractedVectorsWrapper(
+                field=field,
+                vectors=utils_pb2.VectorObject(
+                    vectors=utils_pb2.Vectors(
+                        vectors=[
+                            utils_pb2.Vector(
+                                start=0,
+                                end=1,
+                                start_paragraph=0,
+                                end_paragraph=1,
+                                vector=[0.1] * 768,
+                            )
+                        ]
+                    )
+                ),
+            )
+        )
+
+    await r.apply_fields(bm)
+    await r.apply_extracted(bm)
+
+    count = 0
+    for pkey1, para in r.indexer.brain.paragraphs.items():
+        for pkey2, para2 in para.paragraphs.items():
+            for key, sent in para2.sentences.items():
+                count += 1
+                assert (
+                    len(sent.vector) == 768
+                ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
+
+    assert count == 1

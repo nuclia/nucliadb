@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v3.1.0
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v3.1.0
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -91,38 +91,35 @@ jobs:
         run: |-
           HASH=`git rev-parse --short HEAD`
           BRANCH=${GITHUB_REF##*/}
-          echo "::set-output name=short_sha::$HASH"
-          echo "::set-output name=branch::$BRANCH"
-
-      - name: Docker - Build
-        run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile
-
-      # PR workflows END here
-      # PUSH workflows contine with deploy activities
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v0
+        uses: google-github-actions/auth@v1
         with:
           credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
       - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v0"
+        uses: "google-github-actions/setup-gcloud@v1"
 
       - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
 
-      - name: Docker - Tag
-        run: |-
-          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Docker - Push sha
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}
-
-      - name: Docker - Push latest
-        run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.short_sha }}
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.branch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
@@ -138,7 +135,7 @@ jobs:
         id: env-vars
         run: |-
           HASH=`git rev-parse --short HEAD`
-          echo "::set-output name=short_sha::$HASH"
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
 
       - name: Set helm package image
         id: version_step
@@ -148,7 +145,7 @@ jobs:
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_ingest/Chart.yaml
-          echo "::set-output name=version_number::$VERSION_SHA"
+          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure Git
         run: |

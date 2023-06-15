@@ -204,7 +204,7 @@ pub fn sentry_url() -> String {
 }
 
 pub fn log_level() -> Vec<(String, Level)> {
-    let default = "nucliadb_node=WARN,nucliadb_cluster=WARN,nucliadb_cluster=WARN".to_string();
+    let default = "nucliadb_node=WARN,nucliadb_cluster=WARN".to_string();
     match env::var("RUST_LOG") {
         Ok(levels) => parse_log_level(&levels),
         Err(_) => {
@@ -212,6 +212,11 @@ pub fn log_level() -> Vec<(String, Level)> {
             parse_log_level(&default)
         }
     }
+}
+
+pub fn span_levels() -> Vec<(String, Level)> {
+    let default = "nucliadb_node=INFO,nucliadb_cluster=INFO,nucliadb_core=INFO".to_string();
+    parse_log_level(&default)
 }
 
 pub fn get_sentry_env() -> &'static str {
@@ -287,6 +292,21 @@ pub fn metrics_http_port(default: u16) -> u16 {
                 port
             } else {
                 error!("METRICS_HTTP_PORT defined incorrectly. Defaulting to {default}");
+                default
+            }
+        }
+        Err(_) => default,
+    }
+}
+
+pub fn max_shards_per_node() -> usize {
+    let default = 800;
+    match env::var("MAX_NODE_REPLICAS") {
+        Ok(max_shards) => {
+            if let Ok(max_shards) = max_shards.parse() {
+                max_shards
+            } else {
+                error!("MAX_NODE_REPLICAS defined incorrectly. Using default: {default}");
                 default
             }
         }

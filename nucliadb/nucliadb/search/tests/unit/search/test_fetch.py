@@ -22,7 +22,7 @@ import time
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
 
-from nucliadb.search.search.fetch import highlight_paragraph as highlight
+from nucliadb.search.search.paragraphs import highlight_paragraph as highlight
 
 
 @pytest.mark.benchmark(

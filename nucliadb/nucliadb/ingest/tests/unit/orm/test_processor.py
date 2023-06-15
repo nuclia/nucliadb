@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -51,49 +51,13 @@ def resource():
     yield MagicMock()
 
 
-async def test_mark_resource_error(processor: Processor, txn, shard, resource):
-    with patch("nucliadb.ingest.orm.processor.set_basic") as set_basic:
-        await processor._mark_resource_error(
-            resource, partition="partition", seqid=1, shard=shard, kbid="kbid"
-        )
+async def test_commit_slug(processor: Processor, txn, resource):
+    another_txn = Mock()
+    resource.txn = another_txn
+    resource.set_slug = AsyncMock()
 
-    txn.commit.assert_called_once()
-    set_basic.assert_called_once_with(
-        txn, resource.kb.kbid, resource.uuid, resource.basic
-    )
+    await processor.commit_slug(resource)
 
-    shard.add_resource.assert_called_once_with(
-        resource.indexer.brain, 1, partition="partition", kb="kbid"
-    )
-
-
-async def test_mark_resource_error_handle_error(
-    processor: Processor, shard, resource, txn
-):
-    with patch("nucliadb.ingest.orm.processor.set_basic") as set_basic:
-        set_basic.side_effect = Exception("test")
-        await processor._mark_resource_error(
-            resource, partition="partition", seqid=1, shard=shard, kbid="kbid"
-        )
-
-    txn.commit.assert_not_called()
-
-
-async def test_mark_resource_error_skip_no_shard(
-    processor: Processor, resource, driver
-):
-    await processor._mark_resource_error(
-        resource, partition="partition", seqid=1, shard=None, kbid="kbid"
-    )
-
-    driver.transaction.assert_not_called()
-
-
-async def test_mark_resource_error_skip_no_resource(
-    processor: Processor, shard, driver
-):
-    await processor._mark_resource_error(
-        None, partition="partition", seqid=1, shard=shard, kbid="kbid"
-    )
-
-    driver.transaction.assert_not_called()
+    resource.set_slug.assert_awaited_once()
+    txn.commit.assert_awaited_once()
+    assert resource.txn is another_txn

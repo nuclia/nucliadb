@@ -4,6 +4,12 @@ FROM rust:buster as builder
 LABEL maintainer="info@nuclia.com"
 LABEL org.opencontainers.image.vendor="Nuclia Inc."
 
+COPY ./nucliadb_cluster /nucliadb_cluster
+WORKDIR /nucliadb_cluster
+RUN cargo build --release
+
+FROM debian:buster-slim as runner
+
 RUN apt-get -y update \
     && apt-get -y install ca-certificates \
     cmake \
@@ -12,12 +18,6 @@ RUN apt-get -y update \
     libssl-dev \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
-
-COPY ./nucliadb_cluster /nucliadb_cluster
-WORKDIR /nucliadb_cluster
-RUN cargo build --release
-
-FROM debian:buster-slim as runner
 
 ENV LISTEN_PORT ""
 ENV NODE_TYPE ""
@@ -30,8 +30,3 @@ EXPOSE 4444/udp
 
 WORKDIR /nucliadb_cluster
 COPY --from=builder /nucliadb_cluster/target/release/cluster_manager /nucliadb_cluster/
-
-COPY ./nucliadb_cluster/entrypoint.sh /
-RUN chmod 750 /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]

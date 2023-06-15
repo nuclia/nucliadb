@@ -20,19 +20,16 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v3.1.0
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Install package
-        run: |
-          pip install -r code-requirements.txt
+        run: make -C nucliadb_dataset/ install-dev
+
       - name: Run pre-checks
-        run: |
-          flake8 nucliadb_dataset --config=nucliadb_dataset/setup.cfg
-          isort -c --profile black nucliadb_dataset/
-          black --check --verbose nucliadb_dataset
+        run: make -C nucliadb_dataset/ lint
 
   # Job to run tests
   tests:
@@ -48,39 +45,34 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v3.1.0
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Install the package
-        run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb_dataset/requirements-sources.txt
-          pip install -r nucliadb_dataset/requirements.txt
-          pip install -r nucliadb_dataset/requirements-test.txt
-          pip install -e nucliadb_dataset
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_dataset/
+        run: make -C nucliadb_dataset/ install-dev
 
       - uses: dorny/paths-filter@v2
         id: filter
         with:
           filters: |
-            nucliadb_modified:
+            nucliadb_node_modified:
               - 'nucliadb_node/**'
+            nucliadb_modified:
               - 'nucliadb/**'
 
-      - name: Build Nucliadb docker image for testing
-        if: steps.filter.outputs.nucliadb_modified == 'true'
+      - name: Build Nucliadb docker image (with compiled node bindings) for testing
+        if: steps.filter.outputs.nucliadb_node_modified == 'true'
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding --build-arg RUST_BUILD_PROFILE=dev .
 
-      - name: Run tests
+      - name: Build Nucliadb docker image (without bindings) for testing
+        if: ${{ steps.filter.outputs.nucliadb_node_modified != 'true' && steps.filter.outputs.nucliadb_modified == 'true' }}
         run: |
-          pytest -rfE --cov=nucliadb_dataset -s --tb=native -v --cov-report xml --cov-append nucliadb_dataset/nucliadb_dataset
+          docker build -t nuclia/nucliadb:latest -f Dockerfile .
+      - name: Run tests
+        run: make -C nucliadb_dataset/ test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

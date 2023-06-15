@@ -16,35 +16,45 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from unittest import mock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiohttp.web import Response
 
-from nucliadb.ingest.consumer.pull import (
-    TelemetryHeadersMissing,
-    check_proxy_telemetry_headers,
-)
+from nucliadb.ingest.consumer.pull import PullWorker
 
 
-@pytest.fixture(scope="function")
-def errors():
-    with mock.patch("nucliadb.ingest.consumer.pull.errors") as errors:
-        yield errors
+class TestPullWorker:
+    """
+    It's a complex class so this might get a little messy with mocks
 
+    It should be refactor at some point and these tests be rewritten/removed
+    """
 
-def test_check_proxy_telemetry_headers_ok(errors):
-    resp = Response(
-        headers={"x-b3-traceid": "foo", "x-b3-spanid": "bar", "x-b3-sampled": "baz"}
-    )
-    check_proxy_telemetry_headers(resp)
+    @pytest.fixture()
+    def processor(self):
+        processor = AsyncMock()
+        with patch("nucliadb.ingest.consumer.pull.Processor", return_value=processor):
+            yield processor
 
-    errors.capture_exception.assert_not_called()
+    @pytest.fixture()
+    def nats_conn(self):
+        conn = MagicMock()
+        conn.jetstream.return_value = AsyncMock()
+        conn.drain = AsyncMock()
+        conn.close = AsyncMock()
+        with patch("nucliadb.ingest.consumer.pull.nats.connect", return_value=conn):
+            yield conn
 
-
-def test_check_proxy_telemetry_headers_missing(errors):
-    resp = Response(headers={"x-b3-sampled": "baz"})
-    check_proxy_telemetry_headers(resp)
-
-    errors.capture_exception.assert_called_once()
-    assert isinstance(errors.capture_exception.call_args[0][0], TelemetryHeadersMissing)
+    @pytest.fixture()
+    def worker(self, processor):
+        yield PullWorker(
+            driver=AsyncMock(),
+            partition="1",
+            storage=AsyncMock(),
+            pull_time_error_backoff=100,
+            zone="zone",
+            nuclia_cluster_url="nuclia_cluster_url",
+            nuclia_public_url="nuclia_public_url",
+            audit=None,
+            onprem=False,
+        )

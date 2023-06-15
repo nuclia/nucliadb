@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import base64
 import os
 from datetime import datetime
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -56,9 +58,9 @@ from nucliadb_sdk.file import File
 from nucliadb_sdk.find import FindResult
 from nucliadb_sdk.labels import DEFAULT_LABELSET, Label, Labels, LabelSet, LabelType
 from nucliadb_sdk.resource import (
-    create_resource,
+    build_create_resource_payload,
+    build_update_resource_payload,
     from_resource_to_payload,
-    update_resource,
 )
 from nucliadb_sdk.search import SearchResult
 from nucliadb_sdk.vectors import Vectors, convert_vector
@@ -80,9 +82,14 @@ class KnowledgeBox:
         self.id = self.client.reader_session.base_url.path.strip("/").split("/")[-1]
 
     def __iter__(self) -> Iterable[Resource]:
-        for batch_resources in self.client.list_resources():
-            for resource in batch_resources:
+        page = 0
+        while True:
+            resources_resp = self.client.list_resources(page)
+            for resource in resources_resp.resources:
                 yield resource
+            if resources_resp.pagination.last:
+                return
+            page += 1
 
     async def __aiter__(self) -> AsyncIterable[Resource]:
         async for batch_resources in self.client.async_list_resources():
@@ -166,54 +173,26 @@ class KnowledgeBox:
         title: Optional[str] = None,
         summary: Optional[str] = None,
     ):
-        resource: Optional[Resource] = None
+        """
+        Backward compatible method for uploading a resource.
 
-        if key is None:
-            creating = True
-        else:
-            resource = await self.async_get(key)
-            if resource is None:
-                creating = True
-            else:
-                creating = False
-
-        if vectors is not None and self.vectorsets is None:
-            self.vectorsets = await self.client.async_get_vectorsets()
-
-        if creating:
-            create_payload = create_resource(
-                key=key,
+        Use the `create_resource` and `update_resource` methods instead.
+        """
+        return await asyncio.get_event_loop().run_in_executor(
+            None,
+            partial(
+                self.upload,
+                key,
+                binary=binary,
                 text=text,
                 format=format,
-                binary=binary,
                 labels=labels,
                 entities=entities,
                 vectors=vectors,
-                vectorsets=self.vectorsets,
                 title=title,
                 summary=summary,
-            )
-            resp = await self.client.async_create_resource(create_payload)
-            rid = resp.uuid
-
-        else:
-            assert resource is not None
-
-            update_payload = update_resource(
-                text=text,
-                format=format,
-                binary=binary,
-                labels=labels,
-                entities=entities,
-                vectors=vectors,
-                resource=resource,
-                vectorsets=self.vectorsets,
-                title=title,
-                summary=summary,
-            )
-            rid = resource.id
-            await self.client.async_update_resource(rid, update_payload)
-        return rid
+            ),
+        )
 
     def upload(
         self,
@@ -229,6 +208,11 @@ class KnowledgeBox:
         title: Optional[str] = None,
         summary: Optional[str] = None,
     ) -> str:
+        """
+        Backward compatible method for uploading a resource.
+
+        Use the `create_resource` and `update_resource` methods instead.
+        """
         resource: Optional[Resource] = None
 
         if key is None:
@@ -244,37 +228,93 @@ class KnowledgeBox:
             self.vectorsets = self.client.get_vectorsets()
 
         if creating:
-            create_payload = create_resource(
+            return self.create_resource(
                 key=key,
+                binary=binary,
                 text=text,
                 format=format,
-                binary=binary,
                 labels=labels,
                 entities=entities,
                 vectors=vectors,
-                vectorsets=self.vectorsets,
                 title=title,
                 summary=summary,
             )
-            resp = self.client.create_resource(create_payload)
-            rid = resp.uuid
-
         else:
-            assert resource is not None
-            update_payload = update_resource(
+            return self.update_resource(
+                resource=resource,  # type: ignore
+                binary=binary,
                 text=text,
                 format=format,
-                binary=binary,
                 labels=labels,
                 entities=entities,
                 vectors=vectors,
-                resource=resource,
-                vectorsets=self.vectorsets,
                 title=title,
                 summary=summary,
             )
-            rid = resource.id
-            self.client.update_resource(rid, update_payload)
+
+    def create_resource(
+        self,
+        key: Optional[str] = None,
+        binary: Optional[Union[File, str]] = None,
+        text: Optional[str] = None,
+        format: Optional[TextFormat] = None,
+        labels: Optional[Labels] = None,
+        entities: Optional[Entities] = None,
+        vectors: Optional[
+            Union[Vectors, Dict[str, Union[ndarray, List[float]]]]
+        ] = None,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> str:
+        if vectors is not None and self.vectorsets is None:
+            self.vectorsets = self.client.get_vectorsets()
+
+        create_payload = build_create_resource_payload(
+            key=key,
+            text=text,
+            format=format,
+            binary=binary,
+            labels=labels,
+            entities=entities,
+            vectors=vectors,
+            vectorsets=self.vectorsets,
+            title=title,
+            summary=summary,
+        )
+        resp = self.client.create_resource(create_payload)
+        return resp.uuid
+
+    def update_resource(
+        self,
+        resource: Resource,
+        binary: Optional[Union[File, str]] = None,
+        text: Optional[str] = None,
+        format: Optional[TextFormat] = None,
+        labels: Optional[Labels] = None,
+        entities: Optional[Entities] = None,
+        vectors: Optional[
+            Union[Vectors, Dict[str, Union[ndarray, List[float]]]]
+        ] = None,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> str:
+        if vectors is not None and self.vectorsets is None:
+            self.vectorsets = self.client.get_vectorsets()
+
+        update_payload = build_update_resource_payload(
+            resource=resource,
+            text=text,
+            format=format,
+            binary=binary,
+            labels=labels,
+            entities=entities,
+            vectors=vectors,
+            vectorsets=self.vectorsets,
+            title=title,
+            summary=summary,
+        )
+        rid = resource.id
+        self.client.update_resource(rid, update_payload)
         return rid
 
     def process_uploaded_labels_from_search(
@@ -325,7 +365,7 @@ class KnowledgeBox:
                 "kind": [labelset_type.value],
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
 
     def get_labels(self) -> KnowledgeBoxLabels:
         resp = self.client.get_labels()
@@ -348,9 +388,13 @@ class KnowledgeBox:
         vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
+        page_number: Optional[int] = None,
+        page_size: Optional[int] = None,
     ):
         result = self.client.search(
-            self.build_search_request(text, filter, vector, vectorset, min_score)
+            self.build_search_request(
+                text, filter, vector, vectorset, min_score, page_number, page_size
+            )
         )
         return SearchResult(result, self.client)
 
@@ -423,7 +467,7 @@ class KnowledgeBox:
         field_type_filter: List[FieldTypeName] = list(FieldTypeName),
         extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName),
         context: Optional[List[Message]] = None,
-        fields: List[str] = [],
+        fields: Optional[List[str]] = None,
         range_creation_start: Optional[datetime] = None,
         range_creation_end: Optional[datetime] = None,
         range_modification_start: Optional[datetime] = None,
@@ -450,7 +494,7 @@ class KnowledgeBox:
             args["filters"] = filter_list
 
         args["min_score"] = min_score
-        args["fields"] = fields
+        args["fields"] = fields or []
         args["context"] = context
         args["extracted"] = extracted
         args["field_type_filter"] = field_type_filter
@@ -489,7 +533,6 @@ class KnowledgeBox:
 
         if text is not None:
             args["query"] = text
-            args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
         if vector is not None and vectorset is not None:
@@ -500,7 +543,6 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.VECTOR)
 
         if len(args["features"]) == 0:
-            args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
         args["min_score"] = min_score
@@ -514,6 +556,8 @@ class KnowledgeBox:
         vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
+        page_number: Optional[int] = None,
+        page_size: Optional[int] = None,
     ) -> SearchRequest:
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -546,6 +590,11 @@ class KnowledgeBox:
         if len(args["features"]) == 0:
             args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
+
+        if page_number is not None:
+            args["page_number"] = page_number
+        if page_size is not None:
+            args["page_size"] = page_size
 
         args["min_score"] = min_score
         request = SearchRequest(**args)

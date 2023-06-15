@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from nucliadb_utils import featureflagging, utilities
+from nucliadb_utils.exceptions import ConfigurationError
 
 
 @pytest.fixture(autouse=True)
@@ -78,7 +79,7 @@ async def test_get_storage_local():
 @pytest.mark.asyncio
 async def test_get_storage_missing():
     with patch.object(utilities.storage_settings, "file_backend", "missing"):
-        with pytest.raises(AttributeError):
+        with pytest.raises(ConfigurationError):
             await utilities.get_storage()
 
 

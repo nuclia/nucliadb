@@ -29,21 +29,13 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from redis import asyncio as aioredis
 from starlette.routing import Mount
 
+from nucliadb.common.cluster.manager import KBShardManager, get_index_node
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.cache import clear_ingest_cache
-from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.tests.fixtures import broker_resource
-from nucliadb.ingest.utils import get_driver
 from nucliadb.search import API_PREFIX
+from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import clear_global_cache
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
 
 
 @pytest.fixture(scope="function")
@@ -51,6 +43,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
+        FileBackendConfig,
         nuclia_settings,
         nucliadb_settings,
         running_settings,
@@ -59,7 +52,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
 
     extended_storage_settings.gcs_indexing_bucket = "indexing"
@@ -72,11 +65,13 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
 
     running_settings.debug = False
 
-    ingest_settings.pull_time = 0
+    ingest_settings.disable_pull_worker = True
 
     ingest_settings.nuclia_partitions = 1
 
     nuclia_settings.dummy_processing = True
+    nuclia_settings.dummy_predict = True
+
     ingest_settings.grpc_port = free_port()
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
@@ -86,14 +81,8 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
 
 @pytest.mark.asyncio
 @pytest.fixture(scope="function")
-async def search_api(
-    redis,
-    transaction_utility,
-    indexing_utility_registered,
-    test_settings_search: None,
-    event_loop,
-):  # type: ignore
-    from nucliadb.ingest.orm import NODES
+async def search_api(test_settings_search, transaction_utility, redis):  # type: ignore
+    from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
 
     async def handler(req, exc):  # type: ignore
@@ -112,10 +101,10 @@ async def search_api(
     # Make sure is clean
     await asyncio.sleep(1)
     count = 0
-    while len(NODES) < 2:
+    while len(manager.INDEX_NODES) < 2:
         print("awaiting cluster nodes - search fixtures.py")
-        await asyncio.sleep(4)
-        if count == 10:
+        await asyncio.sleep(1)
+        if count == 40:
             raise Exception("No cluster")
         count += 1
 
@@ -149,14 +138,11 @@ async def search_api(
     await application.router.shutdown()
     # Make sure nodes can sync
     await asyncio.sleep(1)
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
+    await driver.close(close_connection_pool=True)
     clear_ingest_cache()
     clear_global_cache()
-    for node in NODES.values():
-        node._reader = None
-        node._writer = None
-        node._sidecar = None
+    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture(scope="function")
@@ -193,13 +179,14 @@ async def multiple_search_resource(
     knowledgebox_ingest,
 ):
     """
-    Create a resource that has every possible bit of information
+    Create 100 resources that have every possible bit of information
     """
-    for count in range(100):
+    n_resources = 100
+    for count in range(1, n_resources + 1):
         message = broker_resource(knowledgebox_ingest)
         await processor.process(message=message, seqid=count)
 
-    await wait_for_shard(knowledgebox_ingest, 100)
+    await wait_for_shard(knowledgebox_ingest, n_resources)
     return knowledgebox_ingest
 
 
@@ -213,21 +200,22 @@ async def inject_message(
 
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
-    shard = await Node.get_current_active_shard(txn, knowledgebox_ingest)
+    shard_manager = KBShardManager()
+    shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
     if shard is None:
         raise Exception("Could not find shard")
     await txn.abort()
 
     checks: Dict[str, bool] = {}
-    for replica in shard.shard.replicas:
+    for replica in shard.replicas:
         if replica.shard.id not in checks:
             checks[replica.shard.id] = False
 
     for i in range(30):
-        for replica in shard.shard.replicas:
-            node_obj = NODES.get(replica.node)
+        for replica in shard.replicas:
+            node_obj = get_index_node(replica.node)
             if node_obj is not None:
                 req = GetShardRequest()
                 req.shard_id.id = replica.shard.id

@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nucliadb
+  labels:
+    app: nucliadb
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: 1
+  serviceName: nucliadb
+  selector:
+    matchLabels:
+      app: nucliadb
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: nucliadb
+      labels:
+        app: nucliadb
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      topologySpreadConstraints:
+{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+      containers:
+      - name: app
+        image: "{{ .Values.image }}:{{ .Values.imageVersion }}"
+        securityContext:
+          privileged: true
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 20
+          timeoutSeconds: 10
+          periodSeconds: 20
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 20
+          timeoutSeconds: 10
+          periodSeconds: 20
+        command: [
+          "nucliadb"
+        ]
+        env:
+          - name: VERSION
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['version']
+          {{- range $key, $value := .Values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+          {{- end }}
+          {{- if .Values.envSecrets }}
+{{ toYaml .Values.envSecrets | indent 10 }}
+          {{- end }}
+          - name: DATA_PATH
+            value: "/data"
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: train
+          containerPort: 8040
+        - name: grpc
+          containerPort: 8060
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        volumeMounts:
+        - name: ndb-pv
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: ndb-pv
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ .Values.storage.class }}
+      resources:
+        requests:
+          storage: {{ .Values.storage.size }}

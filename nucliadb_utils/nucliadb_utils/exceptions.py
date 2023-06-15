@@ -29,5 +29,5 @@ class LimitsExceededError(Exception):
         self.detail = detail
 
 
-class ShardsNotFound(Exception):
+class ConfigurationError(Exception):
     pass

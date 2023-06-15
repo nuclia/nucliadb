@@ -116,21 +116,31 @@ class NatsPubsub(PubSubDriver):
     async def finalize(self):
         if self.nc:
             for subscription in self._subscriptions.values():
-                await subscription.unsubscribe()
+                try:
+                    await subscription.unsubscribe()
+                except (
+                    RuntimeError,
+                    nats.errors.ConnectionClosedError,
+                ):  # pragma: no cover
+                    pass
 
             try:
                 await self.nc.drain()
-            except RuntimeError:
-                pass
-            except nats.errors.ConnectionClosedError:
+            except (
+                RuntimeError,
+                nats.errors.ConnectionClosedError,
+            ):  # pragma: no cover
                 pass
 
             try:
                 await self.nc.close()
-            except RuntimeError:
+            except (
+                RuntimeError,
+                nats.errors.ConnectionClosedError,
+                AttributeError,
+            ):  # pragma: no cover
                 pass
-            except AttributeError:
-                pass
+
         self.initialized = False
 
     async def disconnected_cb(self):

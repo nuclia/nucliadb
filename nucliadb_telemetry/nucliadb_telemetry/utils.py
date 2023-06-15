@@ -19,21 +19,25 @@
 
 import asyncio
 import os
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional
 
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
 from opentelemetry.sdk.resources import Resource  # type: ignore
-from opentelemetry.trace import get_current_span
 
 from nucliadb_telemetry.batch_span import BatchSpanProcessor
 from nucliadb_telemetry.jaeger import JaegerExporterAsync
 from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.tikv import TiKVInstrumentor
 from nucliadb_telemetry.tracerprovider import (
     AsyncMultiSpanProcessor,
     AsyncTracerProvider,
 )
+
+from .context import set_info_on_span  # noqa: F401
+
+set_info_on_span  # b/w compatible import
 
 GLOBAL_PROVIDER: Dict[str, AsyncTracerProvider] = {}
 
@@ -117,6 +121,7 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
     if tracer_provider is not None:  # pragma: no cover
         await init_telemetry(tracer_provider)
         set_global_textmap(B3MultiFormat())
+        TiKVInstrumentor().instrument(tracer_provider=tracer_provider)
         try:
             from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
                 AioHttpClientInstrumentor,
@@ -126,23 +131,3 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
         except ImportError:
             pass
     return tracer_provider
-
-
-def set_info_on_span(
-    headers: Dict[
-        str,
-        Union[
-            str,
-            bool,
-            int,
-            float,
-            Sequence[str],
-            Sequence[bool],
-            Sequence[int],
-            Sequence[float],
-        ],
-    ]
-):
-    if telemetry_settings.jaeger_enabled:
-        span = get_current_span()
-        span.set_attributes(headers)

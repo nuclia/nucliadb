@@ -130,6 +130,11 @@ pub mod origin {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Extra {
+    #[prost(message, optional, tag="1")]
+    pub metadata: ::core::option::Option<::prost_types::Struct>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Relations {
     #[prost(message, repeated, tag="1")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
@@ -166,6 +171,18 @@ pub struct Message {
     pub content: ::core::option::Option<MessageContent>,
     #[prost(string, tag="5")]
     pub ident: ::prost::alloc::string::String,
+    #[prost(enumeration="message::MessageType", tag="6")]
+    pub r#type: i32,
+}
+/// Nested message and enum types in `Message`.
+pub mod message {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum MessageType {
+        Unset = 0,
+        Question = 1,
+        Answer = 2,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Conversation {
@@ -174,10 +191,15 @@ pub struct Conversation {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldConversation {
+    /// Total number of pages
     #[prost(int32, tag="1")]
     pub pages: i32,
+    /// Max page size
     #[prost(int32, tag="2")]
     pub size: i32,
+    /// Total number of messages
+    #[prost(int32, tag="3")]
+    pub total: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NestedPosition {
@@ -441,6 +463,7 @@ pub mod field_text {
         Html = 1,
         Rst = 2,
         Markdown = 3,
+        Json = 4,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -657,11 +680,42 @@ pub struct PagePositions {
     pub end: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageStructurePage {
+    #[prost(int64, tag="1")]
+    pub width: i64,
+    #[prost(int64, tag="2")]
+    pub height: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageStructureToken {
+    #[prost(int64, tag="1")]
+    pub x: i64,
+    #[prost(int64, tag="2")]
+    pub y: i64,
+    #[prost(int64, tag="3")]
+    pub width: i64,
+    #[prost(int64, tag="4")]
+    pub height: i64,
+    #[prost(string, tag="5")]
+    pub text: ::prost::alloc::string::String,
+    #[prost(float, tag="6")]
+    pub line: f32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageStructure {
+    #[prost(message, optional, tag="1")]
+    pub page: ::core::option::Option<PageStructurePage>,
+    #[prost(message, repeated, tag="2")]
+    pub tokens: ::prost::alloc::vec::Vec<PageStructureToken>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FilePages {
     #[prost(message, repeated, tag="1")]
     pub pages: ::prost::alloc::vec::Vec<CloudFile>,
     #[prost(message, repeated, tag="2")]
     pub positions: ::prost::alloc::vec::Vec<PagePositions>,
+    #[prost(message, repeated, tag="3")]
+    pub structures: ::prost::alloc::vec::Vec<PageStructure>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RowsPreview {
@@ -690,6 +744,11 @@ pub struct FieldId {
     pub field_type: i32,
     #[prost(string, tag="2")]
     pub field: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AllFieldIDs {
+    #[prost(message, repeated, tag="1")]
+    pub fields: ::prost::alloc::vec::Vec<FieldId>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

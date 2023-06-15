@@ -320,6 +320,13 @@ impl AsRef<DataPoint> for DataPoint {
 }
 
 impl DataPoint {
+    pub fn stored_len(&self) -> Option<u64> {
+        if key_value::get_no_elems(&self.nodes) == 0 {
+            return None;
+        }
+        let node = key_value::get_value(Node, &self.nodes, 0);
+        Some(vector::vector_len(Node::vector(node)))
+    }
     pub fn get_id(&self) -> DpId {
         self.journal.uid
     }

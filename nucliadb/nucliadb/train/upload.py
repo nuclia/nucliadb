@@ -19,16 +19,14 @@
 #
 import argparse
 import asyncio
-import logging
-import sys
 from asyncio import tasks
 from typing import Callable, List
 
 import pkg_resources
 
-from nucliadb.train import logger
 from nucliadb.train.uploader import start_upload
 from nucliadb_telemetry import errors
+from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.settings import running_settings
 
 
@@ -75,18 +73,9 @@ def _cancel_all_tasks(loop):
 
 
 def run() -> None:
+    setup_logging()
+
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)-18s | %(levelname)-7s | %(name)-16s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
-    )
-
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
-
-    logging.getLogger("asyncio").setLevel(logging.ERROR)
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")

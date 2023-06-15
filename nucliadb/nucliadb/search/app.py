@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -28,20 +26,16 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.ingest.orm import NODES
+from nucliadb.common.cluster import manager
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
 from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
-from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
-
-logging.getLogger("nucliadb_chitchat").setLevel(
-    logging.getLevelName(running_settings.chitchat_level.upper())
-)
 
 middleware = [
     Middleware(
@@ -52,7 +46,7 @@ middleware = [
     ),
     Middleware(
         AuthenticationMiddleware,
-        backend=STFAuthenticationBackend(),
+        backend=NucliaCloudAuthenticationBackend(),
     ),
 ]
 
@@ -115,20 +109,19 @@ async def chitchat_members(request: Request) -> JSONResponse:
     return JSONResponse(
         [
             {
-                "id": node_id,
+                "id": node.id,
                 "listen_address": node.address,
                 "type": node.label,
-                "load_score": node.load_score,
                 "shard_count": node.shard_count,
                 "dummy": node.dummy,
             }
-            for node_id, node in NODES.items()
+            for node in manager.get_index_nodes()
         ]
     )
 
 
 async def alive(request: Request) -> JSONResponse:
-    if len(NODES) == 0 and settings.driver != "local":
+    if len(manager.get_index_nodes()) == 0 and settings.driver != "local":
         return JSONResponse({"status": "error"}, status_code=503)
     else:
         return JSONResponse({"status": "ok"})

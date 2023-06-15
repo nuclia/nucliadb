@@ -60,41 +60,28 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_dataset
-	isort --profile black nucliadb_client
-	isort --profile black nucliadb_sdk
-	isort --profile black nucliadb_models
-
-	black nucliadb_dataset
-	black nucliadb_client
-	black nucliadb_sdk
-	black nucliadb_models
-
-	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
-	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
-	flake8  --config nucliadb_sdk/setup.cfg nucliadb_sdk/nucliadb_sdk
-	flake8  --config nucliadb_models/setup.cfg nucliadb_models/nucliadb_models
-
-	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
-	MYPYPATH=./mypy_stubs mypy nucliadb_client
-	MYPYPATH=./mypy_stubs mypy nucliadb_models
-	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
-
+	make -C nucliadb_dataset/ format
+	make -C nucliadb_client/ format
+	make -C nucliadb_models/ format
+	make -C nucliadb_sdk/ format
 	make -C nucliadb_node/ format
+	make -C nucliadb_utils/ format
+	make -C nucliadb/ format
+	make -C nucliadb_telemetry/ format
+
+	make -C nucliadb/ lint
+	make -C nucliadb_utils/ lint
+	make -C nucliadb_telemetry/ lint
+	make -C nucliadb_sdk/ lint
+	make -C nucliadb_dataset/ lint
+	make -C nucliadb_client/ lint
+	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
 
-	make -C nucliadb_utils/ format
-	make -C nucliadb_utils/ lint
-
-	make -C nucliadb/ format
-	make -C nucliadb/ lint
-
-	make -C nucliadb_telemetry/ format
-	make -C nucliadb_telemetry/ lint
 
 rust-code-lint:
 	cargo +nightly fmt
-	cargo +nightly clippy --tests
+	cargo clippy --tests
 
 
 test-rust:
@@ -106,10 +93,9 @@ venv:  ## Initializes an environment
 	pyenv local nucliadb
 
 install: ## Install dependencies (on the active environment)
-	pip install --upgrade pip
-	pip install Cython==0.29.24
-	pip install grpcio-tools
-	pip install -r code-requirements.txt
+	pip install --upgrade pip wheel
+	pip install Cython==0.29.24 grpcio-tools
+	pip install -r code-requirements.txt -r test-requirements.txt
 	pip install -e ./nucliadb_protos/python
 	pip install -e ./nucliadb_telemetry
 	pip install -e ./nucliadb_utils
@@ -118,7 +104,6 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_client
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
-	pip install -r test-requirements.txt
 
 base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode

@@ -28,6 +28,9 @@ target
 *.so
 venv/
 nucliadb/.mypy_cache
+lib
+share
+pyvenv.cfg
 
 nucliadb/nucliadb/static/tmp
 
@@ -89,3 +92,7 @@ test.export.tar.bz2
 .env
 .envrc
 benchmarks.json
+
+
+# debugging
+nucliadb-user.creds

@@ -38,20 +38,22 @@ from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
-from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.maindb.keys import (
+from nucliadb.common.cluster.exceptions import (
+    AlreadyExists,
+    EntitiesGroupNotFound,
+    NodeError,
+)
+from nucliadb.common.cluster.index_node import AbstractIndexNode
+from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.keys import (
     KB_DELETED_ENTITIES_GROUPS,
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
 )
-from nucliadb.ingest.orm.exceptions import AlreadyExists, NodeError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node
-from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.settings import settings
-from nucliadb.ingest.utils import get_driver
 from nucliadb_telemetry import errors
-from nucliadb_utils.utilities import get_cache
 
 
 class EntitiesManager:
@@ -107,9 +109,12 @@ class EntitiesManager:
         intact. Use `delete_entities` to delete them instead.
 
         """
+        if not await self.entities_group_exists(group):
+            raise EntitiesGroupNotFound(f"Entities group '{group}' doesn't exist")
+
         entities_group = await self.get_stored_entities_group(group)
         if entities_group is None:
-            raise KeyError(f"Entities group '{group}' doesn't exist")
+            entities_group = EntitiesGroup()
 
         for name, entity in entities.items():
             entities_group.entities[name].CopyFrom(entity)
@@ -137,6 +142,20 @@ class EntitiesManager:
     async def set_entities_group_force(self, group: str, entitiesgroup: EntitiesGroup):
         await self.store_entities_group(group, entitiesgroup)
         await self.index_entities_group(group, entitiesgroup)
+
+    async def set_entities_group_metadata(
+        self, group: str, *, title: Optional[str] = None, color: Optional[str] = None
+    ):
+        entities_group = await self.get_stored_entities_group(group)
+        if entities_group is None:
+            entities_group = EntitiesGroup()
+
+        if title:
+            entities_group.title = title
+        if color:
+            entities_group.color = color
+
+        await self.store_entities_group(group, entities_group)
 
     async def delete_entities(self, group: str, delete: List[str]):
         stored = await self.get_stored_entities_group(group)
@@ -175,7 +194,7 @@ class EntitiesManager:
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
         payload = await self.txn.get(key)
-        if payload is None:
+        if not payload:
             return None
 
         eg = EntitiesGroup()
@@ -183,12 +202,10 @@ class EntitiesManager:
         return eg
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        driver = await get_driver()
-        cache = await get_cache()
-        nodes_manager = NodesManager(driver=driver, cache=cache)
+        shard_manager = get_shard_manager()
 
         async def do_entities_search(
-            node: Node, shard_id: str, node_id: str
+            node: AbstractIndexNode, shard_id: str, node_id: str
         ) -> RelationSearchResponse:
             request = RelationSearchRequest(
                 shard_id=shard_id,
@@ -203,7 +220,7 @@ class EntitiesManager:
             )
             return await node.reader.RelationSearch(request)  # type: ignore
 
-        results = await nodes_manager.apply_for_all_shards(
+        results = await shard_manager.apply_for_all_shards(
             self.kbid, do_entities_search, settings.relation_search_timeout
         )
         for result in results:
@@ -226,7 +243,7 @@ class EntitiesManager:
         deleted: Set[str] = set()
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
-        if payload is not None:
+        if payload:
             deg = DeletedEntitiesGroups()
             deg.ParseFromString(payload)
             deleted.update(deg.entities_groups)
@@ -278,16 +295,14 @@ class EntitiesManager:
             visited_groups.add(group)
 
     async def get_indexed_entities_groups_names(self) -> Set[str]:
-        driver = await get_driver()
-        cache = await get_cache()
-        nodes_manager = NodesManager(driver=driver, cache=cache)
+        shard_manager = get_shard_manager()
 
         async def query_indexed_entities_group_names(
-            node: Node, shard_id: str, node_id: str
+            node: AbstractIndexNode, shard_id: str, node_id: str
         ) -> TypeList:
             return await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
 
-        results = await nodes_manager.apply_for_all_shards(
+        results = await shard_manager.apply_for_all_shards(
             self.kbid,
             query_indexed_entities_group_names,
             settings.relation_types_timeout,
@@ -324,7 +339,7 @@ class EntitiesManager:
         deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(deleted_groups_key)
         deg = DeletedEntitiesGroups()
-        if payload is not None:
+        if payload:
             deg.ParseFromString(payload)
         if group not in deg.entities_groups:
             deg.entities_groups.append(group)
@@ -333,7 +348,7 @@ class EntitiesManager:
     async def unmark_entities_group_as_deleted(self, group: str):
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
-        if payload is None:
+        if not payload:
             return
         deg = DeletedEntitiesGroups()
         deg.ParseFromString(payload)

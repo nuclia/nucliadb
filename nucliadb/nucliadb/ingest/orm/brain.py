@@ -68,39 +68,6 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
 }
 
 
-def get_paragraph_text(
-    extracted_text: ExtractedText, start: int, end: int, split: Optional[str] = None
-) -> str:
-    if split is not None:
-        text = extracted_text.split_text[split]
-    else:
-        text = extracted_text.text
-    return text[start:end]
-
-
-def is_paragraph_repeated_in_field(
-    paragraph: Paragraph,
-    extracted_text: Optional[ExtractedText],
-    unique_paragraphs: Set[str],
-    split: Optional[str] = None,
-) -> bool:
-    if extracted_text is None:
-        return False
-
-    paragraph_text = get_paragraph_text(
-        extracted_text, start=paragraph.start, end=paragraph.end, split=split
-    )
-    if len(paragraph_text) == 0:
-        return False
-
-    if paragraph_text in unique_paragraphs:
-        repeated_in_field = True
-    else:
-        repeated_in_field = False
-        unique_paragraphs.add(paragraph_text)
-    return repeated_in_field
-
-
 class ResourceBrain:
     def __init__(self, rid: str):
         self.rid = rid
@@ -277,16 +244,19 @@ class ResourceBrain:
                 ssentence = sparagraph.sentences[
                     f"{self.rid}/{field_key}/{subfield}/{index}/{vector.start}-{vector.end}"
                 ]
+
+                ssentence.ClearField("vector")  # clear first to prevent duplicates
                 ssentence.vector.extend(vector.vector)
 
         for index, vector in enumerate(vo.vectors.vectors):
-            paragraph = self.brain.paragraphs[field_key].paragraphs[
-                f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
-            ]
-            sentence = paragraph.sentences[
-                f"{self.rid}/{field_key}/{index}/{vector.start}-{vector.end}"
-            ]
+            para_key = f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
+            paragraph = self.brain.paragraphs[field_key].paragraphs[para_key]
+            sent_key = f"{self.rid}/{field_key}/{index}/{vector.start}-{vector.end}"
+            sentence = paragraph.sentences[sent_key]
+
+            sentence.ClearField("vector")  # clear first to prevent duplicates
             sentence.vector.extend(vector.vector)
+
             sentence.metadata.position.start = vector.start
             sentence.metadata.position.end = vector.end
 
@@ -512,6 +482,39 @@ class ResourceBrain:
 
     def compute_tags(self):
         self.brain.labels.extend(flat_resource_tags(self.tags))
+
+
+def get_paragraph_text(
+    extracted_text: ExtractedText, start: int, end: int, split: Optional[str] = None
+) -> str:
+    if split is not None:
+        text = extracted_text.split_text[split]
+    else:
+        text = extracted_text.text
+    return text[start:end]
+
+
+def is_paragraph_repeated_in_field(
+    paragraph: Paragraph,
+    extracted_text: Optional[ExtractedText],
+    unique_paragraphs: Set[str],
+    split: Optional[str] = None,
+) -> bool:
+    if extracted_text is None:
+        return False
+
+    paragraph_text = get_paragraph_text(
+        extracted_text, start=paragraph.start, end=paragraph.end, split=split
+    )
+    if len(paragraph_text) == 0:
+        return False
+
+    if paragraph_text in unique_paragraphs:
+        repeated_in_field = True
+    else:
+        repeated_in_field = False
+        unique_paragraphs.add(paragraph_text)
+    return repeated_in_field
 
 
 def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:

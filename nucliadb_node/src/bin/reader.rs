@@ -19,13 +19,15 @@
 //
 use std::time::Instant;
 
+use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
-use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
-use nucliadb_node::reader::NodeReaderService;
+use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
+use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
+use nucliadb_node::shards::{AsyncReaderShardsProvider, AsyncUnboundedShardReaderCache};
 use nucliadb_node::telemetry::init_telemetry;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
@@ -38,14 +40,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Reader Node starting...");
     let _guard = init_telemetry()?;
     let start_bootstrap = Instant::now();
-    let mut node_reader_service = NodeReaderService::new();
+    let shards_provider = AsyncUnboundedShardReaderCache::new();
 
     std::fs::create_dir_all(env::shards_path())?;
     if !env::lazy_loading() {
-        node_reader_service.load_shards()?;
+        shards_provider.load_all().await?;
     }
 
-    let grpc_driver = NodeReaderGRPCDriver::from(node_reader_service);
+    let grpc_options = GrpcReaderOptions {
+        lazy_loading: env::lazy_loading(),
+    };
+    let grpc_driver = NodeReaderGRPCDriver::new(grpc_options);
+    grpc_driver.initialize().await?;
+
     let _grpc_task = tokio::spawn(start_grpc_service(grpc_driver));
     let metrics_task = tokio::spawn(run_http_metrics_server(MetricsServerOptions {
         default_http_port: 3031,
@@ -82,11 +89,17 @@ pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver) {
 
     info!("Reader listening for gRPC requests at: {:?}", addr);
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    let tracing_middleware = GrpcInstrumentorLayer::default();
+    let debug_logs_middleware = GrpcDebugLogsLayer::default();
+    let metrics_middleware = MetricsLayer::default();
 
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
+        .layer(tracing_middleware)
+        .layer(debug_logs_middleware)
+        .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))
         .serve(addr)

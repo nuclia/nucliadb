@@ -23,6 +23,8 @@ from typing import Any, Optional
 import mrflagly
 import pydantic
 
+from nucliadb_utils import const
+
 
 class Settings(pydantic.BaseSettings):
     environment: str = pydantic.Field(
@@ -32,9 +34,10 @@ class Settings(pydantic.BaseSettings):
 
 
 DEFAULT_FLAG_DATA: dict[str, Any] = {
-    "nucliadb_find_merge_parallelisation": {
+    # These are just defaults to use for local dev and tests
+    const.Features.WAIT_FOR_INDEX: {
         "rollout": 0,
-        "variants": {"environment": ["stage"]},
+        "variants": {"environment": ["none"]},
     }
 }
 

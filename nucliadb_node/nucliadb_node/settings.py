@@ -35,14 +35,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-
-class IndexingSettings(utils_settings.IndexingSettings):
-    indexed_jetstream_target: str = "indexed.{partition}"
-    indexed_jetstream_stream: str = "indexed"
-
-
-indexing_settings = IndexingSettings()
+indexing_settings = utils_settings.IndexingSettings()
 
 
 class RunningSettings(BaseSettings):

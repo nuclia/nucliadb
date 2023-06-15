@@ -21,90 +21,22 @@ from typing import Optional
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.ingest.chitchat import ChitchatNucliaDB  # type: ignore
-from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.settings import settings
+from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
+from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.ingest import SERVICE_NAME
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import nucliadb_settings
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
-
-try:
-    from nucliadb.ingest.maindb.redis import RedisDriver
-
-    REDIS = True
-except ImportError:  # pragma: no cover
-    REDIS = False
-
-try:
-    from nucliadb.ingest.maindb.tikv import TiKVDriver
-
-    TIKV = True
-except ImportError:  # pragma: no cover
-    TIKV = False
-
-
-try:
-    from nucliadb.ingest.maindb.pg import PGDriver
-
-    PG = True
-except ImportError:  # pragma: no cover
-    PG = False
-
-try:
-    from nucliadb.ingest.maindb.local import LocalDriver
-
-    FILES = True
-except ImportError:  # pragma: no cover
-    FILES = False
-
-
-async def get_driver() -> Driver:
-    if (
-        settings.driver == "redis"
-        and REDIS
-        and "driver" not in MAIN
-        and settings.driver_redis_url is not None
-    ):
-        redis_driver = RedisDriver(settings.driver_redis_url)
-        MAIN["driver"] = redis_driver
-    elif (
-        settings.driver == "tikv"
-        and TIKV
-        and "driver" not in MAIN
-        and settings.driver_tikv_url is not None
-    ):
-        tikv_driver = TiKVDriver(settings.driver_tikv_url)
-        MAIN["driver"] = tikv_driver
-    elif (
-        settings.driver == "pg"
-        and PG
-        and "driver" not in MAIN
-        and settings.driver_pg_url is not None
-    ):
-        pg_driver = PGDriver(settings.driver_pg_url)
-        MAIN["driver"] = pg_driver
-    elif (
-        settings.driver == "local"
-        and FILES
-        and "driver" not in MAIN
-        and settings.driver_local_url is not None
-    ):
-        local_driver = LocalDriver(settings.driver_local_url)
-        MAIN["driver"] = local_driver
-    driver: Optional[Driver] = MAIN.get("driver")
-    if driver is not None and not driver.initialized:
-        await driver.initialize()
-    elif driver is None:
-        raise AttributeError("No driver defined on settings")
-    return driver
 
 
 async def start_ingest(service_name: Optional[str] = None):
+    await setup_driver()
+
     actual_service = get_utility(Utility.INGEST)
     if actual_service is not None:
         return
 
+    await setup_cluster(SERVICE_NAME)
     if nucliadb_settings.nucliadb_ingest is not None:
         # Its distributed lets create a GRPC client
         # We want Jaeger telemetry enabled
@@ -131,6 +63,4 @@ async def stop_ingest():
         util = get_utility(Utility.INGEST)
         await util.finalize()
 
-
-def get_chitchat() -> ChitchatNucliaDB:
-    return get_utility(Utility.CHITCHAT)
+    await teardown_cluster()

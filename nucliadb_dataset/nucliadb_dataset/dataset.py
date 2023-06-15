@@ -168,7 +168,7 @@ class NucliaDBDataset(NucliaDataset):
             raise AttributeError("Trainset or task needs to be defined")
 
         if trainset is None:
-            raise AttributeError("Trainset cloud not be defined")
+            raise AttributeError("Trainset could not be defined")
 
         self.trainset = trainset
         self.client = client
@@ -468,7 +468,7 @@ def download_all_partitions(
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
     path: Optional[str] = None,
     knowledgebox: Optional[KnowledgeBox] = None,
-    labels: List[str] = [],
+    labels: Optional[List[str]] = None,
 ):
     if knowledgebox is None and slug is not None:
         knowledgebox = get_kb(slug, nucliadb_base_url)

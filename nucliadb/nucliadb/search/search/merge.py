@@ -39,11 +39,7 @@ from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_labels_resource,
-    get_resource_cache,
-    get_resource_from_cache,
     get_seconds_paragraph,
-    get_text_paragraph,
-    get_text_sentence,
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationTypePbMap
@@ -72,7 +68,9 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 
+from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
+from .paragraphs import get_paragraph_text, get_text_sentence
 
 Bm25Score = Tuple[int, int]
 TimestampScore = datetime.datetime
@@ -143,6 +141,7 @@ async def merge_documents_results(
             score = await text_score(result, sort.field, kbid)
             if score is not None:
                 raw_resource_list.append((result, score))
+        total += document_response.total
 
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
@@ -171,8 +170,6 @@ async def merge_documents_results(
         )
         if result.uuid not in resources:
             resources.append(result.uuid)
-
-    total = len(result_resource_list)
 
     return Resources(
         facets=facets,
@@ -207,8 +204,16 @@ async def merge_suggest_paragraph_results(
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[:10]:
         _, field_type, field = result.field.split("/")
-        text = await get_text_paragraph(
-            result, kbid, highlight=highlight, ematches=ematches  # type: ignore
+        text = await get_paragraph_text(
+            kbid=kbid,
+            rid=result.uuid,
+            field=result.field,
+            start=result.start,
+            end=result.end,
+            split=result.split,
+            highlight=highlight,
+            ematches=ematches,  # type: ignore
+            matches=result.matches,  # type: ignore
         )
         labels = await get_labels_paragraph(result, kbid)
         new_paragraph = Paragraph(
@@ -325,6 +330,7 @@ async def merge_paragraph_results(
     query = None
     next_page = False
     ematches: Optional[List[str]] = None
+    total = 0
     for paragraph_response in paragraph_responses:
         if ematches is None:
             ematches = paragraph_response.ematches  # type: ignore
@@ -342,6 +348,7 @@ async def merge_paragraph_results(
             score = await text_score(result, sort.field, kbid)
             if score is not None:
                 raw_paragraph_list.append((result, score))
+        total += paragraph_response.total
 
     raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
@@ -355,7 +362,17 @@ async def merge_paragraph_results(
     result_paragraph_list: List[Paragraph] = []
     for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
         _, field_type, field = result.field.split("/")
-        text = await get_text_paragraph(result, kbid, highlight, ematches)
+        text = await get_paragraph_text(
+            kbid=kbid,
+            rid=result.uuid,
+            field=result.field,
+            start=result.start,
+            end=result.end,
+            split=result.split,
+            highlight=highlight,
+            ematches=ematches,
+            matches=result.matches,  # type: ignore
+        )
         labels = await get_labels_paragraph(result, kbid)
         new_paragraph = Paragraph(
             score=result.score.bm25,
@@ -386,8 +403,6 @@ async def merge_paragraph_results(
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)
-
-    total = len(result_paragraph_list)
 
     return Paragraphs(
         results=result_paragraph_list,

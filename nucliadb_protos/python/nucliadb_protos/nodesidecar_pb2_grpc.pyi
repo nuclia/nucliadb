@@ -23,7 +23,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
-    ShardList as ShardList,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
@@ -37,14 +36,6 @@ class NodeSidecarStub:
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodesidecar_pb2.Counter,
     ]
-    CreateShadowShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.EmptyQuery,
-        nucliadb_protos.nodesidecar_pb2.ShadowShardResponse,
-    ]
-    DeleteShadowShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.nodesidecar_pb2.ShadowShardResponse,
-    ]
 
 class NodeSidecarServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -53,17 +44,5 @@ class NodeSidecarServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodesidecar_pb2.Counter: ...
-    @abc.abstractmethod
-    def CreateShadowShard(
-        self,
-        request: nucliadb_protos.noderesources_pb2.EmptyQuery,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodesidecar_pb2.ShadowShardResponse: ...
-    @abc.abstractmethod
-    def DeleteShadowShard(
-        self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodesidecar_pb2.ShadowShardResponse: ...
 
 def add_NodeSidecarServicer_to_server(servicer: NodeSidecarServicer, server: grpc.Server) -> None: ...

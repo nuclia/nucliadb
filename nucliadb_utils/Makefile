@@ -1,9 +1,11 @@
 .PHONY: install-dev
 install-dev:
-	pip install -r ../test-requirements.txt
-	pip install -r ../code-requirements.txt
-	cd .. && pip install -r nucliadb_utils/requirements-sources.txt
-	pip install -r requirements.txt
+	pip install --upgrade pip wheel
+	cd .. && pip install \
+		-r test-requirements.txt \
+		-r code-requirements.txt \
+		-r nucliadb_utils/requirements-sources.txt \
+		-r nucliadb_utils/requirements.txt
 	pip install -e .[cache,storages,fastapi,postgres]
 
 .PHONY: format

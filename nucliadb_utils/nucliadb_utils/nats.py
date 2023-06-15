@@ -17,9 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import logging
+import time
+from functools import cached_property
+from typing import Any, Awaitable, Callable, Optional
 
-from nats.aio.client import Client as NATS
+import nats
+import nats.errors
+import nats.js.api
+from nats.aio.client import Client as NATSClient
+from nats.aio.client import Msg
+from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
@@ -27,7 +36,7 @@ from nucliadb_telemetry.utils import get_telemetry
 logger = logging.getLogger(__name__)
 
 
-def get_traced_jetstream(nc: NATS, service_name: str) -> JetStreamContext:
+def get_traced_jetstream(nc: NATSClient, service_name: str) -> JetStreamContext:
     jetstream = nc.jetstream()
     tracer_provider = get_telemetry(service_name)
 
@@ -35,3 +44,139 @@ def get_traced_jetstream(nc: NATS, service_name: str) -> JetStreamContext:
         logger.info(f"Configuring {service_name} jetstream with telemetry")
         jetstream = JetStreamContextTelemetry(jetstream, service_name, tracer_provider)
     return jetstream
+
+
+class NatsConnectionManager:
+    _nc: NATSClient
+    _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
+    _unhealthy_timeout = (
+        10  # needs to be unhealth for 10 seconds to be unhealthy and force exit
+    )
+
+    def __init__(
+        self,
+        *,
+        service_name: str,
+        nats_servers: list[str],
+        nats_creds: Optional[str] = None,
+    ):
+        self._service_name = service_name
+        self._nats_servers = nats_servers
+        self._nats_creds = nats_creds
+        self._subscriptions = []
+        self._lock = asyncio.Lock()
+        self._healthy = True
+        self._last_unhealthy: Optional[float] = None
+
+    def healthy(self) -> bool:
+        if not self._healthy:
+            return False
+
+        if (
+            self._last_unhealthy is not None
+            and time.monotonic() - self._last_unhealthy > self._unhealthy_timeout
+        ):
+            return False
+
+        if not self._nc.is_connected:
+            self._last_unhealthy = time.monotonic()
+
+        return True
+
+    async def initialize(self) -> None:
+        options: dict[str, Any] = {
+            "error_cb": self.error_cb,
+            "closed_cb": self.closed_cb,
+            "reconnected_cb": self.reconnected_cb,
+            "disconnected_cb": self.disconnected_cb,
+        }
+
+        if self._nats_creds is not None:
+            options["user_credentials"] = self._nats_creds
+
+        if len(self._nats_servers) > 0:
+            options["servers"] = self._nats_servers
+
+        async with self._lock:
+            self._nc = await nats.connect(**options)
+
+    async def finalize(self):
+        async with self._lock:
+            for sub, _ in self._subscriptions:
+                try:
+                    await sub.drain()
+                except nats.errors.ConnectionClosedError:  # pragma: no cover
+                    pass
+            try:
+                await asyncio.wait_for(self.nc.drain(), timeout=1)
+            except (
+                nats.errors.ConnectionClosedError,
+                asyncio.TimeoutError,
+            ):  # pragma: no cover
+                pass
+            await self.nc.close()
+            self._subscriptions = []
+
+    async def disconnected_cb(self) -> None:
+        logger.info("Disconnected from NATS!")
+        self._last_unhealthy = time.monotonic()
+
+    async def reconnected_cb(self):
+        # See who we are connected to on reconnect.
+        logger.warning(
+            f"Reconnected to NATS {self._nc.connected_url.netloc}. Attempting to re-subscribe."
+        )
+        async with self._lock:
+            existing_subs = self._subscriptions
+            self._subscriptions = []
+            for sub, recon_callback in existing_subs:
+                try:
+                    await sub.drain()
+                    await recon_callback()
+                except Exception:
+                    logger.exception(
+                        f"Error resubscribing to {sub.subject} on {self._nc.connected_url.netloc}"
+                    )
+                    # should force exit here to restart the service
+                    self._healthy = False
+                    raise
+        self._healthy = True
+        self._last_unhealthy = None  # reset the last unhealthy time
+
+    async def error_cb(self, e):  # pragma: no cover
+        logger.error(f"There was an error on consumer: {e}", exc_info=e)
+
+    async def closed_cb(self):  # pragma: no cover
+        logger.info("Connection is closed on NATS")
+
+    @property
+    def nc(self) -> NATSClient:
+        return self._nc
+
+    @cached_property
+    def js(self) -> JetStreamContext:
+        return get_traced_jetstream(self._nc, self._service_name)
+
+    async def subscribe(
+        self,
+        *,
+        subject: str,
+        queue: str,
+        stream: str,
+        cb: Callable[[Msg], Awaitable[None]],
+        subscription_lost_cb: Callable[[], Awaitable[None]],
+        flow_control: bool = False,
+        config: Optional[nats.js.api.ConsumerConfig] = None,
+    ) -> Subscription:
+        sub = await self.js.subscribe(
+            subject=subject,
+            queue=queue,
+            stream=stream,
+            cb=cb,
+            flow_control=flow_control,
+            config=config,
+        )
+
+        self._subscriptions.append((sub, subscription_lost_cb))
+
+        return sub

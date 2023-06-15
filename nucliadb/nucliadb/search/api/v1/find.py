@@ -17,21 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from datetime import datetime
 from time import time
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
+from pydantic.error_wrappers import ValidationError
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
-from nucliadb.search.search.utils import parse_sort_options
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     FindRequest,
@@ -39,34 +40,21 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
-    SortField,
-    SortOptions,
-    SortOrder,
-    SortOrderMap,
+    SearchParamDefaults,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_audit
 
 FIND_EXAMPLES = {
-    "filtering_by_icon": {
-        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
-        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+    "find_hybrid_search": {
+        "summary": "Do a hybrid search on a Knowledge Box",
+        "description": "Perform a hybrid search that will return text and semantic results matching the query",
         "value": {
-            "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
+            "query": "How can I be an effective product manager?",
+            "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
         },
-    },
-    "get_language_counts": {
-        "summary": "Get the number of documents for each language",
-        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
-        "value": {
-            "page_size": 0,
-            "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
-        },
-    },
+    }
 }
 
 
@@ -85,77 +73,85 @@ async def find_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    advanced_query: Optional[str] = Query(default=None),
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: Optional[int] = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    min_score: float = Query(default=0.70),
-    range_creation_start: Optional[datetime] = Query(default=None),
-    range_creation_end: Optional[datetime] = Query(default=None),
-    range_modification_start: Optional[datetime] = Query(default=None),
-    range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = Query(
+    query: str = fastapi_query(SearchParamDefaults.query),
+    advanced_query: Optional[str] = fastapi_query(SearchParamDefaults.advanced_query),
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    min_score: float = fastapi_query(SearchParamDefaults.min_score),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
+    ),
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
+    features: List[SearchOptions] = fastapi_query(
+        SearchParamDefaults.search_features,
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.VECTOR,
-        ]
+        ],
     ),
     reload: bool = Query(default=True),
-    debug: bool = Query(False),
-    highlight: bool = Query(default=False),
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
+    show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = Query([]),
-    with_duplicates: bool = Query(default=False),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    with_synonyms: bool = Query(default=False),
+    extracted: List[ExtractedDataTypeName] = fastapi_query(
+        SearchParamDefaults.extracted
+    ),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+    with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
+    with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
+    autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
-    item = FindRequest(
-        query=query,
-        advanced_query=advanced_query,
-        fields=fields,
-        filters=filters,
-        faceted=faceted,
-        sort=(
-            SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-            if sort_field is not None
-            else None
-        ),
-        page_number=page_number,
-        page_size=page_size,
-        min_score=min_score,
-        range_creation_end=range_creation_end,
-        range_creation_start=range_creation_start,
-        range_modification_end=range_modification_end,
-        range_modification_start=range_modification_start,
-        features=features,
-        reload=reload,
-        debug=debug,
-        highlight=highlight,
-        show=show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
-        shards=shards,
-        with_duplicates=with_duplicates,
-        with_status=with_status,
-        with_synonyms=with_synonyms,
-    )
     try:
-        return await find(
+        item = FindRequest(
+            query=query,
+            advanced_query=advanced_query,
+            fields=fields,
+            filters=filters,
+            faceted=faceted,
+            page_number=page_number,
+            page_size=page_size,
+            min_score=min_score,
+            range_creation_end=range_creation_end,
+            range_creation_start=range_creation_start,
+            range_modification_end=range_modification_end,
+            range_modification_start=range_modification_start,
+            features=features,
+            reload=reload,
+            debug=debug,
+            highlight=highlight,
+            show=show,
+            field_type_filter=field_type_filter,
+            extracted=extracted,
+            shards=shards,
+            with_duplicates=with_duplicates,
+            with_synonyms=with_synonyms,
+            autofilter=autofilter,
+        )
+    except ValidationError as exc:
+        detail = json.loads(exc.json())
+        return HTTPClientError(status_code=422, detail=detail)
+    try:
+        results, _ = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -181,9 +177,10 @@ async def find_post_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        return await find(
+        results, _ = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -196,11 +193,9 @@ async def find(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-) -> KnowledgeboxFindResults:
+) -> Tuple[KnowledgeboxFindResults, bool]:
     audit = get_audit()
     start_time = time()
-
-    sort_options = parse_sort_options(item)
 
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
@@ -209,15 +204,14 @@ async def find(
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
-    pb_query, incomplete_results = await global_query_to_pb(
+    pb_query, incomplete_results, autofilters = await global_query_to_pb(
         kbid,
         features=item.features,
         query=processed_query,
         advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
-        sort=sort_options,
-        sort_ord=SortOrderMap[sort_options.order],
+        sort=None,
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
@@ -229,10 +223,9 @@ async def find(
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
-        with_status=item.with_status,
         with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
     )
-
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
@@ -246,7 +239,6 @@ async def find(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=sort_options,
         requested_relations=pb_query.relation_subgraph,
         min_score=item.min_score,
         highlight=item.highlight,
@@ -268,4 +260,6 @@ async def find(
         search_results.nodes = queried_nodes
 
     search_results.shards = queried_shards
+    search_results.autofilters = autofilters
+    return search_results, incomplete_results
     return search_results

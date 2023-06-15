@@ -21,8 +21,8 @@ import asyncio
 from contextvars import ContextVar
 from typing import Optional
 
-from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.utils import get_driver
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.utils import get_driver
 
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 txn_lock: ContextVar[Optional[asyncio.Lock]] = ContextVar("txn_lock", default=None)
@@ -46,7 +46,7 @@ async def get_transaction() -> Transaction:
             if check_txn_again is not None:
                 return check_txn_again
 
-            driver = await get_driver()
+            driver = get_driver()
             transaction = await driver.begin()
             txn.set(transaction)
 
@@ -66,3 +66,4 @@ async def abort_transaction() -> None:
     if transaction is not None:
         async with _get_transaction_lock():
             await transaction.abort()
+            txn.set(None)

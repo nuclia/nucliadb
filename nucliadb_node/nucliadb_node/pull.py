@@ -29,24 +29,16 @@ from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
-from nucliadb_protos.nodewriter_pb2 import (
-    IndexedMessage,
-    IndexMessage,
-    OpStatus,
-    TypeMessage,
-)
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
+from nucliadb_protos.writer_pb2 import Notification
 from nucliadb_telemetry import errors, metrics
+from nucliadb_utils import const
 from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    get_storage,
-    get_transaction_utility,
-)
+from nucliadb_utils.utilities import get_pubsub, get_storage
 
-from nucliadb_node import SERVICE_NAME, logger, shadow_shards
+from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
@@ -90,27 +82,17 @@ class Worker:
         self.event = asyncio.Event()
         self.node = node
         self.gc_task = None
-        self.ssm = shadow_shards.get_manager()
-        self.publisher = IndexedPublisher(
-            stream=indexing_settings.indexed_jetstream_stream,
-            subject=indexing_settings.indexed_jetstream_target,
-            auth=indexing_settings.index_jetstream_auth,
-            servers=indexing_settings.index_jetstream_servers,
-        )
+        self.publisher = IndexedPublisher()
         self.load_seqid()
+        self.brain: Optional[Resource] = None
 
     async def finalize(self):
         if self.gc_task:
             self.gc_task.cancel()
 
+        await self.publisher.finalize()
         await self.subscriber_finalize()
 
-        transaction_utility = get_transaction_utility()
-        if transaction_utility:
-            await transaction_utility.finalize()
-            clean_utility(Utility.TRANSACTION)
-
-        await self.publisher.finalize()
         await self.storage.finalize()
 
     async def disconnected_cb(self):
@@ -118,7 +100,11 @@ class Worker:
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect
-        logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
+        logger.warning(
+            f"Got reconnected to NATS {self.nc.connected_url}. Attempting reconnect"
+        )
+        await self.drain_subscriptions()
+        await self.subscribe()
 
     async def error_cb(self, e):
         errors.capture_exception(e)
@@ -132,10 +118,9 @@ class Worker:
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
-        await self.ssm.load()
         self.event.clear()
-        await self.subscriber_initialize()
         await self.publisher.initialize()
+        await self.subscriber_initialize()
         self.gc_task = asyncio.create_task(self.garbage())
 
     async def subscriber_initialize(self):
@@ -156,7 +141,7 @@ class Worker:
         logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
         await self.subscribe()
 
-    async def subscriber_finalize(self):
+    async def drain_subscriptions(self) -> None:
         for subscription in self.subscriptions:
             try:
                 await subscription.drain()
@@ -164,6 +149,8 @@ class Worker:
                 pass
         self.subscriptions = []
 
+    async def subscriber_finalize(self):
+        await self.drain_subscriptions()
         try:
             await self.nc.close()
         except (RuntimeError, AttributeError):  # pragma: no cover
@@ -212,31 +199,22 @@ class Worker:
             # First time the consumer is started
             self.last_seqid = None
 
-    async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
-        brain: Resource = await self.storage.get_indexing(pb)
-        brain.shard_id = brain.resource.shard_id = pb.shard
-        is_shadow_shard = self.ssm.exists(pb.shard)
+    async def set_resource(self, pb: IndexMessage) -> OpStatus:
+        self.brain = await self.storage.get_indexing(pb)
+        self.brain.shard_id = self.brain.resource.shard_id = pb.shard
         logger.info(
-            f"Added [shadow={is_shadow_shard}] {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
+            f"Added {self.brain.resource.uuid} at {self.brain.shard_id} otx:{pb.txid}"
         )
-        status: Optional[OpStatus] = None
-        if is_shadow_shard:
-            await self.ssm.set_resource(brain, pb.shard, pb.txid)
-        else:
-            status = await self.writer.set_resource(brain)
+        status = await self.writer.set_resource(self.brain)
         logger.info(f"...done")
-        del brain
+        del self.brain
+        self.brain = None
         return status
 
-    async def delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
-        is_shadow_shard = self.ssm.exists(pb.shard)
-        logger.info(f"Deleting [shadow={is_shadow_shard}] {pb.resource} otx:{pb.txid}")
-        status: Optional[OpStatus] = None
-        if is_shadow_shard:
-            await self.ssm.delete_resource(pb.resource, pb.shard, pb.txid)
-        else:
-            rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
-            status = await self.writer.delete_resource(rid)
+    async def delete_resource(self, pb: IndexMessage) -> OpStatus:
+        logger.info(f"Deleting {pb.resource} otx:{pb.txid}")
+        rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
+        status = await self.writer.delete_resource(rid)
         logger.info(f"...done")
         return status
 
@@ -276,14 +254,20 @@ class Worker:
                     logger.error(
                         f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                     )
-                    raise grpc_error
+                    if (
+                        pb.typemessage == TypeMessage.CREATION
+                        and self.brain
+                        and self.brain.HasField("metadata")
+                    ):
+                        # Hard fail if we have the correct data
+                        raise grpc_error
 
             except IndexDataNotFound as storage_error:
                 # This should never happen now.
                 # Remove this block in the future once we're confident it's not needed.
                 errors.capture_exception(storage_error)
                 logger.warning(
-                    "Error retrieving the indexing payload we do not block as that means its already deleted"
+                    "Error retrieving the indexing payload we do not block as that means its already deleted!"
                 )
             except Exception as e:
                 event_id = errors.capture_exception(e)
@@ -306,19 +290,22 @@ class Worker:
     async def subscribe(self):
         logger.info(f"Last seqid {self.last_seqid}")
         try:
-            await self.js.stream_info(indexing_settings.index_jetstream_stream)
+            await self.js.stream_info(const.Streams.INDEX.name)
         except StreamNotFoundError:
             logger.info("Creating stream")
             res = await self.js.add_stream(
-                name=indexing_settings.index_jetstream_stream,
-                subjects=[indexing_settings.index_jetstream_target.format(node=">")],
+                name=const.Streams.INDEX.name,
+                subjects=[
+                    const.Streams.INDEX.subject.format(node=">"),
+                ],
             )
-            await self.js.stream_info(indexing_settings.index_jetstream_stream)
+            await self.js.stream_info(const.Streams.INDEX.name)
 
+        subject = const.Streams.INDEX.subject.format(node=self.node)
         res = await self.js.subscribe(
-            subject=indexing_settings.index_jetstream_target.format(node=self.node),
-            queue=indexing_settings.index_jetstream_group.format(node=self.node),
-            stream=indexing_settings.index_jetstream_stream,
+            subject=subject,
+            queue=const.Streams.INDEX.group.format(node=self.node),
+            stream=const.Streams.INDEX.name,
             flow_control=True,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
@@ -332,86 +319,33 @@ class Worker:
             ),
         )
         self.subscriptions.append(res)
-        logger.info(
-            f"Subscribed to {indexing_settings.index_jetstream_target.format(node=self.node)} on \
-             stream {indexing_settings.index_jetstream_stream}"
-        )
+        logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
 
 class IndexedPublisher:
-    def __init__(
-        self,
-        stream: str,
-        subject: str,
-        servers: List[str],
-        auth: Optional[str],
-    ):
-        self.stream = stream
-        self.subject = subject
-        self.auth: Optional[str] = auth
-        self.servers: List[str] = servers
-        self.js = None
-        self.nc = None
+    def __init__(self):
+        self.pubsub = None
 
     async def initialize(self):
-        options = dict(
-            closed_cb=self.on_connection_closed,
-            reconnected_cb=self.on_reconnection,
-        )
-        if self.auth is not None:
-            options["user_credentials"] = self.auth
-        if len(self.servers) > 0:
-            options["servers"] = self.servers
-        self.nc = await nats.connect(**options)
-        self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
-        await self.create_stream_if_not_exists()
-
-    async def create_stream_if_not_exists(self):
-        try:
-            await self.js.stream_info(self.stream)
-        except StreamNotFoundError:
-            logger.info("Creating publisher stream")
-            await self.js.add_stream(
-                name=self.stream,
-                subjects=[self.subject.format(partition=">")],
-            )
-            await self.js.stream_info(self.stream)
-
-    async def on_reconnection(self):
-        logger.warning(
-            "Got reconnected to NATS {url}".format(url=self.nc.connected_url)
-        )
-
-    async def on_connection_closed(self):
-        logger.warning("Connection is closed on NATS")
+        self.pubsub = await get_pubsub()
 
     async def finalize(self):
-        if self.nc is not None:
-            try:
-                await self.nc.flush()
-                await self.nc.close()
-            except (RuntimeError, AttributeError):  # pragma: no cover
-                # RuntimeError: can be thrown if event loop is closed
-                # AttributeError: can be thrown by nats-py when handling shutdown
-                pass
-            self.nc = None
+        await self.pubsub.finalize()
 
     async def indexed(self, indexpb: IndexMessage):
-        if self.js is None:
-            raise RuntimeError("Not initialized")
-
         if not indexpb.HasField("partition"):
             logger.warning(f"Could not publish message without partition")
             return
 
-        indexedpb = IndexedMessage()
-        indexedpb.node = indexpb.node
-        indexedpb.shard = indexpb.shard
-        indexedpb.txid = indexpb.txid
-        indexedpb.resource = indexpb.resource
-        indexedpb.typemessage = indexpb.typemessage
-        indexedpb.reindex_id = indexpb.reindex_id
-        subject = self.subject.format(partition=indexpb.partition)
-        await self.js.publish(subject, indexedpb.SerializeToString())
-        logger.info(f"Published to indexed stream {subject}")
-        return
+        message = Notification(
+            partition=int(indexpb.partition),
+            seqid=indexpb.txid,
+            uuid=indexpb.resource,
+            kbid=indexpb.kbid,
+            action=Notification.INDEXED,
+        )
+
+        await self.pubsub.publish(
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=indexpb.kbid),
+            message.SerializeToString(),
+        )

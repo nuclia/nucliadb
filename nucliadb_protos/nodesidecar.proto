@@ -12,13 +12,7 @@ message Counter {
 
 }
 
-message ShadowShardResponse {
-    bool success = 1;
-    noderesources.ShardId shard = 2;
-}
 
 service NodeSidecar {
     rpc GetCount(noderesources.ShardId) returns (Counter) {}
-    rpc CreateShadowShard(noderesources.EmptyQuery) returns (ShadowShardResponse) {}
-    rpc DeleteShadowShard(noderesources.ShardId) returns (ShadowShardResponse) {}
 }

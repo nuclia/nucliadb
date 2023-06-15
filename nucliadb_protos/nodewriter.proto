@@ -35,15 +35,7 @@ message IndexMessage {
     string reindex_id = 6;
     optional string partition = 7;
     string storage_key = 8;
-}
-
-message IndexedMessage {
-    string node = 1;
-    string shard = 2;
-    uint64 txid = 3;
-    string resource = 4;
-    TypeMessage typemessage = 5;
-    string reindex_id = 6;
+    string kbid = 9;
 }
 
 message SetGraph {
@@ -54,17 +46,6 @@ message SetGraph {
 message DeleteGraphNodes {
     noderesources.ShardId shard_id = 2;
     repeated utils.RelationNode nodes = 1;
-}
-
-message MoveShardRequest {
-    noderesources.ShardId shard_id = 1;
-    string address = 2;
-}
-
-message AcceptShardRequest {
-    noderesources.ShardId shard_id = 1;
-    uint32 port = 2;
-    bool override_shard = 3;
 }
 
 message NewShardRequest {
@@ -78,7 +59,6 @@ message NewVectorSetRequest {
 }
 
 service NodeWriter {
-    rpc GetShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc NewShard(NewShardRequest) returns (noderesources.ShardCreated) {}
     rpc CleanAndUpgradeShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
@@ -93,9 +73,6 @@ service NodeWriter {
     rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
     rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
     rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
-
-    rpc MoveShard(MoveShardRequest) returns (noderesources.EmptyResponse) {}
-    rpc AcceptShard(AcceptShardRequest) returns (noderesources.EmptyResponse) {}
 
     rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }

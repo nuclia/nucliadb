@@ -17,42 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-import re
-import string
 from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
-from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
 
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import serialize
-from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
-from nucliadb_utils.utilities import get_cache, get_storage
+
+from .cache import get_resource_from_cache
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
-
-RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)
-
-PRE_WORD = string.punctuation + " "
-
-
-def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
-    value: Optional[Dict[str, ResourceORM]] = rcache.get()
-    if value is None or clear:
-        value = {}
-        rcache.set(value)
-    return value
 
 
 async def fetch_resources(
@@ -77,35 +60,6 @@ async def fetch_resources(
     return result
 
 
-async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    orm_resource: Optional[ResourceORM] = None
-
-    resource_cache = get_resource_cache()
-
-    if uuid not in RESOURCE_LOCKS:
-        lock = asyncio.Lock()
-        RESOURCE_LOCKS[uuid] = lock
-        await lock.acquire()
-    else:
-        await RESOURCE_LOCKS[uuid].acquire()
-
-    try:
-        if uuid not in resource_cache:
-            transaction = await get_transaction()
-            storage = await get_storage(service_name=SERVICE_NAME)
-            cache = await get_cache()
-            kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-            orm_resource = await kb.get(uuid)
-
-        if orm_resource is not None:
-            resource_cache[uuid] = orm_resource
-        else:
-            orm_resource = resource_cache.get(uuid)
-    finally:
-        RESOURCE_LOCKS[uuid].release()
-    return orm_resource
-
-
 async def get_paragraph_from_resource(
     orm_resource: ResourceORM, result: ParagraphResult
 ) -> Optional[Paragraph]:
@@ -121,156 +75,6 @@ async def get_paragraph_from_resource(
         elif len(field_metadata.metadata.paragraphs) > result.index:
             paragraph = field_metadata.metadata.paragraphs[result.index]
     return paragraph
-
-
-async def get_text_sentence(
-    rid: str,
-    field_type: str,
-    field: str,
-    kbid: str,
-    index: int,
-    start: int,
-    end: int,
-    split: Optional[str] = None,
-) -> str:
-    orm_resource = await get_resource_from_cache(kbid, rid)
-
-    if orm_resource is None:
-        logger.warning(f"{rid} does not exist on DB")
-        return ""
-
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.info(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return ""
-    start = start - 1
-    if start < 0:
-        start = 0
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
-    return splitted_text
-
-
-async def get_text_paragraph(
-    result: ParagraphResult,
-    kbid: str,
-    highlight: bool = False,
-    ematches: Optional[List[str]] = None,
-) -> str:
-    orm_resource = await get_resource_from_cache(kbid, result.uuid)
-
-    if orm_resource is None:
-        logger.error(f"{result.uuid} does not exist on DB")
-        return ""
-
-    _, field_type, field = result.field.split("/")
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warning(
-            f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return ""
-
-    if result.split not in (None, ""):
-        text = extracted_text.split_text[result.split]
-        splitted_text = text[result.start : result.end]
-    else:
-        splitted_text = extracted_text.text[result.start : result.end]
-
-    if highlight:
-        splitted_text = highlight_paragraph(
-            splitted_text, words=result.matches, ematches=ematches  # type: ignore
-        )
-
-    return splitted_text
-
-
-def get_regex(some_string: str) -> str:
-    return r"\b" + some_string.lower() + r"\b"
-
-
-def highlight_paragraph(
-    text: str, words: Optional[List[str]] = None, ematches: Optional[List[str]] = None
-) -> str:
-    text_lower = text.lower()
-
-    marks = [0] * (len(text_lower) + 1)
-    if ematches is not None:
-        for quote in ematches:
-            quote_regex = get_regex(quote.lower())
-            try:
-                for match in re.finditer(quote_regex, text_lower):
-                    start, end = match.span()
-                    marks[start] = 1
-                    marks[end] = 2
-            except re.error:
-                logger.warning(
-                    f"Regex errors while highlighting text. Regex: {quote_regex}"
-                )
-                continue
-
-    words = words or []
-    for word in words:
-        word_regex = get_regex(word.lower())
-        try:
-            for match in re.finditer(word_regex, text_lower):
-                start, end = match.span()
-                if marks[start] == 0 and marks[end] == 0:
-                    marks[start] = 1
-                    marks[end] = 2
-        except re.error:
-            logger.warning(f"Regex errors while highlighting text. Regex: {word_regex}")
-            continue
-
-    new_text = ""
-    actual = 0
-    mod = 0
-    skip = False
-
-    length = len(text)
-
-    for index, pos in enumerate(marks):
-        if skip:
-            skip = False
-            continue
-        if (index - mod) >= length:
-            char_pos = ""
-        else:
-            begining = True
-            if index > 0 and text[index - mod - 1] not in PRE_WORD:
-                begining = False
-            char_pos = text[index - mod]
-            if text[index - mod].lower() != text_lower[index]:
-                # May be incorrect positioning due to unicode lower
-                mod += 1
-                skip = True
-        if pos == 1 and actual == 0 and begining:
-            new_text += "<mark>"
-            new_text += char_pos
-            actual = 1
-        elif pos == 2 and actual == 1:
-            new_text += "</mark>"
-            new_text += char_pos
-            actual = 0
-        elif pos == 1 and actual > 0:
-            new_text += char_pos
-            actual += 1
-        elif pos == 2 and actual > 1:
-            new_text += char_pos
-            actual -= 1
-        else:
-            new_text += char_pos
-
-    return new_text
 
 
 async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:

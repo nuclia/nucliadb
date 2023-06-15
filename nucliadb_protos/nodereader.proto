@@ -6,13 +6,28 @@ import public "nucliadb_protos/noderesources.proto";
 import "google/protobuf/timestamp.proto";
 import public "nucliadb_protos/utils.proto";
 
+
 message Filter {
     repeated string tags = 1;
 }
 
+
+message StreamFilter {
+    enum Conjunction {
+        AND = 0;
+        OR = 1;
+        NOT = 2;
+    }
+    Conjunction conjunction = 1;
+
+    repeated string tags = 2;
+}
+
+
 message Faceted {
     repeated string tags = 1;
 }
+
 
 message OrderBy {
     enum OrderType {
@@ -27,6 +42,7 @@ message OrderBy {
     OrderType type = 2;
     OrderField sort_by = 3;
 }
+
 
 message Timestamps {
     google.protobuf.Timestamp from_modified = 1;
@@ -398,16 +414,16 @@ message DocumentItem {
 }
 
 message StreamRequest {
-    Filter filter = 1;
+    Filter filter__deprecated = 1 [deprecated = true];
     bool reload = 2;
     noderesources.ShardId shard_id = 3;
+    StreamFilter filter = 4;
 }
 
 // Implemented at nucliadb_object_storage
 
 service NodeReader {
     rpc GetShard(GetShardRequest) returns (noderesources.Shard) {}
-    rpc GetShards(noderesources.EmptyQuery) returns (noderesources.ShardList) {}
 
     rpc DocumentSearch(DocumentSearchRequest) returns (DocumentSearchResponse) {}
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}

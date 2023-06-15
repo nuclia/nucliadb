@@ -18,20 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import uuid
 from datetime import datetime
 from typing import Optional
 
-import nats
 import pytest
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
-from nucliadb_protos.nodewriter_pb2 import IndexedMessage, IndexMessage, TypeMessage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_protos.writer_pb2 import Notification
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_pubsub, get_storage
 
-from nucliadb_node import SERVICE_NAME, shadow_shards
+from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
-from nucliadb_node.settings import indexing_settings, settings
-from nucliadb_node.shadow_shards import OperationCode
+from nucliadb_node.settings import settings
 
 TEST_PARTITION = "111"
 
@@ -87,41 +88,6 @@ async def test_indexing_not_found(worker, reader):
 
 
 @pytest.mark.asyncio
-async def test_indexing_shadow_shard(data_path, worker, shadow_shard: str):
-    storage = await get_storage(service_name=SERVICE_NAME)
-    node_id = settings.force_host_id
-
-    # Add a set resource operation
-    pb = resource_payload(shadow_shard)
-    setpb = await create_indexing_message(pb, "kb", shadow_shard, node_id)  # type: ignore
-    await send_indexing_message(worker, setpb, node_id)  # type: ignore
-
-    # Add a delete operation
-    deletepb = delete_indexing_message("bar", shadow_shard, node_id)  # type: ignore
-    await send_indexing_message(worker, deletepb, node_id)  # type: ignore
-
-    # Check that they were stored in a shadow shard
-    ssm = shadow_shards.get_manager()
-
-    ops = []
-    for _ in range(10):
-        print("Waiting for sidecar to consume messages...")
-        await asyncio.sleep(1)
-        ops = [op async for op in ssm.iter_operations(shadow_shard)]
-        if len(ops) == 2:
-            break
-    assert len(ops) == 2
-    assert ops[0][0] == OperationCode.SET
-    assert ops[0][1] == pb
-    assert ops[1][0] == OperationCode.DELETE
-    assert ops[1][1] == "bar"
-
-    await asyncio.sleep(1)
-
-    assert await storage.get_indexing(setpb) is not None
-
-
-@pytest.mark.asyncio
 async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
     node_id = settings.force_host_id
     assert node_id
@@ -130,18 +96,20 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
         resource_payload(shard), "kb", shard, node_id
     )
 
+    waiting_task = asyncio.create_task(wait_for_indexed_message("kb"))
+    await asyncio.sleep(0.1)
+
     await send_indexing_message(worker, indexpb, node_id)  # type: ignore
 
-    msg = await get_indexed_message(natsd)
+    msg = await waiting_task
 
-    assert msg.subject == f"indexed.{TEST_PARTITION}"
-    indexedpb = IndexedMessage()
-    indexedpb.ParseFromString(msg.data)
-    assert indexedpb.node == indexpb.node
-    assert indexedpb.shard == indexpb.shard
-    assert indexedpb.txid == indexpb.txid
-    assert indexedpb.typemessage == indexpb.typemessage
-    assert indexedpb.reindex_id == indexpb.reindex_id
+    assert msg.subject == const.PubSubChannels.RESOURCE_NOTIFY.format(kbid="kb")
+    notification = Notification()
+    notification.ParseFromString(msg.data)
+    assert notification.partition == int(indexpb.partition)
+    assert notification.seqid == indexpb.txid
+    assert notification.uuid == indexpb.resource
+    assert notification.kbid == indexpb.kbid
 
 
 def resource_payload(shard: str) -> Resource:
@@ -189,39 +157,30 @@ async def create_indexing_message(
 
 async def send_indexing_message(worker: Worker, index: IndexMessage, node: str):
     # Push on stream
-    assert indexing_settings.index_jetstream_target is not None
     await worker.js.publish(
-        indexing_settings.index_jetstream_target.format(node=node),
+        const.Streams.INDEX.subject.format(node=node),
         index.SerializeToString(),
     )
 
 
-async def get_indexed_message(natsd):
-    nc = await nats.connect(servers=[natsd])
-    future = asyncio.Future()
+async def wait_for_indexed_message(kbid: str):
+    pubsub = await get_pubsub()
+    future = asyncio.Future()  # type: ignore
+    request_id = str(uuid.uuid4())
 
     async def cb(msg):
         nonlocal future
         future.set_result(msg)
 
-    js = nc.jetstream()
-    await js.subscribe(
-        stream=indexing_settings.indexed_jetstream_stream,
-        subject=indexing_settings.indexed_jetstream_target.format(
-            partition=TEST_PARTITION
-        ),
-        queue="indexed-{partition}".format(partition=TEST_PARTITION),
-        cb=cb,
-        config=nats.js.api.ConsumerConfig(
-            deliver_policy=nats.js.api.DeliverPolicy.NEW,
-        ),
+    await pubsub.subscribe(
+        handler=cb,
+        key=const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
+        subscription_id=request_id,
     )
     msg = None
     try:
-        msg = await asyncio.wait_for(future, 1)
+        msg = await asyncio.wait_for(future, 10)
     except TimeoutError:  # pragma: no cover
         pass
     finally:
-        await nc.flush()
-        await nc.close()
         return msg

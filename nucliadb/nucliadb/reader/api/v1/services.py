@@ -45,7 +45,6 @@ from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet, VectorSets
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -74,7 +73,6 @@ async def get_all_entities(kbid: str):
     ingest = get_ingest()
     e_request: GetEntitiesRequest = GetEntitiesRequest()
     e_request.kb.uuid = kbid
-    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetEntitiesResponse = await ingest.GetEntities(e_request)  # type: ignore
     if kbobj.status == GetEntitiesResponse.Status.OK:
@@ -92,14 +90,15 @@ async def get_all_entities(kbid: str):
             status_code=500, detail="Error while getting entities groups"
         )
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting Knowledge box entities"
+        )
 
 
 async def list_entities_groups(kbid: str):
     ingest = get_ingest()
     e_request: ListEntitiesGroupsRequest = ListEntitiesGroupsRequest()
     e_request.kb.uuid = kbid
-    set_info_on_span({"nuclia.kbid": kbid})
 
     entities_groups = await ingest.ListEntitiesGroups(e_request)  # type: ignore
     if entities_groups.status == ListEntitiesGroupsResponse.Status.OK:
@@ -115,13 +114,15 @@ async def list_entities_groups(kbid: str):
             status_code=500, detail="Error while listing entities groups"
         )
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on listing Knowledge box entities"
+        )
 
 
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
     status_code=200,
-    name="Get Knowledge Box Entities",
+    name="Get a Knowledge Box Entities Group",
     response_model=EntitiesGroup,
     tags=["Knowledge Box Services"],
 )
@@ -132,7 +133,6 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
     l_request: GetEntitiesGroupRequest = GetEntitiesGroupRequest()
     l_request.kb.uuid = kbid
     l_request.group = group
-    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
@@ -147,23 +147,24 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
             status_code=404, detail=f"Entities group '{group}' does not exist"
         )
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting entities group on a Knowledge box"
+        )
 
 
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/labelsets",
     status_code=200,
-    name="Get Knowledge Box Labels",
+    name="Get Knowledge Box Label Sets",
     response_model=KnowledgeBoxLabels,
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
+async def get_labelsets(request: Request, kbid: str) -> KnowledgeBoxLabels:
     ingest = get_ingest()
     l_request: GetLabelsRequest = GetLabelsRequest()
     l_request.kb.uuid = kbid
-    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetLabelsResponse = await ingest.GetLabels(l_request)  # type: ignore
     if kbobj.status == GetLabelsResponse.Status.OK:
@@ -181,24 +182,25 @@ async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
     elif kbobj.status == GetLabelsResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting Knowledge box labels"
+        )
 
 
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/labelset/{{labelset}}",
     status_code=200,
-    name="Get Knowledge Box Label",
+    name="Get a Knowledge Box Label Set",
     response_model=LabelSet,
     tags=["Knowledge Box Services"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
+async def get_labelset(request: Request, kbid: str, labelset: str) -> LabelSet:
     ingest = get_ingest()
     l_request: GetLabelSetRequest = GetLabelSetRequest()
     l_request.kb.uuid = kbid
     l_request.labelset = labelset
-    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetLabelSetResponse = await ingest.GetLabelSet(l_request)  # type: ignore
     if kbobj.status == GetLabelSetResponse.Status.OK:
@@ -213,13 +215,15 @@ async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
     elif kbobj.status == GetLabelSetResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     else:
-        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+        raise HTTPException(
+            status_code=500, detail="Error on getting labelset on a Knowledge box"
+        )
 
 
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/vectorsets",
     status_code=200,
-    name="Get Knowledge Box VectorSet",
+    name="Get Knowledge Box Vector Sets",
     tags=["Knowledge Box Services"],
     response_model=VectorSets,
     openapi_extra={"x-operation_order": 1},
@@ -230,8 +234,6 @@ async def get_vectorsets(request: Request, kbid: str):
     ingest = get_ingest()
     pbrequest: GetVectorSetsRequest = GetVectorSetsRequest()
     pbrequest.kb.uuid = kbid
-
-    set_info_on_span({"nuclia.kbid": kbid})
 
     vectorsets: GetVectorSetsResponse = await ingest.GetVectorSets(pbrequest)  # type: ignore
     if vectorsets.status == GetVectorSetsResponse.Status.OK:
@@ -258,7 +260,6 @@ async def get_vectorsets(request: Request, kbid: str):
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_custom_synonyms(request: Request, kbid: str):
-    set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = KnowledgeBoxID(uuid=kbid)
     pbresponse: GetSynonymsResponse = await ingest.GetSynonyms(pbrequest)  # type: ignore

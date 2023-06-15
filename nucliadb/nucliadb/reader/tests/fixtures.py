@@ -34,13 +34,17 @@ from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility
 
 @pytest.fixture(scope="function")
 def test_settings_reader(cache, gcs, fake_node, maindb_driver):  # type: ignore
-    from nucliadb_utils.settings import running_settings, storage_settings
+    from nucliadb_utils.settings import (
+        FileBackendConfig,
+        running_settings,
+        storage_settings,
+    )
 
     running_settings.debug = False
     print(f"Driver ready at {maindb_driver.url}")
 
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test"
 
     set_utility(Utility.CACHE, cache)
@@ -119,9 +123,9 @@ async def test_pagination_resources(
 
     from time import time
 
-    from nucliadb.ingest.utils import get_driver
+    from nucliadb.common.maindb.utils import get_driver
 
-    driver = await get_driver()
+    driver = get_driver()
 
     t0 = time()
 

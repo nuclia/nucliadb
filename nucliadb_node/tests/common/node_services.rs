@@ -26,8 +26,7 @@ use nucliadb_core::protos::node_reader_client::NodeReaderClient;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
-use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
-use nucliadb_node::reader::NodeReaderService;
+use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use once_cell::sync::Lazy;
@@ -49,8 +48,13 @@ async fn start_reader(addr: SocketAddr) {
 
     if !*initialized_lock {
         tokio::spawn(async move {
-            let reader_server =
-                NodeReaderServer::new(NodeReaderGRPCDriver::from(NodeReaderService::new()));
+            let options = GrpcReaderOptions { lazy_loading: true };
+            let grpc_driver = NodeReaderGRPCDriver::new(options);
+            grpc_driver
+                .initialize()
+                .await
+                .expect("Unable to initialize reader gRPC");
+            let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)
                 .serve(addr)

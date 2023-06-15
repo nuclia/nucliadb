@@ -28,6 +28,7 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestRequest,
 )
 from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
@@ -36,9 +37,10 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
-    Sort,
     SortFieldMap,
     SortOptions,
+    SortOrder,
+    SortOrderMap,
     SuggestOptions,
 )
 
@@ -53,33 +55,49 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
-    sort: SortOptions,
+    sort: Optional[SortOptions],
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     user_vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
     with_synonyms: bool = False,
-) -> Tuple[SearchRequest, bool]:
+    autofilter: bool = False,
+) -> Tuple[SearchRequest, bool, List[str]]:
+    """
+    Converts the pydantic query to a protobuf query
+
+    :return: (request, incomplete, autofilters)
+        where:
+            - request: protobuf SearchRequest object
+            - incomplete: If the query is incomplete (missing vectors)
+            - autofilters: The autofilters that were applied
+    """
     fields = fields or []
+    autofilters = []
 
     request = SearchRequest()
+    request.body = query
+    if advanced_query is not None:
+        request.advanced_query = advanced_query
     request.reload = reload
     request.with_duplicates = with_duplicates
+    request.filter.tags.extend(filters)
+    request.faceted.tags.extend(faceted)
+    request.fields.extend(fields)
 
     if with_status is not None:
         request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]
 
     # We need to ask for all and cut later
     request.page_number = 0
-    if sort.limit is not None:
+    if sort and sort.limit is not None:
         # As the index can't sort, we have to do it when merging. To
         # have consistent results, we must limit them
         request.result_per_page = sort.limit
@@ -99,18 +117,10 @@ async def global_query_to_pb(
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
     if SearchOptions.DOCUMENT in features or SearchOptions.PARAGRAPH in features:
-        request.body = query
-        if advanced_query is not None:
-            request.advanced_query = advanced_query
-        request.filter.tags.extend(filters)
-        request.faceted.tags.extend(faceted)
-
-        sort_field = SortFieldMap[sort.field]
+        sort_field = SortFieldMap[sort.field] if sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
-            request.order.type = sort_ord  # type: ignore
-
-        request.fields.extend(fields)
+            request.order.type = SortOrderMap[sort.order]  # type: ignore
 
     request.document = SearchOptions.DOCUMENT in features
     request.paragraph = SearchOptions.PARAGRAPH in features
@@ -121,8 +131,15 @@ async def global_query_to_pb(
             request, kbid, query, user_vector=user_vector, vectorset=vectorset
         )
 
-    if SearchOptions.RELATIONS in features:
-        await _parse_entities(request, kbid, query)
+    relations_search = SearchOptions.RELATIONS in features
+    if relations_search or autofilter:
+        detected_entities = await detect_entities(kbid, query)
+        if relations_search:
+            request.relation_subgraph.entry_points.extend(detected_entities)
+            request.relation_subgraph.depth = 1
+        if autofilter:
+            entity_filters = parse_entities_to_filters(request, detected_entities)
+            autofilters.extend(entity_filters)
 
     if with_synonyms:
         if advanced_query:
@@ -137,7 +154,7 @@ async def global_query_to_pb(
             )
         await apply_synonyms_to_request(request, kbid)
 
-    return request, incomplete
+    return request, incomplete, autofilters
 
 
 async def _parse_vectors(
@@ -166,14 +183,28 @@ async def _parse_vectors(
     return incomplete
 
 
-async def _parse_entities(request: SearchRequest, kbid: str, query: str):
+async def detect_entities(kbid: str, query: str) -> List[RelationNode]:
     predict = get_predict()
     try:
-        detected_entities = await predict.detect_entities(kbid, query)
-        request.relation_subgraph.entry_points.extend(detected_entities)
-        request.relation_subgraph.depth = 1
+        return await predict.detect_entities(kbid, query)
     except SendToPredictError as ex:
         logger.warning(f"Errors on predict api detecting entities: {ex}")
+        return []
+
+
+def parse_entities_to_filters(
+    request: SearchRequest, detected_entities: List[RelationNode]
+) -> List[str]:
+    added_filters = []
+    for entity_filter in [
+        f"/e/{entity.subtype}/{entity.value}"
+        for entity in detected_entities
+        if entity.ntype == RelationNode.NodeType.ENTITY
+    ]:
+        if entity_filter not in request.filter.tags:
+            request.filter.tags.append(entity_filter)
+            added_filters.append(entity_filter)
+    return added_filters
 
 
 async def suggest_query_to_pb(
@@ -219,7 +250,7 @@ async def paragraph_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     sort: Optional[str] = None,
-    sort_ord: int = Sort.ASC.value,
+    sort_ord: str = SortOrder.DESC.value,
     reload: bool = False,
     with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:
@@ -260,6 +291,9 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.PENDING: Resource.ResourceStatus.PENDING,
     ResourceProcessingStatus.PROCESSED: Resource.ResourceStatus.PROCESSED,
     ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR,
+    ResourceProcessingStatus.EMPTY: Resource.ResourceStatus.EMPTY,
+    ResourceProcessingStatus.BLOCKED: Resource.ResourceStatus.BLOCKED,
+    ResourceProcessingStatus.EXPIRED: Resource.ResourceStatus.EXPIRED,
 }
 
 

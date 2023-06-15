@@ -4,7 +4,6 @@ running:
   debug: False
   log_level: DEBUG
   running_environment: local
-  logging_integration: False
 
 http:
   cors:
@@ -57,9 +56,6 @@ transaction:
   transaction_jetstream_auth:
   transaction_jetstream_servers:
     - nats1
-  transaction_jetstream_target: "ndb.consumer.{partition}"
-  transaction_jetstream_group: "nucliadb-{partition}"
-  transaction_jetstream_stream: "nucliadb"
 
 cache:
   cache_pubsub_nats_url:

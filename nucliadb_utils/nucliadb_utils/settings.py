@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import BaseSettings, Field
@@ -29,10 +30,6 @@ class RunningSettings(BaseSettings):
     running_environment: str = Field(
         "local", env=["environment", "running_environment"]
     )
-    logging_integration: bool = False
-    log_level: str = "DEBUG"
-    activity_log_level: str = "INFO"
-    chitchat_level: str = "INFO"
     metrics_port: int = 3030
     metrics_host: str = "0.0.0.0"
     serving_port: int = 8080
@@ -49,8 +46,27 @@ class HTTPSettings(BaseSettings):
 http_settings = HTTPSettings()
 
 
+class FileBackendConfig(str, Enum):
+    GCS = "gcs"
+    S3 = "s3"
+    PG = "pg"
+    LOCAL = "local"
+    NOT_SET = "notset"  # setting not provided
+
+    @classmethod
+    def _missing_(cls, value):
+        """
+        allow case insensitive enum values
+        """
+        for member in cls:
+            if member.value == value.lower():
+                return member
+
+
 class StorageSettings(BaseSettings):
-    file_backend: str = "gcs"  # gcs | s3 | pg | local
+    file_backend: FileBackendConfig = Field(
+        FileBackendConfig.NOT_SET, description="File backend storage type"
+    )
 
     gcs_base64_creds: Optional[str] = None
     gcs_bucket: Optional[str] = None
@@ -68,7 +84,10 @@ class StorageSettings(BaseSettings):
     s3_region_name: Optional[str] = None
     s3_bucket: Optional[str] = None
 
-    local_files: Optional[str] = None
+    local_files: Optional[str] = Field(
+        None,
+        description="If using LOCAL `file_backend` storage, directory files should be stored",
+    )
     upload_token_expiration: Optional[int] = 3
 
     driver_pg_url: Optional[str] = None  # match same env var for k/v storage
@@ -83,7 +102,7 @@ class NucliaSettings(BaseSettings):
     nuclia_cluster_url: str = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
     nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
 
-    nuclia_zone: str = "dev"
+    nuclia_zone: str = "europe-1"
     onprem: bool = True
 
     nuclia_jwt_key: Optional[str] = None
@@ -91,7 +110,7 @@ class NucliaSettings(BaseSettings):
     nuclia_partitions: int = 1
 
     dummy_processing: bool = False
-    disable_send_to_process: bool = False
+    dummy_predict: bool = False
 
     @root_validator(pre=True)
     def check_onprem_does_not_use_jwt_key(cls, values):
@@ -113,10 +132,6 @@ nucliadb_settings = NucliaDBSettings()
 class TransactionSettings(BaseSettings):
     transaction_jetstream_auth: Optional[str] = None
     transaction_jetstream_servers: List[str] = ["nats://localhost:4222"]
-    transaction_jetstream_target: str = "ndb.consumer.{partition}"
-    transaction_jetstream_group: str = "nucliadb-{partition}"
-    transaction_jetstream_stream: str = "nucliadb"
-    transaction_notification: str = "notify.{kbid}"
     transaction_local: bool = False
 
 
@@ -124,9 +139,6 @@ transaction_settings = TransactionSettings()
 
 
 class IndexingSettings(BaseSettings):
-    index_jetstream_target: Optional[str] = "node.{node}"
-    index_jetstream_group: Optional[str] = "node-{node}"
-    index_jetstream_stream: Optional[str] = "node"
     index_jetstream_servers: List[str] = []
     index_jetstream_auth: Optional[str] = None
     index_local: bool = False

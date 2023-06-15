@@ -26,12 +26,13 @@ from typing import Any, Dict, List, Optional, Union
 import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, OpStatusWriter
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 
-from nucliadb_utils import logger
+from nucliadb_utils import const, logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.utilities import get_pubsub, has_feature
 
 
 class WaitFor:
@@ -45,7 +46,11 @@ class WaitFor:
 
 class LocalTransactionUtility:
     async def commit(
-        self, writer: BrokerMessage, partition: int, wait: bool = False
+        self,
+        writer: BrokerMessage,
+        partition: int,
+        wait: bool = False,
+        target_subject: Optional[str] = None,
     ) -> int:
         from nucliadb_utils.utilities import get_ingest
 
@@ -54,7 +59,9 @@ class LocalTransactionUtility:
         async def iterator(writer):
             yield writer
 
-        await ingest.ProcessMessage(iterator(writer))  # type: ignore
+        resp = await ingest.ProcessMessage(iterator(writer))  # type: ignore
+        if resp.status != OpStatusWriter.Status.OK:
+            logger.error(f"Local transaction failed processing {writer}")
         return 0
 
     async def finalize(self):
@@ -65,23 +72,17 @@ class LocalTransactionUtility:
 
 
 class TransactionUtility:
-    nc: Optional[Client] = None
-    js: Optional[Union[JetStreamContext, JetStreamContextTelemetry]] = None
+    nc: Client
+    js: Union[JetStreamContext, JetStreamContextTelemetry]
+    pubsub: PubSubDriver
 
     def __init__(
         self,
         nats_servers: List[str],
-        nats_target: str,
         nats_creds: Optional[str] = None,
-        nats_index_target: Optional[str] = None,
-        notify_subject: Optional[str] = None,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
-        self.nats_target = nats_target
-        self.nats_index_target = nats_index_target
-        self.notify_subject = notify_subject
-        self.pubsub: Optional[PubSubDriver] = None
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -100,51 +101,46 @@ class TransactionUtility:
         logger.info("Connection is closed on NATS")
 
     async def stop_waiting(self, kbid: str, request_id: str):
-        if self.pubsub is None:
-            logger.warning("No PubSub configured")
-            return
-        if self.notify_subject is None:
-            logger.warning("No subject defined")
-            return
         await self.pubsub.unsubscribe(
-            key=self.notify_subject.format(kbid=kbid), subscription_id=request_id
+            key=const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
+            subscription_id=request_id,
         )
+
+    def _get_notification_action_type(self):
+        if has_feature(const.Features.WAIT_FOR_INDEX):
+            return Notification.Action.INDEXED
+        return Notification.Action.COMMIT  # currently do not handle ABORT!
 
     async def wait_for_commited(
         self, kbid: str, waiting_for: WaitFor, request_id: str
     ) -> Optional[Event]:
-        if self.notify_subject is None:
-            logger.warning("Not waiting because there is not subject to wait")
-            return None
-
-        if self.pubsub is None:
-            logger.warning("No PubSub configured")
-            return None
+        action_type = self._get_notification_action_type()
 
         def received(waiting_for: WaitFor, event: Event, raw_data: bytes):
-            if self.pubsub is None:
-                return None
             data = self.pubsub.parse(raw_data)
             pb = Notification()
             pb.ParseFromString(data)
-            if pb.uuid == waiting_for.uuid:
-                if waiting_for.seq is None or pb.seqid == waiting_for.seq:
+            if pb.uuid == waiting_for.uuid and pb.action == action_type:
+                if (
+                    waiting_for.seq is None
+                    or pb.seqid == waiting_for.seq
+                    # if we're waiting for index of this resource
+                    # the seq id will not match
+                    or action_type != Notification.Action.INDEXED
+                ):
                     event.set()
 
         waiting_event = Event()
         partial_received = partial(received, waiting_for, waiting_event)
         await self.pubsub.subscribe(
             handler=partial_received,
-            key=self.notify_subject.format(kbid=kbid),
+            key=const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
             subscription_id=request_id,
         )
         return waiting_event
 
     async def initialize(self, service_name: Optional[str] = None):
-        if self.notify_subject is not None:
-            from nucliadb_utils.utilities import get_pubsub
-
-            self.pubsub = await get_pubsub()
+        self.pubsub = await get_pubsub()
 
         options: Dict[str, Any] = {
             "error_cb": self.error_cb,
@@ -162,17 +158,21 @@ class TransactionUtility:
         self.js = get_traced_jetstream(self.nc, service_name or "nucliadb")
 
     async def finalize(self):
-        if self.nc:
-            await self.nc.flush()
-            await self.nc.close()
-            self.nc = None
+        try:
+            await self.nc.drain()
+        except nats.errors.ConnectionClosedError:
+            pass
+        await self.nc.close()
 
     async def commit(
-        self, writer: BrokerMessage, partition: int, wait: bool = False
+        self,
+        writer: BrokerMessage,
+        partition: int,
+        wait: bool = False,
+        target_subject: Optional[
+            str
+        ] = None,  # allow customizing where to send the message
     ) -> int:
-        if self.js is None:
-            raise AttributeError()
-
         waiting_event: Optional[Event] = None
 
         waiting_for = WaitFor(uuid=writer.uuid)
@@ -183,9 +183,10 @@ class TransactionUtility:
                 writer.kbid, waiting_for, request_id=request_id
             )
 
-        res = await self.js.publish(
-            self.nats_target.format(partition=partition), writer.SerializeToString()
-        )
+        if target_subject is None:
+            target_subject = const.Streams.INGEST.subject.format(partition=partition)
+
+        res = await self.js.publish(target_subject, writer.SerializeToString())
 
         waiting_for.seq = res.seq
 
@@ -194,7 +195,8 @@ class TransactionUtility:
                 await asyncio.wait_for(waiting_event.wait(), timeout=30.0)
             except asyncio.TimeoutError:
                 logger.warning("Took too much to commit")
-            await self.stop_waiting(writer.kbid, request_id=request_id)
+            finally:
+                await self.stop_waiting(writer.kbid, request_id=request_id)
 
         logger.info(
             f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"  # noqa

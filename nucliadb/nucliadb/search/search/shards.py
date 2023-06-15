@@ -32,20 +32,24 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import Shard
 
-from nucliadb.ingest.orm.node import Node
+from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb_telemetry import metrics
 
 node_observer = metrics.Observer("node_client", labels={"type": ""})
 
 
-async def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:
-    query.shard = shard
+async def query_shard(
+    node: AbstractIndexNode, shard: str, query: SearchRequest
+) -> SearchResponse:
+    req = SearchRequest()
+    req.CopyFrom(query)
+    req.shard = shard
     with node_observer({"type": "search"}):
-        return await node.reader.Search(query)  # type: ignore
+        return await node.reader.Search(req)  # type: ignore
 
 
 async def get_shard(
-    node: Node, shard_id: str, vectorset: Optional[str] = None
+    node: AbstractIndexNode, shard_id: str, vectorset: Optional[str] = None
 ) -> Shard:
     req = GetShardRequest()
     req.shard_id.id = shard_id
@@ -56,24 +60,30 @@ async def get_shard(
 
 
 async def query_paragraph_shard(
-    node: Node, shard: str, query: ParagraphSearchRequest
+    node: AbstractIndexNode, shard: str, query: ParagraphSearchRequest
 ) -> ParagraphSearchResponse:
-    query.id = shard
+    req = ParagraphSearchRequest()
+    req.CopyFrom(query)
+    req.id = shard
     with node_observer({"type": "paragraph_search"}):
-        return await node.reader.ParagraphSearch(query)  # type: ignore
+        return await node.reader.ParagraphSearch(req)  # type: ignore
 
 
 async def suggest_shard(
-    node: Node, shard: str, query: SuggestRequest
+    node: AbstractIndexNode, shard: str, query: SuggestRequest
 ) -> SuggestResponse:
-    query.shard = shard
+    req = SuggestRequest()
+    req.CopyFrom(query)
+    req.shard = shard
     with node_observer({"type": "suggest"}):
-        return await node.reader.Suggest(query)  # type: ignore
+        return await node.reader.Suggest(req)  # type: ignore
 
 
 async def relations_shard(
-    node: Node, shard: str, query: RelationSearchRequest
+    node: AbstractIndexNode, shard: str, query: RelationSearchRequest
 ) -> RelationSearchResponse:
-    query.shard_id = shard
+    req = RelationSearchRequest()
+    req.CopyFrom(query)
+    req.shard_id = shard
     with node_observer({"type": "relation_search"}):
-        return await node.reader.RelationSearch(query)  # type: ignore
+        return await node.reader.RelationSearch(req)  # type: ignore

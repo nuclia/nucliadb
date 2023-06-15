@@ -23,7 +23,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
-    ShardList as ShardList,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
@@ -33,10 +32,6 @@ from nucliadb_protos.noderesources_pb2 import (
 
 class NodeWriterStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
-    GetShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardId,
-    ]
     NewShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodewriter_pb2.NewShardRequest,
         nucliadb_protos.noderesources_pb2.ShardCreated,
@@ -85,26 +80,12 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.noderesources_pb2.VectorSetList,
     ]
-    MoveShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.MoveShardRequest,
-        nucliadb_protos.noderesources_pb2.EmptyResponse,
-    ]
-    AcceptShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.AcceptShardRequest,
-        nucliadb_protos.noderesources_pb2.EmptyResponse,
-    ]
     GetMetadata: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.EmptyQuery,
         nucliadb_protos.noderesources_pb2.NodeMetadata,
     ]
 
 class NodeWriterServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def GetShard(
-        self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.ShardId: ...
     @abc.abstractmethod
     def NewShard(
         self,
@@ -177,18 +158,6 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.VectorSetList: ...
-    @abc.abstractmethod
-    def MoveShard(
-        self,
-        request: nucliadb_protos.nodewriter_pb2.MoveShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
-    @abc.abstractmethod
-    def AcceptShard(
-        self,
-        request: nucliadb_protos.nodewriter_pb2.AcceptShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
     @abc.abstractmethod
     def GetMetadata(
         self,

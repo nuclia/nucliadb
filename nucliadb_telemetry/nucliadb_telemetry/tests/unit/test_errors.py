@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import ANY, patch
+from unittest.mock import patch
 
 from nucliadb_telemetry import errors
 
@@ -59,20 +59,18 @@ def test_capture_message_no_sentry() -> None:
 
 def test_setup_error_handling(monkeypatch):
     monkeypatch.setenv("sentry_url", "sentry_url")
-    monkeypatch.setenv("logging_integration", "True")
     monkeypatch.setenv("environment", "environment")
     with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
         errors, "SENTRY", True
-    ), patch("nucliadb_telemetry.errors.LoggingIntegration") as LoggingIntegration:
+    ):
         errors.setup_error_handling("1.0.0")
         mock_sentry_sdk.init.assert_called_once_with(
             release="1.0.0",
             environment="environment",
             dsn="sentry_url",
-            integrations=[ANY],
+            integrations=[],
             default_integrations=False,
         )
-        LoggingIntegration.assert_called_once()
 
 
 def test_setup_error_handling_no_sentry(monkeypatch):

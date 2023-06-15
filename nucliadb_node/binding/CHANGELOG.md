@@ -1,4 +1,8 @@
 # Changelog
+## 0.7.6
+
+- Properly compute total search results for document and paragaph
+
 ## 0.7.5
 
 - Fully remove stop-words from paragraphs

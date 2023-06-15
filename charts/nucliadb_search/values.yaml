@@ -1,3 +1,28 @@
+# -----
+# NucliaDB Search Settings
+# -----
+
+# Image settings
+imagePullPolicy: IfNotPresent
+imageOtherPullPolicy: Always
+containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
+image: IMAGE_TO_REPLACE
+image_other: cluster_manager:main
+
+# Component settings
+# ---
+# These settings are controlled through environment variables
+# all kubernetes oriented settings are controlled through
+# other values settings.
+# HOWEVER, we are in a transition period where we allow
+# both until all component settings are removed from
+# settings not mapped directly through env
+env:
+  SEARCH_TIMEOUT: "10" # seconds
+  SEARCH_CACHE_REDIS_HOST:
+  SEARCH_CACHE_REDIS_PORT:
+
+# Kubernetes settings
 affinity: {}
 nodeSelector: {}
 tolerations: []
@@ -5,11 +30,6 @@ topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
-imagePullPolicy: IfNotPresent
-imageOtherPullPolicy: Always
-containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
-image: IMAGE_TO_REPLACE
-image_other: cluster_manager:main
 resources: {}
 #  limits:
 #    memory: "600Mi"
@@ -27,7 +47,6 @@ services:
 
 running:
   sentry_url:
-  chitchat_level: INFO
 
 chitchat:
   cluster_manager:
@@ -40,8 +59,6 @@ chitchat:
     node0_svc_fixed_ip: 10.4.0.255
     chitchat_port: 4444
 
-config:
-  search_timeout: 10 # seconds
 
 serviceMonitor:
   enabled: False

@@ -35,13 +35,13 @@ from nucliadb.train.generators.token_classifier import (
     generate_token_classification_payloads,
 )
 from nucliadb.train.generators.utils import get_transaction
-from nucliadb.train.utils import get_nodes_manager
+from nucliadb.train.utils import get_shard_manager
 
 
 async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     # Get the data structure to generate data
-    node_manager = get_nodes_manager()
-    node, shard_replica_id = await node_manager.get_reader(kbid, shard)
+    shard_manager = get_shard_manager()
+    node, shard_replica_id = await shard_manager.get_reader(kbid, shard)
 
     if trainset.batch_size == 0:
         trainset.batch_size = 50
@@ -64,7 +64,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
                 status_code=422,
-                detail="Paragraph Classification should be of 1 labelset",
+                detail="Field Classification should be of 1 labelset",
             )
 
         async for field_data in generate_field_classification_payloads(

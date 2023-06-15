@@ -21,14 +21,14 @@
 from typing import List, Optional
 
 import nucliadb_models as models
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
-from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb.ingest.utils import get_driver
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldData,
@@ -40,6 +40,7 @@ from nucliadb_models.resource import (
     ExtractedDataTypeName,
     FileFieldData,
     FileFieldExtractedData,
+    GenericFieldData,
     KeywordsetFieldData,
     KeywordsetFieldExtractedData,
     LayoutFieldData,
@@ -54,7 +55,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.vectors import UserVectorSet
-from nucliadb_utils.utilities import get_cache, get_storage
+from nucliadb_utils.utilities import get_storage
 
 
 async def set_resource_field_extracted_data(
@@ -128,7 +129,7 @@ async def serialize(
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
 
     orm_resource = await get_orm_resource(
@@ -206,6 +207,11 @@ async def serialize(
         if orm_resource.origin is not None:
             resource.origin = models.Origin.from_message(orm_resource.origin)
 
+    if ResourceProperties.EXTRA in show:
+        await orm_resource.get_extra()
+        if orm_resource.extra is not None:
+            resource.extra = models.Extra.from_message(orm_resource.extra)
+
     include_errors = ResourceProperties.ERRORS in show
 
     if field_type_filter and (include_values or include_extracted_data):
@@ -217,6 +223,7 @@ async def serialize(
                 continue
 
             include_value = ResourceProperties.VALUES in show
+            value = None
             if include_value:
                 value = await field.get_value()
 
@@ -227,7 +234,7 @@ async def serialize(
                     resource.data.texts[field.id] = TextFieldData()
                 if include_value:
                     resource.data.texts[field.id].value = models.FieldText.from_message(
-                        value
+                        value  # type: ignore
                     )
                 if include_errors:
                     error = await field.get_error()
@@ -243,15 +250,14 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.FILE:
+            elif field_type_name is FieldTypeName.FILE:
                 if resource.data.files is None:
                     resource.data.files = {}
                 if field.id not in resource.data.files:
                     resource.data.files[field.id] = FileFieldData()
                 if include_value:
                     resource.data.files[field.id].value = models.FieldFile.from_message(
-                        value
+                        value  # type: ignore
                     )
 
                 if include_errors:
@@ -269,8 +275,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.LINK:
+            elif field_type_name is FieldTypeName.LINK:
                 if resource.data.links is None:
                     resource.data.links = {}
                 if field.id not in resource.data.links:
@@ -295,8 +300,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.LAYOUT:
+            elif field_type_name is FieldTypeName.LAYOUT:
                 if resource.data.layouts is None:
                     resource.data.layouts = {}
                 if field.id not in resource.data.layouts:
@@ -304,7 +308,9 @@ async def serialize(
                 if include_value:
                     resource.data.layouts[
                         field.id
-                    ].value = models.FieldLayout.from_message(value)
+                    ].value = models.FieldLayout.from_message(
+                        value  # type: ignore
+                    )
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
@@ -321,8 +327,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.CONVERSATION:
+            elif field_type_name is FieldTypeName.CONVERSATION:
                 if resource.data.conversations is None:
                     resource.data.conversations = {}
                 if field.id not in resource.data.conversations:
@@ -348,8 +353,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.DATETIME:
+            elif field_type_name is FieldTypeName.DATETIME:
                 if resource.data.datetimes is None:
                     resource.data.datetimes = {}
                 if field.id not in resource.data.datetimes:
@@ -363,7 +367,9 @@ async def serialize(
                 if include_value:
                     resource.data.datetimes[
                         field.id
-                    ].value = models.FieldDatetime.from_message(value)
+                    ].value = models.FieldDatetime.from_message(
+                        value  # type: ignore
+                    )
                 if include_extracted_data:
                     resource.data.datetimes[
                         field.id
@@ -374,8 +380,7 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-
-            if field_type_name is FieldTypeName.KEYWORDSET:
+            elif field_type_name is FieldTypeName.KEYWORDSET:
                 if resource.data.keywordsets is None:
                     resource.data.keywordsets = {field.id: KeywordsetFieldData()}
                 if field.id not in resource.data.keywordsets:
@@ -389,7 +394,9 @@ async def serialize(
                 if include_value:
                     resource.data.keywordsets[
                         field.id
-                    ].value = models.FieldKeywordset.from_message(value)
+                    ].value = models.FieldKeywordset.from_message(
+                        value  # type: ignore
+                    )
                 if include_extracted_data:
                     resource.data.keywordsets[
                         field.id
@@ -399,6 +406,25 @@ async def serialize(
                         resource.data.keywordsets[field.id].extracted,
                         field_type_name,
                         extracted,
+                    )
+            elif field_type_name is FieldTypeName.GENERIC:
+                if resource.data.generics is None:
+                    resource.data.generics = {}
+                if field.id not in resource.data.generics:
+                    resource.data.generics[field.id] = GenericFieldData()
+                if include_value:
+                    resource.data.generics[field.id].value = value
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.generics[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
+                if include_extracted_data:
+                    resource.data.generics[field.id].extracted = TextFieldExtractedData(
+                        text=models.ExtractedText(
+                            text=resource.data.generics[field.id].value
+                        )
                     )
     await txn.abort()
     return resource
@@ -412,9 +438,8 @@ async def get_orm_resource(
     service_name: Optional[str] = None,
 ) -> Optional[ORMResource]:
     storage = await get_storage(service_name=service_name)
-    cache = await get_cache()
 
-    kb = KnowledgeBox(txn, storage, cache, kbid)
+    kb = KnowledgeBox(txn, storage, kbid)
 
     if rid is None:
         if slug is None:
@@ -436,8 +461,7 @@ async def get_resource_uuid_by_slug(
     kbid: str, slug: str, service_name: Optional[str] = None
 ) -> Optional[str]:
     storage = await get_storage(service_name=service_name)
-    cache = await get_cache()
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, cache, kbid)
+    kb = KnowledgeBox(txn, storage, kbid)
     return await kb.get_resource_uuid_by_slug(slug)

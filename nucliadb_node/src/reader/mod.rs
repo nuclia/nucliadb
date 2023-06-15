@@ -25,8 +25,8 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest, IdCollection,
     ParagraphSearchRequest, ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse,
-    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest,
-    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, StreamRequest, SuggestRequest,
+    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
@@ -53,17 +53,6 @@ impl NodeReaderService {
             debug!("Stopping shard {}", shard_id);
             ShardReaderService::stop(shard);
         }
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn iter_shards(&self) -> NodeResult<impl Iterator<Item = NodeResult<ShardReaderService>>> {
-        let shards_path = env::shards_path();
-        Ok(std::fs::read_dir(shards_path)?.flatten().map(|entry| {
-            let file_name = entry.file_name().to_str().unwrap().to_string();
-            let shard_path = entry.path();
-            debug!("Opening {shard_path:?}");
-            ShardReaderService::new(file_name, &shard_path)
-        }))
     }
 
     /// Load all shards on the shards memory structure
@@ -99,40 +88,20 @@ impl NodeReaderService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardReaderService::new(shard_name, &shard_path) else {
-            error!("Shard {shard_path:?} could not be loaded from disk");
-            return;
-        };
-        self.cache.insert(shard_id.id.clone(), shard);
-        debug!("{shard_path:?}: Shard loaded");
+        match ShardReaderService::new(shard_name, &shard_path) {
+            Err(err) => error!("Shard {shard_path:?} could not be loaded from disk: {err:?}"),
+            Ok(shard) => {
+                self.cache.insert(shard_id.id.clone(), shard);
+                debug!("{shard_path:?}: Shard loaded");
+            }
+        }
     }
 
     #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardReaderService> {
         self.cache.get(&shard_id.id)
     }
-    #[tracing::instrument(skip_all)]
-    pub fn get_shards(&self) -> NodeResult<ShardList> {
-        use crate::telemetry::run_with_telemetry;
-        let span = tracing::Span::current();
-        let task = move |shard_id: &str, shard: &ShardReaderService| {
-            run_with_telemetry(info_span!(parent: &span, "get shards"), || {
-                shard.get_resources().map(|count| ShardPB {
-                    metadata: Some(shard.metadata.clone().into()),
-                    shard_id: shard_id.to_string(),
-                    resources: count as u64,
-                    paragraphs: 0_u64,
-                    sentences: 0_u64,
-                })
-            })
-        };
-        let shards = self
-            .cache
-            .par_iter()
-            .map(|(id, shard)| task(id, shard))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(ShardList { shards })
-    }
+
     #[tracing::instrument(skip_all)]
     pub fn suggest(
         &self,

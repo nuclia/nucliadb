@@ -53,7 +53,7 @@ from nucliadb.writer.exceptions import (
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic, set_processing_info
 from nucliadb.writer.resource.field import parse_fields
-from nucliadb.writer.resource.origin import parse_origin
+from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
 from nucliadb.writer.tus.exceptions import (
     HTTPBadRequest,
@@ -67,7 +67,6 @@ from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
@@ -353,13 +352,6 @@ async def patch(
     if rslug:
         rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
-    if rid:
-        set_info_on_span(
-            {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.upload_id": upload_id}
-        )
-    else:
-        set_info_on_span({"nuclia.kbid": kbid, "nuclia.upload_id": upload_id})
-
     dm = get_dm()
     await dm.load(upload_id)
     to_upload = None
@@ -631,11 +623,6 @@ async def start_upload_field(
     elif field is None:
         field = md5
 
-    if rid and kbid and field:
-        set_info_on_span(
-            {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.field": field}
-        )
-
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field
 
@@ -693,6 +680,8 @@ async def store_file_on_nuclia_db(
         parse_basic(writer, item, toprocess)
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)
+        if item.extra is not None:
+            parse_extra(writer.extra, item.extra)
 
         await parse_fields(
             writer=writer,

@@ -42,21 +42,8 @@ pub struct IndexMessage {
     pub partition: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, tag="8")]
     pub storage_key: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IndexedMessage {
-    #[prost(string, tag="1")]
-    pub node: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub shard: ::prost::alloc::string::String,
-    #[prost(uint64, tag="3")]
-    pub txid: u64,
-    #[prost(string, tag="4")]
-    pub resource: ::prost::alloc::string::String,
-    #[prost(enumeration="TypeMessage", tag="5")]
-    pub typemessage: i32,
-    #[prost(string, tag="6")]
-    pub reindex_id: ::prost::alloc::string::String,
+    #[prost(string, tag="9")]
+    pub kbid: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetGraph {
@@ -71,22 +58,6 @@ pub struct DeleteGraphNodes {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
     #[prost(message, repeated, tag="1")]
     pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MoveShardRequest {
-    #[prost(message, optional, tag="1")]
-    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
-    #[prost(string, tag="2")]
-    pub address: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct AcceptShardRequest {
-    #[prost(message, optional, tag="1")]
-    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
-    #[prost(uint32, tag="2")]
-    pub port: u32,
-    #[prost(bool, tag="3")]
-    pub override_shard: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewShardRequest {
@@ -173,28 +144,6 @@ pub mod node_writer_client {
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
-        }
-        pub async fn get_shard(
-            &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::ShardId>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/GetShard",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn new_shard(
             &mut self,
@@ -440,50 +389,6 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn move_shard(
-            &mut self,
-            request: impl tonic::IntoRequest<super::MoveShardRequest>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/MoveShard",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
-        pub async fn accept_shard(
-            &mut self,
-            request: impl tonic::IntoRequest<super::AcceptShardRequest>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/AcceptShard",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
         pub async fn get_metadata(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
@@ -515,13 +420,6 @@ pub mod node_writer_server {
     ///Generated trait containing gRPC methods that should be implemented for use with NodeWriterServer.
     #[async_trait]
     pub trait NodeWriter: Send + Sync + 'static {
-        async fn get_shard(
-            &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::ShardId>,
-            tonic::Status,
-        >;
         async fn new_shard(
             &self,
             request: tonic::Request<super::NewShardRequest>,
@@ -588,20 +486,6 @@ pub mod node_writer_server {
             tonic::Response<super::super::noderesources::VectorSetList>,
             tonic::Status,
         >;
-        async fn move_shard(
-            &self,
-            request: tonic::Request<super::MoveShardRequest>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyResponse>,
-            tonic::Status,
-        >;
-        async fn accept_shard(
-            &self,
-            request: tonic::Request<super::AcceptShardRequest>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyResponse>,
-            tonic::Status,
-        >;
         async fn get_metadata(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
@@ -657,44 +541,6 @@ pub mod node_writer_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/nodewriter.NodeWriter/GetShard" => {
-                    #[allow(non_camel_case_types)]
-                    struct GetShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<
-                        T: NodeWriter,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for GetShardSvc<T> {
-                        type Response = super::super::noderesources::ShardId;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).get_shard(request).await };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = GetShardSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
                 "/nodewriter.NodeWriter/NewShard" => {
                     #[allow(non_camel_case_types)]
                     struct NewShardSvc<T: NodeWriter>(pub Arc<T>);
@@ -1165,84 +1011,6 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = ListVectorSetsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodewriter.NodeWriter/MoveShard" => {
-                    #[allow(non_camel_case_types)]
-                    struct MoveShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<
-                        T: NodeWriter,
-                    > tonic::server::UnaryService<super::MoveShardRequest>
-                    for MoveShardSvc<T> {
-                        type Response = super::super::noderesources::EmptyResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::MoveShardRequest>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).move_shard(request).await };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = MoveShardSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodewriter.NodeWriter/AcceptShard" => {
-                    #[allow(non_camel_case_types)]
-                    struct AcceptShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<
-                        T: NodeWriter,
-                    > tonic::server::UnaryService<super::AcceptShardRequest>
-                    for AcceptShardSvc<T> {
-                        type Response = super::super::noderesources::EmptyResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::AcceptShardRequest>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).accept_shard(request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = AcceptShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -31,19 +31,19 @@ from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb.ingest.settings import settings
-from nucliadb_utils.settings import running_settings
+from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb_utils.tests import free_port
 
 logger = logging.getLogger(__name__)
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
     "version": "main",
-    "command": "bash -c 'node_reader & node_writer'",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
+        "NODE_TYPE": "Io",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
         "LAZY_LOADING": "true",
@@ -66,6 +66,7 @@ images.settings["nucliadb_node_writer"] = {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
+        "NODE_TYPE": "Io",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "CHITCHAT_PORT": "4444",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
@@ -86,15 +87,15 @@ images.settings["nucliadb_node_sidecar"] = {
     "image": "eu.gcr.io/stashify-218417/node_sidecar",
     "version": "main",
     "env": {
-        "INDEX_JETSTREAM_TARGET": "node.{node}",
-        "INDEX_JETSTREAM_GROUP": "node-{node}",
-        "INDEX_JETSTREAM_STREAM": "node",
         "INDEX_JETSTREAM_SERVERS": "[]",
+        "CACHE_PUBSUB_NATS_URL": "",
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
         "SIDECAR_LISTEN_ADDRESS": "0.0.0.0:4447",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
+        "PYTHONUNBUFFERED": "1",
+        "LOG_LEVEL": "DEBUG",
     },
     "options": {
         "command": [
@@ -122,14 +123,6 @@ images.settings["nucliadb_cluster_manager"] = {
         ],
     },
 }
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
 
 
 def get_chitchat_port(container_obj, port):
@@ -210,14 +203,6 @@ class nucliadbChitchatNode(BaseImage):
 
     def check(self):
         return True
-        # channel = insecure_channel(f"{self.host}:{self.get_port()}")
-        # stub = health_pb2_grpc.HealthStub(channel)
-        # pb = HealthCheckRequest(service="Chitchat")
-        # try:
-        #    result = stub.Check(pb)
-        #    return result.status == 1
-        # except:  # noqa
-        #    return False
 
 
 class nucliadbNodeSidecar(BaseImage):
@@ -263,7 +248,6 @@ class _NodeRunner:
         self.data = {}
 
     def start(self):
-        running_settings.log_level = "DEBUG"
         docker_platform_name = self.docker_client.api.version()["Platform"][
             "Name"
         ].upper()
@@ -281,13 +265,12 @@ class _NodeRunner:
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
 
-        settings.chitchat_binding_host = "0.0.0.0"
-        settings.chitchat_binding_port = free_port()
-        settings.chitchat_enabled = True
+        cluster_settings.chitchat_binding_host = "0.0.0.0"
+        cluster_settings.chitchat_binding_port = free_port()
 
         images.settings["nucliadb_cluster_manager"]["env"][
             "MONITOR_ADDR"
-        ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
+        ] = f"{docker_internal_host}:{cluster_settings.chitchat_binding_port}"
         images.settings["nucliadb_cluster_manager"]["env"]["UPDATE_INTERVAL"] = "1s"
 
         cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
@@ -308,6 +291,9 @@ class _NodeRunner:
         natsd_server = self.natsd.replace("localhost", docker_internal_host)
         images.settings["nucliadb_node_sidecar"]["env"][
             "INDEX_JETSTREAM_SERVERS"
+        ] = f'["{natsd_server}"]'
+        images.settings["nucliadb_node_sidecar"]["env"][
+            "CACHE_PUBSUB_NATS_URL"
         ] = f'["{natsd_server}"]'
         gcs_server = self.gcs.replace("localhost", docker_internal_host)
         images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server
@@ -411,22 +397,22 @@ class _NodeRunner:
 
     def setup_env(self):
         # reset on every test run in case something touches it
-        settings.writer_port_map = {
+        cluster_settings.writer_port_map = {
             self.data["writer1_internal_host"]: self.data["writer1"]["port"],
             self.data["writer2_internal_host"]: self.data["writer2"]["port"],
         }
-        settings.reader_port_map = {
+        cluster_settings.reader_port_map = {
             self.data["writer1_internal_host"]: self.data["reader1"]["port"],
             self.data["writer2_internal_host"]: self.data["reader2"]["port"],
         }
-        settings.sidecar_port_map = {
+        cluster_settings.sidecar_port_map = {
             self.data["writer1_internal_host"]: self.data["sidecar1"]["port"],
             self.data["writer2_internal_host"]: self.data["sidecar2"]["port"],
         }
 
-        settings.node_writer_port = None  # type: ignore
-        settings.node_reader_port = None  # type: ignore
-        settings.node_sidecar_port = None  # type: ignore
+        cluster_settings.node_writer_port = None  # type: ignore
+        cluster_settings.node_reader_port = None  # type: ignore
+        cluster_settings.node_sidecar_port = None  # type: ignore
 
 
 @pytest.fixture(scope="session", autouse=False)

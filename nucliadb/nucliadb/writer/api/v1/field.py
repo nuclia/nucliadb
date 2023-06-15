@@ -27,9 +27,9 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 import nucliadb_models as models
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.ingest.utils import get_driver
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -48,11 +48,9 @@ from nucliadb.writer.resource.field import (
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
-from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
-    get_cache,
     get_partitioning,
     get_storage,
     get_transaction_utility,
@@ -103,8 +101,6 @@ def prepare_field_put(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
-
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     parse_audit(writer.audit, request)
     return writer, toprocess, partition
@@ -457,8 +453,6 @@ async def append_messages_to_conversation_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
-
     parse_audit(writer.audit, request)
 
     field = models.InputConversationField()
@@ -527,8 +521,6 @@ async def append_blocks_to_layout_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
-
     parse_audit(writer.audit, request)
 
     field = models.InputLayoutField(body=models.InputLayoutContent())
@@ -589,8 +581,6 @@ async def delete_resource_field(
     pb_field_id.field_type = FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP[field_type]
     pb_field_id.field = field_id
 
-    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
-
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
@@ -631,14 +621,11 @@ async def reprocess_file_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
-
     storage = await get_storage(service_name=SERVICE_NAME)
-    cache = await get_cache()
-    driver = await get_driver()
+    driver = get_driver()
 
     async with driver.transaction() as txn:
-        kb = KnowledgeBox(txn, storage, cache, kbid)
+        kb = KnowledgeBox(txn, storage, kbid)
 
         resource = await kb.get(rid)
         if resource is None:

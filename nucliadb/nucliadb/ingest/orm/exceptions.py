@@ -19,7 +19,7 @@
 #
 
 
-class NodeClusterSmall(Exception):
+class NotFound(Exception):
     pass
 
 
@@ -27,19 +27,7 @@ class KnowledgeBoxConflict(Exception):
     pass
 
 
-class ShardNotFound(Exception):
-    pass
-
-
-class KnowledgeBoxNotFound(Exception):
-    pass
-
-
-class NodesUnsync(Exception):
-    pass
-
-
-class NodeError(Exception):
+class KnowledgeBoxNotFound(NotFound):
     pass
 
 
@@ -54,7 +42,3 @@ class ReallyStopPulling(Exception):
 class SequenceOrderViolation(Exception):
     def __init__(self, last_seqid: int):
         self.last_seqid = last_seqid
-
-
-class AlreadyExists(Exception):
-    pass

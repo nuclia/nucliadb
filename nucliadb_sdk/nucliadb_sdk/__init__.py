@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# Old SDK APIs that should eventually be removed
 from nucliadb_sdk.entities import Entity
 from nucliadb_sdk.file import File
 from nucliadb_sdk.knowledgebox import KnowledgeBox
@@ -28,9 +29,22 @@ from nucliadb_sdk.utils import (
     get_or_create,
     list_kbs,
 )
+from nucliadb_sdk.v2 import NucliaDB, NucliaDBAsync, Region, exceptions
 from nucliadb_sdk.vectors import Vector
 
+# backward compatibility
+NucliaSDK = NucliaDB
+NucliaSDKAsync = NucliaDBAsync
+
 __all__ = (
+    "NucliaSDK",
+    "NucliaSDKAsync",
+    "NucliaDB",
+    "NucliaDBAsync",
+    "Region",
+    "exceptions",
+    # OLD support APIs
+    # Plan on removing these in the future
     "File",
     "KnowledgeBox",
     "Entity",

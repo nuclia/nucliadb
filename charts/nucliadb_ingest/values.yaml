@@ -1,6 +1,28 @@
+# -----
 # NucliaDB Ingest Settings
+# -----
+
+# Image settings
+imagePullPolicy: IfNotPresent
+imageOtherPullPolicy: Always
+containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
+image: IMAGE_TO_REPLACE
+image_other: cluster_manager:main
+
+# Component settings
+# ---
+# These settings are controlled through environment variables
+# all kubernetes oriented settings are controlled through
+# other values.
+# HOWEVER, we are in a transition period where we allow
+# both until all component settings are removed from
+# settings not mapped directly through env
+env:
+  EXAMPLE: "VALUE"
+
+# Kubernetes settings
 config:
-  pull_time: 100
+  pull_time_error_backoff: 100
   node_replicas: 2
 
 affinity: {}
@@ -9,11 +31,6 @@ tolerations: []
 topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
-imagePullPolicy: IfNotPresent
-imageOtherPullPolicy: Always
-containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
-image: IMAGE_TO_REPLACE
-image_other: cluster_manager:main
 debug: False
 resources: {}
 #  limits:
@@ -45,7 +62,6 @@ services:
 
 running:
   sentry_url:
-  activity_log_level: INFO
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
@@ -60,7 +76,6 @@ indexing:
   index_jetstream_auth:
   index_jetstream_servers:
     - nats1
-  index_jetstream_target: "node.{node}"
 
 tracing:
   enabled: false
@@ -70,11 +85,48 @@ tracing:
 
 # ingest-orm-grpc settings
 # flat structure so no issues merging
-ingest_orm_grpc_resources: {}
-ingest_orm_grpc_replicaCount: 2
+ingest_orm_grpc_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
+ingest_orm_grpc_replicaCount: 1
 ingest_orm_grpc_autoscaling:
   minReplicas: 1
   maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+# ingest-processed-consumer settings
+ingest_processed_consumer_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
+ingest_processed_consumer_replicaCount: 1
+ingest_processed_consumer_autoscaling:
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+# ingest-subscriber-workers settings
+ingest_subscriber_workers_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
+ingest_subscriber_workers_replicaCount: 1
+ingest_subscriber_workers_autoscaling:
+  minReplicas: 1
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:

@@ -24,6 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_telemetry import grpc_metrics
+from nucliadb_telemetry.jetstream import msg_time_histo
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.telemetry import Greeter
 
@@ -96,3 +97,13 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
 
     assert grpc_metrics.grpc_client_observer.histogram.collect()[0].samples  # type: ignore
     assert grpc_metrics.grpc_server_observer.histogram.collect()[0].samples  # type: ignore
+
+    assert msg_time_histo.histo.collect()[0].samples  # type: ignore
+
+    sample = [
+        sam.labels
+        for sam in msg_time_histo.histo.collect()[0].samples  # type: ignore
+        if sam.labels.get("le") == "0.005"
+    ][0]
+    sample.pop("consumer")
+    assert sample == {"stream": "testing", "acked": "no", "le": "0.005"}

@@ -1,0 +1,132 @@
+name: nucliadb Standalone (py)
+env:
+  API_VERSION: 1
+  COMPONENT: nucliadb-standalone
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_standalone.yml"
+      - "charts/nucliadb/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/writer/**"
+      - "nucliadb/nucliadb/standalone/**"
+      - "nucliadb/nucliadb/reader/**"
+      - "nucliadb/nucliadb/search/**"
+      - "nucliadb_models/**"
+      - "nucliadb_protos/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_standalone.yml"
+      - "charts/nucliadb/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/writer/**"
+      - "nucliadb/nucliadb/standalone/**"
+      - "nucliadb/nucliadb/reader/**"
+      - "nucliadb/nucliadb/search/**"
+      - "nucliadb_models/**"
+      - "nucliadb_protos/**"
+jobs:
+  # Job to run pre-checks
+  pre-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install package
+        run: make -C nucliadb/ install-dev
+
+      - name: Run pre-checks
+        run: make -C nucliadb/ lint-standalone
+
+  # Job to run tests
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/auth@v1
+        with:
+          project_id: "${{ secrets.PROJECT_ID }}"
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v1"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install the package
+        run: make -C nucliadb/ install-dev
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            node_modified:
+              - 'nucliadb_node/src/**'
+            sidecar_modified:
+              - 'nucliadb_node/nucliadb_node/**'
+            cluster_modified:
+              - 'nucliadb_cluster/**'
+
+      # we may need eu.gcr.io/stashify-218417/node
+      # or eu.gcr.io/stashify-218417/cluster_manager
+      # or eu.gcr.io/stashify-218417/node_sidecar
+
+      # We need to setup buildx to be able to cache with gha
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build local Node for testing
+        if: steps.filter.outputs.node_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
+      - name: Build local Sidecar for testing
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
+
+      - name: Build local ClusterManager for testing
+        if: steps.filter.outputs.cluster_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
+
+      - name: Run tests
+        run: |
+          pytest -rfE --cov=nucliadb.standalone -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/standalone
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: standalone

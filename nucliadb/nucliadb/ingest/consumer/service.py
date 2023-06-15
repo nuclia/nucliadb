@@ -18,162 +18,165 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Dict, List, Optional
+import sys
+from functools import partial
+from typing import Awaitable, Callable, Optional
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
 from nucliadb.ingest.consumer.pull import PullWorker
-from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.settings import settings
-from nucliadb.ingest.utils import get_driver
-from nucliadb_utils.settings import (
-    nuclia_settings,
-    running_settings,
-    transaction_settings,
+from nucliadb_utils.exceptions import ConfigurationError
+from nucliadb_utils.settings import running_settings, transaction_settings
+from nucliadb_utils.utilities import (
+    get_audit,
+    get_cache,
+    get_nats_manager,
+    get_pubsub,
+    get_storage,
 )
-from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_audit, get_cache, get_storage
+
+from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
+from .shard_creator import ShardCreatorHandler
 
 
-class ConsumerService:
-    pull_workers_task: Dict[str, asyncio.Task]
-    pull_workers: Dict[str, PullWorker]
-    driver: Driver
-    storage: Storage
+def _handle_task_result(task: asyncio.Task) -> None:
+    e = task.exception()
+    if e:
+        logger.exception(
+            "Loop stopped by exception. This should not happen. Exiting.", exc_info=e
+        )
+        sys.exit(1)
 
-    def __init__(
-        self,
-        partitions: Optional[List[str]] = None,
-        pull_time: Optional[int] = None,
-        zone: Optional[str] = None,
-        creds: Optional[str] = None,
-        nuclia_cluster_url: Optional[str] = None,
-        nuclia_public_url: Optional[str] = None,
-        nats_servers: Optional[List[str]] = None,
-        nats_auth: Optional[str] = None,
-        nats_target: Optional[str] = None,
-        nats_group: Optional[str] = None,
-        nats_stream: Optional[str] = None,
-        onprem: Optional[bool] = None,
+
+async def _exit_tasks(tasks: list[asyncio.Task]) -> None:
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def start_pull_workers(
+    service_name: Optional[str] = None,
+) -> Callable[[], Awaitable[None]]:
+    driver = await setup_driver()
+    cache = await get_cache()
+    storage = await get_storage(service_name=service_name or SERVICE_NAME)
+    tasks = []
+    for partition in settings.partitions:
+        worker = PullWorker(
+            driver=driver,
+            partition=partition,
+            storage=storage,
+            pull_time_error_backoff=settings.pull_time_error_backoff,
+            cache=cache,
+            local_subscriber=transaction_settings.transaction_local,
+        )
+        task = asyncio.create_task(worker.loop())
+        task.add_done_callback(_handle_task_result)
+        tasks.append(task)
+
+    return partial(_exit_tasks, tasks)
+
+
+async def start_ingest_consumers(
+    service_name: Optional[str] = None,
+) -> Callable[[], Awaitable[None]]:
+    if transaction_settings.transaction_local:
+        raise ConfigurationError("Can not start ingest consumers in local mode")
+
+    while len(
+        manager.get_index_nodes()
+    ) == 0 and running_settings.running_environment not in (
+        "local",
+        "test",
     ):
-        if partitions is not None:
-            self.partitions: List[str] = partitions
-        else:
-            self.partitions = settings.partitions
+        logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
+        await asyncio.sleep(1)
 
-        if pull_time is not None:
-            self.pull_time: int = pull_time
-        else:
-            self.pull_time = settings.pull_time
+    driver = await setup_driver()
+    cache = await get_cache()
+    storage = await get_storage(service_name=service_name or SERVICE_NAME)
+    nats_connection_manager = get_nats_manager()
 
-        if zone is not None:
-            self.zone: str = zone
-        else:
-            self.zone = nuclia_settings.nuclia_zone
-
-        if creds is not None:
-            self.nuclia_creds: Optional[str] = creds
-        else:
-            self.nuclia_creds = nuclia_settings.nuclia_service_account
-
-        if nuclia_cluster_url is not None:
-            self.nuclia_cluster_url: str = nuclia_cluster_url
-        else:
-            self.nuclia_cluster_url = nuclia_settings.nuclia_cluster_url
-
-        self.nuclia_public_url = (
-            nuclia_public_url
-            if nuclia_public_url
-            else nuclia_settings.nuclia_public_url
+    for partition in settings.partitions:
+        consumer = IngestConsumer(
+            driver=driver,
+            partition=partition,
+            storage=storage,
+            cache=cache,
+            nats_connection_manager=nats_connection_manager,
         )
+        await consumer.initialize()
 
-        self.nats_auth = (
-            nats_auth if nats_auth else transaction_settings.transaction_jetstream_auth
-        )
-        self.nats_url = (
-            nats_servers
-            if nats_servers is not None and len(nats_servers) > 0
-            else transaction_settings.transaction_jetstream_servers
-        )
+    return nats_connection_manager.finalize
 
-        if nats_target is not None:
-            self.nats_target: str = nats_target
-        else:
-            self.nats_target = transaction_settings.transaction_jetstream_target
 
-        if nats_group is not None:
-            self.nats_group: str = nats_group
-        else:
-            self.nats_group = transaction_settings.transaction_jetstream_group
+async def start_ingest_processed_consumer(
+    service_name: Optional[str] = None,
+) -> Callable[[], Awaitable[None]]:
+    """
+    This is not meant to be deployed with a stateful set like the other consumers.
 
-        if nats_stream is not None:
-            self.nats_stream: str = nats_stream
-        else:
-            self.nats_stream = transaction_settings.transaction_jetstream_stream
+    We are not maintaining transactionability based on the nats sequence id from this
+    consumer and we will start off by not separating writes by partition AND
+    allowing NATS to manage the queue group for us.
+    """
+    if transaction_settings.transaction_local:
+        raise ConfigurationError("Can not start ingest consumers in local mode")
 
-        self.local_subscriber = transaction_settings.transaction_local
-        self.onprem = onprem if onprem is not None else nuclia_settings.onprem
-        self.pull_workers_task = {}
-        self.pull_workers = {}
-        self.audit = get_audit()
+    while len(
+        manager.get_index_nodes()
+    ) == 0 and running_settings.running_environment not in (
+        "local",
+        "test",
+    ):
+        logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
+        await asyncio.sleep(1)
 
-    async def run(self, service_name: Optional[str] = None):
-        logger.info(
-            f"Ingest txn from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
-        )
+    driver = await setup_driver()
+    cache = await get_cache()
+    storage = await get_storage(service_name=service_name or SERVICE_NAME)
+    nats_connection_manager = get_nats_manager()
 
-        while len(NODES) == 0 and running_settings.running_environment not in (
-            "local",
-            "test",
-        ):
-            logger.warning(
-                "Initializion delayed 1s to receive some Nodes on the cluster"
-            )
-            await asyncio.sleep(1)
+    consumer = IngestProcessedConsumer(
+        driver=driver,
+        partition="-1",
+        storage=storage,
+        cache=cache,
+        nats_connection_manager=nats_connection_manager,
+    )
+    await consumer.initialize()
 
-        for partition in self.partitions:
-            self.pull_workers[partition] = PullWorker(
-                driver=self.driver,
-                partition=partition,
-                storage=self.storage,
-                pull_time=self.pull_time,
-                zone=self.zone,
-                cache=self.cache,
-                audit=self.audit,
-                creds=self.nuclia_creds,
-                nuclia_cluster_url=self.nuclia_cluster_url,
-                nuclia_public_url=self.nuclia_public_url,
-                target=self.nats_target,
-                group=self.nats_group,
-                stream=self.nats_stream,
-                onprem=self.onprem,
-                nats_creds=self.nats_auth,
-                nats_servers=self.nats_url,
-                local_subscriber=self.local_subscriber,
-                service_name=service_name,
-            )
-            self.pull_workers_task[partition] = asyncio.create_task(
-                self.pull_workers[partition].loop()
-            )
-            self.pull_workers_task[partition].add_done_callback(
-                self._handle_task_result
-            )
+    return nats_connection_manager.finalize
 
-    async def start(self, service_name: Optional[str] = None):
-        self.driver = await get_driver()
-        self.cache = await get_cache()
-        self.storage = await get_storage(service_name=SERVICE_NAME)
 
-        # Start consummer coroutine
-        await self.run(service_name)
+async def start_auditor() -> Callable[[], Awaitable[None]]:
+    driver = await setup_driver()
+    audit = get_audit()
+    assert audit is not None
+    pubsub = await get_pubsub()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    index_auditor = IndexAuditHandler(driver=driver, audit=audit, pubsub=pubsub)
+    resource_writes_auditor = ResourceWritesAuditHandler(
+        driver=driver, storage=storage, audit=audit, pubsub=pubsub
+    )
 
-    async def stop(self):
-        for value in self.pull_workers.values():
-            await value.finalize()
-        for value in self.pull_workers_task.values():
-            value.cancel()
+    await index_auditor.initialize()
+    await resource_writes_auditor.initialize()
 
-    def _handle_task_result(self, task: asyncio.Task) -> None:
-        e = task.exception()
-        if e:
-            logger.exception("Consumer loop stopped by exception", exc_info=e)
+    return partial(
+        asyncio.gather, index_auditor.finalize(), resource_writes_auditor.finalize()  # type: ignore
+    )
+
+
+async def start_shard_creator() -> Callable[[], Awaitable[None]]:
+    driver = await setup_driver()
+    pubsub = await get_pubsub()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    shard_creator = ShardCreatorHandler(driver=driver, storage=storage, pubsub=pubsub)
+    await shard_creator.initialize()
+
+    return shard_creator.finalize

@@ -27,6 +27,7 @@ from fastapi_versioning import version
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
@@ -39,11 +40,11 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
+    SearchParamDefaults,
     SearchRequest,
     SortField,
     SortOptions,
     SortOrder,
-    SortOrderMap,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -86,40 +87,51 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    advanced_query: Optional[str] = Query(default=None),
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: Optional[int] = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    min_score: float = Query(default=0.70),
-    range_creation_start: Optional[datetime] = Query(default=None),
-    range_creation_end: Optional[datetime] = Query(default=None),
-    range_modification_start: Optional[datetime] = Query(default=None),
-    range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = Query(
+    query: str = fastapi_query(SearchParamDefaults.query),
+    advanced_query: Optional[str] = fastapi_query(SearchParamDefaults.advanced_query),
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
+    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
+    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    min_score: float = fastapi_query(SearchParamDefaults.min_score),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
+    ),
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
+    features: List[SearchOptions] = fastapi_query(
+        SearchParamDefaults.search_features,
         default=[
             SearchOptions.PARAGRAPH,
             SearchOptions.DOCUMENT,
             SearchOptions.VECTOR,
-        ]
+        ],
     ),
     reload: bool = Query(default=True),
-    debug: bool = Query(False),
-    highlight: bool = Query(default=False),
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
+    show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = Query([]),
-    with_duplicates: bool = Query(default=False),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    with_synonyms: bool = Query(default=False),
+    extracted: List[ExtractedDataTypeName] = fastapi_query(
+        SearchParamDefaults.extracted
+    ),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+    with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
+    with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
+    autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -151,8 +163,8 @@ async def search_knowledgebox(
         extracted=extracted,
         shards=shards,
         with_duplicates=with_duplicates,
-        with_status=with_status,
         with_synonyms=with_synonyms,
+        autofilter=autofilter,
     )
     try:
         return await search(
@@ -177,16 +189,18 @@ async def catalog(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    shards: List[str] = Query([]),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
+    query: str = fastapi_query(SearchParamDefaults.query),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
+    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
+    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+    with_status: Optional[ResourceProcessingStatus] = fastapi_query(
+        SearchParamDefaults.with_status
+    ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -205,7 +219,6 @@ async def catalog(
         features=[SearchOptions.DOCUMENT],
         show=[ResourceProperties.BASIC],
         shards=shards,
-        with_status=with_status,
     )
     return await search(
         response,
@@ -215,6 +228,7 @@ async def catalog(
         x_nucliadb_user,
         x_forwarded_for,
         do_audit=False,
+        with_status=with_status,
     )
 
 
@@ -254,6 +268,7 @@ async def search(
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
+    with_status: Optional[ResourceProcessingStatus] = None,
 ) -> KnowledgeboxSearchResults:
     audit = get_audit()
     start_time = time()
@@ -267,7 +282,7 @@ async def search(
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
-    pb_query, incomplete_results = await global_query_to_pb(
+    pb_query, incomplete_results, autofilters = await global_query_to_pb(
         kbid,
         features=item.features,
         query=processed_query,
@@ -275,7 +290,6 @@ async def search(
         filters=item.filters,
         faceted=item.faceted,
         sort=sort_options,
-        sort_ord=SortOrderMap[sort_options.order],
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
@@ -287,8 +301,9 @@ async def search(
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
-        with_status=item.with_status,
+        with_status=with_status,
         with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
     )
 
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
@@ -328,4 +343,5 @@ async def search(
         search_results.nodes = queried_nodes
 
     search_results.shards = queried_shards
+    search_results.autofilters = autofilters
     return search_results

@@ -32,9 +32,9 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.ingest.orm import NODES
+from nucliadb.common.cluster.manager import INDEX_NODES
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.tests.vectors import Q
-from nucliadb.ingest.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -135,9 +135,9 @@ async def test_multiple_search_resource_all(
             else:
                 break
         assert len(resp.json()["paragraphs"]["results"]) == 20
-        assert resp.json()["paragraphs"]["total"] == 20
+        assert resp.json()["paragraphs"]["total"] == 100
         assert len(resp.json()["fulltext"]["results"]) == 20
-        assert resp.json()["fulltext"]["total"] == 20
+        assert resp.json()["fulltext"]["total"] == 100
 
         assert resp.json()["paragraphs"]["next_page"] is False
         assert resp.json()["fulltext"]["next_page"] is False
@@ -168,7 +168,7 @@ async def test_search_resource_all(
 
     # get shards ids
 
-    driver = await get_driver()
+    driver = get_driver()
     txn = await driver.begin()
     key = KB_SHARDS.format(kbid=kbid)
     async for key in txn.keys(key):
@@ -177,30 +177,29 @@ async def test_search_resource_all(
         shards = PBShards()
         shards.ParseFromString(value)
         for replica in shards.shards[0].replicas:
-            node_obj = NODES.get(replica.node)
+            node_obj = INDEX_NODES.get(replica.node)
 
             if node_obj is not None:
                 shard = await node_obj.get_shard(replica.shard.id)
-                assert shard.id == replica.shard.id
-                shard_reader = await node_obj.get_reader_shard(replica.shard.id)
-                assert shard_reader.resources == 3
-                assert shard_reader.paragraphs == 2
-                assert shard_reader.sentences == 3
+                assert shard.shard_id == replica.shard.id
+                assert shard.resources == 3
+                assert shard.paragraphs == 2
+                assert shard.sentences == 3
 
                 prequest = ParagraphSearchRequest()
-                prequest.id = shard.id
+                prequest.id = replica.shard.id
                 prequest.body = "Ramon"
                 prequest.result_per_page = 10
                 prequest.reload = True
 
                 drequest = DocumentSearchRequest()
-                drequest.id = shard.id
+                drequest.id = replica.shard.id
                 drequest.body = "Ramon"
                 drequest.result_per_page = 10
                 drequest.reload = True
 
                 vrequest = VectorSearchRequest()
-                vrequest.id = shard.id
+                vrequest.id = replica.shard.id
                 vrequest.vector.extend(Q)
                 vrequest.result_per_page = 20
                 vrequest.reload = True
@@ -338,8 +337,8 @@ async def test_search_handles_limits_exceeded_error(
         kb = knowledgebox_ingest
         resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
         assert resp.status_code == 402
-        assert resp.json() == "over the quota"
+        assert resp.json() == {"detail": "over the quota"}
 
         resp = await client.post(f"/{KB_PREFIX}/{kb}/search", json={})
         assert resp.status_code == 402
-        assert resp.json() == "over the quota"
+        assert resp.json() == {"detail": "over the quota"}

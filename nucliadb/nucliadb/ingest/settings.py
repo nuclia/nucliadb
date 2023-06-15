@@ -18,16 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
 
 
 class DriverConfig(str, Enum):
-    redis = "redis"
-    tikv = "tikv"
-    pg = "pg"
-    local = "local"
+    REDIS = "redis"
+    TIKV = "tikv"
+    PG = "pg"
+    LOCAL = "local"
+    NOT_SET = "notset"  # setting not provided
 
     @classmethod
     def _missing_(cls, value):
@@ -40,15 +41,13 @@ class DriverConfig(str, Enum):
 
 
 class DriverSettings(BaseSettings):
-    # allowing defaults is not ideal
-    # TODO: implement settings without defaults
-    driver: DriverConfig = DriverConfig.redis
-    driver_redis_url: Optional[str] = None
-    driver_tikv_url: Optional[List[str]] = []
-    driver_local_url: Optional[str] = None
-    driver_pg_url: Optional[str] = None
-
-    nodes_load_ingest: bool = False
+    driver: DriverConfig = Field(DriverConfig.NOT_SET, description="K/V storage driver")
+    driver_redis_url: Optional[str] = Field(None, description="Redis URL")
+    driver_tikv_url: Optional[List[str]] = Field([], description="TiKV PD URL")
+    driver_local_url: Optional[str] = Field(
+        None, description="Local path to store data on file system."
+    )
+    driver_pg_url: Optional[str] = Field(None, description="PostgreSQL DSN")
 
 
 class Settings(DriverSettings):
@@ -56,42 +55,13 @@ class Settings(DriverSettings):
 
     partitions: List[str] = ["1"]
 
-    pull_time: int = 100
+    pull_time_error_backoff: int = 100
+    disable_pull_worker: bool = False
 
+    # ingest consumer sts replica settings
     replica_number: int = -1
     total_replicas: int = 1
     nuclia_partitions: int = 50
-
-    # NODE INFORMATION
-
-    node_replicas: int = 2  # TODO discuss default value
-
-    chitchat_binding_host: str = "0.0.0.0"
-    chitchat_binding_port: int = 31337
-    chitchat_enabled: bool = True
-
-    # chitchat_peers_addr: List[str] = ["localhost:3001"] # TODO is it seed list?
-    # swim_host_key: str = "ingest.key" # TODO: ask if it's swim specific keys?
-
-    logging_config: Optional[str] = None
-
-    node_writer_port: int = 10000
-    node_reader_port: int = 10001
-    node_sidecar_port: int = 10002
-
-    # Only for testing proposes
-    writer_port_map: Dict[str, int] = {}
-    reader_port_map: Dict[str, int] = {}
-    sidecar_port_map: Dict[str, int] = {}
-
-    # Node limits
-    max_shard_fields: int = 200000  # max number of fields to target per shard
-    max_node_replicas: int = (
-        600  # max number of shard replicas a single node will manage
-    )
-
-    local_reader_threads: int = 5
-    local_writer_threads: int = 5
 
     max_receive_message_length: int = 4
 

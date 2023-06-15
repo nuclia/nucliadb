@@ -9,7 +9,6 @@ COPY Cargo.toml \
     /nucliadb/
 COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
-COPY nucliadb_ftp /nucliadb/nucliadb_ftp
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
@@ -44,7 +43,6 @@ COPY Cargo.toml \
     /nucliadb/
 COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
-COPY nucliadb_ftp /nucliadb/nucliadb_ftp
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
@@ -86,9 +84,4 @@ COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bi
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer
 
-COPY nucliadb_node/entrypoint.sh /
-RUN chmod 750 /entrypoint.sh
-
 EXPOSE 4444/udp
-
-ENTRYPOINT ["/entrypoint.sh"]

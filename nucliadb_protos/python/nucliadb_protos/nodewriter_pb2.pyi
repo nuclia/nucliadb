@@ -34,7 +34,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
-    ShardList as ShardList,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
@@ -117,6 +116,7 @@ class IndexMessage(google.protobuf.message.Message):
     REINDEX_ID_FIELD_NUMBER: builtins.int
     PARTITION_FIELD_NUMBER: builtins.int
     STORAGE_KEY_FIELD_NUMBER: builtins.int
+    KBID_FIELD_NUMBER: builtins.int
     node: builtins.str
     shard: builtins.str
     """physical shard message is for"""
@@ -126,6 +126,7 @@ class IndexMessage(google.protobuf.message.Message):
     reindex_id: builtins.str
     partition: builtins.str
     storage_key: builtins.str
+    kbid: builtins.str
     def __init__(
         self,
         *,
@@ -137,42 +138,13 @@ class IndexMessage(google.protobuf.message.Message):
         reindex_id: builtins.str = ...,
         partition: builtins.str | None = ...,
         storage_key: builtins.str = ...,
+        kbid: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "partition", b"partition"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_partition", b"_partition", "kbid", b"kbid", "node", b"node", "partition", b"partition", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "storage_key", b"storage_key", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_partition", b"_partition"]) -> typing_extensions.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage
-
-@typing_extensions.final
-class IndexedMessage(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NODE_FIELD_NUMBER: builtins.int
-    SHARD_FIELD_NUMBER: builtins.int
-    TXID_FIELD_NUMBER: builtins.int
-    RESOURCE_FIELD_NUMBER: builtins.int
-    TYPEMESSAGE_FIELD_NUMBER: builtins.int
-    REINDEX_ID_FIELD_NUMBER: builtins.int
-    node: builtins.str
-    shard: builtins.str
-    txid: builtins.int
-    resource: builtins.str
-    typemessage: global___TypeMessage.ValueType
-    reindex_id: builtins.str
-    def __init__(
-        self,
-        *,
-        node: builtins.str = ...,
-        shard: builtins.str = ...,
-        txid: builtins.int = ...,
-        resource: builtins.str = ...,
-        typemessage: global___TypeMessage.ValueType = ...,
-        reindex_id: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
-
-global___IndexedMessage = IndexedMessage
 
 @typing_extensions.final
 class SetGraph(google.protobuf.message.Message):
@@ -215,49 +187,6 @@ class DeleteGraphNodes(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes", "shard_id", b"shard_id"]) -> None: ...
 
 global___DeleteGraphNodes = DeleteGraphNodes
-
-@typing_extensions.final
-class MoveShardRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    ADDRESS_FIELD_NUMBER: builtins.int
-    @property
-    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    address: builtins.str
-    def __init__(
-        self,
-        *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        address: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["address", b"address", "shard_id", b"shard_id"]) -> None: ...
-
-global___MoveShardRequest = MoveShardRequest
-
-@typing_extensions.final
-class AcceptShardRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    PORT_FIELD_NUMBER: builtins.int
-    OVERRIDE_SHARD_FIELD_NUMBER: builtins.int
-    @property
-    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    port: builtins.int
-    override_shard: builtins.bool
-    def __init__(
-        self,
-        *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        port: builtins.int = ...,
-        override_shard: builtins.bool = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["override_shard", b"override_shard", "port", b"port", "shard_id", b"shard_id"]) -> None: ...
-
-global___AcceptShardRequest = AcceptShardRequest
 
 @typing_extensions.final
 class NewShardRequest(google.protobuf.message.Message):

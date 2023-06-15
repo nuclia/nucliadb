@@ -35,7 +35,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
-    ShardList as ShardList,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
@@ -78,6 +77,40 @@ class Filter(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["tags", b"tags"]) -> None: ...
 
 global___Filter = Filter
+
+@typing_extensions.final
+class StreamFilter(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Conjunction:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _ConjunctionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[StreamFilter._Conjunction.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        AND: StreamFilter._Conjunction.ValueType  # 0
+        OR: StreamFilter._Conjunction.ValueType  # 1
+        NOT: StreamFilter._Conjunction.ValueType  # 2
+
+    class Conjunction(_Conjunction, metaclass=_ConjunctionEnumTypeWrapper): ...
+    AND: StreamFilter.Conjunction.ValueType  # 0
+    OR: StreamFilter.Conjunction.ValueType  # 1
+    NOT: StreamFilter.Conjunction.ValueType  # 2
+
+    CONJUNCTION_FIELD_NUMBER: builtins.int
+    TAGS_FIELD_NUMBER: builtins.int
+    conjunction: global___StreamFilter.Conjunction.ValueType
+    @property
+    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        conjunction: global___StreamFilter.Conjunction.ValueType = ...,
+        tags: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["conjunction", b"conjunction", "tags", b"tags"]) -> None: ...
+
+global___StreamFilter = StreamFilter
 
 @typing_extensions.final
 class Faceted(google.protobuf.message.Message):
@@ -1233,22 +1266,26 @@ global___DocumentItem = DocumentItem
 class StreamRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FILTER_FIELD_NUMBER: builtins.int
+    FILTER__DEPRECATED_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
+    FILTER_FIELD_NUMBER: builtins.int
     @property
-    def filter(self) -> global___Filter: ...
+    def filter__deprecated(self) -> global___Filter: ...
     reload: builtins.bool
     @property
     def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
+    @property
+    def filter(self) -> global___StreamFilter: ...
     def __init__(
         self,
         *,
-        filter: global___Filter | None = ...,
+        filter__deprecated: global___Filter | None = ...,
         reload: builtins.bool = ...,
         shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
+        filter: global___StreamFilter | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["filter", b"filter", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "filter__deprecated", b"filter__deprecated", "shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["filter", b"filter", "filter__deprecated", b"filter__deprecated", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
 
 global___StreamRequest = StreamRequest

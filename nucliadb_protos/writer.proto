@@ -117,7 +117,10 @@ message BrokerMessage {
 
     // If true, force reindex all paragraphs in a resource
     bool reindex = 36;
+
+    resources.Extra extra = 37;
 }
+
 
 message WriterStatusResponse {
     repeated string knowledgeboxes = 1;
@@ -190,6 +193,9 @@ message UpdateEntitiesGroupRequest {
 
     // entity_id
     repeated string delete = 5;
+
+    string title = 6;
+    string color = 7;
 }
 
 message UpdateEntitiesGroupResponse {
@@ -323,8 +329,18 @@ message Notification {
     enum Action {
         COMMIT = 0;
         ABORT = 1;
+        INDEXED = 2;
     }
     Action action = 6;
+
+    enum WriteType {
+        UNSET = 0;
+        CREATED = 1;
+        MODIFIED = 2;
+        DELETED = 3;
+    }
+    WriteType write_type = 7;
+    BrokerMessage message = 8;
 }
 
 
@@ -354,7 +370,7 @@ message Member {
     bool dummy = 5;
 
     /// The load score of the member.
-    float load_score = 6;
+    float load_score = 6 [deprecated = true];
 
     /// The number of shards in the node.
     uint32 shard_count = 7;
@@ -367,17 +383,9 @@ message ListMembersResponse {
   repeated Member members = 1;
 }
 
-
-message ShadowShard {
-    noderesources.ShardId shard = 1;
-    string node = 2;
-}
-
 message ShardReplica {
     noderesources.ShardCreated shard = 1;
     string node = 2;
-
-    ShadowShard shadow_replica = 3;
 }
 
 message ShardObject {
@@ -467,23 +475,6 @@ message FileUploaded {
     
 }
 
-message CreateShadowShardRequest {
-    string kbid = 1;
-    noderesources.ShardId replica = 2;
-    // node where the shadow shard is created
-    string node = 3;
-}
-
-message DeleteShadowShardRequest {
-    string kbid = 1;
-    noderesources.ShardId replica = 2;
-}
-
-message ShadowShardResponse {
-    ShadowShard shadow_shard = 1;
-    bool success = 2;
-}
-
 message SynonymsRequest {
     string kbid = 1;
 }
@@ -549,8 +540,4 @@ service Writer {
     rpc Export(ExportRequest) returns (stream BrokerMessage) {}
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
-
-    // Shard management
-    rpc CreateShadowShard(CreateShadowShardRequest) returns (ShadowShardResponse) {}
-    rpc DeleteShadowShard(DeleteShadowShardRequest) returns (ShadowShardResponse) {}
 }

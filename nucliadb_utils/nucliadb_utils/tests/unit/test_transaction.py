@@ -20,23 +20,76 @@
 from unittest import mock
 
 import pytest
+from nucliadb_protos.writer_pb2 import Notification
 
-from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.transaction import TransactionUtility, WaitFor
 
 
-@pytest.mark.asyncio
-async def test_transaction_commit():
-    txn = TransactionUtility(
-        nats_servers=["foobar"],
-        nats_target="node.{node}",
-        notify_subject="notify.{kbid}",
-    )
-    ps = NatsPubsub()
-    ps.nc = mock.AsyncMock()
-    txn.pubsub = ps
+@pytest.fixture()
+def pubsub():
+    pubsub = mock.AsyncMock()
+    pubsub.parse = lambda msg: msg.data
+    with mock.patch("nucliadb_utils.transaction.get_pubsub", return_value=pubsub):
+        yield pubsub
 
-    waiting_for = WaitFor(uuid="foo", seq="bar")
+
+@pytest.fixture()
+async def txn(pubsub):
+    nats_conn = mock.AsyncMock()
+    with mock.patch("nucliadb_utils.transaction.nats.connect", return_value=nats_conn):
+        txn = TransactionUtility(nats_servers=["foobar"])
+        await txn.initialize()
+        yield txn
+        await txn.finalize()
+
+
+@pytest.mark.asyncio
+async def test_wait_for_commited(txn: TransactionUtility, pubsub):
+    waiting_for = WaitFor(uuid="foo")
+    request_id = "request1"
+    kbid = "kbid"
+    notification = Notification()
+    notification.uuid = waiting_for.uuid
+    notification.action = Notification.Action.COMMIT
+
+    async def _subscribe(handler, key, subscription_id):
+        # call it immediately
+        handler(mock.Mock(data=notification.SerializeToString()))
+
+    pubsub.subscribe.side_effect = _subscribe
+
+    await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
+
+
+@pytest.mark.asyncio
+async def test_wait_for_indexed(txn: TransactionUtility, pubsub):
+    waiting_for = WaitFor(uuid="foo")
+    request_id = "request1"
+    kbid = "kbid"
+    notification = Notification()
+    notification.uuid = waiting_for.uuid
+    notification.action = Notification.Action.INDEXED
+
+    async def _subscribe(handler, key, subscription_id):
+        # call it immediately
+        handler(mock.Mock(data=notification.SerializeToString()))
+
+    pubsub.subscribe.side_effect = _subscribe
+
+    with mock.patch("nucliadb_utils.transaction.has_feature", return_value=True):
+        await (
+            await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)
+        ).wait()
+
+
+@pytest.mark.asyncio
+async def test_wait_for_commit_stop_waiting(txn: TransactionUtility, pubsub):
+    pubsub.unsubscribe.side_effect = [
+        "sub_id",
+        KeyError(),
+    ]  # second call raises KeyError
+
+    waiting_for = WaitFor(uuid="foo", seq=1)
     request_id = "request1"
     kbid = "kbid"
 

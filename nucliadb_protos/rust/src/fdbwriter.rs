@@ -126,6 +126,8 @@ pub struct BrokerMessage {
     /// If true, force reindex all paragraphs in a resource
     #[prost(bool, tag="36")]
     pub reindex: bool,
+    #[prost(message, optional, tag="37")]
+    pub extra: ::core::option::Option<super::resources::Extra>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
@@ -244,6 +246,10 @@ pub struct UpdateEntitiesGroupRequest {
     /// entity_id
     #[prost(string, repeated, tag="5")]
     pub delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag="6")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag="7")]
+    pub color: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateEntitiesGroupResponse {
@@ -454,6 +460,10 @@ pub struct Notification {
     pub seqid: i64,
     #[prost(enumeration="notification::Action", tag="6")]
     pub action: i32,
+    #[prost(enumeration="notification::WriteType", tag="7")]
+    pub write_type: i32,
+    #[prost(message, optional, tag="8")]
+    pub message: ::core::option::Option<BrokerMessage>,
 }
 /// Nested message and enum types in `Notification`.
 pub mod notification {
@@ -462,6 +472,15 @@ pub mod notification {
     pub enum Action {
         Commit = 0,
         Abort = 1,
+        Indexed = 2,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum WriteType {
+        Unset = 0,
+        Created = 1,
+        Modified = 2,
+        Deleted = 3,
     }
 }
 //// The member information.
@@ -484,6 +503,7 @@ pub struct Member {
     #[prost(bool, tag="5")]
     pub dummy: bool,
     //// The load score of the member.
+    #[deprecated]
     #[prost(float, tag="6")]
     pub load_score: f32,
     //// The number of shards in the node.
@@ -511,20 +531,11 @@ pub struct ListMembersResponse {
     pub members: ::prost::alloc::vec::Vec<Member>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ShadowShard {
-    #[prost(message, optional, tag="1")]
-    pub shard: ::core::option::Option<super::noderesources::ShardId>,
-    #[prost(string, tag="2")]
-    pub node: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardReplica {
     #[prost(message, optional, tag="1")]
     pub shard: ::core::option::Option<super::noderesources::ShardCreated>,
     #[prost(string, tag="2")]
     pub node: ::prost::alloc::string::String,
-    #[prost(message, optional, tag="3")]
-    pub shadow_replica: ::core::option::Option<ShadowShard>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardObject {
@@ -652,30 +663,6 @@ pub mod upload_binary_data {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileUploaded {
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CreateShadowShardRequest {
-    #[prost(string, tag="1")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(message, optional, tag="2")]
-    pub replica: ::core::option::Option<super::noderesources::ShardId>,
-    /// node where the shadow shard is created
-    #[prost(string, tag="3")]
-    pub node: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DeleteShadowShardRequest {
-    #[prost(string, tag="1")]
-    pub kbid: ::prost::alloc::string::String,
-    #[prost(message, optional, tag="2")]
-    pub replica: ::core::option::Option<super::noderesources::ShardId>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ShadowShardResponse {
-    #[prost(message, optional, tag="1")]
-    pub shadow_shard: ::core::option::Option<ShadowShard>,
-    #[prost(bool, tag="2")]
-    pub success: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SynonymsRequest {

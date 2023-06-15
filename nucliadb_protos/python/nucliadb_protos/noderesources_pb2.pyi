@@ -262,22 +262,6 @@ class Shard(google.protobuf.message.Message):
 global___Shard = Shard
 
 @typing_extensions.final
-class ShardList(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARDS_FIELD_NUMBER: builtins.int
-    @property
-    def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Shard]: ...
-    def __init__(
-        self,
-        *,
-        shards: collections.abc.Iterable[global___Shard] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["shards", b"shards"]) -> None: ...
-
-global___ShardList = ShardList
-
-@typing_extensions.final
 class EmptyResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -543,6 +527,8 @@ class Resource(google.protobuf.message.Message):
         ERROR: Resource._ResourceStatus.ValueType  # 2
         DELETE: Resource._ResourceStatus.ValueType  # 3
         PENDING: Resource._ResourceStatus.ValueType  # 4
+        BLOCKED: Resource._ResourceStatus.ValueType  # 5
+        EXPIRED: Resource._ResourceStatus.ValueType  # 6
 
     class ResourceStatus(_ResourceStatus, metaclass=_ResourceStatusEnumTypeWrapper): ...
     PROCESSED: Resource.ResourceStatus.ValueType  # 0
@@ -550,6 +536,8 @@ class Resource(google.protobuf.message.Message):
     ERROR: Resource.ResourceStatus.ValueType  # 2
     DELETE: Resource.ResourceStatus.ValueType  # 3
     PENDING: Resource.ResourceStatus.ValueType  # 4
+    BLOCKED: Resource.ResourceStatus.ValueType  # 5
+    EXPIRED: Resource.ResourceStatus.ValueType  # 6
 
     @typing_extensions.final
     class TextsEntry(google.protobuf.message.Message):

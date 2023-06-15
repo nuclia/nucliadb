@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
@@ -29,6 +30,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
+import aiohttp.client_exceptions
 import backoff  # type: ignore
 import google.auth.transport.requests  # type: ignore
 import yarl
@@ -81,9 +83,12 @@ RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
     aiohttp.client_exceptions.ClientPayloadError,
     aiohttp.client_exceptions.ClientConnectorError,
+    aiohttp.client_exceptions.ClientConnectionError,
     aiohttp.client_exceptions.ClientOSError,
     aiohttp.client_exceptions.ServerConnectionError,
+    aiohttp.client_exceptions.ServerDisconnectedError,
     CouldNotCreateBucket,
+    socket.gaierror,
 )
 
 
@@ -179,6 +184,7 @@ class GCSStorageField(StorageField):
     async def range_supported(self) -> bool:
         return True
 
+    @storage_ops_observer.wrap({"type": "read_range"})
     async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
         """
         Iterate through ranges of data
@@ -468,7 +474,9 @@ class GCSStorage(Storage):
         loop = asyncio.get_event_loop()
 
         await setup_telemetry(service_name or "GCS_SERVICE")
-        self.session = aiohttp.ClientSession(loop=loop)
+        self.session = aiohttp.ClientSession(
+            loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5)
+        )
 
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":

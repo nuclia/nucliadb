@@ -53,7 +53,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated as ShardCreated,
     ShardId as ShardId,
     ShardIds as ShardIds,
-    ShardList as ShardList,
     ShardMetadata as ShardMetadata,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
@@ -61,6 +60,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList as VectorSetList,
 )
 from nucliadb_protos.resources_pb2 import (
+    AllFieldIDs as AllFieldIDs,
     Basic as Basic,
     Block as Block,
     CONVERSATION as CONVERSATION,
@@ -70,6 +70,7 @@ from nucliadb_protos.resources_pb2 import (
     Conversation as Conversation,
     DATETIME as DATETIME,
     Entity as Entity,
+    Extra as Extra,
     ExtractedTextWrapper as ExtractedTextWrapper,
     ExtractedVectorsWrapper as ExtractedVectorsWrapper,
     FILE as FILE,
@@ -105,6 +106,9 @@ from nucliadb_protos.resources_pb2 import (
     NestedPosition as NestedPosition,
     Origin as Origin,
     PagePositions as PagePositions,
+    PageStructure as PageStructure,
+    PageStructurePage as PageStructurePage,
+    PageStructureToken as PageStructureToken,
     Paragraph as Paragraph,
     ParagraphAnnotation as ParagraphAnnotation,
     Position as Position,
@@ -264,15 +268,6 @@ class WriterStub:
     UploadFile: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.UploadBinaryData,
         nucliadb_protos.writer_pb2.FileUploaded,
-    ]
-    CreateShadowShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.CreateShadowShardRequest,
-        nucliadb_protos.writer_pb2.ShadowShardResponse,
-    ]
-    """Shard management"""
-    DeleteShadowShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DeleteShadowShardRequest,
-        nucliadb_protos.writer_pb2.ShadowShardResponse,
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
@@ -490,18 +485,5 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request_iterator: collections.abc.Iterator[nucliadb_protos.writer_pb2.UploadBinaryData],
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.FileUploaded: ...
-    @abc.abstractmethod
-    def CreateShadowShard(
-        self,
-        request: nucliadb_protos.writer_pb2.CreateShadowShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.ShadowShardResponse:
-        """Shard management"""
-    @abc.abstractmethod
-    def DeleteShadowShard(
-        self,
-        request: nucliadb_protos.writer_pb2.DeleteShadowShardRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.ShadowShardResponse: ...
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: grpc.Server) -> None: ...

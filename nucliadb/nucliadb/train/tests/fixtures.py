@@ -40,8 +40,9 @@ from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb.settings import Settings
-from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
+from nucliadb.standalone.settings import Settings
+from nucliadb.train.utils import start_shard_manager, stop_shard_manager
+from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
     clear_global_cache,
@@ -54,7 +55,7 @@ from nucliadb_utils.utilities import (
 async def train_rest_api(nucliadb: Settings):  # type: ignore
     async with aiohttp.ClientSession(
         headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http}",
+        base_url=f"http://localhost:{nucliadb.http_port}",
     ) as client:
         yield client
 
@@ -192,9 +193,9 @@ async def test_pagination_resources(
 
     from time import time
 
-    from nucliadb.ingest.utils import get_driver
+    from nucliadb.common.maindb.utils import get_driver
 
-    driver = await get_driver()
+    driver = get_driver()
 
     t0 = time()
 
@@ -214,7 +215,7 @@ async def test_pagination_resources(
     # Add entities
     storage = await get_storage()
     txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest, cache=None)
+    kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     entities_manager = EntitiesManager(kb, txn)
     entities = EntitiesGroup()
     entities.entities["entity1"].value = "PERSON"
@@ -228,23 +229,19 @@ async def test_pagination_resources(
     label.title = label_title
     labelset.labels.append(label)
     await kb.set_labelset(label_title, labelset)
-    await txn.commit(resource=False)
+    await txn.commit()
 
     yield knowledgebox_ingest
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
 
 
 @pytest.fixture(scope="function")
 def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
     from nucliadb.train.settings import settings
-    from nucliadb_utils.settings import running_settings, storage_settings
+    from nucliadb_utils.settings import (
+        FileBackendConfig,
+        running_settings,
+        storage_settings,
+    )
 
     running_settings.debug = False
     print(f"Redis ready at {maindb_driver.url}")
@@ -255,7 +252,7 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
     old_grpc_port = settings.grpc_port
 
     storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
+    storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
     settings.grpc_port = free_port()
     set_utility(Utility.CACHE, cache)
@@ -270,11 +267,11 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
 async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
     from nucliadb.train.utils import start_train_grpc, stop_train_grpc
 
-    await start_nodes_manager()
+    await start_shard_manager()
     await start_train_grpc("testing_train")
     yield
     await stop_train_grpc()
-    await stop_nodes_manager()
+    await stop_shard_manager()
 
 
 @pytest.fixture(scope="function")
