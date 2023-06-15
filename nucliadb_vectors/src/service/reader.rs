@@ -115,6 +115,7 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
+
         let key_filters = request.keys.iter().cloned().map(AtomClause::key_prefix);
         let mut formula = Formula::new();
         request
@@ -126,6 +127,7 @@ impl ReaderChild for VectorReaderService {
         if key_filters.len() > 0 {
             formula.extend(CompoundClause::new(1, key_filters.collect()));
         }
+
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
