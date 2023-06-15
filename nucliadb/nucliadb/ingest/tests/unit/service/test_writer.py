@@ -132,19 +132,9 @@ class TestWriterServicer:
         servicer.driver.transaction = MagicMock(return_value=AsyncMock())
         servicer.proc = AsyncMock()
         servicer.proc.driver = servicer.driver
+        servicer.storage = AsyncMock()
+        servicer.cache = AsyncMock()
         yield servicer
-
-    @pytest.fixture(autouse=True)
-    def storage(self):
-        mock = AsyncMock()
-        with patch("nucliadb.ingest.service.writer.get_storage", return_value=mock):
-            yield mock
-
-    @pytest.fixture(autouse=True)
-    def cache(self):
-        mock = AsyncMock()
-        with patch("nucliadb.ingest.service.writer.get_cache", return_value=mock):
-            yield mock
 
     @pytest.fixture
     def field_value(self):
