@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.search.search import chat_prompt
+from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb_protos import resources_pb2
 
 pytestmark = pytest.mark.asyncio

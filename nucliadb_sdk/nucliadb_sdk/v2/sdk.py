@@ -494,6 +494,22 @@ class _NucliaDBBase:
         response_type=chat_response_parser,
         docstring=docstrings.CHAT,
     )
+    chat_on_resource_by_id = _request_builder(
+        name="chat_on_resource_by_id",
+        path_template="/v1/kb/{kbid}/resource/{rid}/chat",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+    )
+    chat_on_resource_by_slug = _request_builder(
+        name="chat_on_resource_by_slug",
+        path_template="/v1/kb/{kbid}/s/resource/{rslug}/chat",
+        method="POST",
+        path_params=("kbid", "rslug"),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+    )
 
 
 class NucliaDB(_NucliaDBBase):

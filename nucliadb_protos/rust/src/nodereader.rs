@@ -134,6 +134,8 @@ pub struct ParagraphSearchRequest {
     pub only_faceted: bool,
     #[prost(string, optional, tag="16")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="17")]
+    pub keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {

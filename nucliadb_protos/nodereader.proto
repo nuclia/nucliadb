@@ -108,6 +108,7 @@ message ParagraphSearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 15;
     optional string advanced_query = 16;
+    repeated string keys = 17;
 }
 
 message ResultScore {

@@ -114,3 +114,60 @@ async def test_find_does_not_support_fulltext_search(
     )
     assert resp.status_code == 422
     assert resp.json()["detail"][0]["msg"] == "fulltext search not supported"
+
+
+@pytest.mark.asyncio
+async def test_find_resources_filter(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+        },
+        headers={"X-SYNCHRONOUS": "True"},
+    )
+    assert resp.status_code == 201
+    rid1 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+        },
+        headers={"X-SYNCHRONOUS": "True"},
+    )
+    assert resp.status_code == 201
+    rid2 = resp.json()["uuid"]
+
+    # Should get 2 result
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "title",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+
+    # Check that resource filtering works
+    for rid in [rid1, rid2]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/find",
+            json={
+                "query": "title",
+                "resource_filters": [rid],
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["resources"]) == 1
+        assert rid in body["resources"]
