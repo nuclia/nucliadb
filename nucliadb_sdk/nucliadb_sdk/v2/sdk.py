@@ -142,7 +142,7 @@ def _request_builder(
                     if not isinstance(content, request_type):  # type: ignore
                         raise TypeError(f"Expected {request_type}, got {type(content)}")
                     else:
-                        data = content.json()
+                        data = content.json(by_alias=True)
                 except TypeError:
                     if not isinstance(content, list):
                         raise
@@ -153,7 +153,7 @@ def _request_builder(
                 for key in list(kwargs.keys()):
                     if key in request_type.__fields__:  # type: ignore
                         content_data[key] = kwargs.pop(key)
-                data = request_type.parse_obj(content_data).json()  # type: ignore
+                data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
 
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
