@@ -12,6 +12,19 @@ metadata:
     "helm.sh/hook": post-install
 spec:
   template:
+    metadata:
+      name: migrate-job
+      annotations:
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
+        # do not have access to dependency chart cm this component references
+        checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
+      labels:
+        app: migrate-job
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
     spec:
       restartPolicy: Never
       containers:
@@ -34,15 +47,16 @@ spec:
               value: {{ tpl $value $ | toJson }}
           {{- end }}
           resources:
-  {{ toYaml .Values.ingest_orm_grpc_resources | indent 10 }}
-  {{- if .Values.nats.secretName }}
+{{ toYaml .Values.ingest_orm_grpc_resources | indent 10 }}
+{{- if .Values.nats.secretName }}
           volumeMounts:
             - name: nats-creds
               readOnly: true
               mountPath: /appsecrets
-  {{- end }}
-  {{- if .Values.nats.regionalSecretName }}
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
             - name: regional-nats-creds
               readOnly: true
               mountPath: /regioncreds
+{{- end }}
   backoffLimit: 3
