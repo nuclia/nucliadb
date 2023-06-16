@@ -297,7 +297,6 @@ class Storage:
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
             new_cf.uri = destination.key
-            return new_cf
         elif file.source == self.source:
             return file
         elif file.source == CloudFile.EXPORT:
@@ -305,7 +304,7 @@ class Storage:
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
             new_cf.uri = destination.key
-            new_cf.source = self.source
+            new_cf.source = self.source  # type: ignore
         elif file.source == CloudFile.FLAPS:
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
