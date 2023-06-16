@@ -1,8 +1,7 @@
-import asyncio
-
 from . import migrator
-from .context import ExecutionContext
 from .settings import Settings
+from .context import ExecutionContext
+import asyncio
 
 
 async def run():

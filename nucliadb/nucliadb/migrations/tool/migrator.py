@@ -1,8 +1,15 @@
 import logging
 
+from nucliadb_telemetry import errors, metrics
+
 from .context import ExecutionContext
 from .models import MigrationContext
 from .utils import get_migrations
+
+migration_observer = metrics.Observer(
+    "nucliadb_migrations", labels={"type": "kb", "target_version": ""}
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +37,16 @@ async def run_kb_migrations(
 
             try:
                 logger.warning("Migrating KB", extra=migration_info)
-                await migration.module.migrate_kb(migration_context, kbid)  # type: ignore
+                with migration_observer(
+                    {"type": "kb", "target_version": str(migration_context.to_version)}
+                ):
+                    await migration.module.migrate_kb(migration_context, kbid)  # type: ignore
                 logger.warning("Finished KB Migration", extra=migration_info)
                 await context.data_manager.update_kb_info(
                     kbid=kbid, current_version=migration.version
                 )
-            except Exception:
+            except Exception as exc:
+                errors.capture_exception(exc)
                 logger.exception("Failed to migrate KB", extra=migration_info)
                 raise
             await context.data_manager.delete_kb_migration(kbid=kbid)
@@ -69,12 +80,16 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
         }
         try:
             logger.warning("Migrating", extra=migration_info)
-            await migration.module.migrate(migration_context)  # type: ignore
+            with migration_observer(
+                {"type": "global", "target_version": str(migration_context.to_version)}
+            ):
+                await migration.module.migrate(migration_context)  # type: ignore
             await context.data_manager.update_global_info(
                 current_version=migration.version
             )
             logger.warning("Finished migration", extra=migration_info)
-        except Exception:
+        except Exception as exc:
+            errors.capture_exception(exc)
             logger.exception("Failed to migrate", extra=migration_info)
             raise
 
