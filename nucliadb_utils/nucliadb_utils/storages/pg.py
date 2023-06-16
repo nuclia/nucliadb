@@ -177,6 +177,16 @@ WHERE kb_id = $1 AND file_id = $2
         destination_kb: str,
     ):
         async with self.connection.transaction():
+            # make sure to delete the destination first in
+            # case this is an overwrite of an existing
+            await self.connection.execute(
+                """
+delete from kb_files
+WHERE kb_id = $1 AND file_id = $2
+""",
+                destination_kb,
+                destination_key,
+            )
             await self.connection.execute(
                 """
 UPDATE kb_files
@@ -188,7 +198,16 @@ WHERE kb_id = $3 AND file_id = $4
                 origin_kb,
                 origin_key,
             )
-
+            # make sure to delete the destination first in
+            # case this is an overwrite of an existing
+            await self.connection.execute(
+                """
+delete from kb_files_fileparts
+WHERE kb_id = $1 AND file_id = $2
+""",
+                destination_kb,
+                destination_key,
+            )
             await self.connection.execute(
                 """
 UPDATE kb_files_fileparts
