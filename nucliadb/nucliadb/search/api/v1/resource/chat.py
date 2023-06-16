@@ -21,6 +21,7 @@ from typing import Optional, Union
 
 from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
+from nucliadb.search.api.v1.resource.find import find_on_resource
 from starlette.responses import StreamingResponse
 
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
@@ -163,7 +164,7 @@ async def chat_on_resource(
             kbid, item.context, item.query, x_nucliadb_user
         )
 
-    find_request = FindRequest()
+    find_request = FindResourceRequest()
     find_request.resource_filters = [rid]
     find_request.features = [
         SearchOptions.PARAGRAPH,
@@ -184,8 +185,8 @@ async def chat_on_resource(
     find_request.autofilter = item.autofilter
     find_request.highlight = item.highlight
 
-    find_results, incomplete = await find(
-        response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    find_results, incomplete = await find_on_resource(
+        response, kbid, rid, None, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
     if incomplete:
         raise IncompleteFindResourceResults()
