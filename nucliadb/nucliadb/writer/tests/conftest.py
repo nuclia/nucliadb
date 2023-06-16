@@ -27,5 +27,4 @@ pytest_plugins = [
     "nucliadb.writer.tests.fixtures",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
-    "nucliadb.writer.tests.tus",
 ]

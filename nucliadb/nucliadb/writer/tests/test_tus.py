@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import tempfile
 import uuid
 from typing import Dict
 
+import asyncpg
 import pytest
 
 from nucliadb.writer.settings import settings
@@ -27,9 +29,81 @@ from nucliadb.writer.tus import get_dm
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
+from nucliadb.writer.tus.pg import PGBlobStore, PGFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
+from nucliadb_utils.storages.pg import PostgresStorage
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
+
+
+@pytest.fixture(scope="function")
+async def s3_storage_tus(s3):
+    storage = S3BlobStore()
+    await storage.initialize(
+        client_id="",
+        client_secret="",
+        max_pool_connections=2,
+        endpoint_url=s3,
+        verify_ssl=False,
+        ssl=False,
+        region_name=None,
+        bucket="test_{kbid}",
+    )
+    yield storage
+    await storage.finalize()
+
+
+@pytest.fixture(scope="function")
+async def gcs_storage_tus(gcs):
+    storage = GCloudBlobStore()
+    await storage.initialize(
+        json_credentials=None,
+        bucket="test_{kbid}",
+        location="location",
+        project="project",
+        bucket_labels={},
+        object_base_url=gcs,
+    )
+    yield storage
+    await storage.finalize()
+
+
+@pytest.fixture(scope="function")
+async def local_storage_tus():
+    folder = tempfile.TemporaryDirectory()
+    storage = LocalBlobStore(local_testing_files=folder.name)
+    await storage.initialize()
+    yield storage
+    await storage.finalize()
+    folder.cleanup()
+
+
+@pytest.fixture(scope="function")
+async def pg_storage_tus(pg):
+    dsn = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    conn = await asyncpg.connect(dsn)
+    await conn.execute(
+        """
+DROP table IF EXISTS kb_files;
+DROP table IF EXISTS kb_files_fileparts;
+"""
+    )
+    await conn.close()
+    fstorage = PostgresStorage(dsn)  # set everything up
+    await fstorage.initialize()
+    await fstorage.finalize()
+
+    storage = PGBlobStore(dsn)
+    await storage.initialize()
+    yield storage
+    await storage.finalize()
+
+
+@pytest.mark.asyncio
+async def test_pg_driver(pg_storage_tus: PGBlobStore):
+    settings.dm_enabled = False
+    await storage_test(pg_storage_tus, PGFileStorageManager(pg_storage_tus))
+    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio
@@ -65,12 +139,15 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
         "test_mykb_tus_test",
         "test-mykb-tus-test",
         "ndb_mykb_tus_test",
+        "mykb_tus_test",
     ]
 
-    assert await storage.check_exists(bucket_name) is False
+    if not isinstance(storage, PGBlobStore):
+        # this is silly, but we don't need this for pg
+        assert await storage.check_exists(bucket_name) is False
 
-    exists = await storage.create_bucket(bucket_name)
-    assert exists is False
+        exists = await storage.create_bucket(bucket_name)
+        assert exists is False
 
     upload_id = uuid.uuid4().hex
     dm = get_dm()

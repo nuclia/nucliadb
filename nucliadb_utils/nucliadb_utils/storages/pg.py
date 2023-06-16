@@ -112,9 +112,9 @@ VALUES ($1, $2, $3, $4, $5)
 """,
                 kb_id,
                 file_id,
-                filename,
+                filename or "",
                 size,
-                content_type,
+                content_type or "",
             )
 
     async def delete_file(self, kb_id: str, file_id: str) -> None:
