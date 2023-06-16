@@ -842,9 +842,10 @@ class Resource:
             FieldType.FILE,
             load=False,
         )
+        # uri can change after extraction
+        await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
-        await field_file.set_file_extracted_data(file_extracted_data)
 
     async def _apply_field_computed_metadata(
         self, field_metadata: FieldComputedMetadataWrapper
