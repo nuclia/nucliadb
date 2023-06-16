@@ -467,7 +467,7 @@ class PostgresStorageField(StorageField):
             dl = PostgresFileDataLayer(conn)
             if self.field.old_uri not in ("", None):
                 # Already has a file
-                await dl.delete_file(self.bucket, self.field.bucket_name)
+                await dl.delete_file(self.bucket, self.field.uri)
 
             if self.field.upload_uri != self.key:
                 await dl.move(

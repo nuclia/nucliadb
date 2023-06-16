@@ -292,8 +292,12 @@ class Storage:
         # this is covered by other tests
         # see if file is in the same Cloud in the same bucket
         if file.source == self.source and file.uri != destination.key:
-            new_cf = await self.move(file, destination)
-
+            await self.move(file, destination)
+            new_cf = CloudFile()
+            new_cf.CopyFrom(file)
+            new_cf.bucket_name = destination.bucket
+            new_cf.uri = destination.key
+            return new_cf
         elif file.source == self.source:
             return file
         elif file.source == CloudFile.EXPORT:
