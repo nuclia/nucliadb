@@ -118,10 +118,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.partitions = settings.partitions
 
     async def initialize(self):
-        storage = await get_storage(service_name=SERVICE_NAME)
-        driver = await setup_driver()
-        cache = await get_cache()
-        self.proc = Processor(driver=driver, storage=storage, cache=cache)
+        self.storage = await get_storage(service_name=SERVICE_NAME)
+        self.driver = await setup_driver()
+        self.cache = await get_cache()
+        self.proc = Processor(
+            driver=self.driver, storage=self.storage, cache=self.cache
+        )
         self.shards_manager = get_shard_manager()
 
     async def finalize(self):
@@ -137,27 +139,26 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: KnowledgeBoxID, context=None
     ) -> CleanedKnowledgeBoxResponse:
         try:
-            txn = await self.proc.driver.begin()
-            all_shards = await self.shards_manager.get_all_shards(txn, request.uuid)
+            async with self.driver.transaction() as txn:
+                all_shards = await self.shards_manager.get_all_shards(txn, request.uuid)
 
-            updated_shards = PBShards()
-            updated_shards.CopyFrom(all_shards)
+                updated_shards = PBShards()
+                updated_shards.CopyFrom(all_shards)
 
-            for logic_shard in all_shards.shards:
-                replicas_cleaned = await clean_and_upgrade(logic_shard)
-                for replica_id, shard_cleaned in replicas_cleaned.items():
-                    update_shards_with_updated_replica(
-                        updated_shards, replica_id, shard_cleaned
-                    )
+                for logic_shard in all_shards.shards:
+                    replicas_cleaned = await clean_and_upgrade(logic_shard)
+                    for replica_id, shard_cleaned in replicas_cleaned.items():
+                        update_shards_with_updated_replica(
+                            updated_shards, replica_id, shard_cleaned
+                        )
 
-            key = KB_SHARDS.format(kbid=request.uuid)
-            await txn.set(key, updated_shards.SerializeToString())
-            await txn.commit()
-            return CleanedKnowledgeBoxResponse()
+                key = KB_SHARDS.format(kbid=request.uuid)
+                await txn.set(key, updated_shards.SerializeToString())
+                await txn.commit()
+                return CleanedKnowledgeBoxResponse()
         except Exception as e:
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
-            await txn.abort()
             raise
 
     async def SetVectors(  # type: ignore
@@ -166,34 +167,30 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = SetVectorsResponse()
         response.found = True
 
-        txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
+        async with self.driver.transaction() as txn:
+            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+            field = await resobj.get_field(
+                request.field.field, request.field.field_type, load=True
+            )
+            if field.value is None:
+                response.found = False
+                return response
 
-        field = await resobj.get_field(
-            request.field.field, request.field.field_type, load=True
-        )
-        if field.value is None:
-            await txn.abort()
-            response.found = False
+            evw = ExtractedVectorsWrapper()
+            evw.field.CopyFrom(request.field)
+            evw.vectors.CopyFrom(request.vectors)
+            logger.debug(f"Setting {len(request.vectors.vectors.vectors)} vectors")
+
+            try:
+                await field.set_vectors(evw)
+                await txn.commit()
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
+
             return response
-
-        evw = ExtractedVectorsWrapper()
-        evw.field.CopyFrom(request.field)
-        evw.vectors.CopyFrom(request.vectors)
-        logger.debug(f"Setting {len(request.vectors.vectors.vectors)} vectors")
-
-        try:
-            await field.set_vectors(evw)
-            await txn.commit()
-        except Exception as e:
-            errors.capture_exception(e)
-            logger.error("Error in ingest gRPC servicer", exc_info=True)
-            await txn.abort()
-
-        return response
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None
@@ -257,7 +254,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         response = OpStatusWriter()
-        cache = await get_cache()
         async for message in request_stream:
             try:
                 await self.proc.process(
@@ -269,58 +265,53 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 break
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
-            if cache is not None:
-                await cache.delete(
+            if self.cache is not None:
+                await self.cache.delete(
                     KB_COUNTER_CACHE.format(kbid=message.kbid), invalidate=True
                 )
         return response
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is not None:
-            try:
-                await kbobj.set_labelset(request.id, request.labelset)
-                await txn.commit()
-                response.status = OpStatusWriter.Status.OK
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.error("Error in ingest gRPC servicer", exc_info=True)
-                response.status = OpStatusWriter.Status.ERROR
-                await txn.abort()
-        else:
-            await txn.abort()
-            response.status = OpStatusWriter.Status.NOTFOUND
-        return response
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = OpStatusWriter()
+            if kbobj is not None:
+                try:
+                    await kbobj.set_labelset(request.id, request.labelset)
+                    await txn.commit()
+                    response.status = OpStatusWriter.Status.OK
+                except Exception as e:
+                    errors.capture_exception(e)
+                    logger.error("Error in ingest gRPC servicer", exc_info=True)
+                    response.status = OpStatusWriter.Status.ERROR
+            else:
+                response.status = OpStatusWriter.Status.NOTFOUND
+            return response
 
     async def DelLabels(self, request: DelLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is not None:
-            try:
-                await kbobj.del_labelset(request.id)
-                await txn.commit()
-                response.status = OpStatusWriter.Status.OK
-            except Exception as e:
-                errors.capture_exception(e)
-                logger.error("Error in ingest gRPC servicer", exc_info=True)
-                response.status = OpStatusWriter.Status.ERROR
-                await txn.abort()
-        else:
-            await txn.abort()
-            response.status = OpStatusWriter.Status.NOTFOUND
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = OpStatusWriter()
+            if kbobj is not None:
+                try:
+                    await kbobj.del_labelset(request.id)
+                    await txn.commit()
+                    response.status = OpStatusWriter.Status.OK
+                except Exception as e:
+                    errors.capture_exception(e)
+                    logger.error("Error in ingest gRPC servicer", exc_info=True)
+                    response.status = OpStatusWriter.Status.ERROR
+            else:
+                response.status = OpStatusWriter.Status.NOTFOUND
 
-        return response
+            return response
 
     async def GetLabels(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:  # type: ignore
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        labels: Optional[Labels] = None
-        if kbobj is not None:
-            labels = await kbobj.get_labels()
-        await txn.abort()
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            labels: Optional[Labels] = None
+            if kbobj is not None:
+                labels = await kbobj.get_labels()
         response = GetLabelsResponse()
         if kbobj is None:
             response.status = GetLabelsResponse.Status.NOTFOUND
@@ -334,66 +325,64 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def GetLabelSet(  # type: ignore
         self, request: GetLabelSetRequest, context=None
     ) -> GetLabelSetResponse:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetLabelSetResponse()
-        if kbobj is not None:
-            await kbobj.get_labelset(request.labelset, response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetLabelSetResponse.Status.OK
-        await txn.abort()
-        if kbobj is None:
-            response.status = GetLabelSetResponse.Status.NOTFOUND
-        return response
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = GetLabelSetResponse()
+            if kbobj is not None:
+                await kbobj.get_labelset(request.labelset, response)
+                response.kb.uuid = kbobj.kbid
+                response.status = GetLabelSetResponse.Status.OK
+            else:
+                response.status = GetLabelSetResponse.Status.NOTFOUND
+            return response
 
     async def GetVectorSets(  # type: ignore
         self, request: GetVectorSetsRequest, context=None
     ) -> GetVectorSetsResponse:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetVectorSetsResponse()
-        if kbobj is not None:
-            await kbobj.get_vectorsets(response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetVectorSetsResponse.Status.OK
-        await txn.abort()
-        if kbobj is None:
-            response.status = GetVectorSetsResponse.Status.NOTFOUND
-        return response
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = GetVectorSetsResponse()
+            if kbobj is not None:
+                await kbobj.get_vectorsets(response)
+                response.kb.uuid = kbobj.kbid
+                response.status = GetVectorSetsResponse.Status.OK
+            else:
+                response.status = GetVectorSetsResponse.Status.NOTFOUND
+            return response
 
     async def DelVectorSet(  # type: ignore
         self, request: DelVectorSetRequest, context=None
     ) -> OpStatusWriter:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is not None:
-            await kbobj.del_vectorset(request.vectorset)
-            response.status = OpStatusWriter.Status.OK
-        await txn.commit()
-        if kbobj is None:
-            response.status = OpStatusWriter.Status.NOTFOUND
-        return response
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = OpStatusWriter()
+            if kbobj is not None:
+                await kbobj.del_vectorset(request.vectorset)
+                response.status = OpStatusWriter.Status.OK
+                await txn.commit()
+            else:
+                response.status = OpStatusWriter.Status.NOTFOUND
+            return response
 
     async def SetVectorSet(  # type: ignore
         self, request: SetVectorSetRequest, context=None
     ) -> OpStatusWriter:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = OpStatusWriter()
-        if kbobj is not None:
-            await kbobj.set_vectorset(request.id, request.vectorset)
-            response.status = OpStatusWriter.Status.OK
-        await txn.commit()
-        if kbobj is None:
-            response.status = OpStatusWriter.Status.NOTFOUND
-        return response
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = OpStatusWriter()
+            if kbobj is not None:
+                await kbobj.set_vectorset(request.id, request.vectorset)
+                response.status = OpStatusWriter.Status.OK
+                await txn.commit()
+            else:
+                response.status = OpStatusWriter.Status.NOTFOUND
+            return response
 
     async def NewEntitiesGroup(  # type: ignore
         self, request: NewEntitiesGroupRequest, context=None
     ) -> NewEntitiesGroupResponse:
         response = NewEntitiesGroupResponse()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
@@ -416,7 +405,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -439,7 +428,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -464,7 +453,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
 
             if kbobj is None:
@@ -494,7 +483,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
@@ -518,7 +507,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: UpdateEntitiesGroupRequest, context=None
     ) -> UpdateEntitiesGroupResponse:
         response = UpdateEntitiesGroupResponse()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
@@ -547,7 +536,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
@@ -571,7 +560,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request
         response = GetSynonymsResponse()
         txn: Transaction
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status.status = OpStatusWriter.Status.NOTFOUND
@@ -592,7 +581,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request.kbid
         response = OpStatusWriter()
         txn: Transaction
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
@@ -614,7 +603,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request
         response = OpStatusWriter()
         txn: Transaction
-        async with self.proc.driver.transaction() as txn:
+        async with self.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
@@ -635,17 +624,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> WriterStatusResponse:
         logger.info("Status Call")
         response = WriterStatusResponse()
-        txn = await self.proc.driver.begin()
-        async for (kbid, slug) in KnowledgeBoxObj.get_kbs(txn, slug="", count=-1):
-            response.knowledgeboxes.append(slug)
+        async with self.driver.transaction() as txn:
+            async for (_, slug) in KnowledgeBoxObj.get_kbs(txn, slug="", count=-1):
+                response.knowledgeboxes.append(slug)
 
-        for partition in settings.partitions:
-            seq_id = await sequence_manager.get_last_seqid(self.proc.driver, partition)
-            if seq_id is not None:
-                response.msgid[partition] = seq_id
+            for partition in settings.partitions:
+                seq_id = await sequence_manager.get_last_seqid(self.driver, partition)
+                if seq_id is not None:
+                    response.msgid[partition] = seq_id
 
-        await txn.abort()
-        return response
+            return response
 
     async def ListMembers(  # type: ignore
         self, request: ListMembersRequest, context=None
@@ -670,15 +658,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> ResourceIdResponse:
         response = ResourceIdResponse()
         response.uuid = ""
-        txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
-
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        rid = await kbobj.get_resource_uuid_by_slug(request.slug)
-        if rid:
-            response.uuid = rid
-        await txn.abort()
-        return response
+        async with self.driver.transaction() as txn:
+            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+            rid = await kbobj.get_resource_uuid_by_slug(request.slug)
+            if rid:
+                response.uuid = rid
+            return response
 
     async def ResourceFieldExists(  # type: ignore
         self, request: ResourceFieldId, context=None
@@ -686,132 +671,117 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = ResourceFieldExistsResponse()
         response.found = False
         resobj = None
-        txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
+        async with self.driver.transaction() as txn:
+            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+            if request.field != "":
+                field = await resobj.get_field(
+                    request.field, request.field_type, load=True
+                )
+                if field.value is not None:
+                    response.found = True
+                else:
+                    response.found = False
+                return response
 
-        if request.field != "":
-            field = await resobj.get_field(request.field, request.field_type, load=True)
-            if field.value is not None:
-                response.found = True
-            else:
-                response.found = False
-            await txn.abort()
+            if request.rid != "":
+                if await resobj.exists():
+                    response.found = True
+                else:
+                    response.found = False
+                return response
+
+            if request.kbid != "":
+                config = await KnowledgeBoxORM.get_kb(txn, request.kbid)
+                if config is not None:
+                    response.found = True
+                else:
+                    response.found = False
+                return response
+
             return response
-
-        if request.rid != "":
-            if await resobj.exists():
-                response.found = True
-            else:
-                response.found = False
-            await txn.abort()
-            return response
-
-        if request.kbid != "":
-            config = await KnowledgeBoxORM.get_kb(txn, request.kbid)
-            if config is not None:
-                response.found = True
-            else:
-                response.found = False
-            await txn.abort()
-            return response
-
-        await txn.abort()
-        return response
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
-        txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
+        async with self.driver.transaction() as txn:
+            kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+            resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
+            bm = await resobj.generate_broker_message()
+            transaction = get_transaction_utility()
+            partitioning = get_partitioning()
+            partition = partitioning.generate_partition(request.kbid, request.rid)
+            await transaction.commit(bm, partition)
 
-        kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
-        bm = await resobj.generate_broker_message()
-        transaction = get_transaction_utility()
-        partitioning = get_partitioning()
-        partition = partitioning.generate_partition(request.kbid, request.rid)
-        await transaction.commit(bm, partition)
-
-        response = IndexStatus()
-        await txn.abort()
-        return response
+            response = IndexStatus()
+            return response
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
-            txn = await self.proc.driver.begin()
-            storage = await get_storage(service_name=SERVICE_NAME)
-            kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-            resobj = ResourceORM(txn, storage, kbobj, request.rid)
-            resobj.disable_vectors = not request.reindex_vectors
+            async with self.driver.transaction() as txn:
+                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+                resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
+                resobj.disable_vectors = not request.reindex_vectors
 
-            brain = await resobj.generate_index_message()
-            shard_id = await kbobj.get_resource_shard_id(request.rid)
-            shard: Optional[writer_pb2.ShardObject] = None
-            if shard_id is not None:
-                shard = await kbobj.get_resource_shard(shard_id)
+                brain = await resobj.generate_index_message()
+                shard_id = await kbobj.get_resource_shard_id(request.rid)
+                shard: Optional[writer_pb2.ShardObject] = None
+                if shard_id is not None:
+                    shard = await kbobj.get_resource_shard(shard_id)
 
-            if shard is None:
-                shard = await self.shards_manager.get_current_active_shard(
-                    txn, request.kbid
-                )
                 if shard is None:
-                    # no shard currently exists, create one
-                    similarity = await kbobj.get_similarity()
-                    shard = await self.shards_manager.create_shard_by_kbid(
-                        txn, request.kbid, similarity=similarity
+                    shard = await self.shards_manager.get_current_active_shard(
+                        txn, request.kbid
+                    )
+                    if shard is None:
+                        # no shard currently exists, create one
+                        similarity = await kbobj.get_similarity()
+                        shard = await self.shards_manager.create_shard_by_kbid(
+                            txn, request.kbid, similarity=similarity
+                        )
+
+                    await kbobj.set_resource_shard_id(request.rid, shard.shard)
+
+                if shard is not None:
+                    await self.shards_manager.add_resource(
+                        shard,
+                        brain.brain,
+                        0,
+                        partition=self.partitions[0],
+                        kb=request.kbid,
+                        reindex_id=uuid.uuid4().hex,
                     )
 
-                await kbobj.set_resource_shard_id(request.rid, shard.shard)
-
-            if shard is not None:
-                await self.shards_manager.add_resource(
-                    shard,
-                    brain.brain,
-                    0,
-                    partition=self.partitions[0],
-                    kb=request.kbid,
-                    reindex_id=uuid.uuid4().hex,
-                )
-
-            response = IndexStatus()
-            await txn.abort()
-            return response
+                response = IndexStatus()
+                return response
         except Exception as e:
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
-            await txn.abort()
             raise
 
     async def Export(self, request: ExportRequest, context=None):
         try:
-            txn = await self.proc.driver.begin()
-            storage = await get_storage(service_name=SERVICE_NAME)
-
-            kbobj = KnowledgeBoxORM(txn, storage, request.kbid)
-            async for resource in kbobj.iterate_resources():
-                yield await resource.generate_broker_message()
-            await txn.abort()
+            async with self.driver.transaction() as txn:
+                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
+                async for resource in kbobj.iterate_resources():
+                    yield await resource.generate_broker_message()
         except Exception:
             logger.exception("Export", stack_info=True)
             raise
 
     async def DownloadFile(self, request: FileRequest, context=None):
-        storage = await get_storage(service_name=SERVICE_NAME)
-        async for data in storage.download(request.bucket, request.key):
+        async for data in self.storage.download(request.bucket, request.key):
             yield BinaryData(data=data)
 
     async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
-        storage = await get_storage(service_name=SERVICE_NAME)
         data: UploadBinaryData
 
         destination: Optional[StorageField] = None
         cf = CloudFile()
         data = await request.__anext__()
         if data.HasField("metadata"):
-            bucket = storage.get_bucket_name(data.metadata.kbid)
-            destination = storage.field_klass(
-                storage=storage, bucket=bucket, fullkey=data.metadata.key
+            bucket = self.storage.get_bucket_name(data.metadata.kbid)
+            destination = self.storage.field_klass(
+                storage=self.storage, bucket=bucket, fullkey=data.metadata.key
             )
             cf.content_type = data.metadata.content_type
             cf.filename = data.metadata.filename
@@ -844,7 +814,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         if destination is None:
             raise AttributeError("No destination file")
-        await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
+        await self.storage.uploaditerator(
+            generate_buffer(self.storage, request), destination, cf
+        )
         result = FileUploaded()
         return result
 
