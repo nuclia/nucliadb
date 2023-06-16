@@ -135,6 +135,15 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
 }
 
 impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
+    fn get_key(&self, x @ Address(addr): Address) -> &[u8] {
+        if addr == self.no_nodes {
+            &[]
+        } else {
+            let x = self.find_node(x);
+            Node::key(x)
+        }
+    }
+
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
         if addr == self.no_nodes {
             self.temp

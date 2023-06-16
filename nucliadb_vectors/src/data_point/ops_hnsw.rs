@@ -45,6 +45,7 @@ pub mod params {
     }
 }
 pub trait DataRetriever: std::marker::Sync {
+    fn get_key(&self, _: Address) -> &[u8];
     fn is_deleted(&self, _: Address) -> bool;
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
     fn similarity(&self, _: Address, _: Address) -> f32;

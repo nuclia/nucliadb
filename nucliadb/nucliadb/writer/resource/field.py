@@ -416,6 +416,8 @@ async def parse_conversation_field(
         for to in message.to:
             cm.to.append(to)
         cm.ident = message.ident
+        if message.type_ is not None:
+            cm.type = resources_pb2.Message.MessageType.Value(message.type_.value)
 
         processing_message_content = models.PushMessageContent(
             text=message.content.text,

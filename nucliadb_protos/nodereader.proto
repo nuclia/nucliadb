@@ -186,9 +186,6 @@ message ParagraphSearchResponse {
 message VectorSearchRequest {
      //Shard ID
     string id = 1;
-    // ID for the vector set.
-    // Empty for searching on the original index
-    string vector_set = 15; 
     // Embedded vector search.
     repeated float vector = 2;
     // tags to filter
@@ -198,8 +195,12 @@ message VectorSearchRequest {
 
     // How many results are in this page.
     int32 result_per_page = 5;
-    bool with_duplicates = 14;
     bool reload = 13;
+    bool with_duplicates = 14;
+    // ID for the vector set.
+    // Empty for searching on the original index
+    string vector_set = 15; 
+    repeated string keys = 16;
 }
 
 message DocumentVectorIdentifier {
@@ -337,6 +338,7 @@ message SearchRequest {
     RelationSearchRequest relations = 19 [deprecated = true];
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
+    repeated string keys = 22;
 }
 
 message SuggestRequest {
