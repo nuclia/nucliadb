@@ -141,7 +141,13 @@ WHERE kb_id = $1 AND file_id = $2
             await self.connection.execute(
                 """
 INSERT INTO kb_files_fileparts (kb_id, file_id, part_id, data, size)
-VALUES ($1, $2, (SELECT COALESCE(MAX(part_id), 0) + 1 FROM kb_files_fileparts WHERE kb_id = $1 AND file_id = $2), $3, $4)
+VALUES (
+    $1, $2,
+    (
+        SELECT COALESCE(MAX(part_id), 0) + 1
+        FROM kb_files_fileparts WHERE kb_id = $1 AND file_id = $2
+    ),
+    $3, $4)
 """,
                 kb_id,
                 file_id,
@@ -474,7 +480,9 @@ class PostgresStorageField(StorageField):
             dl = PostgresFileDataLayer(conn)
             async for chunk in iterable:
                 await dl.append_chunk(
-                    kb_id=self.bucket, file_id=cf.upload_uri, data=chunk
+                    kb_id=self.bucket,
+                    file_id=cf.upload_uri or self.field.upload_uri,
+                    data=chunk,
                 )
                 size = len(chunk)
                 count += size
