@@ -17,10 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from redis import asyncio as aioredis
-import uuid
-import time
 import asyncio
+import time
+import uuid
+
+from redis import asyncio as aioredis
 
 
 class ResourceLocked(Exception):
