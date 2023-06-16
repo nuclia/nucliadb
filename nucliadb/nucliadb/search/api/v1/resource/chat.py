@@ -92,7 +92,7 @@ async def chat_post_resource_by_id(
 
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rslug}}/chat",
+    f"/{KB_PREFIX}/{{kbid}}/s/resource/{{rslug}}/chat",
     status_code=200,
     name="Chat with a Resource (by slug)",
     summary="Chat with a resource",
@@ -124,6 +124,7 @@ async def chat_post_resource_by_slug(
 
 
 async def chat_on_resource_endpoint(*args, **kwargs):
+    # All chat endpoint / view logic should be here
     try:
         return await chat_on_resource(*args, **kwargs)
     except LimitsExceededError as exc:
@@ -151,6 +152,7 @@ async def chat_on_resource(
         raise ValueError("You must provide either rid or rslug")
 
     if rid is None:
+        # We need the resource uuid to filter the search results
         rid = await get_resource_uuid_by_slug(kbid, rslug)  # type: ignore
         if rid is None:
             raise ResourceNotFoundError()
@@ -187,4 +189,5 @@ async def chat_on_resource(
     )
     if incomplete:
         raise IncompleteFindResourceResults()
+
     return await chat(kbid, find_results, item, x_nucliadb_user)

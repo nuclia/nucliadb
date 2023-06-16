@@ -494,6 +494,38 @@ class _NucliaDBBase:
         response_type=chat_response_parser,
         docstring=docstrings.CHAT,
     )
+    find_on_resource_by_id = _request_builder(
+        name="find_on_resource_by_id",
+        path_template="/v1/kb/{kbid}/resource/{rid}/find",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=FindRequest,
+        response_type=KnowledgeboxFindResults,
+    )
+    find_on_resource_by_slug = _request_builder(
+        name="find_on_resource_by_slug",
+        path_template="/v1/kb/{kbid}/resource/{rslug}/find",
+        method="POST",
+        path_params=("kbid", "rslug"),
+        request_type=FindRequest,
+        response_type=KnowledgeboxFindResults,
+    )
+    chat_on_resource_by_id = _request_builder(
+        name="chat_on_resource_by_id",
+        path_template="/v1/kb/{kbid}/resource/{rid}/chat",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+    )
+    chat_on_resource_by_slug = _request_builder(
+        name="chat_on_resource_by_slug",
+        path_template="/v1/kb/{kbid}/s/resource/{rslug}/chat",
+        method="POST",
+        path_params=("kbid", "rslug"),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+    )
 
 
 class NucliaDB(_NucliaDBBase):

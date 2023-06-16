@@ -16,13 +16,3 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from . import chat  # noqa
-from . import feedback  # noqa
-from . import find  # noqa
-from . import knowledgebox  # noqa
-from . import search  # noqa
-from . import suggest  # noqa
-from .resource import chat as chat_resource  # noqa
-from .resource import search as search_resource  # noqa
-from .router import api  # noqa

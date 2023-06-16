@@ -35,6 +35,7 @@ from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
     Message,
+    RephraseModel,
 )
 
 END_OF_STREAM = "_END_"
@@ -42,16 +43,15 @@ END_OF_STREAM = "_END_"
 
 async def rephrase_query_from_context(
     kbid: str,
-    context: str,
+    context: List[Message],
     query: str,
     x_nucliadb_user: str,
-):
+) -> str:
     predict = get_predict()
-    req = ChatModel(
+    req = RephraseModel(
         question=query,
         context=context,
         user_id=x_nucliadb_user,
-        retrieval=False,
     )
     return await predict.rephrase_query(kbid, req)
 

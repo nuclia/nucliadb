@@ -719,9 +719,7 @@ class FindResource(Resource):
             self.__setattr__(key, getattr(origin, key))
 
 
-class KnowledgeboxFindResults(BaseModel):
-    """Find on knowledgebox results"""
-
+class BaseFindResults(BaseModel):
     resources: Dict[str, FindResource]
     relations: Optional[Relations] = None
     facets: FacetsResult
@@ -733,6 +731,18 @@ class KnowledgeboxFindResults(BaseModel):
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
+
+
+class KnowledgeboxFindResults(BaseFindResults):
+    """Find on knowledgebox results"""
+
+    resources: Dict[str, FindResource]
+
+
+class ResourceFindResults(BaseFindResults):
+    """Find on resource results"""
+
+    resource: FindResource
 
 
 class FeedbackTasks(str, Enum):

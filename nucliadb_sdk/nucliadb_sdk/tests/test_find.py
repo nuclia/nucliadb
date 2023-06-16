@@ -17,15 +17,36 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import nucliadb_sdk
-from nucliadb_models.search import KnowledgeboxFindResults
+from nucliadb_models.search import KnowledgeboxFindResults, ResourceFindResults
 
 
-def test_find_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+def test_find_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     results: KnowledgeboxFindResults = sdk.find(kbid=docs_dataset, query="love")
     assert results.total == 10
     paragraphs = 0
     for res in results.resources.values():
         for field in res.fields.values():
             paragraphs += len(field.paragraphs)
-
     assert paragraphs == 10
+
+
+def test_find_on_resource_by_id(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    rid = sdk.list_resources(kbid=docs_dataset).resources[0].id
+    results: ResourceFindResults = sdk.find_on_resource_by_id(
+        kbid=docs_dataset, rid=rid, query="love"
+    )
+    paragraphs = 0
+    for field in results.resource.fields.values():
+        paragraphs += len(field.paragraphs)
+    assert paragraphs > 0
+
+
+def test_find_on_resource_by_slug(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    rslug = sdk.list_resources(kbid=docs_dataset).resources[0].slug
+    results: ResourceFindResults = sdk.find_on_resource_by_slug(
+        kbid=docs_dataset, rslug=rslug, query="love"
+    )
+    paragraphs = 0
+    for field in results.resource.fields.values():
+        paragraphs += len(field.paragraphs)
+    assert paragraphs > 0
