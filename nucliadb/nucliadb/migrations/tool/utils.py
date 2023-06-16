@@ -1,10 +1,10 @@
 import logging
 import os
+from functools import lru_cache
 
 import nucliadb.migrations
 
 from .models import Migration
-from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 

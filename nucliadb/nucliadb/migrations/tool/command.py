@@ -1,7 +1,8 @@
-from . import migrator
-from .settings import Settings
-from .context import ExecutionContext
 import asyncio
+
+from . import migrator
+from .context import ExecutionContext
+from .settings import Settings
 
 
 async def run():
@@ -14,5 +15,5 @@ async def run():
         await context.finalize()
 
 
-def main(self):
+def main():
     asyncio.run(run())

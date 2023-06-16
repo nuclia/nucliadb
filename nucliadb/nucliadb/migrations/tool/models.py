@@ -1,7 +1,8 @@
 import types
 from dataclasses import dataclass
-from nucliadb.common.maindb.driver import Driver
 from typing import Optional
+
+from nucliadb.common.maindb.driver import Driver
 
 
 @dataclass

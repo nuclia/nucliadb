@@ -1,7 +1,7 @@
 import logging
 
-from .models import MigrationContext
 from .context import ExecutionContext
+from .models import MigrationContext
 from .utils import get_migrations
 
 logger = logging.getLogger(__name__)
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 async def run_kb_migrations(
     context: ExecutionContext, kbid: str, target_version: int
 ) -> None:
-    async with context.dist_lock_manager.lock(f"migration-{kbid}"):
+    async with context.maybe_distributed_lock(f"migration-{kbid}"):
         kb_info = await context.data_manager.get_kb_info(kbid)
         migrations = get_migrations(
             from_version=kb_info.current_version, to_version=target_version
@@ -30,7 +30,7 @@ async def run_kb_migrations(
 
             try:
                 logger.warning("Migrating KB", extra=migration_info)
-                await migration.module.kb_migrate(migration_context, kbid)  # type: ignore
+                await migration.module.migrate_kb(migration_context, kbid)  # type: ignore
                 logger.warning("Finished KB Migration", extra=migration_info)
                 await context.data_manager.update_kb_info(
                     kbid=kbid, current_version=migration.version
@@ -39,6 +39,10 @@ async def run_kb_migrations(
                 logger.exception("Failed to migrate KB", extra=migration_info)
                 raise
             await context.data_manager.delete_kb_migration(kbid=kbid)
+
+        assert (
+            await context.data_manager.get_kb_info(kbid=kbid)
+        ).current_version == target_version
 
 
 async def run_all_kb_migrations(context: ExecutionContext, target_version: int) -> None:
@@ -65,7 +69,7 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
         }
         try:
             logger.warning("Migrating", extra=migration_info)
-            await migration.migrate(migration_context)  # type: ignore
+            await migration.module.migrate(migration_context)  # type: ignore
             await context.data_manager.update_global_info(
                 current_version=migration.version
             )
@@ -78,7 +82,7 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
 
 
 async def run(context: ExecutionContext) -> None:
-    async with context.dist_lock_manager.lock("migration"):
+    async with context.maybe_distributed_lock("migration"):
         # everything should be in a global lock
         # only 1 migration should be running at a time
         global_info = await context.data_manager.get_global_info()

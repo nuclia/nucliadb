@@ -42,7 +42,7 @@ class RedisLock:
 
     def __init__(self, key: str, mng: "RedisDistributedLockManager"):
         self.mng = mng
-        self.key = key
+        self.key = "_distributed_lock" + key
         self.value = uuid.uuid4().hex
 
     async def __aenter__(self) -> "RedisLock":

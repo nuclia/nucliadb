@@ -408,7 +408,7 @@ async def redis_config(redis):
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
 
-    yield
+    yield ingest_settings.driver_redis_url
 
     ingest_settings.driver_redis_url = None
     cache_settings.cache_pubsub_redis_url = None
