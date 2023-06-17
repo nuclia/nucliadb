@@ -22,7 +22,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - run: python bump --sem=${{ inputs.semType }}
+    - run: python bump.py --sem=${{ inputs.semType }}
 
     - name: Commit & Push changes
       uses: actions-js/push@master
