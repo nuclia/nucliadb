@@ -19,7 +19,6 @@
 #
 from __future__ import annotations
 
-import asyncio
 from typing import AsyncIterator
 
 import asyncpg
