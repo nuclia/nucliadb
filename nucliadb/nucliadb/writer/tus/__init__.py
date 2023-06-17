@@ -25,6 +25,7 @@ from nucliadb.writer.tus.dm import FileDataMangaer, RedisFileDataManagerFactory
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
+from nucliadb.writer.tus.pg import PGBlobStore, PGFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.exceptions import ConfigurationError
@@ -87,6 +88,15 @@ async def initialize():
         await storage_backend.initialize()
 
         storage_manager = LocalFileStorageManager(storage_backend)
+
+        DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
+
+    elif storage_settings.file_backend == FileBackendConfig.PG:
+        storage_backend = PGBlobStore(storage_settings.driver_pg_url)
+
+        await storage_backend.initialize()
+
+        storage_manager = PGFileStorageManager(storage_backend)
 
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
