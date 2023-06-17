@@ -111,16 +111,13 @@ class PGBlobStore(BlobStore):
     def __init__(self, dsn: str):
         self.dsn = dsn
         self.source = CloudFile.POSTGRES
-        self._lock = asyncio.Lock()
 
     async def initialize(self):
-        async with self._lock:
-            self.pool = await asyncpg.create_pool(self.dsn)
+        self.pool = await asyncpg.create_pool(self.dsn)
 
     async def finalize(self):
-        async with self._lock:
-            await self.pool.close()
-            self.initialized = False
+        await self.pool.close()
+        self.initialized = False
 
     async def check_exists(self, bucket_name: str) -> bool:
         return True
