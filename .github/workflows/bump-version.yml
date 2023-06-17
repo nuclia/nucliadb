@@ -1,0 +1,30 @@
+name: Bump Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      semType:
+        description: 'Semantic version part to bump'
+        required: true
+        default: 'bug'
+        type: choice
+        options:
+        - major
+        - minor
+        - bug
+
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - run: python bump --sem=${{ inputs.semType }}
+
+    - name: Commit & Push changes
+      uses: actions-js/push@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
