@@ -90,6 +90,5 @@ setup(
     },
     extras_require={
         "redis": ["redis>=4.3.4"],
-        "postgres": ["asyncpg>=0.27.0"],
     },
 )
