@@ -21,7 +21,6 @@ import asyncio
 import logging
 import random
 import uuid
-from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional
 
 from grpc import aio  # type: ignore
@@ -143,6 +142,15 @@ class KBShardManager:
         kbid: str,
         similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
     ) -> writer_pb2.ShardObject:
+        try:
+            check_enough_nodes()
+        except NodeClusterSmall as err:
+            errors.capture_exception(err)
+            logger.error(
+                f"Shard creation for kbid={kbid} failed: Replication requirements could not be met."
+            )
+            raise
+
         kb_shards_key = KB_SHARDS.format(kbid=kbid)
         kb_shards: Optional[writer_pb2.Shards] = None
         kb_shards_binary = await txn.get(kb_shards_key)
@@ -157,36 +165,39 @@ class KBShardManager:
             kb_shards = writer_pb2.Shards()
             kb_shards.ParseFromString(kb_shards_binary)
 
-        try:
-            existing_kb_nodes = [
-                replica.node for shard in kb_shards.shards for replica in shard.replicas
-            ]
-            node_ids = find_nodes(avoid_nodes=existing_kb_nodes)
-        except NodeClusterSmall as err:
-            errors.capture_exception(err)
-            logger.error(
-                f"Shard creation for kbid={kbid} failed: Replication requirements could not be met."
-            )
-            raise
+        existing_kb_nodes = [
+            replica.node for shard in kb_shards.shards for replica in shard.replicas
+        ]
+        nodes = sorted_nodes(avoid_nodes=existing_kb_nodes)
 
         sharduuid = uuid.uuid4().hex
         shard = writer_pb2.ShardObject(shard=sharduuid)
         try:
-            for node_id in node_ids:
-                logger.info(f"Node description: {node_id}")
+            # Attempt to create configured number of replicas
+            replicas_created = 0
+            while replicas_created < settings.node_replicas:
+                node_id = nodes.pop(0)
                 node = get_index_node(node_id)
                 if node is None:
-                    raise NodesUnsync(f"Node {node_id} is not found or not available")
-                logger.info(f"Node obj: {node} Shards: {node.shard_count}")
-                shard_created = await node.new_shard(
-                    kbid, similarity=kb_shards.similarity
-                )
+                    logger.error(f"Node {node_id} is not found or not available")
+                    continue
+                try:
+                    shard_created = await node.new_shard(
+                        kbid, similarity=kb_shards.similarity
+                    )
+                except Exception as e:
+                    errors.capture_exception(e)
+                    logger.error(f"Error creating new shard at {node}")
+                    continue
+
                 replica = writer_pb2.ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
+                replicas_created += 1
+
         except Exception as e:
             errors.capture_exception(e)
-            logger.error("Error creating new shard")
+            logger.error("Unexpected error creating new shard")
             await self.rollback_shard(shard)
             raise e
 
@@ -361,32 +372,20 @@ def choose_node(
     return node_obj, shard_id, node_id
 
 
-@dataclass
-class ScoredNode:
-    id: str
-    shard_count: int
-
-
-def find_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
+def check_enough_nodes():
     """
-    Returns a list of node ids sorted by increasing shard count and load score.
-    It will avoid the node ids in `avoid_nodes` from the computation if possible.
     It raises an exception if it can't find enough nodes for the configured replicas.
     """
     target_replicas = settings.node_replicas
-    available_nodes = [
-        ScoredNode(id=node.id, shard_count=node.shard_count)
-        for node in get_index_nodes()
-    ]
+    available_nodes = get_index_nodes()
     if len(available_nodes) < target_replicas:
         raise NodeClusterSmall(
             f"Not enough nodes. Total: {len(available_nodes)}, Required: {target_replicas}"
         )
-
     if settings.max_node_replicas >= 0:
         available_nodes = list(
             filter(
-                lambda x: x.shard_count < settings.max_node_replicas, available_nodes  # type: ignore
+                lambda n: n.shard_count < settings.max_node_replicas, available_nodes  # type: ignore
             )
         )
         if len(available_nodes) < target_replicas:
@@ -394,8 +393,16 @@ def find_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
                 f"Could not find enough nodes with available shards. Available: {len(available_nodes)}, Required: {target_replicas}"  # noqa
             )
 
+
+def sorted_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
+    """
+    Returns the list of all node ids sorted by increasing shard count.
+    It will put the node ids in `avoid_nodes` at the tail of the list.
+    """
+    available_nodes = get_index_nodes()
+
     # Sort available nodes by increasing shard_count
-    sorted_nodes = sorted(available_nodes, key=lambda x: x.shard_count)
+    sorted_nodes = sorted(available_nodes, key=lambda n: n.shard_count)
     available_node_ids = [node.id for node in sorted_nodes]
 
     avoid_nodes = avoid_nodes or []
@@ -405,8 +412,7 @@ def find_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
     preferred_node_order = preferred_nodes + [
         nid for nid in available_node_ids if nid not in preferred_nodes
     ]
-
-    return preferred_node_order[:target_replicas]
+    return preferred_node_order
 
 
 async def load_active_nodes():
