@@ -711,6 +711,7 @@ class LinkExtractedData(google.protobuf.message.Message):
     DESCRIPTION_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     EMBED_FIELD_NUMBER: builtins.int
+    PDF_STRUCTURE_FIELD_NUMBER: builtins.int
     @property
     def date(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     language: builtins.str
@@ -727,6 +728,8 @@ class LinkExtractedData(google.protobuf.message.Message):
     description: builtins.str
     type: builtins.str
     embed: builtins.str
+    @property
+    def pdf_structure(self) -> global___PageStructure: ...
     def __init__(
         self,
         *,
@@ -741,9 +744,10 @@ class LinkExtractedData(google.protobuf.message.Message):
         description: builtins.str = ...,
         type: builtins.str = ...,
         embed: builtins.str = ...,
+        pdf_structure: global___PageStructure | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["date", b"date", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["date", b"date", "description", b"description", "embed", b"embed", "field", b"field", "language", b"language", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "metadata", b"metadata", "title", b"title", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["date", b"date", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "pdf_structure", b"pdf_structure"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["date", b"date", "description", b"description", "embed", b"embed", "field", b"field", "language", b"language", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "metadata", b"metadata", "pdf_structure", b"pdf_structure", "title", b"title", "type", b"type"]) -> None: ...
 
 global___LinkExtractedData = LinkExtractedData
 

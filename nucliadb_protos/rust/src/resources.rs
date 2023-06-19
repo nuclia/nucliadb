@@ -268,6 +268,8 @@ pub struct LinkExtractedData {
     pub r#type: ::prost::alloc::string::String,
     #[prost(string, tag="12")]
     pub embed: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="13")]
+    pub pdf_structure: ::core::option::Option<PageStructure>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExtractedTextWrapper {

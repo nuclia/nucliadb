@@ -180,6 +180,8 @@ message LinkExtractedData {
     string description = 10;
     string type = 11;
     string embed = 12;
+
+    PageStructure pdf_structure = 13;
 }
 
 message ExtractedTextWrapper {
