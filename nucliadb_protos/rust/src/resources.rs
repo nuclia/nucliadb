@@ -268,6 +268,8 @@ pub struct LinkExtractedData {
     pub r#type: ::prost::alloc::string::String,
     #[prost(string, tag="12")]
     pub embed: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="13")]
+    pub pdf_structure: ::core::option::Option<PageStructure>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExtractedTextWrapper {
@@ -688,14 +690,26 @@ pub struct PageStructurePage {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PageStructureToken {
+    #[deprecated]
     #[prost(int64, tag="1")]
-    pub x: i64,
+    pub x_deprecated: i64,
+    #[deprecated]
     #[prost(int64, tag="2")]
-    pub y: i64,
+    pub y_deprecated: i64,
+    #[deprecated]
     #[prost(int64, tag="3")]
-    pub width: i64,
+    pub width_deprecated: i64,
+    #[deprecated]
     #[prost(int64, tag="4")]
-    pub height: i64,
+    pub height_deprecated: i64,
+    #[prost(float, tag="7")]
+    pub x: f32,
+    #[prost(float, tag="8")]
+    pub y: f32,
+    #[prost(float, tag="9")]
+    pub width: f32,
+    #[prost(float, tag="10")]
+    pub height: f32,
     #[prost(string, tag="5")]
     pub text: ::prost::alloc::string::String,
     #[prost(float, tag="6")]
