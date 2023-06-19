@@ -1892,12 +1892,20 @@ global___PageStructurePage = PageStructurePage
 class PageStructureToken(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    __X__DEPRECATED_FIELD_NUMBER: builtins.int
+    __Y__DEPRECATED_FIELD_NUMBER: builtins.int
+    __WIDTH__DEPRECATED_FIELD_NUMBER: builtins.int
+    __HEIGHT__DEPRECATED_FIELD_NUMBER: builtins.int
     X_FIELD_NUMBER: builtins.int
     Y_FIELD_NUMBER: builtins.int
     WIDTH_FIELD_NUMBER: builtins.int
     HEIGHT_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
     LINE_FIELD_NUMBER: builtins.int
+    __x__deprecated: builtins.int
+    __y__deprecated: builtins.int
+    __width__deprecated: builtins.int
+    __height__deprecated: builtins.int
     x: builtins.float
     y: builtins.float
     width: builtins.float
@@ -1907,6 +1915,10 @@ class PageStructureToken(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        __x__deprecated: builtins.int = ...,
+        __y__deprecated: builtins.int = ...,
+        __width__deprecated: builtins.int = ...,
+        __height__deprecated: builtins.int = ...,
         x: builtins.float = ...,
         y: builtins.float = ...,
         width: builtins.float = ...,
@@ -1914,7 +1926,7 @@ class PageStructureToken(google.protobuf.message.Message):
         text: builtins.str = ...,
         line: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["height", b"height", "line", b"line", "text", b"text", "width", b"width", "x", b"x", "y", b"y"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["__height__deprecated", b"__height__deprecated", "__width__deprecated", b"__width__deprecated", "__x__deprecated", b"__x__deprecated", "__y__deprecated", b"__y__deprecated", "height", b"height", "line", b"line", "text", b"text", "width", b"width", "x", b"x", "y", b"y"]) -> None: ...
 
 global___PageStructureToken = PageStructureToken
 

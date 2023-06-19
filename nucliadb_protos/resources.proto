@@ -447,10 +447,14 @@ message PageStructurePage {
 }
 
 message PageStructureToken {
-    float x = 1;
-    float y = 2;
-    float width = 3;
-    float height = 4;
+    int64 __x__deprecated = 1 [deprecated = true];
+    int64 __y__deprecated = 2 [deprecated = true];
+    int64 __width__deprecated = 3 [deprecated = true];
+    int64 __height__deprecated = 4 [deprecated = true];
+    float x = 7;
+    float y = 8;
+    float width = 9;
+    float height = 10;
     string text = 5;
     float line = 6;
 }
