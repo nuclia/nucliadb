@@ -180,6 +180,8 @@ message LinkExtractedData {
     string description = 10;
     string type = 11;
     string embed = 12;
+
+    PageStructure pdf_structure = 13;
 }
 
 message ExtractedTextWrapper {
@@ -445,10 +447,14 @@ message PageStructurePage {
 }
 
 message PageStructureToken {
-    int64 x = 1;
-    int64 y = 2;
-    int64 width = 3;
-    int64 height = 4;
+    int64 __x__deprecated = 1 [deprecated = true];
+    int64 __y__deprecated = 2 [deprecated = true];
+    int64 __width__deprecated = 3 [deprecated = true];
+    int64 __height__deprecated = 4 [deprecated = true];
+    float x = 7;
+    float y = 8;
+    float width = 9;
+    float height = 10;
     string text = 5;
     float line = 6;
 }

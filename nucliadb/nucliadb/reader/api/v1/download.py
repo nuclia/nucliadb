@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import urllib.parse
 from enum import Enum
 from typing import Optional, Tuple
 
@@ -182,6 +183,8 @@ async def download_api(sf: StorageField, headers: Headers, inline: bool = False)
     file_size = int(metadata.get("SIZE", -1))
     content_type = metadata.get("CONTENT_TYPE", "application/octet-stream")
     filename = metadata.get("FILENAME", "file")
+    filename = safe_http_header_encode(filename)
+
     status_code = 200
 
     content_disposition = "inline" if inline else f'attachment; filename="{filename}"'
@@ -278,3 +281,7 @@ def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int, int
         end = min(end, max_range_size)
         range_size = (end - start) + 1
     return start, end, range_size
+
+
+def safe_http_header_encode(text):
+    return urllib.parse.quote(text)
