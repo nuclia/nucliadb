@@ -27,7 +27,7 @@ from nucliadb_protos.resources_pb2 import FieldType
 import nucliadb.ingest.tests.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
-from nucliadb.reader.api.v1.download import parse_media_range
+from nucliadb.reader.api.v1.download import parse_media_range, safe_http_header_encode
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
@@ -264,3 +264,10 @@ async def test_resource_download_field_file_content_disposition(
         resp = await client.get(f"{download_url}?inline=true")
         assert resp.status_code == 200
         assert resp.headers["Content-Disposition"] == "inline"
+
+
+@pytest.mark.parametrize("text", ["ÇŞĞIİÖÜ"])
+def test_safe_http_header_encode(text):
+    safe_text = safe_http_header_encode(text)
+    # This is how startette encodes the headers
+    safe_text.lower().encode("latin-1")
