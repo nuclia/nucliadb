@@ -445,10 +445,10 @@ message PageStructurePage {
 }
 
 message PageStructureToken {
-    int64 x = 1;
-    int64 y = 2;
-    int64 width = 3;
-    int64 height = 4;
+    float x = 1;
+    float y = 2;
+    float width = 3;
+    float height = 4;
     string text = 5;
     float line = 6;
 }

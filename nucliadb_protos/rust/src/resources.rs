@@ -688,14 +688,14 @@ pub struct PageStructurePage {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PageStructureToken {
-    #[prost(int64, tag="1")]
-    pub x: i64,
-    #[prost(int64, tag="2")]
-    pub y: i64,
-    #[prost(int64, tag="3")]
-    pub width: i64,
-    #[prost(int64, tag="4")]
-    pub height: i64,
+    #[prost(float, tag="1")]
+    pub x: f32,
+    #[prost(float, tag="2")]
+    pub y: f32,
+    #[prost(float, tag="3")]
+    pub width: f32,
+    #[prost(float, tag="4")]
+    pub height: f32,
     #[prost(string, tag="5")]
     pub text: ::prost::alloc::string::String,
     #[prost(float, tag="6")]

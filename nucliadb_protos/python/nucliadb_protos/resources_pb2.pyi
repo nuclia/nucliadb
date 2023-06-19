@@ -1894,19 +1894,19 @@ class PageStructureToken(google.protobuf.message.Message):
     HEIGHT_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
     LINE_FIELD_NUMBER: builtins.int
-    x: builtins.int
-    y: builtins.int
-    width: builtins.int
-    height: builtins.int
+    x: builtins.float
+    y: builtins.float
+    width: builtins.float
+    height: builtins.float
     text: builtins.str
     line: builtins.float
     def __init__(
         self,
         *,
-        x: builtins.int = ...,
-        y: builtins.int = ...,
-        width: builtins.int = ...,
-        height: builtins.int = ...,
+        x: builtins.float = ...,
+        y: builtins.float = ...,
+        width: builtins.float = ...,
+        height: builtins.float = ...,
         text: builtins.str = ...,
         line: builtins.float = ...,
     ) -> None: ...
