@@ -30,7 +30,7 @@ use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
-use nucliadb_core::NodeResult;
+use nucliadb_core::{metrics, NodeResult};
 use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
@@ -57,8 +57,9 @@ pub enum NodeUpdate {
 #[tokio::main]
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
-    let _guard = init_telemetry()?;
     let start_bootstrap = Instant::now();
+    let _guard = init_telemetry()?;
+    let metrics = metrics::get_metrics();
     let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
     let mut node_writer_service = NodeWriterService::new();
@@ -95,14 +96,32 @@ async fn main() -> NodeResult<()> {
     nucliadb_telemetry::sync::start_telemetry_loop();
 
     tokio::spawn(start_grpc_service(grpc_driver));
-    tokio::spawn(update_node_metadata(
-        update_sender,
-        metadata_receiver,
-        node_metadata,
-        metadata_path,
-    ));
+    {
+        let task = update_node_metadata(
+            update_sender,
+            metadata_receiver,
+            node_metadata,
+            metadata_path,
+        );
+        match metrics.task_monitor("UpdateNodeMetadata".to_string()) {
+            Some(monitor) => {
+                let instrumented = monitor.instrument(task);
+                tokio::spawn(instrumented)
+            }
+            None => tokio::spawn(task),
+        };
+    }
     let update_task = tokio::spawn(update_node_state(update_handle, update_receiver));
-    let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
+    let monitor_task = {
+        let task = monitor_cluster(cluster_watcher);
+        match metrics.task_monitor("ClusterMonitor".to_string()) {
+            Some(monitor) => {
+                let instrumented = monitor.instrument(task);
+                tokio::spawn(instrumented)
+            }
+            None => tokio::spawn(task),
+        }
+    };
     let metrics_task = tokio::spawn(run_http_metrics_server(MetricsServerOptions {
         default_http_port: 3032,
     }));
