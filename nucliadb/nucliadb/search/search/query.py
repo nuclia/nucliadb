@@ -55,6 +55,7 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
+    min_score: float,
     sort: Optional[SortOptions],
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
@@ -83,6 +84,7 @@ async def global_query_to_pb(
     autofilters = []
 
     request = SearchRequest()
+    request.min_score = min_score
     request.body = query
     if advanced_query is not None:
         request.advanced_query = advanced_query

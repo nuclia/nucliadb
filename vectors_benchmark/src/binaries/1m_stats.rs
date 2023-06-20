@@ -31,6 +31,9 @@ impl SearchRequest for Request {
     fn no_results(&self) -> usize {
         NO_NEIGHBOURS
     }
+    fn min_score(&self) -> f32 {
+        -1.0
+    }
 }
 
 fn label_set(batch_id: usize) -> Vec<String> {

@@ -292,6 +292,7 @@ async def search(
         sort=sort_options,
         page_number=item.page_number,
         page_size=item.page_size,
+        min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
