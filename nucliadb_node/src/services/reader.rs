@@ -457,6 +457,7 @@ impl ShardReaderService {
                 .flat_map(|f| f.tags.iter().cloned())
                 .chain(search_request.fields.iter().cloned())
                 .collect(),
+            min_score: search_request.min_score,
         };
         let vector_reader_service = self.vector_reader.clone();
         let vector_task = move || {

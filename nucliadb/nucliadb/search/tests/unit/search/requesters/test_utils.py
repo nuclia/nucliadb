@@ -56,3 +56,20 @@ def test_validate_node_query_results_invalid_query():
     assert isinstance(result, HTTPException)
     assert result.status_code == 412
     assert result.detail == "Query is invalid. AllButQueryForbidden"
+
+
+def test_validate_node_query_results_internal_unhandled():
+    result = utils.validate_node_query_results(
+        [
+            AioRpcError(
+                code=StatusCode.INTERNAL,
+                initial_metadata=Mock(),
+                trailing_metadata=Mock(),
+                details="There is something wrong with your query, my friend!",
+                debug_error_string="This query is simply wrong",
+            )
+        ]
+    )
+    assert isinstance(result, HTTPException)
+    assert result.status_code == 500
+    assert result.detail == "There is something wrong with your query, my friend!"

@@ -50,6 +50,7 @@ pub trait DataRetriever: std::marker::Sync {
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
     fn similarity(&self, _: Address, _: Address) -> f32;
     fn get_vector(&self, _: Address) -> &[u8];
+    fn min_score(&self) -> f32;
 }
 
 pub trait Layer {
@@ -123,6 +124,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         loop {
             match candidates.pop() {
                 None => break None,
+                Some(Cnx(_, score)) if score < self.tracker.min_score() => break None,
                 Some(Cnx(n, score))
                         // The vector was deleted at some point and will be removed in a future merge
                         if !self.tracker.is_deleted(n)

@@ -258,6 +258,8 @@ pub struct VectorSearchRequest {
     pub vector_set: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="16")]
     pub keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(float, tag="17")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentVectorIdentifier {
@@ -425,6 +427,8 @@ pub struct SearchRequest {
     pub relation_subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
     #[prost(string, repeated, tag="22")]
     pub keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(float, tag="23")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

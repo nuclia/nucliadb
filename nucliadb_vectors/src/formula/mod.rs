@@ -158,6 +158,9 @@ mod tests {
         fn get_vector(&self, _: Address) -> &[u8] {
             panic!("Not meant to be used")
         }
+        fn min_score(&self) -> f32 {
+            -1.0
+        }
     }
     #[test]
     fn test_query() {
