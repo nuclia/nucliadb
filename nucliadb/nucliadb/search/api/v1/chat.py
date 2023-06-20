@@ -26,6 +26,7 @@ from starlette.responses import StreamingResponse
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -36,8 +37,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-
-END_OF_STREAM = "_END_"
 
 CHAT_EXAMPLES = {
     "search_and_chat": {
@@ -79,6 +78,8 @@ async def chat_knowledgebox_endpoint(
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except SendToPredictError:
+        return HTTPClientError(status_code=503, detail="Chat service unavailable")
     except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,
