@@ -35,6 +35,7 @@ from nucliadb_utils.utilities import get_indexing, get_storage
 
 from .abc import AbstractIndexNode
 from .exceptions import (
+    ExhaustedNodesError,
     NodeClusterSmall,
     NodeError,
     NodesUnsync,
@@ -176,7 +177,13 @@ class KBShardManager:
             # Attempt to create configured number of replicas
             replicas_created = 0
             while replicas_created < settings.node_replicas:
-                node_id = nodes.pop(0)
+                try:
+                    node_id = nodes.pop(0)
+                except IndexError:
+                    # It was not possible to find enough nodes
+                    # available/responsive to create the required replicas
+                    raise ExhaustedNodesError()
+
                 node = get_index_node(node_id)
                 if node is None:
                     logger.error(f"Node {node_id} is not found or not available")
@@ -194,7 +201,6 @@ class KBShardManager:
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
                 replicas_created += 1
-
         except Exception as e:
             errors.capture_exception(e)
             logger.error("Unexpected error creating new shard")

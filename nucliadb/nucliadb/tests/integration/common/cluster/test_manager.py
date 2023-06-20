@@ -19,12 +19,14 @@
 #
 import uuid
 from typing import AsyncIterable
+from unittest import mock
 
 import pytest
 from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.exceptions import ExhaustedNodesError
 from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_utils.keys import KB_SHARDS
@@ -163,3 +165,23 @@ async def test_apply_for_all_shards(fake_kbid: str, shards, redis_driver: Driver
     assert len(nodes) == 2
     assert nodes[0] == ("shard-a.1", "node-0") or nodes[0] == ("shard-a.2", "node-1")
     assert nodes[1] == ("shard-b.1", "node-1") or nodes[1] == ("shard-b.2", "node-2")
+
+
+@pytest.fixture(scope="function")
+def node_new_shard():
+    with mock.patch(
+        "nucliadb.common.cluster.abc.AbstractIndexNode.new_shard",
+        side_effect=Exception(),
+    ) as mocked:
+        yield mocked
+
+
+async def test_create_shard_by_kbid_attempts_on_all_nodes(
+    shards, redis_driver, fake_kbid, node_new_shard
+):
+    shard_manager = manager.KBShardManager()
+    async with redis_driver.transaction() as txn:
+        with pytest.raises(ExhaustedNodesError):
+            await shard_manager.create_shard_by_kbid(txn, fake_kbid)
+
+    assert node_new_shard.await_count == len(manager.get_index_nodes())
