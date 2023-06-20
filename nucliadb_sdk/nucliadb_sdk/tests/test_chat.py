@@ -30,7 +30,11 @@ def _test_chat_response(result):
 
 def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result = sdk.chat(kbid=docs_dataset, query="Nuclia loves Semantic Search")
-    _test_chat_response(result)
+    assert result.learning_id == "00"
+    assert result.answer == "valid answer  to"
+    assert len(result.result.resources) == 9
+    assert result.relations
+    assert len(result.relations.entities["Nuclia"].related_to) == 18
 
 
 def test_chat_on_resource_by_id(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
@@ -38,7 +42,10 @@ def test_chat_on_resource_by_id(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result = sdk.chat_on_resource_by_id(
         kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search"
     )
-    _test_chat_response(result)
+    assert result.learning_id == "00"
+    assert result.answer == "valid answer  to"
+    assert len(result.result.resources) == 1
+    assert result.result.resources[rid]
 
 
 def test_chat_on_resource_by_slug(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
@@ -46,4 +53,7 @@ def test_chat_on_resource_by_slug(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result = sdk.chat_on_resource_by_slug(
         kbid=docs_dataset, rslug=rslug, query="Nuclia loves Semantic Search"
     )
-    _test_chat_response(result)
+    assert result.learning_id == "00"
+    assert result.answer == "valid answer  to"
+    assert len(result.result.resources) == 1
+    assert result.result.resources.popitem()[1].slug == rslug
