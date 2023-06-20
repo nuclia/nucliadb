@@ -19,7 +19,7 @@
 #
 from datetime import datetime
 from time import time
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
@@ -166,12 +166,9 @@ async def search_knowledgebox(
         with_synonyms=with_synonyms,
         autofilter=autofilter,
     )
-    try:
-        return await search(
-            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-        )
-    except LimitsExceededError as exc:
-        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    return await _search_endpoint(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    )
 
 
 @api.get(
@@ -204,7 +201,7 @@ async def catalog(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     sort = None
     if sort_field:
         sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -220,7 +217,7 @@ async def catalog(
         show=[ResourceProperties.BASIC],
         shards=shards,
     )
-    return await search(
+    return await _search_endpoint(
         response,
         kbid,
         item,
@@ -252,16 +249,32 @@ async def search_post_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+    return await _search_endpoint(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    )
+
+
+async def _search_endpoint(
+    response: Response,
+    kbid: str,
+    item: SearchRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    **kwargs,
+) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+    # All endpoint logic should be here
     try:
-        return await search(
-            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        results, incomplete = await search(
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, **kwargs
         )
+        response.status_code = 206 if incomplete else 200
+        return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
 
 async def search(
-    response: Response,
     kbid: str,
     item: SearchRequest,
     x_ndb_client: NucliaDBClientType,
@@ -269,7 +282,7 @@ async def search(
     x_forwarded_for: str,
     do_audit: bool = True,
     with_status: Optional[ResourceProcessingStatus] = None,
-) -> KnowledgeboxSearchResults:
+) -> Tuple[KnowledgeboxSearchResults, bool]:
     audit = get_audit()
     start_time = time()
 
@@ -310,6 +323,9 @@ async def search(
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
+
+    incomplete_results = incomplete_results or query_incomplete_results
+
     # We need to merge
     search_results = await merge_results(
         results,
@@ -326,10 +342,6 @@ async def search(
     )
     await abort_transaction()
 
-    response.status_code = (
-        206 if incomplete_results or query_incomplete_results else 200
-    )
-
     if audit is not None and do_audit:
         await audit.search(
             kbid,
@@ -345,4 +357,4 @@ async def search(
 
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
-    return search_results
+    return search_results, incomplete_results
