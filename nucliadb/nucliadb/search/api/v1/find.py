@@ -177,9 +177,10 @@ async def find_post_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        results, _ = await find(
+        results, incomplete = await find(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
+        response.status_code = 206 if incomplete else 200
         return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
@@ -204,7 +205,7 @@ async def find(
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
-    pb_query, incomplete_results, autofilters = await global_query_to_pb(
+    pb_query, vector_results_missing, autofilters = await global_query_to_pb(
         kbid,
         features=item.features,
         query=processed_query,
@@ -226,9 +227,11 @@ async def find(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
-    results, incomplete_results, queried_nodes, queried_shards = await node_query(
+    results, node_query_missing, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
+
+    incomplete_results = vector_results_missing or node_query_missing
 
     # We need to merge
     search_results = await find_merge_results(
@@ -243,8 +246,6 @@ async def find(
         min_score=item.min_score,
         highlight=item.highlight,
     )
-
-    response.status_code = 206 if incomplete_results else 200
 
     if audit is not None and do_audit:
         await audit.search(
@@ -262,4 +263,3 @@ async def find(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
     return search_results, incomplete_results
-    return search_results
