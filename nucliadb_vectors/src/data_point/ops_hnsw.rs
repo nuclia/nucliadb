@@ -167,7 +167,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         loop {
             match (candidates.pop(), ms_neighbours.peek().cloned()) {
                 (None, _) => break,
-                (Some(Cnx(_, cs)), _) if cs < self.tracker.min_score() => break,
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
