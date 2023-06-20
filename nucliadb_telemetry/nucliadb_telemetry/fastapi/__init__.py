@@ -28,7 +28,7 @@ from starlette.responses import PlainTextResponse
 
 from nucliadb_telemetry.fastapi.metrics import PrometheusMiddleware
 from nucliadb_telemetry.fastapi.tracing import (
-    AddTraceIDHeaderMiddleware,
+    CaptureTraceIdMiddleware,
     OpenTelemetryMiddleware,
     ServerRequestHookT,
 )
@@ -90,4 +90,4 @@ def instrument_app(
         # `add_middleware` always adds to the beginning of the middleware list
         app.add_middleware(SentryAsgiMiddleware)
 
-    app.add_middleware(AddTraceIDHeaderMiddleware)
+    app.add_middleware(CaptureTraceIdMiddleware)

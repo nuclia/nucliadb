@@ -310,7 +310,6 @@ class OpenTelemetryMiddleware:
                     scope,
                     send,
                 )
-
                 await self.app(scope, receive, otel_send)
 
         finally:
@@ -351,7 +350,7 @@ class OpenTelemetryMiddleware:
         return otel_send
 
 
-class AddTraceIDHeaderMiddleware(BaseHTTPMiddleware):
+class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
