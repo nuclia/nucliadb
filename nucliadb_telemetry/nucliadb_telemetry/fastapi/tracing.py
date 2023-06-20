@@ -22,6 +22,7 @@ from functools import wraps
 from typing import Callable, Optional, Tuple
 
 from asgiref.compatibility import guarantee_single_callable
+from fastapi import Request, Response
 from opentelemetry import context, trace
 from opentelemetry.instrumentation.asgi.version import __version__  # noqa
 from opentelemetry.instrumentation.propagators import get_global_response_propagator
@@ -42,6 +43,7 @@ from opentelemetry.util.http import (
     normalise_response_header_name,
     remove_url_credentials,
 )
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 ServerRequestHookT = Optional[Callable[[Span, dict], None]]
 
@@ -347,3 +349,15 @@ class OpenTelemetryMiddleware:
             await send(message)
 
         return otel_send
+
+
+class AddTraceIDHeaderMiddleware(BaseHTTPMiddleware):
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        try:
+            response = await call_next(request)
+        finally:
+            trace_id = str(trace.get_current_span().get_span_context().trace_id)
+            response.headers["X-NUCLIADB-TRACE-ID"] = trace_id
+            return response
