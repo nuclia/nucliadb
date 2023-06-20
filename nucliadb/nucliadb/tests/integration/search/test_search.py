@@ -1190,10 +1190,12 @@ async def test_resource_search_pagination(
 
 
 @pytest.mark.asyncio
-async def test_search_handles_predict_errors(
+@pytest.mark.parametrize("endpoint", ["search", "find"])
+async def test_search_endpoints_handle_predict_errors(
     nucliadb_reader: AsyncClient,
     knowledgebox,
     predict_mock,
+    endpoint,
 ):
     kbid = knowledgebox
 
@@ -1203,7 +1205,7 @@ async def test_search_handles_predict_errors(
     ):
         predict_mock.convert_sentence_to_vector = convert_sentence_to_vector_mock
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/search",
+            f"/kb/{kbid}/{endpoint}",
             json={
                 "features": ["vector"],
                 "query": "something",
@@ -1216,7 +1218,7 @@ async def test_search_handles_predict_errors(
     for detect_entities_mock in (AsyncMock(side_effect=SendToPredictError()),):
         predict_mock.detect_entities = detect_entities_mock
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/search",
+            f"/kb/{kbid}/{endpoint}",
             json={
                 "features": ["relations"],
                 "query": "something",

@@ -205,7 +205,7 @@ async def find(
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
-    pb_query, vector_results_missing, autofilters = await global_query_to_pb(
+    pb_query, incomplete_results, autofilters = await global_query_to_pb(
         kbid,
         features=item.features,
         query=processed_query,
@@ -227,11 +227,11 @@ async def find(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
-    results, node_query_missing, queried_nodes, queried_shards = await node_query(
+    results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
 
-    incomplete_results = vector_results_missing or node_query_missing
+    incomplete_results = incomplete_results or query_incomplete_results
 
     # We need to merge
     search_results = await find_merge_results(
