@@ -155,7 +155,7 @@ async def node_query(
 
     if not ops:
         await abort_transaction()
-        logger.info(f"No node found for any of this resources shards {kbid}")
+        logger.warning(f"No node found for any of this resources shards {kbid}")
         raise HTTPException(
             status_code=512,
             detail=f"No node found for any of this resources shards {kbid}",
@@ -188,7 +188,7 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             status_code=500, detail=f"Error while executing shard queries. No results."
         )
 
-    for i, result in enumerate(results):
+    for result in results:
         if isinstance(result, Exception):
             status_code = 500
             reason = "Error while querying shard data."
@@ -198,6 +198,9 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
                     if "AllButQueryForbidden" in result.details():
                         status_code = 412
                         reason = result.details().split(":")[-1].strip().strip("'")
+                    else:
+                        reason = result.details()
+                        logger.exception(f"Unhandled node error", exc_info=result)
                 else:
                     logger.error(
                         f"Unhandled GRPC error while querying shard data: {result.debug_error_string()}"
