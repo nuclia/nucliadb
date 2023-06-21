@@ -351,6 +351,10 @@ class OpenTelemetryMiddleware:
 
 
 class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
+    def __init__(self, response_header: str, *args, **kwargs):
+        self.response_header = response_header
+        super().__init__(*args, **kwargs)
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -358,5 +362,5 @@ class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         finally:
             trace_id = str(trace.get_current_span().get_span_context().trace_id)
-            response.headers["X-NUCLIADB-TRACE-ID"] = trace_id
+            response.headers[self.response_header] = trace_id
             return response

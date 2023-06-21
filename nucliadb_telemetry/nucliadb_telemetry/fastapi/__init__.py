@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 from urllib.parse import urlparse
 
 import prometheus_client  # type: ignore
@@ -69,7 +69,11 @@ def instrument_app(
     server_request_hook: ServerRequestHookT = None,
     tracer_provider=None,
     metrics=False,
+    trace_id_header: Optional[str] = None,
 ):
+    """
+    :param trace_id_header: If specified, trace ids will be returned in this header for all responses.
+    """
     if metrics:
         # b/w compat
         app.add_middleware(PrometheusMiddleware)
@@ -90,4 +94,5 @@ def instrument_app(
         # `add_middleware` always adds to the beginning of the middleware list
         app.add_middleware(SentryAsgiMiddleware)
 
-    app.add_middleware(CaptureTraceIdMiddleware)
+    if trace_id_header is not None:
+        app.add_middleware(CaptureTraceIdMiddleware, response_header=trace_id_header)
