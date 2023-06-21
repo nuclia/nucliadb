@@ -29,6 +29,10 @@ from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
+from nucliadb.search.search.exceptions import (
+    IncompleteFindResultsError,
+    ResourceNotFoundError,
+)
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     ChatRequest,
@@ -38,14 +42,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-
-
-class ResourceNotFoundError(Exception):
-    pass
-
-
-class IncompleteFindResourceResults(Exception):
-    pass
 
 
 @api.post(
@@ -122,7 +118,7 @@ async def chat_on_resource_endpoint(*args, **kwargs):
         return HTTPClientError(status_code=503, detail="Chat service not available")
     except ResourceNotFoundError:
         return HTTPClientError(status_code=404, detail="Resource not found")
-    except IncompleteFindResourceResults:
+    except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,
             detail="Temporary error on information retrieval. Please try again.",
@@ -184,6 +180,6 @@ async def chat_on_resource(
         x_forwarded_for,
     )
     if incomplete:
-        raise IncompleteFindResourceResults()
+        raise IncompleteFindResultsError()
 
     return await chat(kbid, find_results, item, x_nucliadb_user)

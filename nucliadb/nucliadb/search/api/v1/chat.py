@@ -28,6 +28,7 @@ from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
+from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     ChatRequest,
@@ -47,10 +48,6 @@ CHAT_EXAMPLES = {
         },
     },
 }
-
-
-class IncompleteFindResultsError(Exception):
-    pass
 
 
 @api.post(
