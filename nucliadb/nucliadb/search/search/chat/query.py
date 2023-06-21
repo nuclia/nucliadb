@@ -45,13 +45,13 @@ async def rephrase_query_from_context(
     kbid: str,
     context: List[Message],
     query: str,
-    x_nucliadb_user: str,
+    user_id: str,
 ) -> str:
     predict = get_predict()
     req = RephraseModel(
         question=query,
         context=context,
-        user_id=x_nucliadb_user,
+        user_id=user_id,
     )
     return await predict.rephrase_query(kbid, req)
 
@@ -60,7 +60,7 @@ async def chat(
     kbid: str,
     find_results: KnowledgeboxFindResults,
     chat_request: ChatRequest,
-    x_nucliadb_user: str,
+    user_id: str,
 ):
     predict = get_predict()
     context = chat_request.context or []
@@ -71,7 +71,7 @@ async def chat(
         )
     )
     chat_model = ChatModel(
-        user_id=x_nucliadb_user,
+        user_id=user_id,
         context=context,
         question=chat_request.query,
     )
