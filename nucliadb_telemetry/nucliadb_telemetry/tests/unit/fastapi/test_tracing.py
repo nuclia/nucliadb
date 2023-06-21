@@ -42,7 +42,7 @@ async def test_capture_trace_id_middleware(trace_id):
     response = mock.Mock(headers={})
     call_next = mock.AsyncMock(return_value=response)
 
-    mdw = CaptureTraceIdMiddleware("x-my-header", mock.Mock())
+    mdw = CaptureTraceIdMiddleware(mock.Mock())
     response = await mdw.dispatch(request, call_next)
 
-    assert response.headers["x-my-header"] == str(trace_id)
+    assert response.headers["x-nuclia-trace-id"] == str(trace_id)

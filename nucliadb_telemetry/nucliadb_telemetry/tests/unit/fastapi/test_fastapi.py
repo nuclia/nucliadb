@@ -29,7 +29,5 @@ def tests_instrument_app_adds_capture_trace_id_middleware():
         assert not isinstance(middleware_call[0][0], CaptureTraceIdMiddleware)
 
     app = Mock()
-    instrument_app(app, [], trace_id_header="x-foo-bar")
-    app.add_middleware.assert_called_with(
-        CaptureTraceIdMiddleware, response_header="x-foo-bar"
-    )
+    instrument_app(app, [], trace_id_on_responses=True)
+    app.add_middleware.assert_called_with(CaptureTraceIdMiddleware)

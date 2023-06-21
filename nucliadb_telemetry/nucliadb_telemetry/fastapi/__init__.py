@@ -41,9 +41,6 @@ except ImportError:  # pragma: no cover
     SentryAsgiMiddleware = None  # type: ignore
 
 
-NUCLIADB_TRACE_ID_HEADER = "X-NUCLIADB-TRACE-ID"
-
-
 async def metrics_endpoint(request):
     output = prometheus_client.exposition.generate_latest()
     return PlainTextResponse(
@@ -72,10 +69,10 @@ def instrument_app(
     server_request_hook: ServerRequestHookT = None,
     tracer_provider=None,
     metrics=False,
-    trace_id_header: Optional[str] = None,
+    trace_id_on_responses: bool = False,
 ):
     """
-    :param trace_id_header: If specified, trace ids will be returned in this header for all responses.
+    :param trace_id_on_responses: If set to True, trace ids will be returned in the X-NUCLIA-TRACE-ID header for all HTTP responses of this app.
     """
     if metrics:
         # b/w compat
@@ -97,5 +94,6 @@ def instrument_app(
         # `add_middleware` always adds to the beginning of the middleware list
         app.add_middleware(SentryAsgiMiddleware)
 
-    if trace_id_header is not None:
-        app.add_middleware(CaptureTraceIdMiddleware, response_header=trace_id_header)
+    if trace_id_on_responses:
+        # Trace ids are provided by OpenTelemetryMiddleware, so it needs to be added after.
+        app.add_middleware(CaptureTraceIdMiddleware)

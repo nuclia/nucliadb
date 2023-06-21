@@ -213,7 +213,7 @@ class TestCaseCaptureTraceIdMiddleware:
     @pytest.fixture(scope="class")
     def app(self):
         app_ = Starlette()
-        app_.add_middleware(CaptureTraceIdMiddleware, response_header="x-trace-id")
+        app_.add_middleware(CaptureTraceIdMiddleware)
 
         @app_.route("/foo/")
         def foo(request):
@@ -228,4 +228,4 @@ class TestCaseCaptureTraceIdMiddleware:
     def test_trace_id_header_is_returned(self, client):
         response = client.get("/foo/")
 
-        assert response.headers["x-trace-id"]
+        assert response.headers["x-nuclia-trace-id"]

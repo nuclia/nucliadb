@@ -48,6 +48,9 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 ServerRequestHookT = Optional[Callable[[Span, dict], None]]
 
 
+NUCLIA_TRACE_ID_HEADER = "X-NUCLIA-TRACE-ID"
+
+
 # ----------------------------
 # Forked from https://raw.githubusercontent.com/open-telemetry/opentelemetry-python-contrib/main/instrumentation/opentelemetry-instrumentation-asgi/src/opentelemetry/instrumentation/asgi/__init__.py
 #
@@ -351,10 +354,6 @@ class OpenTelemetryMiddleware:
 
 
 class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
-    def __init__(self, response_header: str, *args, **kwargs):
-        self.response_header = response_header
-        super().__init__(*args, **kwargs)
-
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -362,5 +361,5 @@ class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         finally:
             trace_id = str(trace.get_current_span().get_span_context().trace_id)
-            response.headers[self.response_header] = trace_id
+            response.headers[NUCLIA_TRACE_ID_HEADER] = trace_id
             return response
