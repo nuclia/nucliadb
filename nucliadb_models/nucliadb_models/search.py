@@ -378,9 +378,9 @@ class SearchParamDefaults:
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
     )
-    resource_filters = ParamDefault(
+    resources_filter = ParamDefault(
         default=[],
-        title="Resource filters",
+        title="Resources filter",
         description="List of resource ids to filter search results for. Only paragraphs from the specified resources will be returned.",  # noqa: E501
     )
     faceted = ParamDefault(
@@ -584,9 +584,9 @@ class BaseSearchRequest(BaseModel):
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
-    resource_filters: List[
+    resources_filter: List[
         str
-    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    ] = SearchParamDefaults.resources_filter.to_pydantic_field()
 
 
 class SearchRequest(BaseSearchRequest):

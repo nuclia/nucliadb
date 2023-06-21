@@ -164,7 +164,7 @@ async def test_find_resources_filter(
             f"/kb/{knowledgebox}/find",
             json={
                 "query": "title",
-                "resource_filters": [rid],
+                "resources_filter": [rid],
             },
         )
         assert resp.status_code == 200

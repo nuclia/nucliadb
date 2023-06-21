@@ -108,7 +108,7 @@ message ParagraphSearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 15;
     optional string advanced_query = 16;
-    repeated string keys = 17;
+    repeated string keys_filter = 17;
 }
 
 message ResultScore {
@@ -201,7 +201,7 @@ message VectorSearchRequest {
     // ID for the vector set.
     // Empty for searching on the original index
     string vector_set = 15; 
-    repeated string keys = 16;
+    repeated string keys_filter = 16;
 
     float min_score = 17;
 }
@@ -341,7 +341,7 @@ message SearchRequest {
     RelationSearchRequest relations = 19 [deprecated = true];
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
-    repeated string keys = 22;
+    repeated string keys_filter = 22;
 
     float min_score = 23;
 }

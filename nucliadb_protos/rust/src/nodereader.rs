@@ -135,7 +135,7 @@ pub struct ParagraphSearchRequest {
     #[prost(string, optional, tag="16")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="17")]
-    pub keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub keys_filter: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -259,7 +259,7 @@ pub struct VectorSearchRequest {
     #[prost(string, tag="15")]
     pub vector_set: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="16")]
-    pub keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub keys_filter: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="17")]
     pub min_score: f32,
 }
@@ -428,7 +428,7 @@ pub struct SearchRequest {
     #[prost(message, optional, tag="21")]
     pub relation_subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
     #[prost(string, repeated, tag="22")]
-    pub keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub keys_filter: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="23")]
     pub min_score: f32,
 }

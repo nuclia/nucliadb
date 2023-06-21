@@ -151,7 +151,7 @@ async def chat_on_resource(
         )
 
     find_request = FindRequest()
-    find_request.resource_filters = [rid]
+    find_request.resources_filter = [rid]
     find_request.features = [
         SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
