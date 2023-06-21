@@ -51,7 +51,7 @@ RUN ARCH="$(uname -m)"; \
 
 RUN mkdir -p /usr/src/app
 COPY --from=python_rust /nucliadb/target/wheels/ /wheels/
-RUN pip install /wheels/*.whl --force-reinstall
+RUN pip install /wheels/*.whl
 
 WORKDIR /usr/src/app
 
