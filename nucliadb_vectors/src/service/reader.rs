@@ -119,7 +119,11 @@ impl ReaderChild for VectorReaderService {
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
 
-        let key_filters = request.keys.iter().cloned().map(AtomClause::key_prefix);
+        let key_filters = request
+            .keys_filter
+            .iter()
+            .cloned()
+            .map(AtomClause::key_prefix);
         let mut formula = Formula::new();
         request
             .tags
