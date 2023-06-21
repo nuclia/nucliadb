@@ -204,6 +204,7 @@ async def test_search_resource_all(
                 vrequest.vector.extend(Q)
                 vrequest.result_per_page = 20
                 vrequest.reload = True
+                vrequest.min_score = -1.0
 
                 paragraphs = await node_obj.reader.ParagraphSearch(prequest)  # type: ignore
                 documents = await node_obj.reader.DocumentSearch(drequest)  # type: ignore
