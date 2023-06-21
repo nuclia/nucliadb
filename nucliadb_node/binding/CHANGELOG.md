@@ -1,4 +1,9 @@
 # Changelog
+
+## 0.7.7
+
+- Be able to filter paragraph and vectors search results by keys
+
 ## 0.7.6
 
 - Properly compute total search results for document and paragaph
