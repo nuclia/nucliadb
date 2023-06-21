@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Iterable, List, Optional
+from typing import Iterable, List
 from urllib.parse import urlparse
 
 import prometheus_client  # type: ignore
