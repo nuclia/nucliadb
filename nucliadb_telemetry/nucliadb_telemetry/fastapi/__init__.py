@@ -28,6 +28,7 @@ from starlette.responses import PlainTextResponse
 
 from nucliadb_telemetry.fastapi.metrics import PrometheusMiddleware
 from nucliadb_telemetry.fastapi.tracing import (
+    CaptureTraceIdMiddleware,
     OpenTelemetryMiddleware,
     ServerRequestHookT,
 )
@@ -68,7 +69,11 @@ def instrument_app(
     server_request_hook: ServerRequestHookT = None,
     tracer_provider=None,
     metrics=False,
+    trace_id_on_responses: bool = False,
 ):
+    """
+    :param trace_id_on_responses: If set to True, trace ids will be returned in the X-NUCLIA-TRACE-ID header for all HTTP responses of this app.
+    """
     if metrics:
         # b/w compat
         app.add_middleware(PrometheusMiddleware)
@@ -88,3 +93,7 @@ def instrument_app(
         # add last to catch all exceptions
         # `add_middleware` always adds to the beginning of the middleware list
         app.add_middleware(SentryAsgiMiddleware)
+
+    if trace_id_on_responses:
+        # Trace ids are provided by OpenTelemetryMiddleware, so it needs to be added after.
+        app.add_middleware(CaptureTraceIdMiddleware)

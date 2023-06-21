@@ -16,24 +16,33 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from unittest import mock
+
+import pytest
+
+from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
 
 
-from nucliadb.search import SERVICE_NAME
-from nucliadb.search.app import application
-from nucliadb_telemetry.fastapi import instrument_app
-from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.utils import get_telemetry
-from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
+@pytest.fixture(scope="function")
+def trace_id():
+    tid = 123
+    context = mock.Mock()
+    context.trace_id = tid
+    current_span = mock.Mock()
+    current_span.get_span_context = mock.Mock(return_value=context)
+    with mock.patch(
+        "nucliadb_telemetry.fastapi.tracing.trace.get_current_span",
+        return_value=current_span,
+    ):
+        yield tid
 
 
-def run():
-    setup_logging()
-    instrument_app(
-        application,
-        tracer_provider=get_telemetry(SERVICE_NAME),
-        excluded_urls=["/"],
-        metrics=True,
-        trace_id_on_responses=True,
-    )
+async def test_capture_trace_id_middleware(trace_id):
+    request = mock.Mock()
+    response = mock.Mock(headers={})
+    call_next = mock.AsyncMock(return_value=response)
 
-    run_fastapi_with_metrics(application)
+    mdw = CaptureTraceIdMiddleware(mock.Mock())
+    response = await mdw.dispatch(request, call_next)
+
+    assert response.headers["X-NUCLIA-TRACE-ID"] == str(trace_id)

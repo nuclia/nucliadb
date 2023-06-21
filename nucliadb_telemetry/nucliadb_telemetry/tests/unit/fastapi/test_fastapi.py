@@ -16,24 +16,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from unittest.mock import Mock
 
-
-from nucliadb.search import SERVICE_NAME
-from nucliadb.search.app import application
 from nucliadb_telemetry.fastapi import instrument_app
-from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.utils import get_telemetry
-from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
+from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
 
 
-def run():
-    setup_logging()
-    instrument_app(
-        application,
-        tracer_provider=get_telemetry(SERVICE_NAME),
-        excluded_urls=["/"],
-        metrics=True,
-        trace_id_on_responses=True,
-    )
+def tests_instrument_app_adds_capture_trace_id_middleware():
+    app = Mock()
+    instrument_app(app, [])
+    for middleware_call in app.add_middleware.call_args_list:
+        assert not isinstance(middleware_call[0][0], CaptureTraceIdMiddleware)
 
-    run_fastapi_with_metrics(application)
+    app = Mock()
+    instrument_app(app, [], trace_id_on_responses=True)
+    app.add_middleware.assert_called_with(CaptureTraceIdMiddleware)

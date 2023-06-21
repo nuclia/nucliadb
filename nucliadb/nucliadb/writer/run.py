@@ -33,6 +33,7 @@ def run():
         tracer_provider=get_telemetry(SERVICE_NAME),
         excluded_urls=["/"],
         metrics=True,
+        trace_id_on_responses=True,
     )
 
     run_fastapi_with_metrics(application)
