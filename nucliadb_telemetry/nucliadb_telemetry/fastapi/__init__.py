@@ -41,6 +41,9 @@ except ImportError:  # pragma: no cover
     SentryAsgiMiddleware = None  # type: ignore
 
 
+NUCLIADB_TRACE_ID_HEADER = "X-NUCLIADB-TRACE-ID"
+
+
 async def metrics_endpoint(request):
     output = prometheus_client.exposition.generate_latest()
     return PlainTextResponse(
