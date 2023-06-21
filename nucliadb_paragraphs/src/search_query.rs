@@ -412,7 +412,7 @@ pub fn search_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
     // Keys
-    search.keys_filter.iter().for_each(|uuid| {
+    search.key_filters.iter().for_each(|uuid| {
         let term = Term::from_field_text(schema.uuid, uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         fuzzies.push((Occur::Must, Box::new(term_query.clone())));

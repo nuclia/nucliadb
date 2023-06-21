@@ -120,7 +120,7 @@ impl ReaderChild for VectorReaderService {
         let index_slock = self.index.get_slock()?;
 
         let key_filters = request
-            .keys_filter
+            .key_filters
             .iter()
             .cloned()
             .map(AtomClause::key_prefix);

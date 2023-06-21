@@ -378,7 +378,7 @@ class SearchParamDefaults:
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
     )
-    resources_filter = ParamDefault(
+    resource_filters = ParamDefault(
         default=[],
         title="Resources filter",
         description="List of resource ids to filter search results for. Only paragraphs from the specified resources will be returned.",  # noqa: E501
@@ -584,9 +584,9 @@ class BaseSearchRequest(BaseModel):
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
-    resources_filter: List[
+    resource_filters: List[
         str
-    ] = SearchParamDefaults.resources_filter.to_pydantic_field()
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
 
 
 class SearchRequest(BaseSearchRequest):

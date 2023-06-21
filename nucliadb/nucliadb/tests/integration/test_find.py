@@ -117,7 +117,7 @@ async def test_find_does_not_support_fulltext_search(
 
 
 @pytest.mark.asyncio
-async def test_find_resources_filter(
+async def test_find_resource_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -164,7 +164,7 @@ async def test_find_resources_filter(
             f"/kb/{knowledgebox}/find",
             json={
                 "query": "title",
-                "resources_filter": [rid],
+                "resource_filters": [rid],
             },
         )
         assert resp.status_code == 200

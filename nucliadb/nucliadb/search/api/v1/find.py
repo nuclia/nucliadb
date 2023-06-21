@@ -227,7 +227,7 @@ async def find(
         with_duplicates=item.with_duplicates,
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
-        keys_filter=item.resources_filter,
+        key_filters=item.resource_filters,
     )
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards

@@ -432,7 +432,7 @@ impl ShardReaderService {
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
-            keys_filter: search_request.keys_filter.clone(),
+            key_filters: search_request.key_filters.clone(),
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
         let paragraph_task = move || {
@@ -451,7 +451,7 @@ impl ShardReaderService {
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             with_duplicates: true,
-            keys_filter: search_request.keys_filter.clone(),
+            key_filters: search_request.key_filters.clone(),
             tags: search_request
                 .filter
                 .iter()
