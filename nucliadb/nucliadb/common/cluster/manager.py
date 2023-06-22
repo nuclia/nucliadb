@@ -74,8 +74,8 @@ class KBShardManager:
         async with driver.transaction() as txn:
             payload = await txn.get(key)
             if payload is None:
-                # could be None because /shards doesn't exist, or beacause the whole KB does not exist.
-                # In any case, this should not happen
+                # could be None because /shards doesn't exist, or beacause the
+                # whole KB does not exist. In any case, this should not happen
                 raise ShardsNotFound(kbid)
 
             pb = writer_pb2.Shards()

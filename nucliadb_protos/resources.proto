@@ -451,6 +451,7 @@ message PageStructureToken {
     int64 __y__deprecated = 2 [deprecated = true];
     int64 __width__deprecated = 3 [deprecated = true];
     int64 __height__deprecated = 4 [deprecated = true];
+
     float x = 7;
     float y = 8;
     float width = 9;

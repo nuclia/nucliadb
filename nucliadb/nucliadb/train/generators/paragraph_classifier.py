@@ -96,8 +96,8 @@ async def generate_paragraph_classification_payloads(
 
         tl.text = paragraph_text
         for label in text_labels:
-            _, _, label_abelset, label_title = label.split("/")
-            tl.labels.append(Label(labelset=label_abelset, label=label_title))
+            _, _, label_labelset, label_title = label.split("/")
+            tl.labels.append(Label(labelset=label_labelset, label=label_title))
         batch.data.append(tl)
 
         if len(batch.data) == trainset.batch_size:
