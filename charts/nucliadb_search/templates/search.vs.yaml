@@ -31,9 +31,9 @@ spec:
           method:
             regex: "GET|OPTIONS"
         - uri:
-            regex: ^/api/v\d+/kb/[^/]+/resource/[^/]+/(chat|find|search)$
+            regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+/(chat|find|search)$'
           method:
-            regex: GET|POST|OPTIONS
+            regex: "GET|POST|OPTIONS"
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/counters'
           method:
