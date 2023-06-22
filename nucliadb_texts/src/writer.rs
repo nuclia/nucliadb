@@ -244,18 +244,18 @@ impl TextWriterService {
         }
 
         for (field, text_info) in &resource.texts {
-            let mut doc = base_doc.clone();
+            let mut field_doc = base_doc.clone();
             let mut facet_key: String = "/".to_owned();
             facet_key.push_str(field.as_str());
             let facet_field = Facet::from(facet_key.as_str());
-            doc.add_facet(self.schema.field, facet_field);
-            doc.add_text(self.schema.text, &text_info.text);
+            field_doc.add_facet(self.schema.field, facet_field);
+            field_doc.add_text(self.schema.text, &text_info.text);
 
             for label in text_info.labels.iter() {
                 let facet = Facet::from(label.as_str());
-                doc.add_facet(self.schema.facets, facet);
+                field_doc.add_facet(self.schema.facets, facet);
             }
-            self.writer.add_document(doc).unwrap();
+            self.writer.add_document(field_doc).unwrap();
         }
     }
 }
