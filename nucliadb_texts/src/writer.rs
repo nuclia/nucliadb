@@ -232,9 +232,7 @@ impl TextWriterService {
             self.schema.status => resource.status as u64,
         );
 
-        #[allow(clippy::iter_cloned_collect)]
-        let resource_labels: Vec<String> = resource.labels.iter().cloned().collect();
-        for label in resource_labels {
+        for label in resource.labels.iter() {
             let facet = Facet::from(label.as_str());
             doc.add_facet(self.schema.facets, facet);
         }
@@ -247,9 +245,7 @@ impl TextWriterService {
             subdoc.add_facet(self.schema.field, facet_field);
             subdoc.add_text(self.schema.text, &text_info.text);
 
-            #[allow(clippy::iter_cloned_collect)]
-            let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
-            for label in field_labels {
+            for label in text_info.labels.iter() {
                 let facet = Facet::from(label.as_str());
                 subdoc.add_facet(self.schema.facets, facet);
             }
