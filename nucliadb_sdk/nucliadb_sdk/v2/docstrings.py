@@ -94,6 +94,30 @@ France won the 2018 football World Cup.
     ],
 )
 
+RESOURCE_CHAT = Docstring(
+    doc="""Chat with your document""",
+    examples=[
+        Example(
+            description="Have a chat with your document. Generated answers are scoped to the context of the document.",
+            code=""">>> sdk.chat_on_resource(kbid="mykbid", query="What is the coldest season in Sevilla?").answer
+January is the coldest month.
+""",
+        ),
+        Example(
+            description="You can use the `content` parameter to pass previous context to the query",
+            code="""from nucliadb_models.search import ChatRequest, Message
+>>> content = ChatRequest()
+>>> content.query = "What is the average temperature?"
+>>> content.context.append(Messate(author="USER", text="What is the coldest season in Sevilla?"))
+>>> content.context.append(Messate(author="NUCLIA", text="January is the coldest month."))
+>>> sdk.chat(kbid="mykbid", content=content).answer
+According to the context, the average temperature in January in Sevilla is 15.9 °C and 5.2 °C.
+""",
+        ),
+    ],
+)
+
+
 DELETE_LABELSET = Docstring(
     doc="Delete a specific set of labels",
     path_param_doc={"labelset": "Id of the labelset to delete"},
