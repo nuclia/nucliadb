@@ -27,13 +27,17 @@ use tantivy::schema::{
 pub struct TextSchema {
     pub schema: Schema,
 
+    /// Resource id
     pub uuid: Field,
+
+    /// Field id
+    pub field: Field,
+
     pub text: Field,
     pub created: Field,
     pub modified: Field,
     pub status: Field,
     pub facets: Field,
-    pub field: Field,
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {

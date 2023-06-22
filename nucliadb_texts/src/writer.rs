@@ -212,6 +212,12 @@ impl TextWriterService {
     }
 
     fn index_document(&mut self, resource: &Resource) {
+        let resource_id = resource
+            .resource
+            .as_ref()
+            .expect("Missing resource ID")
+            .uuid
+            .as_str();
         let metadata = resource
             .metadata
             .as_ref()
@@ -225,35 +231,31 @@ impl TextWriterService {
             .as_ref()
             .expect("Missing resource created date in metadata");
 
-        let mut doc = doc!(
-            self.schema.uuid => resource.resource.as_ref().expect("Missing resource details").uuid.as_str(),
+        let mut base_doc = doc!(
+            self.schema.uuid => resource_id,
             self.schema.modified => timestamp_to_datetime_utc(modified),
             self.schema.created => timestamp_to_datetime_utc(created),
             self.schema.status => resource.status as u64,
         );
 
-        #[allow(clippy::iter_cloned_collect)]
-        let resource_labels: Vec<String> = resource.labels.iter().cloned().collect();
-        for label in resource_labels {
+        for label in resource.labels.iter() {
             let facet = Facet::from(label.as_str());
-            doc.add_facet(self.schema.facets, facet);
+            base_doc.add_facet(self.schema.facets, facet);
         }
 
         for (field, text_info) in &resource.texts {
-            let mut subdoc = doc.clone();
+            let mut field_doc = base_doc.clone();
             let mut facet_key: String = "/".to_owned();
             facet_key.push_str(field.as_str());
             let facet_field = Facet::from(facet_key.as_str());
-            subdoc.add_facet(self.schema.field, facet_field);
-            subdoc.add_text(self.schema.text, &text_info.text);
+            field_doc.add_facet(self.schema.field, facet_field);
+            field_doc.add_text(self.schema.text, &text_info.text);
 
-            #[allow(clippy::iter_cloned_collect)]
-            let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
-            for label in field_labels {
+            for label in text_info.labels.iter() {
                 let facet = Facet::from(label.as_str());
-                subdoc.add_facet(self.schema.facets, facet);
+                field_doc.add_facet(self.schema.facets, facet);
             }
-            self.writer.add_document(subdoc.clone()).unwrap();
+            self.writer.add_document(field_doc).unwrap();
         }
     }
 }
