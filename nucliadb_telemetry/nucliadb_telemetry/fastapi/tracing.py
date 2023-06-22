@@ -49,7 +49,7 @@ ServerRequestHookT = Optional[Callable[[Span, dict], None]]
 
 
 NUCLIA_TRACE_ID_HEADER = "X-NUCLIA-TRACE-ID"
-
+ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
 
 # ----------------------------
 # Forked from https://raw.githubusercontent.com/open-telemetry/opentelemetry-python-contrib/main/instrumentation/opentelemetry-instrumentation-asgi/src/opentelemetry/instrumentation/asgi/__init__.py
@@ -362,4 +362,15 @@ class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
         finally:
             trace_id = str(trace.get_current_span().get_span_context().trace_id)
             response.headers[NUCLIA_TRACE_ID_HEADER] = trace_id
+            if ACCESS_CONTROL_EXPOSE_HEADER in response.headers:
+                exposed_headers = response.headers[ACCESS_CONTROL_EXPOSE_HEADER].split(
+                    ","
+                )
+            else:
+                exposed_headers = []
+            if NUCLIA_TRACE_ID_HEADER not in exposed_headers:
+                exposed_headers.append(NUCLIA_TRACE_ID_HEADER)
+                response.headers[ACCESS_CONTROL_EXPOSE_HEADER] = ",".join(
+                    exposed_headers
+                )
             return response

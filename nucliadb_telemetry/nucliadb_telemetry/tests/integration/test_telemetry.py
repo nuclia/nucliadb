@@ -63,8 +63,9 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
     assert resp.status_code == 200
 
     # Check that trace ids are returned in response headers
-    assert resp.headers["x-nuclia-trace-id"]
-    assert resp.headers["x-nuclia-trace-id"] != "0"
+    assert resp.headers["X-NUCLIA-TRACE-ID"]
+    assert resp.headers["X-NUCLIA-TRACE-ID"] != "0"
+    assert "X-NUCLIA-TRACE-ID" in resp.headers["Access-Control-Expose-Headers"]
 
     for i in range(10):
         if len(greeter.messages) == 0:
