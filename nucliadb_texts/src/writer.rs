@@ -249,7 +249,7 @@ impl TextWriterService {
                 let facet = Facet::from(label.as_str());
                 subdoc.add_facet(self.schema.facets, facet);
             }
-            self.writer.add_document(subdoc.clone()).unwrap();
+            self.writer.add_document(subdoc).unwrap();
         }
     }
 }
