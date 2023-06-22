@@ -30,10 +30,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/catalog$'
           method:
             regex: "GET|OPTIONS"
-        - method:
-            regex: GET|POST|OPTIONS
-          uri:
+        - uri:
             regex: ^/api/v\d+/kb/[^/]+/resource/[^/]+/(chat|find|search)$
+          method:
+            regex: GET|POST|OPTIONS
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/counters'
           method:
