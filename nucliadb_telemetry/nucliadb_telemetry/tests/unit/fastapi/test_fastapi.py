@@ -22,12 +22,12 @@ from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
 
 
-def tests_instrument_app_adds_capture_trace_id_middleware():
+def test_instrument_app_adds_capture_trace_id_middleware():
     app = Mock()
     instrument_app(app, [])
     for middleware_call in app.add_middleware.call_args_list:
-        assert not isinstance(middleware_call[0][0], CaptureTraceIdMiddleware)
+        assert middleware_call[0][0] != CaptureTraceIdMiddleware
 
     app = Mock()
     instrument_app(app, [], trace_id_on_responses=True)
-    app.add_middleware.assert_called_with(CaptureTraceIdMiddleware)
+    assert app.add_middleware.call_args_list[0][0][0] == CaptureTraceIdMiddleware

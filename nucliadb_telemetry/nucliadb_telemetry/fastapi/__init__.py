@@ -80,6 +80,11 @@ def instrument_app(
 
     excluded_urls_obj = ExcludeList(excluded_urls)
 
+    if trace_id_on_responses:
+        # Trace ids are provided by OpenTelemetryMiddleware,
+        # so the capture middleware needs to be added before.
+        app.add_middleware(CaptureTraceIdMiddleware)
+
     app.add_middleware(ContextInjectorMiddleware)
     app.add_middleware(
         OpenTelemetryMiddleware,
@@ -93,7 +98,3 @@ def instrument_app(
         # add last to catch all exceptions
         # `add_middleware` always adds to the beginning of the middleware list
         app.add_middleware(SentryAsgiMiddleware)
-
-    if trace_id_on_responses:
-        # Trace ids are provided by OpenTelemetryMiddleware, so it needs to be added after.
-        app.add_middleware(CaptureTraceIdMiddleware)

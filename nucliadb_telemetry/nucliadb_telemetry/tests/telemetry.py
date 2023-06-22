@@ -317,7 +317,13 @@ async def http_service(
     await init_telemetry(tracer_provider)
     app = FastAPI(title="Test API")  # type: ignore
     set_global_textmap(B3MultiFormat())
-    instrument_app(app, tracer_provider=tracer_provider, excluded_urls=[], metrics=True)
+    instrument_app(
+        app,
+        tracer_provider=tracer_provider,
+        excluded_urls=[],
+        metrics=True,
+        trace_id_on_responses=True,
+    )
 
     @app.get("/")
     async def simple_api():

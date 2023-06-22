@@ -61,6 +61,11 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
         },
     )
     assert resp.status_code == 200
+
+    # Check that trace ids are returned in response headers
+    assert resp.headers["x-nuclia-trace-id"]
+    assert resp.headers["x-nuclia-trace-id"] != "0"
+
     for i in range(10):
         if len(greeter.messages) == 0:
             await asyncio.sleep(1)
