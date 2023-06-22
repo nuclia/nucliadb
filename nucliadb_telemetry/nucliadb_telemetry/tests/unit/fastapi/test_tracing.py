@@ -46,3 +46,18 @@ async def test_capture_trace_id_middleware(trace_id):
     response = await mdw.dispatch(request, call_next)
 
     assert response.headers["X-NUCLIA-TRACE-ID"] == str(trace_id)
+    assert response.headers["Access-Control-Expose-Headers"] == "X-NUCLIA-TRACE-ID"
+
+
+async def test_capture_trace_id_middleware_appends_trace_id_header_to_exposed(trace_id):
+    request = mock.Mock()
+    response = mock.Mock(headers={"Access-Control-Expose-Headers": "Foo-Bar,X-Header"})
+    call_next = mock.AsyncMock(return_value=response)
+
+    mdw = CaptureTraceIdMiddleware(mock.Mock())
+    response = await mdw.dispatch(request, call_next)
+
+    assert (
+        response.headers["Access-Control-Expose-Headers"]
+        == "Foo-Bar,X-Header,X-NUCLIA-TRACE-ID"
+    )
