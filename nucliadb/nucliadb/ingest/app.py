@@ -84,6 +84,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
+        teardown_cluster,
     ]
 
     if not transaction_settings.transaction_local:
@@ -104,7 +105,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
             health.nats_manager_healthy,
             health.nodes_health_check,
             health.pubsub_check,
-            teardown_cluster,
         ]
     )
 
