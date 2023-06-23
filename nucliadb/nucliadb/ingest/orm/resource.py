@@ -116,7 +116,7 @@ KB_REVERSE: dict[str, FieldType.ValueType] = {
     "c": FieldType.CONVERSATION,
 }
 
-KB_REVERSE_REVERSE = {v: k for k, v in KB_REVERSE.items()}
+FIELD_TYPE_TO_ID = {v: k for k, v in KB_REVERSE.items()}
 
 _executor = ThreadPoolExecutor(10)
 
@@ -617,7 +617,9 @@ class Resource:
             self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
-    async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
+    async def get_field(
+        self, key: str, type: FieldType.ValueType, load: bool = True
+    ) -> Field:
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
@@ -967,7 +969,7 @@ class Resource:
         await field_obj.set_large_field_metadata(field_large_metadata)
 
     def generate_field_id(self, field: FieldID) -> str:
-        return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
+        return f"{FIELD_TYPE_TO_ID[field.field_type]}/{field.field}"
 
     @processor_observer.wrap({"type": "compute_global_tags"})
     async def compute_global_tags(self, brain: ResourceBrain):
