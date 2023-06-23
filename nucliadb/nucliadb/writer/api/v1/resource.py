@@ -18,11 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import time
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
-from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -41,6 +40,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, SYNC_CALL, X_NUCLIADB_USER
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -81,15 +81,6 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction_utility,
 )
-
-if TYPE_CHECKING:  # pragma: no cover
-    SKIP_STORE_DEFAULT = False
-    SYNC_CALL = False
-    X_NUCLIADB_USER = ""
-else:
-    SKIP_STORE_DEFAULT = Header(False)
-    SYNC_CALL = Header(False)
-    X_NUCLIADB_USER = Header("")
 
 
 @api.post(

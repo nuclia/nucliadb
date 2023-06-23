@@ -35,6 +35,96 @@ class Docstring(BaseModel):
     path_param_doc: Dict[str, str] = {}
 
 
+CREATE_RESOURCE = Docstring(
+    doc="""Create a resource in your Knowledge Box""",
+    examples=[
+        Example(
+            description="You can create a resource with a single text field",
+            code=""">>> from nucliadb_sdk import *
+>>> from nucliadb_models.text import TextField
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> text = TextField(body="This is the content of my file")
+>>> resp = sdk.create_resource(kbid="mykbid", texts={"text1": text})
+""",
+        ),
+        Example(
+            description="Other formats like json, rst, html or markdown are also supported",
+            code=""">>> from nucliadb_sdk import *
+>>> from nucliadb_models.text import TextField, TextFormat
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> text = TextField(format=TextFormat.JSON, body="{'this_is_a': 'json_document'}")
+>>> resp = sdk.create_resource(kbid="mykbid", title="Myfile.json", slug="my-resource" texts={"text1": text})
+""",
+        ),
+    ],
+)
+
+UPDATE_RESOURCE = Docstring(
+    doc="""Update a Resource from your Knowledge Box""",
+    examples=[
+        Example(
+            description="You can update any of the resource attributes with this method",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> resp = sdk.update_resoure(kbid="mykbid", rid="cf54a55", title="My new title")
+""",
+        ),
+    ],
+)
+
+GET_RESOURCE_BY_ID = Docstring(
+    doc="""Get Resource by id""",
+    examples=[
+        Example(
+            description="Endpoint query parameters can be specified as follows:",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> resource = sdk.get_resource_by_id(kbid="mykbid", rid="cf54a55", query_params={"show": ["values", "basic"]})
+>>> resource.title
+My resource title
+""",
+        ),
+    ],
+)
+
+GET_RESOURCE_BY_SLUG = Docstring(
+    doc="""Get Resource by slug""",
+    examples=[
+        Example(
+            description="Get the resource by its slug, which you can set upon creation",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> resource = sdk.get_resource_by_slug(kbid="mykbid", rslug="myresource")
+>>> resource.title
+My resource title
+""",
+        ),
+    ],
+)
+
+LIST_RESOURCES = Docstring(
+    doc="""List the resources in your Knowledge Box""",
+    examples=[
+        Example(
+            description="Paginate through all the resources in your Knowledge Box",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> all_resources = []
+>>> page = 0
+>>> while True:
+...    result = sdk.list_resources(kbid="mykbid", query_params={"page": page})
+...    if result.pagination.last:
+...        break
+...    all_resources.extend(result.resources)
+...    page += 1
+>>> len(all_resources)
+45
+""",
+        ),
+    ],
+)
+
+
 SEARCH = Docstring(
     doc="""Search in your Knowledge Box""",
     examples=[
