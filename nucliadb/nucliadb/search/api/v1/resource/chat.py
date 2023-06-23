@@ -19,7 +19,7 @@
 #
 from typing import Union
 
-from fastapi import Body, Header, Request, Response
+from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
@@ -39,44 +39,35 @@ from nucliadb_models.search import (
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
-CHAT_EXAMPLES = {
-    "search_and_chat": {
-        "summary": "Ask who won the league final",
-        "description": "You can ask a question to your knowledge box",  # noqa
-        "value": {
-            "query": "Who won the league final?",
-        },
-    },
-}
-
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/chat",
+    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/chat",
     status_code=200,
-    name="Chat Knowledge Box",
-    summary="Chat on a Knowledge Box",
-    description="Chat on a Knowledge Box",
+    name="Chat with a Resource (by id)",
+    summary="Chat with a resource",
+    description="Chat with a resource",
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def chat_knowledgebox_endpoint(
+async def resource_chat_endpoint(
     request: Request,
     response: Response,
     kbid: str,
-    item: ChatRequest = Body(examples=CHAT_EXAMPLES),
+    rid: str,
+    item: ChatRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[StreamingResponse, HTTPClientError]:
     try:
-        return await chat_knowledgebox(
-            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        return await resource_chat(
+            response, kbid, rid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except SendToPredictError:
-        return HTTPClientError(status_code=503, detail="Chat service unavailable")
+        return HTTPClientError(status_code=503, detail="Chat service not available")
     except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,
@@ -84,21 +75,23 @@ async def chat_knowledgebox_endpoint(
         )
 
 
-async def chat_knowledgebox(
+async def resource_chat(
     response: Response,
     kbid: str,
+    rid: str,
     item: ChatRequest,
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ):
     new_query = item.query
-    if item.context is not None and len(item.context) > 0:
+    if item.context and len(item.context) > 0:
         new_query = await rephrase_query_from_context(
             kbid, item.context, item.query, x_nucliadb_user
         )
 
     find_request = FindRequest()
+    find_request.resource_filters = [rid]
     find_request.features = [
         SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
@@ -128,4 +121,5 @@ async def chat_knowledgebox(
     )
     if incomplete:
         raise IncompleteFindResultsError()
+
     return await chat(kbid, find_results, item, x_nucliadb_user)

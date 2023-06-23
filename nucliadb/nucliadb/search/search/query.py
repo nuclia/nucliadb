@@ -70,6 +70,7 @@ async def global_query_to_pb(
     with_status: Optional[ResourceProcessingStatus] = None,
     with_synonyms: bool = False,
     autofilter: bool = False,
+    key_filters: Optional[List[str]] = None,
 ) -> Tuple[SearchRequest, bool, List[str]]:
     """
     Converts the pydantic query to a protobuf query
@@ -93,6 +94,7 @@ async def global_query_to_pb(
     request.filter.tags.extend(filters)
     request.faceted.tags.extend(faceted)
     request.fields.extend(fields)
+    request.key_filters.extend(key_filters or [])
 
     if with_status is not None:
         request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]

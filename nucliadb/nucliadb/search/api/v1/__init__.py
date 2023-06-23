@@ -21,7 +21,8 @@ from . import chat  # noqa
 from . import feedback  # noqa
 from . import find  # noqa
 from . import knowledgebox  # noqa
-from . import resource  # noqa
 from . import search  # noqa
 from . import suggest  # noqa
+from .resource import chat as chat_resource  # noqa
+from .resource import search as search_resource  # noqa
 from .router import api  # noqa

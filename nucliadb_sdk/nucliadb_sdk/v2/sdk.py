@@ -302,6 +302,7 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=CreateResourcePayload,
         response_type=ResourceCreated,
+        docstring=docstrings.CREATE_RESOURCE,
     )
     update_resource = _request_builder(
         name="update_resource",
@@ -310,6 +311,7 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=UpdateResourcePayload,
         response_type=ResourceUpdated,
+        docstring=docstrings.UPDATE_RESOURCE,
     )
     delete_resource = _request_builder(
         name="delete_resource",
@@ -326,6 +328,7 @@ class _NucliaDBBase:
         path_params=("kbid", "slug"),
         request_type=None,
         response_type=Resource,
+        docstring=docstrings.GET_RESOURCE_BY_SLUG,
     )
     get_resource_by_id = _request_builder(
         name="get_resource_by_id",
@@ -334,6 +337,7 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=None,
         response_type=Resource,
+        docstring=docstrings.GET_RESOURCE_BY_ID,
     )
     list_resources = _request_builder(
         name="list_resources",
@@ -342,6 +346,7 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=ResourceList,
+        docstring=docstrings.LIST_RESOURCES,
     )
 
     # Conversation endpoints
@@ -493,6 +498,15 @@ class _NucliaDBBase:
         request_type=ChatRequest,
         response_type=chat_response_parser,
         docstring=docstrings.CHAT,
+    )
+    chat_on_resource = _request_builder(
+        name="chat_on_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/chat",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+        docstring=docstrings.RESOURCE_CHAT,
     )
 
 

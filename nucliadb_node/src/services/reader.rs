@@ -43,6 +43,7 @@ use crate::telemetry::run_with_telemetry;
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
+const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 
 #[derive(Debug)]
 pub struct ShardReaderService {
@@ -298,26 +299,20 @@ impl ShardReaderService {
     /// defines the limit of words a query can have.
     #[tracing::instrument(skip_all)]
     fn split_suggest_query(query: String, max_group: usize) -> Vec<String> {
-        let words = query.split(' ');
-        let mut i = 0;
-        let mut prefixes = vec![];
-        let mut prefix = String::new();
-
-        for word in words.rev() {
-            if prefix.is_empty() {
-                prefix = word.to_string();
-            } else {
-                prefix = format!("{word} {prefix}");
-            }
-            prefixes.push(prefix.clone());
-
-            i += 1;
-            if i == max_group {
-                break;
+        // Paying the price of allocating the vector to not have to
+        // prepend to the partial strings.
+        let relevant_words: Vec<_> = query.split(' ').rev().take(max_group).collect();
+        let mut prefixes = vec![String::new(); max_group];
+        for (index, word) in relevant_words.into_iter().rev().enumerate() {
+            // The inner loop is upper-bounded by max_group
+            for prefix in prefixes.iter_mut().take(index + 1) {
+                if !prefix.is_empty() {
+                    prefix.push(' ');
+                }
+                prefix.push_str(word);
             }
         }
-
-        prefixes.into_iter().rev().collect()
+        prefixes
     }
 
     #[tracing::instrument(skip_all)]
@@ -329,17 +324,20 @@ impl ShardReaderService {
         let paragraph_reader_service = self.paragraph_reader.clone();
 
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
-        let relations = prefixes.par_iter().map(|prefix| {
-            let request = RelationSearchRequest {
-                shard_id: String::default(),
-                prefix: Some(RelationPrefixSearchRequest {
-                    prefix: prefix.clone(),
-                    ..Default::default()
-                }),
+        let relations = prefixes
+            .par_iter()
+            .filter(|p| p.len() >= MIN_VIABLE_PREFIX_SUGGEST)
+            .cloned()
+            .map(|prefix| RelationPrefixSearchRequest {
+                prefix,
                 ..Default::default()
-            };
-            relations_reader_service.search(&request)
-        });
+            })
+            .map(|prefix| RelationSearchRequest {
+                shard_id: String::default(),
+                prefix: Some(prefix),
+                ..Default::default()
+            })
+            .map(|request| relations_reader_service.search(&request));
 
         let relation_task = move || relations.collect::<Vec<_>>();
         let paragraph_task = move || paragraph_reader_service.suggest(&request);
@@ -349,22 +347,15 @@ impl ShardReaderService {
         let info = info_span!(parent: &span, "paragraph suggest");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
 
-        let tasks = thread::join(paragraph_task, relation_task);
-        let rparagraph = tasks.0.unwrap();
-        let entities = tasks
-            .1
+        let (paragraph, relation) = thread::join(paragraph_task, relation_task);
+        let rparagraph = paragraph?;
+        let entities = relation
             .into_iter()
-            .flat_map(|relation| {
-                relation
-                    .unwrap()
-                    .prefix
-                    .expect("Prefix search request must return a prefix response")
-                    .nodes
-                    .iter()
-                    .map(|relation_node| relation_node.value.clone())
-                    .collect::<Vec<String>>()
-            })
-            .collect::<Vec<String>>();
+            .flatten()
+            .flat_map(|r| r.prefix)
+            .flat_map(|prefix| prefix.nodes.into_iter())
+            .map(|node| node.value)
+            .collect::<Vec<_>>();
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -432,6 +423,7 @@ impl ShardReaderService {
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
+            key_filters: search_request.key_filters.clone(),
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
         let paragraph_task = move || {
@@ -450,7 +442,7 @@ impl ShardReaderService {
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             with_duplicates: true,
-            keys: search_request.keys,
+            key_filters: search_request.key_filters.clone(),
             tags: search_request
                 .filter
                 .iter()
@@ -615,13 +607,12 @@ mod tests {
     fn test_suggest_split() {
         let query = "Some search with multiple words".to_string();
 
-        assert_eq!(
-            ShardReaderService::split_suggest_query(query.clone(), 3),
-            vec!["with multiple words", "multiple words", "words"]
-        );
-        assert_eq!(
-            ShardReaderService::split_suggest_query(query, 2),
-            vec!["multiple words", "words"]
-        );
+        let expected = vec!["with multiple words", "multiple words", "words"];
+        let got = ShardReaderService::split_suggest_query(query.clone(), 3);
+        assert_eq!(expected, got);
+
+        let expected = vec!["multiple words", "words"];
+        let got = ShardReaderService::split_suggest_query(query, 2);
+        assert_eq!(expected, got);
     }
 }

@@ -16,24 +16,4 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
-from nucliadb.search import SERVICE_NAME
-from nucliadb.search.app import application
-from nucliadb_telemetry.fastapi import instrument_app
-from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.utils import get_telemetry
-from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
-
-
-def run():
-    setup_logging()
-    instrument_app(
-        application,
-        tracer_provider=get_telemetry(SERVICE_NAME),
-        excluded_urls=["/"],
-        metrics=True,
-        trace_id_on_responses=True,
-    )
-
-    run_fastapi_with_metrics(application)
+#

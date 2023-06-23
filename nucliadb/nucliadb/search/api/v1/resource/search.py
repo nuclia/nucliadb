@@ -20,12 +20,11 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import Header, HTTPException, Query, Request, Response
+from fastapi import Header, Query, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.ingest.txn_utils import abort_transaction
-from nucliadb.search import SERVICE_NAME
+from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_paragraphs_results
@@ -43,17 +42,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires_one
 
-from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/search",
-    status_code=200,
-    name="Search on Resource",
-    description="Search on a Resource",
-    tags=["Search"],
-    response_model_exclude_unset=True,
-)
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/search",
     status_code=200,
@@ -64,13 +53,12 @@ from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def search(
+async def resource_search(
     request: Request,
     response: Response,
     kbid: str,
     query: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    rid: str,
     fields: List[str] = fastapi_query(SearchParamDefaults.fields),
     filters: List[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -107,11 +95,6 @@ async def search(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> ResourceSearchResults:
-    if not rid:
-        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
-        if rid is None:
-            raise HTTPException(status_code=404, detail="Resource does not exist")
-
     # We need to query all nodes
     pb_query = await paragraph_query_to_pb(
         [SearchOptions.PARAGRAPH],
