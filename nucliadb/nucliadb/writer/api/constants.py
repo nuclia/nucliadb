@@ -33,10 +33,10 @@ else:
     )
     SYNC_CALL = Header(
         False,
-        description="The request will return when the changes to be commited to the database",
+        description="If set to true, the request will return when the changes to be commited to the database.",
     )
     X_NUCLIADB_USER = Header("")
     X_FILE_PASSWORD = Header(
         None,
-        description="If some of the files are password protected, the password must be provided here for the file to be processed",  # noqa
+        description="If a file is password protected, the password must be provided here for the file to be processed",  # noqa
     )
