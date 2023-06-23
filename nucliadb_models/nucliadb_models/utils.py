@@ -24,6 +24,8 @@ import pydantic
 
 
 class FieldIdString(pydantic.ConstrainedStr):
+    """A string that is used as a field id."""
+
     regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
 
     @classmethod

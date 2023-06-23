@@ -20,7 +20,6 @@
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, Response
-from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
 from nucliadb_protos.resources_pb2 import FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -31,6 +30,12 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer.api.constants import (
+    SKIP_STORE_DEFAULT,
+    SYNC_CALL,
+    X_FILE_PASSWORD,
+    X_NUCLIADB_USER,
+)
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
@@ -57,17 +62,9 @@ from nucliadb_utils.utilities import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    SKIP_STORE_DEFAULT = False
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, FieldType.V]
-    SYNC_CALL = False
-    X_NUCLIADB_USER = ""
-    X_FILE_PASSWORD = None
 else:
-    SKIP_STORE_DEFAULT = Header(False)
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, int]
-    SYNC_CALL = Header(False)
-    X_NUCLIADB_USER = Header("")
-    X_FILE_PASSWORD = Header(None)
 
 
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
