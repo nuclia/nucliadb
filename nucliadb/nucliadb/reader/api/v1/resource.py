@@ -66,8 +66,8 @@ async def list_resources(
     request: Request,
     response: Response,
     kbid: str,
-    page: int = Query(0),
-    size: int = Query(DEFAULT_RESOURCE_LIST_PAGE_SIZE),
+    page: int = Query(0, description="Requested page number (0-based)"),
+    size: int = Query(DEFAULT_RESOURCE_LIST_PAGE_SIZE, description="Page size"),
 ) -> ResourceList:
     # Get all resource id's fast by scanning all existing slugs
 
