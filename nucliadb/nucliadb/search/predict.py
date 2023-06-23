@@ -26,7 +26,12 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.search import logger
-from nucliadb_models.search import ChatModel, FeedbackRequest, RephraseModel
+from nucliadb_models.search import (
+    AskDocumentModel,
+    ChatModel,
+    FeedbackRequest,
+    RephraseModel,
+)
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
@@ -57,6 +62,7 @@ PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
 CHAT = "/chat"
+ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
 
@@ -134,6 +140,11 @@ class DummyPredictEngine:
 
         return (DUMMY_LEARNING_ID, generate())
 
+    async def ask_document(self, kbid: str, query: str, blocks: list[list[str]]) -> str:
+        self.calls.append((query, blocks))
+        answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
+        return answer
+
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         self.calls.append(sentence)
         if (
@@ -175,6 +186,22 @@ class PredictEngine:
 
     async def finalize(self):
         await self.session.close()
+
+    def check_nua_key(self):
+        if self.onprem and self.nuclia_service_account is None:
+            raise SendToPredictError("Missing nuclia service account")
+
+    def get_predict_url(self, endpoint: str) -> str:
+        if self.onprem:
+            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
+        else:
+            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+
+    def get_predict_headers(self, kbid: str) -> dict[str, str]:
+        if self.onprem:
+            return {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+        else:
+            return {"X-STF-KBID": kbid}
 
     async def check_response(self, resp, expected: int = 200) -> None:
         if resp.status == expected:
@@ -273,6 +300,18 @@ class PredictEngine:
         await self.check_response(resp, expected=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
         return ident, resp.content.iter_any()
+
+    @predict_observer.wrap({"type": "ask_document"})
+    async def ask_document(self, kbid: str, query: str, blocks: list[list[str]]) -> str:
+        self.check_nua_key()
+        url = self.get_predict_url(ASK_DOCUMENT)
+        headers = self.get_predict_headers(kbid)
+        item = AskDocumentModel(query=query, blocks=blocks)
+        resp = await self.session.post(
+            url=url, json=item.dict(), headers=headers, timeout=None
+        )
+        await self.check_response(resp, expected=200)
+        return resp.text()
 
     @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
