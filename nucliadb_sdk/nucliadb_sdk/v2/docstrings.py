@@ -66,7 +66,7 @@ UPDATE_RESOURCE = Docstring(
             description="You can update any of the resource attributes with this method",
             code=""">>> from nucliadb_sdk import *
 >>> sdk = NucliaDBSDK(api_key="api-key")
->>> resp = sdk.update_resoure(kbid="mykbid", rid=rid, title="My new title")
+>>> resp = sdk.update_resoure(kbid="mykbid", rid="cf54a55", title="My new title")
 """,
         ),
     ],
