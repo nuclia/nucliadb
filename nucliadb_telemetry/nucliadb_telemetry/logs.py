@@ -26,6 +26,7 @@ from typing import Any
 import orjson
 import pydantic
 from opentelemetry import trace
+from opentelemetry.trace import format_span_id, format_trace_id
 from opentelemetry.trace.span import INVALID_SPAN
 
 from nucliadb_telemetry.settings import LogLevel, LogSettings
@@ -111,8 +112,8 @@ class JSONFormatter(logging.Formatter):
             span_context = current_span.get_span_context()
             # for us, this is opentelemetry trace_id/span_id
             # GCP has logging.googleapis.com/spanId but it's for it's own cloud tracing system
-            data["trace_id"] = str(span_context.trace_id)
-            data["span_id"] = str(span_context.span_id)
+            data["trace_id"] = format_trace_id(span_context.trace_id)
+            data["span_id"] = format_span_id(span_context.span_id)
 
         if hasattr(record, "stack_info"):
             data["stack_info"] = record.stack_info

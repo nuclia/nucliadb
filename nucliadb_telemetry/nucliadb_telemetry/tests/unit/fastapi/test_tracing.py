@@ -19,6 +19,7 @@
 from unittest import mock
 
 import pytest
+from opentelemetry.trace import format_trace_id
 
 from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
 
@@ -45,7 +46,7 @@ async def test_capture_trace_id_middleware(trace_id):
     mdw = CaptureTraceIdMiddleware(mock.Mock())
     response = await mdw.dispatch(request, call_next)
 
-    assert response.headers["X-NUCLIA-TRACE-ID"] == str(trace_id)
+    assert response.headers["X-NUCLIA-TRACE-ID"] == format_trace_id(trace_id)
     assert response.headers["Access-Control-Expose-Headers"] == "X-NUCLIA-TRACE-ID"
 
 
