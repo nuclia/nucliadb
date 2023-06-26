@@ -24,6 +24,14 @@ import os
 import pytest
 from httpx import AsyncClient
 
+_dir = os.path.dirname(__file__)
+_testdata_dir = os.path.join(_dir, "..", "testdata")
+
+INVOICE_FILENAME = os.path.join(_testdata_dir, "invoice.pdf")
+INVOICE_SELECTIONS_FILENAME = os.path.join(_testdata_dir, "invoice_selections.json")
+
+PAGE_0_SELECTION_COUNT = 18
+
 
 @pytest.fixture(scope="function")
 @pytest.mark.asyncio
@@ -34,18 +42,10 @@ async def annotated_file_field(
     kbid = knowledgebox
     field_id = "invoice"
 
-    testdata_dir = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "testdata",
-    )
-
-    invoice_filename = os.path.join(testdata_dir, "invoice.pdf")
-    with open(invoice_filename, "rb") as f:
+    with open(INVOICE_FILENAME, "rb") as f:
         invoice_content = f.read()
 
-    selections_filename = os.path.join(testdata_dir, "invoice_selections.json")
-    with open(selections_filename) as f:
+    with open(INVOICE_SELECTIONS_FILENAME) as f:
         selections = json.load(f)
 
     selections_by_page = {}
@@ -65,6 +65,7 @@ async def annotated_file_field(
                 ],
             }
         )
+    assert len(selections_by_page[0]) == PAGE_0_SELECTION_COUNT
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -108,13 +109,14 @@ async def test_visual_selection(
     rid, field_id = annotated_file_field
 
     resp = await nucliadb_reader.get(
-        # f"/kb/{kbid}/resource/{rid}/file/{field_id}",
-        # params={"show": ["value", "extracted"]},
         f"/kb/{kbid}/resource/{rid}",
-        params={"show": ["basic", "extra", "values", "extracted"]},
     )
     assert resp.status_code == 200
     body = resp.json()
 
-    # TODO
-    pass
+    assert len(body["fieldmetadata"][0]["selections"]) == 1
+    assert body["fieldmetadata"][0]["selections"][0]["page"] == 0
+    assert (
+        len(body["fieldmetadata"][0]["selections"][0]["visual"])
+        == PAGE_0_SELECTION_COUNT
+    )
