@@ -577,11 +577,36 @@ pub struct ParagraphAnnotation {
     pub classifications: ::prost::alloc::vec::Vec<Classification>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VisualSelection {
+    #[prost(string, tag="1")]
+    pub label: ::prost::alloc::string::String,
+    #[prost(float, tag="2")]
+    pub top: f32,
+    #[prost(float, tag="3")]
+    pub left: f32,
+    #[prost(float, tag="4")]
+    pub right: f32,
+    #[prost(float, tag="5")]
+    pub bottom: f32,
+    /// Token IDs are the indexes in PageStructure
+    #[prost(uint32, repeated, tag="6")]
+    pub token_ids: ::prost::alloc::vec::Vec<u32>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageSelections {
+    #[prost(uint32, tag="1")]
+    pub page: u32,
+    #[prost(message, repeated, tag="2")]
+    pub visual: ::prost::alloc::vec::Vec<VisualSelection>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserFieldMetadata {
     #[prost(message, repeated, tag="1")]
     pub token: ::prost::alloc::vec::Vec<TokenSplit>,
     #[prost(message, repeated, tag="2")]
     pub paragraphs: ::prost::alloc::vec::Vec<ParagraphAnnotation>,
+    #[prost(message, repeated, tag="4")]
+    pub page_selections: ::prost::alloc::vec::Vec<PageSelections>,
     #[prost(message, optional, tag="3")]
     pub field: ::core::option::Option<FieldId>,
 }

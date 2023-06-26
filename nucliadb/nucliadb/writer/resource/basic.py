@@ -27,10 +27,11 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldType,
     Metadata,
+    PageSelections,
     Paragraph,
 )
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation as PBParagraphAnnotation
-from nucliadb_protos.resources_pb2 import TokenSplit, UserFieldMetadata
+from nucliadb_protos.resources_pb2 import TokenSplit, UserFieldMetadata, VisualSelection
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -110,6 +111,24 @@ def parse_basic_modify(
                         )
                     )
                 userfieldmetadata.paragraphs.append(paragraphpb)
+
+            for page_selections in fieldmetadata.selections:
+                page_selections_pb = PageSelections()
+                page_selections_pb.page = page_selections.page
+                page_selections_pb.visual.extend(
+                    [
+                        VisualSelection(
+                            label=visual_selection.label,
+                            top=visual_selection.top,
+                            left=visual_selection.left,
+                            right=visual_selection.right,
+                            bottom=visual_selection.bottom,
+                            token_ids=visual_selection.token_ids,
+                        )
+                        for visual_selection in page_selections.visual
+                    ]
+                )
+                userfieldmetadata.page_selections.append(page_selections_pb)
 
             userfieldmetadata.field.field = fieldmetadata.field.field
             userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[  # type: ignore

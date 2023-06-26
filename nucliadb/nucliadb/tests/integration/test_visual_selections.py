@@ -83,10 +83,10 @@ async def annotated_file_field(
             "fieldmetadata": [
                 {
                     "field": {"field": field_id, "field_type": "file"},
-                    "visual_selections": [
+                    "selections": [
                         {
                             "page": page,
-                            "selections": selections,
+                            "visual": selections,
                         }
                         for page, selections in selections_by_page.items()
                     ],
@@ -108,11 +108,14 @@ async def test_visual_selection(
     rid, field_id = annotated_file_field
 
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/file/{field_id}",
-        params={"show": ["value", "extracted"]},
+        # f"/kb/{kbid}/resource/{rid}/file/{field_id}",
+        # params={"show": ["value", "extracted"]},
+        f"/kb/{kbid}/resource/{rid}",
+        params={"show": ["basic", "extra", "values", "extracted"]},
     )
     assert resp.status_code == 200
     body = resp.json()
     print(json.dumps(body, indent=4))
+
     # TODO
     pass

@@ -281,12 +281,12 @@ class VisualSelection(BaseModel):
     left: float
     right: float
     bottom: float
-    token_ids: List[str]
+    token_ids: List[int]
 
 
-class PageVisualSelections(BaseModel):
-    page: str
-    selections: List[VisualSelection]
+class PageSelections(BaseModel):
+    page: int
+    visual: List[VisualSelection]
 
 
 class UserFieldMetadata(BaseModel):
@@ -296,7 +296,7 @@ class UserFieldMetadata(BaseModel):
 
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
-    visual_selections: List[PageVisualSelections] = []
+    selections: List[PageSelections] = []
     field: FieldID
 
     @classmethod
@@ -307,6 +307,17 @@ class UserFieldMetadata(BaseModel):
             including_default_value_fields=True,
             use_integers_for_enums=True,
         )
+        value["selections"] = [
+            MessageToDict(
+                selections,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+                use_integers_for_enums=True,
+            )
+            for selections in message.page_selections
+        ]
+        print("FROM_MESSAGE")
+        print(value)
         value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]]
         return cls(**value)
 
