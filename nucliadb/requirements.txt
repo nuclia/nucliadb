@@ -37,7 +37,7 @@ grpc-stubs>=1.24.7
 aiodns>=3.0.0
 
 types-orjson
-nucliadb-telemetry>=1.11.1
+nucliadb-telemetry>=1.12.0
 nucliadb-utils[storages,fastapi,cache]
 nucliadb-protos
 nucliadb-models>=2.15.1.post353
