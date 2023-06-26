@@ -19,7 +19,6 @@
 #
 import asyncio
 import logging
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import aiohttp.client_exceptions
@@ -36,7 +35,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
@@ -44,17 +43,6 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class KBModelMetadata:
-    """
-    Metadata of the semantic model associated to the Knowledge Box
-    """
-
-    similarity_function: utils_pb2.VectorSimilarity = utils_pb2.VectorSimilarity.COSINE
-    vector_dimension: Optional[int] = None
-    default_min_score: Optional[float] = None
 
 
 class Processor:
