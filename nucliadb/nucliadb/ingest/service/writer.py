@@ -200,7 +200,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             kbid = await self.proc.create_kb(
                 request.slug,
                 request.config,
-                semantic_model=parse_model_metadata(request),
+                parse_model_metadata(request),
                 forceuuid=request.forceuuid,
             )
         except KnowledgeBoxConflict:

@@ -457,7 +457,7 @@ class KnowledgeBox:
             )
             return VectorSimilarity.COSINE
 
-    async def get_model_metadata(self) -> SemanticModelMetadata.ValueType:
+    async def get_model_metadata(self) -> SemanticModelMetadata:
         # TODO: cleanp this code after a migration is done unifying all fields under `model``
         try:
             shards_obj = await self.get_shards_object()
