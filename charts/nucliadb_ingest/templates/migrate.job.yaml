@@ -47,7 +47,7 @@ spec:
               value: {{ tpl $value $ | toJson }}
           {{- end }}
           resources:
-{{ toYaml .Values.ingest_orm_grpc_resources | indent 10 }}
+{{ toYaml .Values.ingest_orm_grpc_resources | indent 12 }}
 {{- if .Values.nats.secretName }}
           volumeMounts:
             - name: nats-creds
