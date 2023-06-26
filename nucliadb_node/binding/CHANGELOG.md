@@ -1,4 +1,7 @@
 # Changelog
+## 0.7.7
+
+- Upgrade to 1.70.0
 
 ## 0.7.7
 
