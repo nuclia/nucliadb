@@ -22,14 +22,14 @@ import os
 import types
 from functools import lru_cache
 
-import nucliadb.migrations
+import migrations
 
 from .models import Migration
 
 logger = logging.getLogger(__name__)
 
 MIGRATION_DIR = os.path.sep.join(
-    os.path.dirname(os.path.abspath(__file__)).split(os.path.sep)[:-1]
+    os.path.dirname(os.path.abspath(__file__)).split(os.path.sep)[:-2] + ["migrations"]
 )
 
 
@@ -39,8 +39,8 @@ def get_migration_modules() -> list[tuple[types.ModuleType, int]]:
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
             version = int(module_name.split("_")[-1])
-            __import__(f"nucliadb.migrations.{module_name}")
-            module = getattr(nucliadb.migrations, module_name)
+            __import__(f"migrations.{module_name}")
+            module = getattr(migrations, module_name)
             if not hasattr(module, "migrate"):
                 raise Exception(f"Missing `migrate` function in {module_name}")
             if not hasattr(module, "migrate_kb"):
