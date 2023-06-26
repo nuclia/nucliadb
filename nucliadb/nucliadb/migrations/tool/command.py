@@ -19,6 +19,8 @@
 #
 import asyncio
 
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 
 from . import migrator
@@ -27,6 +29,9 @@ from .settings import Settings
 
 
 async def run():
+    setup_logging()
+    await setup_telemetry("migrator")
+
     settings = Settings()
     context = ExecutionContext(settings)
     await context.initialize()
