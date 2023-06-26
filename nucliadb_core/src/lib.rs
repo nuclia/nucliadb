@@ -27,7 +27,7 @@ pub mod vectors;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
-use nucliadb_protos::{Resource, ResourceId};
+use nucliadb_protos::noderesources::{Resource, ResourceId};
 pub type NodeResult<O> = anyhow::Result<O>;
 
 pub fn paragraph_write(
@@ -79,7 +79,7 @@ pub fn relation_read(
 }
 
 pub mod protos {
-    pub use nucliadb_protos::*;
+    pub use nucliadb_protos::prelude::*;
     pub use {prost, prost_types};
 }
 

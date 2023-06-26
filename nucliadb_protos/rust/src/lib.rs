@@ -21,20 +21,16 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 pub mod fdbwriter;
-mod knowledgebox;
-mod nodereader;
-mod noderesources;
-mod nodewriter;
-mod resources;
-mod utils;
+pub mod knowledgebox;
+pub mod nodereader;
+pub mod noderesources;
+pub mod nodewriter;
+pub mod resources;
+pub mod utils;
 
-extern crate serde;
-
-// writer should not serialized to rust as its only ingest and brings conflict
-// pub use fdbwriter::*;
-pub use knowledgebox::*;
-pub use nodereader::*;
-pub use noderesources::*;
-pub use nodewriter::*;
-pub use resources::*;
-pub use utils::*;
+pub mod prelude {
+    pub use super::nodereader::*;
+    pub use super::noderesources::*;
+    pub use super::nodewriter::*;
+    pub use super::utils::*;
+}

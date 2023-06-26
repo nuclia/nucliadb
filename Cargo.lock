@@ -2024,7 +2024,6 @@ dependencies = [
  "nucliadb_cluster",
  "nucliadb_core",
  "nucliadb_paragraphs",
- "nucliadb_protos",
  "nucliadb_relations",
  "nucliadb_telemetry",
  "nucliadb_texts",
@@ -2068,7 +2067,6 @@ dependencies = [
  "log",
  "nucliadb_core",
  "nucliadb_node",
- "nucliadb_protos",
  "nucliadb_telemetry",
  "openssl",
  "prost",
@@ -2104,7 +2102,6 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "serde",
  "tonic",
  "tonic-build",
 ]

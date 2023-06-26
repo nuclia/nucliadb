@@ -20,9 +20,8 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use nucliadb_protos::*;
-
 use crate::prelude::*;
+use crate::protos::*;
 
 pub type RelationsReaderPointer = Arc<dyn RelationReader>;
 pub type RelationsWriterPointer = Arc<RwLock<dyn RelationWriter>>;
