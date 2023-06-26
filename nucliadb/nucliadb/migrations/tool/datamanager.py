@@ -34,8 +34,9 @@ class _Unset:
 
 _UNSET = _Unset()
 
+MIGRATIONS_CONTAINER_KEY = "migrations/"
 MIGRATIONS_KEY = "migrations/{kbid}"
-MIGRATION_INFO = "migration/info"
+MIGRATION_INFO_KEY = "migration/info"
 
 
 class MigrationsDataManager:
@@ -53,7 +54,7 @@ class MigrationsDataManager:
     async def get_kb_migrations(self, limit: int = 100) -> list[str]:
         keys = []
         async with self.driver.transaction() as txn:
-            async for key in txn.keys("migrations/", count=limit):
+            async for key in txn.keys(MIGRATIONS_CONTAINER_KEY, count=limit):
                 keys.append(key.split("/")[-1])
 
         return keys
@@ -81,7 +82,7 @@ class MigrationsDataManager:
 
     async def get_global_info(self) -> GlobalInfo:
         async with self.driver.transaction() as txn:
-            raw_pb = await txn.get(MIGRATION_INFO)
+            raw_pb = await txn.get(MIGRATION_INFO_KEY)
         if raw_pb is None:
             return GlobalInfo(current_version=0, target_version=None)
         pb = migrations_pb2.MigrationInfo()
@@ -97,7 +98,7 @@ class MigrationsDataManager:
         target_version: Union[int, None, _Unset] = _UNSET,
     ) -> None:
         async with self.driver.transaction() as txn:
-            raw_pb = await txn.get(MIGRATION_INFO)
+            raw_pb = await txn.get(MIGRATION_INFO_KEY)
             pb = migrations_pb2.MigrationInfo()
             if raw_pb is not None:
                 pb.ParseFromString(raw_pb)
@@ -106,6 +107,6 @@ class MigrationsDataManager:
             if not isinstance(target_version, _Unset):
                 if target_version is None:
                     pb.ClearField("target_version")
-            await txn.set(MIGRATION_INFO, pb.SerializeToString())
+            await txn.set(MIGRATION_INFO_KEY, pb.SerializeToString())
 
             await txn.commit()

@@ -19,6 +19,7 @@
 #
 import logging
 import os
+import types
 from functools import lru_cache
 
 import nucliadb.migrations
@@ -32,8 +33,8 @@ MIGRATION_DIR = os.path.sep.join(
 )
 
 
-def get_migrations(from_version: int = 0, to_version: int = 99999999):
-    migrations: list[Migration] = []
+def get_migration_modules() -> list[tuple[types.ModuleType, int]]:
+    output = []
     for filename in os.listdir(MIGRATION_DIR):
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
@@ -44,7 +45,14 @@ def get_migrations(from_version: int = 0, to_version: int = 99999999):
                 raise Exception(f"Missing `migrate` function in {module_name}")
             if not hasattr(module, "migrate_kb"):
                 raise Exception(f"Missing `migrate_kb` function in {module_name}")
-            migrations.append(Migration(version=version, module=module))
+            output.append((module, version))
+    return output
+
+
+def get_migrations(from_version: int = 0, to_version: int = 99999999):
+    migrations: list[Migration] = []
+    for module, version in get_migration_modules():
+        migrations.append(Migration(version=version, module=module))
 
     migrations.sort(key=lambda m: m.version)
     return [

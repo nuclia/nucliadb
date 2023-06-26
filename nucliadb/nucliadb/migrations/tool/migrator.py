@@ -68,7 +68,8 @@ async def run_kb_migrations(
                 errors.capture_exception(exc)
                 logger.exception("Failed to migrate KB", extra=migration_info)
                 raise
-            await context.data_manager.delete_kb_migration(kbid=kbid)
+
+        await context.data_manager.delete_kb_migration(kbid=kbid)
 
         assert (
             await context.data_manager.get_kb_info(kbid=kbid)
