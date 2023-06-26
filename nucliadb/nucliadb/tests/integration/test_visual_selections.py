@@ -115,7 +115,6 @@ async def test_visual_selection(
     )
     assert resp.status_code == 200
     body = resp.json()
-    print(json.dumps(body, indent=4))
 
     # TODO
     pass

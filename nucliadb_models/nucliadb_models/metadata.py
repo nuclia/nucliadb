@@ -316,8 +316,6 @@ class UserFieldMetadata(BaseModel):
             )
             for selections in message.page_selections
         ]
-        print("FROM_MESSAGE")
-        print(value)
         value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]]
         return cls(**value)
 
