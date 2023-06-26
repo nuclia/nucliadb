@@ -20,9 +20,8 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use nucliadb_protos::*;
-
 use crate::prelude::*;
+use crate::protos::*;
 
 pub type ParagraphsReaderPointer = Arc<dyn ParagraphReader>;
 pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
