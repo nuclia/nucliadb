@@ -68,11 +68,25 @@ class StorageSettings(BaseSettings):
         FileBackendConfig.NOT_SET, description="File backend storage type"
     )
 
-    gcs_base64_creds: Optional[str] = None
-    gcs_bucket: Optional[str] = None
-    gcs_location: Optional[str] = None
-    gcs_project: Optional[str] = None
-    gcs_bucket_labels: Dict[str, str] = {}
+    gcs_base64_creds: Optional[str] = Field(
+        None, description="GCS JSON credentials encoded in Base64"
+    )
+    gcs_bucket: Optional[str] = Field(
+        None,
+        description="GCS Bucket name where files are stored: https://cloud.google.com/storage/docs/buckets",
+    )
+    gcs_location: Optional[str] = Field(
+        None,
+        description="GCS Bucket location: https://cloud.google.com/storage/docs/locations",
+    )
+    gcs_project: Optional[str] = Field(
+        None,
+        description="Google Cloud Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects",  # noqa
+    )
+    gcs_bucket_labels: Dict[str, str] = Field(
+        {},
+        description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",  # noqa
+    )
     gcs_endpoint_url: str = "https://www.googleapis.com"
 
     s3_client_id: Optional[str] = None
@@ -86,9 +100,12 @@ class StorageSettings(BaseSettings):
 
     local_files: Optional[str] = Field(
         None,
-        description="If using LOCAL `file_backend` storage, directory files should be stored",
+        description="If using LOCAL `file_backend` storage, directory where files should be stored",
     )
-    upload_token_expiration: Optional[int] = 3
+    upload_token_expiration: int = Field(
+        3,
+        description="Number of days that uploaded files are kept in Nulia's processing engine",
+    )
 
     driver_pg_url: Optional[str] = None  # match same env var for k/v storage
 
