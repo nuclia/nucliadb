@@ -355,7 +355,10 @@ class OpenTelemetryMiddleware:
 
 class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
     def capture_trace_id(self, response):
-        trace_id = format_trace_id(trace.get_current_span().get_span_context().trace_id)
+        span = trace.get_current_span()
+        if span is None:
+            return
+        trace_id = format_trace_id(span.get_span_context().trace_id)
         response.headers[NUCLIA_TRACE_ID_HEADER] = trace_id
 
     def expose_trace_id_header(self, response):
