@@ -34,6 +34,8 @@ pub struct KnowledgeBoxConfig {
     pub slug: ::prost::alloc::string::String,
     #[prost(bool, tag="6")]
     pub disable_vectors: bool,
+    #[prost(int64, tag="7")]
+    pub migration_version: i64,
 }
 // NEW
 

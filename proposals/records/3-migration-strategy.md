@@ -41,8 +41,8 @@ supported for IndexNodes is to simply roll them over to new shards and delete th
 All other migrations will target running python code against a knowledge box.
 
 All migrations will be provided in the folder `nucliadb/nucliadb/migrations/` and have a filename
-the follows the structure: `[sequence]_[migration name].py`. Where `sequence` is the order the
-migration should be run in. Example: `1_migrate_data.py`.
+the follows the structure: `[migration name]_[sequence].py`. Where `sequence` is the order the
+migration should be run in. Example: `migrate_data_1.py`.
 
 The migration framework manages the framework around iterating through all the knowledge boxes,
 tracking which ones finished succesfully so if there was a failure, it can be retried from
@@ -50,22 +50,27 @@ where it was left off.
 
 #### Examples
 
-File: `nucliadb/nucliadb/migrations/1_migrate_data.py`:
+File: `nucliadb/nucliadb/migrations/migrate_data_1.py`:
 
 ```python
 
+async def migrate(context) -> None:
+    ...
 
-async def migration(kbid: str) -> None:
+async def migrate_kb(context, kbid: str) -> None:
     async for res in interate_resources():
         ...
 ```
 
-File: `nucliadb/nucliadb/migrations/2_rollover_shards.py`:
+File: `nucliadb/nucliadb/migrations/rollover_shards_2.py`:
 
 ```python
 from nucliadb.migrations.utils import rollover_shards
 
-async def migration(kbid: str) -> None:
+async def migrate(context) -> None:
+    ...
+
+async def migrate_kb(context, kbid: str) -> None:
     await rollover_shards(kbid)
 ```
 

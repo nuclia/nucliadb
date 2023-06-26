@@ -1,0 +1,7 @@
+syntax = "proto3";
+package migrations;
+
+message MigrationInfo {
+    uint64 current_version = 1;
+    uint64 target_version = 2;
+}
