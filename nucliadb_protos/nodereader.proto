@@ -108,6 +108,7 @@ message ParagraphSearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 15;
     optional string advanced_query = 16;
+    repeated string key_filters = 17;
 }
 
 message ResultScore {
@@ -186,9 +187,6 @@ message ParagraphSearchResponse {
 message VectorSearchRequest {
      //Shard ID
     string id = 1;
-    // ID for the vector set.
-    // Empty for searching on the original index
-    string vector_set = 15; 
     // Embedded vector search.
     repeated float vector = 2;
     // tags to filter
@@ -198,8 +196,14 @@ message VectorSearchRequest {
 
     // How many results are in this page.
     int32 result_per_page = 5;
-    bool with_duplicates = 14;
     bool reload = 13;
+    bool with_duplicates = 14;
+    // ID for the vector set.
+    // Empty for searching on the original index
+    string vector_set = 15; 
+    repeated string key_filters = 16;
+
+    float min_score = 17;
 }
 
 message DocumentVectorIdentifier {
@@ -337,6 +341,9 @@ message SearchRequest {
     RelationSearchRequest relations = 19 [deprecated = true];
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
+    repeated string key_filters = 22;
+
+    float min_score = 23;
 }
 
 message SuggestRequest {

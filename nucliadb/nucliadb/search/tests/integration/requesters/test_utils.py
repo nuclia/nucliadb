@@ -42,6 +42,7 @@ async def test_vector_result_metadata(
         faceted=[],
         page_number=0,
         page_size=20,
+        min_score=-1,
         sort=SortOptions(
             field=SortField.SCORE,
             order=SortOrder.DESC,

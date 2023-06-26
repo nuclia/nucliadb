@@ -2024,7 +2024,6 @@ dependencies = [
  "nucliadb_cluster",
  "nucliadb_core",
  "nucliadb_paragraphs",
- "nucliadb_protos",
  "nucliadb_relations",
  "nucliadb_telemetry",
  "nucliadb_texts",
@@ -2062,13 +2061,12 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.7.6"
+version = "0.7.7"
 dependencies = [
  "bincode",
  "log",
  "nucliadb_core",
  "nucliadb_node",
- "nucliadb_protos",
  "nucliadb_telemetry",
  "openssl",
  "prost",
@@ -2104,7 +2102,6 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "serde",
  "tonic",
  "tonic-build",
 ]

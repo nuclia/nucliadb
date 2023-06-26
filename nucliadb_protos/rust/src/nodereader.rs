@@ -134,6 +134,8 @@ pub struct ParagraphSearchRequest {
     pub only_faceted: bool,
     #[prost(string, optional, tag="16")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="17")]
+    pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -236,10 +238,6 @@ pub struct VectorSearchRequest {
     ///Shard ID
     #[prost(string, tag="1")]
     pub id: ::prost::alloc::string::String,
-    /// ID for the vector set.
-    /// Empty for searching on the original index
-    #[prost(string, tag="15")]
-    pub vector_set: ::prost::alloc::string::String,
     /// Embedded vector search.
     #[prost(float, repeated, tag="2")]
     pub vector: ::prost::alloc::vec::Vec<f32>,
@@ -252,10 +250,18 @@ pub struct VectorSearchRequest {
     /// How many results are in this page.
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
-    #[prost(bool, tag="14")]
-    pub with_duplicates: bool,
     #[prost(bool, tag="13")]
     pub reload: bool,
+    #[prost(bool, tag="14")]
+    pub with_duplicates: bool,
+    /// ID for the vector set.
+    /// Empty for searching on the original index
+    #[prost(string, tag="15")]
+    pub vector_set: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="16")]
+    pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(float, tag="17")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentVectorIdentifier {
@@ -421,6 +427,10 @@ pub struct SearchRequest {
     pub relation_prefix: ::core::option::Option<RelationPrefixSearchRequest>,
     #[prost(message, optional, tag="21")]
     pub relation_subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
+    #[prost(string, repeated, tag="22")]
+    pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(float, tag="23")]
+    pub min_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

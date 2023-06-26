@@ -128,22 +128,13 @@ class TestWriterServicer:
     @pytest.fixture
     def writer(self):
         servicer = WriterServicer()
+        servicer.driver = AsyncMock()
+        servicer.driver.transaction = MagicMock(return_value=AsyncMock())
         servicer.proc = AsyncMock()
-        servicer.proc.driver = AsyncMock()
-        servicer.proc.driver.transaction = MagicMock(return_value=AsyncMock())
+        servicer.proc.driver = servicer.driver
+        servicer.storage = AsyncMock()
+        servicer.cache = AsyncMock()
         yield servicer
-
-    @pytest.fixture(autouse=True)
-    def storage(self):
-        mock = AsyncMock()
-        with patch("nucliadb.ingest.service.writer.get_storage", return_value=mock):
-            yield mock
-
-    @pytest.fixture(autouse=True)
-    def cache(self):
-        mock = AsyncMock()
-        with patch("nucliadb.ingest.service.writer.get_cache", return_value=mock):
-            yield mock
 
     @pytest.fixture
     def field_value(self):
@@ -178,7 +169,9 @@ class TestWriterServicer:
         )
 
         resp = await writer.SetVectors(request)
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
+
+        txn = writer.driver.transaction.return_value.__aenter__.return_value
+        txn.commit.assert_called_once()
 
         assert resp.found
 
@@ -205,7 +198,6 @@ class TestWriterServicer:
         resp = await writer.SetVectors(request)
 
         assert resp.found
-        writer.proc.driver.begin.return_value.abort.assert_called_once()
 
     async def test_NewKnowledgeBox(self, writer: WriterServicer):
         request = writer_pb2.KnowledgeBoxNew(slug="slug")
@@ -287,7 +279,8 @@ class TestWriterServicer:
         resp = await writer.SetLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
+        txn = writer.driver.transaction.return_value.__aenter__.return_value
+        txn.commit.assert_called_once()
 
     async def test_SetLabels_missing(self, writer: WriterServicer):
         request = writer_pb2.SetLabelsRequest(
@@ -310,7 +303,6 @@ class TestWriterServicer:
         resp = await writer.SetLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
-        writer.proc.driver.begin.return_value.abort.assert_called_once()
 
     async def test_DelLabels(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
@@ -320,7 +312,8 @@ class TestWriterServicer:
         resp = await writer.DelLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.OK
-        writer.proc.driver.begin.return_value.commit.assert_called_once()
+        txn = writer.driver.transaction.return_value.__aenter__.return_value
+        txn.commit.assert_called_once()
 
     async def test_DelLabels_missing(self, writer: WriterServicer):
         request = writer_pb2.DelLabelsRequest(
@@ -343,7 +336,6 @@ class TestWriterServicer:
         resp = await writer.DelLabels(request)
 
         assert resp.status == writer_pb2.OpStatusWriter.Status.ERROR
-        writer.proc.driver.begin.return_value.abort.assert_called_once()
 
     async def test_GetLabelSet(self, writer: WriterServicer):
         request = writer_pb2.GetLabelSetRequest(

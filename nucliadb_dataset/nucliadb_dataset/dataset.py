@@ -474,7 +474,7 @@ def download_all_partitions(
         knowledgebox = get_kb(slug, nucliadb_base_url)
 
     if knowledgebox is None:
-        raise KeyError("KnowlwedgeBox not found")
+        raise KeyError("KnowledgeBox not found")
 
     task_obj = Task(task)
     fse = NucliaDBDataset(

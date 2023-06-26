@@ -87,3 +87,24 @@ jobs:
           asset_path: ./nucliadb-${{ steps.version_step.outputs.version_number }}.tgz
           asset_name: nucliadb-${{ steps.version_step.outputs.version_number }}-chart.tgz
           asset_content_type: application/tar+gzip
+
+  tag-stable:
+    name: Tag current latest as stable
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag it
+        run: |-
+          docker pull nuclia/nucliadb:latest
+          docker tag nuclia/nucliadb:latest nuclia/nucliadb:stable
+          docker push nuclia/nucliadb:stable

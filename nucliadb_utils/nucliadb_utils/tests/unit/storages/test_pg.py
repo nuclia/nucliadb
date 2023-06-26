@@ -196,13 +196,15 @@ class TestPostgresFileDataLayer:
             destination_kb="destination_kb",
         )
 
-        assert connection.execute.call_count == 2
+        assert connection.execute.call_count == 4
 
         connection.execute.assert_has_awaits(
             [
+                call(ANY, "destination_kb", "destination_key"),
                 call(
                     ANY, "destination_kb", "destination_key", "origin_kb", "origin_key"
                 ),
+                call(ANY, "destination_kb", "destination_key"),
                 call(
                     ANY, "destination_kb", "destination_key", "origin_kb", "origin_key"
                 ),
@@ -344,10 +346,11 @@ class TestPostgresStorageField:
             "destination_bucket_name",
         )
 
-        assert connection.execute.call_count == 2
+        assert connection.execute.call_count == 4
 
         connection.execute.assert_has_awaits(
             [
+                call(ANY, "destination_bucket_name", "destination_uri"),
                 call(
                     ANY,
                     "destination_bucket_name",
@@ -355,6 +358,7 @@ class TestPostgresStorageField:
                     "origin_bucket_name",
                     "origin_uri",
                 ),
+                call(ANY, "destination_bucket_name", "destination_uri"),
                 call(
                     ANY,
                     "destination_bucket_name",
@@ -472,7 +476,7 @@ class TestPostgresStorageField:
         await storage_field.finish()
         assert field.uri == storage_field.key
 
-        assert connection.execute.call_count == 4
+        assert connection.execute.call_count == 6
 
     async def test_upload(
         self,
@@ -485,7 +489,7 @@ class TestPostgresStorageField:
 
         await storage_field.upload(iter_result([b"test1", b"test2"]), field)
 
-        assert connection.execute.call_count == 7
+        assert connection.execute.call_count == 9
 
 
 class TestPostgresStorage:

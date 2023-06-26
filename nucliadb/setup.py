@@ -38,13 +38,14 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3 :: Only",
     ],
     url="https://nucliadb.com",
     author="NucliaDB Community",
     keywords="search, semantic, AI",
     author_email="nucliadb@nuclia.com",
-    python_requires=">=3.7, <4",
+    python_requires=">=3.9, <4",
     license="BSD",
     zip_safe=True,
     include_package_data=True,
@@ -90,6 +91,5 @@ setup(
     },
     extras_require={
         "redis": ["redis>=4.3.4"],
-        "postgres": ["asyncpg>=0.27.0"],
     },
 )

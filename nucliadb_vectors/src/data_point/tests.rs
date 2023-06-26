@@ -21,7 +21,7 @@
 use std::collections::HashSet;
 
 use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary, Similarity};
-use crate::formula::{Formula, LabelClause};
+use crate::formula::{AtomClause, Formula};
 
 const SIMILARITY: Similarity = Similarity::Cosine;
 
@@ -47,7 +47,7 @@ fn simple_flow() {
     let mut queries = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
-        queries.push(LabelClause::new(format!("LABEL_{}", i)));
+        queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let mut expected_keys = vec![];
     let label_dictionary = LabelDictionary::new(labels.clone());
@@ -74,6 +74,7 @@ fn simple_flow() {
         true,
         no_results,
         Similarity::Cosine,
+        -1.0,
     );
     let got_keys = reader.get_keys(&HashSet::new());
     assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
@@ -88,7 +89,7 @@ fn accuracy_test() {
     let mut queries = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
-        queries.push(LabelClause::new(format!("LABEL_{}", i)));
+        queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let labels_dictionary = LabelDictionary::new(labels.clone());
     let mut elems = Vec::new();
@@ -113,6 +114,7 @@ fn accuracy_test() {
             true,
             no_results,
             Similarity::Cosine,
+            -1.0,
         )
         .collect::<Vec<_>>();
     result_0.sort_by(|i, j| i.id().cmp(j.id()));
@@ -126,6 +128,7 @@ fn accuracy_test() {
             true,
             no_results,
             Similarity::Cosine,
+            -1.0,
         )
         .collect::<Vec<_>>();
     result_1.sort_by(|i, j| i.id().cmp(j.id()));
@@ -153,6 +156,7 @@ fn single_graph() {
         true,
         5,
         Similarity::Cosine,
+        -1.0,
     );
     assert_eq!(result.count(), 0);
 
@@ -165,6 +169,7 @@ fn single_graph() {
             true,
             5,
             Similarity::Cosine,
+            -1.0,
         )
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
@@ -212,6 +217,7 @@ fn data_merge() {
             true,
             1,
             Similarity::Cosine,
+            -1.0,
         )
         .collect();
     assert_eq!(result.len(), 1);
@@ -225,6 +231,7 @@ fn data_merge() {
             true,
             1,
             Similarity::Cosine,
+            -1.0,
         )
         .collect();
     assert_eq!(result.len(), 1);

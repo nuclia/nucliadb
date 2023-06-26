@@ -142,7 +142,7 @@ def _request_builder(
                     if not isinstance(content, request_type):  # type: ignore
                         raise TypeError(f"Expected {request_type}, got {type(content)}")
                     else:
-                        data = content.json()
+                        data = content.json(by_alias=True)
                 except TypeError:
                     if not isinstance(content, list):
                         raise
@@ -153,7 +153,7 @@ def _request_builder(
                 for key in list(kwargs.keys()):
                     if key in request_type.__fields__:  # type: ignore
                         content_data[key] = kwargs.pop(key)
-                data = request_type.parse_obj(content_data).json()  # type: ignore
+                data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
 
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
@@ -302,6 +302,7 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=CreateResourcePayload,
         response_type=ResourceCreated,
+        docstring=docstrings.CREATE_RESOURCE,
     )
     update_resource = _request_builder(
         name="update_resource",
@@ -310,6 +311,7 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=UpdateResourcePayload,
         response_type=ResourceUpdated,
+        docstring=docstrings.UPDATE_RESOURCE,
     )
     delete_resource = _request_builder(
         name="delete_resource",
@@ -326,6 +328,7 @@ class _NucliaDBBase:
         path_params=("kbid", "slug"),
         request_type=None,
         response_type=Resource,
+        docstring=docstrings.GET_RESOURCE_BY_SLUG,
     )
     get_resource_by_id = _request_builder(
         name="get_resource_by_id",
@@ -334,6 +337,7 @@ class _NucliaDBBase:
         path_params=("kbid", "rid"),
         request_type=None,
         response_type=Resource,
+        docstring=docstrings.GET_RESOURCE_BY_ID,
     )
     list_resources = _request_builder(
         name="list_resources",
@@ -342,6 +346,7 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=ResourceList,
+        docstring=docstrings.LIST_RESOURCES,
     )
 
     # Conversation endpoints
@@ -493,6 +498,15 @@ class _NucliaDBBase:
         request_type=ChatRequest,
         response_type=chat_response_parser,
         docstring=docstrings.CHAT,
+    )
+    chat_on_resource = _request_builder(
+        name="chat_on_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/chat",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=ChatRequest,
+        response_type=chat_response_parser,
+        docstring=docstrings.RESOURCE_CHAT,
     )
 
 

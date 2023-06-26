@@ -55,6 +55,7 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
+    min_score: float,
     sort: Optional[SortOptions],
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
@@ -69,6 +70,7 @@ async def global_query_to_pb(
     with_status: Optional[ResourceProcessingStatus] = None,
     with_synonyms: bool = False,
     autofilter: bool = False,
+    key_filters: Optional[List[str]] = None,
 ) -> Tuple[SearchRequest, bool, List[str]]:
     """
     Converts the pydantic query to a protobuf query
@@ -83,6 +85,7 @@ async def global_query_to_pb(
     autofilters = []
 
     request = SearchRequest()
+    request.min_score = min_score
     request.body = query
     if advanced_query is not None:
         request.advanced_query = advanced_query
@@ -91,6 +94,7 @@ async def global_query_to_pb(
     request.filter.tags.extend(filters)
     request.faceted.tags.extend(faceted)
     request.fields.extend(fields)
+    request.key_filters.extend(key_filters or [])
 
     if with_status is not None:
         request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]

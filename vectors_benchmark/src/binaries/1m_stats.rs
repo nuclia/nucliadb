@@ -31,6 +31,9 @@ impl SearchRequest for Request {
     fn no_results(&self) -> usize {
         NO_NEIGHBOURS
     }
+    fn min_score(&self) -> f32 {
+        -1.0
+    }
 }
 
 fn label_set(batch_id: usize) -> Vec<String> {
@@ -68,7 +71,7 @@ fn main() {
             .enumerate()
             .map(|(i, q)| (i.to_string(), q))
             .collect();
-        possible_tag.push(LabelClause::new(labels[0].clone()));
+        possible_tag.push(AtomClause::label(labels[0].clone()));
         let now = SystemTime::now();
         add_batch(&mut writer, elems, labels);
         stats.writing_time += now.elapsed().unwrap().as_millis();

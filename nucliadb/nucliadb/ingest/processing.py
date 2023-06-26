@@ -207,10 +207,12 @@ class ProcessingEngine:
             self.driver = 0
         elif driver == "s3":
             self.driver = 1
-        elif driver == "local":
+        elif driver in ("local", "pg"):
             self.driver = 2
         else:
-            logger.error(f"Not valid driver to processing, fallback to local: {driver}")
+            logger.error(
+                f"Not a valid driver to processing, fallback to local: {driver}"
+            )
             self.driver = 2
         self._exit_stack = AsyncExitStack()
 

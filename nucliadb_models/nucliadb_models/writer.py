@@ -20,7 +20,7 @@
 import json
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.datetime import FieldDatetime
@@ -43,11 +43,62 @@ from nucliadb_models.vectors import UserVectorsWrapper
 GENERIC_MIME_TYPE = "application/generic"
 
 
+class FieldDefaults:
+    title = Field(None, title="Title")
+    summary = Field(None, title="Summary")
+    slug = Field(
+        None,
+        title="Slug",
+        description="The slug is the user-defined id for the resource",
+    )
+    icon = Field(
+        None,
+        title="Icon",
+        description="The icon should be a media type string: https://www.iana.org/assignments/media-types/media-types.xhtml",  # noqa
+    )
+
+    files = Field(
+        {},
+        title="Files",
+        description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+    links = Field(
+        {},
+        title="Links",
+        description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+    texts = Field(
+        {},
+        title="Texts",
+        description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+    layouts = Field(
+        {},
+        title="Layouts",
+        description=f"Dictionary of layout fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+    conversations = Field(
+        {},
+        title="Conversations",
+        description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+    keywordsets = Field(
+        {},
+        title="Keywordsets",
+        description=f"Dictionary of keywordset fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+    datetimes = Field(
+        {},
+        title="Datetimes",
+        description=f"Dictionary of datetime fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdString.regex.pattern}",  # noqa
+    )
+
+
 class CreateResourcePayload(BaseModel):
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    slug: Optional[SlugString] = None
-    icon: Optional[str] = None
+    title: Optional[str] = FieldDefaults.title
+    summary: Optional[str] = FieldDefaults.summary
+    slug: Optional[SlugString] = FieldDefaults.slug
+    icon: Optional[str] = FieldDefaults.icon
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
@@ -57,13 +108,15 @@ class CreateResourcePayload(BaseModel):
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None
 
-    files: Dict[FieldIdString, FileField] = {}
-    links: Dict[FieldIdString, LinkField] = {}
-    texts: Dict[FieldIdString, TextField] = {}
-    layouts: Dict[FieldIdString, InputLayoutField] = {}
-    conversations: Dict[FieldIdString, InputConversationField] = {}
-    keywordsets: Dict[FieldIdString, FieldKeywordset] = {}
-    datetimes: Dict[FieldIdString, FieldDatetime] = {}
+    files: Dict[FieldIdString, FileField] = FieldDefaults.files
+    links: Dict[FieldIdString, LinkField] = FieldDefaults.links
+    texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
+    layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
+    conversations: Dict[
+        FieldIdString, InputConversationField
+    ] = FieldDefaults.conversations
+    keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
+    datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
 
     # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -92,10 +145,10 @@ class CreateResourcePayload(BaseModel):
 
 
 class UpdateResourcePayload(BaseModel):
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    slug: Optional[SlugString] = None
-    icon: Optional[str] = None
+    title: Optional[str] = FieldDefaults.title
+    summary: Optional[str] = FieldDefaults.summary
+    slug: Optional[SlugString] = FieldDefaults.slug
+    icon: Optional[str] = FieldDefaults.icon
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     usermetadata: Optional[UserMetadata] = None
@@ -103,14 +156,15 @@ class UpdateResourcePayload(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None
-
-    files: Dict[FieldIdString, FileField] = {}
-    links: Dict[FieldIdString, LinkField] = {}
-    texts: Dict[FieldIdString, TextField] = {}
-    layouts: Dict[FieldIdString, InputLayoutField] = {}
-    conversations: Dict[FieldIdString, InputConversationField] = {}
-    keywordsets: Dict[FieldIdString, FieldKeywordset] = {}
-    datetimes: Dict[FieldIdString, FieldDatetime] = {}
+    files: Dict[FieldIdString, FileField] = FieldDefaults.files
+    links: Dict[FieldIdString, LinkField] = FieldDefaults.links
+    texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
+    layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
+    conversations: Dict[
+        FieldIdString, InputConversationField
+    ] = FieldDefaults.conversations
+    keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
+    datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
 
     # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()

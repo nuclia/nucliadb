@@ -31,7 +31,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
-use crate::formula::{Formula, LabelClause};
+use crate::formula::{AtomClause, CompoundClause, Formula};
 use crate::indexset::IndexSet;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
@@ -46,6 +46,9 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     }
     fn no_results(&self) -> usize {
         self.0
+    }
+    fn min_score(&self) -> f32 {
+        self.1.min_score
     }
 }
 
@@ -115,13 +118,23 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
+
+        let key_filters = request
+            .key_filters
+            .iter()
+            .cloned()
+            .map(AtomClause::key_prefix);
         let mut formula = Formula::new();
         request
             .tags
             .iter()
             .cloned()
-            .map(LabelClause::new)
+            .map(AtomClause::label)
             .for_each(|c| formula.extend(c));
+        if key_filters.len() > 0 {
+            formula.extend(CompoundClause::new(1, key_filters.collect()));
+        }
+
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
@@ -343,6 +356,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: true,
+            ..Default::default()
         };
         let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 4);
@@ -356,11 +370,30 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = reader.search(&request).unwrap();
         let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
+
+        // Check that min_score works
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            reload: false,
+            with_duplicates: false,
+            min_score: 900.0,
+            ..Default::default()
+        };
+        let result = reader.search(&request).unwrap();
+        let no_nodes = reader.count("").unwrap();
+        assert_eq!(no_nodes, 4);
+        assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
             id: "".to_string(),
@@ -371,6 +404,7 @@ mod tests {
             result_per_page: 20,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         assert!(reader.search(&bad_request).is_err());
     }

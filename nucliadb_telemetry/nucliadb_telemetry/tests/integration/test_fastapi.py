@@ -23,6 +23,7 @@ from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
 from nucliadb_telemetry.fastapi import PrometheusMiddleware, metrics_endpoint
+from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
 
 
 class TestCasePrometheusMiddleware:
@@ -206,3 +207,25 @@ class TestCasePrometheusMiddlewareFilterUnhandledPaths:
             'starlette_requests_in_progress{method="GET",path_template="/metrics/"} 1.0'
             in metrics_text
         )
+
+
+class TestCaseCaptureTraceIdMiddleware:
+    @pytest.fixture(scope="class")
+    def app(self):
+        app_ = Starlette()
+        app_.add_middleware(CaptureTraceIdMiddleware)
+
+        @app_.route("/foo/")
+        def foo(request):
+            return PlainTextResponse("Foo")
+
+        return app_
+
+    @pytest.fixture
+    def client(self, app):
+        return TestClient(app)
+
+    def test_trace_id_header_is_returned(self, client):
+        response = client.get("/foo/")
+
+        assert response.headers["x-nuclia-trace-id"]

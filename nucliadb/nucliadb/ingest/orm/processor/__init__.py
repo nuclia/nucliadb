@@ -516,6 +516,7 @@ class Processor:
         await txn.abort()
         return uuid
 
+    @processor_observer.wrap({"type": "create_kb"})
     async def create_kb(
         self,
         slug: str,
