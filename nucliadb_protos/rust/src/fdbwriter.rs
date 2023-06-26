@@ -555,8 +555,11 @@ pub struct Shards {
     /// current shard that resources index to
     #[prost(int32, tag="3")]
     pub actual: i32,
+    #[deprecated]
     #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
     pub similarity: i32,
+    #[prost(message, optional, tag="5")]
+    pub model: ::core::option::Option<super::knowledgebox::SemanticModelMetadata>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResourceFieldId {

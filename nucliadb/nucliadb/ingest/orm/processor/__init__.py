@@ -19,6 +19,7 @@
 #
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import aiohttp.client_exceptions
@@ -43,6 +44,17 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class KBModelMetadata:
+    """
+    Metadata of the semantic model associated to the Knowledge Box
+    """
+
+    similarity_function: utils_pb2.VectorSimilarity = utils_pb2.VectorSimilarity.COSINE
+    vector_dimension: Optional[int] = None
+    default_min_score: Optional[float] = None
 
 
 class Processor:
@@ -316,9 +328,9 @@ class Processor:
             shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
-                similarity = await kb.get_similarity()
+                model = await kb.get_model_metadata()
                 shard = await self.shard_manager.create_shard_by_kbid(
-                    txn, kbid, similarity=similarity
+                    txn, kbid, semantic_model=model
                 )
             await kb.set_resource_shard_id(uuid, shard.shard)
 
@@ -521,13 +533,17 @@ class Processor:
         self,
         slug: str,
         config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
+        semantic_model: knowledgebox_pb2.SemanticModelMetadata,
         forceuuid: Optional[str] = None,
-        similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
     ) -> str:
         async with self.driver.transaction() as txn:
             try:
                 uuid, failed = await KnowledgeBox.create(
-                    txn, slug, config=config, uuid=forceuuid, similarity=similarity
+                    txn,
+                    slug,
+                    semantic_model,
+                    uuid=forceuuid,
+                    config=config,
                 )
                 if failed:
                     raise Exception("Failed to create KB")

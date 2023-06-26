@@ -23,7 +23,12 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, Labels, LabelSet
+from nucliadb_protos.knowledgebox_pb2 import (
+    KnowledgeBoxConfig,
+    Labels,
+    LabelSet,
+    SemanticModelMetadata,
+)
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
@@ -167,9 +172,9 @@ class KnowledgeBox:
         cls,
         txn: Transaction,
         slug: str,
+        semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
-        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
     ) -> Tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
@@ -210,7 +215,7 @@ class KnowledgeBox:
             shard_manager = get_shard_manager()
             try:
                 await shard_manager.create_shard_by_kbid(
-                    txn, uuid, similarity=similarity
+                    txn, uuid, semantic_model=semantic_model
                 )
             except Exception as e:
                 await storage.delete_kb(uuid)
@@ -442,6 +447,8 @@ class KnowledgeBox:
     async def get_similarity(self) -> VectorSimilarity.ValueType:
         try:
             shards_obj = await self.get_shards_object()
+            if shards_obj.HasField("model"):
+                return shards_obj.model.similarity_function
             return shards_obj.similarity
         except ShardsNotFound:
             logger.warning(
@@ -449,6 +456,21 @@ class KnowledgeBox:
                     Defaulting to cosine distance."
             )
             return VectorSimilarity.COSINE
+
+    async def get_model_metadata(self) -> SemanticModelMetadata.ValueType:
+        # TODO: cleanp this code after a migration is done unifying all fields under `model``
+        try:
+            shards_obj = await self.get_shards_object()
+            if shards_obj.HasField("model"):
+                return shards_obj.model
+            else:
+                return SemanticModelMetadata(similarity_function=shards_obj.similarity)
+        except ShardsNotFound:
+            logger.warning(
+                f"Config for kb not found: {self.kbid} while trying to get the model metadata. \
+                    Defaulting to cosine distance."
+            )
+            return SemanticModelMetadata(similarity_function=VectorSimilarity.COSINE)
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

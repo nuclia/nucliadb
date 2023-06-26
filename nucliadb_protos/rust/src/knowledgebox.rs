@@ -49,6 +49,10 @@ pub struct KnowledgeBoxNew {
     pub forceuuid: ::prost::alloc::string::String,
     #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
     pub similarity: i32,
+    #[prost(int32, optional, tag="5")]
+    pub vector_dimension: ::core::option::Option<i32>,
+    #[prost(float, optional, tag="6")]
+    pub default_min_score: ::core::option::Option<f32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewKnowledgeBoxResponse {
@@ -203,6 +207,16 @@ pub struct TermSynonyms {
 pub struct Synonyms {
     #[prost(map="string, message", tag="1")]
     pub terms: ::std::collections::HashMap<::prost::alloc::string::String, TermSynonyms>,
+}
+/// Metadata of the model associated to the KB
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SemanticModelMetadata {
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="1")]
+    pub similarity_function: i32,
+    #[prost(int32, optional, tag="2")]
+    pub vector_dimension: ::core::option::Option<i32>,
+    #[prost(float, optional, tag="3")]
+    pub default_min_score: ::core::option::Option<f32>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
