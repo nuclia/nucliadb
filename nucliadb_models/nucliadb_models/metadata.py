@@ -275,6 +275,20 @@ class ParagraphAnnotation(BaseModel):
     key: str
 
 
+class VisualSelection(BaseModel):
+    label: str
+    top: float
+    left: float
+    right: float
+    bottom: float
+    token_ids: List[str]
+
+
+class PageVisualSelections(BaseModel):
+    page: str
+    selections: List[VisualSelection]
+
+
 class UserFieldMetadata(BaseModel):
     """
     Field-level metadata set by the user via the rest api
@@ -282,6 +296,7 @@ class UserFieldMetadata(BaseModel):
 
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
+    visual_selections: List[PageVisualSelections] = []
     field: FieldID
 
     @classmethod
