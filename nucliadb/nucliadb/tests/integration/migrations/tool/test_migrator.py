@@ -47,6 +47,6 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     await migrator.run(execution_context)
 
     kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
-    assert kb_info.current_version == get_latest_version()
+    assert kb_info.current_version == get_latest_version()  # type: ignore
     global_info = await execution_context.data_manager.get_global_info()
     assert global_info.current_version == get_latest_version()
