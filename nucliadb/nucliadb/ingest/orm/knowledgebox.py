@@ -464,6 +464,8 @@ class KnowledgeBox:
             if shards_obj.HasField("model"):
                 return shards_obj.model
             else:
+                # Bw/compatible code for accounts that do
+                # not have the `model` attribute set in  the Shards object.
                 return SemanticModelMetadata(similarity_function=shards_obj.similarity)
         except ShardsNotFound:
             logger.warning(
