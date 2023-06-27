@@ -27,7 +27,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from nucliadb_protos.audit_pb2 import AuditField, AuditKBCounter, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
-from opentelemetry.trace import get_current_span
+from opentelemetry.trace import format_trace_id, get_current_span
 
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
@@ -164,7 +164,9 @@ class StreamAuditStorage(AuditStorage):
         if kb_counter:
             auditrequest.kb_counter.CopyFrom(kb_counter)
 
-        auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
+        auditrequest.trace_id = format_trace_id(
+            get_current_span().get_span_context().trace_id
+        )
 
         await self.send(auditrequest)
 
@@ -177,7 +179,9 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.type = AuditRequest.VISITED
         auditrequest.time.FromDatetime(datetime.now())
 
-        auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
+        auditrequest.trace_id = format_trace_id(
+            get_current_span().get_span_context().trace_id
+        )
 
         await self.send(auditrequest)
 
@@ -187,7 +191,9 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.KB_DELETED
         auditrequest.time.FromDatetime(datetime.now())
-        auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
+        auditrequest.trace_id = format_trace_id(
+            get_current_span().get_span_context().trace_id
+        )
         await self.send(auditrequest)
 
     async def search(
@@ -212,7 +218,9 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.type = AuditRequest.SEARCH
         auditrequest.time.FromDatetime(datetime.now())
 
-        auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
+        auditrequest.trace_id = format_trace_id(
+            get_current_span().get_span_context().trace_id
+        )
         await self.send(auditrequest)
 
     async def suggest(
@@ -231,6 +239,8 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.timeit = timeit
         auditrequest.type = AuditRequest.SUGGEST
         auditrequest.time.FromDatetime(datetime.now())
-        auditrequest.trace_id = str(get_current_span().get_span_context().trace_id)
+        auditrequest.trace_id = format_trace_id(
+            get_current_span().get_span_context().trace_id
+        )
 
         await self.send(auditrequest)
