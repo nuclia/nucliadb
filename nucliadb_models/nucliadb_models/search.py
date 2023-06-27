@@ -45,6 +45,11 @@ class ModelParamDefaults:
         title="Autofilters",
         description="List of filters automatically applied to the search query",
     )
+    min_score = ParamDefault(
+        default=...,
+        title="Minimum score",
+        description="Minimum similarity score applied to the vector index search. Results with a lower score have been ignored.",  # noqa
+    )
 
 
 class ResourceProperties(str, Enum):
@@ -123,9 +128,7 @@ class Sentences(BaseModel):
     facets: FacetsResult
     page_number: int = 0
     page_size: int = 20
-    min_score: float = Field(
-        description="Minimum similarity score applied to the vector index search. Results with a lower score have been ignored."  # noqa
-    )
+    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
 
 
 class Paragraph(BaseModel):
@@ -738,9 +741,7 @@ class KnowledgeboxFindResults(BaseModel):
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
-    min_score: float = Field(
-        description="Minimum similarity score applied to the vector index search. Results with a lower score have been ignored."  # noqa
-    )
+    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
 
 
 class FeedbackTasks(str, Enum):
