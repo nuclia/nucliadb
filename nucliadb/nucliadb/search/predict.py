@@ -302,16 +302,18 @@ class PredictEngine:
         return ident, resp.content.iter_any()
 
     @predict_observer.wrap({"type": "ask_document"})
-    async def ask_document(self, kbid: str, query: str, blocks: list[list[str]]) -> str:
+    async def ask_document(
+        self, kbid: str, question: str, blocks: list[list[str]]
+    ) -> str:
         self.check_nua_key()
         url = self.get_predict_url(ASK_DOCUMENT)
         headers = self.get_predict_headers(kbid)
-        item = AskDocumentModel(query=query, blocks=blocks)
+        item = AskDocumentModel(question=question, blocks=blocks)
         resp = await self.session.post(
             url=url, json=item.dict(), headers=headers, timeout=None
         )
         await self.check_response(resp, expected=200)
-        return resp.text()
+        return await resp.text()
 
     @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:

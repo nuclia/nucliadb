@@ -130,7 +130,10 @@ def split_by_computed_paragraphs(
 
 def split_by_newlines(etxt: ExtractedText) -> list[str]:
     block = []
-    block.extend(etxt.text.split("\n"))
+    if etxt.text:
+        block.extend(etxt.text.split("\n"))
     for extracted_text in etxt.split_text.values():
+        if not extracted_text:
+            continue
         block.extend(extracted_text.split("\n"))
     return block
