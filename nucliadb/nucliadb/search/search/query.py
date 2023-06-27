@@ -19,6 +19,7 @@
 #
 import re
 from datetime import datetime
+from functools import lru_cache
 from typing import List, Optional, Tuple
 
 from fastapi import HTTPException
@@ -88,9 +89,11 @@ async def global_query_to_pb(
     autofilters = []
 
     request = SearchRequest()
+
     if min_score is None:
         min_score = await get_default_min_score(kbid)
     request.min_score = min_score
+
     request.body = query
     if advanced_query is not None:
         request.advanced_query = advanced_query
@@ -346,7 +349,7 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
             return None
 
 
-# TODO: hard cache this.
+@lru_cache(maxsize=None)
 async def get_default_min_score(kbid: str) -> float:
     model_min_score = await get_kb_model_default_min_score(kbid)
     if model_min_score is not None:
