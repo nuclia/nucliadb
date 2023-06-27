@@ -182,6 +182,8 @@ async def test_create_shard_by_kbid_attempts_on_all_nodes(
     shard_manager = manager.KBShardManager()
     async with redis_driver.transaction() as txn:
         with pytest.raises(ExhaustedNodesError):
-            await shard_manager.create_shard_by_kbid(txn, fake_kbid)
+            await shard_manager.create_shard_by_kbid(
+                txn, fake_kbid, semantic_model=mock.MagicMock()
+            )
 
     assert node_new_shard.await_count == len(manager.get_index_nodes())
