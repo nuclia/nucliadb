@@ -45,57 +45,57 @@ static WRITER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
 
 async fn start_reader(addr: SocketAddr) {
     let mut initialized_lock = READER_SERVER_INITIALIZED.lock().await;
-
-    if !*initialized_lock {
-        tokio::spawn(async move {
-            let options = GrpcReaderOptions { lazy_loading: true };
-            let grpc_driver = NodeReaderGRPCDriver::new(options);
-            grpc_driver
-                .initialize()
-                .await
-                .expect("Unable to initialize reader gRPC");
-            let reader_server = NodeReaderServer::new(grpc_driver);
-            Server::builder()
-                .add_service(reader_server)
-                .serve(addr)
-                .await
-                .map_or_else(
-                    |err| {
-                        panic!("Error starting gRPC server: {err:?}");
-                    },
-                    |_| {
-                        *initialized_lock = true;
-                    },
-                );
-        });
+    if *initialized_lock {
+        return;
     }
+    tokio::spawn(async move {
+        let options = GrpcReaderOptions { lazy_loading: true };
+        let grpc_driver = NodeReaderGRPCDriver::new(options);
+        grpc_driver
+            .initialize()
+            .await
+            .expect("Unable to initialize reader gRPC");
+        let reader_server = NodeReaderServer::new(grpc_driver);
+        Server::builder()
+            .add_service(reader_server)
+            .serve(addr)
+            .await
+            .map_or_else(
+                |err| {
+                    panic!("Error starting gRPC server: {err:?}");
+                },
+                |_| {
+                    *initialized_lock = true;
+                },
+            );
+    });
 }
 
 async fn start_writer(addr: SocketAddr) {
     let mut initialized_lock = WRITER_SERVER_INITIALIZED.lock().await;
-
-    if !*initialized_lock {
-        tokio::spawn(async move {
-            let data_path = nucliadb_node::env::data_path();
-            if !data_path.exists() {
-                std::fs::create_dir(&data_path).expect("Can not create the data directory");
-            }
-            let writer_server =
-                NodeWriterServer::new(NodeWriterGRPCDriver::from(NodeWriterService::new()));
-            Server::builder()
-                .add_service(writer_server)
-                .serve(addr)
-                .await
-                .map_or_else(
-                    |err| {
-                        panic!("Error starting gRPC server: {err:?}");
-                    },
-                    |_| {
-                        *initialized_lock = true;
-                    },
-                );
-        });
+    let data_path = nucliadb_node::env::data_path();
+    if !data_path.exists() {
+        std::fs::create_dir(&data_path).unwrap();
     }
+    if *initialized_lock {
+        return;
+    }
+    tokio::spawn(async move {
+        let writer_server =
+            NodeWriterServer::new(NodeWriterGRPCDriver::from(NodeWriterService::new()));
+        Server::builder()
+            .add_service(writer_server)
+            .serve(addr)
+            .await
+            .map_or_else(
+                |err| {
+                    panic!("Error starting gRPC server: {err:?}");
+                },
+                |_| {
+                    *initialized_lock = true;
+                },
+            );
+    });
 }
 
 async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::Result<()> {
