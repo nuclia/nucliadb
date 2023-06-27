@@ -123,6 +123,9 @@ class Sentences(BaseModel):
     facets: FacetsResult
     page_number: int = 0
     page_size: int = 20
+    min_score: float = Field(
+        description="Minimum similarity score applied to the vector index search"
+    )
 
 
 class Paragraph(BaseModel):
@@ -145,6 +148,9 @@ class Paragraphs(BaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
+    min_score: float = Field(
+        description="Minimum bm25 score applied to the paragraph index search"
+    )
 
 
 class ResourceResult(BaseModel):
@@ -735,6 +741,12 @@ class KnowledgeboxFindResults(BaseModel):
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
+    min_score: float = Field(
+        description="Minimum similarity score applied to the vector index search"
+    )
+    min_score_bm25: float = Field(
+        description="Minimum bm25 score applied to the paragraph index search"
+    )
 
 
 class FeedbackTasks(str, Enum):
