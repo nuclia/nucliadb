@@ -19,10 +19,10 @@
 #
 import pytest
 
-from nucliadb.migrations.tool import migrator
-from nucliadb.migrations.tool.context import ExecutionContext
-from nucliadb.migrations.tool.settings import Settings
-from nucliadb.migrations.tool.utils import get_latest_version
+from nucliadb.migrator import migrator
+from nucliadb.migrator.context import ExecutionContext
+from nucliadb.migrator.settings import Settings
+from nucliadb.migrator.utils import get_latest_version
 
 pytestmark = pytest.mark.asyncio
 

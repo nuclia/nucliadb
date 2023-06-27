@@ -65,7 +65,7 @@ async def migrate_kb(context, kbid: str) -> None:
 File: `nucliadb/nucliadb/migrations/rollover_shards_2.py`:
 
 ```python
-from nucliadb.migrations.utils import rollover_shards
+from nucliadb.migrator.utils import rollover_shards
 
 async def migrate(context) -> None:
     ...
