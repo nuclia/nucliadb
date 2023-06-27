@@ -69,7 +69,8 @@ class StorageSettings(BaseSettings):
     )
 
     gcs_base64_creds: Optional[str] = Field(
-        None, description="GCS JSON credentials encoded in Base64"
+        None,
+        description="GCS JSON credentials of a service account encoded in Base64: https://cloud.google.com/iam/docs/service-account-overview",  # noqa
     )
     gcs_bucket: Optional[str] = Field(
         None,
