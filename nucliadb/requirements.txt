@@ -53,3 +53,5 @@ asgiref>=3.3.2
 jmespath>=1.0.0
 idna>=3.3
 sniffio>=1.2.0
+
+tiktoken==0.4.0
