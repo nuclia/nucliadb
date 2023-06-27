@@ -49,7 +49,7 @@ from nucliadb.ingest.orm.resource import (
 )
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
-from nucliadb.migrations.tool.utils import get_latest_version
+from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage
