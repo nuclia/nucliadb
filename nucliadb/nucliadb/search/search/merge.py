@@ -312,7 +312,11 @@ async def merge_vectors_results(
             resources.append(rid)
 
     return Sentences(
-        results=result_sentence_list, facets=facets, page_number=page, page_size=count
+        results=result_sentence_list,
+        facets=facets,
+        page_number=page,
+        page_size=count,
+        min_score=min_score,
     )
 
 

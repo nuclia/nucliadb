@@ -124,7 +124,7 @@ class Sentences(BaseModel):
     page_number: int = 0
     page_size: int = 20
     min_score: float = Field(
-        description="Minimum similarity score applied to the vector index search"
+        description="Minimum similarity score applied to the vector index search. Results with a lower score have been ignored."  # noqa
     )
 
 
@@ -148,9 +148,6 @@ class Paragraphs(BaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
-    min_score: float = Field(
-        description="Minimum bm25 score applied to the paragraph index search"
-    )
 
 
 class ResourceResult(BaseModel):
@@ -400,7 +397,7 @@ class SearchParamDefaults:
     min_score = ParamDefault(
         default=None,
         title="Minimum result score",
-        description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned. If not set, the default minimum value associated to the Knowledge box's semantic model is used.",  # noqa: E501
+        description="The minimum score to consider a vector index result as valid. Results with a lower score will not be returned. If not set, the default minimum value associated to the Knowledge box's semantic model is used.",  # noqa: E501
     )
     autofilter = ParamDefault(
         default=False,
@@ -742,10 +739,7 @@ class KnowledgeboxFindResults(BaseModel):
     shards: Optional[List[str]]
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = Field(
-        description="Minimum similarity score applied to the vector index search"
-    )
-    min_score_bm25: float = Field(
-        description="Minimum bm25 score applied to the paragraph index search"
+        description="Minimum similarity score applied to the vector index search. Results with a lower score have been ignored."  # noqa
     )
 
 
