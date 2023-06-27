@@ -191,7 +191,7 @@ class PredictEngine:
     async def finalize(self):
         await self.session.close()
 
-    def check_nua_key(self):
+    def check_nua_key_is_configured_for_onprem(self):
         if self.onprem and self.nuclia_service_account is None:
             raise NUAKeyMissingError()
 
@@ -226,7 +226,7 @@ class PredictEngine:
         x_forwarded_for: str,
     ):
         try:
-            self.check_nua_key()
+            self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
             logger.warning(
                 "Nuclia Service account is not defined so could not send the feedback"
@@ -248,7 +248,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
         try:
-            self.check_nua_key()
+            self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
             error = "Nuclia Service account is not defined so could not rephrase query"
             logger.warning(error)
@@ -267,7 +267,7 @@ class PredictEngine:
         self, kbid: str, item: ChatModel
     ) -> Tuple[str, AsyncIterator[bytes]]:
         try:
-            self.check_nua_key()
+            self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
             error = "Nuclia Service account is not defined so the chat operation could not be performed"
             logger.warning(error)
@@ -287,7 +287,7 @@ class PredictEngine:
         self, kbid: str, question: str, blocks: list[list[str]]
     ) -> str:
         try:
-            self.check_nua_key()
+            self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
             error = "Nuclia Service account is not defined so could not ask document"
             logger.warning(error)
@@ -306,7 +306,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         try:
-            self.check_nua_key()
+            self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
             logger.warning(
                 "Nuclia Service account is not defined so could not retrieve vectors for the query"
@@ -327,7 +327,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "entities"})
     async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
         try:
-            self.check_nua_key()
+            self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
             logger.warning(
                 "Nuclia Service account is not defined so could not retrieve entities from the query"

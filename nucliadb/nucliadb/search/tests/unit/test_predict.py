@@ -107,7 +107,6 @@ async def test_convert_sentence_ok(
     assert await pe.convert_sentence_to_vector(kbid, sentence) == [0.0, 0.1]
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
-    url = f"{path}?text={sentence}"
 
     headers = {
         expected_header: expected_header_value.format(
@@ -115,7 +114,8 @@ async def test_convert_sentence_ok(
         )
     }
     pe.session.get.assert_awaited_once_with(
-        url=url,
+        url=path,
+        params={"text": sentence},
         headers=headers,
     )
 
@@ -175,7 +175,6 @@ async def test_detect_entities_ok(
     assert len(await pe.detect_entities(kbid, sentence)) > 0
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
-    url = f"{path}?text={sentence}"
 
     headers = {
         expected_header: expected_header_value.format(
@@ -183,7 +182,8 @@ async def test_detect_entities_ok(
         )
     }
     pe.session.get.assert_awaited_once_with(
-        url=url,
+        url=path,
+        params={"text": sentence},
         headers=headers,
     )
 
