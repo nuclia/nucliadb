@@ -80,7 +80,7 @@ async def find_knowledgebox(
     faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
-    min_score: float = fastapi_query(SearchParamDefaults.min_score),
+    min_score: Optional[float] = fastapi_query(SearchParamDefaults.min_score),
     range_creation_start: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_creation_start
     ),

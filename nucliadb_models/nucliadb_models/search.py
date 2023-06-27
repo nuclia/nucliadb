@@ -392,9 +392,9 @@ class SearchParamDefaults:
         description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
     )
     min_score = ParamDefault(
-        default=0.70,
+        default=None,
         title="Minimum result score",
-        description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
+        description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned. If not set, the default minimum value associated to the Knowledge box's semantic model is used.",  # noqa: E501
     )
     autofilter = ParamDefault(
         default=False,
@@ -549,7 +549,7 @@ class BaseSearchRequest(BaseModel):
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
-    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
+    min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     range_creation_start: Optional[
         datetime
     ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
@@ -624,7 +624,7 @@ class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
-    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
+    min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
         datetime
