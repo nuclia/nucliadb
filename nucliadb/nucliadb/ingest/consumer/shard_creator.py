@@ -105,9 +105,8 @@ class ShardCreatorHandler:
             logger.warning({"message": "Adding shard", "kbid": kbid})
             async with self.driver.transaction() as txn:
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                similarity = await kb.get_similarity()
-
+                model = await kb.get_model_metadata()
                 await self.shard_manager.create_shard_by_kbid(
-                    txn, kbid, similarity=similarity
+                    txn, kbid, semantic_model=model
                 )
                 await txn.commit()

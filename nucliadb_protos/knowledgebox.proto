@@ -47,7 +47,9 @@ message KnowledgeBoxNew {
     string slug = 1;
     KnowledgeBoxConfig config = 2;
     string forceuuid = 3;
-    utils.VectorSimilarity similarity = 4;    
+    utils.VectorSimilarity similarity = 4;
+    optional int32 vector_dimension = 5;
+    optional float default_min_score = 6;
 }
 
 
@@ -171,4 +173,12 @@ message TermSynonyms {
 
 message Synonyms {
     map <string, TermSynonyms> terms = 1;
+}
+
+
+// Metadata of the model associated to the KB
+message SemanticModelMetadata {
+    utils.VectorSimilarity similarity_function = 1;
+    optional int32 vector_dimension = 2;
+    optional float default_min_score = 3;
 }

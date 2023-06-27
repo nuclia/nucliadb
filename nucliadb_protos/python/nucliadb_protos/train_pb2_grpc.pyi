@@ -30,6 +30,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NOTFOUND as NOTFOUND,
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
+    SemanticModelMetadata as SemanticModelMetadata,
     Synonyms as Synonyms,
     TermSynonyms as TermSynonyms,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,

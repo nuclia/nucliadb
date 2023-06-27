@@ -23,12 +23,13 @@ import random
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
-from grpc import aio  # type: ignore
+from grpc import aio
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_protos import noderesources_pb2, nodewriter_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import noderesources_pb2, nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -141,7 +142,7 @@ class KBShardManager:
         self,
         txn: Transaction,
         kbid: str,
-        similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
+        semantic_model: SemanticModelMetadata,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -160,7 +161,8 @@ class KBShardManager:
             kb_shards = writer_pb2.Shards()
             kb_shards.kbid = kbid
             kb_shards.actual = -1
-            kb_shards.similarity = similarity
+            kb_shards.similarity = semantic_model.similarity_function
+            kb_shards.model.CopyFrom(semantic_model)
         else:
             # New logic shard on an existing index
             kb_shards = writer_pb2.Shards()

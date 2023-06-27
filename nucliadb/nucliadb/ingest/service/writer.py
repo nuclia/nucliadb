@@ -33,6 +33,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxUpdate,
     Labels,
     NewKnowledgeBoxResponse,
+    SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
@@ -199,8 +200,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             kbid = await self.proc.create_kb(
                 request.slug,
                 request.config,
+                parse_model_metadata(request),
                 forceuuid=request.forceuuid,
-                similarity=request.similarity,
             )
         except KnowledgeBoxConflict:
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
@@ -734,9 +735,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
                     if shard is None:
                         # no shard currently exists, create one
-                        similarity = await kbobj.get_similarity()
+                        model = await kbobj.get_model_metadata()
                         shard = await self.shards_manager.create_shard_by_kbid(
-                            txn, request.kbid, similarity=similarity
+                            txn, request.kbid, semantic_model=model
                         )
 
                     await kbobj.set_resource_shard_id(request.rid, shard.shard)
@@ -832,3 +833,15 @@ def update_shards_with_updated_replica(
                 replica.shard.paragraph_service = updated_replica.paragraph_service
                 replica.shard.relation_service = updated_replica.relation_service
                 return
+
+
+def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
+    model = SemanticModelMetadata()
+    model.similarity_function = request.similarity
+    # TODO: remove `HasField` conditions once we are sure
+    # they are always provided (both in self-hosted and cloud)
+    if request.HasField("vector_dimension"):
+        model.vector_dimension = request.vector_dimension
+    if request.HasField("default_min_score"):
+        model.default_min_score = request.default_min_score
+    return model

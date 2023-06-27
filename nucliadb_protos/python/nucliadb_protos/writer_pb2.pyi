@@ -43,6 +43,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NOTFOUND as NOTFOUND,
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
+    SemanticModelMetadata as SemanticModelMetadata,
     Synonyms as Synonyms,
     TermSynonyms as TermSynonyms,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
@@ -1525,12 +1526,15 @@ class Shards(google.protobuf.message.Message):
     KBID_FIELD_NUMBER: builtins.int
     ACTUAL_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
+    MODEL_FIELD_NUMBER: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     kbid: builtins.str
     actual: builtins.int
     """current shard that resources index to"""
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    @property
+    def model(self) -> nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata: ...
     def __init__(
         self,
         *,
@@ -1538,8 +1542,10 @@ class Shards(google.protobuf.message.Message):
         kbid: builtins.str = ...,
         actual: builtins.int = ...,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+        model: nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["model", b"model"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "model", b"model", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
 
 global___Shards = Shards
 
