@@ -38,6 +38,11 @@ async def run_kb_migrations(
 ) -> None:
     async with context.maybe_distributed_lock(f"migration-{kbid}"):
         kb_info = await context.data_manager.get_kb_info(kbid)
+        if kb_info is None:
+            logger.warning("KB not found", extra={"kbid": kbid})
+            await context.data_manager.delete_kb_migration(kbid=kbid)
+            return
+
         migrations = get_migrations(
             from_version=kb_info.current_version, to_version=target_version
         )
@@ -71,9 +76,13 @@ async def run_kb_migrations(
 
         await context.data_manager.delete_kb_migration(kbid=kbid)
 
-        assert (
-            await context.data_manager.get_kb_info(kbid=kbid)
-        ).current_version == target_version
+        refreshed_kb_info = await context.data_manager.get_kb_info(kbid=kbid)
+        if refreshed_kb_info is None:
+            logger.warning(
+                "KB not found. This should not happen.", extra={"kbid": kbid}
+            )
+            return
+        assert refreshed_kb_info.current_version == target_version
 
 
 async def run_all_kb_migrations(context: ExecutionContext, target_version: int) -> None:

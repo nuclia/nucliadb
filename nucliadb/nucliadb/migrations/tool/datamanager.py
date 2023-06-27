@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Union
+from typing import Optional, Union
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
@@ -64,11 +64,11 @@ class MigrationsDataManager:
             await txn.delete(MIGRATIONS_KEY.format(kbid=kbid))
             await txn.commit()
 
-    async def get_kb_info(self, kbid: str) -> KnowledgeBoxInfo:
+    async def get_kb_info(self, kbid: str) -> Optional[KnowledgeBoxInfo]:
         async with self.driver.transaction() as txn:
             kb_config = await KnowledgeBoxORM.get_kb(txn, kbid)
             if kb_config is None:
-                raise Exception(f"KB {kbid} does not exist")
+                return None
         return KnowledgeBoxInfo(current_version=kb_config.migration_version)
 
     async def update_kb_info(self, *, kbid: str, current_version: int) -> None:
