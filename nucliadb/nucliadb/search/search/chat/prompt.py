@@ -127,11 +127,11 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
+            text = paragraph.text.strip()
+            words += len(GPT_4_ENC.encode(text))
             if words >= MAX_WORDS:
                 break
 
-            text = paragraph.text.strip()
-            words += len(GPT_4_ENC.encode(text))
             output[paragraph.id] = text
 
             rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
@@ -142,6 +142,8 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
                     words += len(GPT_4_ENC.encode(text))
+                    if words >= MAX_WORDS:
+                        break
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
 
