@@ -76,6 +76,10 @@ async fn start_writer(addr: SocketAddr) {
 
     if !*initialized_lock {
         tokio::spawn(async move {
+            let data_path = nucliadb_node::env::data_path();
+            if !data_path.exists() {
+                std::fs::create_dir(&data_path).expect("Can not create the data directory");
+            }
             let writer_server =
                 NodeWriterServer::new(NodeWriterGRPCDriver::from(NodeWriterService::new()));
             Server::builder()
