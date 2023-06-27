@@ -28,6 +28,7 @@ from unittest.mock import AsyncMock, patch
 import nats
 import pytest
 from grpc import aio  # type: ignore
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common.cluster import manager
@@ -195,7 +196,8 @@ async def knowledgebox_ingest(gcs_storage, redis_driver: RedisDriver, shard_mana
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     txn = await redis_driver.begin()
-    await KnowledgeBox.create(txn, kbslug, kbid)
+    model = SemanticModelMetadata(similarity_function=upb.VectorSimilarity.COSINE)
+    await KnowledgeBox.create(txn, kbslug, model, uuid=kbid)
     await txn.commit()
     yield kbid
     txn = await redis_driver.begin()

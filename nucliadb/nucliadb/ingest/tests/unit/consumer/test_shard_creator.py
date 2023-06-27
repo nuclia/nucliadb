@@ -94,7 +94,7 @@ async def test_handle_message_create_new_shard(
     await asyncio.sleep(0.06)
 
     shard_manager.create_shard_by_kbid.assert_called_with(
-        ANY, "kbid", similarity=kb.get_similarity.return_value
+        ANY, "kbid", semantic_model=kb.get_model_metadata.return_value
     )
 
 

@@ -20,9 +20,8 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use nucliadb_protos::*;
-
 use crate::prelude::*;
+use crate::protos::*;
 
 pub type VectorsReaderPointer = Arc<dyn VectorReader>;
 pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;

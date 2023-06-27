@@ -24,10 +24,11 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use common::{node_services, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::op_status::Status;
-use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
+use nucliadb_core::protos as nucliadb_protos;
+use nucliadb_protos::op_status::Status;
+use nucliadb_protos::prost_types::Timestamp;
+use nucliadb_protos::resource::ResourceStatus;
+use nucliadb_protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
 use tonic::Request;
 use uuid::Uuid;
 

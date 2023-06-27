@@ -47,6 +47,10 @@ class NodeError(Exception):
     pass
 
 
+class ExhaustedNodesError(Exception):
+    pass
+
+
 class ReallyStopPulling(Exception):
     pass
 

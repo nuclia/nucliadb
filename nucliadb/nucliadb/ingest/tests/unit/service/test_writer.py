@@ -20,8 +20,10 @@
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxNotFound
@@ -200,16 +202,44 @@ class TestWriterServicer:
         assert resp.found
 
     async def test_NewKnowledgeBox(self, writer: WriterServicer):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug")
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug", similarity=VectorSimilarity.DOT
+        )
         writer.proc.create_kb.return_value = "kbid"
 
         resp = await writer.NewKnowledgeBox(request)
 
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.DOT
+        )
         writer.proc.create_kb.assert_called_once_with(
             request.slug,
             request.config,
+            expected_model_metadata,
             forceuuid=request.forceuuid,
-            similarity=request.similarity,
+        )
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+
+    async def test_NewKnowledgeBox_with_model_metadata(self, writer: WriterServicer):
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug2",
+            vector_dimension=10,
+            default_min_score=-1.0,
+        )
+        writer.proc.create_kb.return_value = "kbid"
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.COSINE,
+            vector_dimension=10,
+            default_min_score=-1.0,
+        )
+        writer.proc.create_kb.assert_called_once_with(
+            request.slug,
+            request.config,
+            expected_model_metadata,
+            forceuuid=request.forceuuid,
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 

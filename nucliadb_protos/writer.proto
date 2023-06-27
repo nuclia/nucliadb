@@ -398,7 +398,8 @@ message Shards {
     repeated ShardObject shards = 1;
     string kbid = 2;
     int32 actual = 3;  // current shard that resources index to
-    utils.VectorSimilarity similarity = 4;
+    utils.VectorSimilarity similarity = 4 [deprecated = true];
+    knowledgebox.SemanticModelMetadata model = 5;
 }
 
 message ResourceFieldId {

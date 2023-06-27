@@ -29,7 +29,7 @@ from nucliadb.common.cluster.settings import settings
 
 
 @pytest.fixture(scope="function")
-def nodes():
+def available_nodes():
     nodes = {
         "node-0": IndexNode(id="node-0", address="node-0", shard_count=0, dummy=True),
         "node-30": IndexNode(
@@ -43,34 +43,37 @@ def nodes():
         yield nodes
 
 
-def test_find_nodes_orders_by_shard_count(nodes):
+def test_sorted_nodes_orders_by_shard_count(available_nodes):
     with mock.patch.object(settings, "node_replicas", 2):
-        nodes_found = manager.find_nodes()
-        assert len(nodes_found) == settings.node_replicas
-        assert nodes_found == ["node-0", "node-30"]
+        nodes = manager.sorted_nodes()
+        assert nodes[:2] == ["node-0", "node-30"]
 
 
-def test_find_nodes_exclude_nodes(nodes):
+def test_sorted_nodes_puts_nodes_to_avoid_at_the_end(available_nodes):
     with mock.patch.object(settings, "node_replicas", 2):
         excluded_node = "node-0"
-        nodes_found = manager.find_nodes(avoid_nodes=[excluded_node])
-        assert nodes_found == ["node-30", "node-40"]
+        nodes = manager.sorted_nodes(avoid_nodes=[excluded_node])
+        assert nodes == ["node-30", "node-40", "node-0"]
 
         # even if all are used, still should find nodes
-        all_nodes = list(nodes.keys())
-        assert manager.find_nodes(avoid_nodes=all_nodes) == ["node-0", "node-30"]
+        all_nodes = list(available_nodes.keys())
+        assert manager.sorted_nodes(avoid_nodes=all_nodes) == [
+            "node-0",
+            "node-30",
+            "node-40",
+        ]
 
 
-def test_find_nodes_raises_error_if_not_enough_nodes_are_found(nodes):
+def test_check_enough_nodes_raises_error_if_not_enough_nodes_are_found(available_nodes):
     with mock.patch.object(settings, "node_replicas", 200):
         with pytest.raises(NodeClusterSmall):
-            manager.find_nodes()
+            manager.check_enough_nodes()
 
 
-def test_find_nodes_checks_max_node_replicas_only_if_set(nodes):
+def test_check_enough_nodes_checks_max_node_replicas_only_if_set(available_nodes):
     with mock.patch.object(settings, "max_node_replicas", 0):
         with pytest.raises(NodeClusterSmall):
-            manager.find_nodes()
+            manager.check_enough_nodes()
 
     with mock.patch.object(settings, "max_node_replicas", -1):
-        assert len(manager.find_nodes())
+        manager.check_enough_nodes()

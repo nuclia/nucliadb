@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.tests.fixtures import IngestFixture
@@ -30,19 +31,23 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture):
     async for key in grpc_servicer.servicer.proc.list_kb(""):
         count += 1
     assert count == 0
-
+    model = SemanticModelMetadata(
+        similarity_function=VectorSimilarity.COSINE,
+        vector_dimension=384,
+        default_min_score=1.2,
+    )
     kbid = await grpc_servicer.servicer.proc.create_kb(
-        "test", KnowledgeBoxConfig(title="My Title 1")
+        "test", KnowledgeBoxConfig(title="My Title 1"), model
     )
     assert kbid
 
     with pytest.raises(KnowledgeBoxConflict):
         kbid = await grpc_servicer.servicer.proc.create_kb(
-            "test", KnowledgeBoxConfig(title="My Title 2")
+            "test", KnowledgeBoxConfig(title="My Title 2"), model
         )
 
     kbid2 = await grpc_servicer.servicer.proc.create_kb(
-        "test2", KnowledgeBoxConfig(title="My Title 3")
+        "test2", KnowledgeBoxConfig(title="My Title 3"), model
     )
     assert kbid2
 

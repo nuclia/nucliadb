@@ -35,7 +35,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
@@ -316,9 +316,9 @@ class Processor:
             shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
-                similarity = await kb.get_similarity()
+                model = await kb.get_model_metadata()
                 shard = await self.shard_manager.create_shard_by_kbid(
-                    txn, kbid, similarity=similarity
+                    txn, kbid, semantic_model=model
                 )
             await kb.set_resource_shard_id(uuid, shard.shard)
 
@@ -521,13 +521,17 @@ class Processor:
         self,
         slug: str,
         config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
+        semantic_model: knowledgebox_pb2.SemanticModelMetadata,
         forceuuid: Optional[str] = None,
-        similarity: utils_pb2.VectorSimilarity.ValueType = utils_pb2.VectorSimilarity.COSINE,
     ) -> str:
         async with self.driver.transaction() as txn:
             try:
                 uuid, failed = await KnowledgeBox.create(
-                    txn, slug, config=config, uuid=forceuuid, similarity=similarity
+                    txn,
+                    slug,
+                    semantic_model,
+                    uuid=forceuuid,
+                    config=config,
                 )
                 if failed:
                     raise Exception("Failed to create KB")

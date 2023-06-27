@@ -101,3 +101,11 @@ async def setup_driver() -> Driver:
     if not driver.initialized:
         await driver.initialize()
     return driver
+
+
+async def teardown_driver() -> None:
+    if _DRIVER_UTIL_NAME in MAIN:
+        driver: Driver = MAIN[_DRIVER_UTIL_NAME]
+        if driver.initialized:
+            await driver.finalize()
+        del MAIN[_DRIVER_UTIL_NAME]
