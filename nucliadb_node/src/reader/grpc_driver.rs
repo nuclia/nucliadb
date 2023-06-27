@@ -52,7 +52,6 @@ impl NodeReaderGRPCDriver {
             // If lazy loading is disabled, load
             self.shards.load_all().await?
         }
-
         Ok(())
     }
 

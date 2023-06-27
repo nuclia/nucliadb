@@ -144,7 +144,7 @@ impl ShardWriterService {
     pub fn clean_and_create(id: String, path: &Path) -> NodeResult<ShardWriterService> {
         let metadata = ShardMetadata::open(&path.join(METADATA_FILE))?;
         std::fs::remove_dir_all(path)?;
-        std::fs::create_dir_all(path)?;
+        std::fs::create_dir(path)?;
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -154,7 +154,6 @@ impl ShardWriterService {
         };
 
         let vsc = VectorConfig {
-            no_results: None,
             similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
@@ -171,7 +170,7 @@ impl ShardWriterService {
     ) -> NodeResult<ShardWriterService> {
         let time = SystemTime::now();
 
-        std::fs::create_dir_all(path)?;
+        std::fs::create_dir(path)?;
         let metadata_path = path.join(METADATA_FILE);
         let similarity = request.similarity();
         let metadata = ShardMetadata::from(request.clone());
@@ -184,7 +183,6 @@ impl ShardWriterService {
         };
 
         let vsc = VectorConfig {
-            no_results: None,
             similarity: Some(similarity),
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
@@ -217,7 +215,6 @@ impl ShardWriterService {
         };
 
         let vsc = VectorConfig {
-            no_results: None,
             similarity: None,
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),

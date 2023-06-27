@@ -151,7 +151,7 @@ impl Index {
         Ok(index)
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
-        std::fs::create_dir_all(path)?;
+        std::fs::create_dir(path)?;
         fs_state::initialize_disk(path, State::new)?;
         metadata.write(path)?;
         let lock = fs_state::shared_lock(path)?;

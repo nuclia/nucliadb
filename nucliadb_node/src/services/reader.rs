@@ -41,7 +41,6 @@ use crate::shard_metadata::ShardMetadata;
 use crate::telemetry::run_with_telemetry;
 
 const RELOAD_PERIOD: u128 = 5000;
-const FIXED_VECTORS_RESULTS: usize = 10;
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 
@@ -181,7 +180,6 @@ impl ShardReaderService {
 
         let vsc = VectorConfig {
             similarity: None,
-            no_results: Some(FIXED_VECTORS_RESULTS),
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),
         };

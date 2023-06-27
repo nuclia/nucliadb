@@ -22,7 +22,7 @@ use std::time::Instant;
 use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
-use nucliadb_core::NodeResult;
+use nucliadb_core::{node_error, NodeResult};
 use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
@@ -36,13 +36,17 @@ use tonic::transport::Server;
 type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
+
+    if !env::data_path().exists() {
+        return Err(node_error!("Data directory missing"));
+    }
+
     let _guard = init_telemetry()?;
     let start_bootstrap = Instant::now();
     let shards_provider = AsyncUnboundedShardReaderCache::new();
 
-    std::fs::create_dir_all(env::shards_path())?;
     if !env::lazy_loading() {
         shards_provider.load_all().await?;
     }

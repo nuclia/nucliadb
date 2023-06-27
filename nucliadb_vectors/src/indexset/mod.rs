@@ -39,7 +39,7 @@ pub struct IndexSet {
 impl IndexSet {
     pub fn new(path: &Path, with_check: IndexCheck) -> VectorR<IndexSet> {
         if !path.exists() {
-            std::fs::create_dir_all(path)?;
+            std::fs::create_dir(path)?;
         }
         fs_state::initialize_disk(path, || State::new(path.to_path_buf()))?;
         let lock = fs_state::shared_lock(path)?;
