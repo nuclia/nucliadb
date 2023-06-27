@@ -19,6 +19,7 @@ spec:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
+        sidecar.istio.io/inject: "false"
       labels:
         app: migrate-job
         version: "{{ .Chart.Version | replace "+" "_" }}"
