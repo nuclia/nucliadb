@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field, validator
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.vectors import VectorSimilarity
+from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 
 _T = TypeVar("_T")
 
@@ -344,6 +344,7 @@ class KnowledgeboxShards(BaseModel):
     actual: int
     similarity: VectorSimilarity
     shards: List[ShardObject]
+    model: Optional[SemanticModelMetadata]
 
     @classmethod
     def from_message(cls: Type[_T], message: PBShards) -> _T:
@@ -353,6 +354,8 @@ class KnowledgeboxShards(BaseModel):
             including_default_value_fields=True,
         )
         as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
+        if message.HasField("model"):
+            as_dict["model"] = SemanticModelMetadata.from_message(message.model)
         return cls(**as_dict)
 
 
