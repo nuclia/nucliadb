@@ -26,7 +26,12 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.search import logger
-from nucliadb_models.search import ChatModel, FeedbackRequest, RephraseModel
+from nucliadb_models.search import (
+    AskDocumentModel,
+    ChatModel,
+    FeedbackRequest,
+    RephraseModel,
+)
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
@@ -38,6 +43,10 @@ class SendToPredictError(Exception):
 
 
 class PredictVectorMissing(Exception):
+    pass
+
+
+class NUAKeyMissingError(Exception):
     pass
 
 
@@ -57,6 +66,7 @@ PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
 CHAT = "/chat"
+ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
 
@@ -134,6 +144,11 @@ class DummyPredictEngine:
 
         return (DUMMY_LEARNING_ID, generate())
 
+    async def ask_document(self, kbid: str, query: str, blocks: list[list[str]]) -> str:
+        self.calls.append((query, blocks))
+        answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
+        return answer
+
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         self.calls.append(sentence)
         if (
@@ -176,6 +191,22 @@ class PredictEngine:
     async def finalize(self):
         await self.session.close()
 
+    def check_nua_key_is_configured_for_onprem(self):
+        if self.onprem and self.nuclia_service_account is None:
+            raise NUAKeyMissingError()
+
+    def get_predict_url(self, endpoint: str) -> str:
+        if self.onprem:
+            return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
+        else:
+            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+
+    def get_predict_headers(self, kbid: str) -> dict[str, str]:
+        if self.onprem:
+            return {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+        else:
+            return {"X-STF-KBID": kbid}
+
     async def check_response(self, resp, expected: int = 200) -> None:
         if resp.status == expected:
             return
@@ -194,56 +225,40 @@ class PredictEngine:
         x_ndb_client: str,
         x_forwarded_for: str,
     ):
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            logger.warning(
+                "Nuclia Service account is not defined so could not send the feedback"
+            )
+            return
+
         data = item.dict()
         data["user_id"] = x_nucliadb_user
         data["client"] = x_ndb_client
         data["forwarded"] = x_forwarded_for
 
-        if self.onprem is False:
-            # Upload the payload
-            resp = await self.session.post(
-                url=f"{self.cluster_url}{PRIVATE_PREDICT}{FEEDBACK}",
-                json=data,
-                headers={"X-STF-KBID": kbid},
-            )
-        else:
-            if self.nuclia_service_account is None:
-                logger.warning(
-                    "Nuclia Service account is not defined so could not send the feedback"
-                )
-                return
-            # Upload the payload
-            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            resp = await self.session.post(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{FEEDBACK}",
-                json=data,
-                headers=headers,
-            )
+        resp = await self.session.post(
+            url=self.get_predict_url(FEEDBACK),
+            json=data,
+            headers=self.get_predict_headers(kbid),
+        )
         await self.check_response(resp, expected=204)
 
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
-        if self.onprem is False:
-            # Upload the payload
-            resp = await self.session.post(
-                url=f"{self.cluster_url}{PRIVATE_PREDICT}{REPHRASE}",
-                json=item.dict(),
-                headers={"X-STF-KBID": kbid},
-            )
-        else:
-            if self.nuclia_service_account is None:
-                error = (
-                    "Nuclia Service account is not defined so could not rephrase query"
-                )
-                logger.warning(error)
-                raise SendToPredictError(error)
-            # Upload the payload
-            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            resp = await self.session.post(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{REPHRASE}",
-                json=item.dict(),
-                headers=headers,
-            )
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so could not rephrase query"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        resp = await self.session.post(
+            url=self.get_predict_url(REPHRASE),
+            json=item.dict(),
+            headers=self.get_predict_headers(kbid),
+        )
         await self.check_response(resp, expected=200)
         return await resp.text()
 
@@ -251,49 +266,58 @@ class PredictEngine:
     async def chat_query(
         self, kbid: str, item: ChatModel
     ) -> Tuple[str, AsyncIterator[bytes]]:
-        if self.onprem is False:
-            # Upload the payload
-            resp = await self.session.post(
-                url=f"{self.cluster_url}{PRIVATE_PREDICT}{CHAT}",
-                json=item.dict(),
-                headers={"X-STF-KBID": kbid},
-            )
-        else:
-            if self.nuclia_service_account is None:
-                error = "Nuclia Service account is not defined so could not retrieve vectors for the query"
-                logger.warning(error)
-                raise SendToPredictError(error)
-            # Upload the payload
-            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            resp = await self.session.post(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{CHAT}",
-                json=item.dict(),
-                headers=headers,
-            )
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so the chat operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        resp = await self.session.post(
+            url=self.get_predict_url(CHAT),
+            json=item.dict(),
+            headers=self.get_predict_headers(kbid),
+        )
         await self.check_response(resp, expected=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
         return ident, resp.content.iter_any()
 
+    @predict_observer.wrap({"type": "ask_document"})
+    async def ask_document(
+        self, kbid: str, question: str, blocks: list[list[str]]
+    ) -> str:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined so could not ask document"
+            logger.warning(error)
+            raise SendToPredictError(error)
+
+        item = AskDocumentModel(question=question, blocks=blocks)
+        resp = await self.session.post(
+            url=self.get_predict_url(ASK_DOCUMENT),
+            json=item.dict(),
+            headers=self.get_predict_headers(kbid),
+            timeout=None,
+        )
+        await self.check_response(resp, expected=200)
+        return await resp.text()
+
     @predict_observer.wrap({"type": "sentence"})
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
-        if self.onprem is False:
-            # Upload the payload
-            resp = await self.session.get(
-                url=f"{self.cluster_url}{PRIVATE_PREDICT}{SENTENCE}?text={sentence}",
-                headers={"X-STF-KBID": kbid},
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            logger.warning(
+                "Nuclia Service account is not defined so could not retrieve vectors for the query"
             )
-        else:
-            if self.nuclia_service_account is None:
-                logger.warning(
-                    "Nuclia Service account is not defined so could not retrieve vectors for the query"
-                )
-                return []
-            # Upload the payload
-            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            resp = await self.session.get(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
-                headers=headers,
-            )
+            return []
+
+        resp = await self.session.get(
+            url=self.get_predict_url(SENTENCE),
+            params={"text": sentence},
+            headers=self.get_predict_headers(kbid),
+        )
         await self.check_response(resp, expected=200)
         data = await resp.json()
         if len(data["data"]) == 0:
@@ -302,24 +326,19 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "entities"})
     async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
-        if self.onprem is False:
-            # Upload the payload
-            resp = await self.session.get(
-                url=f"{self.cluster_url}{PRIVATE_PREDICT}{TOKENS}?text={sentence}",
-                headers={"X-STF-KBID": kbid},
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            logger.warning(
+                "Nuclia Service account is not defined so could not retrieve entities from the query"
             )
-        else:
-            if self.nuclia_service_account is None:  # pragma: no cover
-                logger.warning(
-                    "Nuclia Service account is not defined so could not retrieve entities from the query"
-                )
-                return []
-            # Upload the payload
-            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
-            resp = await self.session.get(
-                url=f"{self.public_url}{PUBLIC_PREDICT}{TOKENS}?text={sentence}",
-                headers=headers,
-            )
+            return []
+
+        resp = await self.session.get(
+            url=self.get_predict_url(TOKENS),
+            params={"text": sentence},
+            headers=self.get_predict_headers(kbid),
+        )
         await self.check_response(resp, expected=200)
         data = await resp.json()
 
