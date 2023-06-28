@@ -250,9 +250,7 @@ class StandaloneWriterWrapper:
     writer: NodeWriter
 
     def __init__(self):
-        data_path = os.environ.get("DATA_PATH")
-        if not (os.path.exists(data_path)):
-            os.mkdir(data_path)
+        os.makedirs(os.environ.get("DATA_PATH"), exist_ok=True)
         self.writer = NodeWriter.new()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
