@@ -266,6 +266,7 @@ pub struct NodeWriter {
 impl NodeWriter {
     #[staticmethod]
     pub fn new() -> PyResult<NodeWriter> {
+        let _ = std::fs::create_dir(nucliadb_node::env::data_path());
         match RustWriterService::new() {
             Ok(writer) => Ok(NodeWriter { writer }),
             Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
