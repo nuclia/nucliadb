@@ -175,7 +175,7 @@ impl TextWriterService {
     #[tracing::instrument(skip_all)]
     pub fn new(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
-        fs::create_dir_all(&config.path)?;
+        fs::create_dir(&config.path)?;
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {

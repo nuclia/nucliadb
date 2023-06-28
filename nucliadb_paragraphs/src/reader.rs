@@ -19,7 +19,6 @@
 //
 
 use std::fmt::Debug;
-use std::fs;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics;
@@ -35,10 +34,7 @@ use search_query::{search_query, suggest_query};
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{
-    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
-    ReloadPolicy,
-};
+use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy};
 
 use super::schema::ParagraphSchema;
 use crate::search_query;
@@ -313,63 +309,21 @@ impl ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            match ParagraphReaderService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
-        } else {
-            Ok(ParagraphReaderService::open(config)?)
+        if !config.path.exists() {
+            return Err(node_error!("Invalid path {:?}", config.path));
         }
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn new(config: &ParagraphConfig) -> NodeResult<ParagraphReaderService> {
-        let paragraph_schema = ParagraphSchema::default();
-        fs::create_dir_all(&config.path)?;
-        let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
-        let settings = IndexSettings {
-            sort_by_field: Some(IndexSortByField {
-                field: "created".to_string(),
-                order: Order::Desc,
-            }),
-            ..Default::default()
-        };
-
-        index_builder = index_builder.settings(settings);
-        let index = index_builder.create_in_dir(&config.path).unwrap();
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?;
-        Ok(ParagraphReaderService {
-            index,
-            reader,
-            schema: paragraph_schema,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &ParagraphConfig) -> NodeResult<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::default();
         let index = Index::open_in_dir(&config.path)?;
-
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into()?;
-
         Ok(ParagraphReaderService {
             index,
             reader,
             schema: paragraph_schema,
         })
     }
-
     fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
         match text.trim() {
             "" => text.to_string(),

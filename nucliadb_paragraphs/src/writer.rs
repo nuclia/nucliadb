@@ -182,7 +182,7 @@ impl ParagraphWriterService {
     pub fn new(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::default();
 
-        fs::create_dir_all(&config.path)?;
+        fs::create_dir(&config.path)?;
 
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
         let settings = IndexSettings {

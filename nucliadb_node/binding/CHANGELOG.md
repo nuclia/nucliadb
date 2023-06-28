@@ -1,4 +1,8 @@
 # Changelog
+## 0.7.9
+
+- restructured disk handling
+
 ## 0.7.8
 
 - Upgrade to 1.70.0

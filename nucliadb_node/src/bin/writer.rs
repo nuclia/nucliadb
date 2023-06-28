@@ -60,11 +60,16 @@ async fn main() -> NodeResult<()> {
     let start_bootstrap = Instant::now();
     let _guard = init_telemetry()?;
     let metrics = metrics::get_metrics();
+    let data_path = env::data_path();
     let metadata_path = env::metadata_path();
-    let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
-    let mut node_writer_service = NodeWriterService::new();
 
-    std::fs::create_dir_all(env::shards_path())?;
+    if !data_path.exists() {
+        std::fs::create_dir(data_path)?;
+    }
+
+    let mut node_writer_service = NodeWriterService::new()?;
+    let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
+
     if !env::lazy_loading() {
         node_writer_service.load_shards()?;
     }
@@ -273,7 +278,7 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
     } else {
         if let Some(dir) = host_key_path.parent() {
             if !dir.exists() {
-                fs::create_dir_all(dir).with_context(|| {
+                std::fs::create_dir(dir).with_context(|| {
                     format!("Failed to create host key directory '{}'", dir.display())
                 })?;
             }

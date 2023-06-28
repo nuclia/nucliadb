@@ -222,52 +222,19 @@ impl TryFrom<Neighbour> for DocumentScored {
         })
     }
 }
-
 impl VectorReaderService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            match VectorReaderService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
-        } else {
-            VectorReaderService::open(config)
+        if !config.path.exists() {
+            return Err(node_error!("Invalid path {:?}", config.path));
         }
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn new(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let path_indexset = std::path::Path::new(&config.vectorset);
-        if path.exists() {
-            Err(node_error!("Shard does exist".to_string()))
-        } else {
-            let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified"));
-            };
-            Ok(VectorReaderService {
-                index: Index::new(path, IndexMetadata { similarity })?,
-                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
-            })
+        if !config.vectorset.exists() {
+            return Err(node_error!("Invalid path {:?}", config.vectorset));
         }
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &VectorConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let path_indexset = std::path::Path::new(&config.vectorset);
-        if !path.exists() {
-            Err(node_error!("Shard does not exist".to_string()))
-        } else {
-            Ok(VectorReaderService {
-                index: Index::open(path, IndexCheck::None)?,
-                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
-            })
-        }
+        Ok(VectorReaderService {
+            index: Index::open(&config.path, IndexCheck::None)?,
+            indexset: IndexSet::new(&config.vectorset, IndexCheck::None)?,
+        })
     }
 }
 
@@ -289,7 +256,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
-            no_results: Some(3),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
         };

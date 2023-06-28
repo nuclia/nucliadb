@@ -208,7 +208,7 @@ fn simple_graph(at: &Path) -> (RelationsWriterService, RelationsReaderService) {
     };
     println!("Writer starts");
     let writer = RelationsWriterService::start(&rsc).unwrap();
-    let reader = RelationsReaderService::open(&rsc).unwrap();
+    let reader = RelationsReaderService::start(&rsc).unwrap();
     (writer, reader)
 }
 

@@ -19,7 +19,6 @@
 //
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs;
 use std::time::*;
 
 use itertools::Itertools;
@@ -35,10 +34,7 @@ use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{
-    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
-    ReloadPolicy, Result as TantivyResult, Searcher,
-};
+use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
 
 use super::schema::TextSchema;
 use super::search_query;
@@ -222,54 +218,9 @@ impl TextReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &TextConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            match TextReaderService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
-        } else {
-            Ok(TextReaderService::open(config)?)
+        if !config.path.exists() {
+            return Err(node_error!("Invalid path {:?}", config.path));
         }
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn new(config: &TextConfig) -> NodeResult<Self> {
-        let field_schema = TextSchema::new();
-
-        fs::create_dir_all(&config.path)?;
-
-        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
-        let settings = IndexSettings {
-            sort_by_field: Some(IndexSortByField {
-                field: "created".to_string(),
-                order: Order::Desc,
-            }),
-            ..Default::default()
-        };
-
-        index_builder = index_builder.settings(settings);
-
-        let index = index_builder.create_in_dir(&config.path).unwrap();
-
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?;
-
-        Ok(TextReaderService {
-            index,
-            reader,
-            schema: field_schema,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(&config.path)?;
 
@@ -426,7 +377,10 @@ impl TextReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn do_search(&self, request: &DocumentSearchRequest) -> TantivyResult<DocumentSearchResponse> {
+    fn do_search(
+        &self,
+        request: &DocumentSearchRequest,
+    ) -> tantivy::Result<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = SystemTime::now();

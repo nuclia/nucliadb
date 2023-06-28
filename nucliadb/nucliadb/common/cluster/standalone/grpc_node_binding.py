@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncIterator
@@ -249,6 +250,7 @@ class StandaloneWriterWrapper:
     writer: NodeWriter
 
     def __init__(self):
+        os.makedirs(settings.data_path, exist_ok=True)
         self.writer = NodeWriter.new()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
