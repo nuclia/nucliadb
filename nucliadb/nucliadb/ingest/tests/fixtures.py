@@ -196,7 +196,9 @@ async def knowledgebox_ingest(gcs_storage, redis_driver: RedisDriver, shard_mana
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     txn = await redis_driver.begin()
-    model = SemanticModelMetadata(similarity_function=upb.VectorSimilarity.COSINE)
+    model = SemanticModelMetadata(
+        similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=768
+    )
     await KnowledgeBox.create(txn, kbslug, model, uuid=kbid)
     await txn.commit()
     yield kbid
