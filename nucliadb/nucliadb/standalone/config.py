@@ -71,9 +71,6 @@ def config_standalone_driver(nucliadb_args: Settings):
     if "DATA_PATH" not in os.environ:
         os.environ["DATA_PATH"] = nucliadb_args.data_path
 
-    if not os.path.isdir(nucliadb_args.data_path):
-        os.makedirs(nucliadb_args.data_path, exist_ok=True)
-
 
 def config_nucliadb(nucliadb_args: Settings):
     """
@@ -97,6 +94,7 @@ def config_nucliadb(nucliadb_args: Settings):
 
     cluster_settings.standalone_mode = True
     cluster_settings.node_replicas = 1
+    cluster_settings.data_path = nucliadb_args.data_path
     ingest_settings.nuclia_partitions = 1
     ingest_settings.total_replicas = 1
     ingest_settings.replica_number = 0
