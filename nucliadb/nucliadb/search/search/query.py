@@ -355,5 +355,5 @@ async def get_default_min_score(kbid: str) -> float:
         return model_min_score
     else:
         # B/w compatible code until we figure out how to
-        # set default min score for on-prem NucliaDB
+        # set default min score for old on-prem kbs
         return 0.7
