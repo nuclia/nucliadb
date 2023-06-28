@@ -43,6 +43,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
+    const.Features.ROLLOVER_SHARDS: {
+        "rollout": 0,
+        "variants": {"environment": ["stage"]},
+    },
 }
 
 

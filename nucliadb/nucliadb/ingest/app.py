@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable
 
 import pkg_resources
 
@@ -35,41 +35,18 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
-from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.run import run_until_exit
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    get_indexing,
-    set_utility,
     start_audit_utility,
+    start_indexing_utility,
     start_nats_manager,
     start_transaction_utility,
     stop_audit_utility,
+    stop_indexing_utility,
     stop_nats_manager,
     stop_transaction_utility,
 )
-
-
-async def start_indexing_utility(service_name: Optional[str] = None):
-    if (
-        not cluster_settings.standalone_mode
-        and indexing_settings.index_jetstream_servers is not None
-    ):
-        indexing_utility = IndexingUtility(
-            nats_creds=indexing_settings.index_jetstream_auth,
-            nats_servers=indexing_settings.index_jetstream_servers,
-        )
-        await indexing_utility.initialize(service_name)
-        set_utility(Utility.INDEXING, indexing_utility)
-
-
-async def stop_indexing_utility():
-    indexing_utility = get_indexing()
-    if indexing_utility:
-        await indexing_utility.finalize()
-        clean_utility(Utility.INDEXING)
 
 
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
@@ -77,7 +54,12 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
 
     await setup_cluster(SERVICE_NAME)
     await start_transaction_utility(SERVICE_NAME)
-    await start_indexing_utility(SERVICE_NAME)
+    if (
+        not cluster_settings.standalone_mode
+        and indexing_settings.index_jetstream_servers is not None
+    ):
+        await start_indexing_utility(SERVICE_NAME)
+
     await start_audit_utility(SERVICE_NAME)
 
     finalizers = [

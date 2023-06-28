@@ -44,6 +44,7 @@ from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     FileBackendConfig,
     audit_settings,
+    indexing_settings,
     nuclia_settings,
     storage_settings,
     transaction_settings,
@@ -228,6 +229,15 @@ def get_ingest() -> WriterStub:
     return get_utility(Utility.INGEST)  # type: ignore
 
 
+def start_partitioning_utility() -> PartitionUtility:
+    util = PartitionUtility(
+        partitions=nuclia_settings.nuclia_partitions,
+        seed=nuclia_settings.nuclia_hash_seed,
+    )
+    set_utility(Utility.PARTITION, util)
+    return util
+
+
 def get_partitioning() -> PartitionUtility:
     return get_utility(Utility.PARTITION)  # type: ignore
 
@@ -276,6 +286,23 @@ async def stop_transaction_utility() -> None:
     if transaction_utility:
         await transaction_utility.finalize()
         clean_utility(Utility.TRANSACTION)
+
+
+async def start_indexing_utility(service_name: Optional[str] = None) -> IndexingUtility:
+    indexing_utility = IndexingUtility(
+        nats_creds=indexing_settings.index_jetstream_auth,
+        nats_servers=indexing_settings.index_jetstream_servers,
+    )
+    await indexing_utility.initialize(service_name)
+    set_utility(Utility.INDEXING, indexing_utility)
+    return indexing_utility
+
+
+async def stop_indexing_utility():
+    indexing_utility = get_indexing()
+    if indexing_utility:
+        await indexing_utility.finalize()
+        clean_utility(Utility.INDEXING)
 
 
 def get_indexing() -> IndexingUtility:

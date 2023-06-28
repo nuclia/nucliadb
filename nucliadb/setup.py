@@ -78,6 +78,7 @@ setup(
             "nucliadb-purge = nucliadb.purge:purge",
             "nucliadb-ingest-purge = nucliadb.ingest.purge:run",
             "nucliadb-migrate = nucliadb.migrator.command:main",
+            "nucliadb-rollover-kbid = nucliadb.common.cluster.rollover:rollover_kbid_command",
             "nucliadb-extract-openapi-reader = nucliadb.reader.openapi:command_extract_openapi",
             "nucliadb-extract-openapi-search = nucliadb.search.openapi:command_extract_openapi",
             "nucliadb-extract-openapi-writer = nucliadb.writer.openapi:command_extract_openapi",

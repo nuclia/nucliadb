@@ -29,7 +29,9 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 from .settings import settings
 
 
-async def setup_cluster(service_name: str):
+async def setup_cluster(
+    service_name: str,
+) -> Union[KBShardManager, StandaloneKBShardManager]:
     await start_chitchat(service_name)
     mng: Union[KBShardManager, StandaloneKBShardManager]
     if settings.standalone_mode:
@@ -37,6 +39,7 @@ async def setup_cluster(service_name: str):
     else:
         mng = KBShardManager()
     set_utility(Utility.SHARD_MANAGER, mng)
+    return mng
 
 
 async def teardown_cluster():
