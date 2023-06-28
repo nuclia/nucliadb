@@ -38,7 +38,7 @@ def get_migration_modules() -> list[tuple[types.ModuleType, int]]:
     for filename in os.listdir(MIGRATION_DIR):
         if filename.endswith(".py") and filename != "__init__.py":
             module_name = filename[:-3]
-            version = int(module_name.split("_")[-1])
+            version = int(module_name.split("_")[0])
             __import__(f"migrations.{module_name}")
             module = getattr(migrations, module_name)
             if not hasattr(module, "migrate"):

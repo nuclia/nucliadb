@@ -40,9 +40,10 @@ supported for IndexNodes is to simply roll them over to new shards and delete th
 
 All other migrations will target running python code against a knowledge box.
 
-All migrations will be provided in the folder `nucliadb/nucliadb/migrations/` and have a filename
-the follows the structure: `[migration name]_[sequence].py`. Where `sequence` is the order the
-migration should be run in. Example: `migrate_data_1.py`.
+All migrations will be provided in the `migrations` folder and have a filename
+that follows the structure: `[sequence]_[migration name].py`.
+Where `sequence` is the order the migration should be run in with zero padding.
+Example: `0001_migrate_data.py`.
 
 The migration framework manages the framework around iterating through all the knowledge boxes,
 tracking which ones finished succesfully so if there was a failure, it can be retried from
@@ -50,7 +51,7 @@ where it was left off.
 
 #### Examples
 
-File: `nucliadb/nucliadb/migrations/migrate_data_1.py`:
+File: `nucliadb/nucliadb/migrations/0001_migrate_data.py`:
 
 ```python
 
@@ -62,7 +63,7 @@ async def migrate_kb(context, kbid: str) -> None:
         ...
 ```
 
-File: `nucliadb/nucliadb/migrations/rollover_shards_2.py`:
+File: `nucliadb/nucliadb/migrations/0002_rollover_shards.py`:
 
 ```python
 from nucliadb.migrator.utils import rollover_shards

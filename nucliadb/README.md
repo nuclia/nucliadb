@@ -13,8 +13,9 @@ This module contains most of the Python components for NucliaDB:
 This module is used to manage NucliaDB Migrations.
 
 All migrations will be provided in the `migrations` folder and have a filename
-that follows the structure: `[migration name]_[sequence].py`.
-Where `sequence` is the order the migration should be run in. Example: `migrate_data_1.py`.
+that follows the structure: `[sequence]_[migration name].py`.
+Where `sequence` is the order the migration should be run in with zero padding.
+Example: `0001_migrate_data.py`.
 
 Each migration should have the following:
 
