@@ -152,7 +152,7 @@ The proposal focusses on moving toward 3 patterns:
 
 - `ingest` focuses on components for ingesting data and not providing interfaces to other components
 - shared tooling and data layers are moved to the `nucliadb.common` module
-- no main component should import from the `injest` module
+- no main component should import from the `ingest` module
 - nucliadb should stop using the `ingest` grpc service
 
 ### Isolate our data layers into separate interfaces
