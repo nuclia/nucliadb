@@ -67,7 +67,7 @@ async fn main() -> NodeResult<()> {
         std::fs::create_dir(data_path)?;
     }
 
-    let mut node_writer_service = NodeWriterService::new();
+    let mut node_writer_service = NodeWriterService::new()?;
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
 
     if !env::lazy_loading() {

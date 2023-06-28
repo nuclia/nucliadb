@@ -77,8 +77,12 @@ async fn start_writer(addr: SocketAddr) {
         return;
     }
     tokio::spawn(async move {
-        let writer_server =
-            NodeWriterServer::new(NodeWriterGRPCDriver::from(NodeWriterService::new()));
+        let data_path = nucliadb_node::env::data_path();
+        if !data_path.exists() {
+            std::fs::create_dir(&data_path).expect("Can not create data directory");
+        }
+        let writer = NodeWriterService::new().expect("Can not create writer");
+        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::from(writer));
         Server::builder()
             .add_service(writer_server)
             .serve(addr)
@@ -159,8 +163,4 @@ pub async fn node_writer() -> TestNodeWriter {
         .await
         .expect("Error starting node writer");
     node_writer_client().await
-}
-
-pub async fn node_services() -> (TestNodeReader, TestNodeWriter) {
-    (node_reader().await, node_writer().await)
 }

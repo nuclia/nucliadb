@@ -262,18 +262,14 @@ pub struct NodeWriter {
     writer: RustWriterService,
 }
 
-impl Default for NodeWriter {
-    fn default() -> NodeWriter {
-        NodeWriter {
-            writer: RustWriterService::new(),
-        }
-    }
-}
 #[pymethods]
 impl NodeWriter {
     #[staticmethod]
-    pub fn new() -> NodeWriter {
-        Self::default()
+    pub fn new() -> PyResult<NodeWriter> {
+        match RustWriterService::new() {
+            Ok(writer) => Ok(NodeWriter { writer }),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+        }
     }
 
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
