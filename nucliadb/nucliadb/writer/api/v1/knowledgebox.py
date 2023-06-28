@@ -32,10 +32,11 @@ from starlette.requests import Request
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
-    KnowledgeBoxConfig,
+    CreateKnowledgeBox,
     KnowledgeBoxObj,
     KnowledgeBoxObjID,
     NucliaDBRoles,
+    UpdateKnowledgeBox,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
@@ -51,7 +52,7 @@ from nucliadb_utils.utilities import get_ingest
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def create_kb(request: Request, item: KnowledgeBoxConfig):
+async def create_kb(request: Request, item: CreateKnowledgeBox):
     ingest = get_ingest()
     requestpb = KnowledgeBoxNew()
     if item.slug:
@@ -61,8 +62,10 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
         requestpb.config.title = item.title
     if item.description:
         requestpb.config.description = item.description
-    if item.similarity:
-        requestpb.similarity = item.similarity.to_pb()
+
+    requestpb.similarity = item.similarity.to_pb()
+    requestpb.vector_dimension = item.vector_dimension
+    requestpb.default_min_score = item.default_min_score
 
     requestpb.config.disable_vectors = item.disable_vectors
 
@@ -91,7 +94,7 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
+async def update_kb(request: Request, kbid: str, item: UpdateKnowledgeBox):
     ingest = get_ingest()
     pbrequest = KnowledgeBoxUpdate(uuid=kbid)
     if item.slug is not None:

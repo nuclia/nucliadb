@@ -26,12 +26,17 @@ from fastapi import Body, Header, Query, Request, Response
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
+from nucliadb.ingest import orm
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
-from nucliadb.search.search.query import global_query_to_pb, pre_process_query
+from nucliadb.search.search.query import (
+    get_default_min_score,
+    global_query_to_pb,
+    pre_process_query,
+)
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -182,6 +187,8 @@ async def find_post_knowledgebox(
         )
         response.status_code = 206 if incomplete else 200
         return results
+    except orm.exceptions.KnowledgeBoxNotFound:
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -203,6 +210,10 @@ async def find(
         if SearchOptions.VECTOR in item.features:
             item.features.remove(SearchOptions.VECTOR)
 
+    min_score = item.min_score
+    if min_score is None:
+        min_score = await get_default_min_score(kbid)
+
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
     pb_query, incomplete_results, autofilters = await global_query_to_pb(
@@ -215,7 +226,7 @@ async def find(
         sort=None,
         page_number=item.page_number,
         page_size=item.page_size,
-        min_score=item.min_score,
+        min_score=min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
@@ -245,7 +256,7 @@ async def find(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         requested_relations=pb_query.relation_subgraph,
-        min_score=pb_query.min_score,
+        min_score=min_score,
         highlight=item.highlight,
     )
 

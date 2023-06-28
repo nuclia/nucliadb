@@ -59,7 +59,7 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
-    min_score: Optional[float],
+    min_score: float,
     sort: Optional[SortOptions],
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
@@ -89,9 +89,6 @@ async def global_query_to_pb(
     autofilters = []
 
     request = SearchRequest()
-
-    if min_score is None:
-        min_score = await get_default_min_score(kbid)
     request.min_score = min_score
 
     request.body = query

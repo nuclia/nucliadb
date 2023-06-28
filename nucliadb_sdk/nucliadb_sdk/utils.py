@@ -43,7 +43,9 @@ class KnowledgeBoxAlreadyExists(Exception):
 def create_knowledge_box(
     slug: Optional[str] = None,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
-    similarity: Optional[str] = None,
+    similarity: str = "cosine",
+    vector_dimension: int = 768,
+    default_min_score: Optional[float] = None,
 ):
     url_obj = urlparse(nucliadb_base_url)
     if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
@@ -55,8 +57,10 @@ def create_knowledge_box(
         slug = uuid4().hex
 
     payload = {"slug": slug}
-    if similarity:
-        payload["similarity"] = similarity
+    payload["similarity"] = similarity
+    payload["vector_dimension"] = vector_dimension
+    if default_min_score is not None:
+        payload["default_min_score"] = default_min_score
 
     api_path = f"{nucliadb_base_url}/api/v1"
     response = requests.post(
@@ -111,7 +115,7 @@ def get_kb(
 def get_or_create(
     slug: str,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
-    similarity: Optional[str] = None,
+    similarity: str = "cosine",
 ):
     kb = get_kb(slug, nucliadb_base_url)
     if kb is None:

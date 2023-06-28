@@ -444,7 +444,10 @@ class KnowledgeBox:
         return pb
 
     async def get_model_metadata(self) -> SemanticModelMetadata:
-        shards_obj = await self.get_shards_object()
+        try:
+            shards_obj = await self.get_shards_object()
+        except ShardsNotFound:
+            raise KnowledgeBoxNotFound(self.kbid)
         if shards_obj.HasField("model"):
             return shards_obj.model
         else:

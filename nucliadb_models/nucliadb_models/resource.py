@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.datetime import FieldDatetime
@@ -80,14 +80,13 @@ class ExtractedDataTypeName(str, Enum):
     USERVECTORS = "uservectors"
 
 
-class KnowledgeBoxConfig(BaseModel):
+class KnowledgeBoxBase(BaseModel):
     slug: Optional[SlugString] = None
     title: Optional[str] = None
     description: Optional[str] = None
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
     disable_vectors: bool = False
-    similarity: Optional[VectorSimilarity]
 
     @validator("slug")
     def id_check(cls, v: str) -> str:
@@ -98,6 +97,8 @@ class KnowledgeBoxConfig(BaseModel):
                 raise ValueError("Invalid chars")
         return v
 
+
+class KnowledgeBoxConfig(KnowledgeBoxBase):
     @classmethod
     def from_message(cls: Type[_T], message: PBKnowledgeBoxConfig) -> _T:
         as_dict = MessageToDict(
@@ -106,6 +107,32 @@ class KnowledgeBoxConfig(BaseModel):
             including_default_value_fields=True,
         )
         return cls(**as_dict)
+
+
+class CreateKnowledgeBox(KnowledgeBoxBase):
+    """
+    Model for the creation payload of a Knowledge Box
+    """
+
+    similarity: VectorSimilarity = Field(
+        title="Semantic similarity function",
+        description="Similarity function to use for semantic search",
+    )
+    vector_dimension: int = Field(
+        title="Vector dimension",
+        description="Dimension of the vectors to use for the main vectors index",
+    )
+    default_min_score: float = Field(
+        0.7,
+        title="Default semantic minimum score",
+        description="Default minimum score to use for semantic search",
+    )
+
+
+class UpdateKnowledgeBox(KnowledgeBoxBase):
+    """
+    Model for the update payload of a Knowledge Box
+    """
 
 
 class KnowledgeBoxObjSummary(BaseModel):
