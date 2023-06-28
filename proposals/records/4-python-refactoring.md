@@ -233,10 +233,6 @@ class HTTPApplication(fastapi.FastAPI):
 def main():
     app = HTTPApplication(Settings())
     uvicorn.run(app, host="0.0.0.0", port=8080)
-
-
-if __name__ == "__main__":
-    main()
 ```
 
 - single ApplicationContext to manage runtime state
