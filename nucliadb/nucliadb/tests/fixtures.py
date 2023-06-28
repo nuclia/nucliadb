@@ -109,6 +109,9 @@ async def nucliadb(dummy_processing, telemetry_disabled):
     manager.INDEX_NODES.clear()
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        # we need to force DATA_PATH updates to run every test on the proper
+        # temporary directory
+        os.environ["DATA_PATH"] = f"{tmpdir}/node"
         settings = Settings(
             driver="local",
             file_backend="local",
@@ -119,6 +122,7 @@ async def nucliadb(dummy_processing, telemetry_disabled):
             ingest_grpc_port=free_port(),
             train_grpc_port=free_port(),
         )
+
         config_nucliadb(settings)
         server = await run_async_nucliadb(settings)
 
