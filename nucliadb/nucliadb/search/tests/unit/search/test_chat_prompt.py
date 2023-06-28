@@ -16,12 +16,19 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.search.search.chat import prompt as chat_prompt
+from nucliadb_models.search import (
+    SCORE_TYPE,
+    FindField,
+    FindParagraph,
+    FindResource,
+    KnowledgeboxFindResults,
+)
 from nucliadb_protos import resources_pb2
 
 pytestmark = pytest.mark.asyncio
@@ -131,4 +138,76 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
             kb=kb, rid="rid", field_id="field_id", mident="missing"
         )
         == []
+    )
+
+
+def _create_find_result(
+    _id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25
+):
+    return FindResource(
+        id=_id.split("/")[0],
+        fields={
+            "c/conv": FindField(
+                paragraphs={
+                    _id: FindParagraph(
+                        id=_id,
+                        score=1.0,
+                        score_type=score_type,
+                        order=1,
+                        text=result_text,
+                    )
+                }
+            )
+        },
+    )
+
+
+async def test_format_chat_prompt_content(kb):
+    result_text = " ".join(["text"] * 10)
+    with patch("nucliadb.search.search.chat.prompt.get_driver"), patch(
+        "nucliadb.search.search.chat.prompt.get_storage"
+    ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
+        prompt_result = await chat_prompt.format_chat_prompt_content(
+            "kbid",
+            KnowledgeboxFindResults(
+                facets={},
+                resources={
+                    "bmid": _create_find_result(
+                        "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25
+                    ),
+                    "vecid": _create_find_result(
+                        "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR
+                    ),
+                },
+            ),
+        )
+        assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
+            [result_text, result_text]
+        )
+
+
+async def test_format_chat_prompt_content_truncates(kb):
+    result_text = " ".join(["text"] * 100)
+    words = 0
+    resources = {}
+    index = 1
+    while True:
+        resources[f"id{index}"] = _create_find_result(
+            f"id{index}/c/conv/ident", result_text, SCORE_TYPE.BM25
+        )
+        words += len(chat_prompt.GPT_4_ENC.encode(result_text))
+        if words > chat_prompt.MAX_TOKENS:
+            break
+        index += 1
+
+    with patch("nucliadb.search.search.chat.prompt.get_driver"), patch(
+        "nucliadb.search.search.chat.prompt.get_storage"
+    ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
+        prompt_result = await chat_prompt.format_chat_prompt_content(
+            "kbid",
+            KnowledgeboxFindResults(facets={}, resources=resources),
+        )
+
+    assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
+        [result_text] * (index - 2)
     )
