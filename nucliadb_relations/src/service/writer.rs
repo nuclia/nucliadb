@@ -270,7 +270,7 @@ impl RelationsWriterService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            std::fs::create_dir_all(path)?;
+            std::fs::create_dir(path)?;
             let (index, wmode) = Index::new_writer(path)?;
             Ok(RelationsWriterService { index, wmode })
         }
