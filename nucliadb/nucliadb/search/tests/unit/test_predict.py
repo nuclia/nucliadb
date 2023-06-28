@@ -28,6 +28,7 @@ from nucliadb.search.predict import (
     SendToPredictError,
 )
 from nucliadb_models.search import (
+    AskDocumentModel,
     ChatModel,
     FeedbackRequest,
     FeedbackTasks,
@@ -106,7 +107,6 @@ async def test_convert_sentence_ok(
     assert await pe.convert_sentence_to_vector(kbid, sentence) == [0.0, 0.1]
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
-    url = f"{path}?text={sentence}"
 
     headers = {
         expected_header: expected_header_value.format(
@@ -114,7 +114,8 @@ async def test_convert_sentence_ok(
         )
     }
     pe.session.get.assert_awaited_once_with(
-        url=url,
+        url=path,
+        params={"text": sentence},
         headers=headers,
     )
 
@@ -174,7 +175,6 @@ async def test_detect_entities_ok(
     assert len(await pe.detect_entities(kbid, sentence)) > 0
 
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
-    url = f"{path}?text={sentence}"
 
     headers = {
         expected_header: expected_header_value.format(
@@ -182,7 +182,8 @@ async def test_detect_entities_ok(
         )
     }
     pe.session.get.assert_awaited_once_with(
-        url=url,
+        url=path,
+        params={"text": sentence},
         headers=headers,
     )
 
@@ -230,6 +231,7 @@ def session_limits_exceeded():
             ],
         ),
         ("rephrase_query", ["kbid", RephraseModel(question="foo", user_id="bar")]),
+        ("ask_document", ["kbid", "query", [["footext"]]]),
     ],
 )
 async def test_predict_engine_handles_limits_exceeded_error(
@@ -254,6 +256,7 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("send_feedback", ["kbid", MagicMock(), "", "", ""], False, None),
         ("convert_sentence_to_vector", ["kbid", "sentence"], False, []),
         ("detect_entities", ["kbid", "sentence"], False, []),
+        ("ask_document", ["kbid", "query", [["footext"]]], True, None),
     ],
 )
 async def test_onprem_nuclia_service_account_not_configured(
@@ -284,3 +287,46 @@ async def test_convert_sentence_to_vector_empty_vectors():
     )
     with pytest.raises(PredictVectorMissing):
         await pe.convert_sentence_to_vector("kbid", "sentence")
+
+
+async def test_ask_document_onprem():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        nuclia_service_account="foo",
+        zone="europe1",
+        onprem=True,
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, text="The answer", context_manager=False
+    )
+
+    assert await pe.ask_document("kbid", "query", [["footext"]]) == "The answer"
+
+    pe.session.post.assert_awaited_once_with(
+        url="public-europe1/api/v1/predict/ask_document",
+        json=AskDocumentModel(question="query", blocks=[["footext"]]).dict(),
+        headers={"X-STF-NUAKEY": "Bearer foo"},
+        timeout=None,
+    )
+
+
+async def test_ask_document_cloud():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, text="The answer", context_manager=False
+    )
+
+    assert await pe.ask_document("kbid", "query", [["footext"]]) == "The answer"
+
+    pe.session.post.assert_awaited_once_with(
+        url="cluster/api/internal/predict/ask_document",
+        json=AskDocumentModel(question="query", blocks=[["footext"]]).dict(),
+        headers={"X-STF-KBID": "kbid"},
+        timeout=None,
+    )
