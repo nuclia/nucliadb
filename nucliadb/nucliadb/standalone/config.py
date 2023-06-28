@@ -97,6 +97,7 @@ def config_nucliadb(nucliadb_args: Settings):
 
     cluster_settings.standalone_mode = True
     cluster_settings.node_replicas = 1
+    cluster_settings.data_path = nucliadb_args.data_path
     ingest_settings.nuclia_partitions = 1
     ingest_settings.total_replicas = 1
     ingest_settings.replica_number = 0
