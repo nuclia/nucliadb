@@ -35,6 +35,8 @@ async def test_knowledgebox_lifecycle(writer_api):
                 "enabled_filters": ["filter1", "filter2"],
                 "enabled_insights": ["insight1", "insight2"],
                 "disable_vectors": True,
+                "vector_dimension": 768,
+                "similarity": "cosine",
             },
         )
         assert resp.status_code == 201

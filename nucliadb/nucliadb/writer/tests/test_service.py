@@ -90,6 +90,8 @@ async def test_entities_custom_field(writer_api, entities_manager_mock):
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
+                "vector_dimension": 768,
+                "similarity": "cosine",
             },
         )
         assert resp.status_code == 201
@@ -124,6 +126,8 @@ async def test_service_lifecycle_labels(writer_api):
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
+                "vector_dimension": 768,
+                "similarity": "cosine",
             },
         )
         assert resp.status_code == 201
