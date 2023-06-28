@@ -21,30 +21,30 @@ from nucliadb_protos.resources_pb2 import FieldComputedMetadata, Paragraph
 from nucliadb_protos.utils_pb2 import ExtractedText
 
 from nucliadb.search.api.v1.resource.ask import (
-    split_by_computed_paragraphs,
-    split_by_newlines,
+    get_field_blocks,
+    get_field_blocks_split_by_paragraphs,
 )
 
 
-def test_split_by_newlines():
-    etxt = ExtractedText(text="Hello\nWorld")
-    assert split_by_newlines(etxt) == ["Hello", "World"]
+def test_get_field_blocks():
+    etxt = ExtractedText(text="Hello World")
+    assert get_field_blocks(etxt) == ["Hello World"]
 
     # split text
     etxt = ExtractedText()
-    etxt.split_text["foo"] = "Hello\nWorld"
-    etxt.split_text["bar"] = "I am\nhere"
-    assert split_by_newlines(etxt) == ["I am", "here", "Hello", "World"]
+    etxt.split_text["foo"] = "Hello World"
+    etxt.split_text["bar"] = "I am here"
+    assert get_field_blocks(etxt) == ["I am here", "Hello World"]
 
 
-def test_split_by_computed_paragraphs():
+def test_get_field_blocks_split_by_paragraphs():
     etxt = ExtractedText(text="Hello World")
     fcm = FieldComputedMetadata()
     p1 = Paragraph(start=0, end=5)
     p2 = Paragraph(start=6, end=11)
     fcm.metadata.paragraphs.append(p1)
     fcm.metadata.paragraphs.append(p2)
-    assert split_by_computed_paragraphs(etxt, fcm) == ["Hello", "World"]
+    assert get_field_blocks_split_by_paragraphs(etxt, fcm) == ["Hello", "World"]
 
     # split text
     etxt = ExtractedText()
@@ -59,4 +59,9 @@ def test_split_by_computed_paragraphs():
     fcm.split_metadata["foo"].paragraphs.append(p2)
     fcm.split_metadata["bar"].paragraphs.append(p3)
     fcm.split_metadata["bar"].paragraphs.append(p4)
-    assert split_by_computed_paragraphs(etxt, fcm) == ["I am", "here", "Hello", "World"]
+    assert get_field_blocks_split_by_paragraphs(etxt, fcm) == [
+        "I am",
+        "here",
+        "Hello",
+        "World",
+    ]

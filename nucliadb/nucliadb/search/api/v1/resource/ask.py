@@ -105,13 +105,13 @@ async def get_resource_text_blocks(kbid: str, rid: str) -> TextBlocks:
             fcm = await field_obj.get_field_metadata()
             if fcm is None:
                 logger.warning(f"Field metadata not found for {field_id}")
-                blocks.append(split_by_newlines(etxt))
+                blocks.append(get_field_blocks(etxt))
             else:
-                blocks.append(split_by_computed_paragraphs(etxt, fcm))
+                blocks.append(get_field_blocks_split_by_paragraphs(etxt, fcm))
     return blocks
 
 
-def split_by_computed_paragraphs(
+def get_field_blocks_split_by_paragraphs(
     etxt: ExtractedText, fcm: FieldComputedMetadata
 ) -> list[str]:
     block = []
@@ -128,12 +128,11 @@ def split_by_computed_paragraphs(
     return block
 
 
-def split_by_newlines(etxt: ExtractedText) -> list[str]:
-    block = []
+def get_field_blocks(etxt: ExtractedText) -> list[str]:
+    blocks = []
     if etxt.text:
-        block.extend(etxt.text.split("\n"))
-    for extracted_text in etxt.split_text.values():
-        if not extracted_text:
-            continue
-        block.extend(extracted_text.split("\n"))
-    return block
+        blocks.append(etxt.text)
+    for split_etxt in etxt.split_text.values():
+        if split_etxt:
+            blocks.append(split_etxt)
+    return blocks
