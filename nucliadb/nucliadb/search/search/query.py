@@ -19,9 +19,9 @@
 #
 import re
 from datetime import datetime
-from functools import lru_cache
 from typing import List, Optional, Tuple
 
+from async_lru import alru_cache
 from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
@@ -348,7 +348,7 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
             return None
 
 
-@lru_cache(maxsize=None)
+@alru_cache(maxsize=None)
 async def get_default_min_score(kbid: str) -> float:
     model_min_score = await get_kb_model_default_min_score(kbid)
     if model_min_score is not None:
