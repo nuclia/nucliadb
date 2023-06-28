@@ -245,7 +245,7 @@ async def find(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         requested_relations=pb_query.relation_subgraph,
-        min_score=item.min_score,
+        min_score=pb_query.min_score,
         highlight=item.highlight,
     )
 

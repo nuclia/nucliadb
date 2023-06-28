@@ -336,7 +336,6 @@ def pre_process_query(user_query: str) -> str:
     return " ".join(result)
 
 
-# TODO: should this go into a common module? or into a ingest exposed utils module?
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
     driver = get_driver()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -355,5 +354,6 @@ async def get_default_min_score(kbid: str) -> float:
     if model_min_score is not None:
         return model_min_score
     else:
-        # B/w compatible code until a migration is done
+        # B/w compatible code until we figure out how to
+        # set default min score for on-prem NucliaDB
         return 0.7

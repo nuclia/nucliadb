@@ -337,7 +337,7 @@ async def search(
         extracted=item.extracted,
         sort=sort_options,
         requested_relations=pb_query.relation_subgraph,
-        min_score=item.min_score,
+        min_score=pb_query.min_score,
         highlight=item.highlight,
     )
     await abort_transaction()
