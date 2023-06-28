@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import HTTPException, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -38,6 +38,7 @@ from nucliadb_models.resource import (
     NucliaDBRoles,
     UpdateKnowledgeBox,
 )
+from nucliadb_models.vectors import SemanticModelMetadata
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -65,7 +66,9 @@ async def create_kb(request: Request, item: CreateKnowledgeBox):
 
     requestpb.similarity = item.similarity.to_pb()
     requestpb.vector_dimension = item.vector_dimension
-    requestpb.default_min_score = item.default_min_score
+
+    if item.default_min_score is not None:
+        requestpb.default_min_score = item.default_min_score
 
     requestpb.config.disable_vectors = item.disable_vectors
 
@@ -77,7 +80,12 @@ async def create_kb(request: Request, item: CreateKnowledgeBox):
     else:
         slug = kbobj.uuid  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug)
+        model = SemanticModelMetadata(
+            vector_dimension=item.vector_dimension,
+            similarity_function=item.similarity,
+            default_min_score=item.default_min_score,
+        )
+        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug, model=model)
     elif kbobj.status == KnowledgeBoxResponseStatus.CONFLICT:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
