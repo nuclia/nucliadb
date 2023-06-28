@@ -626,6 +626,11 @@ class RephraseModel(BaseModel):
     user_id: str
 
 
+class AskDocumentModel(BaseModel):
+    question: str
+    blocks: list[list[str]]
+
+
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
@@ -753,3 +758,20 @@ class FeedbackRequest(BaseModel):
     good: bool
     task: FeedbackTasks
     feedback: Optional[str]
+
+
+TextBlocks = list[list[str]]
+
+
+class AskRequest(BaseModel):
+    question: str = Field(
+        ..., title="Question", description="Question asked to the document"
+    )
+
+
+class AskResponse(BaseModel):
+    answer: str = Field(
+        ...,
+        title="Answer",
+        description="Answer to the question received from the generative AI model",
+    )
