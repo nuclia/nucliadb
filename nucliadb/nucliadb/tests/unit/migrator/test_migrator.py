@@ -20,18 +20,18 @@
 import types
 from unittest.mock import patch
 
-from nucliadb.migrations.tool import migrator
+from nucliadb.migrator import migrator
 
 
 def test_get_migrations():
     migrations = migrator.get_migrations()
     assert len(migrations) > 0
     assert migrations[0].version == 1
-    assert migrations[0].module.__name__ == "nucliadb.migrations.bootstrap_1"
+    assert migrations[0].module.__name__ == "migrations.bootstrap_1"
 
 
 def test_get_migration_with_filtering():
-    with patch("nucliadb.migrations.tool.utils.get_migration_modules") as mock:
+    with patch("nucliadb.migrator.utils.get_migration_modules") as mock:
         mock.return_value = [
             (types.ModuleType("m1"), 1),
             (types.ModuleType("m2"), 2),

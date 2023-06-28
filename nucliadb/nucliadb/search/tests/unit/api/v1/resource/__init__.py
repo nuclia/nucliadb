@@ -17,18 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from .tool import MigrationContext
-
-
-async def migrate(context: MigrationContext) -> None:
-    """
-    Non-kb type of migration.
-    """
-
-
-async def migrate_kb(context: MigrationContext, kbid: str) -> None:
-    """
-    Migrate kb.
-
-    Must have both types of migrations.
-    """

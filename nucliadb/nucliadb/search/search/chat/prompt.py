@@ -19,6 +19,8 @@
 #
 from typing import Optional
 
+import tiktoken
+
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -27,14 +29,17 @@ from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
+GPT_4_ENC = tiktoken.encoding_for_model("gpt-4")
+
 # less than real because of prompt text size, understanding api isn't truncating
 # and hard fails when we're over the limit
-MAX_WORDS = 4000 * 0.75
-
+MAX_TOKENS = 4000 * 0.85
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
-CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 30
+CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
+
+PROMPT_TEXT_RESULT_SEP = " \n\n "
 
 
 async def get_next_conversation_messages(
@@ -122,11 +127,11 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
-            if words >= MAX_WORDS:
+            text = paragraph.text.strip()
+            words += len(GPT_4_ENC.encode(text))
+            if words >= MAX_TOKENS:
                 break
 
-            text = paragraph.text.strip()
-            words += text.count(" ")  # very imperfect but fast
             output[paragraph.id] = text
 
             rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
@@ -136,8 +141,10 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
                 )
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
-                    words += text.count(" ")  # very imperfect but fast
+                    words += len(GPT_4_ENC.encode(text))
+                    if words >= MAX_TOKENS:
+                        break
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
 
-    return " \n\n ".join(output.values())
+    return PROMPT_TEXT_RESULT_SEP.join(output.values())

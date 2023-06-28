@@ -17,13 +17,33 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import chat  # noqa
-from . import feedback  # noqa
-from . import find  # noqa
-from . import knowledgebox  # noqa
-from . import search  # noqa
-from . import suggest  # noqa
-from .resource import ask as ask_resource  # noqa
-from .resource import chat as chat_resource  # noqa
-from .resource import search as search_resource  # noqa
-from .router import api  # noqa
+
+import pytest
+
+
+@pytest.mark.asyncio()
+async def test_ask_document(
+    nucliadb_writer,
+    nucliadb_reader,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "The title",
+            "summary": "The summary",
+            "texts": {"text_field": {"body": "The body of the text field"}},
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code in (200, 201)
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/resource/{rid}/ask",
+        json={"question": "Some question?"},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["answer"] == "Answer to your question"
