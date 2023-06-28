@@ -72,7 +72,9 @@ pub struct NodeReader {
 }
 impl Default for NodeReader {
     fn default() -> NodeReader {
-        NodeReader::new()
+        NodeReader {
+            reader: RustReaderService::new(),
+        }
     }
 }
 
@@ -80,9 +82,7 @@ impl Default for NodeReader {
 impl NodeReader {
     #[staticmethod]
     pub fn new() -> NodeReader {
-        NodeReader {
-            reader: RustReaderService::new(),
-        }
+        Self::default()
     }
 
     pub fn paragraphs(&mut self, shard_id: RawProtos) -> PyResult<PyParagraphProducer> {
@@ -262,17 +262,13 @@ pub struct NodeWriter {
     writer: RustWriterService,
 }
 
-impl Default for NodeWriter {
-    fn default() -> NodeWriter {
-        NodeWriter::new()
-    }
-}
 #[pymethods]
 impl NodeWriter {
     #[staticmethod]
-    pub fn new() -> NodeWriter {
-        NodeWriter {
-            writer: RustWriterService::new(),
+    pub fn new() -> PyResult<NodeWriter> {
+        match RustWriterService::new() {
+            Ok(writer) => Ok(NodeWriter { writer }),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }
     }
 

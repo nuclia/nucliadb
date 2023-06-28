@@ -23,6 +23,7 @@ from pydantic import BaseSettings, Field
 
 
 class Settings(BaseSettings):
+    data_path: str = "./data/node"
     standalone_mode: bool = False
 
     node_replicas: int = 2

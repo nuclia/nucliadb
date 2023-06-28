@@ -34,24 +34,29 @@ use uuid::Uuid;
 use crate::env;
 use crate::services::writer::ShardWriterService;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NodeWriterService {
     pub cache: HashMap<String, ShardWriterService>,
 }
 
-impl Default for NodeWriterService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 impl NodeWriterService {
-    pub fn new() -> Self {
+    fn initialize_file_system() -> NodeResult<()> {
+        let shards_path = env::shards_path();
+        let data_path = env::data_path();
+        if !data_path.exists() {
+            return Err(node_error!("{:?} is not created", data_path));
+        }
+        if !shards_path.exists() {
+            std::fs::create_dir(&shards_path)?;
+        }
+        Ok(())
+    }
+    pub fn new() -> NodeResult<Self> {
+        Self::initialize_file_system()?;
         // We shallow the error if the threadpools were already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
         let _ = VectorsMerger::install_global().map(std::thread::spawn);
-        Self {
-            cache: HashMap::new(),
-        }
+        Ok(Self::default())
     }
 
     #[tracing::instrument(skip_all)]

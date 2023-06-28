@@ -364,40 +364,10 @@ impl ReaderChild for RelationsReaderService {
 impl RelationsReaderService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &RelationConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            match RelationsReaderService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
-        } else {
-            Ok(RelationsReaderService::open(config)?)
+        if !config.path.exists() {
+            return Err(node_error!("Shard does not exist".to_string()));
         }
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn new(config: &RelationConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if path.exists() {
-            Err(node_error!("Shard does exist".to_string()))
-        } else {
-            std::fs::create_dir_all(path)?;
-            let (index, rmode) = Index::new_reader(path)?;
-            Ok(RelationsReaderService { index, rmode })
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &RelationConfig) -> NodeResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        if !path.exists() {
-            Err(node_error!("Shard does not exist".to_string()))
-        } else {
-            let (index, rmode) = Index::new_reader(path)?;
-            Ok(RelationsReaderService { index, rmode })
-        }
+        let (index, rmode) = Index::new_reader(&config.path)?;
+        Ok(RelationsReaderService { index, rmode })
     }
 }

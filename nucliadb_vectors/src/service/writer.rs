@@ -451,7 +451,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
-            no_results: None,
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
         };
@@ -520,7 +519,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
             similarity: Some(VectorSimilarity::Cosine),
-            no_results: None,
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
         };

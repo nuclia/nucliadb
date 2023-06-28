@@ -29,7 +29,6 @@ pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
 #[derive(Clone)]
 pub struct VectorConfig {
     pub similarity: Option<VectorSimilarity>,
-    pub no_results: Option<usize>,
     pub path: PathBuf,
     pub vectorset: PathBuf,
 }

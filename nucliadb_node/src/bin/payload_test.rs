@@ -20,12 +20,13 @@
 use std::io::Cursor;
 
 use nucliadb_core::protos::*;
+use nucliadb_core::NodeResult;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::writer::NodeWriterService;
 use prost::Message;
 
-fn main() -> anyhow::Result<()> {
-    let writer = NodeWriterService::new();
+fn main() -> NodeResult<()> {
+    let writer = NodeWriterService::new()?;
     let reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");

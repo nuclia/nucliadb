@@ -151,7 +151,7 @@ impl Index {
         Ok(index)
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
-        std::fs::create_dir_all(path)?;
+        std::fs::create_dir(path)?;
         fs_state::initialize_disk(path, State::new)?;
         metadata.write(path)?;
         let lock = fs_state::shared_lock(path)?;
@@ -267,14 +267,15 @@ mod test {
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
-        let index = Index::new(dir.path(), IndexMetadata::default())?;
-        let empty_no_entries = std::fs::read_dir(dir.path())?.count();
+        let vectors_path = dir.path().join("vectors");
+        let index = Index::new(&vectors_path, IndexMetadata::default())?;
+        let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
-            DataPoint::new(dir.path(), vec![], None, Similarity::Cosine).unwrap();
+            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
         }
         let lock = index.get_slock()?;
         index.collect_garbage(&lock)?;
-        let no_entries = std::fs::read_dir(dir.path())?.count();
+        let no_entries = std::fs::read_dir(&vectors_path)?.count();
         assert_eq!(no_entries, empty_no_entries);
         Ok(())
     }
