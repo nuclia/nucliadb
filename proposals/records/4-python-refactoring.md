@@ -294,7 +294,7 @@ async def get_kbs(prefix: str = "", app_context: AppContext) -> KnowledgeBoxList
 ```
 
 - `app_context` is injected from the FastAPI runtime initialization but not global state
-- does not expose transation details
+- does not expose transaction details
 - testing allows directly calling `get_kbs` with `app_context` injected and no other
   test setup required
 
