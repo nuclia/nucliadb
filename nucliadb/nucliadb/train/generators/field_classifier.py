@@ -71,7 +71,6 @@ async def generate_field_classification_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     request.filter.tags.append(labelset)
-    request.reload = True
     total = 0
 
     batch = FieldClassificationBatch()

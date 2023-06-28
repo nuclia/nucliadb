@@ -22,7 +22,7 @@ from datetime import datetime
 from time import time
 from typing import List, Optional, Tuple, Union
 
-from fastapi import Body, Header, Query, Request, Response
+from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
@@ -100,7 +100,6 @@ async def find_knowledgebox(
             SearchOptions.VECTOR,
         ],
     ),
-    reload: bool = Query(default=True),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     show: List[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
@@ -133,7 +132,6 @@ async def find_knowledgebox(
             range_modification_end=range_modification_end,
             range_modification_start=range_modification_start,
             features=features,
-            reload=reload,
             debug=debug,
             highlight=highlight,
             show=show,
@@ -221,7 +219,6 @@ async def find(
         range_modification_start=item.range_modification_start,
         range_modification_end=item.range_modification_end,
         fields=item.fields,
-        reload=item.reload,
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,

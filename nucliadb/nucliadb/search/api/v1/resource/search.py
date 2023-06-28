@@ -20,7 +20,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import Header, Query, Request, Response
+from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.txn_utils import abort_transaction
@@ -80,7 +80,6 @@ async def resource_search(
     range_modification_end: Optional[datetime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    reload: bool = Query(False),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     show: List[ResourceProperties] = fastapi_query(
         SearchParamDefaults.show, default=list(ResourceProperties)
@@ -109,7 +108,6 @@ async def resource_search(
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        reload=reload,
         sort=sort.value if sort else None,
         sort_ord=sort_order.value,
     )
