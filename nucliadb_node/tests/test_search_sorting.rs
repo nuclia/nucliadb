@@ -23,7 +23,7 @@ mod common;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use common::{node_services, TestNodeReader, TestNodeWriter};
+use common::{node_reader, node_writer, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos as nucliadb_protos;
 use nucliadb_protos::op_status::Status;
 use nucliadb_protos::prost_types::Timestamp;
@@ -81,7 +81,8 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
 
 #[tokio::test]
 async fn test_search_sorting() -> Result<(), Box<dyn std::error::Error>> {
-    let (mut reader, mut writer) = node_services().await;
+    let mut writer = node_writer().await;
+    let mut reader = node_reader().await;
 
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest::default()))

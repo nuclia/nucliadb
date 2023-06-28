@@ -73,10 +73,6 @@ async fn start_reader(addr: SocketAddr) {
 
 async fn start_writer(addr: SocketAddr) {
     let mut initialized_lock = WRITER_SERVER_INITIALIZED.lock().await;
-    let data_path = nucliadb_node::env::data_path();
-    if !data_path.exists() {
-        std::fs::create_dir(&data_path).unwrap();
-    }
     if *initialized_lock {
         return;
     }
