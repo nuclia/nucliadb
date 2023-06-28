@@ -20,7 +20,7 @@
 # europe-1.nuclia.cloud
 # localhost:8080
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -56,7 +56,7 @@ def create_knowledge_box(
     if slug is None:
         slug = uuid4().hex
 
-    payload = {"slug": slug}
+    payload: dict[str, Any] = {"slug": slug}
     payload["similarity"] = similarity
     payload["vector_dimension"] = vector_dimension
     if default_min_score is not None:
