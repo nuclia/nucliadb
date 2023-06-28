@@ -48,7 +48,7 @@ class InvalidSlugError(pydantic.errors.PydanticValueError):
     code = "str.slug"
     msg_template = (
         "Invalid slug: '{value}'. Slug must be a string with only "
-        "letters, numbers, underscores, colons and dashes."
+        "lowercase letters, numbers, underscores, colons and dashes."
     )
 
 
