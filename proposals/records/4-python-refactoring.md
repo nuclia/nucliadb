@@ -152,12 +152,14 @@ The proposal focusses on moving toward 3 patterns:
 
 - `ingest` focuses on components for ingesting data and not providing interfaces to other components
 - shared tooling and data layers are moved to the `nucliadb.common` module
+- no main component should import from the `injest` module
+- nucliadb should stop using the `ingest` grpc service
 
 ### Isolate our data layers into separate interfaces
 
 - create data layer management components
 - limit direct exposure of k/v and blob storage drivers
-- limit exposure of protobuf types
+- limit exposure of protobuf types(this might be very difficult and cumbersome)
 - Attempt to separate reads/writes into separate methods in case they need more explicit isolation later.
   We do not need command/query type system but it is similar to that idea.
 
@@ -169,7 +171,7 @@ The proposal focusses on moving toward 3 patterns:
 - unify application state between main components
 
 
-### Example FastAPI setup
+#### Example FastAPI setup
 
 Currently, we setup our FastAPI services like this:
 
@@ -239,7 +241,7 @@ def main():
 - app/settings are instantiated at runtime instead of import time
 - enabled testing endpoints without needing to mock global state since you can directly inject
 
-### Example endpoint
+#### Example endpoint
 
 Let's take a simple example for this code block:
 
