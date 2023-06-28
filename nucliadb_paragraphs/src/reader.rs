@@ -754,7 +754,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -774,7 +773,6 @@ mod tests {
             page_number: 0,
             result_per_page: 0,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -873,7 +871,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -893,7 +890,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -913,7 +909,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -933,7 +928,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -953,7 +947,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -973,7 +966,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -993,7 +985,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -1014,7 +1005,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -1035,7 +1025,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: true,
             only_faceted: false,
             ..Default::default()
@@ -1055,7 +1044,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -1073,7 +1061,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps),
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -1093,7 +1080,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: None,
-            reload: false,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -1104,7 +1090,6 @@ mod tests {
         let request = StreamRequest {
             shard_id: None,
             filter: None,
-            reload: false,
             ..Default::default()
         };
         let iter = paragraph_reader_service.iterator(&request).unwrap();

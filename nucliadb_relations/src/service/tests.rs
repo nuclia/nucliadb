@@ -65,9 +65,9 @@ lazy_static! {
     };
     static ref REQUEST_BONES: RelationSearchRequest = RelationSearchRequest {
         shard_id: SHARD_ID.clone(),
-        reload: false,
         prefix: None,
         subgraph: None,
+        ..Default::default()
     };
     static ref REQUEST0: EntitiesSubgraphRequest = EntitiesSubgraphRequest {
         entry_points: vec![E0.clone()],
