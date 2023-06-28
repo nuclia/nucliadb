@@ -48,7 +48,7 @@ async def annotated_file_field(
     with open(INVOICE_SELECTIONS_FILENAME) as f:
         selections = json.load(f)
 
-    selections_by_page = {}
+    selections_by_page = {}  # type: ignore
     for annotation in selections["annotations"]:
         page_selections = selections_by_page.setdefault(annotation["page"], [])
         page_selections.append(

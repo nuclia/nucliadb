@@ -617,9 +617,7 @@ class Resource:
             self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
-    async def get_field(
-        self, key: str, type: FieldType.ValueType, load: bool = True
-    ) -> Field:
+    async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
