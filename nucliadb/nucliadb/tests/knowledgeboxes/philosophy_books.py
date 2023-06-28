@@ -185,7 +185,14 @@ async def philosophy_books_kb(
         },
     ]
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "philosophy-books"})
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={
+            "slug": "philosophy-books",
+            "similarity": "cosine",
+            "vector_dimension": 768,
+        },
+    )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 

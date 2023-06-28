@@ -1284,7 +1284,9 @@ async def kb_with_one_logic_shard(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
 ):
-    resp = await nucliadb_manager.post("/kbs", json={})
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"vector_dimension": 768, "similarity": "cosine"}
+    )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -1312,7 +1314,9 @@ async def kb_with_two_logic_shards(
     sc = shard_creator.ShardCreatorHandler(
         driver=get_driver(), storage=await get_storage(), pubsub=None  # type: ignore
     )
-    resp = await nucliadb_manager.post("/kbs", json={})
+    resp = await nucliadb_manager.post(
+        "/kbs", json={"vector_dimension": 768, "similarity": "cosine"}
+    )
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 

@@ -104,7 +104,7 @@ async def nucliadb_api(
 async def knowledgebox_one(nucliadb_api):
     kbslug = str(uuid.uuid4())
     async with nucliadb_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        data = {"slug": kbslug}
+        data = {"slug": kbslug, "similarity": "cosine", "vector_dimension": 768}
         resp = await client.post(f"/{KBS_PREFIX}", json=data)
         assert resp.status_code == 201
         kbid = resp.json()["uuid"]

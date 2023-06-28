@@ -46,7 +46,12 @@ async def test_kb_creation_with_similarity(
     # Check that by default we get cosine similarity
     resp = await nucliadb_manager.post(
         f"/kbs",
-        json={"title": "My KB", "slug": "kb1"},
+        json={
+            "title": "My KB",
+            "slug": "kb1",
+            "similarity": "cosine",
+            "vector_dimension": 768,
+        },
         timeout=None,
     )
     assert resp.status_code == 201
@@ -60,7 +65,12 @@ async def test_kb_creation_with_similarity(
     # Check that we can define it to dot similarity
     resp = await nucliadb_manager.post(
         f"/kbs",
-        json={"title": "My KB with dot similarity", "slug": "dot", "similarity": "dot"},
+        json={
+            "title": "My KB with dot similarity",
+            "slug": "dot",
+            "similarity": "dot",
+            "vector_dimension": 768,
+        },
     )
     assert resp.status_code == 201
     dot_kbid = resp.json()["uuid"]
@@ -69,6 +79,7 @@ async def test_kb_creation_with_similarity(
     body = resp.json()
     assert body["similarity"] == "dot"
     assert body["model"]["similarity_function"] == "dot"
+    assert body["model"]["vector_dimension"] == 768
 
 
 @pytest.mark.asyncio
@@ -204,7 +215,11 @@ async def test_can_create_knowledgebox_with_colon_in_slug(
 ):
     resp = await nucliadb_manager.post(
         f"/kbs",
-        json={"slug": "something:else"},
+        json={
+            "slug": "something:else",
+            "vector_dimension": 768,
+            "similarity": "cosine",
+        },
     )
     assert resp.status_code == 201
 
