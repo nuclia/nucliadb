@@ -231,7 +231,7 @@ def session_limits_exceeded():
             ],
         ),
         ("rephrase_query", ["kbid", RephraseModel(question="foo", user_id="bar")]),
-        ("ask_document", ["kbid", "query", [["footext"]]]),
+        ("ask_document", ["kbid", "query", [["footext"]], "userid"]),
     ],
 )
 async def test_predict_engine_handles_limits_exceeded_error(
@@ -256,7 +256,7 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("send_feedback", ["kbid", MagicMock(), "", "", ""], False, None),
         ("convert_sentence_to_vector", ["kbid", "sentence"], False, []),
         ("detect_entities", ["kbid", "sentence"], False, []),
-        ("ask_document", ["kbid", "query", [["footext"]]], True, None),
+        ("ask_document", ["kbid", "query", [["footext"]], "userid"], True, None),
     ],
 )
 async def test_onprem_nuclia_service_account_not_configured(
@@ -301,11 +301,15 @@ async def test_ask_document_onprem():
         "POST", 200, text="The answer", context_manager=False
     )
 
-    assert await pe.ask_document("kbid", "query", [["footext"]]) == "The answer"
+    assert (
+        await pe.ask_document("kbid", "query", [["footext"]], "userid") == "The answer"
+    )
 
     pe.session.post.assert_awaited_once_with(
         url="public-europe1/api/v1/predict/ask_document",
-        json=AskDocumentModel(question="query", blocks=[["footext"]]).dict(),
+        json=AskDocumentModel(
+            question="query", blocks=[["footext"]], user_id="userid"
+        ).dict(),
         headers={"X-STF-NUAKEY": "Bearer foo"},
         timeout=None,
     )
@@ -322,11 +326,15 @@ async def test_ask_document_cloud():
         "POST", 200, text="The answer", context_manager=False
     )
 
-    assert await pe.ask_document("kbid", "query", [["footext"]]) == "The answer"
+    assert (
+        await pe.ask_document("kbid", "query", [["footext"]], "userid") == "The answer"
+    )
 
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/internal/predict/ask_document",
-        json=AskDocumentModel(question="query", blocks=[["footext"]]).dict(),
+        json=AskDocumentModel(
+            question="query", blocks=[["footext"]], user_id="userid"
+        ).dict(),
         headers={"X-STF-KBID": "kbid"},
         timeout=None,
     )
