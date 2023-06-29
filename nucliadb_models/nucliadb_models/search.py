@@ -638,8 +638,11 @@ class RephraseModel(BaseModel):
 
 
 class AskDocumentModel(BaseModel):
-    question: str
-    blocks: list[list[str]]
+    question: str = Field(description="The question to ask on the document")
+    blocks: list[list[str]] = Field(
+        description="The complete list of text blocks of a document"
+    )
+    user_id: str = Field(description="The id of the user associated to the request")
 
 
 class ChatRequest(BaseModel):
@@ -775,7 +778,10 @@ TextBlocks = list[list[str]]
 
 class AskRequest(BaseModel):
     question: str = Field(
-        ..., title="Question", description="Question asked to the document"
+        ...,
+        title="Question",
+        description="Question asked to the document",
+        example="Does this document contain personal information?",
     )
 
 
