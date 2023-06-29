@@ -284,7 +284,7 @@ class PredictEngine:
 
     @predict_observer.wrap({"type": "ask_document"})
     async def ask_document(
-        self, kbid: str, question: str, blocks: list[list[str]]
+        self, kbid: str, question: str, blocks: list[list[str]], user_id: str
     ) -> str:
         try:
             self.check_nua_key_is_configured_for_onprem()
@@ -293,7 +293,7 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        item = AskDocumentModel(question=question, blocks=blocks)
+        item = AskDocumentModel(question=question, blocks=blocks, user_id=user_id)
         resp = await self.session.post(
             url=self.get_predict_url(ASK_DOCUMENT),
             json=item.dict(),

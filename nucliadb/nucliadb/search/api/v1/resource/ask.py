@@ -19,7 +19,7 @@
 #
 from typing import Union
 
-from fastapi import Request, Response
+from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -38,6 +38,16 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_storage
 
+ASK_EXAMPLES = {
+    "Ask a Resource": {
+        "summary": "Ask a question to the document",
+        "description": "Ask a question to the document. The whole document is sent as context to the generative AI",
+        "value": {
+            "question": "Does this document contain personal information?",
+        },
+    }
+}
+
 
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/ask",
@@ -54,10 +64,13 @@ async def resource_ask_endpoint(
     response: Response,
     kbid: str,
     rid: str,
-    item: AskRequest,
+    item: AskRequest = Body(
+        examples=ASK_EXAMPLES, description="Ask a question payload"
+    ),
+    x_nucliadb_user: str = Header("", description="User Id", include_in_schema=False),
 ) -> Union[AskResponse, HTTPClientError]:
     try:
-        return await resource_ask(kbid, rid, item)
+        return await resource_ask(kbid, rid, item, user_id=x_nucliadb_user)
     except ResourceNotFoundError:
         return HTTPClientError(status_code=404, detail="Resource not found")
     except LimitsExceededError as exc:
@@ -70,11 +83,12 @@ async def resource_ask(
     kbid: str,
     rid: str,
     item: AskRequest,
+    user_id: str,
 ) -> AskResponse:
     blocks = await get_resource_text_blocks(kbid, rid)
 
     predict = get_predict()
-    answer = await predict.ask_document(kbid, item.question, blocks)
+    answer = await predict.ask_document(kbid, item.question, blocks, user_id)
 
     return AskResponse(answer=answer)
 
