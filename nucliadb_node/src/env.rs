@@ -136,17 +136,10 @@ pub fn lazy_loading() -> bool {
     }
 }
 
-pub fn host_key_path() -> String {
-    let default = String::from("host_key");
+pub fn host_key_path() -> PathBuf {
     match env::var("HOST_KEY_PATH") {
-        Ok(var) => match var.parse() {
-            Ok(value) => value,
-            Err(_) => {
-                error!("Error parsing environment variable HOST_KEY_PATH");
-                default
-            }
-        },
-        Err(_) => default,
+        Ok(var) => PathBuf::from(var),
+        Err(_) => PathBuf::from("host_key"),
     }
 }
 
