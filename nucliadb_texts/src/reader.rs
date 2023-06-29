@@ -597,11 +597,6 @@ mod tests {
 
         let field_reader_service = TextReaderService::start(&fsc).unwrap();
 
-        let rid = ResourceId {
-            shard_id: "shard1".to_string(),
-            uuid: "f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string(),
-        };
-
         let filter = Filter {
             tags: vec!["/l/mylabel2".to_string()],
         };

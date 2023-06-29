@@ -732,10 +732,6 @@ mod tests {
         assert_eq!(count, 4);
 
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
-        let rid = ResourceId {
-            shard_id: "shard1".to_string(),
-            uuid: UUID.to_string(),
-        };
 
         // Testing filtering one filter from resource, one from field and one from paragraph
 
