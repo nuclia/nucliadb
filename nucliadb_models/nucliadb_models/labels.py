@@ -28,13 +28,7 @@ class LabelSetKind(str, Enum):
     RESOURCES = "RESOURCES"
     PARAGRAPHS = "PARAGRAPHS"
     SENTENCES = "SENTENCES"
-    VISUAL_SELECTIONS = "SELECTIONS"
-
-    def pb_str(self) -> str:
-        if self == self.VISUAL_SELECTIONS:
-            return "VISUAL_SELECTIONS"
-        else:
-            return str(self)
+    SELECTIONS = "SELECTIONS"
 
 
 class Label(BaseModel):

@@ -239,7 +239,7 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
 
     pbrequest.labelset.multiple = item.multiple
     for kind in item.kind:
-        pbrequest.labelset.kind.append(LabelSetPB.LabelSetKind.Value(kind.pb_str()))
+        pbrequest.labelset.kind.append(LabelSetPB.LabelSetKind.Value(kind))
 
     for label_input in item.labels:
         lbl = LabelPB()

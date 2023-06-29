@@ -335,13 +335,13 @@ class LabelSet(google.protobuf.message.Message):
         RESOURCES: LabelSet._LabelSetKind.ValueType  # 0
         PARAGRAPHS: LabelSet._LabelSetKind.ValueType  # 1
         SENTENCES: LabelSet._LabelSetKind.ValueType  # 2
-        VISUAL_SELECTIONS: LabelSet._LabelSetKind.ValueType  # 3
+        SELECTIONS: LabelSet._LabelSetKind.ValueType  # 3
 
     class LabelSetKind(_LabelSetKind, metaclass=_LabelSetKindEnumTypeWrapper): ...
     RESOURCES: LabelSet.LabelSetKind.ValueType  # 0
     PARAGRAPHS: LabelSet.LabelSetKind.ValueType  # 1
     SENTENCES: LabelSet.LabelSetKind.ValueType  # 2
-    VISUAL_SELECTIONS: LabelSet.LabelSetKind.ValueType  # 3
+    SELECTIONS: LabelSet.LabelSetKind.ValueType  # 3
 
     TITLE_FIELD_NUMBER: builtins.int
     COLOR_FIELD_NUMBER: builtins.int

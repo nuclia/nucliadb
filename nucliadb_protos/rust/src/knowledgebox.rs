@@ -137,7 +137,7 @@ pub mod label_set {
         Resources = 0,
         Paragraphs = 1,
         Sentences = 2,
-        VisualSelections = 3,
+        Selections = 3,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
