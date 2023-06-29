@@ -26,13 +26,13 @@ use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
-    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
-    StreamRequest, SuggestRequest,
+    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest,
+    SuggestRequest,
 };
 use nucliadb_core::tracing::{self, *};
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, TopDocs};
-use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy};
 
@@ -99,7 +99,7 @@ impl ParagraphReader for ParagraphReaderService {
         }
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
-        let mut results = searcher.search(&original, &topdocs).unwrap();
+        let mut results = searcher.search(&original, &topdocs)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: ends at {v} ms");
         }
@@ -249,7 +249,9 @@ impl ReaderChild for ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn reload(&self) {
-        self.reader.reload().unwrap();
+        if let Err(err) = self.reader.reload() {
+            error!("Could not reload due to {err}")
+        }
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
@@ -275,38 +277,6 @@ impl ReaderChild for ParagraphReaderService {
 }
 
 impl ParagraphReaderService {
-    pub fn find_one(&self, resource_id: &ResourceId) -> tantivy::Result<Option<Document>> {
-        let uuid_field = self.schema.uuid;
-        let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        let uuid_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
-
-        let searcher = self.reader.searcher();
-
-        let top_docs = searcher.search(&uuid_query, &TopDocs::with_limit(1))?;
-
-        top_docs
-            .first()
-            .map(|(_, doc_address)| searcher.doc(*doc_address))
-            .transpose()
-    }
-
-    pub fn find_resource(&self, resource_id: &ResourceId) -> tantivy::Result<Vec<Document>> {
-        let uuid_field = self.schema.uuid;
-        let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        let uuid_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
-
-        let searcher = self.reader.searcher();
-
-        let top_docs = searcher.search(&uuid_query, &TopDocs::with_limit(1000))?;
-        let mut docs = Vec::with_capacity(1000);
-
-        for (_score, doc_address) in top_docs {
-            let doc = searcher.doc(doc_address)?;
-            docs.push(doc);
-        }
-
-        Ok(docs)
-    }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> NodeResult<Self> {
         if !config.path.exists() {
@@ -360,7 +330,10 @@ impl Iterator for BatchProducer {
         debug!("Producing a new batch with offset: {}", self.offset);
 
         let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
-        let top_docs = self.searcher.search(&self.query, &topdocs).unwrap();
+        let Ok(top_docs) = self.searcher.search(&self.query, &topdocs) else {
+            error!("Something went wrong");
+            return None;
+        };
         let mut items = vec![];
         for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
             let id = doc
@@ -759,15 +732,6 @@ mod tests {
         assert_eq!(count, 4);
 
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
-        let rid = ResourceId {
-            shard_id: "shard1".to_string(),
-            uuid: UUID.to_string(),
-        };
-
-        let result = paragraph_reader_service.find_resource(&rid).unwrap();
-        assert!(!result.is_empty());
-        let result = paragraph_reader_service.find_one(&rid).unwrap();
-        assert!(result.is_some());
 
         // Testing filtering one filter from resource, one from field and one from paragraph
 
