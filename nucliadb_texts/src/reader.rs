@@ -641,7 +641,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
-            reload: false,
             only_faceted: false,
             ..Default::default()
         };
@@ -658,7 +657,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
-            reload: false,
             only_faceted: false,
             ..Default::default()
         };
@@ -675,7 +673,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
-            reload: false,
             only_faceted: false,
             ..Default::default()
         };
@@ -693,7 +690,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
-            reload: false,
             only_faceted: false,
             ..Default::default()
         };
@@ -711,7 +707,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
-            reload: false,
             only_faceted: false,
             ..Default::default()
         };
@@ -729,7 +724,6 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps),
-            reload: false,
             only_faceted: false,
             ..Default::default()
         };
@@ -740,7 +734,6 @@ mod tests {
         let request = StreamRequest {
             shard_id: None,
             filter: None,
-            reload: false,
             ..Default::default()
         };
         let iter = field_reader_service.iterator(&request).unwrap();

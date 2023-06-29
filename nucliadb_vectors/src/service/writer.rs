@@ -476,7 +476,6 @@ mod tests {
             tags: vec!["4/label".to_string()],
             page_number: 0,
             result_per_page: 20,
-            reload: false,
             with_duplicates: false,
             ..Default::default()
         };

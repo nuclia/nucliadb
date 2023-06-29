@@ -320,7 +320,6 @@ mod tests {
             tags: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
-            reload: false,
             with_duplicates: true,
             ..Default::default()
         };
@@ -334,7 +333,6 @@ mod tests {
             tags: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
-            reload: false,
             with_duplicates: false,
             ..Default::default()
         };
@@ -351,7 +349,6 @@ mod tests {
             tags: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
-            reload: false,
             with_duplicates: false,
             min_score: 900.0,
             ..Default::default()
@@ -368,7 +365,6 @@ mod tests {
             tags: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
-            reload: false,
             with_duplicates: false,
             ..Default::default()
         };

@@ -99,7 +99,6 @@ async def generate_sentence_classification_payloads(
         labelset = f"/l/{trainset.filter.labels[0]}"
         labelsets.append(labelset)
         request.filter.tags.append(labelset)
-    request.reload = True
     batch = SentenceClassificationBatch()
 
     async for paragraph_item in node.stream_get_paragraphs(request):
