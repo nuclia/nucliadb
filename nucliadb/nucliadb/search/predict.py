@@ -144,8 +144,10 @@ class DummyPredictEngine:
 
         return (DUMMY_LEARNING_ID, generate())
 
-    async def ask_document(self, kbid: str, query: str, blocks: list[list[str]]) -> str:
-        self.calls.append((query, blocks))
+    async def ask_document(
+        self, kbid: str, query: str, blocks: list[list[str]], user_id: str
+    ) -> str:
+        self.calls.append((query, blocks, user_id))
         answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
         return answer
 
