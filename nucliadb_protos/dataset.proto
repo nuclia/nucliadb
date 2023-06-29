@@ -10,6 +10,7 @@ enum TaskType {
     PARAGRAPH_CLASSIFICATION = 1;
     SENTENCE_CLASSIFICATION = 2;
     TOKEN_CLASSIFICATION = 3;
+    IMAGE_CLASSIFICATION = 4;
 }
 
 message TrainSet {
@@ -64,4 +65,13 @@ message TokensClassification {
 
 message TokenClassificationBatch {
     repeated TokensClassification data = 1;
+}
+
+message ImageClassification {
+    string selections = 1;
+    string page_uri = 2;
+}
+
+message ImageClassificationBatch {
+    repeated ImageClassification data = 1;
 }
