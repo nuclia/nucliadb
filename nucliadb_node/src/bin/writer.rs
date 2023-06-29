@@ -278,7 +278,7 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
     } else {
         if let Some(dir) = host_key_path.parent() {
             if !dir.exists() {
-                std::fs::create_dir(dir).with_context(|| {
+                std::fs::create_dir_all(dir).with_context(|| {
                     format!("Failed to create host key directory '{}'", dir.display())
                 })?;
             }
