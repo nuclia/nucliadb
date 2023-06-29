@@ -159,6 +159,7 @@ message FileExtractedData {
 
     CloudFile file_preview = 7;
     FilePages file_pages_previews = 8;
+
     CloudFile file_thumbnail = 9;
 
     string field = 10;
@@ -371,10 +372,26 @@ message ParagraphAnnotation {
     repeated Classification classifications = 2;
 }
 
+message VisualSelection {
+    string label = 1;
+    float top = 2;
+    float left = 3;
+    float right = 4;
+    float bottom = 5;
+
+    // Token IDs are the indexes in PageStructure
+    repeated uint32 token_ids = 6;
+}
+
+message PageSelections {
+    uint32 page = 1;
+    repeated VisualSelection visual = 2;
+}
 
 message UserFieldMetadata {
     repeated TokenSplit token = 1;
     repeated ParagraphAnnotation paragraphs = 2;
+    repeated PageSelections page_selections = 4;
     FieldID field = 3;
 }
 
@@ -451,6 +468,7 @@ message PageStructureToken {
     int64 __y__deprecated = 2 [deprecated = true];
     int64 __width__deprecated = 3 [deprecated = true];
     int64 __height__deprecated = 4 [deprecated = true];
+
     float x = 7;
     float y = 8;
     float width = 9;
