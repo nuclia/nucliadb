@@ -28,11 +28,11 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
-    FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
+    FacetResults, OrderBy, ResultScore, StreamRequest,
 };
 use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
-use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
 
@@ -106,7 +106,7 @@ impl FieldReader for TextReaderService {
         let id: Option<String> = None;
         let time = SystemTime::now();
         let searcher = self.reader.searcher();
-        let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
+        let count = searcher.search(&AllQuery, &Count)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Ending at: {v} ms");
         }
@@ -126,18 +126,20 @@ impl ReaderChild for TextReaderService {
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
 
-        let result = self.do_search(request);
+        let result = self.do_search(request)?;
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::texts("search".to_string());
         metrics.record_request_time(metric, took);
 
-        Ok(result?)
+        Ok(result)
     }
     #[tracing::instrument(skip_all)]
     fn reload(&self) {
-        self.reader.reload().unwrap();
+        if let Err(err) = self.reader.reload() {
+            error!("Could not reload due to {err}")
+        }
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
@@ -188,34 +190,6 @@ impl TextReaderService {
         )
     }
 
-    pub fn find_one(&self, resource_id: &ResourceId) -> tantivy::Result<Option<Document>> {
-        let uuid_term = Term::from_field_text(self.schema.uuid, &resource_id.uuid);
-        let uuid_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
-        let searcher = self.reader.searcher();
-        searcher
-            .search(&uuid_query, &TopDocs::with_limit(1))?
-            .first()
-            .map(|(_, doc_address)| searcher.doc(*doc_address))
-            .transpose()
-    }
-
-    pub fn find_resource(&self, resource_id: &ResourceId) -> tantivy::Result<Vec<Document>> {
-        let uuid_field = self.schema.uuid;
-        let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        let uuid_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
-
-        let searcher = self.reader.searcher();
-
-        let top_docs = searcher.search(&uuid_query, &TopDocs::with_limit(1000))?;
-        let mut docs = Vec::with_capacity(1000);
-
-        for (_score, doc_address) in top_docs {
-            let doc = searcher.doc(doc_address)?;
-            docs.push(doc);
-        }
-
-        Ok(docs)
-    }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &TextConfig) -> NodeResult<Self> {
         if !config.path.exists() {
@@ -377,10 +351,7 @@ impl TextReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn do_search(
-        &self,
-        request: &DocumentSearchRequest,
-    ) -> tantivy::Result<DocumentSearchResponse> {
+    fn do_search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = SystemTime::now();
@@ -432,7 +403,7 @@ impl TextReaderService {
         match maybe_order {
             _ if request.only_faceted => {
                 // Just a facet search
-                let facets_count = searcher.search(&query, &facet_collector).unwrap();
+                let facets_count = searcher.search(&query, &facet_collector)?;
                 Ok(DocumentSearchResponse {
                     facets: produce_facets(facets, facets_count),
                     ..Default::default()
@@ -630,8 +601,6 @@ mod tests {
             shard_id: "shard1".to_string(),
             uuid: "f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string(),
         };
-        let result = field_reader_service.find_one(&rid).unwrap();
-        assert!(result.is_some());
 
         let filter = Filter {
             tags: vec!["/l/mylabel2".to_string()],
