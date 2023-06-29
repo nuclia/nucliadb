@@ -28,7 +28,7 @@ from fastapi_versioning import version
 from starlette.datastructures import Headers
 from starlette.responses import StreamingResponse
 
-from nucliadb.ingest.orm.resource import KB_REVERSE_REVERSE
+from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.reader import SERVICE_NAME, logger
 from nucliadb.reader.api.models import FIELD_NAMES_TO_PB_TYPE_MAP
@@ -74,7 +74,7 @@ async def download_extract_file(
     storage = await get_storage(service_name=SERVICE_NAME)
 
     pb_field_type = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
-    field_type_letter = KB_REVERSE_REVERSE[pb_field_type]
+    field_type_letter = FIELD_TYPE_TO_ID[pb_field_type]
 
     sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, download_field)
 

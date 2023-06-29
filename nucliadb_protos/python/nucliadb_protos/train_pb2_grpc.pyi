@@ -84,6 +84,7 @@ from nucliadb_protos.resources_pb2 import (
     NestedPosition as NestedPosition,
     Origin as Origin,
     PagePositions as PagePositions,
+    PageSelections as PageSelections,
     PageStructure as PageStructure,
     PageStructurePage as PageStructurePage,
     PageStructureToken as PageStructureToken,
@@ -99,6 +100,7 @@ from nucliadb_protos.resources_pb2 import (
     UserFieldMetadata as UserFieldMetadata,
     UserMetadata as UserMetadata,
     UserVectorsWrapper as UserVectorsWrapper,
+    VisualSelection as VisualSelection,
 )
 from nucliadb_protos.writer_pb2 import (
     Audit as Audit,

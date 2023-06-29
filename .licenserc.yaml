@@ -94,6 +94,7 @@ header:
     - "nucliadb_paragraphs/stop_words"
     - "nucliadb_paragraphs/stop_words"
     - "**/.gitignore"
+    - "nucliadb/nucliadb/tests/testdata/*"
 
   comment: on-failure
 

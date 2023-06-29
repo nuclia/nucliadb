@@ -55,6 +55,7 @@ async def test_fieldmetadata_crud(
                 ],
             },
         ],
+        "selections": [],
         "token": [
             {
                 "token": "token1",
@@ -94,6 +95,7 @@ async def test_fieldmetadata_crud(
                 ],
             }
         ],
+        "selections": [],
         "token": [
             {
                 "token": "token2",

@@ -275,6 +275,20 @@ class ParagraphAnnotation(BaseModel):
     key: str
 
 
+class VisualSelection(BaseModel):
+    label: str
+    top: float
+    left: float
+    right: float
+    bottom: float
+    token_ids: List[int]
+
+
+class PageSelections(BaseModel):
+    page: int
+    visual: List[VisualSelection]
+
+
 class UserFieldMetadata(BaseModel):
     """
     Field-level metadata set by the user via the rest api
@@ -282,6 +296,7 @@ class UserFieldMetadata(BaseModel):
 
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
+    selections: List[PageSelections] = []
     field: FieldID
 
     @classmethod
@@ -292,6 +307,15 @@ class UserFieldMetadata(BaseModel):
             including_default_value_fields=True,
             use_integers_for_enums=True,
         )
+        value["selections"] = [
+            MessageToDict(
+                selections,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+                use_integers_for_enums=True,
+            )
+            for selections in message.page_selections
+        ]
         value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]]
         return cls(**value)
 

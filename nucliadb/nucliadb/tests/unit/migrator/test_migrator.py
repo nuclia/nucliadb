@@ -27,7 +27,7 @@ def test_get_migrations():
     migrations = migrator.get_migrations()
     assert len(migrations) > 0
     assert migrations[0].version == 1
-    assert migrations[0].module.__name__ == "migrations.bootstrap_1"
+    assert migrations[0].module.__name__ == "migrations.0001_bootstrap"
 
 
 def test_get_migration_with_filtering():
