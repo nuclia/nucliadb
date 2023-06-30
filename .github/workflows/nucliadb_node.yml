@@ -209,15 +209,9 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build local Node for testing
-        uses: docker/build-push-action@v4
         if: steps.filter.outputs.node_modified == 'true'
-        with:
-          context: .
-          file: Dockerfile.node
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: eu.gcr.io/stashify-218417/node:main
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
       - name: Run tests
         run: |

@@ -76,7 +76,7 @@ message DocumentSearchRequest {
 
     Timestamps timestamps = 9;
     
-    bool reload = 10;
+    bool reload = 10 [deprecated = true];
     bool only_faceted = 15;
     optional noderesources.Resource.ResourceStatus with_status = 16;
     optional string advanced_query = 17;
@@ -104,7 +104,7 @@ message ParagraphSearchRequest {
     
     Timestamps timestamps = 12;
     
-    bool reload = 13;
+    bool reload = 13 [deprecated = true];
     bool with_duplicates = 14;
     bool only_faceted = 15;
     optional string advanced_query = 16;
@@ -196,7 +196,7 @@ message VectorSearchRequest {
 
     // How many results are in this page.
     int32 result_per_page = 5;
-    bool reload = 13;
+    bool reload = 13 [deprecated = true];
     bool with_duplicates = 14;
     // ID for the vector set.
     // Empty for searching on the original index
@@ -287,7 +287,7 @@ message EntitiesSubgraphResponse {
 //   - (TODO) given some vertices, get paths between them
 message RelationSearchRequest {
     string shard_id = 1;
-    bool reload = 5;
+    bool reload = 5 [deprecated = true];
 
     RelationPrefixSearchRequest prefix = 11;
     EntitiesSubgraphRequest subgraph = 12;
@@ -326,7 +326,7 @@ message SearchRequest {
 
     string vectorset = 15;
 
-    bool reload = 11;
+    bool reload = 11 [deprecated = true];
     bool paragraph = 12;
     bool document = 13;
 
@@ -420,7 +420,7 @@ message DocumentItem {
 
 message StreamRequest {
     Filter filter__deprecated = 1 [deprecated = true];
-    bool reload = 2;
+    bool reload = 2 [deprecated = true];
     noderesources.ShardId shard_id = 3;
     StreamFilter filter = 4;
 }

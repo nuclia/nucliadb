@@ -17,7 +17,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::sync::RwLock;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics::{self, request_time};
@@ -40,7 +39,6 @@ use super::versions::Versions;
 use crate::shard_metadata::ShardMetadata;
 use crate::telemetry::run_with_telemetry;
 
-const RELOAD_PERIOD: u128 = 5000;
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 
@@ -48,7 +46,6 @@ const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 pub struct ShardReaderService {
     pub id: String,
     pub metadata: ShardMetadata,
-    creation_time: RwLock<SystemTime>,
     text_reader: TextsReaderPointer,
     paragraph_reader: ParagraphsReaderPointer,
     vector_reader: VectorsReaderPointer,
@@ -97,7 +94,6 @@ impl ShardReaderService {
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
-        self.reload_policy(true);
         let paragraphs = self.paragraph_reader.clone();
         let vectors = self.vector_reader.clone();
         let texts = self.text_reader.clone();
@@ -135,32 +131,26 @@ impl ShardReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn get_text_keys(&self) -> NodeResult<Vec<String>> {
-        self.reload_policy(true);
         self.text_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
     pub fn get_paragraphs_keys(&self) -> NodeResult<Vec<String>> {
-        self.reload_policy(true);
         self.paragraph_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
     pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
-        self.reload_policy(true);
         self.vector_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
     pub fn get_relations_keys(&self) -> NodeResult<Vec<String>> {
-        self.reload_policy(true);
         self.relation_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
     pub fn get_relations_edges(&self) -> NodeResult<EdgeList> {
-        self.reload_policy(true);
         self.relation_reader.get_edges()
     }
     #[tracing::instrument(skip_all)]
     pub fn get_relations_types(&self) -> NodeResult<TypeList> {
-        self.reload_policy(true);
         self.relation_reader.get_node_types()
     }
 
@@ -227,7 +217,6 @@ impl ShardReaderService {
             paragraph_reader: paragraphs.unwrap(),
             vector_reader: vectors.unwrap(),
             relation_reader: relations.unwrap(),
-            creation_time: RwLock::new(SystemTime::now()),
             document_service_version: versions.version_texts() as i32,
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
@@ -377,7 +366,6 @@ impl ShardReaderService {
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
-        self.reload_policy(search_request.reload);
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
         let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
@@ -392,10 +380,10 @@ impl ShardReaderService {
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             timestamps: search_request.timestamps.clone(),
-            reload: search_request.reload,
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
+            ..Default::default()
         };
         let text_reader_service = self.text_reader.clone();
         let text_task = move || {
@@ -418,10 +406,10 @@ impl ShardReaderService {
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             timestamps: search_request.timestamps.clone(),
-            reload: search_request.reload,
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
             key_filters: search_request.key_filters.clone(),
+            ..Default::default()
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
         let paragraph_task = move || {
@@ -436,7 +424,6 @@ impl ShardReaderService {
             id: "".to_string(),
             vector_set: search_request.vectorset.clone(),
             vector: search_request.vector.clone(),
-            reload: search_request.reload,
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             with_duplicates: true,
@@ -448,6 +435,7 @@ impl ShardReaderService {
                 .chain(search_request.fields.iter().cloned())
                 .collect(),
             min_score: search_request.min_score,
+            ..Default::default()
         };
         let vector_reader_service = self.vector_reader.clone();
         let vector_task = move || {
@@ -460,9 +448,9 @@ impl ShardReaderService {
 
         let relation_request = RelationSearchRequest {
             shard_id: search_request.shard.clone(),
-            reload: search_request.reload,
             prefix: search_request.relation_prefix.clone(),
             subgraph: search_request.relation_subgraph,
+            ..Default::default()
         };
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || Some(relation_reader_service.search(&relation_request));
@@ -503,7 +491,6 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn paragraph_iterator(&self, request: StreamRequest) -> NodeResult<ParagraphIterator> {
-        self.reload_policy(request.reload);
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "paragraph iteration"), || {
             self.paragraph_reader.iterator(&request)
@@ -512,7 +499,6 @@ impl ShardReaderService {
 
     #[tracing::instrument(skip_all)]
     pub fn document_iterator(&self, request: StreamRequest) -> NodeResult<DocumentIterator> {
-        self.reload_policy(request.reload);
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
             self.text_reader.iterator(&request)
@@ -525,7 +511,6 @@ impl ShardReaderService {
         search_request: ParagraphSearchRequest,
     ) -> NodeResult<ParagraphSearchResponse> {
         let span = tracing::Span::current();
-        self.reload_policy(search_request.reload);
         run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
             self.paragraph_reader.search(&search_request)
         })
@@ -537,7 +522,7 @@ impl ShardReaderService {
         search_request: DocumentSearchRequest,
     ) -> NodeResult<DocumentSearchResponse> {
         let span = tracing::Span::current();
-        self.reload_policy(search_request.reload);
+
         run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
             self.text_reader.search(&search_request)
         })
@@ -549,7 +534,7 @@ impl ShardReaderService {
         search_request: VectorSearchRequest,
     ) -> NodeResult<VectorSearchResponse> {
         let span = tracing::Span::current();
-        self.reload_policy(search_request.reload);
+
         run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
             self.vector_reader.search(&search_request)
         })
@@ -560,7 +545,7 @@ impl ShardReaderService {
         search_request: RelationSearchRequest,
     ) -> NodeResult<RelationSearchResponse> {
         let span = tracing::Span::current();
-        self.reload_policy(search_request.reload);
+
         run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {
             self.relation_reader.search(&search_request)
         })
@@ -579,21 +564,6 @@ impl ShardReaderService {
     #[tracing::instrument(skip_all)]
     pub fn text_count(&self) -> NodeResult<usize> {
         self.text_reader.count()
-    }
-
-    fn reload_policy(&self, trigger: bool) {
-        let elapsed = self
-            .creation_time
-            .read()
-            .unwrap()
-            .elapsed()
-            .unwrap()
-            .as_millis();
-        if trigger || elapsed >= RELOAD_PERIOD {
-            let mut creation_time = self.creation_time.write().unwrap();
-            *creation_time = SystemTime::now();
-            self.vector_reader.reload()
-        }
     }
 }
 

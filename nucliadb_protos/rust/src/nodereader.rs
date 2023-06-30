@@ -93,6 +93,7 @@ pub struct DocumentSearchRequest {
     pub result_per_page: i32,
     #[prost(message, optional, tag="9")]
     pub timestamps: ::core::option::Option<Timestamps>,
+    #[deprecated]
     #[prost(bool, tag="10")]
     pub reload: bool,
     #[prost(bool, tag="15")]
@@ -126,6 +127,7 @@ pub struct ParagraphSearchRequest {
     pub result_per_page: i32,
     #[prost(message, optional, tag="12")]
     pub timestamps: ::core::option::Option<Timestamps>,
+    #[deprecated]
     #[prost(bool, tag="13")]
     pub reload: bool,
     #[prost(bool, tag="14")]
@@ -250,6 +252,7 @@ pub struct VectorSearchRequest {
     /// How many results are in this page.
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
+    #[deprecated]
     #[prost(bool, tag="13")]
     pub reload: bool,
     #[prost(bool, tag="14")]
@@ -359,6 +362,7 @@ pub struct EntitiesSubgraphResponse {
 pub struct RelationSearchRequest {
     #[prost(string, tag="1")]
     pub shard_id: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(bool, tag="5")]
     pub reload: bool,
     #[prost(message, optional, tag="11")]
@@ -404,6 +408,7 @@ pub struct SearchRequest {
     pub vector: ::prost::alloc::vec::Vec<f32>,
     #[prost(string, tag="15")]
     pub vectorset: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(bool, tag="11")]
     pub reload: bool,
     #[prost(bool, tag="12")]
@@ -535,6 +540,7 @@ pub struct StreamRequest {
     #[deprecated]
     #[prost(message, optional, tag="1")]
     pub filter_deprecated: ::core::option::Option<Filter>,
+    #[deprecated]
     #[prost(bool, tag="2")]
     pub reload: bool,
     #[prost(message, optional, tag="3")]

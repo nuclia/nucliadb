@@ -86,7 +86,7 @@ async fn main() -> NodeResult<()> {
     let chitchat_addr = SocketAddr::from_str(&format!("{}:{}", public_ip, chitchat_port))?;
 
     // Cluster
-    let host_key = read_or_create_host_key(Path::new(&host_key_path))?;
+    let host_key = read_or_create_host_key(&host_key_path)?;
     let node = Node::builder()
         .register_as(NodeType::Io)
         .on_local_network(chitchat_addr)
@@ -276,13 +276,6 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
         host_key = read_host_key(host_key_path)?;
         info!(host_key=?host_key, host_key_path=?host_key_path, "Read existing host key.");
     } else {
-        if let Some(dir) = host_key_path.parent() {
-            if !dir.exists() {
-                std::fs::create_dir(dir).with_context(|| {
-                    format!("Failed to create host key directory '{}'", dir.display())
-                })?;
-            }
-        }
         host_key = Uuid::new_v4();
         fs::write(host_key_path, host_key.as_bytes()).with_context(|| {
             format!("Failed to write host key to '{}'", host_key_path.display())

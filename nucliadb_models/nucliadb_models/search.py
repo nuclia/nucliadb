@@ -569,7 +569,6 @@ class BaseSearchRequest(BaseModel):
             SearchOptions.VECTOR,
         ]
     )
-    reload: bool = True
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()

@@ -28,7 +28,7 @@ class LabelSetKind(str, Enum):
     RESOURCES = "RESOURCES"
     PARAGRAPHS = "PARAGRAPHS"
     SENTENCES = "SENTENCES"
-    VISUAL_SELECTIONS = "SELECTIONS"
+    SELECTIONS = "SELECTIONS"
 
 
 class Label(BaseModel):
