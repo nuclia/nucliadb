@@ -3,4 +3,4 @@ requests
 nucliadb-models
 urllib3<1.27,>=1.21.1
 orjson
-pydantic>=1.10.9
+pydantic>=1.10.9,<2.0
