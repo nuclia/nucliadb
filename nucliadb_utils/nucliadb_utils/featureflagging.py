@@ -38,7 +38,11 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     const.Features.WAIT_FOR_INDEX: {
         "rollout": 0,
         "variants": {"environment": ["none"]},
-    }
+    },
+    const.Features.DEFAULT_MIN_SCORE: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 
