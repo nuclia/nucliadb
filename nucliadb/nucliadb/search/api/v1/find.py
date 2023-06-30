@@ -26,6 +26,7 @@ from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -154,6 +155,8 @@ async def find_knowledgebox(
             response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
         return results
+    except KnowledgeBoxNotFound:
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
