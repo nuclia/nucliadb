@@ -35,7 +35,7 @@ from nucliadb.ingest.fields.file import File as FileField
 from nucliadb.ingest.fields.link import Link as LinkField
 from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache
+from nucliadb.train.generators.utils import get_resource_from_cache_or_db
 
 VISUALLY_ANNOTABLE_FIELDS = {FieldType.FILE, FieldType.LINK}
 
@@ -55,7 +55,7 @@ async def generate_image_classification_payloads(
     batch = ImageClassificationBatch()
     async for item in node.stream_get_fields(request):
         rid = item.uuid
-        resource = await get_resource_from_cache(kbid, rid)
+        resource = await get_resource_from_cache_or_db(kbid, rid)
         if resource is None:
             logger.error(f"Resource {rid} does not exist on DB")
             return
