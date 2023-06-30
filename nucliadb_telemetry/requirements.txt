@@ -15,7 +15,7 @@ opentelemetry-propagator-b3==1.11.1
 opentelemetry-instrumentation-fastapi==0.30b1
 opentelemetry-instrumentation-aiohttp-client>=0.30b1
 opentelemetry-semantic-conventions>=0.30b1
-pydantic
+pydantic<2.0
 requests
 fastapi
 tikv-client>=0.0.3
