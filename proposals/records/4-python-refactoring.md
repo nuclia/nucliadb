@@ -304,3 +304,12 @@ async def get_kbs(prefix: str = "", app_context: AppContext) -> KnowledgeBoxList
 - Migrating a lot of tests
 - Considerable refactoring
 
+
+
+### Implementation strategy
+
+1. Limit and isolate imports from `ingress` in other modules
+2. Start integrating datamanager implementations for adopting data access alternatives for `ingress` in the `common` module
+3. Refactor out the usage of the `ingress` GRPC service
+
+Once these steps are done, re-evaluate status.
