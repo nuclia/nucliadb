@@ -252,7 +252,7 @@ async def merge_vectors_results(
     kbid: str,
     count: int,
     page: int,
-    min_score: float = 0.70,
+    min_score: float,
 ):
     facets: Dict[str, Any] = {}
     raw_vectors_list: List[DocumentScored] = []
@@ -312,7 +312,11 @@ async def merge_vectors_results(
             resources.append(rid)
 
     return Sentences(
-        results=result_sentence_list, facets=facets, page_number=page, page_size=count
+        results=result_sentence_list,
+        facets=facets,
+        page_number=page,
+        page_size=count,
+        min_score=min_score,
     )
 
 
@@ -474,7 +478,7 @@ async def merge_results(
     extracted: List[ExtractedDataTypeName],
     sort: SortOptions,
     requested_relations: EntitiesSubgraphRequest,
-    min_score: float = 0.85,
+    min_score: float,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []

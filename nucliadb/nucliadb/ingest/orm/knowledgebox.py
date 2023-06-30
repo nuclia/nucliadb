@@ -32,7 +32,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import VectorSimilarity
 
 from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
@@ -444,35 +443,17 @@ class KnowledgeBox:
         pb.ParseFromString(payload)
         return pb
 
-    async def get_similarity(self) -> VectorSimilarity.ValueType:
-        try:
-            shards_obj = await self.get_shards_object()
-            if shards_obj.HasField("model"):
-                return shards_obj.model.similarity_function
-            return shards_obj.similarity
-        except ShardsNotFound:
-            logger.warning(
-                f"Config for kb not found: {self.kbid} while trying to get the similarity. \
-                    Defaulting to cosine distance."
-            )
-            return VectorSimilarity.COSINE
-
     async def get_model_metadata(self) -> SemanticModelMetadata:
-        # TODO: cleanp this code after a migration is done unifying all fields under `model``
         try:
             shards_obj = await self.get_shards_object()
-            if shards_obj.HasField("model"):
-                return shards_obj.model
-            else:
-                # Bw/compatible code for accounts that do
-                # not have the `model` attribute set in  the Shards object.
-                return SemanticModelMetadata(similarity_function=shards_obj.similarity)
         except ShardsNotFound:
-            logger.warning(
-                f"Config for kb not found: {self.kbid} while trying to get the model metadata. \
-                    Defaulting to cosine distance."
-            )
-            return SemanticModelMetadata(similarity_function=VectorSimilarity.COSINE)
+            raise KnowledgeBoxNotFound(self.kbid)
+        if shards_obj.HasField("model"):
+            return shards_obj.model
+        else:
+            # B/c code for old KBs that do not have the `model` attribute set in the Shards object.
+            # Cleanup this code after a migration is done unifying all fields under `model` (on-prem and cloud).
+            return SemanticModelMetadata(similarity_function=shards_obj.similarity)
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

@@ -4,10 +4,10 @@ from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from nucliadb_protos.writer_pb2 import VectorSet as PBVectorSet
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models import FieldID
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import knowledgebox_pb2, resources_pb2
 
 UserVectorPosition = Tuple[int, int]
 _T = TypeVar("_T")
@@ -50,6 +50,34 @@ VECTOR_SIMILARITY_ENUM_TO_PB = {
     VectorSimilarity.DOT.value: PBVectorSimilarity.DOT,
 }
 VECTOR_SIMILARITY_PB_TO_ENUM = {v: k for k, v in VECTOR_SIMILARITY_ENUM_TO_PB.items()}
+
+
+class SemanticModelMetadata(BaseModel):
+    """
+    Metadata of the semantic model associated to the KB
+    """
+
+    similarity_function: VectorSimilarity = Field(
+        description="Vector similarity algorithm that is applied on search"
+    )
+    vector_dimension: Optional[int] = Field(
+        description="Dimension of the indexed vectors/embeddings"
+    )
+    default_min_score: Optional[float] = Field(
+        description="Default minimum similarity value at which results are ignored"
+    )
+
+    @classmethod
+    def from_message(cls, message: knowledgebox_pb2.SemanticModelMetadata):
+        as_dict = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        as_dict["similarity_function"] = VectorSimilarity.from_message(
+            message.similarity_function
+        )
+        return cls(**as_dict)
 
 
 class VectorSet(BaseModel):

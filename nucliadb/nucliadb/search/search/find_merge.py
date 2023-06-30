@@ -337,7 +337,7 @@ async def find_merge_results(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     requested_relations: EntitiesSubgraphRequest,
-    min_score: float = 0.85,
+    min_score: float,
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
     # force getting transaction on current asyncio task
@@ -385,6 +385,7 @@ async def find_merge_results(
         page_number=page,
         page_size=count,
         next_page=next_page,
+        min_score=min_score,
     )
 
     await fetch_find_metadata(

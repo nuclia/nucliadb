@@ -52,7 +52,11 @@ from nucliadb_models.metadata import (
 )
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import UserVectorSet, VectorSimilarity
+from nucliadb_models.vectors import (
+    SemanticModelMetadata,
+    UserVectorSet,
+    VectorSimilarity,
+)
 
 _T = TypeVar("_T")
 
@@ -125,6 +129,7 @@ class KnowledgeBoxObj(BaseModel):
     slug: Optional[SlugString] = None
     uuid: str
     config: Optional[KnowledgeBoxConfig] = None
+    model: Optional[SemanticModelMetadata] = None
 
 
 class KnowledgeBoxList(BaseModel):
