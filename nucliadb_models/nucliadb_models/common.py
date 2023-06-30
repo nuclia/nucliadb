@@ -54,6 +54,7 @@ class ParamDefault(BaseModel):
     title: str
     description: str
     gt: Optional[float] = None
+    max_items: Optional[int] = None
 
     def to_pydantic_field(self, default=_NOT_SET) -> Field:  # type: ignore
         """
@@ -65,6 +66,7 @@ class ParamDefault(BaseModel):
             title=self.title,
             description=self.description,
             gt=self.gt,
+            max_items=self.max_items,
         )
 
 
