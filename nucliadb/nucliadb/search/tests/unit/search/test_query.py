@@ -17,10 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.utils_pb2 import RelationNode
+import unittest
 
-from nucliadb.search.search.query import parse_entities_to_filters
+import pytest
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.nodereader_pb2 import SearchRequest
+from nucliadb_protos.utils_pb2 import RelationNode, VectorSimilarity
+
+from nucliadb.search.search.query import (
+    get_default_min_score,
+    get_kb_model_default_min_score,
+    parse_entities_to_filters,
+)
+
+QUERY_MODULE = "nucliadb.search.search.query"
 
 
 def test_parse_entities_to_filters():
@@ -34,3 +44,83 @@ def test_parse_entities_to_filters():
 
     assert parse_entities_to_filters(request, detected_entities) == []
     assert request.filter.tags == ["/e/person/John"]
+
+
+@pytest.fixture()
+def get_kb_model_default_min_score_mock():
+    with unittest.mock.patch(f"{QUERY_MODULE}.get_kb_model_default_min_score") as mock:
+        yield mock
+
+
+async def test_get_default_min_score(get_kb_model_default_min_score_mock):
+    get_kb_model_default_min_score_mock.return_value = 1.5
+
+    assert await get_default_min_score("kbid") == 1.5
+
+    get_default_min_score.cache_clear()
+
+
+async def test_get_default_min_score_default_value(get_kb_model_default_min_score_mock):
+    get_kb_model_default_min_score_mock.return_value = None
+
+    assert await get_default_min_score("kbid") == 0.7
+
+    get_default_min_score.cache_clear()
+
+
+async def test_get_default_min_score_is_cached(get_kb_model_default_min_score_mock):
+    await get_default_min_score("kbid1")
+    await get_default_min_score("kbid1")
+    await get_default_min_score("kbid1")
+
+    await get_default_min_score("kbid2")
+
+    assert get_kb_model_default_min_score_mock.call_count == 2
+
+    get_default_min_score.cache_clear()
+
+
+@pytest.fixture()
+def txn():
+    txn = unittest.mock.AsyncMock()
+    yield txn
+
+
+@pytest.fixture()
+def driver(txn):
+    driver = unittest.mock.MagicMock()
+    driver.transaction.return_value.__aenter__.return_value = txn
+    with unittest.mock.patch(f"{QUERY_MODULE}.get_driver", return_value=driver):
+        yield driver
+
+
+@pytest.fixture()
+def storage():
+    storage = unittest.mock.AsyncMock()
+    with unittest.mock.patch(f"{QUERY_MODULE}.get_storage", return_value=storage):
+        yield storage
+
+
+@pytest.fixture()
+def kb_get_model_metadata(driver, storage):
+    with unittest.mock.patch(f"{QUERY_MODULE}.KnowledgeBox.get_model_metadata") as mock:
+        yield mock
+
+
+async def test_get_kb_model_default_min_score(kb_get_model_metadata):
+    # If min_score is set, it should return it
+    kb_get_model_metadata.return_value = SemanticModelMetadata(
+        similarity_function=VectorSimilarity.COSINE,
+        default_min_score=1.5,
+    )
+    assert await get_kb_model_default_min_score("kbid") == 1.5
+
+
+async def test_get_kb_model_default_min_score_backward_compatible(
+    kb_get_model_metadata,
+):
+    # If min_score is not set yet, it should return None
+    kb_get_model_metadata.return_value = SemanticModelMetadata(
+        similarity_function=VectorSimilarity.COSINE
+    )
+    assert await get_kb_model_default_min_score("kbid") is None
