@@ -74,7 +74,6 @@ async def generate_image_classification_payloads(
         field = await resource.get_field(field_key, field_type, load=True)
         page_structure = await get_page_structure(field)
 
-        print("LEN DE PAGE STRCTURE:", len(page_structure))
         for page, (page_uri, ps) in enumerate(page_structure):
             pawls_payload = {
                 "width": ps.page.width,
