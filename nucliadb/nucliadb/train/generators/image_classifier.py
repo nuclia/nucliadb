@@ -64,12 +64,13 @@ async def generate_image_classification_payloads(
         if field_type not in VISUALLY_ANNOTABLE_FIELDS:
             continue
 
-        page_selections = await get_page_selections(resource, field_key)
+        field = await resource.get_field(field_key, field_type, load=True)
+
+        page_selections = await get_page_selections(resource, field)
         if len(page_selections) == 0:
             # Generating a payload without annotations makes no sense
             continue
 
-        field = await resource.get_field(field_key, field_type, load=True)
         page_structure = await get_page_structure(field)
 
         for page, (page_uri, ps) in enumerate(page_structure):
@@ -125,8 +126,7 @@ async def generate_image_classification_payloads(
 
 
 async def get_page_selections(
-    resource: Resource,
-    field_key: str,
+    resource: Resource, field: Field
 ) -> Dict[int, List[VisualSelection]]:
     page_selections: Dict[int, List[VisualSelection]] = {}
     basic = await resource.get_basic()
@@ -136,7 +136,10 @@ async def get_page_selections(
     # We assume only one fieldmetadata per field as it's implemented in
     # resource ingestion
     for fieldmetadata in basic.fieldmetadata:
-        if fieldmetadata.field.field == field_key:
+        if (
+            fieldmetadata.field.field == field.id
+            and fieldmetadata.field.field_type == field.type
+        ):
             for selection in fieldmetadata.page_selections:
                 page_selections[selection.page] = selection.visual  # type: ignore
             break
