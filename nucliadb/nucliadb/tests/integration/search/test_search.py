@@ -1375,3 +1375,22 @@ async def test_search_two_logic_shards(
     assert len(content1["sentences"]["results"]) == len(
         content2["sentences"]["results"]
     )
+
+
+async def test_search_min_score(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    # When not specifying the min score on the request, it should default to 0.7
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search", json={"query": "dummy"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["sentences"]["min_score"] == 0.7
+
+    # If we specify a min score, it should be used
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search", json={"query": "dummy", "min_score": 0.5}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["sentences"]["min_score"] == 0.5
