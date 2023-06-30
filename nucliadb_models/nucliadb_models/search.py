@@ -748,6 +748,7 @@ class KnowledgeboxFindResults(BaseModel):
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
+    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
 
 
 class FeedbackTasks(str, Enum):

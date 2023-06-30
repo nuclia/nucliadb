@@ -179,6 +179,7 @@ async def test_format_chat_prompt_content(kb):
                         "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR
                     ),
                 },
+                min_score=-1,
             ),
         )
         assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
@@ -205,7 +206,7 @@ async def test_format_chat_prompt_content_truncates(kb):
     ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
         prompt_result = await chat_prompt.format_chat_prompt_content(
             "kbid",
-            KnowledgeboxFindResults(facets={}, resources=resources),
+            KnowledgeboxFindResults(facets={}, resources=resources, min_score=-1),
         )
 
     assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
