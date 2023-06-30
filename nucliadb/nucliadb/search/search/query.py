@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import re
-from nucliadb_utils import const
 from datetime import datetime
 from typing import List, Optional, Tuple
 
@@ -47,6 +46,7 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_utils import const
 from nucliadb_utils.utilities import get_storage, has_feature
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")

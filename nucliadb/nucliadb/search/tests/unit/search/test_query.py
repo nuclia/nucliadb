@@ -52,7 +52,13 @@ def get_kb_model_default_min_score_mock():
         yield mock
 
 
-async def test_get_default_min_score(get_kb_model_default_min_score_mock):
+@pytest.fixture(scope="function")
+def has_feature():
+    with unittest.mock.patch(f"{QUERY_MODULE}.has_feature", return_value=True) as mock:
+        yield mock
+
+
+async def test_get_default_min_score(has_feature, get_kb_model_default_min_score_mock):
     get_kb_model_default_min_score_mock.return_value = 1.5
 
     assert await get_default_min_score("kbid") == 1.5
@@ -60,7 +66,9 @@ async def test_get_default_min_score(get_kb_model_default_min_score_mock):
     get_default_min_score.cache_clear()
 
 
-async def test_get_default_min_score_default_value(get_kb_model_default_min_score_mock):
+async def test_get_default_min_score_default_value(
+    has_feature, get_kb_model_default_min_score_mock
+):
     get_kb_model_default_min_score_mock.return_value = None
 
     assert await get_default_min_score("kbid") == 0.7
@@ -68,7 +76,9 @@ async def test_get_default_min_score_default_value(get_kb_model_default_min_scor
     get_default_min_score.cache_clear()
 
 
-async def test_get_default_min_score_is_cached(get_kb_model_default_min_score_mock):
+async def test_get_default_min_score_is_cached(
+    has_feature, get_kb_model_default_min_score_mock
+):
     await get_default_min_score("kbid1")
     await get_default_min_score("kbid1")
     await get_default_min_score("kbid1")
@@ -107,7 +117,7 @@ def kb_get_model_metadata(driver, storage):
         yield mock
 
 
-async def test_get_kb_model_default_min_score(kb_get_model_metadata):
+async def test_get_kb_model_default_min_score(has_feature, kb_get_model_metadata):
     # If min_score is set, it should return it
     kb_get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE,
@@ -117,6 +127,7 @@ async def test_get_kb_model_default_min_score(kb_get_model_metadata):
 
 
 async def test_get_kb_model_default_min_score_backward_compatible(
+    has_feature,
     kb_get_model_metadata,
 ):
     # If min_score is not set yet, it should return None
