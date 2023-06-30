@@ -590,23 +590,31 @@ class BaseSearchRequest(BaseModel):
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
 
     @validator("faceted")
-    def nested_facets_not_supported(cls, v):
+    def nested_facets_not_supported(cls, facets):
         """
         Raises ValueError if provided facets contains nested facets, like:
         ["/a/b", "/a/b/c"]
         """
-        # Sort by length to ensure that child facets are checked first
-        sorted_facets = list(sorted(v[:], key=len, reverse=True))
-        for index, facet in enumerate(sorted_facets):
+        if len(facets) < 2:
+            return facets
+
+        # Sort facets alphabetically to make sure that nested facets appear right after their parents
+        sorted_facets = sorted(facets)
+        facet = sorted_facets.pop(0)
+        while True:
             try:
-                next_facet = sorted_facets[index + 1]
+                next_facet = sorted_facets.pop(0)
             except IndexError:
-                return v
-            if facet.startswith(next_facet):
+                # No more facets to check
+                break
+            if next_facet == facet:
                 raise ValueError(
-                    f"Nested facets are not allowed: {facet} is a child of {next_facet}"
+                    f"Facet {next_facet} is already present in facets. Faceted list must be unique."
                 )
-        return v
+            if next_facet.startswith(facet):
+                raise ValueError(f"Facet {next_facet} is a nested faced from {facet}")
+            facet = next_facet
+        return facets
 
 
 class SearchRequest(BaseSearchRequest):
