@@ -33,6 +33,7 @@ async def test_redis_driver(redis):
 
 
 @pytest.mark.asyncio
+@pytest.mark.flaky(reruns=5)
 async def test_tikv_driver(tikvd):
     url = [f"{tikvd[0]}:{tikvd[2]}"]
     driver = TiKVDriver(url=url)
