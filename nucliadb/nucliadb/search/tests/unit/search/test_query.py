@@ -90,6 +90,15 @@ async def test_get_default_min_score_is_cached(
     get_default_min_score.cache_clear()
 
 
+async def test_get_default_min_score_feature_not_enabled(
+    has_feature, get_kb_model_default_min_score_mock
+):
+    has_feature.return_value = False
+    get_kb_model_default_min_score_mock.return_value = 1.5
+
+    assert await get_default_min_score("kbid1") == 0.7
+
+
 @pytest.fixture()
 def txn():
     txn = unittest.mock.AsyncMock()
