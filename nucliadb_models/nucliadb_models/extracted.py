@@ -242,9 +242,29 @@ class PagePositions(BaseModel):
     end: Optional[int]
 
 
+class PageStructurePage(BaseModel):
+    width: int
+    height: int
+
+
+class PageStructureToken(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+    text: str
+    line: float
+
+
+class PageStructure(BaseModel):
+    page: PageStructurePage
+    tokens: List[PageStructureToken]
+
+
 class FilePages(BaseModel):
     pages: Optional[List[CloudLink]]
     positions: Optional[List[PagePositions]]
+    structures: Optional[List[PageStructure]]
 
 
 class FileExtractedData(BaseModel):

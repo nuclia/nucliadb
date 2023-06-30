@@ -110,7 +110,7 @@ message LabelSet {
         RESOURCES = 0;
         PARAGRAPHS = 1;
         SENTENCES = 2;
-        VISUAL_SELECTIONS = 3;
+        SELECTIONS = 3;
     }
     string title = 1;
     string color = 2;
