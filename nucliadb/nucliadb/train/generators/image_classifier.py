@@ -19,7 +19,7 @@
 #
 
 import json
-from typing import Any, AsyncIterator, Dict, List, Tuple, cast
+from typing import Any, AsyncIterator, Dict, List, Tuple
 
 from nucliadb_protos.dataset_pb2 import (
     ImageClassification,
@@ -31,8 +31,6 @@ from nucliadb_protos.resources_pb2 import FieldType, PageStructure, VisualSelect
 
 from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.fields.file import File as FileField
-from nucliadb.ingest.fields.link import Link as LinkField
 from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import get_resource_from_cache_or_db
@@ -60,8 +58,8 @@ async def generate_image_classification_payloads(
             logger.error(f"Resource {rid} does not exist on DB")
             return
 
-        _, field_type, field_key = item.field.split("/")
-        field_type = KB_REVERSE[field_type]
+        _, field_type_key, field_key = item.field.split("/")
+        field_type = KB_REVERSE[field_type_key]
 
         if field_type not in VISUALLY_ANNOTABLE_FIELDS:
             continue
@@ -114,7 +112,7 @@ async def generate_image_classification_payloads(
             }
 
             ic = ImageClassification()
-            ic.uri = page_uri
+            ic.page_uri = page_uri
             ic.selections = json.dumps(pawls_payload)
             batch.data.append(ic)
 
@@ -127,9 +125,10 @@ async def generate_image_classification_payloads(
 
 
 async def get_page_selections(
-    resource: Resource, field_key: str
+    resource: Resource,
+    field_key: str,
 ) -> Dict[int, List[VisualSelection]]:
-    page_selections = {}
+    page_selections: Dict[int, List[VisualSelection]] = {}
     basic = await resource.get_basic()
     if basic is None or basic.fieldmetadata is None:
         return page_selections
@@ -139,18 +138,17 @@ async def get_page_selections(
     for fieldmetadata in basic.fieldmetadata:
         if fieldmetadata.field.field == field_key:
             for selection in fieldmetadata.page_selections:
-                page_selections[selection.page] = selection.visual
+                page_selections[selection.page] = selection.visual  # type: ignore
             break
 
     return page_selections
 
 
 async def get_page_structure(field: Field) -> List[Tuple[str, PageStructure]]:
-    page_structures = []
+    page_structures: List[Tuple[str, PageStructure]] = []
     field_type = KB_REVERSE[field.type]
     if field_type == FieldType.FILE:
-        cast(FileField, field)
-        fed = await field.get_file_extracted_data()
+        fed = await field.get_file_extracted_data()  # type: ignore
         if fed is None:
             return page_structures
 
@@ -171,12 +169,9 @@ async def get_page_structure(field: Field) -> List[Tuple[str, PageStructure]]:
                 for i in range(len(fp.pages))
             ]
         )
-        __import__("pdb").set_trace()
-        pass
 
     elif field_type == FieldType.LINK:
-        cast(LinkField, field)
-        led = await field.get_link_extracted_data()
+        led = await field.get_link_extracted_data()  # type: ignore
         if led is None:
             return page_structures
 

@@ -25,7 +25,7 @@ import time
 
 import pyarrow as pa  # type: ignore
 import pytest
-from grpc import aio
+from grpc import aio  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
@@ -40,7 +40,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_models.metadata import UserFieldMetadata
-from nucliadb_models.resource import KnowledgeBoxConfig
+from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.tests.fixtures import NucliaFixture
 from nucliadb_sdk.v2.sdk import NucliaDB, Region
@@ -86,7 +86,7 @@ def test_image_classification(
 @pytest.fixture
 @pytest.mark.asyncio
 async def image_classification_resource(
-    sdk_v2: NucliaDB, nucliadb_grpc: WriterStub, kb: KnowledgeBoxConfig
+    sdk_v2: NucliaDB, nucliadb_grpc: WriterStub, kb: KnowledgeBoxObj
 ):
     kbid = kb.uuid
     field_id = "invoice"
@@ -119,7 +119,7 @@ async def image_classification_resource(
     broker_message = generate_image_classification_broker_message(
         selections, kbid, resource.uuid, field_id
     )
-    resp = await nucliadb_grpc.ProcessMessage(
+    resp = await nucliadb_grpc.ProcessMessage(  # type: ignore
         [broker_message], timeout=10, wait_for_ready=True
     )
     assert resp.status == OpStatusWriter.Status.OK
@@ -143,7 +143,7 @@ async def nucliadb_grpc(nucliadb: NucliaFixture) -> NucliaDB:
 
 
 @pytest.fixture
-def kb(sdk_v2: NucliaDB) -> KnowledgeBoxConfig:
+def kb(sdk_v2: NucliaDB) -> KnowledgeBoxObj:
     import random
 
     salt = str(random.random())[2:]

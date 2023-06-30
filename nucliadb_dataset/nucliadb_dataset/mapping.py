@@ -93,8 +93,8 @@ def batch_to_image_classification_arrow(batch: ImageClassificationBatch):
     IMAGE = []
     SELECTION = []
     for data in batch.data:
-        IMAGE.append(data.selection.encode())
-        SELECTION.append(data.selection)
+        IMAGE.append(data.page_uri)
+        SELECTION.append(data.selections)
 
     if len(IMAGE):
         pa_data = [pa.array(IMAGE), pa.array(SELECTION)]
