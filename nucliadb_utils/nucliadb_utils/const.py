@@ -54,3 +54,4 @@ class Streams:
 
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
+    DEFAULT_MIN_SCORE = "nucliadb_default_min_score"

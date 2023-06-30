@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import re
+from nucliadb_utils import const
 from datetime import datetime
 from typing import List, Optional, Tuple
 
@@ -46,7 +47,7 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
@@ -342,10 +343,14 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
 
 @alru_cache(maxsize=None)
 async def get_default_min_score(kbid: str) -> float:
+    fallback = 0.7
+    if not has_feature(const.Features.DEFAULT_MIN_SCORE):
+        return fallback
+
     model_min_score = await get_kb_model_default_min_score(kbid)
     if model_min_score is not None:
         return model_min_score
     else:
         # B/w compatible code until we figure out how to
         # set default min score for old on-prem kbs
-        return 0.7
+        return fallback
