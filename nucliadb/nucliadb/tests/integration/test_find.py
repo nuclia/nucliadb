@@ -171,3 +171,22 @@ async def test_find_resource_filters(
         body = resp.json()
         assert len(body["resources"]) == 1
         assert rid in body["resources"]
+
+
+async def test_find_min_score(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    # When not specifying the min score on the request, it should default to 0.7
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find", json={"query": "dummy"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["min_score"] == 0.7
+
+    # If we specify a min score, it should be used
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find", json={"query": "dummy", "min_score": 0.5}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["min_score"] == 0.5

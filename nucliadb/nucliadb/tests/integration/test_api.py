@@ -55,6 +55,7 @@ async def test_kb_creation_with_similarity(
     assert resp.status_code == 200
     body = resp.json()
     assert body["similarity"] == "cosine"
+    assert body["model"]["similarity_function"] == "cosine"
 
     # Check that we can define it to dot similarity
     resp = await nucliadb_manager.post(
@@ -67,6 +68,7 @@ async def test_kb_creation_with_similarity(
     assert resp.status_code == 200
     body = resp.json()
     assert body["similarity"] == "dot"
+    assert body["model"]["similarity_function"] == "dot"
 
 
 @pytest.mark.asyncio

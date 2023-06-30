@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field, validator
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.vectors import VectorSimilarity
+from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 
 _T = TypeVar("_T")
 
@@ -44,6 +44,11 @@ class ModelParamDefaults:
         default=[],
         title="Autofilters",
         description="List of filters automatically applied to the search query",
+    )
+    min_score = ParamDefault(
+        default=...,
+        title="Minimum score",
+        description="Minimum similarity score used to filter vector index search. Results with a lower score will be ignored.",  # noqa
     )
 
 
@@ -123,6 +128,7 @@ class Sentences(BaseModel):
     facets: FacetsResult
     page_number: int = 0
     page_size: int = 20
+    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
 
 
 class Paragraph(BaseModel):
@@ -344,6 +350,7 @@ class KnowledgeboxShards(BaseModel):
     actual: int
     similarity: VectorSimilarity
     shards: List[ShardObject]
+    model: Optional[SemanticModelMetadata]
 
     @classmethod
     def from_message(cls: Type[_T], message: PBShards) -> _T:
@@ -353,6 +360,8 @@ class KnowledgeboxShards(BaseModel):
             including_default_value_fields=True,
         )
         as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
+        if message.HasField("model"):
+            as_dict["model"] = SemanticModelMetadata.from_message(message.model)
         return cls(**as_dict)
 
 
@@ -390,9 +399,9 @@ class SearchParamDefaults:
         max_items=50,
     )
     min_score = ParamDefault(
-        default=0.70,
+        default=None,
         title="Minimum result score",
-        description="The minimum score to consider a result as valid. Results with a score lower than this value will not be returned",  # noqa: E501
+        description="The minimum score to consider a vector index result as valid. Results with a lower score will not be returned. If not set, the default minimum value associated to the Knowledge box's semantic model is used.",  # noqa: E501
     )
     autofilter = ParamDefault(
         default=False,
@@ -547,7 +556,7 @@ class BaseSearchRequest(BaseModel):
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
-    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
+    min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     range_creation_start: Optional[
         datetime
     ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
@@ -660,7 +669,7 @@ class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
-    min_score: float = SearchParamDefaults.min_score.to_pydantic_field()
+    min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
         datetime
@@ -771,6 +780,7 @@ class KnowledgeboxFindResults(BaseModel):
     nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
+    min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
 
 
 class FeedbackTasks(str, Enum):

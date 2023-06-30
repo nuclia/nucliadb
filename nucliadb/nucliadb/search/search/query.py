@@ -21,6 +21,7 @@ import re
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+from async_lru import alru_cache
 from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
@@ -30,7 +31,9 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.utils_pb2 import RelationNode
 
-from nucliadb.search import logger
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
@@ -43,6 +46,7 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_utils.utilities import get_storage
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
@@ -322,3 +326,26 @@ def pre_process_query(user_query: str) -> str:
             result.append(term)
 
     return " ".join(result)
+
+
+async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
+    driver = get_driver()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    async with driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid)
+        model = await kb.get_model_metadata()
+        if model.HasField("default_min_score"):
+            return model.default_min_score
+        else:
+            return None
+
+
+@alru_cache(maxsize=None)
+async def get_default_min_score(kbid: str) -> float:
+    model_min_score = await get_kb_model_default_min_score(kbid)
+    if model_min_score is not None:
+        return model_min_score
+    else:
+        # B/w compatible code until we figure out how to
+        # set default min score for old on-prem kbs
+        return 0.7

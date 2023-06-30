@@ -26,13 +26,18 @@ from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import global_query_to_pb, pre_process_query
+from nucliadb.search.search.query import (
+    get_default_min_score,
+    global_query_to_pb,
+    pre_process_query,
+)
 from nucliadb.search.search.utils import parse_sort_options
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -278,6 +283,8 @@ async def _search_endpoint(
         )
         response.status_code = 206 if incomplete else 200
         return results
+    except KnowledgeBoxNotFound:
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
 
@@ -301,6 +308,10 @@ async def search(
         if SearchOptions.VECTOR in item.features:
             item.features.remove(SearchOptions.VECTOR)
 
+    min_score = item.min_score
+    if min_score is None:
+        min_score = await get_default_min_score(kbid)
+
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
     pb_query, incomplete_results, autofilters = await global_query_to_pb(
@@ -313,7 +324,7 @@ async def search(
         sort=sort_options,
         page_number=item.page_number,
         page_size=item.page_size,
-        min_score=item.min_score,
+        min_score=min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
@@ -344,7 +355,7 @@ async def search(
         extracted=item.extracted,
         sort=sort_options,
         requested_relations=pb_query.relation_subgraph,
-        min_score=item.min_score,
+        min_score=min_score,
         highlight=item.highlight,
     )
     await abort_transaction()
