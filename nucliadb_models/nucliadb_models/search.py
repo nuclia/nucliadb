@@ -611,7 +611,11 @@ class BaseSearchRequest(BaseModel):
                     f"Facet {next_facet} is already present in facets. Faceted list must be unique."
                 )
             if next_facet.startswith(facet):
-                raise ValueError(f"Facet {next_facet} is a nested faced from {facet}")
+                raise ValueError(
+                    "Nested facets are not allowed: {child} is a child of {parent}".format(
+                        child=next_facet, parent=facet
+                    )
+                )
             facet = next_facet
         return facets
 
