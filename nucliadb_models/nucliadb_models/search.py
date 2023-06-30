@@ -48,7 +48,7 @@ class ModelParamDefaults:
     min_score = ParamDefault(
         default=...,
         title="Minimum score",
-        description="Minimum similarity score applied to the vector index search. Results with a lower score have been ignored.",  # noqa
+        description="Minimum similarity score used to filter vector index search. Results with a lower score will be ignored.",  # noqa
     )
 
 
