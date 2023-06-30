@@ -1375,3 +1375,29 @@ async def test_search_two_logic_shards(
     assert len(content1["sentences"]["results"]) == len(
         content2["sentences"]["results"]
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["find", "search"])
+async def test_facets_validation(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    endpoint,
+):
+    invalid_facets = ["/a/b", "/a/b/c"]
+    valid_facets = ["/a/b", "/c/d/e", "/f/g"]
+
+    kbid = knowledgebox
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/{endpoint}", params={"faceted": invalid_facets}
+    )
+    assert resp.status_code == 422
+    assert (
+        resp.json()["detail"][0]["msg"]
+        == "Nested facets are not allowed: /a/b/c is a child of /a/b"
+    )
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/{endpoint}", params={"faceted": valid_facets}
+    )
+    assert resp.status_code == 200

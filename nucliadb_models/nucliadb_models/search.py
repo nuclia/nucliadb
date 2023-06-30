@@ -387,6 +387,7 @@ class SearchParamDefaults:
         default=[],
         title="Faceted",
         description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+        max_items=50,
     )
     min_score = ParamDefault(
         default=0.70,
@@ -586,6 +587,37 @@ class BaseSearchRequest(BaseModel):
     resource_filters: List[
         str
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+
+    @validator("faceted")
+    def nested_facets_not_supported(cls, facets):
+        """
+        Raises ValueError if provided facets contains nested facets, like:
+        ["/a/b", "/a/b/c"]
+        """
+        if len(facets) < 2:
+            return facets
+
+        # Sort facets alphabetically to make sure that nested facets appear right after their parents
+        sorted_facets = sorted(facets)
+        facet = sorted_facets.pop(0)
+        while True:
+            try:
+                next_facet = sorted_facets.pop(0)
+            except IndexError:
+                # No more facets to check
+                break
+            if next_facet == facet:
+                raise ValueError(
+                    f"Facet {next_facet} is already present in facets. Faceted list must be unique."
+                )
+            if next_facet.startswith(facet):
+                raise ValueError(
+                    "Nested facets are not allowed: {child} is a child of {parent}".format(
+                        child=next_facet, parent=facet
+                    )
+                )
+            facet = next_facet
+        return facets
 
 
 class SearchRequest(BaseSearchRequest):
