@@ -264,15 +264,14 @@ pub fn shutdown_delay() -> Duration {
 
     let Ok(value) = env::var(SHUTDOWN_DELAY_KEY) else {
         warn!("{SHUTDOWN_DELAY_KEY} not defined. Defaulting to {SHUTDOWN_DELAY_PLACEHOLDER}");
-        return DEFAULT_SHUTDOWN_DELAY
+        return DEFAULT_SHUTDOWN_DELAY;
     };
 
     let Ok(duration) = parse_duration::parse(&value) else {
         error!(
-            "{SHUTDOWN_DELAY_KEY} defined incorrectly. Defaulting to \
-             {SHUTDOWN_DELAY_PLACEHOLDER}"
+            "{SHUTDOWN_DELAY_KEY} defined incorrectly. Defaulting to {SHUTDOWN_DELAY_PLACEHOLDER}"
         );
-        return DEFAULT_SHUTDOWN_DELAY
+        return DEFAULT_SHUTDOWN_DELAY;
     };
 
     duration
