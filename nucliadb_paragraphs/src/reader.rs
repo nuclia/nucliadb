@@ -154,10 +154,6 @@ impl ParagraphReader for ParagraphReaderService {
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
-    fn stop(&self) -> NodeResult<()> {
-        debug!("Stopping Paragraph Reader Service");
-        Ok(())
-    }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -246,12 +242,6 @@ impl ReaderChild for ParagraphReaderService {
         metrics.record_request_time(metric, took);
 
         Ok(response)
-    }
-    #[tracing::instrument(skip_all)]
-    fn reload(&self) {
-        if let Err(err) = self.reader.reload() {
-            error!("Could not reload due to {err}")
-        }
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {

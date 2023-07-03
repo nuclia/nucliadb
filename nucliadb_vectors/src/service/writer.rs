@@ -116,11 +116,6 @@ impl VectorWriter for VectorWriterService {
 }
 impl WriterChild for VectorWriterService {
     #[tracing::instrument(skip_all)]
-    fn stop(&mut self) -> NodeResult<()> {
-        debug!("Stopping vector writer Service");
-        Ok(())
-    }
-    #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
 
@@ -576,6 +571,5 @@ mod tests {
         assert!(res.is_ok());
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        writer.stop().unwrap();
     }
 }
