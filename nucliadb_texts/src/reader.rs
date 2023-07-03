@@ -118,11 +118,6 @@ impl ReaderChild for TextReaderService {
     type Request = DocumentSearchRequest;
     type Response = DocumentSearchResponse;
     #[tracing::instrument(skip_all)]
-    fn stop(&self) -> NodeResult<()> {
-        debug!("Stopping Reader Text Service");
-        Ok(())
-    }
-    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
 
@@ -134,12 +129,6 @@ impl ReaderChild for TextReaderService {
         metrics.record_request_time(metric, took);
 
         Ok(result)
-    }
-    #[tracing::instrument(skip_all)]
-    fn reload(&self) {
-        if let Err(err) = self.reader.reload() {
-            error!("Could not reload due to {err}")
-        }
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {

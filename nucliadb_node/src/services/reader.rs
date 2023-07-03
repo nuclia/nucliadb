@@ -224,63 +224,6 @@ impl ShardReaderService {
         })
     }
 
-    /// Stop the service
-    #[tracing::instrument(skip_all)]
-    pub fn stop(&self) {
-        let span = tracing::Span::current();
-        let time = SystemTime::now();
-
-        debug!("Stopping shard {}...", { &self.id });
-        let fields = self.text_reader.clone();
-        let paragraphs = self.paragraph_reader.clone();
-        let vectors = self.vector_reader.clone();
-        let relations = self.relation_reader.clone();
-
-        let text_task = move || fields.stop();
-        let paragraph_task = move || paragraphs.stop();
-        let vector_task = move || vectors.stop();
-        let relation_task = move || relations.stop();
-
-        let info = info_span!(parent: &span, "text stop");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph stop");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector stop");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation stop");
-        let relation_task = || run_with_telemetry(info, relation_task);
-
-        let mut text_result = Ok(());
-        let mut paragraph_result = Ok(());
-        let mut vector_result = Ok(());
-        let mut relation_result = Ok(());
-        thread::scope(|s| {
-            s.spawn(|_| text_result = text_task());
-            s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
-            s.spawn(|_| relation_result = relation_task());
-        });
-        if let Err(e) = text_result {
-            error!("Error stopping the Field reader service: {}", e);
-        }
-        if let Err(e) = paragraph_result {
-            error!("Error stopping the Paragraph reader service: {}", e);
-        }
-        if let Err(e) = vector_result {
-            error!("Error stopping the Vector reader service: {}", e);
-        }
-        if let Err(e) = relation_result {
-            error!("Error stopping the Relation reader service: {}", e);
-        }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/stop".to_string());
-        metrics.record_request_time(metric, took);
-
-        debug!("Shard stopped {}...", { &self.id });
-    }
-
     /// Return a list of queries to suggest from the original
     /// query. The query with more words will come first. `max_group`
     /// defines the limit of words a query can have.

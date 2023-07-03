@@ -103,10 +103,6 @@ impl VectorReader for VectorReaderService {
 impl ReaderChild for VectorReaderService {
     type Request = VectorSearchRequest;
     type Response = VectorSearchResponse;
-    fn stop(&self) -> NodeResult<()> {
-        debug!("Stopping vector reader Service");
-        Ok(())
-    }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -199,7 +195,6 @@ impl ReaderChild for VectorReaderService {
         }
         Ok(result)
     }
-    fn reload(&self) {}
 }
 
 impl TryFrom<Neighbour> for DocumentScored {
@@ -311,7 +306,6 @@ mod tests {
         let mut writer = VectorWriterService::start(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        writer.stop().unwrap();
         let reader = VectorReaderService::start(&vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),

@@ -60,10 +60,6 @@ impl Debug for ParagraphWriterService {
 impl ParagraphWriter for ParagraphWriterService {}
 
 impl WriterChild for ParagraphWriterService {
-    fn stop(&mut self) -> NodeResult<()> {
-        debug!("Stopping Paragraph Service");
-        Ok(())
-    }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
