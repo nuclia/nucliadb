@@ -124,7 +124,7 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
             text = paragraph.text.strip()
-            words += len(text.split(" "))
+            words += len(text.split())
             if words >= MAX_TOKENS:
                 break
 
@@ -137,7 +137,7 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
                 )
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
-                    words += len(text.split(" "))
+                    words += len(text.split())
                     if words >= MAX_TOKENS:
                         break
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
