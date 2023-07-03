@@ -196,7 +196,7 @@ async def test_format_chat_prompt_content_truncates(kb):
         resources[f"id{index}"] = _create_find_result(
             f"id{index}/c/conv/ident", result_text, SCORE_TYPE.BM25
         )
-        words += len(chat_prompt.GPT_4_ENC.encode(result_text))
+        words += len(result_text.split())
         if words > chat_prompt.MAX_TOKENS:
             break
         index += 1
@@ -210,5 +210,5 @@ async def test_format_chat_prompt_content_truncates(kb):
         )
 
     assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
-        [result_text] * (index - 2)
+        [result_text] * (index - 1)
     )
