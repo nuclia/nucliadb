@@ -275,6 +275,7 @@ class Resource:
             self.slug_modified = True
         if deleted_fields is not None and len(deleted_fields) > 0:
             remove_field_classifications(self.basic, deleted_fields=deleted_fields)
+
         await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
         self.modified = True
 

@@ -40,7 +40,7 @@ def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
     return value
 
 
-async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
+async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
     resouce_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
     if uuid not in resouce_cache:
