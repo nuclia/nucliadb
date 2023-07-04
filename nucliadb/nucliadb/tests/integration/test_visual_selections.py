@@ -58,11 +58,7 @@ async def annotated_file_field(
                 "left": annotation["bounds"]["left"],
                 "right": annotation["bounds"]["right"],
                 "bottom": annotation["bounds"]["bottom"],
-                "token_ids": [
-                    # TODO pageIndex?
-                    token["tokenIndex"]
-                    for token in annotation["tokens"]
-                ],
+                "token_ids": [token["tokenIndex"] for token in annotation["tokens"]],
             }
         )
     assert len(selections_by_page[0]) == PAGE_0_SELECTION_COUNT
