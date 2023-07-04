@@ -74,14 +74,15 @@ async def purge_kb(driver: Driver):
 
         # Now delete the tikv delete mark
         try:
-            async with driver.transaction() as txn:
-                key_to_purge = KB_TO_DELETE.format(kbid=kbid)
-                await txn.delete(key_to_purge)
-                await txn.commit()
+            txn = await driver.begin()
+            key_to_purge = KB_TO_DELETE.format(kbid=kbid)
+            await txn.delete(key_to_purge)
+            await txn.commit()
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error(f"  X Error while deleting key {key_to_purge}")
+            await txn.abort()
     logger.info("END PURGING KB")
 
 
