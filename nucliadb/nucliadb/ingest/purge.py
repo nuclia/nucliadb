@@ -40,7 +40,6 @@ from nucliadb_utils.utilities import get_storage
 async def purge_kb(driver: Driver):
     logger.info("START PURGING KB")
     async for key in driver.keys(match=KB_TO_DELETE_BASE, count=-1):
-        breakpoint()
         logger.info(f"Purging kb {key}")
         try:
             kbid = key.split("/")[2]
@@ -60,7 +59,6 @@ async def purge_kb(driver: Driver):
             )
             continue
         except NodeError as exc:
-            breakpoint()
             errors.capture_exception(exc)
             logger.error(
                 f"  X At least one node was unavailable while purging {kbid}, skipping"
@@ -68,7 +66,6 @@ async def purge_kb(driver: Driver):
             continue
 
         except Exception as exc:
-            breakpoint()
             errors.capture_exception(exc)
             logger.error(
                 f"  X ERROR while executing KnowledgeBox.purge of {kbid}, skipping: {exc.__class__.__name__} {exc}"
@@ -77,15 +74,14 @@ async def purge_kb(driver: Driver):
 
         # Now delete the tikv delete mark
         try:
-            txn = await driver.begin()
-            key_to_purge = KB_TO_DELETE.format(kbid=kbid)
-            await txn.delete(key_to_purge)
-            await txn.commit()
+            async with driver.transaction() as txn:
+                key_to_purge = KB_TO_DELETE.format(kbid=kbid)
+                await txn.delete(key_to_purge)
+                await txn.commit()
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.info(f"  X Error while deleting key {key_to_purge}")
-            await txn.abort()
+            logger.error(f"  X Error while deleting key {key_to_purge}")
     logger.info("END PURGING KB")
 
 
