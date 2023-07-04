@@ -173,6 +173,7 @@ async def test_vectorset(
         f"/kb/{knowledgebox}/search",
         json={"vector": [1.0] * 512, "vectorset": "invalid", "features": ["vector"]},
     )
+    assert resp.status_code == 200
     assert len(resp.json()["sentences"]["results"]) == 0
 
     resp = await nucliadb_reader.post(
