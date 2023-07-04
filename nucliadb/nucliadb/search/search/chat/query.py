@@ -74,6 +74,7 @@ async def chat(
         user_id=user_id,
         context=context,
         question=chat_request.query,
+        truncate=True,
     )
 
     ident, generator = await predict.chat_query(kbid, chat_model)

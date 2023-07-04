@@ -644,11 +644,18 @@ class Message(BaseModel):
 
 
 class ChatModel(BaseModel):
-    question: str
+    question: str = Field(description="Question to ask the generative model")
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    context: List[Message] = []
+    context: List[Message] = Field(
+        [], description="The information retrieval context for the current question"
+    )
+    conversation: List[Message] = Field([], description="The chat conversation history")
+    truncate: bool = Field(
+        True,
+        description="Truncate the chat context in case it doesn't fit the generative input",
+    )
 
 
 class RephraseModel(BaseModel):

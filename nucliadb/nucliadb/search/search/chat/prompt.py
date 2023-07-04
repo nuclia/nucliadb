@@ -130,8 +130,14 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
 
             output[paragraph.id] = text
 
+            # If the paragraph is a conversation and it matches semantically, we assume we
+            # have matched with the question, therefore try to include the answer to the
+            # context by pulling the next few messages of the conversation field
             rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
-            if field_type == "c" and paragraph.score_type == SCORE_TYPE.VECTOR:
+            if field_type == "c" and paragraph.score_type in (
+                SCORE_TYPE.VECTOR,
+                SCORE_TYPE.BOTH,
+            ):
                 expanded_msgs = await get_expanded_conversation_messages(
                     kb=kb, rid=rid, field_id=field_id, mident=mident
                 )
@@ -140,6 +146,7 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
                     words += len(text.split())
                     if words >= MAX_TOKENS:
                         break
+
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
 
