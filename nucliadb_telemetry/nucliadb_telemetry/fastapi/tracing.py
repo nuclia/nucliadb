@@ -372,9 +372,11 @@ class CaptureTraceIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
+        response = None
         try:
             response = await call_next(request)
         finally:
-            self.capture_trace_id(response)
-            self.expose_trace_id_header(response)
-            return response
+            if response is not None:
+                self.capture_trace_id(response)
+                self.expose_trace_id_header(response)
+                return response
