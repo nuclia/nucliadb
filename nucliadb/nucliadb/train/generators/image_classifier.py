@@ -138,7 +138,7 @@ async def get_page_selections(
     for fieldmetadata in basic.fieldmetadata:
         if (
             fieldmetadata.field.field == field.id
-            and fieldmetadata.field.field_type == field.type
+            and fieldmetadata.field.field_type == KB_REVERSE[field.type]
         ):
             for selection in fieldmetadata.page_selections:
                 page_selections[selection.page] = selection.visual  # type: ignore
