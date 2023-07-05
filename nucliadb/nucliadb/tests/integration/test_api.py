@@ -536,3 +536,36 @@ async def test_extra(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
     assert resp.status_code == 200
     assert resp.json()["extra"] == extra
+
+
+@pytest.mark.asyncio
+async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={"title": "Foo", "icon": "application/pdf"},
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    assert resp.json()["icon"] == "application/pdf"
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{uuid}",
+        json={
+            "usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}
+        },
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    assert resp.json()["icon"] == "application/pdf"
