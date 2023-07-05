@@ -557,6 +557,7 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "application/pdf"
 
+    # A partial patch should not change the icon
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{uuid}",
         json={
@@ -569,3 +570,17 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "application/pdf"
+
+    # Check that if we change the icon specifically, the change is applied
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{uuid}",
+        json={
+            "icon": "text/plain",
+        },
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    assert resp.json()["icon"] == "text/plain"
