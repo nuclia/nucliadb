@@ -23,7 +23,7 @@ import pkg_resources
 
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE,
@@ -44,7 +44,7 @@ async def purge_kb(driver: Driver):
         try:
             kbid = key.split("/")[2]
         except Exception:
-            logger.info(
+            logger.warning(
                 f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_BASE}"
             )
             continue
@@ -54,20 +54,20 @@ async def purge_kb(driver: Driver):
             logger.info(f"  √ Successfully Purged {kbid}")
         except ShardNotFound as exc:
             errors.capture_exception(exc)
-            logger.info(
+            logger.error(
                 f"  X At least one shard was unavailable while purging {kbid}, skipping"
             )
             continue
         except NodeError as exc:
             errors.capture_exception(exc)
-            logger.info(
+            logger.error(
                 f"  X At least one node was unavailable while purging {kbid}, skipping"
             )
             continue
 
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.info(
+            logger.error(
                 f"  X ERROR while executing KnowledgeBox.purge of {kbid}, skipping: {exc.__class__.__name__} {exc}"
             )
             continue
@@ -81,7 +81,7 @@ async def purge_kb(driver: Driver):
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.info(f"  X Error while deleting key {key_to_purge}")
+            logger.error(f"  X Error while deleting key {key_to_purge}")
             await txn.abort()
     logger.info("END PURGING KB")
 
@@ -138,10 +138,12 @@ async def main():
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
         service_name=SERVICE_NAME,
     )
-
-    await purge_kb(driver)
-    await purge_kb_storage(driver, storage)
-    await storage.finalize()
+    try:
+        await purge_kb(driver)
+        await purge_kb_storage(driver, storage)
+    finally:
+        await storage.finalize()
+        await teardown_driver()
 
 
 def run() -> int:  # pragma: no cover
