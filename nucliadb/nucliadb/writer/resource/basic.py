@@ -85,7 +85,8 @@ def parse_basic_modify(
         bm.basic.thumbnail = item.thumbnail
     if item.layout:
         bm.basic.layout = item.layout
-    parse_icon(bm, item)
+    if item.icon:
+        bm.basic.icon = item.icon
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
             userfieldmetadata = UserFieldMetadata()
@@ -208,6 +209,7 @@ def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushP
 
     if item.title is None:
         item.title = compute_title(item, bm.uuid)
+    parse_icon_on_create(bm, item)
 
     parse_basic_modify(bm, item, toprocess)
 
@@ -254,15 +256,16 @@ def compute_title(item: CreateResourcePayload, rid: str) -> str:
     return item.slug or rid
 
 
-def parse_icon(bm: BrokerMessage, item: ComingResourcePayload):
+def parse_icon_on_create(bm: BrokerMessage, item: CreateResourcePayload):
     if item.icon:
         # User input icon takes precedence
         bm.basic.icon = item.icon
         return
-    elif len(item.texts) > 0:
+
+    icon = GENERIC_MIME_TYPE
+    if len(item.texts) > 0:
         # Infer icon from text file format
         format = next(iter(item.texts.values())).format
-        bm.basic.icon = TEXT_FORMAT_TO_MIMETYPE[format]
-    else:
-        # Default
-        bm.basic.icon = GENERIC_MIME_TYPE
+        icon = TEXT_FORMAT_TO_MIMETYPE[format]
+    item.icon = icon
+    bm.basic.icon = icon
