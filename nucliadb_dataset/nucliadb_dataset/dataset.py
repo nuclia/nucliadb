@@ -304,7 +304,7 @@ class NucliaDBDataset(NucliaDataset):
         self._set_schema(
             pa.schema(
                 [
-                    pa.field("image", pa.binary()),
+                    pa.field("image", pa.string()),
                     pa.field("selection", pa.string()),
                 ]
             )
@@ -325,6 +325,7 @@ class NucliaDBDataset(NucliaDataset):
         """
         Get expected number of partitions from a live NucliaDB
         """
+        # XXX Bad pattern: using `client` attributes objects instead of methods
         partitions = self.client.train_session.get(f"/trainset").json()
         if len(partitions["partitions"]) == 0:
             raise KeyError("There is no partitions")
