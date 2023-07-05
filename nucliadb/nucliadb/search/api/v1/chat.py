@@ -117,7 +117,7 @@ async def chat_knowledgebox(
     find_request.shards = item.shards
     find_request.autofilter = item.autofilter
     find_request.highlight = item.highlight
-    find_request.bm25_boost = item.bm25_boost
+    find_request.bm25_factor = item.bm25_factor
 
     find_results, incomplete = await find(
         response,

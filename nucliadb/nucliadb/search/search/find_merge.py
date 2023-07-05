@@ -337,7 +337,7 @@ async def find_merge_results(
     requested_relations: EntitiesSubgraphRequest,
     min_score: float,
     highlight: bool = False,
-    bm25_boost: float = 1.0,
+    bm25_factor: float = 1.0,
 ) -> KnowledgeboxFindResults:
     # force getting transaction on current asyncio task
     # so all sub tasks will use the same transaction
@@ -363,7 +363,7 @@ async def find_merge_results(
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
         para_results = apply_bm25_noise_filtering(
-            response.paragraph.results, factor=bm25_boost
+            response.paragraph.results, factor=bm25_factor
         )
         total_paragraphs += len(para_results)
 
@@ -410,10 +410,12 @@ async def find_merge_results(
 
 def apply_bm25_noise_filtering(paragraphs, factor=1.0):
     """
-    Apply BM25 noise filtering to the paragraphs
+    Apply BM25 noise filtering to the paragraphs: remove paragraphs
+    with BM25 score is factor % away from the max BM25 score on that request.
     """
     if len(paragraphs) == 0:
         return paragraphs
+
     max_bm25 = max([p.score.bm25 for p in paragraphs])
     threshold = max_bm25 * (1 - factor)
-    return [p for p in paragraphs if p.score.bm25 >= threshold]
+    return [p for p in paragraphs if p.score.bm25 > threshold]

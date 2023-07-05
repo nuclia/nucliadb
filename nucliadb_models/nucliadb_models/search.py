@@ -677,7 +677,7 @@ class ChatRequest(BaseModel):
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
     min_score: Optional[float] = SearchParamDefaults.min_score.to_pydantic_field()
-    bm25_boost: float = 1
+    bm25_factor: float = 1
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[
         datetime
@@ -715,7 +715,7 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.VECTOR,
         ]
     )
-    bm25_boost: float = 1
+    bm25_factor: float = 1
 
     @validator("features")
     def fulltext_not_supported(cls, v):

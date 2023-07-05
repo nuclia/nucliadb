@@ -255,7 +255,7 @@ async def find(
         requested_relations=pb_query.relation_subgraph,
         min_score=min_score,
         highlight=item.highlight,
-        bm25_boost=item.bm25_boost,
+        bm25_factor=item.bm25_factor,
     )
 
     if audit is not None and do_audit:
