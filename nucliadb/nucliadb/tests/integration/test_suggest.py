@@ -20,6 +20,8 @@
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.resources_pb2 import LinkExtractedData
+from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
@@ -262,3 +264,60 @@ async def test_suggest_related_entities(
     assert resp.status_code == 200
     body = resp.json()
     assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]
+
+
+@pytest.mark.asyncio
+async def test_suggestion_on_link_computed_titles_sc6088(
+    nucliadb_writer,
+    nucliadb_grpc,
+    nucliadb_reader,
+    knowledgebox,
+):
+    # Create a resource with a link field
+    link = "http://www.mylink.com"
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": link,
+            "links": {
+                "mylink": {
+                    "uri": link,
+                }
+            },
+        },
+        headers={"X-Synchronous": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Simulate processing link extracted data
+    extracted_title = "MyLink Website"
+    bm = BrokerMessage()
+    bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = kbid
+    led = LinkExtractedData()
+    led.field = "mylink"
+    led.title = extracted_title
+    bm.link_extracted_data.append(led)
+
+    resp = await nucliadb_grpc.ProcessMessage([bm])
+    assert resp.status == OpStatusWriter.Status.OK
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == extracted_title
+
+    # Test suggest returns the extracted title metadata
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=MyLink&fields=a/title")
+    assert resp.status_code == 200
+    body = resp.json()
+    suggested = body["paragraphs"]["results"][0]
+    assert suggested["field"] == "title"
+    assert suggested["field_type"] == "a"
+    assert suggested["rid"] == rid
+    assert suggested["text"] == extracted_title

@@ -47,7 +47,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
-from nucliadb_protos.resources_pb2 import ParagraphAnnotation
+from nucliadb_protos.resources_pb2 import Paragraph, ParagraphAnnotation
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.resources_pb2 import UserVectorsWrapper
 from nucliadb_protos.train_pb2 import EnabledMetadata
@@ -777,6 +777,7 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
+            await self.maybe_update_title_metadata(link_extracted_data)
 
         for file_extracted_data in message.file_extracted_data:
             await self._apply_file_extracted_data(file_extracted_data)
@@ -828,13 +829,40 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
-        if (
-            self.basic.title.startswith("http") and link_extracted_data.title != ""
-        ) or (self.basic.title == "" and link_extracted_data.title != ""):
-            # If the title was http something or empty replace
-            self.basic.title = link_extracted_data.title
-
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
+
+    async def maybe_update_title_metadata(self, link_extracted_data: LinkExtractedData):
+        assert self.basic is not None
+        if not link_extracted_data.title:
+            return
+        if not (self.basic.title.startswith("http") or self.basic.title == ""):
+            return
+
+        title = link_extracted_data.title
+        self.basic.title = title
+        # Extracted text
+        field = await self.get_field("title", FieldType.GENERIC, load=False)
+        etw = ExtractedTextWrapper()
+        etw.body.text = title
+        await field.set_extracted_text(etw)
+
+        # Field computed metadata
+        fcmw = FieldComputedMetadataWrapper()
+        fcmw.field.field = "title"
+        fcmw.field.field_type = FieldType.GENERIC
+
+        # Merge with any existing field computed metadata
+        fcm = await field.get_field_metadata(force=True)
+        if fcm is not None:
+            fcmw.metadata.CopyFrom(fcm)
+
+        fcmw.metadata.metadata.ClearField("paragraphs")
+        paragraph = Paragraph(
+            start=0, end=len(title), kind=Paragraph.TypeParagraph.TITLE
+        )
+        fcmw.metadata.metadata.paragraphs.append(paragraph)
+
+        await field.set_field_metadata(fcmw)
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
         assert self.basic is not None
@@ -1005,7 +1033,6 @@ class Resource:
 
     @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):
-        # For each extracted
         for type, field in await self.get_fields_ids(force=True):
             fieldid = FieldID(field_type=type, field=field)
             await self.compute_global_text_field(fieldid, self.indexer)
