@@ -828,11 +828,7 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
-        if (
-            self.basic.title.startswith("http") and link_extracted_data.title != ""
-        ) or (self.basic.title == "" and link_extracted_data.title != ""):
-            # If the title was http something or empty replace
-            self.basic.title = link_extracted_data.title
+        maybe_update_basic_title(self.basic, link_extracted_data.title)
 
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
 
@@ -1411,6 +1407,15 @@ def maybe_update_basic_thumbnail(
         return False
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
     return True
+
+
+def maybe_update_basic_title(basic: PBBasic, new_title: str) -> bool:
+    if new_title == "":
+        return False
+    if basic.title.startswith("http") or basic.title == "":
+        basic.title = new_title
+        return True
+    return False
 
 
 def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
