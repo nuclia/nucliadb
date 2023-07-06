@@ -349,7 +349,6 @@ async def rollover_shards(app_context: ApplicationContext, kbid: str) -> None:
         await asyncio.sleep(1)
         node_ready_checks += 1
 
-    await cluster_manager.load_active_nodes()
     logger.warning("Rolling over shards", extra={"kbid": kbid})
 
     await create_rollover_shards(app_context, kbid)
