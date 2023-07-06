@@ -20,16 +20,16 @@ Example: `0001_migrate_data.py`.
 Each migration should have the following:
 
 ```python
-from .tool import MigrationContext
+from nucliadb.migrator.context import ExecutionContext
 
 
-async def migrate(context: MigrationContext) -> None:
+async def migrate(context: ExecutionContext) -> None:
     """
     Non-kb type of migration. Migrate global data.
     """
 
 
-async def migrate_kb(context: MigrationContext, kbid: str) -> None:
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     """
     Migrate kb.
 

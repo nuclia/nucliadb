@@ -17,3 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional, Type, TypeVar
+
+from google.protobuf.message import Message
+
+from nucliadb.common.maindb.driver import Transaction
+
+PB_TYPE = TypeVar("PB_TYPE", bound=Message)
+
+
+async def get_kv_pb(
+    txn: Transaction, key: str, pb_type: Type[PB_TYPE]
+) -> Optional[PB_TYPE]:
+    kb_shards_bytes: Optional[bytes] = await txn.get(key)
+    if kb_shards_bytes is not None:
+        kb_shards = pb_type()
+        kb_shards.ParseFromString(kb_shards_bytes)
+        return kb_shards
+    else:
+        return None

@@ -27,6 +27,7 @@ from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import noderesources_pb2, nodewriter_pb2, writer_pb2
@@ -69,18 +70,13 @@ def remove_index_node(node_id: str) -> None:
 
 class KBShardManager:
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        key = KB_SHARDS.format(kbid=kbid)
-        driver = get_driver()
-        async with driver.transaction() as txn:
-            payload = await txn.get(key)
-            if payload is None:
-                # could be None because /shards doesn't exist, or beacause the
-                # whole KB does not exist. In any case, this should not happen
-                raise ShardsNotFound(kbid)
-
-            pb = writer_pb2.Shards()
-            pb.ParseFromString(payload)
-            return pb
+        cdm = ClusterDataManager(get_driver())
+        result = await cdm.get_kb_shards(kbid)
+        if result is None:
+            # could be None because /shards doesn't exist, or beacause the
+            # whole KB does not exist. In any case, this should not happen
+            raise ShardsNotFound(kbid)
+        return result
 
     async def get_shards_by_kbid(self, kbid: str) -> list[writer_pb2.ShardObject]:
         shards = await self.get_shards_by_kbid_inner(kbid)
@@ -224,6 +220,10 @@ class KBShardManager:
             node = get_index_node(node_id)
             if node is not None:
                 try:
+                    logger.warning(
+                        "Deleting shard replica",
+                        extra={"shard": replica_id, "node": node_id},
+                    )
                     await node.delete_shard(replica_id)
                 except Exception as rollback_error:
                     errors.capture_exception(rollback_error)

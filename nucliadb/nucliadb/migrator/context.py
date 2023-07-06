@@ -20,24 +20,23 @@
 import contextlib
 from typing import AsyncIterator
 
-from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.utils import setup_driver, teardown_driver
+from nucliadb.common.context import ApplicationContext
 from nucliadb_utils.cache import locking
 
 from .datamanager import MigrationsDataManager
 from .settings import Settings
 
 
-class ExecutionContext:
+class ExecutionContext(ApplicationContext):
     data_manager: MigrationsDataManager
     dist_lock_manager: locking.RedisDistributedLockManager
-    kv_driver: Driver
 
     def __init__(self, settings: Settings) -> None:
+        super().__init__(service_name="migrator")
         self.settings = settings
 
     async def initialize(self) -> None:
-        self.kv_driver = await setup_driver()
+        await super().initialize()
         self.data_manager = MigrationsDataManager(self.kv_driver)
         if self.settings.redis_url is not None:
             self.dist_lock_manager = locking.RedisDistributedLockManager(
@@ -45,9 +44,9 @@ class ExecutionContext:
             )
 
     async def finalize(self) -> None:
+        await super().finalize()
         if self.settings.redis_url is not None:
             await self.dist_lock_manager.close()
-        await teardown_driver()
 
     @contextlib.asynccontextmanager
     async def maybe_distributed_lock(self, name: str) -> AsyncIterator[None]:

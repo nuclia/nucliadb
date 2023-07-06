@@ -24,12 +24,9 @@ from nucliadb.writer.tus import finalize as storage_finalize
 from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb.writer.utilities import get_processing
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
-from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.utilities import (
-    Utility,
     finalize_utilities,
-    set_utility,
+    start_partitioning_utility,
     start_transaction_utility,
     stop_transaction_utility,
 )
@@ -42,13 +39,8 @@ async def initialize():
 
     await start_processing_engine()
 
-    set_utility(
-        Utility.PARTITION,
-        PartitionUtility(
-            partitions=nuclia_settings.nuclia_partitions,
-            seed=nuclia_settings.nuclia_hash_seed,
-        ),
-    )
+    start_partitioning_utility()
+
     await start_transaction_utility(SERVICE_NAME)
     await storage_initialize()
 

@@ -17,16 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.migrator import MigrationContext
+from nucliadb.migrator.context import ExecutionContext
 
 
-async def migrate(context: MigrationContext) -> None:
+async def migrate(context: ExecutionContext) -> None:
     """
     Non-kb type of migration.
     """
 
 
-async def migrate_kb(context: MigrationContext, kbid: str) -> None:
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     """
     Migrate kb.
 

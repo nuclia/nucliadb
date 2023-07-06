@@ -22,13 +22,12 @@ import pytest
 from nucliadb.migrator import migrator
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.settings import Settings
-from nucliadb.migrator.utils import get_latest_version
 
 pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-async def execution_context(redis_config):
+async def execution_context(natsd, gcs_storage, redis_config):
     settings = Settings(redis_url=redis_config)
     context = ExecutionContext(settings)
     await context.initialize()
@@ -44,9 +43,12 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     await execution_context.data_manager.update_kb_info(
         kbid=knowledgebox, current_version=-1
     )
-    await migrator.run(execution_context)
+    # only run first noop migration
+    # other tests can be so slow and cumbersome to maintain
+    await migrator.run(execution_context, target_version=1)
 
     kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
-    assert kb_info.current_version == get_latest_version()  # type: ignore
+    assert kb_info is not None
+    assert kb_info.current_version == 1
     global_info = await execution_context.data_manager.get_global_info()
-    assert global_info.current_version == get_latest_version()
+    assert global_info.current_version == 1

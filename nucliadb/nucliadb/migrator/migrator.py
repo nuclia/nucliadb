@@ -18,12 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from typing import Optional
 
+from nucliadb.migrator.context import ExecutionContext
+from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
-
-from .context import ExecutionContext
-from .models import MigrationContext
-from .utils import get_migrations
 
 migration_observer = metrics.Observer(
     "nucliadb_migrations", labels={"type": "kb", "target_version": ""}
@@ -48,23 +47,18 @@ async def run_kb_migrations(
         )
 
         for migration in migrations:
-            migration_context = MigrationContext(
-                from_version=kb_info.current_version,
-                to_version=migration.version,
-                kv_driver=context.kv_driver,
-            )
             migration_info = {
-                "from_version": migration_context.from_version,
-                "to_version": migration_context.to_version,
+                "from_version": kb_info.current_version,
+                "to_version": migration.version,
                 "kbid": kbid,
             }
 
             try:
                 logger.warning("Migrating KB", extra=migration_info)
                 with migration_observer(
-                    {"type": "kb", "target_version": str(migration_context.to_version)}
+                    {"type": "kb", "target_version": str(migration.version)}
                 ):
-                    await migration.module.migrate_kb(migration_context, kbid)  # type: ignore
+                    await migration.module.migrate_kb(context, kbid)  # type: ignore
                 logger.warning("Finished KB Migration", extra=migration_info)
                 await context.data_manager.update_kb_info(
                     kbid=kbid, current_version=migration.version
@@ -98,21 +92,16 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
     global_info = await context.data_manager.get_global_info()
     migrations = get_migrations(global_info.current_version, to_version=target_version)
     for migration in migrations:
-        migration_context = MigrationContext(
-            from_version=global_info.current_version,
-            to_version=migration.version,
-            kv_driver=context.kv_driver,
-        )
         migration_info = {
-            "from_version": migration_context.from_version,
-            "to_version": migration_context.to_version,
+            "from_version": global_info.current_version,
+            "to_version": migration.version,
         }
         try:
             logger.warning("Migrating", extra=migration_info)
             with migration_observer(
-                {"type": "global", "target_version": str(migration_context.to_version)}
+                {"type": "global", "target_version": str(migration.version)}
             ):
-                await migration.module.migrate(migration_context)  # type: ignore
+                await migration.module.migrate(context)  # type: ignore
             await context.data_manager.update_global_info(
                 current_version=migration.version
             )
@@ -125,13 +114,13 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
     await context.data_manager.update_global_info(target_version=None)
 
 
-async def run(context: ExecutionContext) -> None:
+async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
     async with context.maybe_distributed_lock("migration"):
         # everything should be in a global lock
         # only 1 migration should be running at a time
         global_info = await context.data_manager.get_global_info()
 
-        if global_info.target_version is not None:
+        if target_version is None and global_info.target_version is not None:
             await run_all_kb_migrations(context, global_info.target_version)
             await run_global_migrations(context, global_info.target_version)
             global_info = await context.data_manager.get_global_info()
@@ -139,7 +128,8 @@ async def run(context: ExecutionContext) -> None:
         migrations = get_migrations(global_info.current_version)
 
         if len(migrations) > 0:
-            target_version = migrations[-1].version
+            if target_version is None:
+                target_version = migrations[-1].version
             # schedule all the kbs to run migrations against
             await context.data_manager.schedule_all_kbs(target_version)
             await context.data_manager.update_global_info(target_version=target_version)
