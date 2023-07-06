@@ -46,15 +46,6 @@ impl NodeReaderService {
         Self::default()
     }
 
-    /// Stop all shards on memory
-    #[tracing::instrument(skip_all)]
-    pub fn shutdown(&mut self) {
-        for (shard_id, shard) in &mut self.cache {
-            debug!("Stopping shard {}", shard_id);
-            ShardReaderService::stop(shard);
-        }
-    }
-
     /// Load all shards on the shards memory structure
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> NodeResult<()> {

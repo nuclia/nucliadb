@@ -380,12 +380,12 @@ class SearchParamDefaults:
     fields = ParamDefault(
         default=[],
         title="Fields",
-        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/query/#search-in-a-specific-field",  # noqa: E501
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/docs/using/search/#search-in-a-specific-field",  # noqa: E501
     )
     filters = ParamDefault(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
     )
     resource_filters = ParamDefault(
         default=[],
@@ -395,7 +395,7 @@ class SearchParamDefaults:
     faceted = ParamDefault(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/query/#filters",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
         max_items=50,
     )
     min_score = ParamDefault(
@@ -620,11 +620,12 @@ class BaseSearchRequest(BaseModel):
                     f"Facet {next_facet} is already present in facets. Faceted list must be unique."
                 )
             if next_facet.startswith(facet):
-                raise ValueError(
-                    "Nested facets are not allowed: {child} is a child of {parent}".format(
-                        child=next_facet, parent=facet
+                if next_facet.replace(facet, "").startswith("/"):
+                    raise ValueError(
+                        "Nested facets are not allowed: {child} is a child of {parent}".format(
+                            child=next_facet, parent=facet
+                        )
                     )
-                )
             facet = next_facet
         return facets
 
@@ -644,11 +645,18 @@ class Message(BaseModel):
 
 
 class ChatModel(BaseModel):
-    question: str
+    question: str = Field(description="Question to ask the generative model")
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    context: List[Message] = []
+    context: List[Message] = Field(
+        [], description="The information retrieval context for the current question"
+    )
+    conversation: List[Message] = Field([], description="The chat conversation history")
+    truncate: bool = Field(
+        True,
+        description="Truncate the chat context in case it doesn't fit the generative input",
+    )
 
 
 class RephraseModel(BaseModel):

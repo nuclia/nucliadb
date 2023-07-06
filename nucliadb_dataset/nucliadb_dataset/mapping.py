@@ -23,6 +23,7 @@ from typing import Any, TypeVar
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
+    ImageClassificationBatch,
     ParagraphClassificationBatch,
     SentenceClassificationBatch,
     TokenClassificationBatch,
@@ -73,16 +74,31 @@ def batch_to_token_classification_arrow(schema: pa.schema):
 
 
 def batch_to_text_classification_normalized_arrow(batch: SentenceClassificationBatch):
-    X = []
-    Y = []
+    TEXT = []
+    LABELS = []
     for data in batch.data:
         batch_labels = [f"{label.labelset}/{label.label}" for label in data.labels]
         for sentence in data.text:
-            X.append(sentence)
-            Y.append(batch_labels)
-    if len(X):
-        pa_data = [pa.array(X), pa.array(Y)]
+            TEXT.append(sentence)
+            LABELS.append(batch_labels)
+    if len(TEXT):
+        pa_data = [pa.array(TEXT), pa.array(LABELS)]
         output_batch = pa.record_batch(pa_data, names=["text", "labels"])
+    else:
+        output_batch = None
+    return output_batch
+
+
+def batch_to_image_classification_arrow(batch: ImageClassificationBatch):
+    IMAGE = []
+    SELECTION = []
+    for data in batch.data:
+        IMAGE.append(data.page_uri)
+        SELECTION.append(data.selections)
+
+    if len(IMAGE):
+        pa_data = [pa.array(IMAGE), pa.array(SELECTION)]
+        output_batch = pa.record_batch(pa_data, names=["image", "selection"])
     else:
         output_batch = None
     return output_batch

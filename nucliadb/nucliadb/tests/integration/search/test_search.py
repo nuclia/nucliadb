@@ -1396,26 +1396,48 @@ async def test_search_min_score(
     assert resp.json()["sentences"]["min_score"] == 0.5
 
 
-@pytest.mark.parametrize("endpoint", ["find", "search"])
+@pytest.mark.parametrize(
+    "facets,valid,error_message",
+    [
+        (
+            [f"/a/{i}" for i in range(51)],
+            False,
+            "ensure this value has at most 50 items",
+        ),
+        (
+            ["/a/b", "/a/b"],
+            False,
+            "Facet /a/b is already present in facets. Faceted list must be unique.",
+        ),
+        (
+            ["/a/b", "/a/b/c"],
+            False,
+            "Nested facets are not allowed: /a/b/c is a child of /a/b",
+        ),
+        (["/a/b", "/c/d/e", "/f/g"], True, ""),
+        (["/a/b", "/a/be"], True, ""),
+        (["/a/b", "/a/be"], True, ""),
+    ],
+)
 async def test_facets_validation(
     nucliadb_reader: AsyncClient,
     knowledgebox,
-    endpoint,
+    facets,
+    valid,
+    error_message,
 ):
-    invalid_facets = ["/a/b", "/a/b/c"]
-    valid_facets = ["/a/b", "/c/d/e", "/f/g"]
-
     kbid = knowledgebox
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/{endpoint}", params={"faceted": invalid_facets}
-    )
-    assert resp.status_code == 422
-    assert (
-        resp.json()["detail"][0]["msg"]
-        == "Nested facets are not allowed: /a/b/c is a child of /a/b"
-    )
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/{endpoint}", params={"faceted": valid_facets}
-    )
-    assert resp.status_code == 200
+    for endpoint in ("find", "search"):
+        for method in ("post", "get"):
+            func = getattr(nucliadb_reader, method)
+            kwargs = (
+                {"params": {"faceted": facets}}
+                if method == "get"
+                else {"json": {"faceted": facets}}
+            )
+            resp = await func(f"/kb/{kbid}/{endpoint}", **kwargs)
+            if valid:
+                assert resp.status_code == 200
+            else:
+                assert resp.status_code == 422
+                assert error_message == resp.json()["detail"][0]["msg"]

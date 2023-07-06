@@ -217,6 +217,14 @@ impl RelationsReaderService {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
         }))
     }
+    #[tracing::instrument(skip_all)]
+    pub fn reload(&self) {
+        let _v = self
+            .index
+            .start_reading()
+            .and_then(|reader| reader.reload(&self.rmode))
+            .map_err(|err| error!("Reload error {err:?}"));
+    }
 }
 impl RelationReader for RelationsReaderService {
     #[tracing::instrument(skip_all)]
@@ -312,11 +320,6 @@ impl ReaderChild for RelationsReaderService {
     type Request = RelationSearchRequest;
     type Response = RelationSearchResponse;
     #[tracing::instrument(skip_all)]
-    fn stop(&self) -> NodeResult<()> {
-        debug!("Stopping relation reader Service");
-        Ok(())
-    }
-    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
 
@@ -350,14 +353,6 @@ impl ReaderChild for RelationsReaderService {
         metrics.record_request_time(metric, took);
 
         Ok(ids)
-    }
-    #[tracing::instrument(skip_all)]
-    fn reload(&self) {
-        let _v = self
-            .index
-            .start_reading()
-            .and_then(|reader| reader.reload(&self.rmode))
-            .map_err(|err| error!("Reload error {err:?}"));
     }
 }
 

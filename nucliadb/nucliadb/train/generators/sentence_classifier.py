@@ -31,7 +31,7 @@ from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache
+from nucliadb.train.generators.utils import get_resource_from_cache_or_db
 
 
 async def get_sentences(kbid: str, result: str) -> List[str]:
@@ -42,7 +42,7 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
         rid, field_type, field, _ = result.split("/")
         split = None
 
-    orm_resource = await get_resource_from_cache(kbid, rid)
+    orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
         logger.error(f"{rid} does not exist on DB")

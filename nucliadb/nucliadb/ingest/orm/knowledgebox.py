@@ -36,7 +36,6 @@ from nucliadb_protos.resources_pb2 import Basic
 from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
 from nucliadb.common.cluster.manager import get_index_node, load_active_nodes
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -133,13 +132,13 @@ class KnowledgeBox:
             slug = pbconfig.slug
 
         # Delete main anchor
-        subtxn = await txn.driver.begin()
-        key_match = KB_SLUGS.format(slug=slug)
-        await subtxn.delete(key_match)
+        async with txn.driver.transaction() as subtxn:
+            key_match = KB_SLUGS.format(slug=slug)
+            await subtxn.delete(key_match)
 
-        when = datetime.now().isoformat()
-        await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
-        await subtxn.commit()
+            when = datetime.now().isoformat()
+            await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
+            await subtxn.commit()
 
         audit_util = get_audit()
         if audit_util is not None:
@@ -379,15 +378,16 @@ class KnowledgeBox:
             shards_obj = writer_pb2.Shards()
             shards_obj.ParseFromString(payload)  # type: ignore
 
-            if cluster_settings.standalone_mode:
-                await load_active_nodes()
+            await load_active_nodes()
 
             for shard in shards_obj.shards:
                 # Delete the shard on nodes
                 for replica in shard.replicas:
                     node = get_index_node(replica.node)
                     if node is None:
-                        logger.info(f"No node {replica.node} found lets continue")
+                        logger.error(
+                            f"No node {replica.node} found lets continue. Some shards may stay orphaned"
+                        )
                         continue
                     try:
                         await node.delete_shard(replica.shard.id)
@@ -409,9 +409,8 @@ class KnowledgeBox:
     ):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
-            txn = await driver.begin()
-            all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
-            await txn.abort()
+            async with driver.transaction() as txn:
+                all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
 
             if len(all_keys) == 0:
                 break
@@ -419,10 +418,10 @@ class KnowledgeBox:
             # We commit deletions in chunks because otherwise
             # tikv complains if there is too much data to commit
             for chunk_of_keys in chunker(all_keys, chunk_size):
-                txn = await driver.begin()
-                for key in chunk_of_keys:
-                    await txn.delete(key)
-                await txn.commit()
+                async with driver.transaction() as txn:
+                    for key in chunk_of_keys:
+                        await txn.delete(key)
+                    await txn.commit()
 
     async def get_resource_shard(
         self, shard_id: str

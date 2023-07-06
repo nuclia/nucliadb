@@ -25,6 +25,9 @@ from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb.train.generators.field_classifier import (
     generate_field_classification_payloads,
 )
+from nucliadb.train.generators.image_classifier import (
+    generate_image_classification_payloads,
+)
 from nucliadb.train.generators.paragraph_classifier import (
     generate_paragraph_classification_payloads,
 )
@@ -93,6 +96,14 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             kbid, trainset, node, shard_replica_id
         ):
             payload = sentence_data.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload
+
+    if trainset.type == TaskType.IMAGE_CLASSIFICATION:
+        async for image_data in generate_image_classification_payloads(
+            kbid, trainset, node, shard_replica_id
+        ):
+            payload = image_data.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 

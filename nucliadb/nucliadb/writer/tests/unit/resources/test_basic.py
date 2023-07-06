@@ -20,7 +20,7 @@
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.writer.resource.basic import compute_title, parse_icon
+from nucliadb.writer.resource.basic import compute_title, parse_icon_on_create
 from nucliadb_models.common import File
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
@@ -75,7 +75,7 @@ def test_compute_title(payload, resource_uuid, expected_title):
         (get_resource_payload(), "application/generic"),
     ],
 )
-def test_parse_icon(payload, expected_icon):
+def test_parse_icon_on_create(payload, expected_icon):
     message = BrokerMessage()
-    parse_icon(message, payload)
+    parse_icon_on_create(message, payload)
     assert message.basic.icon == expected_icon

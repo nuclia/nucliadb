@@ -60,14 +60,6 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn shutdown(&self) {
-        for (shard_id, shard) in self.cache.iter() {
-            debug!("Stopping shard {}", shard_id);
-            shard.stop();
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> NodeResult<()> {
         let shards_path = env::shards_path();
         debug!("Recovering shards from {shards_path:?}...");

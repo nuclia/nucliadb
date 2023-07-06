@@ -86,9 +86,15 @@ pub struct Index {
     state: RwLock<State>,
     date: RwLock<Version>,
     location: PathBuf,
-    dimension_used: Option<u64>,
+    dimension: RwLock<Option<u64>>,
 }
 impl Index {
+    fn get_dimension(&self) -> Option<u64> {
+        *self.dimension.read().unwrap_or_else(|e| e.into_inner())
+    }
+    fn set_dimension(&self, dimension: Option<u64>) {
+        *self.dimension.write().unwrap_or_else(|e| e.into_inner()) = dimension;
+    }
     fn read_state(&self) -> RwLockReadGuard<'_, State> {
         self.state.read().unwrap_or_else(|e| e.into_inner())
     }
@@ -102,17 +108,20 @@ impl Index {
         self.date.write().unwrap_or_else(|e| e.into_inner())
     }
     fn update(&self, lock: &Lock) -> VectorR<()> {
+        let location = self.location();
         let disk_v = fs_state::crnt_version(lock)?;
         let date = self.read_date();
         if disk_v > *date {
             mem::drop(date);
-            let new_state = fs_state::load_state(lock)?;
+            let new_state: State = fs_state::load_state(lock)?;
+            let new_dimension = new_state.stored_len(location)?;
             let mut state = self.write_state();
             let mut date = self.write_date();
             *state = new_state;
             *date = disk_v;
             mem::drop(date);
             mem::drop(state);
+            self.set_dimension(new_dimension);
         }
         Ok(())
     }
@@ -137,8 +146,8 @@ impl Index {
         })?;
         let index = Index {
             metadata,
-            dimension_used,
             work_flag: MergerWriterSync::new(),
+            dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
             date: RwLock::new(date),
             location: path.to_path_buf(),
@@ -159,8 +168,8 @@ impl Index {
         let date = fs_state::crnt_version(&lock)?;
         let index = Index {
             metadata,
-            dimension_used: None,
             work_flag: MergerWriterSync::new(),
+            dimension: RwLock::new(None),
             state: RwLock::new(state),
             date: RwLock::new(date),
             location: path.to_path_buf(),
@@ -177,7 +186,7 @@ impl Index {
     pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<Neighbour>> {
         let state = self.read_state();
         let given_len = request.get_query().len() as u64;
-        match self.dimension_used {
+        match self.get_dimension() {
             Some(expected) if expected != given_len => Err(VectorErr::InconsistentDimensions),
             None => Ok(Vec::with_capacity(0)),
             Some(_) => state.search(&self.location, request, self.metadata.similarity),
@@ -216,13 +225,12 @@ impl Index {
         let Some(new_dp_vector_len) = dp.stored_len() else {
             return Ok(());
         };
-        let Some(state_vector_len) = self.dimension_used else {
+        let Some(state_vector_len) = self.get_dimension() else {
             // There is not a len in the state, therefore adding the datapoint can not
             // create a merging requirement.
-            let dp_dimension = dp.stored_len();
+            self.set_dimension(dp.stored_len());
             let _ = state.add(dp);
             std::mem::drop(state);
-            self.dimension_used = dp_dimension;
             return Ok(());
         };
         if state_vector_len != new_dp_vector_len {

@@ -54,12 +54,6 @@ impl FieldWriter for TextWriterService {}
 
 impl WriterChild for TextWriterService {
     #[tracing::instrument(skip_all)]
-    fn stop(&mut self) -> NodeResult<()> {
-        debug!("Stopping Text Service");
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
 

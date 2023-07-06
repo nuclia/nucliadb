@@ -19,8 +19,6 @@
 #
 from typing import Optional
 
-import tiktoken
-
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -28,12 +26,6 @@ from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb_models.search import SCORE_TYPE, KnowledgeboxFindResults
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
-
-GPT_4_ENC = tiktoken.encoding_for_model("gpt-4")
-
-# less than real because of prompt text size, understanding api isn't truncating
-# and hard fails when we're over the limit
-MAX_TOKENS = 4000 * 0.85
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
@@ -123,27 +115,25 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
     storage = await get_storage()
     # ordered dict that prevents duplicates pulled in through conversation expansion
     output = {}
-    words = 0
     async with driver.transaction() as txn:
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
             text = paragraph.text.strip()
-            words += len(GPT_4_ENC.encode(text))
-            if words >= MAX_TOKENS:
-                break
-
             output[paragraph.id] = text
 
+            # If the paragraph is a conversation and it matches semantically, we assume we
+            # have matched with the question, therefore try to include the answer to the
+            # context by pulling the next few messages of the conversation field
             rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
-            if field_type == "c" and paragraph.score_type == SCORE_TYPE.VECTOR:
+            if field_type == "c" and paragraph.score_type in (
+                SCORE_TYPE.VECTOR,
+                SCORE_TYPE.BOTH,
+            ):
                 expanded_msgs = await get_expanded_conversation_messages(
                     kb=kb, rid=rid, field_id=field_id, mident=mident
                 )
                 for msg in expanded_msgs:
                     text = msg.content.text.strip()
-                    words += len(GPT_4_ENC.encode(text))
-                    if words >= MAX_TOKENS:
-                        break
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
 

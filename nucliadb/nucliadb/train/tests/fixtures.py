@@ -60,6 +60,15 @@ async def train_rest_api(nucliadb: Settings):  # type: ignore
         yield client
 
 
+@pytest.fixture(scope="function")
+async def writer_rest_api(nucliadb: Settings):  # type: ignore
+    async with aiohttp.ClientSession(
+        headers={"X-NUCLIADB-ROLES": "WRITER"},
+        base_url=f"http://localhost:{nucliadb.http_port}",
+    ) as client:
+        yield client
+
+
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(

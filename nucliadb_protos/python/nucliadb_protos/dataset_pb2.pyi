@@ -28,6 +28,7 @@ class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumT
     PARAGRAPH_CLASSIFICATION: _TaskType.ValueType  # 1
     SENTENCE_CLASSIFICATION: _TaskType.ValueType  # 2
     TOKEN_CLASSIFICATION: _TaskType.ValueType  # 3
+    IMAGE_CLASSIFICATION: _TaskType.ValueType  # 4
 
 class TaskType(_TaskType, metaclass=_TaskTypeEnumTypeWrapper):
     """Train API V2"""
@@ -36,6 +37,7 @@ FIELD_CLASSIFICATION: TaskType.ValueType  # 0
 PARAGRAPH_CLASSIFICATION: TaskType.ValueType  # 1
 SENTENCE_CLASSIFICATION: TaskType.ValueType  # 2
 TOKEN_CLASSIFICATION: TaskType.ValueType  # 3
+IMAGE_CLASSIFICATION: TaskType.ValueType  # 4
 global___TaskType = TaskType
 
 class _LabelFrom:
@@ -235,3 +237,37 @@ class TokenClassificationBatch(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
 
 global___TokenClassificationBatch = TokenClassificationBatch
+
+@typing_extensions.final
+class ImageClassification(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SELECTIONS_FIELD_NUMBER: builtins.int
+    PAGE_URI_FIELD_NUMBER: builtins.int
+    selections: builtins.str
+    page_uri: builtins.str
+    def __init__(
+        self,
+        *,
+        selections: builtins.str = ...,
+        page_uri: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["page_uri", b"page_uri", "selections", b"selections"]) -> None: ...
+
+global___ImageClassification = ImageClassification
+
+@typing_extensions.final
+class ImageClassificationBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ImageClassification]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___ImageClassification] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
+
+global___ImageClassificationBatch = ImageClassificationBatch

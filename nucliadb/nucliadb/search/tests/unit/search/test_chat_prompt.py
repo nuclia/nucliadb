@@ -185,30 +185,3 @@ async def test_format_chat_prompt_content(kb):
         assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
             [result_text, result_text]
         )
-
-
-async def test_format_chat_prompt_content_truncates(kb):
-    result_text = " ".join(["text"] * 100)
-    words = 0
-    resources = {}
-    index = 1
-    while True:
-        resources[f"id{index}"] = _create_find_result(
-            f"id{index}/c/conv/ident", result_text, SCORE_TYPE.BM25
-        )
-        words += len(chat_prompt.GPT_4_ENC.encode(result_text))
-        if words > chat_prompt.MAX_TOKENS:
-            break
-        index += 1
-
-    with patch("nucliadb.search.search.chat.prompt.get_driver"), patch(
-        "nucliadb.search.search.chat.prompt.get_storage"
-    ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
-        prompt_result = await chat_prompt.format_chat_prompt_content(
-            "kbid",
-            KnowledgeboxFindResults(facets={}, resources=resources, min_score=-1),
-        )
-
-    assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
-        [result_text] * (index - 2)
-    )

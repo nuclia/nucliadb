@@ -41,6 +41,7 @@ from google.cloud import storage  # type: ignore
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
+    ImageClassificationBatch,
     ParagraphClassificationBatch,
     SentenceClassificationBatch,
     TaskType,
@@ -49,6 +50,7 @@ from nucliadb_protos.dataset_pb2 import (
 )
 
 from nucliadb_dataset.mapping import (
+    batch_to_image_classification_arrow,
     batch_to_text_classification_arrow,
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
@@ -76,6 +78,7 @@ class Task(str, Enum):
     FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
     SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
     TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
+    IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
 
 
 class NucliaDataset(object):
@@ -157,11 +160,11 @@ class NucliaDBDataset(NucliaDataset):
             elif Task.SENTENCE_CLASSIFICATION == task:
                 trainset = TrainSet(type=TaskType.SENTENCE_CLASSIFICATION)
                 trainset.filter.labels.extend(labels)
-
             elif Task.TOKEN_CLASSIFICATION == task:
                 trainset = TrainSet(type=TaskType.TOKEN_CLASSIFICATION)
                 trainset.filter.labels.extend(labels)
-
+            elif Task.IMAGE_CLASSIFICATION == task:
+                trainset = TrainSet(type=TaskType.IMAGE_CLASSIFICATION)
             else:
                 raise KeyError("Not a valid task")
         elif trainset is None and task is None:
@@ -186,6 +189,9 @@ class NucliaDBDataset(NucliaDataset):
 
         if self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
             self._configure_sentence_classification()
+
+        if self.trainset.type == TaskType.IMAGE_CLASSIFICATION:
+            self._configure_image_classification()
 
     def _configure_sentence_classification(self):
         self.labels = self.client.get_labels()
@@ -288,6 +294,22 @@ class NucliaDBDataset(NucliaDataset):
             )
         )
 
+    def _configure_image_classification(self):
+        self._set_mappings(
+            [
+                bytes_to_batch(ImageClassificationBatch),
+                batch_to_image_classification_arrow,
+            ]
+        )
+        self._set_schema(
+            pa.schema(
+                [
+                    pa.field("image", pa.string()),
+                    pa.field("selection", pa.string()),
+                ]
+            )
+        )
+
     def _map(self, batch: Any):
         for func in self.mappings:
             batch = func(batch)
@@ -303,6 +325,7 @@ class NucliaDBDataset(NucliaDataset):
         """
         Get expected number of partitions from a live NucliaDB
         """
+        # XXX Bad pattern: using `client` attributes objects instead of methods
         partitions = self.client.train_session.get(f"/trainset").json()
         if len(partitions["partitions"]) == 0:
             raise KeyError("There is no partitions")

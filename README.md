@@ -18,9 +18,9 @@
 <h3 align="center">The AI Search Database.</h3>
 
 <h4 align="center">
-  <a href="https://docs.nuclia.dev/docs/nucliadb/intro">DB Quickstart</a> |
-  <a href="https://docs.nuclia.dev/docs/intro">Nuclia Docs</a> |
-  <a href="docs/">NuclicDB Developer docs</a> |
+  <a href="https://docs.nuclia.dev/docs/docs/nucliadb/intro">DB Quickstart</a> |
+  <a href="https://docs.nuclia.dev/docs/about/nuclia">Nuclia Docs</a> |
+  <a href="docs/">NucliaDB Developer docs</a> |
   <a href="https://discord.gg/AgevjFJUvk">Chat</a>
 </h4>
 
@@ -67,9 +67,9 @@ and inference. We do all the hard work for you.
 Trying NucliaDB is super easy! You can extend your knowledge with the
 following readings:
 
-- [Quick start!](https://docs.nuclia.dev/docs/nucliadb/intro)
-- Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/nucliadb/basics) section
-- [Upload a file](https://docs.nuclia.dev/docs/quick-start/push)
+- [Quick start!](https://docs.nuclia.dev/docs/docs/nucliadb/intro)
+- Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/docs/nucliadb/basics) section
+- [Upload a file](https://docs.nuclia.dev/docs/docs/quick-start/push)
 
 # 💬 Community
 
