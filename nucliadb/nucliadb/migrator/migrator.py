@@ -68,8 +68,6 @@ async def run_kb_migrations(
                 logger.exception("Failed to migrate KB", extra=migration_info)
                 raise
 
-        await context.data_manager.delete_kb_migration(kbid=kbid)
-
         refreshed_kb_info = await context.data_manager.get_kb_info(kbid=kbid)
         if refreshed_kb_info is None:
             logger.warning(
@@ -77,6 +75,8 @@ async def run_kb_migrations(
             )
             return
         assert refreshed_kb_info.current_version == target_version
+
+        await context.data_manager.delete_kb_migration(kbid=kbid)
 
 
 async def run_all_kb_migrations(context: ExecutionContext, target_version: int) -> None:
@@ -120,7 +120,7 @@ async def run(context: ExecutionContext, target_version: Optional[int] = None) -
         # only 1 migration should be running at a time
         global_info = await context.data_manager.get_global_info()
 
-        if target_version is None and global_info.target_version is not None:
+        if target_version is None and global_info.target_version not in (None, 0):
             await run_all_kb_migrations(context, global_info.target_version)
             await run_global_migrations(context, global_info.target_version)
             global_info = await context.data_manager.get_global_info()
