@@ -777,6 +777,7 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
+            await self.maybe_update_title_metadata(link_extracted_data)
 
         for file_extracted_data in message.file_extracted_data:
             await self._apply_file_extracted_data(file_extracted_data)
@@ -828,12 +829,17 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
-        if maybe_update_basic_title(self.basic, link_extracted_data.title):
-            await self.update_title_extracted_metadata(link_extracted_data.title)
-
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
 
-    async def update_title_extracted_metadata(self, title: str):
+    async def maybe_update_title_metadata(self, link_extracted_data: LinkExtractedData):
+        assert self.basic is not None
+        if not link_extracted_data.title:
+            return
+        if not (self.basic.title.startswith("http") or self.basic.title == ""):
+            return
+
+        title = link_extracted_data.title
+        self.basic.title = title
         # Extracted text
         field = await self.get_field("title", FieldType.GENERIC, load=False)
         etw = ExtractedTextWrapper()
@@ -1432,15 +1438,6 @@ def maybe_update_basic_thumbnail(
         return False
     basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
     return True
-
-
-def maybe_update_basic_title(basic: PBBasic, new_title: str) -> bool:
-    if new_title == "":
-        return False
-    if basic.title.startswith("http") or basic.title == "":
-        basic.title = new_title
-        return True
-    return False
 
 
 def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
