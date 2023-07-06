@@ -98,7 +98,9 @@ async fn main() -> anyhow::Result<()> {
     loop {
         tokio::select! {
             _ = termination.recv() => {
-                node.shutdown().await?;
+                if let Err(e) = node.shutdown().await {
+                    error!("Error while shutting down node: {e}");
+                }
                 break
             },
             _ = sleep(arg.update_interval) => {
