@@ -37,5 +37,6 @@ def fastapi_query(param: ParamDefault, default: Optional[Any] = _NOT_SET, **kw) 
         title=param.title,
         description=param.description,
         gt=param.gt,
+        max_length=param.max_items,
         **kw
     )
