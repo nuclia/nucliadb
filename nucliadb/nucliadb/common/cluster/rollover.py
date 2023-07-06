@@ -341,6 +341,14 @@ async def rollover_shards(app_context: ApplicationContext, kbid: str) -> None:
     - Cut over replicas to new shards
     - Validate that all resources are in the new shards
     """
+    node_ready_checks = 0
+    while len(cluster_manager.INDEX_NODES) == 0:
+        if node_ready_checks > 10:
+            raise Exception("No index nodes available")
+        logger.warning("Waiting for index nodes to be available")
+        await asyncio.sleep(1)
+        node_ready_checks += 1
+
     logger.warning("Rolling over shards", extra={"kbid": kbid})
 
     await create_rollover_shards(app_context, kbid)
