@@ -45,6 +45,9 @@ class UnexpectedRolloverError(Exception):
 async def create_rollover_shards(
     app_context: ApplicationContext, kbid: str
 ) -> writer_pb2.Shards:
+    """
+    Creates shards to to used for a rollover operation
+    """
     logger.warning("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
     cluster_datamanager = ClusterDataManager(app_context.kv_driver)
@@ -130,6 +133,9 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
 async def index_rollover_shards(
     app_context: ApplicationContext, kbid: str
 ) -> dict[str, tuple[str, datetime]]:
+    """
+    Indexes all data in a kb in rollover shards
+    """
     logger.warning("Indexing rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
@@ -201,6 +207,9 @@ async def index_rollover_shards(
 
 
 async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
+    """
+    Swaps our the current active shards for a knowledgebox.
+    """
     logger.warning("Cutting over shards", extra={"kbid": kbid})
     cluster_datamanager = ClusterDataManager(app_context.kv_driver)
     sm = app_context.shard_manager
@@ -222,6 +231,14 @@ async def validate_indexed_data(
     kbid: str,
     indexed_resources: dict[str, tuple[str, datetime]],
 ) -> list[str]:
+    """
+    Goes through all the resources in a knowledgebox and validates it
+    against the data that was indexed during the rollover.
+
+    If any resource is missing, it will be indexed again.
+
+    If a resource was removed during the rollover, it will be removed as well.
+    """
     logger.warning("Validating indexed data", extra={"kbid": kbid})
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
