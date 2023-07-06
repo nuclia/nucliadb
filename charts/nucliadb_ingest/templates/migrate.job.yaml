@@ -36,7 +36,7 @@ spec:
         command: ["/bin/bash", "-c"]
         # cause other containers to exit when migrate command is done
         args:
-        - "nucliadb-migrate && pkill cluster_manager || pkill cluster_manager"
+        - "nucliadb-migrate && pkill cluster_manager || (pkill cluster_manager; exit 1)"
         envFrom:
         - configMapRef:
             name: nucliadb-config
