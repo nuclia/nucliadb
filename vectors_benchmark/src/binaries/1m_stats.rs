@@ -103,8 +103,11 @@ fn main() {
     let now = SystemTime::now();
     reader.search(&request, &lock).unwrap();
     stats.tagged_time += now.elapsed().unwrap().as_millis();
+    std::mem::drop(lock);
     println!("Cleaning garbage..");
-    writer.collect_garbage(&lock).unwrap();
+    let exclusive = writer.get_elock().unwrap();
+    writer.collect_garbage(&exclusive).unwrap();
+    std::mem::drop(exclusive);
     println!("Garbage cleaned");
     println!("{stats}");
 }

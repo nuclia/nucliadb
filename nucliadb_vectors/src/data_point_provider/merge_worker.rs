@@ -108,20 +108,14 @@ impl Worker {
         let lock = fs_state::exclusive_lock(subscriber)?;
         let mut state: State = fs_state::load_state(&lock)?;
         let creates_work = state.replace_work_unit(new_dp);
+        std::mem::drop(work_flag);
+
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
         info!("Merge on {subscriber:?}:\n{report}");
         if creates_work {
             self.notify_merger();
         }
-
-        info!("Removing deprecated datapoints");
-        ids.into_iter()
-            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
-            .filter(|(.., r)| r.is_err())
-            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
-        std::mem::drop(work_flag);
-
         info!("Merge request completed");
         Ok(())
     }

@@ -195,7 +195,7 @@ impl Index {
     pub fn no_nodes(&self, _: &Lock) -> usize {
         self.read_state().no_nodes()
     }
-    pub fn collect_garbage(&self, _: &Lock) -> VectorR<()> {
+    pub fn collect_garbage(&self, _: &ELock) -> VectorR<()> {
         use std::collections::HashSet;
         let work_flag = self.work_flag.try_to_start_working()?;
         let state = self.read_state();
@@ -281,7 +281,7 @@ mod test {
         for _ in 0..10 {
             DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
         }
-        let lock = index.get_slock()?;
+        let lock = index.get_elock()?;
         index.collect_garbage(&lock)?;
         let no_entries = std::fs::read_dir(&vectors_path)?.count();
         assert_eq!(no_entries, empty_no_entries);
