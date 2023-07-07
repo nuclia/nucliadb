@@ -318,7 +318,8 @@ async def validate_indexed_data(
             app_context, kbid, resource_id, shard
         )
         if resource_index_message is not None:
-            del indexed_resources[resource_id]
+            if resource_id in indexed_resources:
+                del indexed_resources[resource_id]
             repaired_resources.append(resource_id)
 
     # any left overs should be deleted
