@@ -19,6 +19,8 @@
 #
 from typing import AsyncGenerator, Optional
 
+import backoff
+
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KB_RESOURCE_SHARD
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -35,17 +37,28 @@ class ResourcesDataManager:
         self.driver = driver
         self.storage = storage
 
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
     async def iterate_resource_ids(self, kbid: str) -> AsyncGenerator[str, None]:
+        """
+        Currently, the implementation of this is optimizing for reducing
+        how long a transaction will be open since the caller controls
+        how long each item that is yielded will be processed.
+        """
+        all_slugs = []
         async with self.driver.transaction() as txn:
-            keys_generator = txn.keys(
+            async for key in txn.keys(
                 match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
-            )
-            async for key in keys_generator:
+            ):
                 slug = key.split("/")[-1]
-                rid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
-                if rid is not None:
-                    yield rid.decode()
+                all_slugs.append(slug)
 
+        for slug in all_slugs:
+            async with self.driver.transaction() as txn:
+                rid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
+            if rid is not None:
+                yield rid.decode()
+
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
     async def get_resource_shard_id(self, kbid: str, rid: str) -> Optional[str]:
         async with self.driver.transaction() as txn:
             shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
@@ -54,6 +67,7 @@ class ResourcesDataManager:
             else:
                 return None
 
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
     async def get_resource(self, kbid: str, rid: str) -> Optional[ResourceORM]:
         """
         Not ideal to return Resource type here but refactoring would
@@ -65,6 +79,7 @@ class ResourcesDataManager:
             kb_orm = KnowledgeBoxORM(txn, self.storage, kbid)
             return await kb_orm.get(rid)
 
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
     async def get_resource_index_message(
         self, kbid: str, rid: str
     ) -> Optional[noderesources_pb2.Resource]:

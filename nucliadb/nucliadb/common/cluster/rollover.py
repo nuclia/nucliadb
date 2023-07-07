@@ -23,11 +23,13 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+import backoff
+
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
-from nucliadb_protos import writer_pb2
+from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 
@@ -132,6 +134,38 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
         await asyncio.sleep(2)
 
 
+@backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+async def index_resource(
+    app_context: ApplicationContext,
+    kbid: str,
+    resource_id: str,
+    shard: writer_pb2.ShardObject,
+) -> Optional[noderesources_pb2.Resource]:
+    sm = app_context.shard_manager
+    partitioning = app_context.partitioning
+    resources_datamanager = ResourcesDataManager(
+        app_context.kv_driver, app_context.blob_storage
+    )
+
+    resource_index_message = await resources_datamanager.get_resource_index_message(
+        kbid, resource_id
+    )
+    if resource_index_message is None:
+        logger.warning(
+            "Resource index message not found while indexing, skipping",
+            extra={"kbid": kbid, "resource_id": resource_id},
+        )
+        return None
+    logger.warning(
+        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
+    )
+    partition = partitioning.generate_partition(kbid, resource_id)
+    await sm.add_resource(
+        shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid
+    )
+    return resource_index_message
+
+
 async def index_rollover_shards(
     app_context: ApplicationContext, kbid: str
 ) -> dict[str, tuple[str, datetime]]:
@@ -139,8 +173,6 @@ async def index_rollover_shards(
     Indexes all data in a kb in rollover shards
     """
     logger.warning("Indexing rollover shards", extra={"kbid": kbid})
-    sm = app_context.shard_manager
-    partitioning = app_context.partitioning
 
     resources_datamanager = ResourcesDataManager(
         app_context.kv_driver, app_context.blob_storage
@@ -152,7 +184,7 @@ async def index_rollover_shards(
         raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
 
     indexed_resources = {}
-    wait_index_batch = []
+    wait_index_batch: list[writer_pb2.ShardObject] = []
     # now index on all new shards only
     async for resource_id in resources_datamanager.iterate_resource_ids(kbid):
         shard_id = await resources_datamanager.get_resource_shard_id(kbid, resource_id)
@@ -173,22 +205,11 @@ async def index_rollover_shards(
                 f"Shard {shard_id} not found. Was a new one created during migration?"
             )
 
-        resource_index_message = await resources_datamanager.get_resource_index_message(
-            kbid, resource_id
+        resource_index_message = await index_resource(
+            app_context, kbid, resource_id, shard
         )
         if resource_index_message is None:
-            logger.warning(
-                "Resource index message not found while indexing, skipping",
-                extra={"kbid": kbid, "resource_id": resource_id},
-            )
             continue
-        logger.warning(
-            "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
-        )
-        partition = partitioning.generate_partition(kbid, resource_id)
-        await sm.add_resource(
-            shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid
-        )
 
         indexed_resources[resource_id] = (
             shard_id,
@@ -293,24 +314,13 @@ async def validate_indexed_data(
             del indexed_resources[resource_id]
             continue
 
-        resource_index_message = await resources_datamanager.get_resource_index_message(
-            kbid, resource_id
+        resource_index_message = await index_resource(
+            app_context, kbid, resource_id, shard
         )
-
-        if resource_index_message is None:
-            logger.warning(
-                "Resource not found while indexing, skipping",
-                extra={"kbid": kbid, "resource_id": resource_id},
-            )
-            continue
-        logger.warning(
-            "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
-        )
-        partition = partitioning.generate_partition(kbid, resource_id)
-        await sm.add_resource(
-            shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid
-        )
-        repaired_resources.append(resource_id)
+        if resource_index_message is not None:
+            if resource_id in indexed_resources:
+                del indexed_resources[resource_id]
+            repaired_resources.append(resource_id)
 
     # any left overs should be deleted
     for resource_id, (shard_id, _) in indexed_resources.items():

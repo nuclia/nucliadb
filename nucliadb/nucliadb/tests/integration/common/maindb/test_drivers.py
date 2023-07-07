@@ -91,7 +91,7 @@ async def driver_basic(driver):
     await txn.abort()
 
     current_internal_kbs_keys = set()
-    async for key in driver.keys("/internal/kbs"):
+    async for key in driver.keys("/internal/kbs/"):
         current_internal_kbs_keys.add(key)
     assert current_internal_kbs_keys == {
         "/internal/kbs/kb1/title",
