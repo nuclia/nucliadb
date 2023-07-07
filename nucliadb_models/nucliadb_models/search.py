@@ -667,7 +667,7 @@ class RephraseModel(BaseModel):
 
 class AskDocumentModel(BaseModel):
     question: str = Field(description="The question to ask on the document")
-    blocks: list[list[str]] = Field(
+    blocks: List[List[str]] = Field(
         description="The complete list of text blocks of a document"
     )
     user_id: str = Field(description="The id of the user associated to the request")
@@ -802,7 +802,7 @@ class FeedbackRequest(BaseModel):
     feedback: Optional[str]
 
 
-TextBlocks = list[list[str]]
+TextBlocks = List[List[str]]
 
 
 class AskRequest(BaseModel):
