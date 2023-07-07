@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import logging
 from typing import Optional
 
@@ -135,3 +136,16 @@ async def run(context: ExecutionContext, target_version: Optional[int] = None) -
             await context.data_manager.update_global_info(target_version=target_version)
             await run_all_kb_migrations(context, target_version)
             await run_global_migrations(context, target_version)
+
+
+async def run_forever(context: ExecutionContext) -> None:
+    """
+    Most of the time this will be a noop but allows
+    retrying failures until everything is done.
+    """
+    while True:
+        try:
+            await run(context)
+        except Exception:
+            logger.exception("Failed to run migrations. Will retry again in 5 minutes")
+        await asyncio.sleep(5 * 60)

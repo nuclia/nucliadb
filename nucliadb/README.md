@@ -47,3 +47,6 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     - KBs to migrate
 - KB Migration State:
     - current version
+
+- Migrations are currently run with a deployment and will be continuously retried on failure.
+- Running migrations in a deployment is to make sure a migration does not prevent code deployment.

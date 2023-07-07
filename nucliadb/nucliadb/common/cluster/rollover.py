@@ -129,7 +129,7 @@ async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
         if consumer_info.num_pending < 5:
             return
         logger.info("Waiting for node to consume messages", extra={"node": node_id})
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
 
 
 async def index_rollover_shards(

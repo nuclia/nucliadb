@@ -28,7 +28,7 @@ from .context import ExecutionContext
 from .settings import Settings
 
 
-async def run():
+async def run(forever: bool = False):
     setup_logging()
     await setup_telemetry("migrator")
 
@@ -37,7 +37,10 @@ async def run():
     await context.initialize()
     metrics_server = await serve_metrics()
     try:
-        await migrator.run(context)
+        if forever:
+            await migrator.run_forever(context)
+        else:
+            await migrator.run(context)
     finally:
         await context.finalize()
         await metrics_server.shutdown()
@@ -45,3 +48,10 @@ async def run():
 
 def main():
     asyncio.run(run())
+
+
+def main_forever():
+    """
+    Keep running migrations forever and retry all failures.
+    """
+    asyncio.run(run(forever=True))

@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import logging
 from typing import Any, List, Optional
 
 from nucliadb.common.maindb.driver import (
@@ -37,6 +38,7 @@ except ImportError:  # pragma: no cover
     TiKV = False
 
 tikv_observer = metrics.Observer("tikv_client", labels={"type": ""})
+logger = logging.getLogger(__name__)
 
 
 class TiKVTransaction(Transaction):
@@ -52,7 +54,10 @@ class TiKVTransaction(Transaction):
             return
 
         with tikv_observer({"type": "rollback"}):
-            await self.txn.rollback()
+            try:
+                await self.txn.rollback()
+            except Exception:
+                logger.exception("Error rolling back transaction")
         self.open = False
 
     async def commit(self):
