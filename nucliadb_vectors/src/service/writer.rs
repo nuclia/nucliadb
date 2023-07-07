@@ -350,8 +350,8 @@ impl VectorWriterService {
     }
     fn collect_garbage_for(&self, index: &Index) -> NodeResult<()> {
         debug!("Collecting garbage for index: {:?}", index.location());
-        let slock = index.get_slock()?;
-        match index.collect_garbage(&slock) {
+        let lock = index.get_elock()?;
+        match index.collect_garbage(&lock) {
             Ok(_) => debug!("Garbage collected for main index"),
             Err(VectorErr::WorkDelayed) => debug!("Garbage collection delayed"),
             Err(e) => Err(e)?,
