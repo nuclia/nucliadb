@@ -160,19 +160,6 @@ async def test_search_resource(
 
 
 @pytest.fixture(scope="function")
-async def test_resource_deterministic_ids(
-    indexing_utility_registered,
-    processor,
-    knowledgebox_ingest,
-):
-    rid = "foobar"
-    slug = "foobar-slug"
-    message1 = broker_resource(knowledgebox_ingest, rid=rid, slug=slug)
-    kb = await inject_message(processor, knowledgebox_ingest, message1)
-    return kb, rid, slug
-
-
-@pytest.fixture(scope="function")
 async def multiple_search_resource(
     indexing_utility_registered,
     processor,
