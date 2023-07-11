@@ -155,8 +155,10 @@ async def test_search_resource(
     Create a resource that has every possible bit of information
     """
     message1 = broker_resource(knowledgebox_ingest, rid="foobar", slug="foobar-slug")
-
-    return await inject_message(processor, knowledgebox_ingest, message1)
+    kbid = await inject_message(processor, knowledgebox_ingest, message1)
+    resource_field_count = 3
+    await wait_for_shard(knowledgebox_ingest, resource_field_count)
+    yield kbid
 
 
 @pytest.fixture(scope="function")
@@ -169,11 +171,12 @@ async def multiple_search_resource(
     Create 100 resources that have every possible bit of information
     """
     n_resources = 100
+    fields_per_resource = 3
     for count in range(1, n_resources + 1):
         message = broker_resource(knowledgebox_ingest)
         await processor.process(message=message, seqid=count)
 
-    await wait_for_shard(knowledgebox_ingest, n_resources)
+    await wait_for_shard(knowledgebox_ingest, n_resources * fields_per_resource)
     return knowledgebox_ingest
 
 

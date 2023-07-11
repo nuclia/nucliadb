@@ -52,7 +52,6 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
         assert resp.status_code == 404
 
 
-@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 @pytest.mark.asyncio
 async def test_multiple_fuzzy_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -79,7 +78,6 @@ async def test_multiple_fuzzy_search_resource_all(
         )
 
 
-@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 @pytest.mark.asyncio
 async def test_multiple_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -144,7 +142,6 @@ async def test_multiple_search_resource_all(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:
@@ -165,8 +162,7 @@ async def test_search_resource_all(
             == "My own <mark>text</mark> Ramon. This is great to be here. "
         )
         assert len(resp.json()["resources"]) == 1
-        # sentences are being flaky everywhere right now
-        # assert len(resp.json()["sentences"]["results"]) == 1
+        assert len(resp.json()["sentences"]["results"]) == 1
 
     # get shards ids
 
@@ -227,7 +223,6 @@ async def test_search_resource_all(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_search_pagination(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
