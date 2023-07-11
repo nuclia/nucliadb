@@ -5,11 +5,8 @@ package nodesidecar;
 import public "nucliadb_protos/noderesources.proto";
 
 message Counter {
-    // right now, resources is returning a value
-    // that represents number of fields, not number of resources
-    uint64 resources = 1;
+    uint64 fields = 1;
     uint64 paragraphs = 2;
-
 }
 
 

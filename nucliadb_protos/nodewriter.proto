@@ -13,9 +13,9 @@ message OpStatus {
     }
     Status status = 1;
     string detail = 2;
-    uint64 count = 3;
-    uint64 count_paragraphs = 5;
-    uint64 count_sentences = 6;
+    uint64 field_count = 3;
+    uint64 paragraph_count = 5;
+    uint64 sentence_count = 6;
     string shard_id = 4;
 }
 
