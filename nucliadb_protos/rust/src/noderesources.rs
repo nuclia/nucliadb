@@ -89,7 +89,7 @@ pub struct Shard {
     #[prost(string, tag="1")]
     pub shard_id: ::prost::alloc::string::String,
     #[prost(uint64, tag="2")]
-    pub resources: u64,
+    pub fields: u64,
     #[prost(uint64, tag="3")]
     pub paragraphs: u64,
     #[prost(uint64, tag="4")]

@@ -238,13 +238,13 @@ class Shard(google.protobuf.message.Message):
 
     METADATA_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
-    RESOURCES_FIELD_NUMBER: builtins.int
+    FIELDS_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     SENTENCES_FIELD_NUMBER: builtins.int
     @property
     def metadata(self) -> global___ShardMetadata: ...
     shard_id: builtins.str
-    resources: builtins.int
+    fields: builtins.int
     paragraphs: builtins.int
     sentences: builtins.int
     def __init__(
@@ -252,12 +252,12 @@ class Shard(google.protobuf.message.Message):
         *,
         metadata: global___ShardMetadata | None = ...,
         shard_id: builtins.str = ...,
-        resources: builtins.int = ...,
+        fields: builtins.int = ...,
         paragraphs: builtins.int = ...,
         sentences: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "paragraphs", b"paragraphs", "resources", b"resources", "sentences", b"sentences", "shard_id", b"shard_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "metadata", b"metadata", "paragraphs", b"paragraphs", "sentences", b"sentences", "shard_id", b"shard_id"]) -> None: ...
 
 global___Shard = Shard
 
