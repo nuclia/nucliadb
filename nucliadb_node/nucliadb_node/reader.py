@@ -25,9 +25,9 @@ from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import OpStatus
-from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from nucliadb_node import SERVICE_NAME  # type: ignore
+from nucliadb_utils.grpc import get_traced_grpc_channel
 
 CACHE = LRU(128)
 
@@ -54,9 +54,9 @@ class Reader:
         if status.status == 0:
             cached_shard = Shard()
             cached_shard.shard_id = shard
-            cached_shard.resources = status.count
-            cached_shard.paragraphs = status.count_paragraphs
-            cached_shard.sentences = status.count_sentences
+            cached_shard.fields = status.field_count
+            cached_shard.paragraphs = status.paragraph_count
+            cached_shard.sentences = status.sentence_count
             CACHE[shard] = cached_shard
 
     async def close(self):

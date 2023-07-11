@@ -124,7 +124,7 @@ impl ShardReaderService {
             shard_id: self.id.clone(),
             // naming issue here, this is not number of resource
             // but more like number of fields
-            resources: text_result? as u64,
+            fields: text_result? as u64,
             paragraphs: paragraph_result? as u64,
             sentences: vector_result? as u64,
         })

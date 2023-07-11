@@ -167,7 +167,7 @@ async def knowledgebox_counters(
                 status_code=500, detail=f"Error while geting shard data"
             )
 
-        field_count += shard.resources
+        field_count += shard.fields
         paragraph_count += shard.paragraphs
         sentence_count += shard.sentences
 

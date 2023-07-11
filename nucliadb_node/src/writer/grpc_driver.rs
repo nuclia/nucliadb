@@ -172,8 +172,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 let op_status = OpStatus {
                     status,
                     detail,
-                    count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    field_count: 0_u64,
                     ..Default::default()
                 };
                 Ok(tonic::Response::new(op_status))
@@ -265,7 +265,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 let op_status = OpStatus {
                     status,
                     detail,
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };

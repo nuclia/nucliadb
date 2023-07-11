@@ -377,21 +377,30 @@ impl ShardWriterService {
         let paragraphs = self.paragraph_writer.clone();
         let vectors = self.vector_writer.clone();
         let texts = self.text_writer.clone();
-        let info = info_span!(parent: &span, "text count");
-        let text_task = || run_with_telemetry(info, move || text_read(&texts).count());
-        let info = info_span!(parent: &span, "paragraph count");
-        let paragraph_task =
-            || run_with_telemetry(info, move || paragraph_read(&paragraphs).count());
-        let info = info_span!(parent: &span, "vector count");
-        let vector_task = || run_with_telemetry(info, move || vector_read(&vectors).count());
 
-        let mut text_result = Ok(0);
-        let mut paragraph_result = Ok(0);
-        let mut vector_result = Ok(0);
+        let count_fields = || {
+            run_with_telemetry(info_span!(parent: &span, "field count"), move || {
+                text_read(&texts).count()
+            })
+        };
+        let count_paragraphs = || {
+            run_with_telemetry(info_span!(parent: &span, "paragraph count"), move || {
+                paragraph_read(&paragraphs).count()
+            })
+        };
+        let count_vectors = || {
+            run_with_telemetry(info_span!(parent: &span, "vector count"), move || {
+                vector_read(&vectors).count()
+            })
+        };
+
+        let mut field_count = Ok(0);
+        let mut paragraph_count = Ok(0);
+        let mut vector_count = Ok(0);
         thread::scope(|s| {
-            s.spawn(|_| text_result = text_task());
-            s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| field_count = count_fields());
+            s.spawn(|_| paragraph_count = count_paragraphs());
+            s.spawn(|_| vector_count = count_vectors());
         });
 
         let metrics = metrics::get_metrics();
@@ -401,9 +410,9 @@ impl ShardWriterService {
 
         Ok(OpStatus {
             shard_id: self.id.clone(),
-            count: text_result? as u64,
-            count_paragraphs: paragraph_result? as u64,
-            count_sentences: vector_result? as u64,
+            field_count: field_count? as u64,
+            paragraph_count: paragraph_count? as u64,
+            sentence_count: vector_count? as u64,
             ..Default::default()
         })
     }

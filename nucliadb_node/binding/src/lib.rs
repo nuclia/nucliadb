@@ -324,7 +324,7 @@ impl NodeWriter {
                 let status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {}", e),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };
@@ -381,7 +381,7 @@ impl NodeWriter {
                 let op_status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {}", e),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };
@@ -417,7 +417,7 @@ impl NodeWriter {
                 let op_status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {}", e),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };
@@ -462,7 +462,7 @@ impl NodeWriter {
                 let op_status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {}", e),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };
@@ -494,7 +494,7 @@ impl NodeWriter {
                 let op_status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {}", e),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };
@@ -516,7 +516,7 @@ impl NodeWriter {
                 let status = OpStatus {
                     status: 0,
                     detail: "Success!".to_string(),
-                    count: 0,
+                    field_count: 0,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };
@@ -526,7 +526,7 @@ impl NodeWriter {
                 let op_status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {}", e),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id: shard_id.id.clone(),
                     ..Default::default()
                 };

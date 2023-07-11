@@ -20,14 +20,14 @@
 
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
-from nucliadb_protos import nodesidecar_pb2_grpc
-from nucliadb_utils.grpc import get_traced_grpc_server
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.reader import Reader  # type: ignore
 from nucliadb_node.servicer import SidecarServicer
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
+from nucliadb_protos import nodesidecar_pb2_grpc
+from nucliadb_utils.grpc import get_traced_grpc_server
 
 
 async def start_grpc(writer: Writer, reader: Reader):

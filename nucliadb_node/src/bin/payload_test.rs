@@ -47,7 +47,7 @@ fn main() -> NodeResult<()> {
             .unwrap();
         println!("Sentences {}", info.sentences);
         println!("Paragraphs {}", info.paragraphs);
-        println!("resources {}", info.resources);
+        println!("Fields {}", info.fields);
     }
     Ok(())
 }

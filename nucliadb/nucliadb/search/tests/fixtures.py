@@ -220,7 +220,7 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
                 req = GetShardRequest()
                 req.shard_id.id = replica.shard.id
                 count_shard: Shard = await node_obj.reader.GetShard(req)  # type: ignore
-                if count_shard.resources >= count:
+                if count_shard.fields >= count:
                     checks[replica.shard.id] = True
                 else:
                     checks[replica.shard.id] = False

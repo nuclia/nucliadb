@@ -31,7 +31,9 @@ struct SyncTelemetryLoop {
 
 impl SyncTelemetryLoop {
     pub fn new(rtxn: Receiver<TelemetryEvent>) -> Option<SyncTelemetryLoop> {
-        let Some(client) = BlockingHttpClient::try_new() else { return None };
+        let Some(client) = BlockingHttpClient::try_new() else {
+            return None;
+        };
         Some(SyncTelemetryLoop { rtxn, client })
     }
     pub fn run(self) {

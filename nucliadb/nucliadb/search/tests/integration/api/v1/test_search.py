@@ -184,7 +184,7 @@ async def test_search_resource_all(
             if node_obj is not None:
                 shard = await node_obj.get_shard(replica.shard.id)
                 assert shard.shard_id == replica.shard.id
-                assert shard.resources == 3
+                assert shard.fields == 3
                 assert shard.paragraphs == 2
                 assert shard.sentences == 3
 

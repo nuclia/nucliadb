@@ -31,17 +31,17 @@ from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
+
+from nucliadb_node import SERVICE_NAME, logger
+from nucliadb_node.reader import Reader
+from nucliadb_node.settings import indexing_settings, settings
+from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_pubsub, get_storage
-
-from nucliadb_node import SERVICE_NAME, logger
-from nucliadb_node.reader import Reader
-from nucliadb_node.settings import indexing_settings, settings
-from nucliadb_node.writer import Writer
 
 subscriber_observer = metrics.Observer(
     "message_processor",

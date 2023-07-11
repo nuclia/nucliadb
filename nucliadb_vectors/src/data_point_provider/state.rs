@@ -226,7 +226,9 @@ impl State {
     }
     #[must_use]
     pub fn replace_work_unit(&mut self, new: DataPoint) -> bool {
-        let Some(unit) = self.work_stack.pop_back() else { return false };
+        let Some(unit) = self.work_stack.pop_back() else {
+            return false;
+        };
         let age_cap = self
             .work_stack
             .back()

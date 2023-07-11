@@ -92,13 +92,14 @@ impl Worker {
         let state: State = fs_state::load_state(&lock)?;
         std::mem::drop(lock);
 
-        let Some(work) = state.current_work_unit().map(|work|
-            work
-            .iter()
-            .rev()
-            .map(|journal| (state.delete_log(*journal), journal.id()))
-            .collect::<Vec<_>>()
-        ) else { return Ok(());};
+        let Some(work) = state.current_work_unit().map(|work| {
+            work.iter()
+                .rev()
+                .map(|journal| (state.delete_log(*journal), journal.id()))
+                .collect::<Vec<_>>()
+        }) else {
+            return Ok(());
+        };
         let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
         let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
         std::mem::drop(state);

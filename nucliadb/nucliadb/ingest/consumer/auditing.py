@@ -124,7 +124,7 @@ class IndexAuditHandler:
                 noderesources_pb2.ShardId(id=shard_id)  # type: ignore
             )
 
-            total_fields += shard_counter.resources
+            total_fields += shard_counter.fields
             total_paragraphs += shard_counter.paragraphs
 
         await self.audit.report(

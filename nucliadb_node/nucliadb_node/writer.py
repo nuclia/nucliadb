@@ -29,9 +29,9 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
-from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from nucliadb_node import SERVICE_NAME  # type: ignore
+from nucliadb_utils.grpc import get_traced_grpc_channel
 
 
 class Writer:

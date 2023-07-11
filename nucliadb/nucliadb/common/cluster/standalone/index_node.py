@@ -45,7 +45,7 @@ class StandaloneSidecarInterface:
         )
         response = nodesidecar_pb2.Counter()
         if shard is not None:
-            response.resources = shard.resources
+            response.fields = shard.fields
             response.paragraphs = shard.paragraphs
         return response
 
