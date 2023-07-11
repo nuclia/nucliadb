@@ -42,6 +42,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import (
     ChatRequest,
+    FeedbackRequest,
     FindRequest,
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
@@ -507,6 +508,14 @@ class _NucliaDBBase:
         request_type=ChatRequest,
         response_type=chat_response_parser,
         docstring=docstrings.RESOURCE_CHAT,
+    )
+    feedback = _request_builder(
+        name="feedback",
+        path_template="/v1/kb/{kbid}/feedback",
+        method="POST",
+        path_params=("kbid",),
+        request_type=FeedbackRequest,
+        response_type=None,
     )
 
 
