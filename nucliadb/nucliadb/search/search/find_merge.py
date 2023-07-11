@@ -29,7 +29,7 @@ from nucliadb_protos.nodereader_pb2 import (
 
 from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
-from nucliadb.search import SERVICE_NAME
+from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
@@ -218,7 +218,7 @@ async def fetch_find_metadata(
         await asyncio.wait(operations)  # type: ignore
 
 
-async def merge_paragraphs_vectors(
+def merge_paragraphs_vectors(
     paragraphs_shards: List[List[ParagraphResult]],
     vectors_shards: List[List[DocumentScored]],
     count: int,
@@ -257,6 +257,9 @@ async def merge_paragraphs_vectors(
                 elif len(doc_id_split) == 6:
                     rid, field_type, field, split, index, position = doc_id_split
                     paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
+                else:
+                    logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
+                    continue
                 start, end = position.split("-")
                 merged_paragrahs.insert(
                     nextpos,
@@ -282,7 +285,7 @@ async def merge_paragraphs_vectors(
     for merged_paragraph in merged_paragrahs:
         if merged_paragraph.vector_index is not None:
             merged_paragraph.paragraph = FindParagraph(
-                score=vector.score,
+                score=merged_paragraph.vector_index.score,
                 score_type=SCORE_TYPE.VECTOR,
                 text="",
                 labels=[],  # TODO: Get labels from index
@@ -372,7 +375,7 @@ async def find_merge_results(
 
     get_resource_cache(clear=True)
 
-    result_paragraphs, merged_next_page = await merge_paragraphs_vectors(
+    result_paragraphs, merged_next_page = merge_paragraphs_vectors(
         paragraphs, vectors, count, page, min_score
     )
     next_page = next_page or merged_next_page
