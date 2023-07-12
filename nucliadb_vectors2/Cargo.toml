@@ -25,5 +25,5 @@ try-catch = "0.2.2"
 lazy_static = "1.4.0"
 
 [lib]
-name = "nucliadb_vectors"
+name = "nucliadb_vectors2"
 path = "src/lib.rs"
