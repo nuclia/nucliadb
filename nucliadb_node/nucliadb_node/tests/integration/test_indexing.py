@@ -27,12 +27,12 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
-from nucliadb_utils import const
-from nucliadb_utils.utilities import get_pubsub, get_storage
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
 from nucliadb_node.settings import settings
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_pubsub, get_storage
 
 TEST_PARTITION = "111"
 
@@ -49,7 +49,7 @@ async def test_indexing(worker, shard: str, reader):
     sipb.id = shard
 
     pbshard: Optional[Shard] = await reader.get_shard(sipb)
-    if pbshard is not None and pbshard.resources > 0:
+    if pbshard is not None and pbshard.fields > 0:
         processed = True
     else:
         processed = False
@@ -57,13 +57,13 @@ async def test_indexing(worker, shard: str, reader):
     while processed is False:  # pragma: no cover
         await asyncio.sleep(0.1)
         pbshard = await reader.get_shard(sipb)
-        if pbshard is not None and pbshard.resources > 0:
+        if pbshard is not None and pbshard.fields > 0:
             processed = True
         else:
             processed = False
 
     assert pbshard is not None
-    assert pbshard.resources == 2
+    assert pbshard.fields == 2
     await asyncio.sleep(0.1)
 
     storage = await get_storage(service_name=SERVICE_NAME)

@@ -28,7 +28,6 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
-@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_find(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -58,7 +57,6 @@ async def test_find(
         }
 
 
-@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_find_order(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -71,9 +69,7 @@ async def test_find_order(
         assert resp.status_code == 200
 
         data = resp.json()
-
-        # TODO: uncomment when we have the total stable in tests
-        # assert data["total"] == 65
+        assert data["total"] == 100
 
         paragraph_count = 0
         orders = set()

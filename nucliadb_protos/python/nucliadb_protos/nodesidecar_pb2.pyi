@@ -41,19 +41,16 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class Counter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    RESOURCES_FIELD_NUMBER: builtins.int
+    FIELDS_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
-    resources: builtins.int
-    """right now, resources is returning a value
-    that represents number of fields, not number of resources
-    """
+    fields: builtins.int
     paragraphs: builtins.int
     def __init__(
         self,
         *,
-        resources: builtins.int = ...,
+        fields: builtins.int = ...,
         paragraphs: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["paragraphs", b"paragraphs", "resources", b"resources"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields", b"fields", "paragraphs", b"paragraphs"]) -> None: ...
 
 global___Counter = Counter

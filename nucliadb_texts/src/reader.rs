@@ -140,7 +140,10 @@ impl ReaderChild for TextReaderService {
             let Some(key) = searcher
                 .doc(addr)?
                 .get_first(self.schema.uuid)
-                .and_then(|i| i.as_text().map(String::from)) else { continue };
+                .and_then(|i| i.as_text().map(String::from))
+            else {
+                continue;
+            };
             keys.push(key);
         }
 

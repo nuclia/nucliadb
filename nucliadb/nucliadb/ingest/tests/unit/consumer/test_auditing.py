@@ -78,7 +78,7 @@ async def index_audit_handler(pubsub, audit, shard_manager):
 async def test_handle_message(
     index_audit_handler: auditing.IndexAuditHandler, sidecar, audit
 ):
-    sidecar.GetCount.return_value = Counter(resources=5, paragraphs=6)
+    sidecar.GetCount.return_value = Counter(fields=5, paragraphs=6)
 
     notif = Notification(
         kbid="kbid",

@@ -24,10 +24,10 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 import pytest
 from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
-from nucliadb_utils import const
 
 from nucliadb_node.pull import IndexedPublisher, Worker
 from nucliadb_node.settings import settings
+from nucliadb_utils import const
 
 
 @pytest.fixture(autouse=True)

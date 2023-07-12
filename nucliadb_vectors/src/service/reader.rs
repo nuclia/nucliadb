@@ -203,8 +203,8 @@ impl TryFrom<Neighbour> for DocumentScored {
         let id = std::str::from_utf8(neighbour.id());
         let metadata = neighbour.metadata().map(SentenceMetadata::decode);
         let labels = neighbour.labels();
-        let Ok(id) = id.map(|i| i.to_string())else {
-            return Err("Id could not be decoded".to_string())
+        let Ok(id) = id.map(|i| i.to_string()) else {
+            return Err("Id could not be decoded".to_string());
         };
         let Ok(metadata) = metadata.transpose() else {
             return Err("The metadata could not be decoded".to_string());

@@ -63,7 +63,7 @@ message ResourceID {
 message Shard {
     ShardMetadata metadata = 5;
     string shard_id = 1;
-    uint64 resources = 2;
+    uint64 fields = 2;
     uint64 paragraphs = 3;
     uint64 sentences = 4;
 }

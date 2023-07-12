@@ -68,13 +68,13 @@ class DummyWriterStub:  # pragma: no cover
     async def SetResource(self, data):
         self.calls.setdefault("SetResource", []).append(data)
         result = OpStatus()
-        result.count = 1
+        result.field_count = 1
         return result
 
     async def AddVectorSet(self, data):
         self.calls.setdefault("AddVectorSet", []).append(data)
         result = OpStatus()
-        result.count = 1
+        result.field_count = 1
         return result
 
     async def ListVectorSet(self, data: ShardId):
@@ -87,7 +87,7 @@ class DummyWriterStub:  # pragma: no cover
     async def JoinGraph(self, data: SetGraph):
         self.calls.setdefault("JoinGraph", []).append(data)
         result = OpStatus()
-        result.count = 1
+        result.field_count = 1
         return result
 
 
@@ -96,9 +96,7 @@ class DummyReaderStub:  # pragma: no cover
 
     async def GetShard(self, data):
         self.calls.setdefault("GetShard", []).append(data)
-        return NodeResourcesShard(
-            shard_id="shard", resources=2, paragraphs=2, sentences=2
-        )
+        return NodeResourcesShard(shard_id="shard", fields=2, paragraphs=2, sentences=2)
 
     async def RelationSearch(self, data):
         self.calls.setdefault("RelationSearch", []).append(data)
@@ -124,4 +122,4 @@ class DummySidecarStub:  # pragma: no cover
 
     async def GetCount(self, data):
         self.calls.setdefault("GetCount", []).append(data)
-        return Counter(paragraphs=2, resources=2)
+        return Counter(paragraphs=2, fields=2)

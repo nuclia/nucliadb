@@ -80,27 +80,27 @@ class OpStatus(google.protobuf.message.Message):
 
     STATUS_FIELD_NUMBER: builtins.int
     DETAIL_FIELD_NUMBER: builtins.int
-    COUNT_FIELD_NUMBER: builtins.int
-    COUNT_PARAGRAPHS_FIELD_NUMBER: builtins.int
-    COUNT_SENTENCES_FIELD_NUMBER: builtins.int
+    FIELD_COUNT_FIELD_NUMBER: builtins.int
+    PARAGRAPH_COUNT_FIELD_NUMBER: builtins.int
+    SENTENCE_COUNT_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     status: global___OpStatus.Status.ValueType
     detail: builtins.str
-    count: builtins.int
-    count_paragraphs: builtins.int
-    count_sentences: builtins.int
+    field_count: builtins.int
+    paragraph_count: builtins.int
+    sentence_count: builtins.int
     shard_id: builtins.str
     def __init__(
         self,
         *,
         status: global___OpStatus.Status.ValueType = ...,
         detail: builtins.str = ...,
-        count: builtins.int = ...,
-        count_paragraphs: builtins.int = ...,
-        count_sentences: builtins.int = ...,
+        field_count: builtins.int = ...,
+        paragraph_count: builtins.int = ...,
+        sentence_count: builtins.int = ...,
         shard_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["count", b"count", "count_paragraphs", b"count_paragraphs", "count_sentences", b"count_sentences", "detail", b"detail", "shard_id", b"shard_id", "status", b"status"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["detail", b"detail", "field_count", b"field_count", "paragraph_count", b"paragraph_count", "sentence_count", b"sentence_count", "shard_id", b"shard_id", "status", b"status"]) -> None: ...
 
 global___OpStatus = OpStatus
 

@@ -22,11 +22,6 @@ import asyncio
 import uuid
 
 import pkg_resources
-from nucliadb_telemetry import errors
-from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.utils import setup_telemetry
-from nucliadb_utils.fastapi.run import serve_metrics
-from nucliadb_utils.run import run_until_exit
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
@@ -34,6 +29,11 @@ from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
+from nucliadb_telemetry import errors
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.utils import setup_telemetry
+from nucliadb_utils.fastapi.run import serve_metrics
+from nucliadb_utils.run import run_until_exit
 
 
 async def start_worker(writer: Writer, reader: Reader) -> Worker:

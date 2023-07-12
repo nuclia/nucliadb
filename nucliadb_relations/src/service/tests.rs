@@ -225,7 +225,9 @@ fn simple_request() -> NodeResult<()> {
     let mut request = REQUEST_BONES.clone();
     request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else {
+        unreachable!("Wrong variant")
+    };
     let len = bfs_response
         .relations
         .into_iter()
@@ -280,7 +282,9 @@ fn join_graph_test() -> NodeResult<()> {
     let mut request = REQUEST_BONES.clone();
     request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else {
+        unreachable!("Wrong variant")
+    };
     let len = bfs_response
         .relations
         .into_iter()
@@ -305,7 +309,9 @@ fn simple_request_with_similarity() -> NodeResult<()> {
     let mut request = REQUEST_BONES.clone();
     request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else {
+        unreachable!("Wrong variant")
+    };
     let len = bfs_response
         .relations
         .into_iter()
@@ -331,7 +337,9 @@ fn typed_request() -> NodeResult<()> {
     let mut request = REQUEST_BONES.clone();
     request.subgraph = Some(REQUEST1.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else {
+        unreachable!("Wrong variant")
+    };
 
     let len = bfs_response
         .relations
@@ -361,7 +369,9 @@ fn just_prefix_querying() -> NodeResult<()> {
         ..Default::default()
     });
     let got = reader.search(&request).unwrap();
-    let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
+    let Some(prefix_response) = got.prefix else {
+        unreachable!("Wrong variant")
+    };
     let is_permutation = prefix_response
         .nodes
         .iter()
@@ -373,7 +383,9 @@ fn just_prefix_querying() -> NodeResult<()> {
         ..Default::default()
     });
     let got = reader.search(&request).unwrap();
-    let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
+    let Some(prefix_response) = got.prefix else {
+        unreachable!("Wrong variant")
+    };
     let is_permutation = prefix_response
         .nodes
         .iter()
@@ -385,7 +397,9 @@ fn just_prefix_querying() -> NodeResult<()> {
         ..Default::default()
     });
     let got = reader.search(&request).unwrap();
-    let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
+    let Some(prefix_response) = got.prefix else {
+        unreachable!("Wrong variant")
+    };
     assert!(prefix_response.nodes.is_empty());
 
     Ok(())
