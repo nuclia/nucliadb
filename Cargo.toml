@@ -11,5 +11,6 @@ members = [
   "nucliadb_telemetry",
   "nucliadb_texts",
   "nucliadb_vectors",
+  "nucliadb_vectors2",
   "vectors_benchmark",
 ]
