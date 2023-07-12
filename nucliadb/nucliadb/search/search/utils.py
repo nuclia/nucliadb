@@ -19,7 +19,13 @@
 #
 from fastapi import HTTPException
 
-from nucliadb_models.search import SearchRequest, SortField, SortOptions, SortOrder
+from nucliadb_models.search import (
+    BaseSearchRequest,
+    SearchRequest,
+    SortField,
+    SortOptions,
+    SortOrder,
+)
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -63,7 +69,19 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
     return sort_options
 
 
-def is_empty_query(request: SearchRequest) -> bool:
+def is_empty_query(request: BaseSearchRequest) -> bool:
     return len(request.query) == 0 and (
         request.advanced_query is None or len(request.advanced_query) == 0
+    )
+
+
+def has_user_vectors(request: BaseSearchRequest) -> bool:
+    return request.vector is not None and len(request.vector) > 0
+
+
+def is_exact_match_query(request: BaseSearchRequest) -> bool:
+    return (
+        len(request.query.split(" ")) == 1
+        and request.query[0] == '"'
+        and request.query[-1] == '"'
     )
