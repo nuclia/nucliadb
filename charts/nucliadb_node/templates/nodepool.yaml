@@ -1,0 +1,23 @@
+apiVersion: container.gcp.upbound.io/v1beta1
+kind: NodePool
+metadata:
+  name: nucliadb-node
+spec:
+  deletionPolicy: Orphan
+  providerConfigRef:
+    name: stage
+  forProvider:
+    autoscaling:
+      - maxNodeCount: 4
+    clusterRef:
+      name: development
+    management:
+      - autoUpgrade: false
+    nodeConfig:
+      - machineType: n2-standard-4
+        labels:
+          nuclia.cloud/nodepool: nucliadb-node
+        taint:
+          - effect: NO_SCHEDULE
+            key: nucliadb/node
+            value: present

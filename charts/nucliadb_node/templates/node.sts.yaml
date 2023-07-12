@@ -38,14 +38,27 @@ spec:
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
     spec:
-      nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:
-{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+        - labelSelector:
+            matchLabels:
+              app: node
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
       affinity:
-{{ toYaml .Values.affinity | indent 8 }}
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nuclia.cloud/nodepool
+                    operator: In
+                    values:
+                      - nucliadb-node
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+        - effect: NoSchedule
+          key: nucliadb/node-test
+          operator: Equal
+          value: present
       dnsPolicy: ClusterFirst
 {{- if .Values.nats.secretName }}
       volumes:

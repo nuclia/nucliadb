@@ -23,10 +23,6 @@ env:
 config:
   data_path: /data
 
-affinity: {}
-nodeSelector: {}
-tolerations: []
-topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False

@@ -1,0 +1,25 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{- range $index, $ := until .Values.replicaCount }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: node-reader-{{ $index }}
+  labels:
+    app: node-reader-{{ $index }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  namespaceSelector:
+    matchNames:
+    - "{{ .Release.Namespace }}"
+  selector:
+    matchLabels:
+      app: node-reader-{{ $index }}
+  endpoints:
+  - targetPort: 3031
+    interval: 10s
+    path: /metrics
+{{- end }}
+{{- end }}

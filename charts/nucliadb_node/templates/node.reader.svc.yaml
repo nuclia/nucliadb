@@ -1,0 +1,21 @@
+{{- range $index, $ := until .Values.replicaCount }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: node-reader-{{ $index }}
+  labels:
+    app: node-reader-{{ $index }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: node-reader-{{ $index }}
+  ports:
+    - name: node-reader
+      port: 10001
+      protocol: TCP
+      appProtocol: grpc
+{{- end }}
