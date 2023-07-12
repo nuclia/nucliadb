@@ -1,14 +1,17 @@
-{{- range $index, $ := until .Values.replicaCount }}
+{{ $count := .Values.replicaCount | int }}
+{{ $release := .Release }}
+{{ $chart := .Chart }}
+{{- range $index, $ := until $count }}
 kind: Service
 apiVersion: v1
 metadata:
   name: node-reader-{{ $index }}
   labels:
     app: node-reader-{{ $index }}
-    version: "{{ .Chart.Version | replace "+" "_" }}"
-    chart: "{{ .Chart.Name }}"
-    release: "{{ .Release.Name }}"
-    heritage: "{{ .Release.Service }}"
+    version: "{{ $chart.Version | replace "+" "_" }}"
+    chart: "{{ $chart.Name }}"
+    release: "{{ $release.Name }}"
+    heritage: "{{ $release.Service }}"
 spec:
   type: ClusterIP
   selector:

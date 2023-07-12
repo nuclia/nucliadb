@@ -1,14 +1,19 @@
-{{- range $index, $ := until .Values.replicaCount }}
+{{ $count := .Values.replicaCount | int }}
+{{ $release := .Release }}
+{{ $chart := .Chart }}
+{{ $values := .Values }}
+
+{{- range $index, $ := until $count }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app: node-reader-{{ $index }}
     app.kubernetes.io/name: node-reader
-    app.kubernetes.io/instance: {{ .Release.Name }}-{{ $index }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    version: "{{ .Chart.Version | replace "+" "_" }}"
-    chart: "{{ .Chart.Name }}"
+    app.kubernetes.io/instance: {{ $release.Name }}-{{ $index }}
+    app.kubernetes.io/managed-by: {{ $release.Service }}
+    version: "{{ $chart.Version | replace "+" "_" }}"
+    chart: "{{ $chart.Name }}"
   name: node-reader-{{ $index }}
 spec:
   replicas: 2
@@ -23,17 +28,15 @@ spec:
   template:
     metadata:
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.nats.port }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }}"
-        # do not have access to dependency chart cm this component references
-        checksum/cm: {{ include (print $.Template.BasePath "/node.cm.yaml") . | sha256sum }}
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{$values.nats.port }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{$values.serving.metricsPort }}"
       labels:
         app: node-reader-{{ $index }}
         app.kubernetes.io/instance: node-reader-{{ $index }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/managed-by: {{ .Release.Service }}
-        version: "{{ .Chart.Version | replace "+" "_" }}"
-        chart: "{{ .Chart.Name }}"
+        app.kubernetes.io/instance: {{ $release.Name }}
+        app.kubernetes.io/managed-by: {{ $release.Service }}
+        version: "{{ $chart.Version | replace "+" "_" }}"
+        chart: "{{ $chart.Name }}"
       name: node-reader-{{ $index }}
     spec:
       affinity:
@@ -109,9 +112,9 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: node-pv
-{{- if .Values.tracing.enabled }}
+{{- if $values.tracing.enabled }}
         - name: jaeger-agent
-          image: "jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}"
+          image: "jaegertracing/jaeger-agent:{{ $values.tracing.jaegerAgentTag }}"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5775
@@ -130,7 +133,7 @@ spec:
               name: admin-http
               protocol: TCP
           args:
-            - --reporter.grpc.host-port=dns:///{{ .Values.tracing.jaegerCollectorHost }}:{{ .Values.tracing.jaegerCollectorGrpcPort }}
+            - --reporter.grpc.host-port=dns:///{{ $values.tracing.jaegerCollectorHost }}:{{ $values.tracing.jaegerCollectorGrpcPort }}
             - --reporter.type=grpc
 {{- end }}
       dnsPolicy: ClusterFirst
