@@ -8,6 +8,8 @@ containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 image_sidecar: IMAGE_SIDECAR_TO_REPLACE
 
+nodePoolMachineType: null
+
 # Component settings
 # ---
 # These settings are controlled through environment variables

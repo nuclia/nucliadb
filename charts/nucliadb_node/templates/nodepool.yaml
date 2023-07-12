@@ -14,7 +14,7 @@ spec:
     management:
       - autoUpgrade: false
     nodeConfig:
-      - machineType: n2-standard-4
+      - machineType: {{.Values.nodePoolMachineType}}
         labels:
           nuclia.cloud/nodepool: nucliadb-node
         taint:
