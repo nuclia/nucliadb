@@ -82,6 +82,7 @@ COPY nucliadb_relations /nucliadb/nucliadb_relations
 COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
+COPY nucliadb_vectors2 /nucliadb/nucliadb_vectors2
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
 # Build application (only run when sources are modified)
