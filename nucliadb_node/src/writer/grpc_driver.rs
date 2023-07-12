@@ -199,7 +199,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 let status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {error:?}"),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id,
                     ..Default::default()
                 };
@@ -287,7 +287,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 let status = OpStatus {
                     status: op_status::Status::Error as i32,
                     detail: format!("Error: {error:?}"),
-                    count: 0_u64,
+                    field_count: 0_u64,
                     shard_id,
                     ..Default::default()
                 };
@@ -408,12 +408,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             })?;
         match result {
             Ok(()) => Ok(tonic::Response::new(EmptyResponse {})),
-            Err(_error) => {
-                // REVIEW: why is GC not returning an error?
-                debug!("Garbage collection at {} raised an error", shard_id.id);
-                let resp = EmptyResponse {};
-                Ok(tonic::Response::new(resp))
-            }
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 }
