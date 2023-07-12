@@ -122,4 +122,4 @@ class DummySidecarStub:  # pragma: no cover
 
     async def GetCount(self, data):
         self.calls.setdefault("GetCount", []).append(data)
-        return Counter(paragraphs=2, resources=2)
+        return Counter(paragraphs=2, fields=2)
