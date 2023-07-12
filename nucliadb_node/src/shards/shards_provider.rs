@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -53,4 +54,13 @@ pub trait AsyncWriterShardsProvider {
     async fn delete(&self, id: ShardId) -> NodeResult<()>;
 
     async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
+}
+
+#[derive(Debug)]
+pub struct ShardNotFoundError(pub &'static str);
+
+impl Display for ShardNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Shard not found: {}", self.0)
+    }
 }

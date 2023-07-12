@@ -22,6 +22,7 @@ mod unbounded_cache_provider;
 
 pub use shards_provider::{
     AsyncReaderShardsProvider, AsyncWriterShardsProvider, ReaderShardsProvider, ShardId,
+    ShardNotFoundError,
 };
 pub use unbounded_cache_provider::{
     AsyncUnboundedShardReaderCache, AsyncUnboundedShardWriterCache, UnboundedShardReaderCache,

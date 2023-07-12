@@ -35,7 +35,9 @@ use tonic::{Request, Response, Status};
 
 use crate::env;
 use crate::shard_metadata::ShardMetadata;
-use crate::shards::{AsyncUnboundedShardWriterCache, AsyncWriterShardsProvider, ShardWriter};
+use crate::shards::{
+    AsyncUnboundedShardWriterCache, AsyncWriterShardsProvider, ShardNotFoundError, ShardWriter,
+};
 
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,
@@ -88,7 +90,11 @@ impl NodeWriterGRPCDriver {
         // the driver is online on `initialize`.
         if self.options.lazy_loading {
             self.shards.load(id.clone()).await.map_err(|error| {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+                if error.is::<ShardNotFoundError>() {
+                    tonic::Status::not_found(error.to_string())
+                } else {
+                    tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+                }
             })?;
         }
 

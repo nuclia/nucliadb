@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 pub use crate::env;
 use crate::shard_metadata::ShardMetadata;
-use crate::shards::shards_provider::{AsyncWriterShardsProvider, ShardId};
+use crate::shards::shards_provider::{AsyncWriterShardsProvider, ShardId, ShardNotFoundError};
 use crate::shards::ShardWriter;
 
 #[derive(Default)]
@@ -83,7 +83,9 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
         let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
-                return Err(node_error!("Shard {shard_path:?} is not on disk"));
+                return Err(node_error!(ShardNotFoundError(
+                    "Shard {shard_path:?} is not on disk"
+                )));
             }
             ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
