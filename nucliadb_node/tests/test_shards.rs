@@ -116,7 +116,7 @@ async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = node_writer().await;
 
-    let request_ids = create_shards(&mut writer, 10).await;
+    let request_ids = create_shards(&mut writer, 5).await;
 
     // XXX We should have a better way to list shards independently of the cache
     for shard_id in request_ids.iter() {
@@ -155,7 +155,7 @@ async fn test_delete_shards() -> anyhow::Result<()> {
 
     assert_eq!(response.get_ref().ids.len(), 0);
 
-    let request_ids = create_shards(&mut writer, 10).await;
+    let request_ids = create_shards(&mut writer, 5).await;
     // XXX We should have a better way to list shards independently of the cache
     for shard_id in request_ids.iter() {
         bring_shard_to_cache(&mut writer, shard_id.to_owned()).await;

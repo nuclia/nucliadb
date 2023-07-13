@@ -23,7 +23,7 @@ use std::sync::Arc;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
-use nucliadb_core::{node_error, Context, Error, NodeResult};
+use nucliadb_core::{node_error, Context, NodeResult};
 
 pub use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
@@ -60,7 +60,7 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
 
         // Avoid blocking while interacting with the file system (reads and
         // writes to disk)
-        let _id = id.clone();
+        let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
                 return Err(node_error!("Shard {shard_path:?} is not on disk"));
@@ -72,27 +72,27 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
         .await
         .context("Blocking task panicked")??;
 
-        self.cache.write().await.insert(_id, Arc::new(shard));
+        self.cache.write().await.insert(id_, Arc::new(shard));
         Ok(())
     }
 
     async fn load_all(&self) -> NodeResult<()> {
         let shards_path = env::shards_path();
-        let mut shards = tokio::task::spawn_blocking(move || {
+        let mut shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {
                 let entry = entry?;
                 let file_name = entry.file_name().to_str().unwrap().to_string();
                 let shard_path = entry.path();
                 match ShardReader::new(file_name.clone(), &shard_path) {
-                    Err(err) => error!("Loading {shard_path:?} raised {err}"),
+                    Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                     Ok(shard) => {
                         debug!("Shard loaded: {shard_path:?}");
                         shards.insert(file_name, shard);
                     }
                 }
             }
-            Ok::<HashMap<String, ShardReader>, Error>(shards)
+            Ok(shards)
         })
         .await
         .context("Blocking task panicked")??;

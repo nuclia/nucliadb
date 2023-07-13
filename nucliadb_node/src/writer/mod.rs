@@ -33,6 +33,30 @@ use uuid::Uuid;
 
 use crate::env;
 use crate::services::writer::ShardWriterService;
+use crate::shard_metadata::ShardMetadata;
+
+/// Initialize the index node writer. This function must be called before using
+/// a writer
+pub fn initialize() -> NodeResult<()> {
+    let data_path = env::data_path();
+    if !data_path.exists() {
+        return Err(node_error!(
+            "Data directory ({:?}) should be already created",
+            data_path
+        ));
+    }
+
+    let shards_path = env::shards_path();
+    if !shards_path.exists() {
+        std::fs::create_dir(&shards_path)?;
+    }
+
+    // We shallow the error if the threadpools were already initialized
+    let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
+    let _ = VectorsMerger::install_global().map(std::thread::spawn);
+
+    Ok(())
+}
 
 #[derive(Debug, Default)]
 pub struct NodeWriterService {
@@ -40,22 +64,8 @@ pub struct NodeWriterService {
 }
 
 impl NodeWriterService {
-    fn initialize_file_system() -> NodeResult<()> {
-        let shards_path = env::shards_path();
-        let data_path = env::data_path();
-        if !data_path.exists() {
-            return Err(node_error!("{:?} is not created", data_path));
-        }
-        if !shards_path.exists() {
-            std::fs::create_dir(&shards_path)?;
-        }
-        Ok(())
-    }
     pub fn new() -> NodeResult<Self> {
-        Self::initialize_file_system()?;
-        // We shallow the error if the threadpools were already initialized
-        let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
-        let _ = VectorsMerger::install_global().map(std::thread::spawn);
+        initialize()?;
         Ok(Self::default())
     }
 
@@ -102,16 +112,16 @@ impl NodeWriterService {
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardWriterService> {
         self.cache.get(&shard_id.id)
     }
-    #[tracing::instrument(skip_all)]
-    pub fn get_mut_shard(&mut self, shard_id: &ShardId) -> Option<&mut ShardWriterService> {
-        self.cache.get_mut(&shard_id.id)
-    }
 
     #[tracing::instrument(skip_all)]
     pub fn new_shard(request: &NewShardRequest) -> NodeResult<ShardCreated> {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = env::shards_path_id(&shard_id);
-        let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path, request)?;
+        let new_shard = ShardWriterService::new(
+            shard_id.clone(),
+            &shard_path,
+            ShardMetadata::from(request.to_owned()),
+        )?;
         Ok(ShardCreated {
             id: shard_id,
             document_service: new_shard.document_version() as i32,

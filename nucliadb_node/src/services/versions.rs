@@ -101,7 +101,7 @@ impl Versions {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as VectorsReaderPointer),
-            Some(v) => Err(node_error!("Invalid vectors  version {v}")),
+            Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -112,7 +112,7 @@ impl Versions {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as ParagraphsReaderPointer),
-            Some(v) => Err(node_error!("Invalid paragraphs  version {v}")),
+            Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -121,7 +121,7 @@ impl Versions {
         match self.version_texts {
             Some(1) => nucliadb_texts::reader::TextReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as TextsReaderPointer),
-            Some(v) => Err(node_error!("Invalid text  version {v}")),
+            Some(v) => Err(node_error!("Invalid text version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -133,7 +133,7 @@ impl Versions {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RelationsReaderPointer),
-            Some(v) => Err(node_error!("Invalid relations  version {v}")),
+            Some(v) => Err(node_error!("Invalid relations version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -142,7 +142,7 @@ impl Versions {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as VectorsWriterPointer),
-            Some(v) => Err(node_error!("Invalid vectors  version {v}")),
+            Some(v) => Err(node_error!("Invalid vectors version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -153,7 +153,7 @@ impl Versions {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as ParagraphsWriterPointer),
-            Some(v) => Err(node_error!("Invalid paragraphs  version {v}")),
+            Some(v) => Err(node_error!("Invalid paragraphs version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -162,7 +162,7 @@ impl Versions {
         match self.version_texts {
             Some(1) => nucliadb_texts::writer::TextWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as TextsWriterPointer),
-            Some(v) => Err(node_error!("Invalid text  version {v}")),
+            Some(v) => Err(node_error!("Invalid text version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
@@ -174,7 +174,7 @@ impl Versions {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as RelationsWriterPointer),
-            Some(v) => Err(node_error!("Invalid relations  version {v}")),
+            Some(v) => Err(node_error!("Invalid relations version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }

@@ -17,14 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-// use nucliadb_vectors::data_point::Similarity;
+use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::NodeResult;
 
-use super::ShardReader;
-// use super::ShardWriter;
+use super::{ShardReader, ShardWriter};
+use crate::shard_metadata::ShardMetadata;
 
 pub type ShardId = String;
 
@@ -43,14 +44,23 @@ pub trait AsyncReaderShardsProvider: Send + Sync {
     async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
 }
 
-// pub trait WriterShardsProvider {
-//     fn create(&self, id: ShardId, kbid: String, similarity: Similarity);
+#[async_trait]
+pub trait AsyncWriterShardsProvider {
+    async fn load(&self, id: ShardId) -> NodeResult<()>;
+    async fn load_all(&self) -> NodeResult<()>;
 
-//     fn load(&self, id: ShardId) -> NodeResult<()>;
-//     fn load_all(&mut self) -> NodeResult<()>;
+    async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;
+    async fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>>;
+    async fn delete(&self, id: ShardId) -> NodeResult<()>;
 
-//     fn get(&self, id: ShardId) -> Option<&ShardWriter>;
-//     fn get_mut(&self, id: ShardId) -> Option<&mut ShardWriter>;
+    async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
+}
 
-//     fn delete(&self, id: ShardId) -> NodeResult<()>;
-// }
+#[derive(Debug)]
+pub struct ShardNotFoundError(pub &'static str);
+
+impl Display for ShardNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Shard not found: {}", self.0)
+    }
+}

@@ -48,8 +48,12 @@ pub struct DTrie {
 impl DTrie {
     fn inner_get(&self, key: &[u8], current: Option<SystemTime>) -> Option<SystemTime> {
         let current = std::cmp::max(current, self.value);
-        let [head, tail @ ..] = key else { return current };
-        let Some(node) = self.go_table.get(head) else { return current};
+        let [head, tail @ ..] = key else {
+            return current;
+        };
+        let Some(node) = self.go_table.get(head) else {
+            return current;
+        };
         node.inner_get(tail, current)
     }
     fn inner_prune(&mut self, time: SystemTime) -> bool {

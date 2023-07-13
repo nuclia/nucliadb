@@ -23,12 +23,11 @@ use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{node_error, NodeResult};
-use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
-use nucliadb_node::shards::{AsyncReaderShardsProvider, AsyncUnboundedShardReaderCache};
 use nucliadb_node::telemetry::init_telemetry;
+use nucliadb_node::{env, reader};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
@@ -43,13 +42,11 @@ async fn main() -> NodeResult<()> {
         return Err(node_error!("Data directory missing"));
     }
 
+    // XXX it probably should be moved to a more clear abstraction
+    reader::initialize();
+
     let _guard = init_telemetry()?;
     let start_bootstrap = Instant::now();
-    let shards_provider = AsyncUnboundedShardReaderCache::new();
-
-    if !env::lazy_loading() {
-        shards_provider.load_all().await?;
-    }
 
     let grpc_options = GrpcReaderOptions {
         lazy_loading: env::lazy_loading(),
