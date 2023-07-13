@@ -87,6 +87,10 @@ class AbstractPullDiscovery(AbstractClusterDiscovery):
                 await self.discover()
             except asyncio.CancelledError:
                 return
+            except Exception:
+                logger.exception(
+                    "Error while watching cluster members. Will retry at started interval"
+                )
 
     async def initialize(self) -> None:
         await self.discover()

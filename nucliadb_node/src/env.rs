@@ -17,16 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use anyhow::{Context, Result};
-use std::env;
-use std::fs;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
-use uuid::Uuid;
+use std::{env, fs};
 
+use anyhow::{Context, Result};
 use nucliadb_core::tracing::*;
+use uuid::Uuid;
 
 use crate::utils::{parse_log_level, reliable_lookup_host};
 

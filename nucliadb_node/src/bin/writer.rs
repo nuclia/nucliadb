@@ -18,13 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fs;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
 
-use anyhow::{Context, Result};
 use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::metrics::middleware::MetricsLayer;
@@ -44,7 +42,6 @@ use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
-use uuid::Uuid;
 
 const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
 
