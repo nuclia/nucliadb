@@ -3,7 +3,7 @@
 {{ $chart := .Chart }}
 {{ $values := .Values }}
 
-{{- range $index, $ := until $count }}
+{{- range $index, $_ := until $count }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
