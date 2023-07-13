@@ -352,32 +352,31 @@ def setup_standalone_cluster():
 
 
 def choose_node(
-    shard: writer_pb2.ShardObject, shard_replicas: Optional[list[str]] = None
+    shard: writer_pb2.ShardObject, target_replicas: Optional[list[str]] = None
 ) -> tuple[AbstractIndexNode, str, str]:
     """
-    Choose an arbitrary node storing `shard`. If passed, choose only between
-    nodes containing any of `shard_replicas`.
+    Choose an arbitrary node storing `shard`. If passed, attempt to choose only between
+    nodes containing any of `target_replicas`.
     """
-    shard_replicas = shard_replicas or []
-    nodes = [x for x in range(len(shard.replicas))]
-    random.shuffle(nodes)
-    node_obj = None
-    shard_id = None
-    for node in nodes:
-        node_id = shard.replicas[node].node
-        node_obj = get_index_node(node_id)
-        if node_obj is not None:
-            shard_id = shard.replicas[node].shard.id
-            if len(shard_replicas) > 0 and shard_id not in shard_replicas:
-                node_obj = None
-                shard_id = None
-            else:
-                break
+    target_replicas = target_replicas or []
 
-    if node_obj is None or node_id is None or shard_id is None:
-        raise KeyError("Could not find a node to query")
+    shuffled_replicas = [(x.shard.id, x.node) for x in shard.replicas]
+    random.shuffle(shuffled_replicas)
 
-    return node_obj, shard_id, node_id
+    head_nodes = []
+    tail_nodes = []
+    for replica_id, node_id in shuffled_replicas:
+        if replica_id in target_replicas:
+            head_nodes.append((replica_id, node_id))
+        else:
+            tail_nodes.append((replica_id, node_id))
+
+    for replica_id, node_id in head_nodes + tail_nodes:
+        node = get_index_node(node_id)
+        if node is not None:
+            return node, replica_id, node_id
+
+    raise KeyError("Could not find a node to query")
 
 
 def check_enough_nodes():
