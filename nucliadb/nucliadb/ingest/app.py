@@ -23,7 +23,10 @@ from typing import Awaitable, Callable
 import pkg_resources
 
 from nucliadb import health
-from nucliadb.common.cluster.chitchat import start_chitchat, stop_chitchat
+from nucliadb.common.cluster.discovery.utils import (
+    setup_cluster_discovery,
+    teardown_cluster_discovery,
+)
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.ingest import SERVICE_NAME
@@ -52,7 +55,7 @@ from nucliadb_utils.utilities import (
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await setup_telemetry(SERVICE_NAME)
 
-    await setup_cluster(SERVICE_NAME)
+    await setup_cluster()
     await start_transaction_utility(SERVICE_NAME)
     if (
         not cluster_settings.standalone_mode
@@ -79,8 +82,8 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         )
         finalizers.append(stop_nats_manager)
 
-        await start_chitchat(SERVICE_NAME)
-        finalizers.append(stop_chitchat)
+        await setup_cluster_discovery()
+        finalizers.append(teardown_cluster_discovery)
 
     health.register_health_checks(
         [

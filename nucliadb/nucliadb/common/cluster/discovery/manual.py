@@ -17,15 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
-
-from pydantic import BaseModel, Field
+from .abc import AbstractPullDiscovery, update_members
 
 
-class ClusterMember(BaseModel):
-    node_id: str = Field(alias="id")
-    listen_addr: str = Field(alias="address")
-    shard_count: Optional[int]
+class ManualDiscovery(AbstractPullDiscovery):
+    """
+    Manual provide all cluster members addresses to load information from.
+    """
 
-    class Config:
-        allow_population_by_field_name = True
+    async def discover(self) -> None:
+        update_members([])

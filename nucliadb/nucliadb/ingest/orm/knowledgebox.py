@@ -35,7 +35,7 @@ from nucliadb_protos.resources_pb2 import Basic
 
 from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
-from nucliadb.common.cluster.manager import get_index_node, load_active_nodes
+from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -377,8 +377,6 @@ class KnowledgeBox:
         else:
             shards_obj = writer_pb2.Shards()
             shards_obj.ParseFromString(payload)  # type: ignore
-
-            await load_active_nodes()
 
             for shard in shards_obj.shards:
                 # Delete the shard on nodes

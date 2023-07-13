@@ -23,9 +23,7 @@ import random
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
-from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.maindb.driver import Transaction
@@ -44,7 +42,6 @@ from .exceptions import (
     ShardNotFound,
     ShardsNotFound,
 )
-from .index_node import IndexNode
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -420,21 +417,6 @@ def sorted_nodes(avoid_nodes: Optional[list[str]] = None) -> list[str]:
         nid for nid in available_node_ids if nid not in preferred_nodes
     ]
     return preferred_node_order
-
-
-async def load_active_nodes():
-    from nucliadb_utils.settings import nucliadb_settings
-
-    stub = WriterStub(aio.insecure_channel(nucliadb_settings.nucliadb_ingest))
-    request = writer_pb2.ListMembersRequest()
-    members: writer_pb2.ListMembersResponse = await stub.ListMembers(request)  # type: ignore
-    for member in members.members:
-        INDEX_NODES[member.id] = IndexNode(
-            id=member.id,
-            address=member.listen_address,
-            shard_count=member.shard_count,
-            dummy=member.dummy,
-        )
 
 
 async def clean_and_upgrade(

@@ -494,12 +494,15 @@ pub struct Member {
     #[prost(string, tag="2")]
     pub listen_address: ::prost::alloc::string::String,
     //// If true, it means self.
+    #[deprecated]
     #[prost(bool, tag="3")]
     pub is_self: bool,
     //// Io, Ingest, Search, Train.
+    #[deprecated]
     #[prost(enumeration="member::Type", tag="4")]
     pub r#type: i32,
     //// Dummy Member
+    #[deprecated]
     #[prost(bool, tag="5")]
     pub dummy: bool,
     //// The load score of the member.

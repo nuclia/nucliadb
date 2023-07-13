@@ -53,7 +53,7 @@ class ApplicationContext:
     async def initialize(self) -> None:
         self.kv_driver = await setup_driver()
         self.blob_storage = await get_storage()
-        self.shard_manager = await setup_cluster(self.service_name)
+        self.shard_manager = await setup_cluster()
         self.partitioning = start_partitioning_utility()
         if not cluster_settings.standalone_mode:
             self.indexing = await start_indexing_utility()

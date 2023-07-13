@@ -17,15 +17,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+from __future__ import annotations
 
-from pydantic import BaseModel, Field
+import asyncio
+
+from nucliadb.common.cluster import manager
+from nucliadb_telemetry import metrics
+
+SHARD_COUNT = metrics.Gauge("nucliadb_node_shard_count", labels={"node": ""})
 
 
-class ClusterMember(BaseModel):
-    node_id: str = Field(alias="id")
-    listen_addr: str = Field(alias="address")
-    shard_count: Optional[int]
+def update_node_metrics():
+    all_nodes = manager.get_index_nodes()
 
-    class Config:
-        allow_population_by_field_name = True
+    for node in all_nodes:
+        SHARD_COUNT.set(node.shard_count, labels=dict(node=node.id))
+
+
+async def run_exporter():
+    while True:
+        await asyncio.sleep(10)
+        update_node_metrics()
