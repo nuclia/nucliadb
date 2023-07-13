@@ -67,7 +67,7 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 
 _PARAGRAPHS_CACHE_UTIL = "paragraphs_cache"
 
-EXTRACTED_TEXT_CACHE: LRUCache = LRUCache(maxsize=1000)
+EXTRACTED_TEXT_CACHE: LRUCache = LRUCache(maxsize=128)
 EXTRACTED_TEXT_CACHE_OPS = metrics.Counter(
     "nucliadb_extracted_text_cache_ops", labels={"type": ""}
 )
