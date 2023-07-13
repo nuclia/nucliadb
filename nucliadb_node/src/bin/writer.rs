@@ -31,13 +31,14 @@ use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{metrics, NodeResult};
-use nucliadb_node::env;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
-use nucliadb_node::writer::NodeWriterService;
+use nucliadb_node::writer::grpc_driver::{
+    GrpcWriterOptions, NodeWriterEvent, NodeWriterGRPCDriver,
+};
+use nucliadb_node::{env, writer};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -60,24 +61,27 @@ async fn main() -> NodeResult<()> {
     let start_bootstrap = Instant::now();
     let _guard = init_telemetry()?;
     let metrics = metrics::get_metrics();
-    let data_path = env::data_path();
-    let metadata_path = env::metadata_path();
 
+    let data_path = env::data_path();
     if !data_path.exists() {
         std::fs::create_dir(data_path)?;
     }
 
-    let mut node_writer_service = NodeWriterService::new()?;
+    let metadata_path = env::metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
 
-    if !env::lazy_loading() {
-        node_writer_service.load_shards()?;
-    }
+    // XXX it probably should be moved to a more clear abstraction
+    writer::initialize()?;
 
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
     let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
-    let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(grpc_sender);
+    let grpc_options = GrpcWriterOptions {
+        lazy_loading: env::lazy_loading(),
+    };
+    let grpc_driver = NodeWriterGRPCDriver::new(grpc_options).with_sender(grpc_sender);
+    grpc_driver.initialize().await?;
+
     let host_key_path = env::host_key_path();
     let public_ip = env::public_ip().await;
     let chitchat_port = env::chitchat_port();

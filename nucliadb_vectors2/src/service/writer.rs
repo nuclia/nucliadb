@@ -286,7 +286,7 @@ impl VectorWriterService {
         std::fs::create_dir(&config.path)?;
         std::fs::create_dir(&config.vectorset)?;
         let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified"));
+            return Err(node_error!("A similarity must be specified"));
         };
         let metadata = IndexMetadata { similarity };
         let default = Index::new(&config.path, metadata).and_then(|i| Index::writer(&i))?;

@@ -76,15 +76,15 @@ async def test_indexing_not_found(worker, reader):
     node = settings.force_host_id
     shard = "fake-shard"
 
+    with pytest.raises(AioRpcError):
+        await reader.get_shard(ShardId(id=shard))
+
     resource = resource_payload(shard)
     index = await create_indexing_message(resource, "kb", shard, node)
     await send_indexing_message(worker, index, node)  # type: ignore
 
-    sipb = ShardId()
-    sipb.id = shard
-
-    with pytest.raises(AioRpcError):
-        await reader.get_shard(sipb)
+    # Make sure message is consumed even if the shard doesn't exist
+    await wait_for_indexed_message("kb")
 
 
 @pytest.mark.asyncio
@@ -102,6 +102,7 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
     await send_indexing_message(worker, indexpb, node_id)  # type: ignore
 
     msg = await waiting_task
+    assert msg is not None, "Message has not been received"
 
     assert msg.subject == const.PubSubChannels.RESOURCE_NOTIFY.format(kbid="kb")
     notification = Notification()
@@ -181,6 +182,6 @@ async def wait_for_indexed_message(kbid: str):
     try:
         msg = await asyncio.wait_for(future, 10)
     except TimeoutError:  # pragma: no cover
-        pass
+        print("Timeout while waiting for resource indexing notification")
     finally:
         return msg

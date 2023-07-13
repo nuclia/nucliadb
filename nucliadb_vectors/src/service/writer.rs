@@ -450,7 +450,7 @@ mod tests {
             vectorset: dir.path().join("vectorsets"),
         };
 
-        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
         let indexes: HashMap<_, _> = (0..10)
             .map(|i| create_vector_set(&mut writer, i.to_string()))
             .collect();

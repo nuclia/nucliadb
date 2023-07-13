@@ -333,7 +333,9 @@ impl Writer {
             };
             if !in_use_dp.contains(&dpid) {
                 info!("found garbage {name}");
-                let Err(err)  = DataPoint::delete(location, dpid) else { continue };
+                let Err(err) = DataPoint::delete(location, dpid) else {
+                    continue;
+                };
                 warn!("{name} is garbage and could not be deleted because of {err}");
             }
         }

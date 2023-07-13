@@ -416,7 +416,7 @@ class SearchParamDefaults:
     shards = ParamDefault(
         default=[],
         title="Shards",
-        description="The list of shards to search in. If empty, all shards will be searched",
+        description="The list of shard replicas to search in. If empty, random replicas will be selected.",
     )
     page_number = ParamDefault(
         default=0,

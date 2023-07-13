@@ -53,6 +53,8 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=DEBUG",  # noqa
+        "DEBUG": "1",
     },
     "options": {
         "command": [
@@ -73,7 +75,8 @@ images.settings["nucliadb_node_writer"] = {
         "CHITCHAT_PORT": "4444",
         "SEED_NODES": "",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_cluster=DEBUG",
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=DEBUG",  # noqa
+        "DEBUG": "1",
     },
     "options": {
         "command": [
@@ -176,14 +179,14 @@ async def writer_stub(node_single):
 
 
 @pytest.fixture(scope="function")
-async def reader() -> AsyncIterable[Reader]:
+async def reader(node_single) -> AsyncIterable[Reader]:
     reader = Reader(settings.reader_listen_address)
     yield reader
     await reader.close()
 
 
 @pytest.fixture(scope="function")
-async def writer() -> AsyncIterable[Writer]:
+async def writer(node_single) -> AsyncIterable[Writer]:
     writer = Writer(settings.writer_listen_address)
     yield writer
     await writer.close()
@@ -235,10 +238,10 @@ async def sidecar_stub(worker):
 async def shard(writer_stub: NodeWriterStub) -> AsyncIterable[str]:
     request = NewShardRequest(kbid="test")
     shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
+
     yield shard.id
-    sid = ShardId()
-    sid.id = shard.id
-    await writer_stub.DeleteShard(sid)  # type: ignore
+
+    await writer_stub.DeleteShard(ShardId(id=shard.id))  # type: ignore
 
 
 @pytest.fixture(scope="function")

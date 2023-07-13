@@ -152,6 +152,9 @@ jobs:
           shared-key: "test_prebuild"
 
       - uses: actions-rs/cargo@v1
+        env:
+          DEBUG: 1
+          RUST_BACKTRACE: 1
         name: cargo test
         with:
           command: test

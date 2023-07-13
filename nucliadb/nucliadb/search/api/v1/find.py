@@ -37,6 +37,7 @@ from nucliadb.search.search.query import (
     global_query_to_pb,
     pre_process_query,
 )
+from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -203,9 +204,8 @@ async def find(
     audit = get_audit()
     start_time = time()
 
-    if item.query == "" and (item.vector is None or len(item.vector) == 0):
-        # If query is not defined we force to not return vector results
-        if SearchOptions.VECTOR in item.features:
+    if SearchOptions.VECTOR in item.features:
+        if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
     min_score = item.min_score
