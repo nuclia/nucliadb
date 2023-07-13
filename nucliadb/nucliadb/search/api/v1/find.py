@@ -37,11 +37,7 @@ from nucliadb.search.search.query import (
     global_query_to_pb,
     pre_process_query,
 )
-from nucliadb.search.search.utils import (
-    has_user_vectors,
-    is_empty_query,
-    is_exact_match_query,
-)
+from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -209,9 +205,7 @@ async def find(
     start_time = time()
 
     if SearchOptions.VECTOR in item.features:
-        if is_exact_match_query(item) or (
-            is_empty_query(item) and not has_user_vectors(item)
-        ):
+        if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
     min_score = item.min_score

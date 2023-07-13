@@ -79,9 +79,23 @@ def has_user_vectors(request: BaseSearchRequest) -> bool:
     return request.vector is not None and len(request.vector) > 0
 
 
-def is_exact_match_query(request: BaseSearchRequest) -> bool:
-    return (
-        len(request.query.split(" ")) == 1
-        and request.query[0] == '"'
-        and request.query[-1] == '"'
-    )
+def is_exact_match_only_query(request: BaseSearchRequest) -> bool:
+    """
+    '"something"' -> True
+    'foo "something" else' -> False
+    """
+    query_split = request.query.strip().split('"')
+    return len(query_split) == 3 and query_split[0] == "" and query_split[2] == ""
+
+
+def should_disable_vector_search(request: BaseSearchRequest) -> bool:
+    if has_user_vectors(request):
+        return False
+
+    if is_exact_match_only_query(request):
+        return True
+
+    if is_empty_query(request):
+        return True
+
+    return False

@@ -39,10 +39,8 @@ from nucliadb.search.search.query import (
     pre_process_query,
 )
 from nucliadb.search.search.utils import (
-    has_user_vectors,
-    is_empty_query,
-    is_exact_match_query,
     parse_sort_options,
+    should_disable_vector_search,
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -309,9 +307,7 @@ async def search(
     sort_options = parse_sort_options(item)
 
     if SearchOptions.VECTOR in item.features:
-        if is_exact_match_query(item) or (
-            is_empty_query(item) and not has_user_vectors(item)
-        ):
+        if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
     min_score = item.min_score

@@ -22,7 +22,8 @@ import pytest
 from nucliadb.search.search.utils import (
     has_user_vectors,
     is_empty_query,
-    is_exact_match_query,
+    is_exact_match_only_query,
+    should_disable_vector_search,
 )
 from nucliadb_models.search import SearchRequest
 
@@ -46,12 +47,15 @@ def test_is_empty_query(item, empty):
         ("some", False),
         ("some query terms", False),
         ('"something"', True),
+        ('   "something"', True),
+        ('"something"   ', True),
         ('"something exact"', True),
-        ('"something exact" but no', False),
+        ('"something exact" and something else', False),
     ],
 )
-def test_is_exact_match_query(query, exact_match):
-    assert is_exact_match_query(SearchRequest(query=query)) is exact_match
+def test_is_exact_match_only_query(query, exact_match):
+    item = SearchRequest(query=query)
+    assert is_exact_match_only_query(item) is exact_match
 
 
 @pytest.mark.parametrize(
@@ -64,3 +68,17 @@ def test_is_exact_match_query(query, exact_match):
 )
 def test_has_user_vectors(item, has_vectors):
     assert has_user_vectors(item) is has_vectors
+
+
+@pytest.mark.parametrize(
+    "item,disable_vectors",
+    [
+        (SearchRequest(query=""), True),
+        (SearchRequest(query='"exact match"'), True),
+        (SearchRequest(query="foo"), False),
+        (SearchRequest(query="", vector=[1.0, 2.0]), False),
+        (SearchRequest(query='"exact match"', vector=[1.0, 2.0]), False),
+    ],
+)
+def test_should_disable_vectors(item, disable_vectors):
+    assert should_disable_vector_search(item) is disable_vectors
