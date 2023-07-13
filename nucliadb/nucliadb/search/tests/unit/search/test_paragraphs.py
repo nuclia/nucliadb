@@ -127,3 +127,24 @@ class TestGetParagraphText:
             )
             == "Cached Value!"
         )
+
+
+async def test_get_field_extracted_text_is_cached(field):
+    field.kbid = "kbid"
+    field.uuid = "rid"
+    field.id = "fid"
+
+    await paragraphs.get_field_extracted_text(field)
+    await paragraphs.get_field_extracted_text(field)
+
+    field.get_extracted_text.assert_awaited_once()
+    assert "kbid/rid/fid" in paragraphs.EXTRACTED_TEXT_CACHE.keys()
+
+
+async def test_get_field_extracted_text_is_not_cached_when_none(field):
+    field.get_extracted_text = AsyncMock(return_value=None)
+
+    await paragraphs.get_field_extracted_text(field)
+    await paragraphs.get_field_extracted_text(field)
+
+    assert field.get_extracted_text.await_count == 2

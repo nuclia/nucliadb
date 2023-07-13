@@ -23,6 +23,8 @@ import re
 import string
 from typing import Optional
 
+from cachetools import LRUCache
+from nucliadb_protos.utils_pb2 import ExtractedText
 from redis import asyncio as aioredis
 from redis.asyncio.client import Redis
 
@@ -64,6 +66,11 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 )
 
 _PARAGRAPHS_CACHE_UTIL = "paragraphs_cache"
+
+EXTRACTED_TEXT_CACHE: LRUCache = LRUCache(maxsize=1000)
+EXTRACTED_TEXT_CACHE_OPS = metrics.Counter(
+    "nucliadb_extracted_text_cache_ops", labels={"type": ""}
+)
 
 
 class ParagraphsCache:
@@ -146,6 +153,21 @@ async def initialize_cache() -> None:
     set_utility(_PARAGRAPHS_CACHE_UTIL, paragraphs_cache)
 
 
+async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
+    key = f"{field.kbid}/{field.uuid}/{field.id}"
+    cached = EXTRACTED_TEXT_CACHE.get(key)
+    if cached is not None:
+        EXTRACTED_TEXT_CACHE_OPS.inc({"type": "hit"})
+        return cached
+    else:
+        EXTRACTED_TEXT_CACHE_OPS.inc({"type": "miss"})
+        extracted_text = await field.get_extracted_text()
+        if extracted_text is not None:
+            # Only cache if we actually have extracted text
+            EXTRACTED_TEXT_CACHE[key] = extracted_text
+        return extracted_text
+
+
 @GET_PARAGRAPH_LATENCY.wrap({"type": "full"})
 async def get_paragraph_from_full_text(
     *, field: Field, start: int, end: int, split: Optional[str] = None
@@ -155,7 +177,7 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    extracted_text = await field.get_extracted_text()
+    extracted_text = await get_field_extracted_text(field)
     if extracted_text is None:
         logger.warning(f"{field} extracted_text does not exist on DB")
         return ""
