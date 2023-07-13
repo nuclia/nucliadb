@@ -84,8 +84,8 @@ def is_exact_match_only_query(request: BaseSearchRequest) -> bool:
     '"something"' -> True
     'foo "something" else' -> False
     """
-    query_split = request.query.strip().split('"')
-    return len(query_split) == 3 and query_split[0] == "" and query_split[2] == ""
+    query = request.query.strip()
+    return len(query) > 0 and query[0] == '"' and query[-1] == '"'
 
 
 def should_disable_vector_search(request: BaseSearchRequest) -> bool:
