@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
+import random
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -129,13 +131,22 @@ class TestGetParagraphText:
         )
 
 
+async def fake_get_extracted_text_from_gcloud(*args, **kwargs):
+    await asyncio.sleep(random.uniform(0, 1))
+    return ExtractedText(text=b"Hello World!")
+
+
 async def test_get_field_extracted_text_is_cached(field):
     field.kbid = "kbid"
     field.uuid = "rid"
     field.id = "fid"
+    # Simulate a slow response from GCloud
+    field.get_extracted_text = AsyncMock(
+        side_effect=fake_get_extracted_text_from_gcloud
+    )
 
-    await paragraphs.get_field_extracted_text(field)
-    await paragraphs.get_field_extracted_text(field)
+    # Run 10 times in parallel to check that the cache is working
+    await asyncio.wait([paragraphs.get_field_extracted_text(field) for _ in range(10)])
 
     field.get_extracted_text.assert_awaited_once()
     assert "kbid/rid/fid" in paragraphs.EXTRACTED_TEXT_CACHE.keys()

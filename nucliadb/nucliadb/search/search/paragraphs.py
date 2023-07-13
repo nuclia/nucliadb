@@ -71,6 +71,7 @@ EXTRACTED_TEXT_CACHE: LRUCache = LRUCache(maxsize=128)
 EXTRACTED_TEXT_CACHE_OPS = metrics.Counter(
     "nucliadb_extracted_text_cache_ops", labels={"type": ""}
 )
+EXTRACTED_TEXT_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 class ParagraphsCache:
@@ -159,7 +160,14 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     if cached is not None:
         EXTRACTED_TEXT_CACHE_OPS.inc({"type": "hit"})
         return cached
-    else:
+
+    async with EXTRACTED_TEXT_LOCKS.setdefault(key, asyncio.Lock()):
+        # Check again in case another task already fetched it
+        cached = EXTRACTED_TEXT_CACHE.get(key)
+        if cached is not None:
+            EXTRACTED_TEXT_CACHE_OPS.inc({"type": "hit"})
+            return cached
+
         EXTRACTED_TEXT_CACHE_OPS.inc({"type": "miss"})
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
