@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.noderesources_pb2 import EmptyQuery
 import asyncio
+import logging
+
+from nucliadb_protos.noderesources_pb2 import EmptyQuery
+
 from nucliadb_models.cluster import ClusterMember
 from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
-import logging
+
 from .abc import AbstractClusterDiscovery, update_members
 
 logger = logging.getLogger(__name__)
