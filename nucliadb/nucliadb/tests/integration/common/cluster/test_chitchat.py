@@ -31,7 +31,7 @@ async def chitchat_monitor_client():
     disc = ChitchatAutoDiscovery(
         Settings(chitchat_binding_host="0.0.0.0", chitchat_binding_port=free_port())
     )
-    await disc.initialilze()
+    await disc.initialize()
 
     def make_client_fixture():
         client_base_url = "http://test"

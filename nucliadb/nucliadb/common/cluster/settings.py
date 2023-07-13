@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     local_writer_threads: int = 5
 
     cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.CHITCHAT
+    cluster_discovery_k8s_number_of_nodes: int = 3
     cluster_discovery_manual_addresses: list[str] = []
 
 

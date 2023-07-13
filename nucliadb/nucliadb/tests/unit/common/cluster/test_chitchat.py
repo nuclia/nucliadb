@@ -53,7 +53,7 @@ async def test_chitchat_monitor(start_server):
     chitchat = ChitchatAutoDiscovery(
         Settings(chitchat_binding_host="127.0.0.1", chitchat_binding_port=8888)
     )
-    await chitchat.initialilze()
+    await chitchat.initialize()
     chitchat.server = AsyncMock()
     await chitchat.finalize()
     chitchat.server.shutdown.assert_awaited_once()

@@ -17,6 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_protos.noderesources_pb2 import EmptyQuery
+
+from nucliadb_models.cluster import ClusterMember
+from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
+from nucliadb_utils.grpc import get_traced_grpc_channel
+
 from .abc import AbstractPullDiscovery, update_members
 
 
@@ -26,4 +32,20 @@ class KubernetesDiscovery(AbstractPullDiscovery):
     """
 
     async def discover(self) -> None:
-        update_members([])
+        members = []
+        for index in range(self.settings.cluster_discovery_k8s_number_of_nodes):
+            address = f"node-{index}.node.nucliadb.svc.cluster.local"
+            grpc_address = f"{address}:{self.settings.node_writer_port}"
+            channel = get_traced_grpc_channel(
+                grpc_address, "discovery", variant="_writer"
+            )
+            stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
+            metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(EmptyQuery())  # type: ignore
+            members.append(
+                ClusterMember(
+                    id=metadata.node_id,
+                    address=address,
+                    shard_count=metadata.shard_count,
+                )
+            )
+        update_members(members)

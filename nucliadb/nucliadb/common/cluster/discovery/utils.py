@@ -53,7 +53,7 @@ async def setup_cluster_discovery() -> None:
         )
 
     disc = klass(settings)
-    await disc.initialilze()
+    await disc.initialize()
     set_utility(UTIL_NAME, disc)
 
 

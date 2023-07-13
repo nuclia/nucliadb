@@ -63,7 +63,7 @@ class AbstractClusterDiscovery(abc.ABC):
         self.settings = settings
 
     @abc.abstractmethod
-    async def initialilze(self) -> None:
+    async def initialize(self) -> None:
         """ """
 
     @abc.abstractmethod

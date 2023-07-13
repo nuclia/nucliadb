@@ -82,7 +82,6 @@ async fn main() -> NodeResult<()> {
     let grpc_driver = NodeWriterGRPCDriver::new(grpc_options).with_sender(grpc_sender);
     grpc_driver.initialize().await?;
 
-    let host_key_path = env::host_key_path();
     let public_ip = env::public_ip().await;
     let chitchat_port = env::chitchat_port();
     let seed_nodes = env::seed_nodes();
@@ -90,7 +89,7 @@ async fn main() -> NodeResult<()> {
     let chitchat_addr = SocketAddr::from_str(&format!("{}:{}", public_ip, chitchat_port))?;
 
     // Cluster
-    let host_key = read_or_create_host_key(&host_key_path)?;
+    let host_key = env::read_or_create_host_key()?;
     let node = Node::builder()
         .register_as(NodeType::Io)
         .on_local_network(chitchat_addr)
@@ -258,34 +257,4 @@ pub async fn update_node_metadata(
     }
 
     info!("Node update task stopped");
-}
-
-pub fn read_host_key(host_key_path: &Path) -> Result<Uuid> {
-    let host_key_contents = fs::read(host_key_path)
-        .with_context(|| format!("Failed to read host key from '{}'", host_key_path.display()))?;
-
-    let host_key = Uuid::from_slice(host_key_contents.as_slice())
-        .with_context(|| format!("Invalid host key from '{}'", host_key_path.display()))?;
-
-    Ok(host_key)
-}
-
-/// Reads the key that makes a node unique from the given file.
-/// If the file does not exist, it generates an ID and writes it to the file
-/// so that it can be reused on reboot.
-pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
-    let host_key;
-
-    if host_key_path.exists() {
-        host_key = read_host_key(host_key_path)?;
-        info!(host_key=?host_key, host_key_path=?host_key_path, "Read existing host key.");
-    } else {
-        host_key = Uuid::new_v4();
-        fs::write(host_key_path, host_key.as_bytes()).with_context(|| {
-            format!("Failed to write host key to '{}'", host_key_path.display())
-        })?;
-        info!(host_key=?host_key, host_key_path=?host_key_path, "Create new host key.");
-    }
-
-    Ok(host_key)
 }
