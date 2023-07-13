@@ -63,18 +63,23 @@ spec:
           operator: Equal
           value: present
       containers:
-        - command:
+        - name: node-reader
+          command:
             - node_reader
+          securityContext:
+            privileged: true
+          image: "{{ $values.containerRegistry }}/{{ $values.image }}"
+          imagePullPolicy: {{ $values.imagePullPolicy }}
           env:
             - name: METRICS_HTTP_PORT
               value: "3031"
-            - name: EXAMPLE
-              value: VALUE
+            {{- range $key, $value := $values.env }}
+            - name: "{{ $key }}"
+              value: {{ tpl $value $ | toJson }}
+            {{- end }}
           envFrom:
             - configMapRef:
                 name: node-config
-          image: eu.gcr.io/stashify-218417/node:b7e3f15
-          imagePullPolicy: IfNotPresent
           livenessProbe:
             exec:
               command:
@@ -86,7 +91,6 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1
-          name: node-reader
           ports:
             - containerPort: 10001
               name: grpc-reader
@@ -105,10 +109,6 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 1
-          securityContext:
-            privileged: true
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
           volumeMounts:
             - mountPath: /data
               name: node-pv
@@ -138,17 +138,7 @@ spec:
 {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
       volumes:
-        - name: nats-creds
-          secret:
-            defaultMode: 420
-            secretName: nats-nucliadb-creds
-        - name: regional-nats-creds
-          secret:
-            defaultMode: 420
-            secretName: nats-regional-creds
         - name: node-pv
           persistentVolumeClaim:
             claimName: node-pv-node-{{ $index }}
