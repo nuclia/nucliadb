@@ -28,6 +28,7 @@ use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
 use nucliadb_node::writer::grpc_driver::{GrpcWriterOptions, NodeWriterGRPCDriver};
+use nucliadb_node::{env, reader, writer};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Server};
@@ -48,6 +49,7 @@ async fn start_reader(addr: SocketAddr) {
         return;
     }
     tokio::spawn(async move {
+        reader::initialize();
         let options = GrpcReaderOptions { lazy_loading: true };
         let grpc_driver = NodeReaderGRPCDriver::new(options);
         grpc_driver
@@ -80,6 +82,7 @@ async fn start_writer(addr: SocketAddr) {
         std::fs::create_dir(&data_path).expect("Can not create data directory");
     }
     tokio::spawn(async move {
+        writer::initialize().expect("Writer initialization has failed");
         let options = GrpcWriterOptions { lazy_loading: true };
         let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(options));
         Server::builder()
@@ -122,6 +125,18 @@ async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::
     .await?;
 
     Ok(())
+}
+
+fn initialize_file_system() {
+    let data_path = env::data_path();
+    if !data_path.exists() {
+        std::fs::create_dir(&data_path).expect("Cannot create data directory");
+    }
+
+    let shards_path = env::shards_path();
+    if !shards_path.exists() {
+        std::fs::create_dir(&shards_path).expect("Cannot create shards directory");
+    }
 }
 
 async fn node_reader_server() -> anyhow::Result<()> {
