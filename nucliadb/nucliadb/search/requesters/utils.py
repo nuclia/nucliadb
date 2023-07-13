@@ -141,7 +141,7 @@ async def node_query(
 
     for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = choose_node(shard_obj, shards)
+            node, shard_id, node_id = choose_node(shard_obj, target_replicas=shards)
         except KeyError:
             incomplete_results = True
         else:
