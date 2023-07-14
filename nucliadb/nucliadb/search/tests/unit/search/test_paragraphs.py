@@ -146,17 +146,13 @@ async def test_get_field_extracted_text_is_cached(field):
     )
 
     # Run 10 times in parallel to check that the cache is working
-    futures = [paragraphs.get_field_extracted_text(field) for _ in range(10)]
+    etcache = paragraphs.ExtractedTextCache()
+    futures = [
+        paragraphs.get_field_extracted_text(field, cache=etcache) for _ in range(10)
+    ]
     await asyncio.gather(*futures)
 
     field.get_extracted_text.assert_awaited_once()
-
-    assert "kbid/rid/fid" in paragraphs.get_extracted_cache().keys()
-
-    paragraphs.clear_request_state()
-
-    assert paragraphs.extracted_cache.get().currsize == 0
-    assert len(paragraphs.extracted_locks.get()) == 0
 
 
 async def test_get_field_extracted_text_is_not_cached_when_none(field):
@@ -166,3 +162,21 @@ async def test_get_field_extracted_text_is_not_cached_when_none(field):
     await paragraphs.get_field_extracted_text(field)
 
     assert field.get_extracted_text.await_count == 2
+
+
+def test_extracted_text_cache():
+    etcache = paragraphs.ExtractedTextCache()
+    assert etcache.get_value("foo") is None
+
+    assert isinstance(etcache.get_lock("foo"), asyncio.Lock)
+    assert len(etcache.locks) == 1
+
+    etcache.set_value("foo", "bar")
+    assert len(etcache.values) == 1
+
+    assert etcache.get_value("foo") == "bar"
+
+    etcache.clear()
+
+    assert len(etcache.values) == 0
+    assert len(etcache.locks) == 0

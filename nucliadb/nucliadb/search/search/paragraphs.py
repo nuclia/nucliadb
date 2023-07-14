@@ -21,10 +21,8 @@ import asyncio
 import logging
 import re
 import string
-from contextvars import ContextVar
 from typing import Optional
 
-from cachetools import TTLCache
 from nucliadb_protos.utils_pb2 import ExtractedText
 from redis import asyncio as aioredis
 from redis.asyncio.client import Redis
@@ -68,29 +66,33 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 
 _PARAGRAPHS_CACHE_UTIL = "paragraphs_cache"
 
-extracted_cache: ContextVar[TTLCache] = ContextVar(
-    "extracted_cache", default=TTLCache(maxsize=128, ttl=60 * 5)
-)
-extracted_locks: ContextVar[dict[str, asyncio.Lock]] = ContextVar(
-    "extracted_lock", default=TTLCache(maxsize=1024, ttl=60)
-)
 EXTRACTED_CACHE_OPS = metrics.Counter(
     "nucliadb_extracted_text_cache_ops", labels={"type": ""}
 )
 
 
-def get_extracted_lock(key: str) -> asyncio.Lock:
-    locks = extracted_locks.get()
-    return locks.setdefault(key, asyncio.Lock())
+class ExtractedTextCache:
+    """
+    Used to cache extracted text from a resource in memory during
+    the process of search results serialization.
+    """
 
+    def __init__(self):
+        self.locks = {}
+        self.values = {}
 
-def get_extracted_cache() -> TTLCache:
-    return extracted_cache.get()
+    def get_value(self, key: str) -> Optional[ExtractedText]:
+        return self.values.get(key)
 
+    def get_lock(self, key: str) -> asyncio.Lock:
+        return self.locks.setdefault(key, asyncio.Lock())
 
-def clear_request_state() -> None:
-    extracted_cache.get().clear()
-    extracted_locks.get().clear()
+    def set_value(self, key: str, value: ExtractedText) -> None:
+        self.values[key] = value
+
+    def clear(self):
+        self.values.clear()
+        self.locks.clear()
 
 
 class ParagraphsCache:
@@ -173,18 +175,21 @@ async def initialize_cache() -> None:
     set_utility(_PARAGRAPHS_CACHE_UTIL, paragraphs_cache)
 
 
-async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
+async def get_field_extracted_text(
+    field: Field, cache: Optional[ExtractedTextCache] = None
+) -> Optional[ExtractedText]:
+    if cache is None:
+        return await field.get_extracted_text()
+
     key = f"{field.kbid}/{field.uuid}/{field.id}"
-    cache = get_extracted_cache()
-    extracted_text = cache.get(key)
+    extracted_text = cache.get_value(key)
     if extracted_text is not None:
         EXTRACTED_CACHE_OPS.inc({"type": "hit"})
         return extracted_text
 
-    async with get_extracted_lock(key):
+    async with cache.get_lock(key):
         # Check again in case another task already fetched it
-        cache = get_extracted_cache()
-        extracted_text = cache.get(key)
+        extracted_text = cache.get_value(key)
         if extracted_text is not None:
             EXTRACTED_CACHE_OPS.inc({"type": "hit"})
             return extracted_text
@@ -193,22 +198,27 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
             # Only cache if we actually have extracted text
-            cache[key] = extracted_text
+            cache.set_value(key, extracted_text)
         return extracted_text
 
 
 @GET_PARAGRAPH_LATENCY.wrap({"type": "full"})
 async def get_paragraph_from_full_text(
-    *, field: Field, start: int, end: int, split: Optional[str] = None
+    *,
+    field: Field,
+    start: int,
+    end: int,
+    split: Optional[str] = None,
+    extracted_text_cache: Optional[ExtractedTextCache] = None,
 ) -> str:
     """
     Pull paragraph from full text stored in database.
 
     This requires downloading the full text and then slicing it.
     """
-    extracted_text = await get_field_extracted_text(field)
+    extracted_text = await get_field_extracted_text(field, cache=extracted_text_cache)
     if extracted_text is None:
-        logger.warning(f"{field} extracted_text does not exist on DB")
+        logger.warning(f"{field} extracted_text does not exist on DB yet")
         return ""
 
     if split not in (None, ""):
@@ -232,6 +242,7 @@ async def get_paragraph_text(
     orm_resource: Optional[
         ResourceORM
     ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
+    extracted_text_cache: Optional[ExtractedTextCache] = None,
 ) -> str:
     if orm_resource is None:
         orm_resource = await get_resource_from_cache(kbid, rid)
@@ -261,7 +272,11 @@ async def get_paragraph_text(
         return cache_val
 
     text = await get_paragraph_from_full_text(
-        field=field_obj, start=start, end=end, split=split
+        field=field_obj,
+        start=start,
+        end=end,
+        split=split,
+        extracted_text_cache=extracted_text_cache,
     )
 
     if highlight:

@@ -46,8 +46,8 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import metrics
 
-from .metrics import merge_observer
 from . import paragraphs
+from .metrics import merge_observer
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
@@ -61,6 +61,7 @@ async def set_text_value(
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: Optional[List[str]] = None,
+    extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
     # TODO: Improve
     await max_operations.acquire()
@@ -77,6 +78,7 @@ async def set_text_value(
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
+            extracted_text_cache=extracted_text_cache,
         )
     finally:
         max_operations.release()
@@ -147,9 +149,8 @@ async def fetch_find_metadata(
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
-
     orderer = Orderer()
-
+    etcache = paragraphs.ExtractedTextCache()
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
             find_resource = find_resources.setdefault(
@@ -191,9 +192,11 @@ async def fetch_find_metadata(
                     highlight=highlight,
                     ematches=ematches,
                     max_operations=max_operations,
+                    extracted_text_cache=etcache,
                 )
             )
             resources.add(result_paragraph.rid)
+    etcache.clear()
 
     for order, (rid, field_id, paragraph_id) in enumerate(
         orderer.sorted_by_insertion()
@@ -216,8 +219,6 @@ async def fetch_find_metadata(
     FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
     if len(operations) > 0:
         await asyncio.wait(operations)  # type: ignore
-
-    paragraphs.clear_request_state()
 
 
 def merge_paragraphs_vectors(
