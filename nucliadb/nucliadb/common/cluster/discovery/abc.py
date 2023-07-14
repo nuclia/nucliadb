@@ -22,14 +22,14 @@ import asyncio
 import logging
 
 from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
-from nucliadb_models.cluster import ClusterMember
 
 logger = logging.getLogger(__name__)
 
 
-def update_members(members: list[ClusterMember]) -> None:
+def update_members(members: list[IndexNodeMetadata]) -> None:
     # First add new nodes or update existing ones
     valid_ids = []
     for member in members:
@@ -42,18 +42,18 @@ def update_members(members: list[ClusterMember]) -> None:
 
         node = manager.get_index_node(member.node_id)
         if node is None:
-            logger.debug(f"{member.node_id} add {member.listen_addr}")
+            logger.debug(f"{member.node_id} add {member.address}")
             manager.add_index_node(
                 IndexNode(
                     id=member.node_id,
-                    address=member.listen_addr,
+                    address=member.address,
                     shard_count=shard_count,
                 )
             )
             logger.debug("Node added")
         else:
             logger.debug(f"{member.node_id} update")
-            node.address = member.listen_addr
+            node.address = member.address
             node.shard_count = shard_count
             logger.debug("Node updated")
 

@@ -22,7 +22,11 @@ from __future__ import annotations
 import asyncio
 
 from nucliadb.common.cluster import manager
+from nucliadb.common.context import ApplicationContext
 from nucliadb_telemetry import metrics
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.utils import setup_telemetry
+from nucliadb_utils.fastapi.run import serve_metrics
 
 SHARD_COUNT = metrics.Gauge("nucliadb_node_shard_count", labels={"node": ""})
 
@@ -38,3 +42,21 @@ async def run_exporter():
     while True:
         await asyncio.sleep(10)
         update_node_metrics()
+
+
+async def run(forever: bool = False):
+    setup_logging()
+    await setup_telemetry("metrics-exporter")
+
+    context = ApplicationContext("metrics-exporter")
+    await context.initialize()
+    metrics_server = await serve_metrics()
+    try:
+        await run_exporter()
+    finally:
+        await context.finalize()
+        await metrics_server.shutdown()
+
+
+def main():
+    asyncio.run(run())

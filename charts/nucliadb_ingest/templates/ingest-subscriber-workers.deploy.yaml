@@ -26,6 +26,7 @@ spec:
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
       labels:
         app: ingest-subscriber-workers
+        metrics: "enabled"
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"

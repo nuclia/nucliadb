@@ -24,9 +24,9 @@ import pytest
 
 from nucliadb.common.cluster.discovery.abc import update_members
 from nucliadb.common.cluster.discovery.chitchat import ChitchatAutoDiscovery
+from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb.common.cluster.settings import Settings
-from nucliadb_models.cluster import ClusterMember
 
 
 @pytest.fixture(scope="function")
@@ -42,9 +42,9 @@ def get_cluster_member(
     node_id="foo",
     listen_addr="192.1.1.1:8080",
     shard_count=0,
-) -> ClusterMember:
-    return ClusterMember(
-        node_id=node_id, listen_addr=listen_addr, shard_count=shard_count
+) -> IndexNodeMetadata:
+    return IndexNodeMetadata(
+        node_id=node_id, address=listen_addr, shard_count=shard_count, name="name"
     )
 
 
@@ -66,23 +66,18 @@ async def test_update_available_nodes():
     update_members([])
     assert len(INDEX_NODES) == 0
 
-    # Check that it ignores itself
-    member = get_cluster_member(is_self=True)
-    update_members([member])
-    assert len(INDEX_NODES) == 0
-
     # Check it registers new members
     member = get_cluster_member(node_id="node1")
     update_members([member])
     assert len(INDEX_NODES) == 1
     node = INDEX_NODES["node1"]
-    assert node.address == member.listen_addr
+    assert node.address == member.address
 
     assert node.shard_count == member.shard_count
 
     # Check that it updates loads score for registered members
     member.shard_count = 2
-    member.listen_addr = "0.0.0.0:7777"
+    member.address = "0.0.0.0:7777"
     member2 = get_cluster_member(node_id="node2", shard_count=1)
     update_members([member, member2])
     assert len(INDEX_NODES) == 2

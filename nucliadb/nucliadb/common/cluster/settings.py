@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     local_writer_threads: int = 5
 
     cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.CHITCHAT
+    cluster_discovery_kubernetes_namespace: str = "nucliadb"
     cluster_discovery_manual_addresses: list[str] = []
 
 

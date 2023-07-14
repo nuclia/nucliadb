@@ -32,6 +32,7 @@ spec:
       name: node
       labels:
         app: node
+        metrics: "enabled"
         app.kubernetes.io/name: node
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/managed-by: {{ .Release.Service }}

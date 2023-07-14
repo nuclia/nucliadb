@@ -26,7 +26,7 @@ from nucliadb.common.cluster.discovery.abc import (
     AbstractClusterDiscovery,
     update_members,
 )
-from nucliadb_models.cluster import ClusterMember
+from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
@@ -48,8 +48,9 @@ class ManualDiscovery(AbstractClusterDiscovery):
             stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
             metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(EmptyQuery())  # type: ignore
             members.append(
-                ClusterMember(
-                    id=metadata.node_id,
+                IndexNodeMetadata(
+                    node_id=metadata.node_id,
+                    name=metadata.node_id,
                     address=address,
                     shard_count=metadata.shard_count,
                 )

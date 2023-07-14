@@ -20,7 +20,9 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Optional
 
+import pydantic
 from fastapi import APIRouter, FastAPI, Response
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
@@ -29,17 +31,36 @@ from nucliadb.common.cluster.discovery.abc import (
     AbstractClusterDiscovery,
     update_members,
 )
+from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb.common.cluster.settings import Settings
 from nucliadb.ingest import logger
-from nucliadb_models.cluster import ClusterMember
 from nucliadb_utils.fastapi.run import start_server
 
 api_router = APIRouter()
 
 
+class ClusterMember(pydantic.BaseModel):
+    node_id: str = pydantic.Field(alias="id")
+    listen_addr: str = pydantic.Field(alias="address")
+    shard_count: Optional[int]
+
+    class Config:
+        allow_population_by_field_name = True
+
+
 @api_router.patch("/members", status_code=204)
 async def api_update_members(members: list[ClusterMember]) -> Response:
-    update_members(members)
+    update_members(
+        [
+            IndexNodeMetadata(
+                node_id=member.node_id,
+                name=member.node_id,
+                address=member.listen_addr,
+                shard_count=member.shard_count or 0,
+            )
+            for member in members
+        ]
+    )
     return Response(status_code=204)
 
 
@@ -81,5 +102,9 @@ class ChitchatAutoDiscovery(AbstractClusterDiscovery):
 
     async def finalize(self) -> None:
         logger.info("Chitchat closed")
-        await self.server.shutdown()
+        try:
+            await self.server.shutdown()
+        except AttributeError:  # pragma: no cover
+            # Problem with uvicorn that can happen in tests
+            pass
         self.task.cancel()

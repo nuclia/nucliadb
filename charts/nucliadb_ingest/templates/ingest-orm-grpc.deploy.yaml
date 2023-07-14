@@ -26,6 +26,7 @@ spec:
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
       labels:
         app: ingest-orm-grpc
+        metrics: "enabled"
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
@@ -79,7 +80,7 @@ spec:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}
         - name: metrics
-          containerPort: {{ .Values.serving.metricsPort }}
+          containerPort: {{.Values.serving.metricsPort }}
         resources:
 {{ toYaml .Values.ingest_orm_grpc_resources | indent 10 }}
 {{- if .Values.nats.secretName }}

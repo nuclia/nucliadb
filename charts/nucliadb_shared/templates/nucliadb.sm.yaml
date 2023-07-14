@@ -2,9 +2,8 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: train-monitor
+  name: ndb-sm
   labels:
-    app: train
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
@@ -15,9 +14,9 @@ spec:
     - "{{ .Release.Namespace }}"
   selector:
     matchLabels:
-      app: train
+      metrics: "enabled"
   endpoints:
-  - targetPort: {{ .Values.serving.metricsPort }}
+  - targetPort: 3030
     interval: 10s
     path: /metrics
 {{- end }}

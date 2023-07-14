@@ -1,31 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ingest-processed-consumer
+  name: metrics-exporter
   labels:
-    app: ingest-processed-consumer
+    app: metrics-exporter
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: {{ .Values.ingest_processed_consumer_replicaCount }}
+  replicas: 1
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
-      app: ingest-processed-consumer
+      app: metrics-exporter
       release: "{{ .Release.Name }}"
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      name: ingest-processed-consumer
+      name: metrics-exporter
       annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }}"
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
       labels:
-        app: ingest-processed-consumer
+        app: metrics-exporter
         metrics: "enabled"
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
@@ -42,25 +44,11 @@ spec:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
       containers:
-      - name: ingest-processed-consumer
+      - name: metrics-exporter
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-          initialDelaySeconds: 10
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
-        livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-          initialDelaySeconds: 10
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
         command: [
-          "nucliadb-ingest-processed-consumer"
+          "nucliadb-migration-runner"
         ]
         envFrom:
         - configMapRef:
@@ -77,12 +65,8 @@ spec:
             value: {{ tpl $value $ | toJson }}
         {{- end }}
         ports:
-        - name: grpc-ingest
-          containerPort: {{ .Values.serving.grpc }}
         - name: metrics
           containerPort: {{ .Values.serving.metricsPort }}
-        resources:
-{{ toYaml .Values.ingest_processed_consumer_resources | indent 10 }}
 {{- if .Values.nats.secretName }}
         volumeMounts:
           - name: nats-creds
