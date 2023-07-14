@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from contextvars import ContextVar
 import logging
 import re
 import string
@@ -67,11 +68,32 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 
 _PARAGRAPHS_CACHE_UTIL = "paragraphs_cache"
 
-EXTRACTED_TEXT_CACHE: LRUCache = LRUCache(maxsize=128)
-EXTRACTED_TEXT_CACHE_OPS = metrics.Counter(
+extracted_cache: ContextVar[Optional[LRUCache]] = ContextVar("extracted_cache", default=None)
+extracted_locks: ContextVar[dict[str, asyncio.Lock]] = ContextVar("extracted_lock", default={})
+EXTRACTED_CACHE_OPS = metrics.Counter(
     "nucliadb_extracted_text_cache_ops", labels={"type": ""}
 )
-EXTRACTED_TEXT_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _get_extracted_lock(key: str) -> asyncio.Lock:
+    locks = extracted_locks.get()
+    return locks.setdefault(key, asyncio.Lock())
+
+
+def _clear_extracted_locks() -> None:
+    extracted_locks.set({})
+
+
+def _get_extracted_cache() -> LRUCache:
+    cache = extracted_cache.get()
+    if cache is None:
+        cache = LRUCache(maxsize=128)
+        extracted_cache.set(cache)
+    return cache
+
+
+def _clear_extracted_cache() -> None:
+    extracted_cache.set(None)
 
 
 class ParagraphsCache:
@@ -156,23 +178,24 @@ async def initialize_cache() -> None:
 
 async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     key = f"{field.kbid}/{field.uuid}/{field.id}"
-    cached = EXTRACTED_TEXT_CACHE.get(key)
+    extracted_cache = _get_extracted_cache()
+    cached = extracted_cache.get(key)
     if cached is not None:
-        EXTRACTED_TEXT_CACHE_OPS.inc({"type": "hit"})
+        EXTRACTED_CACHE_OPS.inc({"type": "hit"})
         return cached
 
-    async with EXTRACTED_TEXT_LOCKS.setdefault(key, asyncio.Lock()):
+    async with _get_extracted_lock(key):
         # Check again in case another task already fetched it
-        cached = EXTRACTED_TEXT_CACHE.get(key)
+        cached = extracted_cache.get(key)
         if cached is not None:
-            EXTRACTED_TEXT_CACHE_OPS.inc({"type": "hit"})
+            EXTRACTED_CACHE_OPS.inc({"type": "hit"})
             return cached
 
-        EXTRACTED_TEXT_CACHE_OPS.inc({"type": "miss"})
+        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
             # Only cache if we actually have extracted text
-            EXTRACTED_TEXT_CACHE[key] = extracted_text
+            extracted_cache[key] = extracted_text
         return extracted_text
 
 
