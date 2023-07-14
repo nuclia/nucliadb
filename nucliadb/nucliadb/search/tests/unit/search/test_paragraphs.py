@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
+import random
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -127,3 +129,54 @@ class TestGetParagraphText:
             )
             == "Cached Value!"
         )
+
+
+async def fake_get_extracted_text_from_gcloud(*args, **kwargs):
+    await asyncio.sleep(random.uniform(0, 1))
+    return ExtractedText(text=b"Hello World!")
+
+
+async def test_get_field_extracted_text_is_cached(field):
+    field.kbid = "kbid"
+    field.uuid = "rid"
+    field.id = "fid"
+    # Simulate a slow response from GCloud
+    field.get_extracted_text = AsyncMock(
+        side_effect=fake_get_extracted_text_from_gcloud
+    )
+
+    # Run 10 times in parallel to check that the cache is working
+    etcache = paragraphs.ExtractedTextCache()
+    futures = [
+        paragraphs.get_field_extracted_text(field, cache=etcache) for _ in range(10)
+    ]
+    await asyncio.gather(*futures)
+
+    field.get_extracted_text.assert_awaited_once()
+
+
+async def test_get_field_extracted_text_is_not_cached_when_none(field):
+    field.get_extracted_text = AsyncMock(return_value=None)
+
+    await paragraphs.get_field_extracted_text(field)
+    await paragraphs.get_field_extracted_text(field)
+
+    assert field.get_extracted_text.await_count == 2
+
+
+def test_extracted_text_cache():
+    etcache = paragraphs.ExtractedTextCache()
+    assert etcache.get_value("foo") is None
+
+    assert isinstance(etcache.get_lock("foo"), asyncio.Lock)
+    assert len(etcache.locks) == 1
+
+    etcache.set_value("foo", "bar")
+    assert len(etcache.values) == 1
+
+    assert etcache.get_value("foo") == "bar"
+
+    etcache.clear()
+
+    assert len(etcache.values) == 0
+    assert len(etcache.locks) == 0
