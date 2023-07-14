@@ -47,7 +47,7 @@ from nucliadb_models.search import (
 from nucliadb_telemetry import metrics
 
 from .metrics import merge_observer
-from .paragraphs import get_paragraph_text
+from . import paragraphs
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
@@ -67,7 +67,7 @@ async def set_text_value(
     try:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
-        result_paragraph.paragraph.text = await get_paragraph_text(
+        result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             rid=result_paragraph.rid,
             field=result_paragraph.field,
@@ -216,6 +216,8 @@ async def fetch_find_metadata(
     FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
     if len(operations) > 0:
         await asyncio.wait(operations)  # type: ignore
+
+    paragraphs.clear_request_state()
 
 
 def merge_paragraphs_vectors(

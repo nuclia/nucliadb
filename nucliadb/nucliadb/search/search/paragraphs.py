@@ -18,13 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from contextvars import ContextVar
 import logging
 import re
 import string
+from contextvars import ContextVar
 from typing import Optional
 
-from cachetools import LRUCache
+from cachetools import TTLCache
 from nucliadb_protos.utils_pb2 import ExtractedText
 from redis import asyncio as aioredis
 from redis.asyncio.client import Redis
@@ -68,32 +68,29 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 
 _PARAGRAPHS_CACHE_UTIL = "paragraphs_cache"
 
-extracted_cache: ContextVar[Optional[LRUCache]] = ContextVar("extracted_cache", default=None)
-extracted_locks: ContextVar[dict[str, asyncio.Lock]] = ContextVar("extracted_lock", default={})
+extracted_cache: ContextVar[TTLCache] = ContextVar(
+    "extracted_cache", default=TTLCache(maxsize=128, ttl=60 * 5)
+)
+extracted_locks: ContextVar[dict[str, asyncio.Lock]] = ContextVar(
+    "extracted_lock", default=TTLCache(maxsize=1024, ttl=60)
+)
 EXTRACTED_CACHE_OPS = metrics.Counter(
     "nucliadb_extracted_text_cache_ops", labels={"type": ""}
 )
 
 
-def _get_extracted_lock(key: str) -> asyncio.Lock:
+def get_extracted_lock(key: str) -> asyncio.Lock:
     locks = extracted_locks.get()
     return locks.setdefault(key, asyncio.Lock())
 
 
-def _clear_extracted_locks() -> None:
-    extracted_locks.set({})
+def get_extracted_cache() -> TTLCache:
+    return extracted_cache.get()
 
 
-def _get_extracted_cache() -> LRUCache:
-    cache = extracted_cache.get()
-    if cache is None:
-        cache = LRUCache(maxsize=128)
-        extracted_cache.set(cache)
-    return cache
-
-
-def _clear_extracted_cache() -> None:
-    extracted_cache.set(None)
+def clear_request_state() -> None:
+    extracted_cache.get().clear()
+    extracted_locks.get().clear()
 
 
 class ParagraphsCache:
@@ -178,24 +175,25 @@ async def initialize_cache() -> None:
 
 async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
     key = f"{field.kbid}/{field.uuid}/{field.id}"
-    extracted_cache = _get_extracted_cache()
-    cached = extracted_cache.get(key)
-    if cached is not None:
+    cache = get_extracted_cache()
+    extracted_text = cache.get(key)
+    if extracted_text is not None:
         EXTRACTED_CACHE_OPS.inc({"type": "hit"})
-        return cached
+        return extracted_text
 
-    async with _get_extracted_lock(key):
+    async with get_extracted_lock(key):
         # Check again in case another task already fetched it
-        cached = extracted_cache.get(key)
-        if cached is not None:
+        cache = get_extracted_cache()
+        extracted_text = cache.get(key)
+        if extracted_text is not None:
             EXTRACTED_CACHE_OPS.inc({"type": "hit"})
-            return cached
+            return extracted_text
 
         EXTRACTED_CACHE_OPS.inc({"type": "miss"})
         extracted_text = await field.get_extracted_text()
         if extracted_text is not None:
             # Only cache if we actually have extracted text
-            extracted_cache[key] = extracted_text
+            cache[key] = extracted_text
         return extracted_text
 
 
