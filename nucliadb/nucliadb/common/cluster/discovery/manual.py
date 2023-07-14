@@ -22,11 +22,13 @@ import logging
 
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 
+from nucliadb.common.cluster.discovery.abc import (
+    AbstractClusterDiscovery,
+    update_members,
+)
 from nucliadb_models.cluster import ClusterMember
 from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
-
-from .abc import AbstractClusterDiscovery, update_members
 
 logger = logging.getLogger(__name__)
 

@@ -19,13 +19,12 @@
 
 from typing import Type, Union
 
+from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
+from nucliadb.common.cluster.discovery.chitchat import ChitchatAutoDiscovery
+from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
+from nucliadb.common.cluster.discovery.manual import ManualDiscovery
+from nucliadb.common.cluster.settings import ClusterDiscoveryMode, settings
 from nucliadb_utils.utilities import clean_utility, get_utility, set_utility
-
-from ..settings import ClusterDiscoveryMode, settings
-from .abc import AbstractClusterDiscovery
-from .chitchat import ChitchatAutoDiscovery
-from .k8s import KubernetesDiscovery
-from .manual import ManualDiscovery
 
 UTIL_NAME = "cluster-discovery"
 

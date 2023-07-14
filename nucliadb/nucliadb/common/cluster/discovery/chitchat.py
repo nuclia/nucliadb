@@ -25,12 +25,14 @@ from fastapi import APIRouter, FastAPI, Response
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
+from nucliadb.common.cluster.discovery.abc import (
+    AbstractClusterDiscovery,
+    update_members,
+)
+from nucliadb.common.cluster.settings import Settings
 from nucliadb.ingest import logger
 from nucliadb_models.cluster import ClusterMember
 from nucliadb_utils.fastapi.run import start_server
-
-from ..settings import Settings
-from .abc import AbstractClusterDiscovery, update_members
 
 api_router = APIRouter()
 

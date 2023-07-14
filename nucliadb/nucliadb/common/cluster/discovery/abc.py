@@ -21,11 +21,10 @@ import abc
 import asyncio
 import logging
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.common.cluster.settings import Settings
 from nucliadb_models.cluster import ClusterMember
-
-from .. import manager
-from ..index_node import IndexNode
-from ..settings import Settings
 
 logger = logging.getLogger(__name__)
 

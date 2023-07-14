@@ -21,19 +21,26 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+from dataclasses import dataclass
 
 import kubernetes
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
+from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.common.cluster.settings import Settings
 from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
-from .. import manager
-from ..index_node import IndexNode
-from ..settings import Settings
-from .abc import AbstractClusterDiscovery
-
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class NodeData:
+    node_id: str
+    sts_name: str
+    shard_count: int
 
 
 class KubernetesDiscovery(AbstractClusterDiscovery):
@@ -42,7 +49,8 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
     """
 
     cluster_task: asyncio.Task
-    watch_task: asyncio.Task
+    watch_update_queue_task: asyncio.Task
+    update_node_data_cache_task: asyncio.Task
     k8s_watch: kubernetes.watch.Watch
 
     def __init__(self, settings: Settings) -> None:
@@ -50,19 +58,24 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         self.queue = asyncio.Queue()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.k8s_watch = kubernetes.watch.Watch()
-        self.node_id_cache = {}
+        self.node_id_cache: dict[str, NodeData] = {}
         self.exit = False
 
-    async def get_node_id(self, sts_name: str) -> str:
+    async def get_node_metadata(self, sts_name: str) -> nodewriter_pb2.NodeMetadata:
+        address = f"{sts_name}.node.nucliadb.svc.cluster.local"
+        grpc_address = f"{address}:{self.settings.node_writer_port}"
+        channel = get_traced_grpc_channel(grpc_address, "discovery", variant="_writer")
+        stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
+        return await stub.GetMetadata(EmptyQuery())  # type: ignore
+
+    async def get_node_data(self, sts_name: str) -> NodeData:
         if sts_name not in self.node_id_cache:
-            address = f"{sts_name}.node.nucliadb.svc.cluster.local"
-            grpc_address = f"{address}:{self.settings.node_writer_port}"
-            channel = get_traced_grpc_channel(
-                grpc_address, "discovery", variant="_writer"
+            metadata = await self.get_node_metadata(sts_name)
+            self.node_id_cache[sts_name] = NodeData(
+                node_id=metadata.node_id,
+                sts_name=sts_name,
+                shard_count=metadata.shard_count,
             )
-            stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
-            metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(EmptyQuery())  # type: ignore
-            self.node_id_cache[sts_name] = metadata.node_id
         return self.node_id_cache[sts_name]
 
     async def update_node(self, event):
@@ -75,27 +88,30 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 break
 
         sts_name = event["object"].metadata.name
-        node_id = await self.get_node_id(sts_name)
+        node_data = await self.get_node_data(sts_name)
         address = f"{sts_name}.node.nucliadb.svc.cluster.local"
         if ready:
-            print(f"Update node {sts_name}: {node_id}")
-            node = manager.get_index_node(node_id)
+            logger.debug(f"Update node {sts_name}: {node_data.node_id}")
+            node = manager.get_index_node(node_data.node_id)
             if node is None:
-                logger.debug(f"{node_id} add {address}")
+                logger.debug(f"Adding node", extra={"node_id": node_data.node_id})
                 manager.add_index_node(
                     IndexNode(
-                        id=node_id,
+                        id=node_data.node_id,
                         address=address,
-                        shard_count=-1,
+                        shard_count=node_data.shard_count,
                     )
                 )
+            else:
+                node.address = address
+                node.shard_count = node_data.shard_count
         else:
-            print(f"Remove node {sts_name}: {node_id}")
-            node = manager.get_index_node(key)
+            logger.debug(f"Remove node", extra={"node_id": node_data.node_id})
+            node = manager.get_index_node(node_data.node_id)
             if node is not None:
-                manager.remove_index_node(node_id)
+                manager.remove_index_node(node_data.node_id)
 
-    async def watch(self) -> None:
+    async def watch_update_queue(self) -> None:
         while True:
             try:
                 event = await self.queue.get()
@@ -126,14 +142,33 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             ):
                 self.queue.put_nowait(event)
 
+    async def update_node_data_cache(self) -> None:
+        while True:
+            await asyncio.sleep(60)
+            try:
+                for sts_name in list(self.node_id_cache.keys()):
+                    node_data = await self.get_node_data(sts_name)
+                    self.node_id_cache[sts_name] = node_data
+                    node = manager.get_index_node(node_data.node_id)
+                    if node is not None:
+                        node.shard_count = node_data.shard_count
+            except asyncio.CancelledError:  # pragma: no cover
+                return
+            except Exception:  # pragma: no cover
+                logger.exception("Error while updating shard info.")
+
     async def initialize(self) -> None:
         self.cluster_task = asyncio.get_event_loop().run_in_executor(
             self.executor, self._initialize_cluster
         )
-        self.watch_task = asyncio.create_task(self.watch())
+        self.watch_update_queue_task = asyncio.create_task(self.watch_update_queue())
+        self.update_node_data_cache_task = asyncio.create_task(
+            self.update_node_data_cache()
+        )
 
     async def finalize(self) -> None:
         self.exit = True
         self.k8s_watch.stop()
         self.cluster_task.cancel()
-        self.watch_task.cancel()
+        self.watch_update_queue_task.cancel()
+        self.update_node_data_cache_task.cancel()
