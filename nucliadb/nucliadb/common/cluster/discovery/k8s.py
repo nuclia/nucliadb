@@ -23,9 +23,9 @@ import logging
 import os
 from dataclasses import dataclass
 
-import kubernetes_asyncio.client
-import kubernetes_asyncio.config
-import kubernetes_asyncio.watch
+import kubernetes_asyncio.client  # type: ignore
+import kubernetes_asyncio.config  # type: ignore
+import kubernetes_asyncio.watch  # type: ignore
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 
 from nucliadb.common.cluster import manager
