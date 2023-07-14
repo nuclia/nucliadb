@@ -55,4 +55,4 @@ idna>=3.3
 sniffio>=1.2.0
 
 async_lru==2.0.2
-kubernetes
+kubernetes_asyncio
