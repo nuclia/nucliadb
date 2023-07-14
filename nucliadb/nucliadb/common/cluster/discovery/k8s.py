@@ -156,6 +156,6 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
 
     async def finalize(self) -> None:
         self.k8s_watch.stop()
-        self.k8s_watch.close()
+        await self.k8s_watch.close()
         self.cluster_task.cancel()
         self.update_node_data_cache_task.cancel()
