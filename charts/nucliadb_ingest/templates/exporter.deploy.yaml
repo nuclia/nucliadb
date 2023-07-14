@@ -48,7 +48,7 @@ spec:
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: [
-          "nucliadb-migration-runner"
+          "nucliadb-metrics-exporter"
         ]
         envFrom:
         - configMapRef:
