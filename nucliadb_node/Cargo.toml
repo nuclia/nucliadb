@@ -58,12 +58,7 @@ thiserror = "1"
 opentelemetry = { version = "0.17", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.17.2"
 reqwest = "0.11.16"
-
-# Test dependencies
-tempfile = "3.2.0"
-regex = "1.5.5"
-lazy_static = "1.4.0"
-openssl = { version = "0.10", features = ["vendored"] }
+derive_builder = "0.12.0"
 
 # Text Service
 async-stream = "0.3.2"
@@ -134,3 +129,9 @@ tracing-subscriber = { version = "0.3.11", features = [
     "std",
 ] }
 uuid = { version = "1.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+serial_test = "2.0.0"
+
+tempfile = "3.2.0"
+regex = "1.5.5"
+lazy_static = "1.4.0"
+openssl = { version = "0.10", features = ["vendored"] }

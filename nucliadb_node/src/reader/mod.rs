@@ -37,7 +37,7 @@ use crate::services::reader::ShardReaderService;
 /// Initialize the index node reader. This function must be called before using
 /// a reader
 pub fn initialize() {
-    // We shallow the error if the threadpool was already initialized
+    // We swallow the error if the threadpool was already initialized
     let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
 }
 

@@ -32,11 +32,14 @@ use nucliadb_core::{metrics, NodeResult};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
+use nucliadb_node::services::shard_disk_structure;
+use nucliadb_node::settings::providers::env::EnvSettingsProvider;
+use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::{
     GrpcWriterOptions, NodeWriterEvent, NodeWriterGRPCDriver,
 };
-use nucliadb_node::{env, writer};
+use nucliadb_node::{utils, writer};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -56,15 +59,18 @@ pub enum NodeUpdate {
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let start_bootstrap = Instant::now();
+
+    let settings = EnvSettingsProvider::generate_settings()?;
+
     let _guard = init_telemetry()?;
     let metrics = metrics::get_metrics();
 
-    let data_path = env::data_path();
+    let data_path = settings.data_path();
     if !data_path.exists() {
-        std::fs::create_dir(data_path)?;
+        std::fs::create_dir(data_path.clone())?;
     }
 
-    let metadata_path = env::metadata_path();
+    let metadata_path = shard_disk_structure::metadata_path(&data_path);
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
 
     // XXX it probably should be moved to a more clear abstraction
@@ -74,19 +80,19 @@ async fn main() -> NodeResult<()> {
     let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
     let grpc_options = GrpcWriterOptions {
-        lazy_loading: env::lazy_loading(),
+        lazy_loading: settings.lazy_loading(),
     };
     let grpc_driver = NodeWriterGRPCDriver::new(grpc_options).with_sender(grpc_sender);
     grpc_driver.initialize().await?;
 
-    let public_ip = env::public_ip().await;
-    let chitchat_port = env::chitchat_port();
-    let seed_nodes = env::seed_nodes();
-
+    // Cluster
+    let public_ip = settings.public_ip();
+    let chitchat_port = settings.chitchat_port();
     let chitchat_addr = SocketAddr::from_str(&format!("{}:{}", public_ip, chitchat_port))?;
 
-    // Cluster
-    let host_key = env::read_or_create_host_key()?;
+    let host_key_path = settings.host_key_path();
+    let host_key = utils::read_or_create_host_key(host_key_path)?;
+    let seed_nodes = settings.seed_nodes();
     let node = Node::builder()
         .register_as(NodeType::Io)
         .on_local_network(chitchat_addr)
@@ -100,7 +106,10 @@ async fn main() -> NodeResult<()> {
 
     nucliadb_telemetry::sync::start_telemetry_loop();
 
-    tokio::spawn(start_grpc_service(grpc_driver));
+    tokio::spawn(start_grpc_service(
+        grpc_driver,
+        settings.writer_listen_address(),
+    ));
     {
         let task = update_node_metadata(
             update_sender,
@@ -147,7 +156,7 @@ async fn main() -> NodeResult<()> {
     // then close the chitchat TCP/IP connection
     node.shutdown().await?;
     // wait some time to handle latest gRPC calls
-    tokio::time::sleep(env::shutdown_delay()).await;
+    tokio::time::sleep(settings.shutdown_delay()).await;
 
     Ok(())
 }
@@ -165,10 +174,8 @@ async fn wait_for_sigkill() -> NodeResult<()> {
     Ok(())
 }
 
-pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
-    let addr = env::writer_listen_address();
-
-    info!("Listening for gRPC requests at: {:?}", addr);
+pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver, listen_address: SocketAddr) {
+    info!("Listening for gRPC requests at: {:?}", listen_address);
 
     let tracing_middleware = GrpcInstrumentorLayer::default();
     let debug_logs_middleware = GrpcDebugLogsLayer::default();
@@ -183,7 +190,7 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
         .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))
-        .serve(addr)
+        .serve(listen_address)
         .await
         .expect("Error starting gRPC service");
 }

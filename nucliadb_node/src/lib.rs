@@ -32,6 +32,8 @@ pub mod middleware;
 
 pub mod shards;
 
+pub mod settings;
+
 /// Global configuration enviromental variables
 pub mod env;
 
@@ -47,5 +49,5 @@ pub mod telemetry;
 /// GRPC writing service
 pub mod writer;
 
-/// Node's http service
+/// HTTP serving utilities
 pub mod http_server;

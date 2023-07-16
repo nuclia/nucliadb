@@ -23,12 +23,42 @@ mod versions;
 pub mod reader;
 pub mod writer;
 
-mod shard_disk_structure {
+/// Files and directories hierarchy
+///
+/// DATA_PATH
+/// |-- SHARDS_DIR
+///     |-- <shard-uuid>
+///         |-- PARAGRAPHS_DIR
+///         |-- RELATIONS_DIR
+///         |-- TEXTS_DIR
+///         |-- VECTORSET_DIR
+///         |-- VECTORS_DIR
+pub mod shard_disk_structure {
+    use std::path::{Path, PathBuf};
+
     pub const VERSION_FILE: &str = "versions.json";
-    pub const VECTORS_DIR: &str = "vectors";
-    pub const VECTORSET_DIR: &str = "vectorset";
-    pub const TEXTS_DIR: &str = "text";
+    pub const METADATA_FILE: &str = "metadata.json";
+
+    pub const SHARDS_DIR: &str = "shards";
+
     pub const PARAGRAPHS_DIR: &str = "paragraph";
     pub const RELATIONS_DIR: &str = "relations";
-    pub const METADATA_FILE: &str = "metadata.json";
+    pub const TEXTS_DIR: &str = "text";
+    pub const VECTORSET_DIR: &str = "vectorset";
+    pub const VECTORS_DIR: &str = "vectors";
+
+    /// Path to index node metadata file
+    pub fn metadata_path(data_path: &Path) -> PathBuf {
+        data_path.join(METADATA_FILE)
+    }
+
+    /// Path where all shards are stored
+    pub fn shards_path(data_path: &Path) -> PathBuf {
+        data_path.join(SHARDS_DIR)
+    }
+
+    /// Path where shard `id` is stored
+    pub fn shard_path_by_id(data_path: &Path, id: &str) -> PathBuf {
+        shards_path(data_path).join(id)
+    }
 }
