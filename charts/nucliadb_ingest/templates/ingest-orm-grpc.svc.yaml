@@ -4,6 +4,7 @@ metadata:
   name: ingest-orm-grpc
   labels:
     app: ingest-orm-grpc
+    metrics: "enabled"
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
@@ -21,3 +22,7 @@ spec:
       port: {{ .Values.chitchat.cluster_manager.port }}
       protocol: TCP
       appProtocol: tcp
+    - name: metrics
+      port: {{ .Values.serving.metricsPort}}
+      protocol: TCP
+      appProtocol: http

@@ -4,6 +4,7 @@ metadata:
   name: search
   labels:
     app: search
+    metrics: "enabled"
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
