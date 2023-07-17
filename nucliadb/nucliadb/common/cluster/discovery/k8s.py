@@ -33,7 +33,10 @@ import kubernetes_asyncio.watch  # type: ignore
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
+from nucliadb.common.cluster.discovery.abc import (
+    AVAILABLE_NODES,
+    AbstractClusterDiscovery,
+)
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
@@ -142,6 +145,8 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             if node is not None:
                 logger.warning(f"Remove node", extra={"node_id": node_data.node_id})
                 manager.remove_index_node(node_data.node_id)
+
+        AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
     async def watch_k8s_for_updates(self) -> None:
         if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/token"):
