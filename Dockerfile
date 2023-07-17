@@ -24,8 +24,8 @@ RUN apt-get update && apt-get install -y jq
 
 # Cachable pip install dependencies
 COPY nucliadb/requirements.txt requirements.txt
-RUN pip install --upgrade "pip<23.1" && \
-    pip install nucliadb-node-binding>=0.7.5 Cython==0.29.24 pybind11 gunicorn uvicorn uvloop asyncpg && \
+RUN pip install --upgrade pip wheel && \
+    pip install nucliadb-node-binding>=0.7.5 Cython==0.29.24 pybind11 uvicorn uvloop asyncpg && \
     pip install -r requirements.txt
 
 

@@ -55,8 +55,8 @@ RUN pip install /wheels/*.whl
 
 WORKDIR /usr/src/app
 
-RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop
-
+RUN pip install --upgrade pip wheel && \
+    pip install Cython==0.29.24 pybind11 uvicorn uvloop
 
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
