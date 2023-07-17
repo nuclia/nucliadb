@@ -255,7 +255,8 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.time.FromDatetime(datetime.now())
         auditrequest.trace_id = get_trace_id()
         auditrequest.chat.question = question
-        auditrequest.chat.answer = answer
+        if answer is not None:
+            auditrequest.chat.answer = answer
         await self.send(auditrequest)
 
 
