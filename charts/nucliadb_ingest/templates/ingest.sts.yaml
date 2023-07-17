@@ -34,6 +34,7 @@ spec:
         checksum/cm: {{ include (print $.Template.BasePath "/ingest.cm.yaml") . | sha256sum }}
       labels:
         app: ingest
+        metrics: "enabled"
         app.kubernetes.io/name: ingest
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/managed-by: {{ .Release.Service }}
