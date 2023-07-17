@@ -39,7 +39,6 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     RephraseModel,
 )
-from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.utilities import get_audit
 
 END_OF_STREAM = "_END_"
@@ -78,27 +77,30 @@ async def generate_answer(
         yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
         yield bytes_results
 
-    answer_generator = predict_generator
-    if do_audit and audit:
-        answer_generator = audited_generator(
-            predict_generator,
-            kbid=kbid,
-            user_id=user_id,
-            client_type=client_type,
-            origin=origin,
-            chat_request=chat_request,
-            audit=audit,
-        )
-
+    start_time = time()
     answer = []
-    async for data in answer_generator:
+    async for data in predict_generator:
         answer.append(data)
         yield data
 
+    text_answer = b"".join(answer)
+
+    if do_audit and audit is not None:
+        chat_answer = text_answer.decode()
+        if chat_answer == NOT_ENOUGH_CONTEXT_ANSWER:
+            chat_answer = None
+        await audit.chat(
+            kbid,
+            user_id,
+            client_type.to_proto(),
+            origin,
+            time() - start_time,
+            question=chat_request.query,
+            answer=chat_answer,
+        )
+
     if ChatOptions.RELATIONS in chat_request.features:
         yield END_OF_STREAM
-
-        text_answer = b"".join(answer)
 
         detected_entities = await predict.detect_entities(kbid, text_answer.decode())
         relation_request = RelationSearchRequest()
@@ -167,40 +169,3 @@ async def chat(
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
-
-
-def audited_generator(
-    predict_generator: AsyncIterator[bytes],
-    kbid: str,
-    user_id: str,
-    client_type: NucliaDBClientType,
-    origin: str,
-    chat_request: ChatRequest,
-    audit: AuditStorage,
-) -> AsyncIterator[bytes]:
-    """
-    Wrapps the answer generator coming from the predict api to send chat audit events
-    """
-
-    async def wrapper():
-        start_time = time()
-        answer = []
-        async for part in predict_generator:
-            answer.append(part)
-            yield part
-
-        answer_str = b"".join(answer).decode()
-        if answer_str == NOT_ENOUGH_CONTEXT_ANSWER:
-            answer_str = None
-
-        await audit.chat(
-            kbid,
-            user_id,
-            client_type.to_proto(),
-            origin,
-            time() - start_time,
-            question=chat_request.query,
-            answer=answer_str,
-        )
-
-    return wrapper()
