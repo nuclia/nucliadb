@@ -2174,26 +2174,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nucliadb_vectors2"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "fs2",
- "itertools",
- "lazy_static",
- "memmap2",
- "nucliadb_core",
- "rand 0.8.5",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "try-catch",
- "uuid 1.3.1",
-]
-
-[[package]]
 name = "num"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4056,17 +4036,6 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
-]
-
-[[package]]
-name = "try-catch"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ac07b511057dbab5380dbd9be97b8375c577136d45db42b63d039c83e54630"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
