@@ -235,6 +235,30 @@ class StreamAuditStorage(AuditStorage):
 
         await self.send(auditrequest)
 
+    async def chat(
+        self,
+        kbid: str,
+        user: str,
+        client_type: int,
+        origin: str,
+        timeit: float,
+        question: str,
+        answer: Optional[str],
+    ):
+        auditrequest = AuditRequest()
+        auditrequest.origin = origin
+        auditrequest.client_type = client_type  # type: ignore
+        auditrequest.userid = user
+        auditrequest.kbid = kbid
+        auditrequest.timeit = timeit
+        auditrequest.type = AuditRequest.CHAT
+        auditrequest.time.FromDatetime(datetime.now())
+        auditrequest.trace_id = get_trace_id()
+        auditrequest.chat.question = question
+        if answer is not None:
+            auditrequest.chat.answer = answer
+        await self.send(auditrequest)
+
 
 def get_trace_id() -> str:
     span = get_current_span()

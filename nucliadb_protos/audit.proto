@@ -32,6 +32,11 @@ enum ClientType {
   CHROME_EXTENSION = 5;
 }
 
+message ChatAudit {
+  string question = 1;
+  optional string answer = 2;
+}
+
 message AuditRequest {
   enum AuditType {
     VISITED = 0;
@@ -45,6 +50,7 @@ message AuditRequest {
     KB_DELETED = 8;
     SUGGEST = 9;
     INDEXED = 10;
+    CHAT = 11;
   }
 
   AuditType type = 1;
@@ -66,4 +72,5 @@ message AuditRequest {
   ClientType client_type = 16;
   string trace_id = 17;
   AuditKBCounter kb_counter = 18;
+  ChatAudit chat = 19;
 }

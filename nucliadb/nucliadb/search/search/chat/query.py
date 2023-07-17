@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+from time import monotonic as time
 from typing import AsyncIterator, List
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
@@ -35,10 +36,13 @@ from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
     Message,
+    NucliaDBClientType,
     RephraseModel,
 )
+from nucliadb_utils.utilities import get_audit
 
 END_OF_STREAM = "_END_"
+NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 
 
 async def rephrase_query_from_context(
@@ -56,11 +60,81 @@ async def rephrase_query_from_context(
     return await predict.rephrase_query(kbid, req)
 
 
+async def generate_answer(
+    results: KnowledgeboxFindResults,
+    kbid: str,
+    user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
+    predict: PredictEngine,
+    predict_generator: AsyncIterator[bytes],
+    chat_request: ChatRequest,
+    do_audit: bool = True,
+):
+    audit = get_audit()
+    if ChatOptions.PARAGRAPHS in chat_request.features:
+        bytes_results = base64.b64encode(results.json().encode())
+        yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+        yield bytes_results
+
+    start_time = time()
+    answer = []
+    async for data in predict_generator:
+        answer.append(data)
+        yield data
+
+    text_answer = b"".join(answer)
+
+    if do_audit and audit is not None:
+        decoded_answer = text_answer.decode()
+        audit_answer = (
+            decoded_answer if decoded_answer != NOT_ENOUGH_CONTEXT_ANSWER else None
+        )
+        await audit.chat(
+            kbid,
+            user_id,
+            client_type.to_proto(),
+            origin,
+            time() - start_time,
+            question=chat_request.query,
+            answer=audit_answer,
+        )
+
+    if ChatOptions.RELATIONS in chat_request.features:
+        yield END_OF_STREAM
+
+        detected_entities = await predict.detect_entities(kbid, text_answer.decode())
+        relation_request = RelationSearchRequest()
+        relation_request.subgraph.entry_points.extend(detected_entities)
+        relation_request.subgraph.depth = 1
+
+        relations_results: List[RelationSearchResponse]
+        (
+            relations_results,
+            _,
+            _,
+            _,
+        ) = await node_query(
+            kbid, Method.RELATIONS, relation_request, chat_request.shards
+        )
+        yield base64.b64encode(
+            (
+                await merge_relations_results(
+                    relations_results, relation_request.subgraph
+                )
+            )
+            .json()
+            .encode()
+        )
+
+
 async def chat(
     kbid: str,
     find_results: KnowledgeboxFindResults,
     chat_request: ChatRequest,
     user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
 ):
     predict = get_predict()
     context = chat_request.context or []
@@ -79,56 +153,17 @@ async def chat(
 
     ident, generator = await predict.chat_query(kbid, chat_model)
 
-    async def generate_answer(
-        results: KnowledgeboxFindResults,
-        kbid: str,
-        predict: PredictEngine,
-        generator: AsyncIterator[bytes],
-        features: List[ChatOptions],
-    ):
-        if ChatOptions.PARAGRAPHS in features:
-            bytes_results = base64.b64encode(results.json().encode())
-            yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
-            yield bytes_results
-
-        answer = []
-        async for data in generator:
-            answer.append(data)
-            yield data
-
-        if ChatOptions.RELATIONS in features:
-            yield END_OF_STREAM
-
-            text_answer = b"".join(answer)
-
-            detected_entities = await predict.detect_entities(
-                kbid, text_answer.decode()
-            )
-            relation_request = RelationSearchRequest()
-            relation_request.subgraph.entry_points.extend(detected_entities)
-            relation_request.subgraph.depth = 1
-
-            relations_results: List[RelationSearchResponse]
-            (
-                relations_results,
-                _,
-                _,
-                _,
-            ) = await node_query(
-                kbid, Method.RELATIONS, relation_request, chat_request.shards
-            )
-            yield base64.b64encode(
-                (
-                    await merge_relations_results(
-                        relations_results, relation_request.subgraph
-                    )
-                )
-                .json()
-                .encode()
-            )
-
     return StreamingResponse(
-        generate_answer(find_results, kbid, predict, generator, chat_request.features),
+        generate_answer(
+            find_results,
+            kbid,
+            user_id,
+            client_type,
+            origin,
+            predict,
+            generator,
+            chat_request=chat_request,
+        ),
         media_type="plain/text",
         headers={
             "NUCLIA-LEARNING-ID": ident or "unknown",
