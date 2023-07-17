@@ -20,10 +20,12 @@
 from __future__ import annotations
 
 import asyncio
+from enum import Enum
 from typing import Optional
 
 import pydantic
 from fastapi import APIRouter, FastAPI, Response
+from nucliadb_protos.writer_pb2 import Member
 from uvicorn.config import Config  # type: ignore
 from uvicorn.server import Server  # type: ignore
 
@@ -39,10 +41,47 @@ from nucliadb_utils.fastapi.run import start_server
 api_router = APIRouter()
 
 
+class MemberType(str, Enum):
+    IO = "Io"
+    SEARCH = "Search"
+    INGEST = "Ingest"
+    TRAIN = "Train"
+    UNKNOWN = "Unknown"
+
+    @staticmethod
+    def from_pb(node_type: Member.Type.ValueType):
+        if node_type == Member.Type.IO:
+            return MemberType.IO
+        elif node_type == Member.Type.SEARCH:
+            return MemberType.SEARCH
+        elif node_type == Member.Type.INGEST:
+            return MemberType.INGEST
+        elif node_type == Member.Type.TRAIN:
+            return MemberType.TRAIN
+        elif node_type == Member.Type.UNKNOWN:
+            return MemberType.UNKNOWN
+        else:
+            raise ValueError(f"incompatible node type '{node_type}'")
+
+    def to_pb(self) -> Member.Type.ValueType:
+        if self == MemberType.IO:
+            return Member.Type.IO
+        elif self == MemberType.SEARCH:
+            return Member.Type.SEARCH
+        elif self == MemberType.INGEST:
+            return Member.Type.INGEST
+        elif self == MemberType.TRAIN:
+            return Member.Type.TRAIN
+        else:
+            return Member.Type.UNKNOWN
+
+
 class ClusterMember(pydantic.BaseModel):
     node_id: str = pydantic.Field(alias="id")
     listen_addr: str = pydantic.Field(alias="address")
     shard_count: Optional[int]
+    type: MemberType = MemberType.UNKNOWN
+    is_self: bool = False
 
     class Config:
         allow_population_by_field_name = True
@@ -59,6 +98,7 @@ async def api_update_members(members: list[ClusterMember]) -> Response:
                 shard_count=member.shard_count or 0,
             )
             for member in members
+            if not member.is_self and member.type == MemberType.IO
         ]
     )
     return Response(status_code=204)

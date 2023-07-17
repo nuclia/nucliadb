@@ -47,7 +47,13 @@ async def chitchat_monitor_client():
 async def test_chitchat_monitor(chitchat_monitor_client):
     INDEX_NODES.clear()
     async with chitchat_monitor_client() as client:
-        member = dict(node_id=f"node", listen_addr=f"10.0.0.0", shard_count=20)
+        member = dict(
+            node_id=f"node",
+            listen_addr=f"10.0.0.0",
+            shard_count=20,
+            type="Io",
+            is_self=False,
+        )
         response = await client.patch("/members", json=[member])
         assert response.status_code == 204
     assert len(INDEX_NODES) == 1
