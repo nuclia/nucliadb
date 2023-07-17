@@ -138,9 +138,9 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 node.address = node_data.address
                 node.shard_count = node_data.shard_count
         else:
-            logger.warning(f"Remove node", extra={"node_id": node_data.node_id})
             node = manager.get_index_node(node_data.node_id)
             if node is not None:
+                logger.warning(f"Remove node", extra={"node_id": node_data.node_id})
                 manager.remove_index_node(node_data.node_id)
 
     async def watch_k8s_for_updates(self) -> None:
