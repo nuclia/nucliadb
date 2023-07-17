@@ -25,8 +25,11 @@ from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
+from nucliadb_telemetry import metrics
 
 logger = logging.getLogger(__name__)
+
+AVAILABLE_NODES = metrics.Gauge("nucliadb_nodes_available")
 
 
 def update_members(members: list[IndexNodeMetadata]) -> None:
@@ -72,6 +75,8 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
         logger.warning(
             f"{len(removed_node_ids)} nodes are down simultaneously. This should never happen!"
         )
+
+    AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
 
 class AbstractClusterDiscovery(abc.ABC):
