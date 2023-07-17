@@ -23,3 +23,7 @@ spec:
       port: {{ .Values.chitchat.cluster_manager.port }}
       protocol: TCP
       appProtocol: tcp
+    - name: metrics
+      port: {{ .Values.serving.metricsPort}}
+      protocol: TCP
+      appProtocol: http

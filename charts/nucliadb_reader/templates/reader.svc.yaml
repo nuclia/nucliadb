@@ -4,6 +4,7 @@ metadata:
   name: reader
   labels:
     app: reader
+    metrics: "enabled"
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"

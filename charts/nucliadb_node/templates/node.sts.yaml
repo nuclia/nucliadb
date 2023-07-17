@@ -26,13 +26,12 @@ spec:
     metadata:
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.nats.port }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }},3031,3032"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/node.cm.yaml") . | sha256sum }}
       name: node
       labels:
         app: node
-        metrics: "enabled"
         app.kubernetes.io/name: node
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/managed-by: {{ .Release.Service }}

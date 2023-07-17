@@ -21,7 +21,6 @@ spec:
       name: writer
       labels:
         app: writer
-        metrics: "enabled"
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"

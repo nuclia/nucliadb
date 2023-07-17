@@ -26,7 +26,6 @@ spec:
         checksum/cm: {{ include (print $.Template.BasePath "/search.cm.yaml") . | sha256sum }}
       labels:
         app: search
-        metrics: "enabled"
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
