@@ -177,15 +177,15 @@ def audited_generator(
     origin: str,
     chat_request: ChatRequest,
     audit: AuditStorage,
-):
+) -> AsyncIterator[bytes]:
     """
     Wrapps the answer generator coming from the predict api to send chat audit events
     """
 
-    async def wrapper(*args, **kwargs):
+    async def wrapper():
         start_time = time()
         answer = []
-        async for part in predict_generator(*args, **kwargs):
+        async for part in predict_generator:
             answer.append(part)
             yield part
 
@@ -203,4 +203,4 @@ def audited_generator(
             answer=answer_str,
         )
 
-    return wrapper
+    return wrapper()
