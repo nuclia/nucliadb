@@ -114,3 +114,13 @@ async def test_suggest(audit_storage: StreamAuditStorage, nats):
 
     await wait_for_queue(audit_storage)
     nats.jetstream().publish.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_chat(audit_storage: StreamAuditStorage, nats):
+    await audit_storage.chat(
+        "kbid", "user", 0, "origin", -1, question="foo", answer="bar"
+    )
+
+    await wait_for_queue(audit_storage)
+    nats.jetstream().publish.assert_called_once()
