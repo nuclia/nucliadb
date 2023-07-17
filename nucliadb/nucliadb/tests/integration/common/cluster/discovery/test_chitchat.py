@@ -20,32 +20,34 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common.cluster.chitchat import chitchat_app
+from nucliadb.common.cluster.discovery.chitchat import ChitchatAutoDiscovery
 from nucliadb.common.cluster.manager import INDEX_NODES
+from nucliadb.common.cluster.settings import Settings
+from nucliadb_utils.tests import free_port
 
 
 @pytest.fixture(scope="function")
 async def chitchat_monitor_client():
+    disc = ChitchatAutoDiscovery(
+        Settings(chitchat_binding_host="0.0.0.0", chitchat_binding_port=free_port())
+    )
+    await disc.initialize()
+
     def make_client_fixture():
         client_base_url = "http://test"
-        client = AsyncClient(app=chitchat_app, base_url=client_base_url)
+        client = AsyncClient(app=disc.app, base_url=client_base_url)
         return client
 
     yield make_client_fixture
+
+    await disc.finalize()
 
 
 @pytest.mark.asyncio
 async def test_chitchat_monitor(chitchat_monitor_client):
     INDEX_NODES.clear()
     async with chitchat_monitor_client() as client:
-        member = dict(
-            node_id=f"node",
-            listen_addr=f"10.0.0.0",
-            type="Io",
-            is_self=False,
-            shard_count=20,
-            online=True,
-        )
+        member = dict(node_id=f"node", listen_addr=f"10.0.0.0", shard_count=20)
         response = await client.patch("/members", json=[member])
         assert response.status_code == 204
     assert len(INDEX_NODES) == 1

@@ -17,13 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
+use std::{env, fs};
 
+use anyhow::{Context, Result};
 use nucliadb_core::tracing::*;
+use uuid::Uuid;
 
 use crate::utils::{parse_log_level, reliable_lookup_host};
 
@@ -304,4 +306,43 @@ pub fn max_shards_per_node() -> usize {
         }
         Err(_) => default,
     }
+}
+
+pub fn read_host_key() -> Result<Uuid> {
+    let hk_path = host_key_path();
+    let host_key_contents = fs::read(hk_path).with_context(|| {
+        format!(
+            "Failed to read host key from '{}'",
+            host_key_path().display()
+        )
+    })?;
+
+    let host_key = Uuid::from_slice(host_key_contents.as_slice())
+        .with_context(|| format!("Invalid host key from '{}'", host_key_path().display()))?;
+
+    Ok(host_key)
+}
+
+/// Reads the key that makes a node unique from the given file.
+/// If the file does not exist, it generates an ID and writes it to the file
+/// so that it can be reused on reboot.
+pub fn read_or_create_host_key() -> Result<Uuid> {
+    let hk_path = host_key_path();
+    let host_key;
+
+    if hk_path.exists() {
+        host_key = read_host_key()?;
+        info!(host_key=?host_key, "Read existing host key.");
+    } else {
+        host_key = Uuid::new_v4();
+        fs::write(hk_path, host_key.as_bytes()).with_context(|| {
+            format!(
+                "Failed to write host key to '{}'",
+                host_key_path().display()
+            )
+        })?;
+        info!(host_key=?host_key, host_key_path=?host_key_path(), "Create new host key.");
+    }
+
+    Ok(host_key)
 }

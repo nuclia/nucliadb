@@ -740,17 +740,20 @@ class NodeMetadata(google.protobuf.message.Message):
     LOAD_SCORE_FIELD_NUMBER: builtins.int
     SHARD_COUNT_FIELD_NUMBER: builtins.int
     SHARDS_FIELD_NUMBER: builtins.int
+    NODE_ID_FIELD_NUMBER: builtins.int
     load_score: builtins.float
     shard_count: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___NodeMetadata.ShardMetadata]: ...
+    node_id: builtins.str
     def __init__(
         self,
         *,
         load_score: builtins.float = ...,
         shard_count: builtins.int = ...,
         shards: collections.abc.Mapping[builtins.str, global___NodeMetadata.ShardMetadata] | None = ...,
+        node_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["load_score", b"load_score", "shard_count", b"shard_count", "shards", b"shards"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["load_score", b"load_score", "node_id", b"node_id", "shard_count", b"shard_count", "shards", b"shards"]) -> None: ...
 
 global___NodeMetadata = NodeMetadata

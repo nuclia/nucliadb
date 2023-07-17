@@ -40,7 +40,7 @@ resources: {}
 
 serving:
   grpc: 8030
-  metricsPort: 8081
+  metricsPort: 3030
 serviceMonitor:
   enabled: false
 chitchat:

@@ -17,9 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import enum
 from typing import Optional
 
 from pydantic import BaseSettings, Field
+
+
+class ClusterDiscoveryMode(str, enum.Enum):
+    CHITCHAT = "chitchat"
+    MANUAL = "manual"
+    KUBERNETES = "kubernetes"
 
 
 class Settings(BaseSettings):
@@ -57,9 +64,9 @@ class Settings(BaseSettings):
     local_reader_threads: int = 5
     local_writer_threads: int = 5
 
-    # if you're running locally without chitchat but want
-    # to load cluster remote nodes manually, set this to True
-    manual_load_cluster_nodes: bool = False
+    cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.CHITCHAT
+    cluster_discovery_kubernetes_namespace: str = "nucliadb"
+    cluster_discovery_manual_addresses: list[str] = []
 
 
 settings = Settings()

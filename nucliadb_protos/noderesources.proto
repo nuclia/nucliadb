@@ -176,5 +176,6 @@ message NodeMetadata {
     }
     float load_score = 1 [deprecated = true];
     uint64 shard_count = 2;
-    map<string, ShardMetadata> shards = 3;
+    map<string, ShardMetadata> shards = 3 [deprecated = true];
+    string node_id = 4;
 }

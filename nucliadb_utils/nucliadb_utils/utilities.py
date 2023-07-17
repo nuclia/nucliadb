@@ -71,7 +71,6 @@ class Utility(str, Enum):
     CACHE = "cache"
     SHARD_MANAGER = "shard_manager"
     COUNTER = "counter"
-    CHITCHAT = "chitchat"
     PUBSUB = "pubsub"
     INDEXING = "indexing"
     AUDIT = "audit"

@@ -361,13 +361,13 @@ message Member {
     string listen_address = 2;
 
     /// If true, it means self.
-    bool is_self = 3;
+    bool is_self = 3 [deprecated = true];
 
     /// Io, Ingest, Search, Train.
-    Type type = 4;
+    Type type = 4 [deprecated = true];
 
     /// Dummy Member
-    bool dummy = 5;
+    bool dummy = 5 [deprecated = true];
 
     /// The load score of the member.
     float load_score = 6 [deprecated = true];

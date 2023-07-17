@@ -45,6 +45,7 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
     fn from(node_metadata: NodeMetadata) -> Self {
         nucliadb_core::protos::NodeMetadata {
             shard_count: node_metadata.shard_count,
+            node_id: env::read_host_key().unwrap().to_string(),
             ..Default::default()
         }
     }

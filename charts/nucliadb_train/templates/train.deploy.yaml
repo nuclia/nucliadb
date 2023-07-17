@@ -26,6 +26,7 @@ spec:
         checksum/cm: {{ include (print $.Template.BasePath "/train.cm.yaml") . | sha256sum }}
       labels:
         app: train
+        metrics: "enabled"
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"

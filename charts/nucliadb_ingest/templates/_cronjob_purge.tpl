@@ -28,6 +28,7 @@ spec:
         metadata:
           labels:
             app: "{{ .Chart.Name }}"
+            metrics: "enabled"
             role: cronjobs
             version: "{{ .Values.hash }}"
             release: "{{ .Release.Name }}"

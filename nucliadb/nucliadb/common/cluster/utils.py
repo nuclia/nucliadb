@@ -16,12 +16,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional, Union
+from typing import Union
 
-from nucliadb.common.cluster.chitchat import (
-    ChitchatMonitor,
-    start_chitchat,
-    stop_chitchat,
+from nucliadb.common.cluster.discovery.utils import (
+    setup_cluster_discovery,
+    teardown_cluster_discovery,
 )
 from nucliadb.common.cluster.manager import KBShardManager, StandaloneKBShardManager
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -29,10 +28,8 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 from .settings import settings
 
 
-async def setup_cluster(
-    service_name: str,
-) -> Union[KBShardManager, StandaloneKBShardManager]:
-    await start_chitchat(service_name)
+async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
+    await setup_cluster_discovery()
     mng: Union[KBShardManager, StandaloneKBShardManager]
     if settings.standalone_mode:
         mng = StandaloneKBShardManager()
@@ -43,14 +40,10 @@ async def setup_cluster(
 
 
 async def teardown_cluster():
-    await stop_chitchat()
+    await teardown_cluster_discovery()
     if get_utility(Utility.SHARD_MANAGER):
         clean_utility(Utility.SHARD_MANAGER)
 
 
 def get_shard_manager() -> KBShardManager:
     return get_utility(Utility.SHARD_MANAGER)  # type: ignore
-
-
-def get_chitchat() -> Optional[ChitchatMonitor]:
-    return get_utility(Utility.CHITCHAT)

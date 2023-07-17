@@ -41,7 +41,7 @@ async def initialize() -> None:
     await start_predict_engine()
 
     await setup_driver()
-    await setup_cluster(SERVICE_NAME)
+    await setup_cluster()
 
     await paragraphs.initialize_cache()
 
