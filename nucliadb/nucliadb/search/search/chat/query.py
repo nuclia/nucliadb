@@ -86,9 +86,10 @@ async def generate_answer(
     text_answer = b"".join(answer)
 
     if do_audit and audit is not None:
-        chat_answer = text_answer.decode()
-        if chat_answer == NOT_ENOUGH_CONTEXT_ANSWER:
-            chat_answer = None
+        decoded_answer = text_answer.decode()
+        audit_answer = (
+            decoded_answer if decoded_answer != NOT_ENOUGH_CONTEXT_ANSWER else None
+        )
         await audit.chat(
             kbid,
             user_id,
@@ -96,7 +97,7 @@ async def generate_answer(
             origin,
             time() - start_time,
             question=chat_request.query,
-            answer=chat_answer,
+            answer=audit_answer,
         )
 
     if ChatOptions.RELATIONS in chat_request.features:
