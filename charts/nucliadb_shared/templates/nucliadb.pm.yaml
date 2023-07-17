@@ -1,7 +1,7 @@
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
-  name: ndb-sm
+  name: ndb-pm
   labels:
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
@@ -14,7 +14,7 @@ spec:
   selector:
     matchLabels:
       metrics: "enabled"
-  endpoints:
-  - targetPort: 3030
-    interval: 10s
-    path: /metrics
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 10s
+      path: /metrics 
