@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+from time import monotonic as time
 from typing import AsyncIterator, List
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
@@ -35,10 +36,14 @@ from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
     Message,
+    NucliaDBClientType,
     RephraseModel,
 )
+from nucliadb_utils.audit.audit import AuditStorage
+from nucliadb_utils.utilities import get_audit
 
 END_OF_STREAM = "_END_"
+NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 
 
 async def rephrase_query_from_context(
@@ -56,11 +61,77 @@ async def rephrase_query_from_context(
     return await predict.rephrase_query(kbid, req)
 
 
+async def generate_answer(
+    results: KnowledgeboxFindResults,
+    kbid: str,
+    user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
+    predict: PredictEngine,
+    predict_generator: AsyncIterator[bytes],
+    chat_request: ChatRequest,
+    do_audit: bool = True,
+):
+    audit = get_audit()
+    if ChatOptions.PARAGRAPHS in chat_request.features:
+        bytes_results = base64.b64encode(results.json().encode())
+        yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+        yield bytes_results
+
+    answer_generator = predict_generator
+    if do_audit and audit:
+        answer_generator = audited_generator(
+            predict_generator,
+            kbid=kbid,
+            user_id=user_id,
+            client_type=client_type,
+            origin=origin,
+            chat_request=chat_request,
+            audit=audit,
+        )
+
+    answer = []
+    async for data in answer_generator:
+        answer.append(data)
+        yield data
+
+    if ChatOptions.RELATIONS in chat_request.features:
+        yield END_OF_STREAM
+
+        text_answer = b"".join(answer)
+
+        detected_entities = await predict.detect_entities(kbid, text_answer.decode())
+        relation_request = RelationSearchRequest()
+        relation_request.subgraph.entry_points.extend(detected_entities)
+        relation_request.subgraph.depth = 1
+
+        relations_results: List[RelationSearchResponse]
+        (
+            relations_results,
+            _,
+            _,
+            _,
+        ) = await node_query(
+            kbid, Method.RELATIONS, relation_request, chat_request.shards
+        )
+        yield base64.b64encode(
+            (
+                await merge_relations_results(
+                    relations_results, relation_request.subgraph
+                )
+            )
+            .json()
+            .encode()
+        )
+
+
 async def chat(
     kbid: str,
     find_results: KnowledgeboxFindResults,
     chat_request: ChatRequest,
     user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
 ):
     predict = get_predict()
     context = chat_request.context or []
@@ -79,59 +150,57 @@ async def chat(
 
     ident, generator = await predict.chat_query(kbid, chat_model)
 
-    async def generate_answer(
-        results: KnowledgeboxFindResults,
-        kbid: str,
-        predict: PredictEngine,
-        generator: AsyncIterator[bytes],
-        features: List[ChatOptions],
-    ):
-        if ChatOptions.PARAGRAPHS in features:
-            bytes_results = base64.b64encode(results.json().encode())
-            yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
-            yield bytes_results
-
-        answer = []
-        async for data in generator:
-            answer.append(data)
-            yield data
-
-        if ChatOptions.RELATIONS in features:
-            yield END_OF_STREAM
-
-            text_answer = b"".join(answer)
-
-            detected_entities = await predict.detect_entities(
-                kbid, text_answer.decode()
-            )
-            relation_request = RelationSearchRequest()
-            relation_request.subgraph.entry_points.extend(detected_entities)
-            relation_request.subgraph.depth = 1
-
-            relations_results: List[RelationSearchResponse]
-            (
-                relations_results,
-                _,
-                _,
-                _,
-            ) = await node_query(
-                kbid, Method.RELATIONS, relation_request, chat_request.shards
-            )
-            yield base64.b64encode(
-                (
-                    await merge_relations_results(
-                        relations_results, relation_request.subgraph
-                    )
-                )
-                .json()
-                .encode()
-            )
-
     return StreamingResponse(
-        generate_answer(find_results, kbid, predict, generator, chat_request.features),
+        generate_answer(
+            find_results,
+            kbid,
+            user_id,
+            client_type,
+            origin,
+            predict,
+            generator,
+            chat_request=chat_request,
+        ),
         media_type="plain/text",
         headers={
             "NUCLIA-LEARNING-ID": ident or "unknown",
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
+
+
+def audited_generator(
+    predict_generator: AsyncIterator[bytes],
+    kbid: str,
+    user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
+    chat_request: ChatRequest,
+    audit: AuditStorage,
+):
+    """
+    Wrapps the answer generator coming from the predict api to send chat audit events
+    """
+
+    async def wrapper(*args, **kwargs):
+        start_time = time()
+        answer = []
+        async for part in predict_generator(*args, **kwargs):
+            answer.append(part)
+            yield part
+
+        answer_str = b"".join(answer).decode()
+        if answer_str == NOT_ENOUGH_CONTEXT_ANSWER:
+            answer_str = None
+
+        await audit.chat(
+            kbid,
+            user_id,
+            client_type.to_proto(),
+            origin,
+            time() - start_time,
+            question=chat_request.query,
+            answer=answer_str,
+        )
+
+    return wrapper

@@ -72,5 +72,17 @@ class AuditStorage:
     ):
         raise NotImplementedError
 
+    async def chat(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        timeit: float,
+        question: str,
+        answer: Optional[str],
+    ):
+        raise NotImplementedError
+
     async def delete_kb(self, kbid):
         raise NotImplementedError

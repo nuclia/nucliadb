@@ -122,4 +122,6 @@ async def resource_chat(
     if incomplete:
         raise IncompleteFindResultsError()
 
-    return await chat(kbid, find_results, item, x_nucliadb_user)
+    return await chat(
+        kbid, find_results, item, x_nucliadb_user, x_ndb_client, x_forwarded_for
+    )

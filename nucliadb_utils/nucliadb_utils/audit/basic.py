@@ -73,7 +73,19 @@ class BasicAuditStorage(AuditStorage):
         origin: str,
         timeit: float,
     ):
-        logger.debug(f"SEARCH {kbid} {user} {origin} {timeit}")
+        logger.debug(f"SUGGEST {kbid} {user} {origin} {timeit}")
+
+    async def chat(
+        self,
+        kbid: str,
+        user: str,
+        client_type: int,
+        origin: str,
+        timeit: float,
+        question: str,
+        answer: Optional[str],
+    ):
+        logger.debug(f"CHAT {kbid} {user} {origin} {timeit}")
 
     async def delete_kb(self, kbid):
         logger.debug(f"KB DELETED {kbid}")
