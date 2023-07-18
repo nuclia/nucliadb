@@ -22,10 +22,11 @@ mod unbounded_cache_provider;
 
 pub use shards_provider::{
     AsyncReaderShardsProvider, AsyncWriterShardsProvider, ReaderShardsProvider, ShardId,
-    ShardNotFoundError,
+    ShardNotFoundError, WriterShardsProvider,
 };
 pub use unbounded_cache_provider::{
     AsyncUnboundedShardReaderCache, AsyncUnboundedShardWriterCache, UnboundedShardReaderCache,
+    UnboundedShardWriterCache,
 };
 
 pub use crate::services::reader::ShardReaderService as ShardReader;

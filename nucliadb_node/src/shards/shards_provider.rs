@@ -44,6 +44,17 @@ pub trait AsyncReaderShardsProvider: Send + Sync {
     async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
 }
 
+pub trait WriterShardsProvider {
+    fn load(&self, id: ShardId) -> NodeResult<()>;
+    fn load_all(&self) -> NodeResult<()>;
+
+    fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;
+    fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>>;
+    fn delete(&self, id: ShardId) -> NodeResult<()>;
+
+    fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
+}
+
 #[async_trait]
 pub trait AsyncWriterShardsProvider {
     async fn load(&self, id: ShardId) -> NodeResult<()>;

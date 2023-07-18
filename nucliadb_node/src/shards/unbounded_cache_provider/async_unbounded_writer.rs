@@ -29,7 +29,6 @@ use nucliadb_core::{node_error, Context, NodeResult};
 use uuid::Uuid;
 
 use crate::disk_structure;
-pub use crate::env;
 use crate::shard_metadata::ShardMetadata;
 use crate::shards::shards_provider::{AsyncWriterShardsProvider, ShardId, ShardNotFoundError};
 use crate::shards::ShardWriter;
@@ -103,7 +102,7 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn load_all(&self) -> NodeResult<()> {
-        let shards_path = env::shards_path();
+        let shards_path = self.shards_path.clone();
         let shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {

@@ -16,3 +16,121 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+use std::path::PathBuf;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+use nucliadb_core::protos::ShardCleaned;
+use nucliadb_core::tracing::{debug, error};
+use nucliadb_core::{node_error, NodeResult};
+use uuid::Uuid;
+
+use crate::disk_structure;
+use crate::shard_metadata::ShardMetadata;
+use crate::shards::shards_provider::{ShardId, ShardNotFoundError, WriterShardsProvider};
+use crate::shards::ShardWriter;
+
+#[derive(Default)]
+pub struct UnboundedShardWriterCache {
+    cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
+    shards_path: PathBuf,
+}
+
+impl UnboundedShardWriterCache {
+    pub fn new(shards_path: PathBuf) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            shards_path,
+        }
+    }
+
+    fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardWriter>>> {
+        self.cache.read().expect("Poisoned lock while reading")
+    }
+
+    fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardWriter>>> {
+        self.cache.write().expect("Poisoned lock while reading")
+    }
+}
+
+impl WriterShardsProvider for UnboundedShardWriterCache {
+    fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
+        let shard_id = Uuid::new_v4().to_string();
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
+        let new_shard = ShardWriter::new(shard_id, &shard_path, metadata)?;
+        Ok(new_shard)
+    }
+
+    fn load(&self, id: ShardId) -> NodeResult<()> {
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+
+        if self.read().contains_key(&id) {
+            debug!("Shard {shard_path:?} is already on memory");
+            return Ok(());
+        }
+
+        // Avoid blocking while interacting with the file system
+        if !shard_path.is_dir() {
+            return Err(node_error!(ShardNotFoundError(
+                "Shard {shard_path:?} is not on disk"
+            )));
+        }
+        let shard = ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
+            node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+        })?;
+
+        self.write().insert(id, Arc::new(shard));
+
+        Ok(())
+    }
+
+    fn load_all(&self) -> NodeResult<()> {
+        let mut cache = self.write();
+        let shards_path = self.shards_path.clone();
+        for entry in std::fs::read_dir(&shards_path)? {
+            let entry = entry?;
+            let file_name = entry.file_name().to_str().unwrap().to_string();
+            let shard_path = entry.path();
+            match ShardWriter::open(file_name.clone(), &shard_path) {
+                Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
+                Ok(shard) => {
+                    debug!("Shard loaded: {shard_path:?}");
+                    cache.insert(file_name, Arc::new(shard));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>> {
+        self.read().get(&id).map(Arc::clone)
+    }
+
+    fn delete(&self, id: ShardId) -> NodeResult<()> {
+        self.write().remove(&id);
+
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+        if shard_path.exists() {
+            debug!("Deleting shard {shard_path:?}");
+            std::fs::remove_dir_all(shard_path)?;
+        }
+        Ok(())
+    }
+
+    fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned> {
+        self.write().remove(&id);
+
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+        let upgraded = ShardWriter::clean_and_create(id.clone(), &shard_path)?;
+        let details = ShardCleaned {
+            document_service: upgraded.document_version() as i32,
+            paragraph_service: upgraded.paragraph_version() as i32,
+            vector_service: upgraded.vector_version() as i32,
+            relation_service: upgraded.relation_version() as i32,
+        };
+
+        self.write().insert(id, Arc::new(upgraded));
+        Ok(details)
+    }
+}

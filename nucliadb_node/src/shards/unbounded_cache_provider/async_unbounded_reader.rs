@@ -27,7 +27,7 @@ use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 
 use crate::disk_structure;
-pub use crate::env;
+use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
 
