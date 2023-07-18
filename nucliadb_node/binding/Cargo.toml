@@ -9,7 +9,7 @@ name = "nucliadb_node_binding"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.17.1", features = ["extension-module"] }
+pyo3 = { version = "0.19.1", features = ["extension-module"] }
 nucliadb_node = { path = "../../nucliadb_node" }
 nucliadb_core= { path = "../../nucliadb_core" }
 nucliadb_telemetry = { path = "../../nucliadb_telemetry" }
