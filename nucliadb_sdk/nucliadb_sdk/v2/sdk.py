@@ -29,7 +29,6 @@ from pydantic import BaseModel
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
-    EntitiesGroup,
     UpdateEntitiesGroupPayload,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -414,14 +413,6 @@ class _NucliaDBBase:
         method="PATCH",
         path_params=("kbid", "group"),
         request_type=UpdateEntitiesGroupPayload,
-        response_type=None,
-    )
-    set_entitygroup_entities = _request_builder(
-        name="set_entitygroup_entities",
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="POST",
-        path_params=("kbid", "group"),
-        request_type=EntitiesGroup,
         response_type=None,
     )
     delete_entitygroup = _request_builder(
