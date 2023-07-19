@@ -246,7 +246,7 @@ impl SettingsBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv4Addr;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     use super::*;
 
@@ -277,9 +277,18 @@ mod tests {
             .unwrap();
 
         assert!(!settings.lazy_loading());
-        assert_eq!(settings.public_ip, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        assert!(
+            Ok(settings.public_ip()) == "127.0.0.1".parse()
+                || Ok(settings.public_ip()) == "::1".parse()
+        );
         assert_eq!(settings.sentry_env, SENTRY_PROD);
-        assert_eq!(settings.reader_listen_address.to_string(), "127.0.0.1:2020");
-        assert_eq!(settings.writer_listen_address.to_string(), "127.0.0.1:2021");
+        assert!(
+            Ok(settings.reader_listen_address()) == "127.0.0.1:2020".parse()
+                || Ok(settings.reader_listen_address()) == "::1:2020".parse()
+        );
+        assert!(
+            Ok(settings.writer_listen_address()) == "127.0.0.1:2021".parse()
+                || Ok(settings.writer_listen_address()) == "::1:2021".parse()
+        );
     }
 }
