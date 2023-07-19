@@ -74,10 +74,6 @@ nucliadb_paragraphs= { path = "../nucliadb_paragraphs" }
 nucliadb_vectors= { path = "../nucliadb_vectors" }
 nucliadb_relations= { path = "../nucliadb_relations" }
 
-# test
-tempdir = "0.3.7"
-portpicker = "0.1.1"
-
 # sentry sdk
 sentry = "0.26.0"
 opentelemetry-jaeger = { version = "0.16.0", features = ["rt-tokio"] }
@@ -135,3 +131,5 @@ tempfile = "3.2.0"
 regex = "1.5.5"
 lazy_static = "1.4.0"
 openssl = { version = "0.10", features = ["vendored"] }
+
+portpicker = "0.1.1"
