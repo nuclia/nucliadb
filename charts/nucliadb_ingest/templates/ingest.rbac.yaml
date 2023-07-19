@@ -13,12 +13,14 @@ metadata:
     heritage: "{{ .Release.Service }}"
 rules:
 - apiGroups:
-  - apps
+  - ""
   resources:
   - statefulsets
+  - pods
   verbs:
   - get
   - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

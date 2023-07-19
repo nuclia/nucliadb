@@ -150,14 +150,14 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
 
     async def watch_k8s_for_updates(self) -> None:
         if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/token"):
-            await kubernetes_asyncio.config.load_incluster_config()
+            kubernetes_asyncio.config.load_incluster_config()
         else:
             await kubernetes_asyncio.config.load_kube_config()
         v1 = kubernetes_asyncio.client.CoreV1Api()
 
         watch = kubernetes_asyncio.watch.Watch()
-        while True:
-            try:
+        try:
+            while True:
                 try:
                     async for event in watch.stream(
                         v1.list_namespaced_pod,
@@ -169,10 +169,14 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 except asyncio.CancelledError:  # pragma: no cover
                     return
                 except Exception:  # pragma: no cover
-                    logger.exception("Error while watching kubernetes.")
-            finally:
-                watch.stop()
-                await watch.close()
+                    logger.exception(
+                        "Error while watching kubernetes. Trying again in 5 seconds.",
+                        exc_info=True,
+                    )
+                    await asyncio.sleep(5)
+        finally:
+            watch.stop()
+            await watch.close()
 
     async def update_node_data_cache(self) -> None:
         while True:
