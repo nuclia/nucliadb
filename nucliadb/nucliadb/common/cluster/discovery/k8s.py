@@ -166,7 +166,12 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                         timeout_seconds=30,
                     ):
                         await self.update_node(event)
-                except asyncio.CancelledError:  # pragma: no cover
+                except (
+                    asyncio.CancelledError,
+                    KeyboardInterrupt,
+                    SystemExit,
+                    RuntimeError,
+                ):  # pragma: no cover
                     return
                 except Exception:  # pragma: no cover
                     logger.exception(
@@ -185,7 +190,12 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 for sts_name in list(self.node_id_cache.keys()):
                     # force updating cache
                     await self.get_node_metadata(sts_name, force=True)
-            except asyncio.CancelledError:  # pragma: no cover
+            except (
+                asyncio.CancelledError,
+                KeyboardInterrupt,
+                SystemExit,
+                RuntimeError,
+            ):  # pragma: no cover
                 return
             except Exception:  # pragma: no cover
                 logger.exception("Error while updating shard info.")
