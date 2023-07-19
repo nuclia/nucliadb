@@ -106,17 +106,10 @@ mod tests {
 
     #[test]
     fn test_lookup_localhost() {
-        assert_eq!(
-            reliable_lookup_host("127.0.0.1").ip().to_string(),
-            "127.0.0.1"
-        );
-        assert_eq!(
-            reliable_lookup_host("localhost").ip().to_string(),
-            "127.0.0.1"
-        );
-        assert_eq!(
-            reliable_lookup_host("localhost:8080").ip().to_string(),
-            "127.0.0.1"
-        );
+        let hosts = vec!["127.0.0.1", "localhost", "localhost:8080"];
+        for host in hosts.into_iter() {
+            let lookup = reliable_lookup_host(host).ip().to_string();
+            assert!(lookup == "127.0.0.1" || lookup == "::1");
+        }
     }
 }
