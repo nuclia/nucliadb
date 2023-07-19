@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Instant;
 
 use nucliadb_core::metrics::middleware::MetricsLayer;
@@ -27,7 +28,7 @@ use nucliadb_core::{node_error, NodeResult};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::reader;
-use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
+use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::telemetry::init_telemetry;
@@ -42,7 +43,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings = EnvSettingsProvider::generate_settings()?;
+    let settings = Arc::new(EnvSettingsProvider::generate_settings()?);
 
     if !settings.data_path().exists() {
         return Err(node_error!("Data directory missing"));
@@ -51,12 +52,9 @@ async fn main() -> NodeResult<()> {
     // XXX it probably should be moved to a more clear abstraction
     reader::initialize();
 
-    let _guard = init_telemetry()?;
+    let _guard = init_telemetry(&settings)?;
 
-    let grpc_options = GrpcReaderOptions {
-        lazy_loading: settings.lazy_loading(),
-    };
-    let grpc_driver = NodeReaderGRPCDriver::new(grpc_options);
+    let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
     grpc_driver.initialize().await?;
 
     let _grpc_task = tokio::spawn(start_grpc_service(

@@ -26,28 +26,25 @@ use nucliadb_core::protos::*;
 use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
+use crate::settings::Settings;
 use crate::shards::{AsyncReaderShardsProvider, AsyncUnboundedShardReaderCache, ShardReader};
 
 pub struct NodeReaderGRPCDriver {
     shards: AsyncUnboundedShardReaderCache,
-    options: GrpcReaderOptions,
-}
-
-pub struct GrpcReaderOptions {
-    pub lazy_loading: bool,
+    settings: Arc<Settings>,
 }
 
 impl NodeReaderGRPCDriver {
-    pub fn new(options: GrpcReaderOptions) -> Self {
+    pub fn new(settings: Arc<Settings>) -> Self {
         Self {
-            shards: AsyncUnboundedShardReaderCache::new(),
-            options,
+            shards: AsyncUnboundedShardReaderCache::new(settings.shards_path()),
+            settings,
         }
     }
 
     /// This function must be called before using this service
     pub async fn initialize(&self) -> NodeResult<()> {
-        if !self.options.lazy_loading {
+        if !self.settings.lazy_loading() {
             // If lazy loading is disabled, load
             self.shards.load_all().await?
         }
@@ -61,7 +58,7 @@ impl NodeReaderGRPCDriver {
         // loading a shard into memory when lazy loading is enabled. Otherwise,
         // we rely on all shards (stored on disk) been brought to memory before
         // the driver is online on `initialize`.
-        if self.options.lazy_loading {
+        if self.settings.lazy_loading() {
             self.shards.load(id.clone()).await.map_err(|error| {
                 tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
             })?;

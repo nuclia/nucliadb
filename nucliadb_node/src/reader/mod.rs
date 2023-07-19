@@ -31,8 +31,8 @@ use nucliadb_core::protos::{
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 
-use crate::env;
 use crate::services::reader::ShardReaderService;
+use crate::{disk_structure, env};
 
 /// Initialize the index node reader. This function must be called before using
 /// a reader
@@ -75,7 +75,7 @@ impl NodeReaderService {
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
-        let shard_path = env::shards_path_id(&shard_id.id);
+        let shard_path = disk_structure::shard_path_by_id(&env::shards_path(), &shard_id.id);
 
         if self.cache.contains_key(&shard_id.id) {
             debug!("Shard {shard_path:?} is already on memory");

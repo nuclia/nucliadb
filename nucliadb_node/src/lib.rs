@@ -24,6 +24,7 @@
 /// Shard metadata, defined at the moment of creation.
 mod shard_metadata;
 
+mod disk_structure;
 pub mod node_metadata;
 
 pub mod services;

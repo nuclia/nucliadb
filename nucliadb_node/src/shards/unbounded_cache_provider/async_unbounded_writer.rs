@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_std::sync::RwLock;
@@ -27,6 +28,7 @@ use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 use uuid::Uuid;
 
+use crate::disk_structure;
 pub use crate::env;
 use crate::shard_metadata::ShardMetadata;
 use crate::shards::shards_provider::{AsyncWriterShardsProvider, ShardId, ShardNotFoundError};
@@ -35,16 +37,18 @@ use crate::shards::ShardWriter;
 #[derive(Default)]
 pub struct AsyncUnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
+    shards_path: PathBuf,
 }
 
 impl AsyncUnboundedShardWriterCache {
-    pub fn new() -> Self {
+    pub fn new(shards_path: PathBuf) -> Self {
         Self {
             // NOTE: as it's not probable all shards will be written, we don't
             // assign any initial capacity to the HashMap under the
             // consideration a resize blocking is not performance critical while
             // writting.
             cache: RwLock::new(HashMap::new()),
+            shards_path,
         }
     }
 
@@ -62,17 +66,16 @@ impl AsyncUnboundedShardWriterCache {
 impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
         let shard_id = Uuid::new_v4().to_string();
-        let new_shard = tokio::task::spawn_blocking(move || {
-            let shard_path = env::shards_path_id(&shard_id);
-            ShardWriter::new(shard_id, &shard_path, metadata)
-        })
-        .await
-        .context("Blocking task panicked")??;
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &shard_id);
+        let new_shard =
+            tokio::task::spawn_blocking(move || ShardWriter::new(shard_id, &shard_path, metadata))
+                .await
+                .context("Blocking task panicked")??;
         Ok(new_shard)
     }
 
     async fn load(&self, id: ShardId) -> NodeResult<()> {
-        let shard_path = env::shards_path_id(&id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
 
         if self.cache.read().await.contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
@@ -130,9 +133,8 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
 
     async fn delete(&self, id: ShardId) -> NodeResult<()> {
         self.cache.write().await.remove(&id);
-
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
         tokio::task::spawn_blocking(move || {
-            let shard_path = env::shards_path_id(&id);
             if shard_path.exists() {
                 debug!("Deleting shard {shard_path:?}");
                 std::fs::remove_dir_all(shard_path)?;
@@ -147,8 +149,8 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
         self.cache.write().await.remove(&id);
 
         let id_ = id.clone();
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
         let (upgraded, details) = tokio::task::spawn_blocking(move || -> NodeResult<_> {
-            let shard_path = env::shards_path_id(&id);
             let upgraded = ShardWriter::clean_and_create(id, &shard_path)?;
             let details = ShardCleaned {
                 document_service: upgraded.document_version() as i32,

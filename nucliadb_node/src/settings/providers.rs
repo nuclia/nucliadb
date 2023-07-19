@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub use env::EnvSettingsProvider;
 use nucliadb_core::NodeResult;
 
 use crate::settings::Settings;
@@ -138,7 +139,7 @@ pub mod env {
         #[serial]
         fn test_default_env_settings() {
             let settings = EnvSettingsProvider::generate_settings().unwrap();
-            assert_eq!(settings.data_path().to_str().unwrap(), "data")
+            assert_eq!(settings.shards_path().to_str().unwrap(), "data/shards")
         }
 
         #[test]
@@ -146,7 +147,7 @@ pub mod env {
         fn test_env_settings_data_path() {
             std::env::set_var("DATA_PATH", "mydata");
             let settings = EnvSettingsProvider::generate_settings().unwrap();
-            assert_eq!(settings.data_path().to_str().unwrap(), "mydata");
+            assert_eq!(settings.shards_path().to_str().unwrap(), "mydata/shards");
             std::env::remove_var("DATA_PATH");
         }
     }

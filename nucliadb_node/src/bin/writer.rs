@@ -21,6 +21,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Instant;
 
 use futures::Stream;
@@ -32,13 +33,10 @@ use nucliadb_core::{metrics, NodeResult};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
-use nucliadb_node::services::shard_disk_structure;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::writer::grpc_driver::{
-    GrpcWriterOptions, NodeWriterEvent, NodeWriterGRPCDriver,
-};
+use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::{utils, writer};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
@@ -60,9 +58,9 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings = EnvSettingsProvider::generate_settings()?;
+    let settings = Arc::new(EnvSettingsProvider::generate_settings()?);
 
-    let _guard = init_telemetry()?;
+    let _guard = init_telemetry(&settings)?;
     let metrics = metrics::get_metrics();
 
     let data_path = settings.data_path();
@@ -70,19 +68,16 @@ async fn main() -> NodeResult<()> {
         std::fs::create_dir(data_path.clone())?;
     }
 
-    let metadata_path = shard_disk_structure::metadata_path(&data_path);
+    let metadata_path = settings.metadata_path();
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
 
     // XXX it probably should be moved to a more clear abstraction
-    writer::initialize()?;
+    writer::initialize(&data_path, &settings.shards_path())?;
 
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
     let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
-    let grpc_options = GrpcWriterOptions {
-        lazy_loading: settings.lazy_loading(),
-    };
-    let grpc_driver = NodeWriterGRPCDriver::new(grpc_options).with_sender(grpc_sender);
+    let grpc_driver = NodeWriterGRPCDriver::new(Arc::clone(&settings)).with_sender(grpc_sender);
     grpc_driver.initialize().await?;
 
     // Cluster

@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_std::sync::RwLock;
@@ -25,6 +26,7 @@ use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 
+use crate::disk_structure;
 pub use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
@@ -32,10 +34,11 @@ use crate::shards::ShardReader;
 #[derive(Default)]
 pub struct AsyncUnboundedShardReaderCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
+    shards_path: PathBuf,
 }
 
 impl AsyncUnboundedShardReaderCache {
-    pub fn new() -> Self {
+    pub fn new(shards_path: PathBuf) -> Self {
         Self {
             // NOTE: we use max shards per node as initial capacity to avoid
             // hashmap resizing, as it would block the current thread while
@@ -44,6 +47,7 @@ impl AsyncUnboundedShardReaderCache {
             // REVIEW: if resize don't take more than 10µs, it's acceptable
             // (blocking in tokio means CPU bound during 10-100µs)
             cache: RwLock::new(HashMap::with_capacity(env::max_shards_per_node())),
+            shards_path,
         }
     }
 }
@@ -51,7 +55,7 @@ impl AsyncUnboundedShardReaderCache {
 #[async_trait]
 impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
     async fn load(&self, id: ShardId) -> NodeResult<()> {
-        let shard_path = env::shards_path_id(&id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
 
         if self.cache.read().await.contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
@@ -77,7 +81,7 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
     }
 
     async fn load_all(&self) -> NodeResult<()> {
-        let shards_path = env::shards_path();
+        let shards_path = self.shards_path.clone();
         let mut shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {

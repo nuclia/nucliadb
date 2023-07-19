@@ -26,15 +26,21 @@ use std::time::Duration;
 
 use derive_builder::Builder;
 use nucliadb_core::tracing::{error, Level};
+pub use providers::{EnvSettingsProvider, SettingsProvider};
 
+use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
 use crate::utils::{parse_log_levels, reliable_lookup_host};
 
 #[derive(Builder)]
 #[builder(pattern = "mutable", setter(strip_option, into))]
 pub struct Settings {
     // Data storage and access
-    #[builder(default = "\"data\".into()")]
+    #[builder(default = "\"data\".into()", setter(custom))]
     data_path: PathBuf,
+    #[builder(private, default = "PathBuf::from(\"data\").join(METADATA_FILE)")]
+    metadata_path: PathBuf,
+    #[builder(private, default = "PathBuf::from(\"data\").join(SHARDS_DIR)")]
+    shards_path: PathBuf,
     #[builder(default = "true", setter(custom))]
     lazy_loading: bool,
     #[builder(default = "800")]
@@ -98,6 +104,16 @@ impl Settings {
     /// Path to main directory where all index node data is stored
     pub fn data_path(&self) -> PathBuf {
         self.data_path.clone()
+    }
+
+    /// Path to index node metadata file
+    pub fn metadata_path(&self) -> PathBuf {
+        self.metadata_path.clone()
+    }
+
+    /// Path where all shards are stored
+    pub fn shards_path(&self) -> PathBuf {
+        self.shards_path.clone()
     }
 
     /// When shard lazy loading is enabled, reader and writer will try to load a
@@ -190,6 +206,14 @@ const SENTRY_PROD: &str = "prod";
 const SENTRY_DEV: &str = "stage";
 
 impl SettingsBuilder {
+    pub fn data_path(&mut self, data_path: impl Into<PathBuf>) -> &mut Self {
+        let data_path = data_path.into();
+        self.metadata_path = Some(data_path.join(METADATA_FILE));
+        self.shards_path = Some(data_path.join(SHARDS_DIR));
+        self.data_path = Some(data_path);
+        self
+    }
+
     pub fn without_lazy_loading(&mut self) -> &mut Self {
         self.lazy_loading = Some(false);
         self
@@ -246,22 +270,20 @@ impl SettingsBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{Ipv4Addr, Ipv6Addr};
-
     use super::*;
 
     #[test]
     fn test_settings_defaults() {
         let settings = Settings::builder().build().unwrap();
 
-        assert_eq!(settings.data_path().to_str().unwrap(), "data");
+        assert_eq!(settings.shards_path().to_str().unwrap(), "data/shards");
     }
 
     #[test]
     fn test_settings_custom_data_path() {
         let settings = Settings::builder().data_path("mydata").build().unwrap();
 
-        assert_eq!(settings.data_path().to_str().unwrap(), "mydata");
+        assert_eq!(settings.shards_path().to_str().unwrap(), "mydata/shards");
     }
 
     #[test]

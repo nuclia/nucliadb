@@ -19,14 +19,10 @@
 //
 use std::env;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use nucliadb_core::tracing::*;
 
 use crate::utils::parse_log_levels;
-
-const SENTRY_PROD: &str = "prod";
-const SENTRY_DEV: &str = "stage";
 
 /// Where data will be stored
 pub fn data_path() -> PathBuf {
@@ -36,57 +32,9 @@ pub fn data_path() -> PathBuf {
     }
 }
 
-/// Path for metadata file inside data folder
-pub fn metadata_path() -> PathBuf {
-    data_path().join("metadata.json")
-}
-
 /// Path for shards information inside data folder
 pub fn shards_path() -> PathBuf {
     data_path().join("shards")
-}
-
-pub fn shards_path_id(id: &str) -> PathBuf {
-    shards_path().join(id)
-}
-
-pub fn jaeger_agent_endp() -> String {
-    let default_host = "localhost".to_string();
-    let default_port = "6831".to_string();
-    let host = env::var("JAEGER_AGENT_HOST").unwrap_or_else(|_| {
-        warn!("JAEGER_AGENT_HOST not defined: Defaulting to {default_host}");
-        default_host
-    });
-    let port = env::var("JAEGER_AGENT_PORT").unwrap_or_else(|_| {
-        warn!("JAEGER_AGENT_PORT not defined: Defaulting to {default_port}");
-        default_port
-    });
-    format!("{host}:{port}")
-}
-
-pub fn jaeger_enabled() -> bool {
-    let default = false;
-    match env::var("JAEGER_ENABLED") {
-        Ok(v) => bool::from_str(&v).unwrap(),
-        Err(_) => {
-            warn!("JAEGER_ENABLED not defined: Defaulting to {}", default);
-            default
-        }
-    }
-}
-
-pub fn sentry_url() -> String {
-    let default = String::from("");
-    match env::var("SENTRY_URL") {
-        Ok(var) => match var.parse() {
-            Ok(value) => value,
-            Err(_) => {
-                error!("Error parsing environment variable SENTRY_URL");
-                default
-            }
-        },
-        Err(_) => default,
-    }
 }
 
 pub fn log_level() -> Vec<(String, Level)> {
@@ -96,27 +44,6 @@ pub fn log_level() -> Vec<(String, Level)> {
         Err(_) => {
             error!("RUST_LOG not defined. Defaulting to {default}");
             parse_log_levels(&default)
-        }
-    }
-}
-
-pub fn span_levels() -> Vec<(String, Level)> {
-    let default = "nucliadb_node=INFO,nucliadb_cluster=INFO,nucliadb_core=INFO".to_string();
-    parse_log_levels(&default)
-}
-
-pub fn get_sentry_env() -> &'static str {
-    let default = SENTRY_DEV;
-    match env::var("RUNNING_ENVIRONMENT") {
-        Ok(sentry_env) if sentry_env.eq("prod") => SENTRY_PROD,
-        Ok(sentry_env) if sentry_env.eq("stage") => SENTRY_DEV,
-        Ok(_) => {
-            error!("RUNNING_ENVIRONMENT defined incorrectly. Defaulting to {default}");
-            default
-        }
-        Err(_) => {
-            error!("RUNNING_ENVIRONMENT not defined. Defaulting to {default}");
-            default
         }
     }
 }
