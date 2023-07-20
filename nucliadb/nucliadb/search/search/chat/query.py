@@ -77,6 +77,10 @@ async def generate_answer(
         yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
         yield bytes_results
 
+    if results.total == 0:
+        yield NOT_ENOUGH_CONTEXT_ANSWER.encode()
+        return
+
     start_time = time()
     answer = []
     async for data in predict_generator:
