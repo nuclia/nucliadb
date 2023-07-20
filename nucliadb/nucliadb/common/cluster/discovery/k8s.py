@@ -64,6 +64,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         super().__init__(settings)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.node_id_cache: dict[str, IndexNodeMetadata] = {}
+        self.update_lock = asyncio.Lock()
 
     async def _query_node_metadata(self, address: str) -> nodewriter_pb2.NodeMetadata:
         """
@@ -79,23 +80,22 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
         return await stub.GetMetadata(EmptyQuery())  # type: ignore
 
-    async def get_node_metadata(
-        self, sts_name: str, node_ip: str, force=False
-    ) -> IndexNodeMetadata:
-        if force or sts_name not in self.node_id_cache:
-            # hard coded assuming that nucliadb is used with current helm charts
-            # XXX right now, GRPC will not know when an IP has changed and
-            # istio is not able to handle this properly. This is a workaround for now.
-            # address = f"{sts_name}.node.{self.settings.cluster_discovery_kubernetes_namespace}.svc.cluster.local"
-            metadata = await self._query_node_metadata(node_ip)
-            self.node_id_cache[sts_name] = IndexNodeMetadata(
-                node_id=metadata.node_id,
-                name=sts_name,
-                shard_count=metadata.shard_count,
-                address=node_ip,
-            )
-        else:
-            self.node_id_cache[sts_name].address = node_ip
+    async def get_node_metadata(self, sts_name: str, node_ip: str) -> IndexNodeMetadata:
+        async with self.update_lock:
+            if sts_name not in self.node_id_cache:
+                # hard coded assuming that nucliadb is used with current helm charts
+                # XXX right now, GRPC will not know when an IP has changed and
+                # istio is not able to handle this properly. This is a workaround for now.
+                # address = f"{sts_name}.node.{self.settings.cluster_discovery_kubernetes_namespace}.svc.cluster.local"
+                metadata = await self._query_node_metadata(node_ip)
+                self.node_id_cache[sts_name] = IndexNodeMetadata(
+                    node_id=metadata.node_id,
+                    name=sts_name,
+                    shard_count=metadata.shard_count,
+                    address=node_ip,
+                )
+            else:
+                self.node_id_cache[sts_name].address = node_ip
         return self.node_id_cache[sts_name]
 
     async def update_node(self, event: EventType) -> None:
@@ -195,9 +195,15 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             try:
                 for sts_name in list(self.node_id_cache.keys()):
                     # force updating cache
-                    await self.get_node_metadata(
-                        sts_name, self.node_id_cache[sts_name].address, force=True
-                    )
+                    async with self.update_lock:
+                        existing = self.node_id_cache[sts_name]
+                        metadata = await self._query_node_metadata(existing.address)
+                        self.node_id_cache[sts_name] = IndexNodeMetadata(
+                            node_id=metadata.node_id,
+                            name=sts_name,
+                            shard_count=metadata.shard_count,
+                            address=existing.address,
+                        )
             except (
                 asyncio.CancelledError,
                 KeyboardInterrupt,
