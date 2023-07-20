@@ -26,7 +26,7 @@ use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 
-use crate::env;
+use crate::{env, utils};
 
 fn number_of_shards() -> NodeResult<usize> {
     Ok(std::fs::read_dir(env::shards_path())?
@@ -45,7 +45,9 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
     fn from(node_metadata: NodeMetadata) -> Self {
         nucliadb_core::protos::NodeMetadata {
             shard_count: node_metadata.shard_count,
-            node_id: env::read_host_key().unwrap().to_string(),
+            node_id: utils::read_host_key(env::host_key_path())
+                .unwrap()
+                .to_string(),
             ..Default::default()
         }
     }

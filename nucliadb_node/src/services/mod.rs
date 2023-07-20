@@ -22,13 +22,3 @@ mod versions;
 // Main services
 pub mod reader;
 pub mod writer;
-
-mod shard_disk_structure {
-    pub const VERSION_FILE: &str = "versions.json";
-    pub const VECTORS_DIR: &str = "vectors";
-    pub const VECTORSET_DIR: &str = "vectorset";
-    pub const TEXTS_DIR: &str = "text";
-    pub const PARAGRAPHS_DIR: &str = "paragraph";
-    pub const RELATIONS_DIR: &str = "relations";
-    pub const METADATA_FILE: &str = "metadata.json";
-}

@@ -26,10 +26,12 @@ use nucliadb_core::protos::node_reader_client::NodeReaderClient;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
-use nucliadb_node::reader::grpc_driver::{GrpcReaderOptions, NodeReaderGRPCDriver};
-use nucliadb_node::writer::grpc_driver::{GrpcWriterOptions, NodeWriterGRPCDriver};
+use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
+use nucliadb_node::settings::Settings;
+use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::{env, reader, writer};
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
+use tempfile::TempDir;
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Server};
 
@@ -43,6 +45,25 @@ static READER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
 static WRITER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::new(false)));
 
+static TEST_DATA_PATH: OnceCell<TempDir> = OnceCell::new();
+
+// Use global settings for now, change it when more test flexibility is desired
+static SETTINGS: Lazy<Arc<Settings>> = Lazy::new(|| {
+    // REVIEW: temporary directory is not being deleted at the end of the tests.
+    // In fact, tests create a different test directory per test file...
+    let tempdir = TEST_DATA_PATH.get_or_init(|| {
+        let tempdir = TempDir::new().expect("Unable to create temporary data directory");
+        println!("Using data path directory: {}", tempdir.path().display());
+        tempdir
+    });
+
+    let settings = Settings::builder()
+        .data_path(tempdir.path())
+        .build()
+        .expect("Error while building test settings");
+    Arc::new(settings)
+});
+
 async fn start_reader(addr: SocketAddr) {
     let mut initialized_lock = READER_SERVER_INITIALIZED.lock().await;
     if *initialized_lock {
@@ -50,8 +71,7 @@ async fn start_reader(addr: SocketAddr) {
     }
     tokio::spawn(async move {
         reader::initialize();
-        let options = GrpcReaderOptions { lazy_loading: true };
-        let grpc_driver = NodeReaderGRPCDriver::new(options);
+        let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&SETTINGS));
         grpc_driver
             .initialize()
             .await
@@ -82,9 +102,10 @@ async fn start_writer(addr: SocketAddr) {
         std::fs::create_dir(&data_path).expect("Can not create data directory");
     }
     tokio::spawn(async move {
-        writer::initialize().expect("Writer initialization has failed");
-        let options = GrpcWriterOptions { lazy_loading: true };
-        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(options));
+        let settings = SETTINGS.clone();
+        writer::initialize(&settings.data_path(), &settings.shards_path())
+            .expect("Writer initialization has failed");
+        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(settings));
         Server::builder()
             .add_service(writer_server)
             .serve(addr)

@@ -18,24 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, NodeResult};
 
-pub use crate::env;
+use crate::disk_structure;
 use crate::shards::shards_provider::{ReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
 
 #[derive(Default)]
 pub struct UnboundedShardReaderCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
+    shards_path: PathBuf,
 }
 
 impl UnboundedShardReaderCache {
-    pub fn new() -> Self {
+    pub fn new(shards_path: PathBuf) -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
+            shards_path,
         }
     }
 
@@ -50,7 +53,7 @@ impl UnboundedShardReaderCache {
 
 impl ReaderShardsProvider for UnboundedShardReaderCache {
     fn load(&self, id: ShardId) -> NodeResult<()> {
-        let shard_path = env::shards_path_id(&id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
 
         if self.read().contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
@@ -70,7 +73,7 @@ impl ReaderShardsProvider for UnboundedShardReaderCache {
 
     fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
-        let shards_path = env::shards_path();
+        let shards_path = self.shards_path.clone();
         debug!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;

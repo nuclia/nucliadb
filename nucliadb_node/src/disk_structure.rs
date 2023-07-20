@@ -17,38 +17,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
+/// Files and directories hierarchy
+///
+/// DATA_PATH
+/// |-- SHARDS_DIR
+///     |-- <shard-uuid>
+///         |-- PARAGRAPHS_DIR
+///         |-- RELATIONS_DIR
+///         |-- TEXTS_DIR
+///         |-- VECTORSET_DIR
+///         |-- VECTORS_DIR
+use std::path::{Path, PathBuf};
 
-/// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
+pub const VERSION_FILE: &str = "versions.json";
+pub const METADATA_FILE: &str = "metadata.json";
 
-mod disk_structure;
-pub mod node_metadata;
+pub const SHARDS_DIR: &str = "shards";
 
-pub mod services;
+pub const PARAGRAPHS_DIR: &str = "paragraph";
+pub const RELATIONS_DIR: &str = "relations";
+pub const TEXTS_DIR: &str = "text";
+pub const VECTORSET_DIR: &str = "vectorset";
+pub const VECTORS_DIR: &str = "vectors";
 
-pub mod middleware;
-
-pub mod shards;
-
-pub mod settings;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
-pub mod utils;
-
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// HTTP serving utilities
-pub mod http_server;
+/// Path where shard `id` is stored
+pub fn shard_path_by_id(shards_path: &Path, id: &str) -> PathBuf {
+    shards_path.join(id)
+}

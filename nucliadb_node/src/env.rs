@@ -17,20 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::env;
 use std::path::PathBuf;
-use std::str::FromStr;
-use std::time::Duration;
-use std::{env, fs};
 
-use anyhow::{Context, Result};
 use nucliadb_core::tracing::*;
-use uuid::Uuid;
 
-use crate::utils::{parse_log_level, reliable_lookup_host};
-
-const SENTRY_PROD: &str = "prod";
-const SENTRY_DEV: &str = "stage";
+use crate::utils::parse_log_levels;
 
 /// Where data will be stored
 pub fn data_path() -> PathBuf {
@@ -40,243 +32,20 @@ pub fn data_path() -> PathBuf {
     }
 }
 
-/// Path for metadata file inside data folder
-pub fn metadata_path() -> PathBuf {
-    data_path().join("metadata.json")
-}
-
 /// Path for shards information inside data folder
 pub fn shards_path() -> PathBuf {
     data_path().join("shards")
 }
 
-pub fn shards_path_id(id: &str) -> PathBuf {
-    shards_path().join(id)
-}
-
-/// Reader GRPC service port
-pub fn reader_listen_address() -> SocketAddr {
-    let port = chitchat_port() + 2;
-
-    let default = SocketAddr::new(IpAddr::from_str("::1").unwrap(), port);
-
-    match env::var("READER_LISTEN_ADDRESS") {
-        Ok(var) => var
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .expect("Error parsing Socket address for swim peers addrs"),
-        Err(_) => {
-            warn!(
-                "READER_LISTEN_ADDRESS not defined. Defaulting to: {}",
-                default
-            );
-            default
-        }
-    }
-}
-
-pub fn jaeger_agent_endp() -> String {
-    let default_host = "localhost".to_string();
-    let default_port = "6831".to_string();
-    let host = env::var("JAEGER_AGENT_HOST").unwrap_or_else(|_| {
-        warn!("JAEGER_AGENT_HOST not defined: Defaulting to {default_host}");
-        default_host
-    });
-    let port = env::var("JAEGER_AGENT_PORT").unwrap_or_else(|_| {
-        warn!("JAEGER_AGENT_PORT not defined: Defaulting to {default_port}");
-        default_port
-    });
-    format!("{host}:{port}")
-}
-
-pub fn jaeger_enabled() -> bool {
-    let default = false;
-    match env::var("JAEGER_ENABLED") {
-        Ok(v) => bool::from_str(&v).unwrap(),
-        Err(_) => {
-            warn!("JAEGER_ENABLED not defined: Defaulting to {}", default);
-            default
-        }
-    }
-}
-
-pub fn writer_listen_address() -> SocketAddr {
-    let port = chitchat_port() + 1;
-    let default = SocketAddr::new(IpAddr::from_str("::1").unwrap(), port);
-
-    match env::var("WRITER_LISTEN_ADDRESS") {
-        Ok(var) => var
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .expect("Error parsing Socket address for swim peers addrs"),
-        Err(_) => {
-            warn!(
-                "WRITER_LISTEN_ADDRESS not defined. Defaulting to: {}",
-                default
-            );
-            default
-        }
-    }
-}
-
-pub fn lazy_loading() -> bool {
-    let default = true;
-    match env::var("LAZY_LOADING") {
-        Ok(var) => match var.parse() {
-            Ok(value) => value,
-            Err(_) => {
-                error!("Error parsing environment variable LAZY_LOADING");
-                default
-            }
-        },
-        Err(_) => {
-            warn!("LAZY_LOADING not defined. Defaulting to: {}", default);
-            default
-        }
-    }
-}
-
-pub fn host_key_path() -> PathBuf {
-    match env::var("HOST_KEY_PATH") {
-        Ok(var) => PathBuf::from(var),
-        Err(_) => PathBuf::from("host_key"),
-    }
-}
-
-pub fn chitchat_port() -> u16 {
-    let default: u16 = 40100;
-    match env::var("CHITCHAT_PORT") {
-        Ok(var) => u16::from_str(&var).unwrap_or_else(|e| {
-            error!("Can't parse CHITCHAT_PORT variable: {e}");
-            default
-        }),
-        Err(_) => {
-            warn!("CHITCHAT_PORT not defined. Defaulting to: {}", default);
-            default
-        }
-    }
-}
-
-pub async fn public_ip() -> IpAddr {
-    let default = IpAddr::from_str("::1").unwrap();
-    match env::var("HOSTNAME") {
-        Ok(v) => {
-            let host = format!("{}:4444", &v);
-            reliable_lookup_host(&host).await
-        }
-        Err(e) => {
-            error!("HOSTNAME node defined. Defaulting to: {default}. Error details: {e}");
-            default
-        }
-    }
-}
-
-pub fn seed_nodes() -> Vec<String> {
-    let default = vec![];
-    match env::var("SEED_NODES") {
-        Ok(v) => v.split(';').map(|addr| addr.to_string()).collect(),
-        Err(e) => {
-            error!("Error parsing environment varialbe SEED_NODES: {e}");
-            default
-        }
-    }
-}
-
-pub fn sentry_url() -> String {
-    let default = String::from("");
-    match env::var("SENTRY_URL") {
-        Ok(var) => match var.parse() {
-            Ok(value) => value,
-            Err(_) => {
-                error!("Error parsing environment variable SENTRY_URL");
-                default
-            }
-        },
-        Err(_) => default,
-    }
-}
-
 pub fn log_level() -> Vec<(String, Level)> {
     let default = "nucliadb_node=WARN,nucliadb_cluster=WARN".to_string();
     match env::var("RUST_LOG") {
-        Ok(levels) => parse_log_level(&levels),
+        Ok(levels) => parse_log_levels(&levels),
         Err(_) => {
             error!("RUST_LOG not defined. Defaulting to {default}");
-            parse_log_level(&default)
+            parse_log_levels(&default)
         }
     }
-}
-
-pub fn span_levels() -> Vec<(String, Level)> {
-    let default = "nucliadb_node=INFO,nucliadb_cluster=INFO,nucliadb_core=INFO".to_string();
-    parse_log_level(&default)
-}
-
-pub fn get_sentry_env() -> &'static str {
-    let default = SENTRY_DEV;
-    match env::var("RUNNING_ENVIRONMENT") {
-        Ok(sentry_env) if sentry_env.eq("prod") => SENTRY_PROD,
-        Ok(sentry_env) if sentry_env.eq("stage") => SENTRY_DEV,
-        Ok(_) => {
-            error!("RUNNING_ENVIRONMENT defined incorrectly. Defaulting to {default}");
-            default
-        }
-        Err(_) => {
-            error!("RUNNING_ENVIRONMENT not defined. Defaulting to {default}");
-            default
-        }
-    }
-}
-
-/// Retuns the liveliness interval update used by cluster node.
-pub fn get_cluster_liveliness_interval_update() -> Duration {
-    const DEFAULT_INTERVAL_UPDATE_PLACEHOLDER: &str = "500ms";
-    const DEFAULT_INTERVAL_UPDATE: Duration = Duration::from_millis(500);
-
-    match env::var("LIVELINESS_UPDATE") {
-        Ok(value) => {
-            if let Ok(duration) = parse_duration::parse(&value) {
-                duration
-            } else {
-                error!(
-                    "LIVELINESS_UPDATE defined incorrectly. Defaulting to \
-                     {DEFAULT_INTERVAL_UPDATE_PLACEHOLDER}"
-                );
-
-                DEFAULT_INTERVAL_UPDATE
-            }
-        }
-        Err(_) => {
-            warn!(
-                "LIVELINESS_UPDATE not defined. Defaulting to \
-                 {DEFAULT_INTERVAL_UPDATE_PLACEHOLDER}"
-            );
-
-            DEFAULT_INTERVAL_UPDATE
-        }
-    }
-}
-
-pub fn shutdown_delay() -> Duration {
-    const SHUTDOWN_DELAY_KEY: &str = "SHUTDOWN_DELAY";
-    const SHUTDOWN_DELAY_PLACEHOLDER: &str = "5s";
-    const DEFAULT_SHUTDOWN_DELAY: Duration = Duration::from_secs(5);
-
-    let Ok(value) = env::var(SHUTDOWN_DELAY_KEY) else {
-        warn!("{SHUTDOWN_DELAY_KEY} not defined. Defaulting to {SHUTDOWN_DELAY_PLACEHOLDER}");
-        return DEFAULT_SHUTDOWN_DELAY;
-    };
-
-    let Ok(duration) = parse_duration::parse(&value) else {
-        error!(
-            "{SHUTDOWN_DELAY_KEY} defined incorrectly. Defaulting to {SHUTDOWN_DELAY_PLACEHOLDER}"
-        );
-        return DEFAULT_SHUTDOWN_DELAY;
-    };
-
-    duration
 }
 
 pub fn metrics_http_port(default: u16) -> u16 {
@@ -308,41 +77,9 @@ pub fn max_shards_per_node() -> usize {
     }
 }
 
-pub fn read_host_key() -> Result<Uuid> {
-    let hk_path = host_key_path();
-    let host_key_contents = fs::read(hk_path).with_context(|| {
-        format!(
-            "Failed to read host key from '{}'",
-            host_key_path().display()
-        )
-    })?;
-
-    let host_key = Uuid::from_slice(host_key_contents.as_slice())
-        .with_context(|| format!("Invalid host key from '{}'", host_key_path().display()))?;
-
-    Ok(host_key)
-}
-
-/// Reads the key that makes a node unique from the given file.
-/// If the file does not exist, it generates an ID and writes it to the file
-/// so that it can be reused on reboot.
-pub fn read_or_create_host_key() -> Result<Uuid> {
-    let hk_path = host_key_path();
-    let host_key;
-
-    if hk_path.exists() {
-        host_key = read_host_key()?;
-        info!(host_key=?host_key, "Read existing host key.");
-    } else {
-        host_key = Uuid::new_v4();
-        fs::write(hk_path, host_key.as_bytes()).with_context(|| {
-            format!(
-                "Failed to write host key to '{}'",
-                host_key_path().display()
-            )
-        })?;
-        info!(host_key=?host_key, host_key_path=?host_key_path(), "Create new host key.");
+pub fn host_key_path() -> PathBuf {
+    match env::var("HOST_KEY_PATH") {
+        Ok(var) => PathBuf::from(var),
+        Err(_) => PathBuf::from("host_key"),
     }
-
-    Ok(host_key)
 }

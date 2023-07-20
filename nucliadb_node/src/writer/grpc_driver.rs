@@ -33,7 +33,7 @@ use nucliadb_telemetry::sync::send_telemetry_event;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
-use crate::env;
+use crate::settings::Settings;
 use crate::shard_metadata::ShardMetadata;
 use crate::shards::{
     AsyncUnboundedShardWriterCache, AsyncWriterShardsProvider, ShardNotFoundError, ShardWriter,
@@ -41,12 +41,8 @@ use crate::shards::{
 
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,
-    options: GrpcWriterOptions,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
-}
-
-pub struct GrpcWriterOptions {
-    pub lazy_loading: bool,
+    settings: Arc<Settings>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,21 +52,20 @@ pub enum NodeWriterEvent {
 }
 
 impl NodeWriterGRPCDriver {
-    pub fn new(options: GrpcWriterOptions) -> Self {
+    pub fn new(settings: Arc<Settings>) -> Self {
         Self {
-            shards: AsyncUnboundedShardWriterCache::new(),
-            options,
+            shards: AsyncUnboundedShardWriterCache::new(settings.shards_path()),
             sender: None,
+            settings,
         }
     }
 
     /// This function must be called before using this service
     pub async fn initialize(&self) -> NodeResult<()> {
-        if !self.options.lazy_loading {
+        if !self.settings.lazy_loading() {
             // If lazy loading is disabled, load
             self.shards.load_all().await?
         }
-
         Ok(())
     }
 
@@ -88,7 +83,7 @@ impl NodeWriterGRPCDriver {
         // loading a shard into memory when lazy loading is enabled. Otherwise,
         // we rely on all shards (stored on disk) been brought to memory before
         // the driver is online on `initialize`.
-        if self.options.lazy_loading {
+        if self.settings.lazy_loading() {
             self.shards.load(id.clone()).await.map_err(|error| {
                 if error.is::<ShardNotFoundError>() {
                     tonic::Status::not_found(error.to_string())
@@ -392,8 +387,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<NodeMetadata>, Status> {
+        let metadata_path = self.settings.metadata_path();
         let metadata = tokio::task::spawn_blocking(move || {
-            crate::node_metadata::NodeMetadata::load(&env::metadata_path())
+            crate::node_metadata::NodeMetadata::load(&metadata_path)
         })
         .await
         .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;

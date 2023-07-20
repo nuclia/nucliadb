@@ -17,6 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use nucliadb_core::tracing::{Level, Span};
 use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;
@@ -28,24 +30,22 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
-use crate::env;
+use crate::settings::Settings;
 
 const TRACE_ID: &str = "trace-id";
 
-pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
+pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<ClientInitGuard> {
     let mut layers = Vec::new();
 
-    let log_levels = env::log_level();
-    let stdout = stdout_layer(log_levels);
+    let stdout = stdout_layer(settings);
     layers.push(stdout);
 
-    if env::jaeger_enabled() {
-        let span_levels = env::span_levels();
-        let jaeger = jaeger_layer(span_levels)?;
+    if settings.jaeger_enabled() {
+        let jaeger = jaeger_layer(settings)?;
         layers.push(jaeger);
     }
 
-    let sentry_guard = setup_sentry(env::get_sentry_env(), env::sentry_url());
+    let sentry_guard = setup_sentry(settings.sentry_env(), settings.sentry_url());
     let sentry = sentry_layer();
     layers.push(sentry);
 
@@ -57,21 +57,20 @@ pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
     Ok(sentry_guard)
 }
 
-fn stdout_layer(log_levels: Vec<(String, Level)>) -> Box<dyn Layer<Registry> + Send + Sync> {
+fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sync> {
     let format = tracing_subscriber::fmt::format().with_level(true).compact();
 
+    let log_levels = settings.log_levels().to_vec();
     tracing_subscriber::fmt::layer()
         .event_format(format)
         .with_filter(Targets::new().with_targets(log_levels))
         .boxed()
 }
 
-fn jaeger_layer(
-    _span_levels: Vec<(String, Level)>,
-) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
+fn jaeger_layer(settings: &Arc<Settings>) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
     global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
-    let agent_endpoint = env::jaeger_agent_endp();
+    let agent_endpoint = settings.jaeger_agent_address();
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
         .with_service_name("nucliadb_node")

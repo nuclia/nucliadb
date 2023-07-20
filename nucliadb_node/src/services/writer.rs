@@ -30,7 +30,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{metrics, thread};
 
-use super::shard_disk_structure::*;
+use crate::disk_structure::*;
 use crate::services::versions::Versions;
 use crate::shard_metadata::ShardMetadata;
 use crate::telemetry::run_with_telemetry;

@@ -19,7 +19,9 @@
 //
 
 pub mod grpc_driver;
+
 use std::collections::HashMap;
+use std::path::Path;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
@@ -31,14 +33,13 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use uuid::Uuid;
 
-use crate::env;
 use crate::services::writer::ShardWriterService;
 use crate::shard_metadata::ShardMetadata;
+use crate::{disk_structure, env};
 
 /// Initialize the index node writer. This function must be called before using
 /// a writer
-pub fn initialize() -> NodeResult<()> {
-    let data_path = env::data_path();
+pub fn initialize(data_path: &Path, shards_path: &Path) -> NodeResult<()> {
     if !data_path.exists() {
         return Err(node_error!(
             "Data directory ({:?}) should be already created",
@@ -46,9 +47,8 @@ pub fn initialize() -> NodeResult<()> {
         ));
     }
 
-    let shards_path = env::shards_path();
     if !shards_path.exists() {
-        std::fs::create_dir(&shards_path)?;
+        std::fs::create_dir(shards_path)?;
     }
 
     // We shallow the error if the threadpools were already initialized
@@ -65,7 +65,7 @@ pub struct NodeWriterService {
 
 impl NodeWriterService {
     pub fn new() -> NodeResult<Self> {
-        initialize()?;
+        initialize(&env::data_path(), &env::shards_path())?;
         Ok(Self::default())
     }
 
@@ -91,7 +91,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
-        let shard_path = env::shards_path_id(&shard_id.id);
+        let shard_path = disk_structure::shard_path_by_id(&env::shards_path(), &shard_id.id);
         if self.cache.contains_key(&shard_id.id) {
             debug!("Shard {shard_path:?} is already on memory");
             return;
@@ -116,7 +116,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn new_shard(request: &NewShardRequest) -> NodeResult<ShardCreated> {
         let shard_id = Uuid::new_v4().to_string();
-        let shard_path = env::shards_path_id(&shard_id);
+        let shard_path = disk_structure::shard_path_by_id(&env::shards_path(), &shard_id);
         let new_shard = ShardWriterService::new(
             shard_id.clone(),
             &shard_path,
@@ -140,7 +140,7 @@ impl NodeWriterService {
 
         self.cache.remove(&shard_id.id);
 
-        let shard_path = env::shards_path_id(&shard_id.id);
+        let shard_path = disk_structure::shard_path_by_id(&env::shards_path(), &shard_id.id);
         if shard_path.exists() {
             debug!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
@@ -153,7 +153,7 @@ impl NodeWriterService {
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
         self.cache.remove(&shard_id.id);
         let shard_id = shard_id.id.clone();
-        let shard_path = env::shards_path_id(&shard_id);
+        let shard_path = disk_structure::shard_path_by_id(&env::shards_path(), &shard_id);
         let new_shard = ShardWriterService::clean_and_create(shard_id.clone(), &shard_path)?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,
