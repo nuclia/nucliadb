@@ -21,6 +21,7 @@ use std::io::Cursor;
 
 use nucliadb_core::protos::*;
 use nucliadb_core::NodeResult;
+use nucliadb_node::env;
 use nucliadb_node::shard_metadata::ShardMetadata;
 use nucliadb_node::shards::{
     ReaderShardsProvider, UnboundedShardReaderCache, UnboundedShardWriterCache,
@@ -29,8 +30,8 @@ use nucliadb_node::shards::{
 use prost::Message;
 
 fn main() -> NodeResult<()> {
-    let writer = UnboundedShardWriterCache::new();
-    let reader = UnboundedShardReaderCache::new();
+    let writer = UnboundedShardWriterCache::new(env::shards_path());
+    let reader = UnboundedShardReaderCache::new(env::shards_path());
     let resources_dir = std::path::Path::new("/path/to/data");
 
     let metadata = ShardMetadata::from(NewShardRequest::default());

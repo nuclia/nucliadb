@@ -26,10 +26,9 @@ use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 
-use crate::disk_structure;
-use crate::env;
 use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
 use crate::shards::ShardReader;
+use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct AsyncUnboundedShardReaderCache {

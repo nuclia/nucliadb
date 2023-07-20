@@ -21,6 +21,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
+use nucliadb_node::env;
 use nucliadb_node::shard_metadata::ShardMetadata;
 use nucliadb_node::shards::{ShardWriter, UnboundedShardWriterCache, WriterShardsProvider};
 use nucliadb_telemetry::blocking::send_telemetry_event;
@@ -64,7 +65,7 @@ impl NodeWriter {
     #[staticmethod]
     pub fn new() -> Self {
         Self {
-            shards: UnboundedShardWriterCache::new(),
+            shards: UnboundedShardWriterCache::new(env::shards_path()),
         }
     }
 
