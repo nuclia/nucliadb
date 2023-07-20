@@ -167,7 +167,7 @@ class StandaloneReaderWrapper:
                     pb.ParseFromString(pb_bytes)
                     asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
                     element = generator.next()
-            except TypeError:
+            except StopIteration:
                 # this is the end
                 pass
             except Exception as e:
@@ -206,7 +206,7 @@ class StandaloneReaderWrapper:
                     pb.ParseFromString(pb_bytes)
                     asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
                     element = generator.next()
-            except TypeError:
+            except StopIteration:
                 # this is the end
                 pass
             except Exception as e:

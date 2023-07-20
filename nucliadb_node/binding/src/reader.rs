@@ -26,7 +26,7 @@ use nucliadb_core::texts::DocumentIterator;
 use nucliadb_node::env;
 use nucliadb_node::shards::{ReaderShardsProvider, ShardReader, UnboundedShardReaderCache};
 use prost::Message;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyStopIteration, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use pyo3::PyErr;
@@ -42,7 +42,7 @@ pub struct PyParagraphProducer {
 impl PyParagraphProducer {
     pub fn next<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
         match self.inner.next() {
-            None => Err(PyValueError::new_err("Empty iterator")),
+            None => Err(PyStopIteration::new_err("Empty iterator")),
             Some(item) => Ok(PyList::new(py, item.encode_to_vec())),
         }
     }
@@ -56,7 +56,7 @@ pub struct PyDocumentProducer {
 impl PyDocumentProducer {
     pub fn next<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
         match self.inner.next() {
-            None => Err(PyValueError::new_err("Empty iterator")),
+            None => Err(PyStopIteration::new_err("Empty iterator")),
             Some(item) => Ok(PyList::new(py, item.encode_to_vec())),
         }
     }
