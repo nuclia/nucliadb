@@ -29,7 +29,8 @@ fn main() {
     let args = Args::new();
     let stop_point = Arc::new(AtomicBool::new(false));
     let at = tempfile::TempDir::new().unwrap();
-    let writer = Index::new(at.path(), IndexMetadata::default()).unwrap();
+    let location = at.path().join("vectors");
+    let writer = Index::new(&location, IndexMetadata::default()).unwrap();
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
     let vector_it = RandomVectors::new(args.embedding_dim()).take(args.index_len());
@@ -37,7 +38,7 @@ fn main() {
         thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 
     let stop = stop_point.clone();
-    let reader = Index::open(at.path(), IndexCheck::None).unwrap();
+    let reader = Index::open(&location, IndexCheck::None).unwrap();
     let no_results = args.neighbours();
     let plotw = PlotWriter::new(args.reader_plot().unwrap());
     let query_it = RandomVectors::new(args.embedding_dim());
