@@ -79,17 +79,23 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
         return await stub.GetMetadata(EmptyQuery())  # type: ignore
 
-    async def get_node_metadata(self, sts_name: str, force=False) -> IndexNodeMetadata:
+    async def get_node_metadata(
+        self, sts_name: str, node_ip: str, force=False
+    ) -> IndexNodeMetadata:
         if force or sts_name not in self.node_id_cache:
             # hard coded assuming that nucliadb is used with current helm charts
-            address = f"{sts_name}.node.{self.settings.cluster_discovery_kubernetes_namespace}.svc.cluster.local"
-            metadata = await self._query_node_metadata(address)
+            # XXX right now, GRPC will not know when an IP has changed and
+            # istio is not able to handle this properly. This is a workaround for now.
+            # address = f"{sts_name}.node.{self.settings.cluster_discovery_kubernetes_namespace}.svc.cluster.local"
+            metadata = await self._query_node_metadata(node_ip)
             self.node_id_cache[sts_name] = IndexNodeMetadata(
                 node_id=metadata.node_id,
                 name=sts_name,
                 shard_count=metadata.shard_count,
-                address=address,
+                address=node_ip,
             )
+        else:
+            self.node_id_cache[sts_name].address = node_ip
         return self.node_id_cache[sts_name]
 
     async def update_node(self, event: EventType) -> None:
@@ -121,7 +127,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     break
 
         sts_name = event_metadata.name
-        node_data = await self.get_node_metadata(sts_name)
+        node_data = await self.get_node_metadata(sts_name, status.pod_ip)
         if ready:
             node = manager.get_index_node(node_data.node_id)
             if node is None:
@@ -189,7 +195,9 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             try:
                 for sts_name in list(self.node_id_cache.keys()):
                     # force updating cache
-                    await self.get_node_metadata(sts_name, force=True)
+                    await self.get_node_metadata(
+                        sts_name, self.node_id_cache[sts_name].address, force=True
+                    )
             except (
                 asyncio.CancelledError,
                 KeyboardInterrupt,
