@@ -21,30 +21,39 @@ use std::io::Cursor;
 
 use nucliadb_core::protos::*;
 use nucliadb_core::NodeResult;
-use nucliadb_node::reader::NodeReaderService;
-use nucliadb_node::writer::NodeWriterService;
+use nucliadb_node::shard_metadata::ShardMetadata;
+use nucliadb_node::shards::{
+    ReaderShardsProvider, UnboundedShardReaderCache, UnboundedShardWriterCache,
+    WriterShardsProvider,
+};
 use prost::Message;
 
 fn main() -> NodeResult<()> {
-    let writer = NodeWriterService::new()?;
-    let reader = NodeReaderService::new();
-
+    let writer = UnboundedShardWriterCache::new();
+    let reader = UnboundedShardReaderCache::new();
     let resources_dir = std::path::Path::new("/path/to/data");
-    let new_shard = NodeWriterService::new_shard(&NewShardRequest::default())?;
+
+    let metadata = ShardMetadata::from(NewShardRequest::default());
+    let new_shard = writer.create(metadata)?;
     let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
     for file_path in std::fs::read_dir(resources_dir).unwrap() {
         let file_path = file_path.unwrap().path();
         println!("processing {file_path:?}");
+
         let content = std::fs::read(&file_path).unwrap();
         let resource = Resource::decode(&mut Cursor::new(content)).unwrap();
         println!("Adding resource {}", file_path.display());
-        let res = writer.set_resource(&shard_id, &resource).unwrap();
-        assert!(res.is_some());
+
+        writer.load(shard_id.id.clone())?;
+        let shard_writer = writer.get(shard_id.id.clone()).unwrap();
+        let res = shard_writer.set_resource(&resource);
+        assert!(res.is_ok());
         println!("Resource added: {:?}", res.unwrap());
-        let info = reader
-            .get_info(&shard_id, GetShardRequest::default())?
-            .unwrap();
+
+        reader.load(shard_id.id.clone())?;
+        let shard_reader = reader.get(shard_id.id.clone()).unwrap();
+        let info = shard_reader.get_info(&GetShardRequest::default())?;
         println!("Sentences {}", info.sentences);
         println!("Paragraphs {}", info.paragraphs);
         println!("Fields {}", info.fields);
