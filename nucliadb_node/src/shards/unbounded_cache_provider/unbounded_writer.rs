@@ -45,6 +45,14 @@ impl UnboundedShardWriterCache {
         }
     }
 
+    pub fn list_loaded_ids(&self) -> Vec<ShardId> {
+        self.read()
+            .iter()
+            .map(|(shard_id, _)| shard_id)
+            .cloned()
+            .collect()
+    }
+
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardWriter>>> {
         self.cache.read().expect("Poisoned lock while reading")
     }

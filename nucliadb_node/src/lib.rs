@@ -22,7 +22,7 @@
 // #![warn(missing_docs)]
 
 /// Shard metadata, defined at the moment of creation.
-mod shard_metadata;
+pub mod shard_metadata;
 
 mod disk_structure;
 pub mod node_metadata;

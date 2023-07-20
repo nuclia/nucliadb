@@ -90,8 +90,10 @@ impl NodeReader {
 #[pymethods]
 impl NodeReader {
     #[staticmethod]
-    pub fn new() -> NodeReader {
-        Self::default()
+    pub fn new() -> Self {
+        Self {
+            shards: UnboundedShardReaderCache::new(),
+        }
     }
 
     pub fn paragraphs(&mut self, shard_id: RawProtos) -> PyResult<PyParagraphProducer> {
