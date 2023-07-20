@@ -306,11 +306,11 @@ mod tests {
         assert_eq!(settings.sentry_env, SENTRY_PROD);
         assert!(
             Ok(settings.reader_listen_address()) == "127.0.0.1:2020".parse()
-                || Ok(settings.reader_listen_address()) == "::1:2020".parse()
+                || Ok(settings.reader_listen_address()) == "[::1]:2020".parse()
         );
         assert!(
             Ok(settings.writer_listen_address()) == "127.0.0.1:2021".parse()
-                || Ok(settings.writer_listen_address()) == "::1:2021".parse()
+                || Ok(settings.writer_listen_address()) == "[::1]:2021".parse()
         );
     }
 }
