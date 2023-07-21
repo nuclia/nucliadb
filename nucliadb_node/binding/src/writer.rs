@@ -21,9 +21,9 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
-use nucliadb_node::env;
 use nucliadb_node::shard_metadata::ShardMetadata;
 use nucliadb_node::shards::{ShardWriter, UnboundedShardWriterCache, WriterShardsProvider};
+use nucliadb_node::{env, writer};
 use nucliadb_telemetry::blocking::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use prost::Message;
@@ -63,10 +63,15 @@ impl NodeWriter {
 #[pymethods]
 impl NodeWriter {
     #[staticmethod]
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> PyResult<Self> {
+        if let Err(error) = writer::initialize(&env::data_path(), &env::shards_path()) {
+            return Err(IndexNodeException::new_err(format!(
+                "Unable to initialize writer: {error}"
+            )));
+        };
+        Ok(Self {
             shards: UnboundedShardWriterCache::new(env::shards_path()),
-        }
+        })
     }
 
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
