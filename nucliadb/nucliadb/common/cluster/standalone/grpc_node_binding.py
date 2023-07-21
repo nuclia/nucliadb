@@ -60,11 +60,18 @@ from ..settings import settings
 logger = logging.getLogger(__name__)
 try:
     from nucliadb_node_binding import IndexNodeException  # type: ignore
+except ImportError:  # pragma: no cover
+    logger.warning("Import error while importing IndexNodeException")
+    IndexNodeException = Exception
+try:
     from nucliadb_node_binding import NodeReader  # type: ignore
+except ImportError:  # pragma: no cover
+    logger.warning("Import error while importing NodeReader")
+    NodeReader = None
+try:
     from nucliadb_node_binding import NodeWriter  # type: ignore
 except ImportError:  # pragma: no cover
-    IndexNodeException = Exception
-    NodeReader = None
+    logger.warning("Import error while importing NodeWriter")
     NodeWriter = None
 
 
