@@ -79,8 +79,11 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     data = raw.read(payload_size)
     find_result = KnowledgeboxFindResults.parse_raw(base64.b64decode(data))
     data = raw.read()
-    answer, relations_payload = data.split(b"_END_")
-
+    try:
+        answer, relations_payload = data.split(b"_END_")
+    except ValueError:
+        answer = data
+        relations_payload = b""
     learning_id = response.headers.get("NUCLIA-LEARNING-ID")
     relations_result = None
     if len(relations_payload) > 0:
