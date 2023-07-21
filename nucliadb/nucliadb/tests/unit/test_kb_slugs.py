@@ -37,6 +37,7 @@ def test_kb_slugs():
         "foo_bar",
         "foo-bar_123",
         "my-kbis:my-kb-slug",
+        "SomeUpperCase",
     ]
     for valid in valid_slugs:
         DummyModel(slug=valid)
@@ -44,7 +45,7 @@ def test_kb_slugs():
     invalid_slugs = [
         "",
         "foo/bar",
-        "SomeUpperCase",
+        "foo.bar",
         "@myslug",
         "&invalid",
     ]
