@@ -34,11 +34,19 @@ use writer::NodeWriter;
 type RawProtos = Vec<u8>;
 
 #[pymodule]
-pub fn nucliadb_node_binding(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn nucliadb_node_binding(py: Python, m: &PyModule) -> PyResult<()> {
     setup_tracing(env::log_level());
 
     m.add_class::<NodeWriter>()?;
     m.add_class::<NodeReader>()?;
+
+    m.add(
+        "IndexNodeException",
+        py.get_type::<errors::IndexNodeException>(),
+    )?;
+    m.add("LoadShardError", py.get_type::<errors::LoadShardError>())?;
+    m.add("ShardNotFound", py.get_type::<errors::ShardNotFound>())?;
+
     Ok(())
 }
 
