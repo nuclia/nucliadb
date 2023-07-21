@@ -76,6 +76,8 @@ jobs:
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
         run: |
