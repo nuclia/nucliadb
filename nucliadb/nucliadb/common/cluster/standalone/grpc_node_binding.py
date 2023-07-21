@@ -72,7 +72,7 @@ class StandaloneReaderWrapper:
     reader: NodeReader
 
     def __init__(self):
-        self.reader = NodeReader.new()
+        self.reader = NodeReader()
         self.executor = ThreadPoolExecutor(settings.local_reader_threads)
 
     async def Search(
@@ -96,7 +96,7 @@ class StandaloneReaderWrapper:
             logger.error(f"IndexNodeException in Search: {request}", exc_info=True)
             if not retry:
                 # reinit?
-                self.reader = NodeReader.new()
+                self.reader = NodeReader()
                 return await self.Search(request, retry=True)
             else:
                 raise
@@ -253,7 +253,7 @@ class StandaloneWriterWrapper:
 
     def __init__(self):
         os.makedirs(settings.data_path, exist_ok=True)
-        self.writer = NodeWriter.new()
+        self.writer = NodeWriter()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
     async def NewShard(self, request: ShardMetadata) -> ShardCreated:

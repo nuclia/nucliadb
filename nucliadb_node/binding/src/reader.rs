@@ -90,7 +90,7 @@ impl NodeReader {
 
 #[pymethods]
 impl NodeReader {
-    #[staticmethod]
+    #[new]
     pub fn new() -> Self {
         reader::initialize();
         Self {

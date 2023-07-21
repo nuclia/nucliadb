@@ -62,7 +62,7 @@ impl NodeWriter {
 
 #[pymethods]
 impl NodeWriter {
-    #[staticmethod]
+    #[new]
     pub fn new() -> PyResult<Self> {
         if let Err(error) = writer::initialize(&env::data_path(), &env::shards_path()) {
             return Err(IndexNodeException::new_err(format!(
