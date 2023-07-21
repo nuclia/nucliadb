@@ -584,3 +584,33 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "text/plain"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "slug,valid",
+    [
+        ("foo", True),
+        ("foo-bar", True),  # with dash
+        ("foo:bar", True),  # with colon
+        ("foo_bar", True),  # with underscore
+        ("FooBar", True),  # with capital letters
+        ("foo.bar", False),  # with dot
+        ("foo/bar", False),  # with slash
+    ],
+)
+async def test_resource_slug_validation(
+    nucliadb_writer, nucliadb_reader, knowledgebox, slug, valid
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources", json={"slug": slug}
+    )
+    if valid:
+        assert resp.status_code == 201
+        resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/slug/{slug}")
+        assert resp.status_code == 200
+    else:
+        assert resp.status_code == 422
+        detail = resp.json()["detail"][0]
+        assert detail["loc"] == ["body", "slug"]
+        assert detail["msg"].startswith(f"Invalid slug: '{slug}'")
