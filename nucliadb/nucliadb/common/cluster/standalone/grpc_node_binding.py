@@ -58,20 +58,18 @@ from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
+
 try:
     from nucliadb_node_binding import IndexNodeException  # type: ignore
 except ImportError:  # pragma: no cover
     logger.warning("Import error while importing IndexNodeException")
     IndexNodeException = Exception
+
 try:
     from nucliadb_node_binding import NodeReader  # type: ignore
-except ImportError:  # pragma: no cover
-    logger.warning("Import error while importing NodeReader")
-    NodeReader = None
-try:
     from nucliadb_node_binding import NodeWriter  # type: ignore
 except ImportError:  # pragma: no cover
-    logger.warning("Import error while importing NodeWriter")
+    NodeReader = None
     NodeWriter = None
 
 
@@ -79,6 +77,10 @@ class StandaloneReaderWrapper:
     reader: NodeReader
 
     def __init__(self):
+        if NodeReader is None:
+            raise ImportError(
+                "NucliaDB index node bindings are not installed (reader not found)"
+            )
         self.reader = NodeReader()
         self.executor = ThreadPoolExecutor(settings.local_reader_threads)
 
@@ -260,6 +262,10 @@ class StandaloneWriterWrapper:
 
     def __init__(self):
         os.makedirs(settings.data_path, exist_ok=True)
+        if NodeWriter is None:
+            raise ImportError(
+                "NucliaDB index node bindings are not installed (writer not found)"
+            )
         self.writer = NodeWriter()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
