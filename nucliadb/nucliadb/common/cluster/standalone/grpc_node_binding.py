@@ -59,9 +59,11 @@ from ..settings import settings
 
 logger = logging.getLogger(__name__)
 try:
+    from nucliadb_node_binding import IndexNodeException  # type: ignore
     from nucliadb_node_binding import NodeReader  # type: ignore
     from nucliadb_node_binding import NodeWriter  # type: ignore
 except ImportError:  # pragma: no cover
+    IndexNodeException = Exception
     NodeReader = None
     NodeWriter = None
 
@@ -85,13 +87,13 @@ class StandaloneReaderWrapper:
             pb = SearchResponse()
             pb.ParseFromString(pb_bytes)
             return pb
-        except TypeError as exc:
+        except IndexNodeException as exc:
             if "IO error" not in str(exc):
                 # ignore any other error
                 raise
 
             # try some mitigations...
-            logger.error(f"TypeError in Search: {request}", exc_info=True)
+            logger.error(f"IndexNodeException in Search: {request}", exc_info=True)
             if not retry:
                 # reinit?
                 self.reader = NodeReader.new()
