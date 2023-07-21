@@ -85,17 +85,19 @@ def create_k8s_event(
 
 
 async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub):
-    assert await k8s_discovery.get_node_metadata("node-0") == IndexNodeMetadata(
+    assert await k8s_discovery.get_node_metadata(
+        "node-0", "1.1.1.1"
+    ) == IndexNodeMetadata(
         node_id="node_id",
         shard_count=1,
         name="node-0",
-        address="node-0.node.nucliadb.svc.cluster.local",
+        address="1.1.1.1",
     )
 
     writer_stub.GetMetadata.assert_called_once()
 
     # should be cached now
-    await k8s_discovery.get_node_metadata("node-0")
+    await k8s_discovery.get_node_metadata("node-0", "1.1.1.1")
 
     assert len(writer_stub.GetMetadata.mock_calls) == 1
 
