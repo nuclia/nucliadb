@@ -48,12 +48,12 @@ class InvalidSlugError(pydantic.errors.PydanticValueError):
     code = "str.slug"
     msg_template = (
         "Invalid slug: '{value}'. Slug must be a string with only "
-        "lowercase letters, numbers, underscores, colons and dashes."
+        "letters, numbers, underscores, colons and dashes."
     )
 
 
 class SlugString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[a-z0-9:_-]+$")
+    regex = re.compile(r"^[a-zA-Z0-9:_-]+$")
 
     @classmethod
     def validate(cls, value: str) -> str:
