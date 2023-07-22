@@ -23,7 +23,6 @@ import logging
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
-from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
 from nucliadb_telemetry import metrics
 
@@ -47,11 +46,9 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
         if node is None:
             logger.debug(f"{member.node_id} add {member.address}")
             manager.add_index_node(
-                IndexNode(
-                    id=member.node_id,
-                    address=member.address,
-                    shard_count=shard_count,
-                )
+                id=member.node_id,
+                address=member.address,
+                shard_count=shard_count,
             )
             logger.debug("Node added")
         else:

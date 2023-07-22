@@ -123,7 +123,6 @@ class PullWorker:
 
         async with ProcessingHTTPClient() as processing_http_client:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
-
             while True:
                 try:
                     data = await processing_http_client.pull(self.partition)

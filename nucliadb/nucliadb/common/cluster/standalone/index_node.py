@@ -17,10 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos import nodereader_pb2, noderesources_pb2, nodesidecar_pb2
+import inspect
+from typing import Any
+
+from nucliadb_protos import (
+    nodereader_pb2,
+    noderesources_pb2,
+    nodesidecar_pb2,
+    standalone_pb2,
+    standalone_pb2_grpc,
+)
+from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from ..abc import AbstractIndexNode
-from .grpc_node_binding import StandaloneReaderWrapper, StandaloneWriterWrapper
+from . import grpc_node_binding
 
 
 class StandaloneSidecarInterface:
@@ -34,7 +44,7 @@ class StandaloneSidecarInterface:
     should be done at the node reader.
     """
 
-    def __init__(self, reader: StandaloneReaderWrapper):
+    def __init__(self, reader: grpc_node_binding.StandaloneReaderWrapper):
         self._reader = reader
 
     async def GetCount(
@@ -51,24 +61,65 @@ class StandaloneSidecarInterface:
 
 
 class StandaloneIndexNode(AbstractIndexNode):
-    _writer: StandaloneWriterWrapper
-    _reader: StandaloneReaderWrapper
+    _writer: grpc_node_binding.StandaloneWriterWrapper
+    _reader: grpc_node_binding.StandaloneReaderWrapper
     label: str = "standalone"
 
     def __init__(self, id: str, address: str, shard_count: int, dummy: bool = False):
         super().__init__(id=id, address=address, shard_count=shard_count, dummy=dummy)
-        self._writer = StandaloneWriterWrapper()
-        self._reader = StandaloneReaderWrapper()
+        self._writer = grpc_node_binding.StandaloneWriterWrapper()
+        self._reader = grpc_node_binding.StandaloneReaderWrapper()
         self._sidecar = StandaloneSidecarInterface(self._reader)
 
     @property
-    def reader(self) -> StandaloneReaderWrapper:  # type: ignore
+    def reader(self) -> grpc_node_binding.StandaloneReaderWrapper:  # type: ignore
         return self._reader
 
     @property
-    def writer(self) -> StandaloneWriterWrapper:  # type: ignore
+    def writer(self) -> grpc_node_binding.StandaloneWriterWrapper:  # type: ignore
         return self._writer
 
     @property
     def sidecar(self) -> StandaloneSidecarInterface:  # type: ignore
         return self._sidecar
+
+
+class ProxyCallerWrapper:
+    def __init__(self, address: str, type: str, original_type: Any):
+        self._address = address
+        self._type = type
+        self._original_type = original_type
+        self._channel = get_traced_grpc_channel(address, "standalone_proxy")
+        self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)
+
+    def __getattr__(self, name):
+        async def call(request):
+            req = standalone_pb2.CallRequest(
+                service=self._type, method=name, request=request.SerializeToString()
+            )
+            resp = await self._stub.NodeAction(req)
+            return_type_str = inspect.signature(
+                getattr(self._original_type, name)
+            ).return_annotation
+            return_type = getattr(grpc_node_binding, return_type_str)
+            return_value = return_type()
+            return_value.ParseFromString(resp.payload)
+            return return_value
+
+        return call
+
+
+class ProxyStandaloneIndexNode(StandaloneIndexNode):
+    label: str = "proxy_standalone"
+
+    def __init__(self, id: str, address: str, shard_count: int, dummy: bool = False):
+        super().__init__(id, address, shard_count, dummy)
+        self._writer = ProxyCallerWrapper(  # type: ignore
+            address, "writer", grpc_node_binding.StandaloneWriterWrapper
+        )
+        self._reader = ProxyCallerWrapper(  # type: ignore
+            address, "reader", grpc_node_binding.StandaloneReaderWrapper
+        )
+        self._sidecar = ProxyCallerWrapper(  # type: ignore
+            address, "sidecar", StandaloneSidecarInterface
+        )

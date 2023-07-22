@@ -25,3 +25,7 @@ spec:
       port: 8060
       protocol: TCP
       appProtocol: grpc
+    - name: node
+      port: 10009
+      protocol: TCP
+      appProtocol: grpc

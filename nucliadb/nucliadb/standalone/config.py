@@ -20,6 +20,7 @@
 
 import logging
 import os
+from socket import gethostname
 
 from nucliadb.standalone.settings import Settings
 
@@ -78,7 +79,7 @@ def config_nucliadb(nucliadb_args: Settings):
     use some specific settings.
     """
 
-    from nucliadb.common.cluster import manager
+    from nucliadb.common.cluster.settings import ClusterDiscoveryMode
     from nucliadb.common.cluster.settings import settings as cluster_settings
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb.train.settings import settings as train_settings
@@ -93,8 +94,12 @@ def config_nucliadb(nucliadb_args: Settings):
     )
 
     cluster_settings.standalone_mode = True
-    cluster_settings.node_replicas = 1
+    cluster_settings.cluster_discovery_mode = ClusterDiscoveryMode.STANDALONE
     cluster_settings.data_path = nucliadb_args.data_path
+    if len(cluster_settings.cluster_discovery_manual_addresses) == 0:
+        cluster_settings.cluster_discovery_manual_addresses = [
+            f"{gethostname()}:{nucliadb_args.http_port}"
+        ]
     ingest_settings.nuclia_partitions = 1
     ingest_settings.total_replicas = 1
     ingest_settings.replica_number = 0
@@ -123,5 +128,3 @@ def config_nucliadb(nucliadb_args: Settings):
         nuclia_settings.nuclia_zone = nucliadb_args.zone
     elif os.environ.get("NUA_ZONE"):
         nuclia_settings.nuclia_zone = os.environ.get("NUA_ZONE", "dev")
-
-    manager.setup_standalone_cluster()

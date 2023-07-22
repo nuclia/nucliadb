@@ -1,0 +1,71 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - uses: balchua/microk8s-actions@v0.3.2
+        with:
+          channel: '1.26/stable'
+          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
+      
+      - name: "Set up Helm"
+        uses: azure/setup-helm@v3
+      
+      - name: Install PostgreSQL with Helm
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm install my-postgresql bitnami/postgresql
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql
+
+      - name: PG Password
+        id: envs
+        run: |-
+          PGPASSWORD=`kubectl get secret --namespace default my-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d`
+          echo "PGPASSWORD=$PGPASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        run: |
+          docker build -t localhost:32000/nucliadb:test .
+          docker push localhost:32000/nucliadb:test
+
+      - name: Install NucliaDB with Helm
+        run: |
+          kubectl create namespace nucliadb
+          helm install nucliadb charts/nucliadb \
+            --timeout 5m \
+            --namespace nucliadb \
+            --values e2e/chart.values.yaml \
+            --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.version_step.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
+            --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
+          kubectl -n nucliadb wait --timeout=5m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-0
+          kubectl -n nucliadb wait --timeout=5m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          cache: "pip"
+
+      - name: Install test deps
+        run: pip install -r e2e/requirements.txt
+
+      - name: Run tests
+        run:
+          kubectl port-forward -n nucliadb service/nucliadb 8080:8080 &
+          pytest e2e/test_e2e.py

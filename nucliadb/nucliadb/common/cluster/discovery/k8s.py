@@ -38,7 +38,6 @@ from nucliadb.common.cluster.discovery.abc import (
     AbstractClusterDiscovery,
 )
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
-from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
 from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
@@ -133,11 +132,9 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             if node is None:
                 logger.warning(f"Adding node", extra={"node_id": node_data.node_id})
                 manager.add_index_node(
-                    IndexNode(
-                        id=node_data.node_id,
-                        address=node_data.address,
-                        shard_count=node_data.shard_count,
-                    )
+                    id=node_data.node_id,
+                    address=node_data.address,
+                    shard_count=node_data.shard_count,
                 )
             else:
                 logger.debug(

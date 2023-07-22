@@ -23,6 +23,7 @@ from typing import Type, Union
 from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
 from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
 from nucliadb.common.cluster.discovery.manual import ManualDiscovery
+from nucliadb.common.cluster.discovery.standalone import StandaloneDiscovery
 from nucliadb.common.cluster.settings import ClusterDiscoveryMode, settings
 from nucliadb_utils.utilities import clean_utility, get_utility, set_utility
 
@@ -41,11 +42,15 @@ async def setup_cluster_discovery() -> None:
             # already loaded
             return util
 
-        klass: Union[Type[ManualDiscovery], Type[KubernetesDiscovery]]
+        klass: Union[
+            Type[ManualDiscovery], Type[KubernetesDiscovery], Type[StandaloneDiscovery]
+        ]
         if settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
             klass = ManualDiscovery
         elif settings.cluster_discovery_mode == ClusterDiscoveryMode.KUBERNETES:
             klass = KubernetesDiscovery
+        elif settings.cluster_discovery_mode == ClusterDiscoveryMode.STANDALONE:
+            klass = StandaloneDiscovery
         else:
             raise NotImplementedError(
                 f"Cluster discovery mode {settings.cluster_discovery_mode} not implemented"

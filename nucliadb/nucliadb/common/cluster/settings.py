@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import enum
-from typing import Optional
 
 from pydantic import BaseSettings, Field
 
@@ -26,15 +25,15 @@ from pydantic import BaseSettings, Field
 class ClusterDiscoveryMode(str, enum.Enum):
     MANUAL = "manual"
     KUBERNETES = "kubernetes"
+    STANDALONE = "standalone"
 
 
 class Settings(BaseSettings):
     data_path: str = "./data/node"
     standalone_mode: bool = False
+    standalone_node_port: int = 10009
 
     node_replicas: int = 2
-
-    logging_config: Optional[str] = None
 
     node_writer_port: int = 10000
     node_reader_port: int = 10001

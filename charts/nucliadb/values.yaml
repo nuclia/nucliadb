@@ -5,11 +5,14 @@ imagePullPolicy: IfNotPresent
 image: nuclia/nucliadb
 imageVersion: latest
 
+replicas: 1
+
 # app settings
 env:
   NUCLIA_ZONE: "europe1"
   CORS_ORIGINS: '["http://localhost:8080"]'
   #NUA_API_KEY: "..."
+  cluster_discovery_manual_addresses: '["nucliadb-0.nucliadb.nucliadb.svc.cluster.local:10009"]'
 
 envSecrets:
   # - name: NUA_API_KEY

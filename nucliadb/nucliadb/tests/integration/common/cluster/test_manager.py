@@ -27,7 +27,6 @@ from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.abc import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ExhaustedNodesError
-from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_utils.keys import KB_SHARDS
 
@@ -40,28 +39,22 @@ async def fake_kbid() -> AsyncIterable[str]:
 @pytest.fixture(scope="function")
 async def fake_nodes():
     manager.add_index_node(
-        IndexNode(
-            id="node-0",
-            address="nohost:9999",
-            shard_count=0,
-            dummy=True,
-        )
+        id="node-0",
+        address="nohost:9999",
+        shard_count=0,
+        dummy=True,
     )
     manager.add_index_node(
-        IndexNode(
-            id="node-1",
-            address="nohost:9999",
-            shard_count=0,
-            dummy=True,
-        )
+        id="node-1",
+        address="nohost:9999",
+        shard_count=0,
+        dummy=True,
     )
     manager.add_index_node(
-        IndexNode(
-            id="node-2",
-            address="nohost:9999",
-            shard_count=0,
-            dummy=True,
-        )
+        id="node-2",
+        address="nohost:9999",
+        shard_count=0,
+        dummy=True,
     )
     yield
 

@@ -1,0 +1,15 @@
+# image built in workflow and pushed to local registry
+image: localhost:32000/nucliadb
+imageVersion: test
+
+env:
+  DRIVER: PG
+  FILE_BACKEND: PG
+  cluster_discovery_manual_addresses: '["nucliadb-0.nucliadb:10009","nucliadb-0.nucliadb:10009"]'
+  NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
+
+replicas: 2
+
+storage:
+  class: "microk8s-hostpath"
+  size: 10Gi
