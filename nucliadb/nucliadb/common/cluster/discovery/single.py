@@ -17,43 +17,35 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import logging
 
 from nucliadb.common.cluster.discovery.abc import (
     AbstractClusterDiscovery,
     update_members,
 )
+from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
+from nucliadb.common.cluster.standalone.utils import get_self
 
 logger = logging.getLogger(__name__)
 
 
-class ManualDiscovery(AbstractClusterDiscovery):
+class SingleNodeDiscovery(AbstractClusterDiscovery):
     """
-    Manual provide all cluster members addresses to load information from.
+    When there is no cluster and ndb is running as a single node.
     """
-
-    async def discover(self) -> None:
-        members = []
-        for address in self.settings.cluster_discovery_manual_addresses:
-            members.append(await self._query_node_metadata(address))
-        update_members(members)
-
-    async def watch(self) -> None:
-        while True:
-            try:
-                await asyncio.sleep(15)
-                await self.discover()
-            except asyncio.CancelledError:
-                return
-            except Exception:
-                logger.exception(
-                    "Error while watching cluster members. Will retry at started interval"
-                )
 
     async def initialize(self) -> None:
-        await self.discover()
-        self.task = asyncio.create_task(self.watch())
+        self_node = get_self()
+        update_members(
+            [
+                IndexNodeMetadata(
+                    node_id=self_node.id,
+                    name=self_node.id,
+                    address=self_node.address,
+                    shard_count=self_node.shard_count,
+                )
+            ]
+        )
 
     async def finalize(self) -> None:
-        self.task.cancel()
+        ...

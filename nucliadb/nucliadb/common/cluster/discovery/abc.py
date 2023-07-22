@@ -21,11 +21,20 @@ import abc
 import asyncio
 import logging
 
+import backoff
+
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
-from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
+from nucliadb_protos import (
+    noderesources_pb2,
+    nodewriter_pb2,
+    nodewriter_pb2_grpc,
+    standalone_pb2,
+    standalone_pb2_grpc,
+)
 from nucliadb_telemetry import metrics
+from nucliadb_utils.grpc import get_traced_grpc_channel
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +56,9 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
         if node is None:
             logger.debug(f"{member.node_id} add {member.address}")
             manager.add_index_node(
-                IndexNode(
-                    id=member.node_id,
-                    address=member.address,
-                    shard_count=shard_count,
-                )
+                id=member.node_id,
+                address=member.address,
+                shard_count=shard_count,
             )
             logger.debug("Node added")
         else:
@@ -79,6 +86,51 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
     AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
 
+@backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
+async def _get_index_node_metadata(
+    settings: Settings, address: str
+) -> IndexNodeMetadata:
+    """
+    Get node metadata directly from the writer.
+
+    Establishes a new connection on every try on purpose to avoid long lived connections
+    and dns caching issues.
+
+    This method should be used carefully and results should be cached.
+    """
+    if address in settings.writer_port_map:
+        # test wiring
+        port = settings.writer_port_map[address]
+        grpc_address = f"localhost:{port}"
+    else:
+        grpc_address = f"{address}:{settings.node_writer_port}"
+    channel = get_traced_grpc_channel(grpc_address, "discovery", variant="_writer")
+    stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
+    metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
+    return IndexNodeMetadata(
+        node_id=metadata.node_id,
+        name=metadata.node_id,
+        address=address,
+        shard_count=metadata.shard_count,
+    )
+
+
+@backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
+async def _get_standalone_index_node_metadata(
+    settings: Settings, address: str
+) -> IndexNodeMetadata:
+    grpc_address = f"{address}:{settings.standalone_node_port}"
+    channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
+    stub = standalone_pb2_grpc.StandaloneClusterServiceStub(channel)
+    resp: standalone_pb2.NodeInfoResponse = await stub.NodeInfo(standalone_pb2.NodeInfoRequest())  # type: ignore
+    return IndexNodeMetadata(
+        node_id=resp.id,
+        name=resp.id,
+        address=address,
+        shard_count=resp.shard_count,
+    )
+
+
 class AbstractClusterDiscovery(abc.ABC):
     task: asyncio.Task
 
@@ -92,3 +144,9 @@ class AbstractClusterDiscovery(abc.ABC):
     @abc.abstractmethod
     async def finalize(self) -> None:
         """ """
+
+    async def _query_node_metadata(self, address: str) -> IndexNodeMetadata:
+        if self.settings.standalone_mode:
+            return await _get_standalone_index_node_metadata(self.settings, address)
+        else:
+            return await _get_index_node_metadata(self.settings, address)

@@ -5,11 +5,16 @@ imagePullPolicy: IfNotPresent
 image: nuclia/nucliadb
 imageVersion: latest
 
+replicas: 1
+
 # app settings
 env:
-  NUCLIA_ZONE: "europe1"
+  NUCLIA_ZONE: "europe-1"
   CORS_ORIGINS: '["http://localhost:8080"]'
   #NUA_API_KEY: "..."
+  cluster_discovery_mode: kubernetes
+  cluster_discovery_kubernetes_namespace: nucliadb
+  cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
 
 envSecrets:
   # - name: NUA_API_KEY

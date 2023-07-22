@@ -63,6 +63,7 @@ def get_server(settings: Settings) -> tuple[FastAPI, uvicorn.Server]:
     server = uvicorn.Server(config)
     config.load()
     server.lifespan = config.lifespan_class(config)
+
     return application, server
 
 

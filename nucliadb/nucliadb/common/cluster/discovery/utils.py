@@ -23,6 +23,7 @@ from typing import Type, Union
 from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
 from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
 from nucliadb.common.cluster.discovery.manual import ManualDiscovery
+from nucliadb.common.cluster.discovery.single import SingleNodeDiscovery
 from nucliadb.common.cluster.settings import ClusterDiscoveryMode, settings
 from nucliadb_utils.utilities import clean_utility, get_utility, set_utility
 
@@ -33,19 +34,21 @@ _setup_lock = asyncio.Lock()
 
 
 async def setup_cluster_discovery() -> None:
-    if settings.standalone_mode:
-        return
     async with _setup_lock:
         util = get_utility(UTIL_NAME)
         if util is not None:
             # already loaded
             return util
 
-        klass: Union[Type[ManualDiscovery], Type[KubernetesDiscovery]]
+        klass: Union[
+            Type[ManualDiscovery], Type[KubernetesDiscovery], Type[SingleNodeDiscovery]
+        ]
         if settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
             klass = ManualDiscovery
         elif settings.cluster_discovery_mode == ClusterDiscoveryMode.KUBERNETES:
             klass = KubernetesDiscovery
+        elif settings.cluster_discovery_mode == ClusterDiscoveryMode.SINGLE_NODE:
+            klass = SingleNodeDiscovery
         else:
             raise NotImplementedError(
                 f"Cluster discovery mode {settings.cluster_discovery_mode} not implemented"
