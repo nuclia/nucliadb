@@ -357,7 +357,6 @@ pub fn search_query(
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
-    with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
     let mut term_collector = TermCollector::default();
     let processed = preprocess_raw_query(text, &mut term_collector);
@@ -366,10 +365,6 @@ pub fn search_query(
     let termc = SharedTermC::from(term_collector);
     let mut fuzzies = fuzzied_queries(fuzzy_query, false, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
-    if let Some(advance) = with_advance {
-        originals.push((Occur::Must, advance.box_clone()));
-        fuzzies.push((Occur::Must, advance));
-    }
     if !search.uuid.is_empty() {
         let term = Term::from_field_text(schema.uuid, &search.uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);

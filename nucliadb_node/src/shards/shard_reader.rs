@@ -324,7 +324,6 @@ impl ShardReader {
             result_per_page: search_request.result_per_page,
             timestamps: search_request.timestamps.clone(),
             only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
             ..Default::default()
         };
@@ -350,7 +349,6 @@ impl ShardReader {
             result_per_page: search_request.result_per_page,
             timestamps: search_request.timestamps.clone(),
             only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
             key_filters: search_request.key_filters.clone(),
             ..Default::default()
         };

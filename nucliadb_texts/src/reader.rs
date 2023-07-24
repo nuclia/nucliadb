@@ -357,12 +357,7 @@ impl TextReaderService {
             query_parser
         };
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
-        let advanced_query = request
-            .advanced_query
-            .as_ref()
-            .map(|query| query_parser.parse_query(query))
-            .transpose()?;
-        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query);
+        let query = create_query(&query_parser, request, &self.schema, &text);
 
         // Offset to search from
         let results = request.result_per_page as usize;
