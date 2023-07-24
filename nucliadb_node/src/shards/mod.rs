@@ -17,17 +17,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-mod shards_provider;
-mod unbounded_cache_provider;
+//! This module provides tools for managing shards
 
-pub use shards_provider::{
-    AsyncReaderShardsProvider, AsyncWriterShardsProvider, ReaderShardsProvider, ShardId,
-    ShardNotFoundError, WriterShardsProvider,
-};
-pub use unbounded_cache_provider::{
-    AsyncUnboundedShardReaderCache, AsyncUnboundedShardWriterCache, UnboundedShardReaderCache,
-    UnboundedShardWriterCache,
-};
+pub mod errors;
+pub mod metadata;
+pub mod providers;
+pub mod shard_reader;
+pub mod shard_writer;
+pub mod versions;
 
-pub use crate::services::reader::ShardReaderService as ShardReader;
-pub use crate::services::writer::ShardWriterService as ShardWriter;
+// Alias for more readable imports
+pub use {shard_reader as reader, shard_writer as writer};
+
+pub type ShardId = String;

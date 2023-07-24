@@ -24,12 +24,10 @@ mod writer;
 use nucliadb_core::tracing::{error, Level};
 use nucliadb_node::env;
 use pyo3::prelude::*;
-use reader::NodeReader;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
-use writer::NodeWriter;
 
 type RawProtos = Vec<u8>;
 
@@ -37,8 +35,8 @@ type RawProtos = Vec<u8>;
 pub fn nucliadb_node_binding(py: Python, m: &PyModule) -> PyResult<()> {
     setup_tracing(env::log_level());
 
-    m.add_class::<NodeWriter>()?;
-    m.add_class::<NodeReader>()?;
+    m.add_class::<reader::NodeReader>()?;
+    m.add_class::<writer::NodeWriter>()?;
 
     m.add(
         "IndexNodeException",

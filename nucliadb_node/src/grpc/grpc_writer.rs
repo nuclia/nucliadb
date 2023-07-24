@@ -34,10 +34,11 @@ use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
 use crate::settings::Settings;
-use crate::shard_metadata::ShardMetadata;
-use crate::shards::{
-    AsyncUnboundedShardWriterCache, AsyncWriterShardsProvider, ShardNotFoundError, ShardWriter,
-};
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
+use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::writer::ShardWriter;
 
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,

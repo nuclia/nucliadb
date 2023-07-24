@@ -18,16 +18,20 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-/// Files and directories hierarchy
-///
-/// DATA_PATH
-/// |-- SHARDS_DIR
-///     |-- <shard-uuid>
-///         |-- PARAGRAPHS_DIR
-///         |-- RELATIONS_DIR
-///         |-- TEXTS_DIR
-///         |-- VECTORSET_DIR
-///         |-- VECTORS_DIR
+//! Files and directories organization
+//!
+//! The following diagram shows how the file system is organized in the index
+//! node (without details about each individual index organization):
+//!
+//! DATA_PATH
+//! |-- SHARDS_DIR
+//!     |-- <shard-uuid>
+//!         |-- PARAGRAPHS_DIR
+//!         |-- RELATIONS_DIR
+//!         |-- TEXTS_DIR
+//!         |-- VECTORSET_DIR
+//!         |-- VECTORS_DIR
+
 use std::path::{Path, PathBuf};
 
 pub const VERSION_FILE: &str = "versions.json";

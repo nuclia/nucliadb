@@ -25,10 +25,10 @@ use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{node_error, NodeResult};
+use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
+use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
-use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
-use nucliadb_node::reader;
-use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
+use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::telemetry::init_telemetry;
@@ -50,7 +50,7 @@ async fn main() -> NodeResult<()> {
     }
 
     // XXX it probably should be moved to a more clear abstraction
-    reader::initialize();
+    lifecycle::initialize_reader();
 
     let _guard = init_telemetry(&settings)?;
 

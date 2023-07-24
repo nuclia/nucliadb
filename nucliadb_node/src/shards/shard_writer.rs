@@ -31,12 +31,12 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{metrics, thread};
 
 use crate::disk_structure::*;
-use crate::services::versions::Versions;
-use crate::shard_metadata::ShardMetadata;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug)]
-pub struct ShardWriterService {
+pub struct ShardWriter {
     pub metadata: ShardMetadata,
     pub id: String,
     pub path: PathBuf,
@@ -50,7 +50,7 @@ pub struct ShardWriterService {
     relation_service_version: i32,
 }
 
-impl ShardWriterService {
+impl ShardWriter {
     #[tracing::instrument(skip_all)]
     fn initialize(
         id: String,
@@ -60,7 +60,7 @@ impl ShardWriterService {
         psc: ParagraphConfig,
         vsc: VectorConfig,
         rsc: RelationConfig,
-    ) -> NodeResult<ShardWriterService> {
+    ) -> NodeResult<ShardWriter> {
         let versions = Versions::load_or_create(&path.join(VERSION_FILE))?;
         let text_task = || Some(versions.get_texts_writer(&tsc));
         let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
@@ -93,7 +93,7 @@ impl ShardWriterService {
         let vectors = vector_result.transpose()?;
         let relations = relation_result.transpose()?;
 
-        Ok(ShardWriterService {
+        Ok(ShardWriter {
             id,
             metadata,
             path: path.to_path_buf(),
@@ -140,7 +140,7 @@ impl ShardWriterService {
             i => panic!("Unknown relation version {i}"),
         }
     }
-    pub fn clean_and_create(id: String, path: &Path) -> NodeResult<ShardWriterService> {
+    pub fn clean_and_create(id: String, path: &Path) -> NodeResult<ShardWriter> {
         let metadata = ShardMetadata::open(&path.join(METADATA_FILE))?;
         std::fs::remove_dir_all(path)?;
         std::fs::create_dir(path)?;
@@ -160,10 +160,10 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
         };
-        ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
-    pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriterService> {
+    pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
         let time = SystemTime::now();
 
         let tsc = TextConfig {
@@ -186,7 +186,7 @@ impl ShardWriterService {
         std::fs::create_dir(path)?;
         let metadata_path = path.join(METADATA_FILE);
         metadata.serialize(&metadata_path)?;
-        let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
+        let result = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc);
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -196,7 +196,7 @@ impl ShardWriterService {
         result
     }
 
-    pub fn open(id: String, path: &Path) -> NodeResult<ShardWriterService> {
+    pub fn open(id: String, path: &Path) -> NodeResult<ShardWriter> {
         let time = SystemTime::now();
 
         let metadata_path = path.join(METADATA_FILE);
@@ -217,7 +217,7 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
         };
-        let result = ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc);
+        let result = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc);
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("writer/open".to_string());

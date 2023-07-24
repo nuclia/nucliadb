@@ -24,9 +24,10 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, NodeResult};
 
-use crate::disk_structure;
-use crate::shards::shards_provider::{ReaderShardsProvider, ShardId};
-use crate::shards::ShardReader;
+use crate::shards::providers::ShardReaderProvider;
+use crate::shards::reader::ShardReader;
+use crate::shards::ShardId;
+use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct UnboundedShardReaderCache {
@@ -51,9 +52,9 @@ impl UnboundedShardReaderCache {
     }
 }
 
-impl ReaderShardsProvider for UnboundedShardReaderCache {
+impl ShardReaderProvider for UnboundedShardReaderCache {
     fn load(&self, id: ShardId) -> NodeResult<()> {
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
 
         if self.read().contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
@@ -73,7 +74,7 @@ impl ReaderShardsProvider for UnboundedShardReaderCache {
 
     fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
-        let shards_path = self.shards_path.clone();
+        let shards_path = env::shards_path();
         debug!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;

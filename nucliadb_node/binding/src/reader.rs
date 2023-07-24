@@ -23,8 +23,10 @@ use std::sync::Arc;
 use nucliadb_core::paragraphs::ParagraphIterator;
 use nucliadb_core::protos::*;
 use nucliadb_core::texts::DocumentIterator;
-use nucliadb_node::shards::{ReaderShardsProvider, ShardReader, UnboundedShardReaderCache};
-use nucliadb_node::{env, reader};
+use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardReaderCache;
+use nucliadb_node::shards::providers::ShardReaderProvider;
+use nucliadb_node::shards::reader::ShardReader;
+use nucliadb_node::{env, lifecycle};
 use prost::Message;
 use pyo3::exceptions::{PyStopIteration, PyValueError};
 use pyo3::prelude::*;
@@ -92,7 +94,7 @@ impl NodeReader {
 impl NodeReader {
     #[new]
     pub fn new() -> Self {
-        reader::initialize();
+        lifecycle::initialize_reader();
         Self {
             shards: UnboundedShardReaderCache::new(env::shards_path()),
         }

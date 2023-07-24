@@ -16,17 +16,18 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 
-mod async_unbounded_reader;
-mod async_unbounded_writer;
-/// Shard provider using an unbounded cache. It can contain all shard
-/// readers/writers from an index node, so it could be memory expensive.
-/// However, it's an easy implementation that speeds up operations (as shards
-/// can be preloaded)
-mod unbounded_reader;
-mod unbounded_writer;
+//! gRPC servers for index node reader and writer.
+//!
+//! This is a high level interface that gives access to the index node
+//! functionalities
 
-pub use async_unbounded_reader::AsyncUnboundedShardReaderCache;
-pub use async_unbounded_writer::AsyncUnboundedShardWriterCache;
-pub use unbounded_reader::UnboundedShardReaderCache;
-pub use unbounded_writer::UnboundedShardWriterCache;
+pub mod grpc_reader;
+pub mod grpc_writer;
+pub mod middleware;
+
+pub use grpc_reader::NodeReaderGRPCDriver;
+pub use grpc_writer::NodeWriterGRPCDriver;
+// Alias for more readable imports
+pub use {grpc_reader as reader, grpc_writer as writer};

@@ -17,38 +17,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-// NucliaDB Node component
 
 // #![warn(missing_docs)]
 
-/// Shard metadata, defined at the moment of creation.
-pub mod shard_metadata;
+//! NucliaDB Index Node component
+//!
+//! This module provides the top level NucliaDB's indexing funcionality. It
+//! allows indexing, searching and deleting indexed contents.
+//!
+//! As a high level interface, it provides a gRPC server to deploy the index in
+//! a distributed fashion. The API allows building other interfaces, as the
+//! already built PyO3 bindings.
 
-mod disk_structure;
+pub mod grpc;
+pub mod http_server;
+pub mod lifecycle;
 pub mod node_metadata;
-
-pub mod services;
-
-pub mod middleware;
-
-pub mod shards;
-
 pub mod settings;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
+pub mod shards;
+pub mod telemetry;
 pub mod utils;
 
-// Telemetry
-pub mod telemetry;
+mod disk_structure;
 
-/// GRPC writing service
-pub mod writer;
-
-/// HTTP serving utilities
-pub mod http_server;
+// TODO: migrate missing functions and delete this module
+pub mod env;

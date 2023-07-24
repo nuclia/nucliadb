@@ -16,30 +16,16 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-//! HTTP serving utilities
+//! Shard providers are an interface to obtain shard readers and writers with a
+//! potential extra layer of functionality.
+//!
+//! Providers, for example, can use cache strategies to provide faster readers
+//! and writers to the users.
 
-mod metrics_service;
+mod provider_traits;
+pub mod unbounded_cache;
 
-use std::net::SocketAddr;
-
-use axum::routing::get;
-use axum::Router;
-
-use crate::env::metrics_http_port;
-
-pub struct MetricsServerOptions {
-    pub default_http_port: u16,
-}
-
-pub async fn run_http_metrics_server(options: MetricsServerOptions) {
-    // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
-    let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
-    axum_server::bind(addr)
-        // Services will be added here
-        .serve(metrics.into_make_service())
-        .await
-        .expect("Error starting the HTTP server");
-}
+pub use provider_traits::{
+    AsyncShardReaderProvider, AsyncShardWriterProvider, ShardReaderProvider, ShardWriterProvider,
+};
