@@ -189,7 +189,7 @@ class KBShardManager:
                     )
                 except Exception as e:
                     errors.capture_exception(e)
-                    logger.error(f"Error creating new shard at {node}")
+                    logger.error(f"Error creating new shard at {node}: {e}")
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))
@@ -198,7 +198,7 @@ class KBShardManager:
                 replicas_created += 1
         except Exception as e:
             errors.capture_exception(e)
-            logger.error("Unexpected error creating new shard")
+            logger.error(f"Unexpected error creating new shard: {e}")
             await self.rollback_shard(shard)
             raise e
 

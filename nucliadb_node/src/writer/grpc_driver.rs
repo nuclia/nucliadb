@@ -199,7 +199,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Err(error) => {
                 let status = OpStatus {
                     status: op_status::Status::Error as i32,
-                    detail: format!("Error: {error:?}"),
+                    detail: error.to_string(),
                     field_count: 0_u64,
                     shard_id,
                     ..Default::default()
@@ -209,19 +209,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn delete_relation_nodes(
+    async fn remove_resource(
         &self,
-        request: Request<DeleteGraphNodes>,
+        request: Request<ResourceId>,
     ) -> Result<Response<OpStatus>, Status> {
-        let request = request.into_inner();
-        let shard_id = match request.shard_id {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let shard = self.obtain_shard(shard_id).await?;
+        let resource = request.into_inner();
+        let shard_id = resource.shard_id.clone();
+        let shard = self.obtain_shard(&shard_id).await?;
         let status = tokio::task::spawn_blocking(move || {
             shard
-                .delete_relation_nodes(&request)
+                .remove_resource(&resource)
                 .and_then(|()| shard.get_opstatus())
         })
         .await
@@ -232,7 +229,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
+            Err(error) => {
+                let status = OpStatus {
+                    status: op_status::Status::Error as i32,
+                    detail: error.to_string(),
+                    field_count: 0_u64,
+                    shard_id,
+                    ..Default::default()
+                };
+                Ok(tonic::Response::new(status))
+            }
         }
     }
 
@@ -264,16 +270,19 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn remove_resource(
+    async fn delete_relation_nodes(
         &self,
-        request: Request<ResourceId>,
+        request: Request<DeleteGraphNodes>,
     ) -> Result<Response<OpStatus>, Status> {
-        let resource = request.into_inner();
-        let shard_id = resource.shard_id.clone();
-        let shard = self.obtain_shard(&shard_id).await?;
+        let request = request.into_inner();
+        let shard_id = match request.shard_id {
+            Some(ref shard_id) => &shard_id.id,
+            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
+        };
+        let shard = self.obtain_shard(shard_id).await?;
         let status = tokio::task::spawn_blocking(move || {
             shard
-                .remove_resource(&resource)
+                .delete_relation_nodes(&request)
                 .and_then(|()| shard.get_opstatus())
         })
         .await
@@ -284,16 +293,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
-            Err(error) => {
-                let status = OpStatus {
-                    status: op_status::Status::Error as i32,
-                    detail: format!("Error: {error:?}"),
-                    field_count: 0_u64,
-                    shard_id,
-                    ..Default::default()
-                };
-                Ok(tonic::Response::new(status))
-            }
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 

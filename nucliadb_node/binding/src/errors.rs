@@ -16,39 +16,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
-// NucliaDB Node component
 
-// #![warn(missing_docs)]
+use pyo3::create_exception;
+use pyo3::exceptions::PyException;
 
-/// Shard metadata, defined at the moment of creation.
-pub mod shard_metadata;
+// Base exception for all custom errors produced by this library
+create_exception!(nucliadb_node_binding, IndexNodeException, PyException);
 
-mod disk_structure;
-pub mod node_metadata;
-
-pub mod services;
-
-pub mod middleware;
-
-pub mod shards;
-
-pub mod settings;
-
-/// Global configuration enviromental variables
-pub mod env;
-
-/// GRPC reading service
-pub mod reader;
-
-/// Utilities
-pub mod utils;
-
-// Telemetry
-pub mod telemetry;
-
-/// GRPC writing service
-pub mod writer;
-
-/// HTTP serving utilities
-pub mod http_server;
+create_exception!(nucliadb_node_binding, LoadShardError, IndexNodeException);
+create_exception!(nucliadb_node_binding, ShardNotFound, IndexNodeException);

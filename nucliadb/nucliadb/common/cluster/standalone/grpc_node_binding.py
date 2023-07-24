@@ -58,6 +58,13 @@ from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
+
+try:
+    from nucliadb_node_binding import IndexNodeException  # type: ignore
+except ImportError:  # pragma: no cover
+    logger.warning("Import error while importing IndexNodeException")
+    IndexNodeException = Exception
+
 try:
     from nucliadb_node_binding import NodeReader  # type: ignore
     from nucliadb_node_binding import NodeWriter  # type: ignore
@@ -70,7 +77,11 @@ class StandaloneReaderWrapper:
     reader: NodeReader
 
     def __init__(self):
-        self.reader = NodeReader.new()
+        if NodeReader is None:
+            raise ImportError(
+                "NucliaDB index node bindings are not installed (reader not found)"
+            )
+        self.reader = NodeReader()
         self.executor = ThreadPoolExecutor(settings.local_reader_threads)
 
     async def Search(
@@ -85,16 +96,16 @@ class StandaloneReaderWrapper:
             pb = SearchResponse()
             pb.ParseFromString(pb_bytes)
             return pb
-        except TypeError as exc:
+        except IndexNodeException as exc:
             if "IO error" not in str(exc):
                 # ignore any other error
                 raise
 
             # try some mitigations...
-            logger.error(f"TypeError in Search: {request}", exc_info=True)
+            logger.error(f"IndexNodeException in Search: {request}", exc_info=True)
             if not retry:
                 # reinit?
-                self.reader = NodeReader.new()
+                self.reader = NodeReader()
                 return await self.Search(request, retry=True)
             else:
                 raise
@@ -167,7 +178,7 @@ class StandaloneReaderWrapper:
                     pb.ParseFromString(pb_bytes)
                     asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
                     element = generator.next()
-            except TypeError:
+            except StopIteration:
                 # this is the end
                 pass
             except Exception as e:
@@ -206,7 +217,7 @@ class StandaloneReaderWrapper:
                     pb.ParseFromString(pb_bytes)
                     asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
                     element = generator.next()
-            except TypeError:
+            except StopIteration:
                 # this is the end
                 pass
             except Exception as e:
@@ -251,7 +262,11 @@ class StandaloneWriterWrapper:
 
     def __init__(self):
         os.makedirs(settings.data_path, exist_ok=True)
-        self.writer = NodeWriter.new()
+        if NodeWriter is None:
+            raise ImportError(
+                "NucliaDB index node bindings are not installed (writer not found)"
+            )
+        self.writer = NodeWriter()
         self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
     async def NewShard(self, request: ShardMetadata) -> ShardCreated:
