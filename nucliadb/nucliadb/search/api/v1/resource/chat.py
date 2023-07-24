@@ -84,9 +84,10 @@ async def resource_chat(
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ):
-    new_query = item.query
+    user_query = item.query
+    rephrased_query = None
     if item.context and len(item.context) > 0:
-        new_query = await rephrase_query_from_context(
+        rephrased_query = await rephrase_query_from_context(
             kbid, item.context, item.query, x_nucliadb_user
         )
 
@@ -96,7 +97,7 @@ async def resource_chat(
         SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
     ]
-    find_request.query = new_query
+    find_request.query = rephrased_query or user_query
     find_request.fields = item.fields
     find_request.filters = item.filters
     find_request.field_type_filter = item.field_type_filter
@@ -118,10 +119,17 @@ async def resource_chat(
         x_ndb_client,
         x_nucliadb_user,
         x_forwarded_for,
+        do_audit=False,
     )
     if incomplete:
         raise IncompleteFindResultsError()
 
     return await chat(
-        kbid, find_results, item, x_nucliadb_user, x_ndb_client, x_forwarded_for
+        kbid,
+        user_query,
+        find_results,
+        item,
+        x_nucliadb_user,
+        x_ndb_client,
+        x_forwarded_for,
     )

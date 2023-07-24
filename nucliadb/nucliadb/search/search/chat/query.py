@@ -61,6 +61,7 @@ async def rephrase_query_from_context(
 
 
 async def generate_answer(
+    user_query: str,
     results: KnowledgeboxFindResults,
     kbid: str,
     user_id: str,
@@ -100,7 +101,7 @@ async def generate_answer(
             client_type.to_proto(),
             origin,
             time() - start_time,
-            question=chat_request.query,
+            question=user_query,
             answer=audit_answer,
         )
 
@@ -134,6 +135,7 @@ async def generate_answer(
 
 async def chat(
     kbid: str,
+    user_query: str,
     find_results: KnowledgeboxFindResults,
     chat_request: ChatRequest,
     user_id: str,
@@ -159,6 +161,7 @@ async def chat(
 
     return StreamingResponse(
         generate_answer(
+            user_query,
             find_results,
             kbid,
             user_id,
