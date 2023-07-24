@@ -236,49 +236,47 @@ class ResourceWritesAuditHandler:
     async def collect_audit_fields(
         self, message: writer_pb2.BrokerMessage
     ) -> list[audit_pb2.AuditField]:
+        if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
+            # If we are fully deleting a resource we won't iterate the delete_fields (if any).
+            # Make no sense as we already collected all resource fields as deleted
+            return []
+
         audit_storage_fields: list[audit_pb2.AuditField] = []
         async with self.driver.transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, message.kbid)
             resource = Resource(txn, self.storage, kb, message.uuid)
             field_keys = await resource.get_fields_ids()
 
-            if message.type != writer_pb2.BrokerMessage.MessageType.DELETE:
-                for field_id, field_type in self.iterate_auditable_fields(
-                    field_keys, message
-                ):
-                    auditfield = audit_pb2.AuditField()
-                    auditfield.field_type = field_type
-                    auditfield.field_id = field_id
-                    if field_type is writer_pb2.FieldType.FILE:
-                        auditfield.filename = message.files[field_id].file.filename
-                    # The field did exist, so we are overwriting it, with a modified file
-                    # in case of a file
-                    auditfield.action = audit_pb2.AuditField.FieldAction.MODIFIED
-                    if field_type is writer_pb2.FieldType.FILE:
-                        auditfield.size = message.files[field_id].file.size
-
-                    audit_storage_fields.append(auditfield)
-
-            if (
-                message.delete_fields
-                and message.type is not writer_pb2.BrokerMessage.MessageType.DELETE
+            for field_id, field_type in self.iterate_auditable_fields(
+                field_keys, message
             ):
-                # If we are fully deleting a resource we won't iterate the delete_fields (if any)
-                # Make no sense as we already collected all resource fields as deleted
-                for fieldid in message.delete_fields:
-                    field = await resource.get_field(
-                        fieldid.field, writer_pb2.FieldType.FILE, load=True
-                    )
-                    audit_field = audit_pb2.AuditField()
-                    audit_field.action = audit_pb2.AuditField.FieldAction.DELETED
-                    audit_field.field_id = fieldid.field
-                    audit_field.field_type = fieldid.field_type
-                    if fieldid.field_type is writer_pb2.FieldType.FILE:
-                        val = await field.get_value()
-                        audit_field.size = 0
-                        if val is not None:
-                            audit_field.filename = val.file.filename
-                    audit_storage_fields.append(audit_field)
+                auditfield = audit_pb2.AuditField()
+                auditfield.field_type = field_type
+                auditfield.field_id = field_id
+                if field_type is writer_pb2.FieldType.FILE:
+                    auditfield.filename = message.files[field_id].file.filename
+                # The field did exist, so we are overwriting it, with a modified file
+                # in case of a file
+                auditfield.action = audit_pb2.AuditField.FieldAction.MODIFIED
+                if field_type is writer_pb2.FieldType.FILE:
+                    auditfield.size = message.files[field_id].file.size
+
+                audit_storage_fields.append(auditfield)
+
+            for fieldid in message.delete_fields or []:
+                field = await resource.get_field(
+                    fieldid.field, writer_pb2.FieldType.FILE, load=True
+                )
+                audit_field = audit_pb2.AuditField()
+                audit_field.action = audit_pb2.AuditField.FieldAction.DELETED
+                audit_field.field_id = fieldid.field
+                audit_field.field_type = fieldid.field_type
+                if fieldid.field_type is writer_pb2.FieldType.FILE:
+                    val = await field.get_value()
+                    audit_field.size = 0
+                    if val is not None:
+                        audit_field.filename = val.file.filename
+                audit_storage_fields.append(audit_field)
 
         return audit_storage_fields
 
@@ -291,13 +289,17 @@ class ResourceWritesAuditHandler:
             metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
             return
 
+        message = notification.message
+        if message.source == message.MessageSource.PROCESSOR:
+            metrics.total_messages.inc({"action": "ignored", "type": "audit_fields"})
+            return
+
         logger.info(
             {"message": "Processing field audit for kbid", "kbid": notification.kbid}
         )
 
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
         with metrics.handler_histo({"type": "audit_fields"}):
-            message = notification.message
             audit_fields = await self.collect_audit_fields(message)
             field_metadata = [fi.field for fi in message.field_metadata]
 
