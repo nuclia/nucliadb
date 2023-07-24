@@ -237,6 +237,8 @@ class ResourceWritesAuditHandler:
         self, message: writer_pb2.BrokerMessage
     ) -> list[audit_pb2.AuditField]:
         if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
+            # If we are fully deleting a resource we won't iterate the delete_fields (if any).
+            # Make no sense as we already collected all resource fields as deleted
             return []
 
         audit_storage_fields: list[audit_pb2.AuditField] = []
@@ -261,23 +263,20 @@ class ResourceWritesAuditHandler:
 
                 audit_storage_fields.append(auditfield)
 
-            if message.delete_fields:
-                # If we are fully deleting a resource we won't iterate the delete_fields (if any)
-                # Make no sense as we already collected all resource fields as deleted
-                for fieldid in message.delete_fields:
-                    field = await resource.get_field(
-                        fieldid.field, writer_pb2.FieldType.FILE, load=True
-                    )
-                    audit_field = audit_pb2.AuditField()
-                    audit_field.action = audit_pb2.AuditField.FieldAction.DELETED
-                    audit_field.field_id = fieldid.field
-                    audit_field.field_type = fieldid.field_type
-                    if fieldid.field_type is writer_pb2.FieldType.FILE:
-                        val = await field.get_value()
-                        audit_field.size = 0
-                        if val is not None:
-                            audit_field.filename = val.file.filename
-                    audit_storage_fields.append(audit_field)
+            for fieldid in message.delete_fields or []:
+                field = await resource.get_field(
+                    fieldid.field, writer_pb2.FieldType.FILE, load=True
+                )
+                audit_field = audit_pb2.AuditField()
+                audit_field.action = audit_pb2.AuditField.FieldAction.DELETED
+                audit_field.field_id = fieldid.field
+                audit_field.field_type = fieldid.field_type
+                if fieldid.field_type is writer_pb2.FieldType.FILE:
+                    val = await field.get_value()
+                    audit_field.size = 0
+                    if val is not None:
+                        audit_field.filename = val.file.filename
+                audit_storage_fields.append(audit_field)
 
         return audit_storage_fields
 

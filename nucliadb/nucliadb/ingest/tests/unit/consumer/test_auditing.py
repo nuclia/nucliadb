@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
 from nucliadb_protos.nodesidecar_pb2 import Counter
-from nucliadb_protos.writer_pb2 import Notification, ShardObject
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, ShardObject
 
 from nucliadb.ingest.consumer import auditing
 
@@ -75,6 +75,19 @@ async def index_audit_handler(pubsub, audit, shard_manager):
     await iah.finalize()
 
 
+@pytest.fixture()
+async def writes_audit_handler(pubsub, audit, shard_manager):
+    rwah = auditing.ResourceWritesAuditHandler(
+        driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
+        storage=AsyncMock(),
+        audit=audit,
+        pubsub=pubsub,
+    )
+    await rwah.initialize()
+    yield rwah
+    await rwah.finalize()
+
+
 async def test_handle_message(
     index_audit_handler: auditing.IndexAuditHandler, sidecar, audit
 ):
@@ -105,5 +118,23 @@ async def test_handle_message_ignore_not_indexed(
     await index_audit_handler.handle_message(notif.SerializeToString())
 
     await index_audit_handler.finalize()
+
+    audit.report.assert_not_called()
+
+
+async def test_resource_handle_message_processor_messages_are_not_audited(
+    writes_audit_handler: auditing.ResourceWritesAuditHandler, audit
+):
+    message = BrokerMessage()
+    message.source = BrokerMessage.MessageSource.PROCESSOR
+    notif = Notification(
+        kbid="kbid",
+        action=Notification.Action.COMMIT,
+        message=message,
+        write_type=Notification.WriteType.MODIFIED,
+    )
+    await writes_audit_handler.handle_message(notif.SerializeToString())
+
+    await writes_audit_handler.finalize()
 
     audit.report.assert_not_called()
