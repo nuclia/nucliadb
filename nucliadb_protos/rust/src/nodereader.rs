@@ -100,6 +100,7 @@ pub struct DocumentSearchRequest {
     pub only_faceted: bool,
     #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="16")]
     pub with_status: ::core::option::Option<i32>,
+    #[deprecated]
     #[prost(string, optional, tag="17")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
 }
@@ -134,6 +135,7 @@ pub struct ParagraphSearchRequest {
     pub with_duplicates: bool,
     #[prost(bool, tag="15")]
     pub only_faceted: bool,
+    #[deprecated]
     #[prost(string, optional, tag="16")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="17")]
@@ -419,6 +421,7 @@ pub struct SearchRequest {
     pub with_duplicates: bool,
     #[prost(bool, tag="16")]
     pub only_faceted: bool,
+    #[deprecated]
     #[prost(string, optional, tag="18")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="17")]

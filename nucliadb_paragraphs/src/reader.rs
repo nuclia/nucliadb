@@ -181,19 +181,8 @@ impl ReaderChild for ParagraphReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
         }
-        let advanced = request
-            .advanced_query
-            .as_ref()
-            .map(|query| parser.parse_query(query))
-            .transpose()?;
-        let (original, termc, fuzzied) = search_query(
-            &parser,
-            &text,
-            request,
-            &self.schema,
-            FUZZY_DISTANCE,
-            advanced,
-        );
+        let (original, termc, fuzzied) =
+            search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
         let searcher = Searcher {
             request,
             results,

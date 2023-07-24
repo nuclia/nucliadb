@@ -79,7 +79,7 @@ message DocumentSearchRequest {
     bool reload = 10 [deprecated = true];
     bool only_faceted = 15;
     optional noderesources.Resource.ResourceStatus with_status = 16;
-    optional string advanced_query = 17;
+    optional string advanced_query = 17 [deprecated = true];
 
 }
 
@@ -107,7 +107,7 @@ message ParagraphSearchRequest {
     bool reload = 13 [deprecated = true];
     bool with_duplicates = 14;
     bool only_faceted = 15;
-    optional string advanced_query = 16;
+    optional string advanced_query = 16 [deprecated = true];
     repeated string key_filters = 17;
 }
 
@@ -333,7 +333,7 @@ message SearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 16;
     
-    optional string advanced_query = 18;
+    optional string advanced_query = 18 [deprecated = true];
     optional noderesources.Resource.ResourceStatus with_status = 17;
 
     // if provided, search metadata for this nodes (nodes at distance
