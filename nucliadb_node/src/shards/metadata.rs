@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+/// Shard metadata, defined at the moment of creation.
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;

@@ -26,8 +26,9 @@ use async_trait::async_trait;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 
-use crate::shards::shards_provider::{AsyncReaderShardsProvider, ShardId};
-use crate::shards::ShardReader;
+use crate::shards::providers::AsyncShardReaderProvider;
+use crate::shards::reader::ShardReader;
+use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
 #[derive(Default)]
@@ -52,9 +53,9 @@ impl AsyncUnboundedShardReaderCache {
 }
 
 #[async_trait]
-impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
+impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
     async fn load(&self, id: ShardId) -> NodeResult<()> {
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
 
         if self.cache.read().await.contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
@@ -80,7 +81,7 @@ impl AsyncReaderShardsProvider for AsyncUnboundedShardReaderCache {
     }
 
     async fn load_all(&self) -> NodeResult<()> {
-        let shards_path = self.shards_path.clone();
+        let shards_path = env::shards_path();
         let mut shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {

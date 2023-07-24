@@ -18,6 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+//! Global settings and providers.
+//!
+//! This module exports a `Settings` struct thought as a global context for the
+//! application. Using diferent providers, one can obtain a `Settings` objects
+//! using values from different places.
+//!
+//! As an example, a `EnvSettingsProvider` collects it's values from environment
+//! variables.
+//!
+//! The trait `SettingsProvider` makes it easy to extend this module with more
+//! providers (to parse from CLI for example).
+
 pub mod providers;
 
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};

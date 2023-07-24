@@ -26,10 +26,10 @@ use nucliadb_core::protos::node_reader_client::NodeReaderClient;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
-use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
+use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
+use nucliadb_node::grpc::writer::NodeWriterGRPCDriver;
 use nucliadb_node::settings::Settings;
-use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
-use nucliadb_node::{env, reader, writer};
+use nucliadb_node::{env, lifecycle};
 use once_cell::sync::{Lazy, OnceCell};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
@@ -70,7 +70,7 @@ async fn start_reader(addr: SocketAddr) {
         return;
     }
     tokio::spawn(async move {
-        reader::initialize();
+        lifecycle::initialize_reader();
         let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&SETTINGS));
         grpc_driver
             .initialize()
@@ -103,7 +103,7 @@ async fn start_writer(addr: SocketAddr) {
     }
     tokio::spawn(async move {
         let settings = SETTINGS.clone();
-        writer::initialize(&settings.data_path(), &settings.shards_path())
+        lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
             .expect("Writer initialization has failed");
         let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(settings));
         Server::builder()

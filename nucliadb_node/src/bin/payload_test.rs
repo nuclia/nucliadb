@@ -22,11 +22,11 @@ use std::io::Cursor;
 use nucliadb_core::protos::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
-use nucliadb_node::shard_metadata::ShardMetadata;
-use nucliadb_node::shards::{
-    ReaderShardsProvider, UnboundedShardReaderCache, UnboundedShardWriterCache,
-    WriterShardsProvider,
+use nucliadb_node::shards::metadata::ShardMetadata;
+use nucliadb_node::shards::providers::unbounded_cache::{
+    UnboundedShardReaderCache, UnboundedShardWriterCache,
 };
+use nucliadb_node::shards::providers::{ShardReaderProvider, ShardWriterProvider};
 use prost::Message;
 
 fn main() -> NodeResult<()> {

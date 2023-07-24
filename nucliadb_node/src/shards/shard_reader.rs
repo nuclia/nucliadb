@@ -34,16 +34,16 @@ use nucliadb_core::protos::{
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
 
-use super::versions::Versions;
 use crate::disk_structure::*;
-use crate::shard_metadata::ShardMetadata;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 
 #[derive(Debug)]
-pub struct ShardReaderService {
+pub struct ShardReader {
     pub id: String,
     pub metadata: ShardMetadata,
     text_reader: TextsReaderPointer,
@@ -56,7 +56,7 @@ pub struct ShardReaderService {
     relation_service_version: i32,
 }
 
-impl ShardReaderService {
+impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn text_version(&self) -> DocumentService {
         match self.document_service_version {
@@ -155,7 +155,7 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
+    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReader> {
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -210,7 +210,7 @@ impl ShardReaderService {
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::shard("reader/new".to_string());
         metrics.record_request_time(metric, took);
-        Ok(ShardReaderService {
+        Ok(ShardReader {
             id,
             metadata,
             text_reader: fields.unwrap(),
@@ -519,11 +519,11 @@ mod tests {
         let query = "Some search with multiple words".to_string();
 
         let expected = vec!["with multiple words", "multiple words", "words"];
-        let got = ShardReaderService::split_suggest_query(query.clone(), 3);
+        let got = ShardReader::split_suggest_query(query.clone(), 3);
         assert_eq!(expected, got);
 
         let expected = vec!["multiple words", "words"];
-        let got = ShardReaderService::split_suggest_query(query, 2);
+        let got = ShardReader::split_suggest_query(query, 2);
         assert_eq!(expected, got);
     }
 }

@@ -28,10 +28,12 @@ use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 use uuid::Uuid;
 
-use crate::disk_structure;
-use crate::shard_metadata::ShardMetadata;
-use crate::shards::shards_provider::{AsyncWriterShardsProvider, ShardId, ShardNotFoundError};
-use crate::shards::ShardWriter;
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::writer::ShardWriter;
+use crate::shards::ShardId;
+use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct AsyncUnboundedShardWriterCache {
@@ -62,10 +64,10 @@ impl AsyncUnboundedShardWriterCache {
 }
 
 #[async_trait]
-impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
+impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
         let shard_id = Uuid::new_v4().to_string();
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &shard_id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
         let new_shard =
             tokio::task::spawn_blocking(move || ShardWriter::new(shard_id, &shard_path, metadata))
                 .await
@@ -74,7 +76,7 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn load(&self, id: ShardId) -> NodeResult<()> {
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
 
         if self.cache.read().await.contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
@@ -102,7 +104,7 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn load_all(&self) -> NodeResult<()> {
-        let shards_path = self.shards_path.clone();
+        let shards_path = env::shards_path();
         let shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {
@@ -132,7 +134,7 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
 
     async fn delete(&self, id: ShardId) -> NodeResult<()> {
         self.cache.write().await.remove(&id);
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         tokio::task::spawn_blocking(move || {
             if shard_path.exists() {
                 debug!("Deleting shard {shard_path:?}");
@@ -148,7 +150,7 @@ impl AsyncWriterShardsProvider for AsyncUnboundedShardWriterCache {
         self.cache.write().await.remove(&id);
 
         let id_ = id.clone();
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path, &id);
+        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
         let (upgraded, details) = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let upgraded = ShardWriter::clean_and_create(id, &shard_path)?;
             let details = ShardCleaned {

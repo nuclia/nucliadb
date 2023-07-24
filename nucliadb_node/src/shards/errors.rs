@@ -16,9 +16,14 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-mod versions;
-// Main services
-pub mod reader;
-pub mod writer;
+use std::fmt::Display;
+
+#[derive(Debug)]
+pub struct ShardNotFoundError(pub &'static str);
+
+impl Display for ShardNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Shard not found: {}", self.0)
+    }
+}

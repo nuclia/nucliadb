@@ -27,7 +27,9 @@ use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
 use crate::settings::Settings;
-use crate::shards::{AsyncReaderShardsProvider, AsyncUnboundedShardReaderCache, ShardReader};
+use crate::shards::providers::unbounded_cache::AsyncUnboundedShardReaderCache;
+use crate::shards::providers::AsyncShardReaderProvider;
+use crate::shards::reader::ShardReader;
 
 pub struct NodeReaderGRPCDriver {
     shards: AsyncUnboundedShardReaderCache,

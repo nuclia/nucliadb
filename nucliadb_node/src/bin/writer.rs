@@ -30,14 +30,14 @@ use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{metrics, NodeResult};
+use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
+use nucliadb_node::grpc::writer::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
-use nucliadb_node::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
-use nucliadb_node::{utils, writer};
+use nucliadb_node::{lifecycle, utils};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -72,7 +72,7 @@ async fn main() -> NodeResult<()> {
     let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
 
     // XXX it probably should be moved to a more clear abstraction
-    writer::initialize(&data_path, &settings.shards_path())?;
+    lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
 
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
     let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();

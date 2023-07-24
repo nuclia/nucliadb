@@ -17,19 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt::Display;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::NodeResult;
 
-use super::{ShardReader, ShardWriter};
-use crate::shard_metadata::ShardMetadata;
+use crate::shards::metadata::ShardMetadata;
+use crate::shards::reader::ShardReader;
+use crate::shards::writer::ShardWriter;
+use crate::shards::ShardId;
 
-pub type ShardId = String;
-
-pub trait ReaderShardsProvider: Send + Sync {
+pub trait ShardReaderProvider: Send + Sync {
     fn load(&self, id: ShardId) -> NodeResult<()>;
     fn load_all(&self) -> NodeResult<()>;
 
@@ -37,14 +36,14 @@ pub trait ReaderShardsProvider: Send + Sync {
 }
 
 #[async_trait]
-pub trait AsyncReaderShardsProvider: Send + Sync {
+pub trait AsyncShardReaderProvider: Send + Sync {
     async fn load(&self, id: ShardId) -> NodeResult<()>;
     async fn load_all(&self) -> NodeResult<()>;
 
     async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
 }
 
-pub trait WriterShardsProvider {
+pub trait ShardWriterProvider {
     fn load(&self, id: ShardId) -> NodeResult<()>;
     fn load_all(&self) -> NodeResult<()>;
 
@@ -56,7 +55,7 @@ pub trait WriterShardsProvider {
 }
 
 #[async_trait]
-pub trait AsyncWriterShardsProvider {
+pub trait AsyncShardWriterProvider {
     async fn load(&self, id: ShardId) -> NodeResult<()>;
     async fn load_all(&self) -> NodeResult<()>;
 
@@ -65,13 +64,4 @@ pub trait AsyncWriterShardsProvider {
     async fn delete(&self, id: ShardId) -> NodeResult<()>;
 
     async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
-}
-
-#[derive(Debug)]
-pub struct ShardNotFoundError(pub &'static str);
-
-impl Display for ShardNotFoundError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Shard not found: {}", self.0)
-    }
 }

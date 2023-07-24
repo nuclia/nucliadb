@@ -16,30 +16,22 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-//! HTTP serving utilities
+//! Shard provider using an unbounded cache.
+//!
+//! It can contain all shard readers/writers from its index node, so it could be
+//! memory expensive. However, it's an easy implementation that speeds up
+//! operations.
+//!
+//! For faster reads at cost of slower initialization and memory consumption,
+//! all shards can be loaded at initialization time.
 
-mod metrics_service;
+mod async_unbounded_reader;
+mod async_unbounded_writer;
+mod unbounded_reader;
+mod unbounded_writer;
 
-use std::net::SocketAddr;
-
-use axum::routing::get;
-use axum::Router;
-
-use crate::env::metrics_http_port;
-
-pub struct MetricsServerOptions {
-    pub default_http_port: u16,
-}
-
-pub async fn run_http_metrics_server(options: MetricsServerOptions) {
-    // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
-    let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
-    axum_server::bind(addr)
-        // Services will be added here
-        .serve(metrics.into_make_service())
-        .await
-        .expect("Error starting the HTTP server");
-}
+pub use async_unbounded_reader::AsyncUnboundedShardReaderCache;
+pub use async_unbounded_writer::AsyncUnboundedShardWriterCache;
+pub use unbounded_reader::UnboundedShardReaderCache;
+pub use unbounded_writer::UnboundedShardWriterCache;
