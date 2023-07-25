@@ -20,11 +20,9 @@
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 
-use futures::Stream;
 use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
@@ -40,12 +38,14 @@ use nucliadb_node::{lifecycle, utils};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tokio_stream::StreamExt;
 use tonic::transport::Server;
 
-const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
-
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
+
+#[derive(Debug)]
+pub enum NodeUpdate {
+    ShardCount(u64),
+}
 
 #[tokio::main]
 async fn main() -> NodeResult<()> {
@@ -75,8 +75,7 @@ async fn main() -> NodeResult<()> {
     grpc_driver.initialize().await?;
 
     let host_key_path = settings.host_key_path();
-    let host_key = utils::read_or_create_host_key(host_key_path)?;
-    let update_handle = node.clone();
+    let _ = utils::read_or_create_host_key(host_key_path)?;
 
     nucliadb_telemetry::sync::start_telemetry_loop();
 
@@ -84,6 +83,21 @@ async fn main() -> NodeResult<()> {
         grpc_driver,
         settings.writer_listen_address(),
     ));
+    {
+        let task = update_node_metadata(
+            update_sender,
+            metadata_receiver,
+            node_metadata,
+            metadata_path,
+        );
+        match metrics.task_monitor("UpdateNodeMetadata".to_string()) {
+            Some(monitor) => {
+                let instrumented = monitor.instrument(task);
+                tokio::spawn(instrumented)
+            }
+            None => tokio::spawn(task),
+        };
+    }
     let metrics_task = tokio::spawn(run_http_metrics_server(MetricsServerOptions {
         default_http_port: 3032,
     }));
@@ -94,6 +108,7 @@ async fn main() -> NodeResult<()> {
     wait_for_sigkill().await?;
 
     info!("Shutting down NucliaDB Writer Node...");
+    // abort all the tasks that hold a chitchat TCP/IP connection
     metrics_task.abort();
     let _ = metrics_task.await;
 
@@ -132,4 +147,40 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver, listen_addres
         .serve(listen_address)
         .await
         .expect("Error starting gRPC service");
+}
+
+pub async fn update_node_metadata(
+    update_sender: UnboundedSender<NodeUpdate>,
+    mut metadata_receiver: UnboundedReceiver<NodeWriterEvent>,
+    mut node_metadata: NodeMetadata,
+    path: PathBuf,
+) {
+    info!("Start node update task");
+
+    while let Some(event) = metadata_receiver.recv().await {
+        debug!("Receive metadata update event: {event:?}");
+
+        let result = match event {
+            NodeWriterEvent::ShardCreation => {
+                node_metadata.new_shard();
+                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
+            }
+            NodeWriterEvent::ShardDeletion => {
+                node_metadata.delete_shard();
+                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
+            }
+        };
+
+        if let Err(e) = result {
+            warn!("Cannot send node update: {e:?}");
+        }
+
+        if let Err(e) = node_metadata.save(&path) {
+            error!("Node metadata update failed: {e}");
+        } else {
+            info!("Node metadata file updated successfully");
+        }
+    }
+
+    info!("Node update task stopped");
 }

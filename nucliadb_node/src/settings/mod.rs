@@ -34,7 +34,6 @@ pub mod providers;
 
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
-use std::time::Duration;
 
 use derive_builder::Builder;
 use nucliadb_core::tracing::{error, Level};
