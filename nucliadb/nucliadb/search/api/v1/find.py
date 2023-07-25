@@ -218,7 +218,6 @@ async def find(
         kbid,
         features=item.features,
         query=processed_query,
-        advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
         sort=None,

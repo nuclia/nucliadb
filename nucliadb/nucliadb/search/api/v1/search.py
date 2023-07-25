@@ -320,7 +320,6 @@ async def search(
         kbid,
         features=item.features,
         query=processed_query,
-        advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
         sort=sort_options,
