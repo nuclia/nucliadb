@@ -32,7 +32,6 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb_utils.tests import free_port
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,6 @@ images.settings["nucliadb_node_reader"] = {
     "version": "main",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
-        "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
@@ -63,11 +61,8 @@ images.settings["nucliadb_node_writer"] = {
     "version": "main",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
-        "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-        "cluster_discovery_mode": "manual",
-        "cluster_discovery_manual_addresses": "<TO_REPLACE>",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
@@ -218,14 +213,10 @@ class _NodeRunner:
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
 
-        images.settings["nucliadb_node_writer"]["env"][
-            "cluster_discovery_manual_addresses"
-        ] = [f"{cluster_mgr_real_host}:{cluster_mgr_port}"]
         writer1_host, writer1_port = nucliadb_node_1_writer.run(self.volume_node_1)
-
         writer2_host, writer2_port = nucliadb_node_2_writer.run(self.volume_node_2)
-        reader1_host, reader1_port = nucliadb_node_1_reader.run(self.volume_node_1)
 
+        reader1_host, reader1_port = nucliadb_node_1_reader.run(self.volume_node_1)
         reader2_host, reader2_port = nucliadb_node_2_reader.run(self.volume_node_2)
 
         natsd_server = self.natsd.replace("localhost", docker_internal_host)

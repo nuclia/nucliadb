@@ -65,8 +65,6 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
 
 FROM debian:bullseye-slim AS nucliadb
 
-ENV VECTORS_DIMENSION=768
-ENV VECTORS_DISTANCE=cosine
 ENV DATA_PATH=data
 ENV RUST_LOG=nucliadb_node=DEBUG
 ENV RUST_BACKTRACE=1
