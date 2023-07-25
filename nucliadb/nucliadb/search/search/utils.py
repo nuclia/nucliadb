@@ -70,9 +70,7 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
 
 
 def is_empty_query(request: BaseSearchRequest) -> bool:
-    return len(request.query) == 0 and (
-        request.advanced_query is None or len(request.advanced_query) == 0
-    )
+    return len(request.query) == 0
 
 
 def has_user_vectors(request: BaseSearchRequest) -> bool:
