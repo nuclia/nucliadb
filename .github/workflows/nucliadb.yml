@@ -63,7 +63,7 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
           source /home/runner/.profile
-          tiup playground --mode tikv-slim --without-monitor &
+          tiup playground 5.2.0 --mode tikv-slim --without-monitor &
 
       - uses: dorny/paths-filter@v2
         id: filter
