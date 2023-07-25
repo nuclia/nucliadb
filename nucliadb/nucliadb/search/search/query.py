@@ -62,7 +62,6 @@ async def global_query_to_pb(
     page_size: int,
     min_score: float,
     sort: Optional[SortOptions],
-    advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
@@ -91,8 +90,6 @@ async def global_query_to_pb(
     request = SearchRequest()
     request.min_score = min_score
     request.body = query
-    if advanced_query is not None:
-        request.advanced_query = advanced_query
     request.with_duplicates = with_duplicates
     request.filter.tags.extend(filters)
     request.faceted.tags.extend(faceted)
@@ -149,11 +146,6 @@ async def global_query_to_pb(
             autofilters.extend(entity_filters)
 
     if with_synonyms:
-        if advanced_query:
-            raise HTTPException(
-                status_code=422,
-                detail="Search with custom synonyms is not compatible with providing advanced search",
-            )
         if SearchOptions.VECTOR in features or SearchOptions.RELATIONS in features:
             raise HTTPException(
                 status_code=422,

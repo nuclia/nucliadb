@@ -32,9 +32,7 @@ from nucliadb_models.search import SearchRequest
     "item,empty",
     [
         (SearchRequest(query=""), True),
-        (SearchRequest(advanced_query=""), True),
         (SearchRequest(query="foo"), False),
-        (SearchRequest(advanced_query="foo"), False),
     ],
 )
 def test_is_empty_query(item, empty):

@@ -80,7 +80,6 @@ async def find_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
-    advanced_query: Optional[str] = fastapi_query(SearchParamDefaults.advanced_query),
     fields: List[str] = fastapi_query(SearchParamDefaults.fields),
     filters: List[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -126,7 +125,6 @@ async def find_knowledgebox(
     try:
         item = FindRequest(
             query=query,
-            advanced_query=advanced_query,
             fields=fields,
             filters=filters,
             faceted=faceted,
@@ -218,7 +216,6 @@ async def find(
         kbid,
         features=item.features,
         query=processed_query,
-        advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
         sort=None,

@@ -372,11 +372,6 @@ class SearchParamDefaults:
     suggest_query = ParamDefault(
         default=..., title="Query", description="The query to get suggestions for"
     )
-    advanced_query = ParamDefault(
-        default=None,
-        title="Advanced query",
-        description="An advanced query to search for. See https://docs.nuclia.dev/docs/query/#advanced-query for examples of advanced queries syntax.",  # noqa: E501
-    )
     fields = ParamDefault(
         default=[],
         title="Fields",
@@ -548,9 +543,6 @@ class SearchParamDefaults:
 
 class BaseSearchRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
-    advanced_query: Optional[
-        str
-    ] = SearchParamDefaults.advanced_query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: List[str] = SearchParamDefaults.filters.to_pydantic_field()
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()

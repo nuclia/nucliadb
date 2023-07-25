@@ -202,24 +202,3 @@ async def test_search_errors_if_vectors_or_relations_requested(
         resp.json()["detail"]
         == "Search with custom synonyms is only supported on paragraph and document search"
     )
-
-
-@pytest.mark.asyncio
-async def test_search_errors_if_advanced_query(
-    nucliadb_reader,
-    knowledgebox,
-):
-    kbid = knowledgebox
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
-        json=dict(
-            features=["paragraph"],
-            advanced_query="planet AND earth",
-            with_synonyms=True,
-        ),
-    )
-    assert resp.status_code == 422
-    assert (
-        resp.json()["detail"]
-        == "Search with custom synonyms is not compatible with providing advanced search"
-    )
