@@ -11,9 +11,9 @@ metadata:
     chart: "{{ .Chart.Name }}"
 data:
 {{- if .Values.debug }}
-  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs=DEBUG,nucliadb_vectors=DEBUG,nucliadb_texts=DEBUG,nucliadb_cluster=DEBUG,nucliadb_relations=DEBUG"
+  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs=DEBUG,nucliadb_vectors=DEBUG,nucliadb_texts=DEBUG,nucliadb_relations=DEBUG"
 {{- else }}
-  RUST_LOG: "nucliadb_node=WARN,nucliadb_cluster=WARN"
+  RUST_LOG: "nucliadb_node=WARN"
 {{- end }}
   RUST_LIB_BACKTRACE: "1"
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
@@ -21,11 +21,8 @@ data:
   READER_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_reader }}
   WRITER_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_writer }}
   SIDECAR_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_sidecar }}
-  CHITCHAT_PORT: "{{ .Values.serving.chitchat_port }}"
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
-  NODE_TYPE: "{{ .Values.serving.node_type }}"
   DATA_PATH: "{{.Values.config.data_path}}"
-  SEED_NODES: "{{.Values.serving.node0_svc_fixed_ip}}:{{ .Values.serving.chitchat_port }}"
 {{- if .Values.config.lazyloading }}
   LAZY_LOADING: "true"
 {{- end }}
@@ -34,5 +31,3 @@ data:
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
-
-  SHUTDOWN_DELAY: {{ .Values.running.shutdown_delay }}

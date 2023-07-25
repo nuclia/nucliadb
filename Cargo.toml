@@ -1,7 +1,6 @@
 [workspace]
 
 members = [
-  "nucliadb_cluster",
   "nucliadb_core",
   "nucliadb_node",
   "nucliadb_node/binding",

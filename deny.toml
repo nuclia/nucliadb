@@ -121,9 +121,6 @@ exceptions = [
     { name = "nucliadb-cluster", allow = [
         "AGPL-3.0",
     ], version = "*" },
-    { name = "nucliadb_cluster_rust", allow = [
-        "Apache-2.0 WITH LLVM-exception",
-    ], version = "*" },
     { name = "target-lexicon", allow = [
         "Apache-2.0 WITH LLVM-exception",
     ], version = "*" },

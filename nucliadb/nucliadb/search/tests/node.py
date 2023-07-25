@@ -43,12 +43,11 @@ images.settings["nucliadb_node_reader"] = {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
-        "NODE_TYPE": "Io",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=ERROR",  # noqa
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
     },
     "options": {
         "command": [
@@ -66,13 +65,12 @@ images.settings["nucliadb_node_writer"] = {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
-        "NODE_TYPE": "Io",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-        "CHITCHAT_PORT": "4444",
+        "cluster_discovery_mode": "manual",
+        "cluster_discovery_manual_addresses": "<TO_REPLACE>",
         "NUCLIADB_DISABLE_TELEMETRY": "True",
-        "SEED_NODES": "",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=ERROR,chitchat=ERROR",  # noqa
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
     },
     "options": {
         "command": [
@@ -104,36 +102,6 @@ images.settings["nucliadb_node_sidecar"] = {
         "ports": {"4447": None},
     },
 }
-
-images.settings["nucliadb_cluster_manager"] = {
-    "image": "eu.gcr.io/stashify-218417/cluster_manager",
-    "version": "main",
-    "network": "host",
-    "env": {
-        "LISTEN_PORT": "4444",
-        "NODE_TYPE": "Ingest",
-        "SEEDS": "0.0.0.0:4444",
-        "MONITOR_ADDR": "TO_REPLACE",
-        "RUST_LOG": "debug",
-        "RUST_BACKTRACE": "full",
-    },
-    "options": {
-        "command": [
-            "/nucliadb_cluster/cluster_manager",
-        ],
-    },
-}
-
-
-def get_chitchat_port(container_obj, port):
-    network = container_obj.attrs["NetworkSettings"]
-    service_port = "{0}/udp".format(port)
-    for netport in network["Ports"].keys():
-        if netport == "6543/tcp":
-            continue
-
-        if netport == service_port:
-            return network["Ports"][service_port][0]["HostPort"]
 
 
 def get_container_host(container_obj):
@@ -190,21 +158,6 @@ class nucliadbNodeWriter(BaseImage):
             return False
 
 
-class nucliadbChitchatNode(BaseImage):
-    name = "nucliadb_cluster_manager"
-    port = 4444
-
-    def run(self):
-        return super(nucliadbChitchatNode, self).run()
-
-    def get_image_options(self):
-        options = super(nucliadbChitchatNode, self).get_image_options()
-        return options
-
-    def check(self):
-        return True
-
-
 class nucliadbNodeSidecar(BaseImage):
     name = "nucliadb_node_sidecar"
     port = 4447
@@ -233,7 +186,6 @@ class nucliadbNodeSidecar(BaseImage):
 nucliadb_node_1_reader = nucliadbNodeReader()
 nucliadb_node_1_writer = nucliadbNodeWriter()
 nucliadb_node_1_sidecar = nucliadbNodeSidecar()
-nucliadb_cluster_mgr = nucliadbChitchatNode()
 
 nucliadb_node_2_reader = nucliadbNodeReader()
 nucliadb_node_2_writer = nucliadbNodeWriter()
@@ -266,22 +218,9 @@ class _NodeRunner:
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
 
-        cluster_settings.chitchat_binding_host = "0.0.0.0"
-        cluster_settings.chitchat_binding_port = free_port()
-
-        images.settings["nucliadb_cluster_manager"]["env"][
-            "MONITOR_ADDR"
-        ] = f"{docker_internal_host}:{cluster_settings.chitchat_binding_port}"
-        images.settings["nucliadb_cluster_manager"]["env"]["UPDATE_INTERVAL"] = "1s"
-
-        cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
-
-        cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
-        cluster_mgr_real_host = get_container_host(nucliadb_cluster_mgr.container_obj)
-
         images.settings["nucliadb_node_writer"]["env"][
-            "SEED_NODES"
-        ] = f"{cluster_mgr_real_host}:4444"
+            "cluster_discovery_manual_addresses"
+        ] = [f"{cluster_mgr_real_host}:{cluster_mgr_port}"]
         writer1_host, writer1_port = nucliadb_node_1_writer.run(self.volume_node_1)
 
         writer2_host, writer2_port = nucliadb_node_2_writer.run(self.volume_node_2)
@@ -336,10 +275,6 @@ class _NodeRunner:
                     "host": writer1_host,
                     "port": writer1_port,
                 },
-                "chitchat": {
-                    "host": cluster_mgr_host,
-                    "port": cluster_mgr_port,
-                },
                 "writer2": {
                     "host": writer2_host,
                     "port": writer2_port,
@@ -371,7 +306,6 @@ class _NodeRunner:
         nucliadb_node_2_writer.stop()
         nucliadb_node_2_reader.stop()
         nucliadb_node_2_sidecar.stop()
-        nucliadb_cluster_mgr.stop()
 
         for container in (
             nucliadb_node_1_reader,
@@ -380,7 +314,6 @@ class _NodeRunner:
             nucliadb_node_2_writer,
             nucliadb_node_2_sidecar,
             nucliadb_node_2_sidecar,
-            nucliadb_cluster_mgr,
         ):
             for i in range(5):
                 try:

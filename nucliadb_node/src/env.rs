@@ -38,7 +38,7 @@ pub fn shards_path() -> PathBuf {
 }
 
 pub fn log_level() -> Vec<(String, Level)> {
-    let default = "nucliadb_node=WARN,nucliadb_cluster=WARN".to_string();
+    let default = "nucliadb_node=WARN".to_string();
     match env::var("RUST_LOG") {
         Ok(levels) => parse_log_levels(&levels),
         Err(_) => {

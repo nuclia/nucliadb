@@ -18,7 +18,6 @@ on:
       - "nucliadb_node/**"
       - "nucliadb_vectors/**"
       - "nucliadb_relations/**"
-      - "nucliadb_cluster/src/**"
       - "nucliadb_telemetry/src/**"
       - "nucliadb_utils/**"
   push:
@@ -38,7 +37,6 @@ on:
       - "nucliadb_node/**"
       - "nucliadb_vectors/**"
       - "nucliadb_relations/**"
-      - "nucliadb_cluster/src/**"
       - "nucliadb_telemetry/src/**"
       - "nucliadb_utils/**"
 

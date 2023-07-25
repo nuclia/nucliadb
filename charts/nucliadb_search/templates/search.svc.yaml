@@ -22,7 +22,3 @@ spec:
       port: {{ .Values.serving.metricsPort}}
       protocol: TCP
       appProtocol: http
-    - name: cluster-monitor
-      port: {{ .Values.chitchat.cluster_manager.port }}
-      protocol: TCP
-      appProtocol: tcp

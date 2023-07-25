@@ -24,6 +24,3 @@ spec:
     port: {{ .Values.serving.grpc_writer }}
     protocol: TCP
     appProtocol: grpc
-  - name: chitchat 
-    port: {{ .Values.serving.chitchat_port }}
-    protocol: UDP

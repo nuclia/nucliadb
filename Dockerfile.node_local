@@ -38,7 +38,6 @@ COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
     /nucliadb/
-COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
@@ -73,7 +72,6 @@ COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
     /nucliadb/
-COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs

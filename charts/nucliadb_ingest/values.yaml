@@ -43,16 +43,6 @@ serving:
   metricsPort: 3030
 serviceMonitor:
   enabled: false
-chitchat:
-  cluster_manager:
-    port: 31337
-    host: "0.0.0.0"
-    update_interval: "5s"
-    liveliness_update: "500ms"
-  node:
-    node_type: Ingest
-    node0_svc_fixed_ip: 10.4.0.255
-    chitchat_port: 4444
 
 # Value of ports to where this component connects to
 services:

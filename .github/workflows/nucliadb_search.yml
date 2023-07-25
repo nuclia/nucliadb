@@ -14,7 +14,6 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/**"
       - "nucliadb_node/**"
   push:
     branches:
@@ -29,7 +28,6 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/**"
       - "nucliadb_node/**"
 env:
   API_VERSION: 1
@@ -102,8 +100,6 @@ jobs:
               - 'nucliadb_node/src/**'
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
-            cluster_modified:
-              - 'nucliadb_cluster/**'
 
       # we may need eu.gcr.io/stashify-218417/node
       # or eu.gcr.io/stashify-218417/cluster_manager
@@ -118,11 +114,6 @@ jobs:
         if: steps.filter.outputs.sidecar_modified == 'true'
         run: |
           docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
-
-      - name: Build local ClusterManager for testing
-        if: steps.filter.outputs.cluster_modified == 'true'
-        run: |
-          docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
 
       - name: Run tests
         run: |
