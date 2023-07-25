@@ -28,6 +28,7 @@ from nucliadb.common.maindb.driver import (
     Driver,
     Transaction,
 )
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry import metrics
 
 try:
@@ -62,7 +63,14 @@ class TiKVTransaction(Transaction):
 
     async def commit(self):
         with tikv_observer({"type": "commit"}):
-            await self.txn.commit()
+            try:
+                await self.txn.commit()
+            except Exception as exc:
+                exc_text = str(exc)
+                if "WriteConflict" in exc_text:
+                    raise ConflictError(exc_text) from exc
+                else:
+                    raise
         self.open = False
 
     async def batch_get(self, keys: List[str]):
