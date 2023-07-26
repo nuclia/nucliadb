@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
@@ -82,6 +83,8 @@ async def test_creation(
     # PUBLIC API
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
     assert resp.status_code == 200
+    config = resp.json()["config"]
+    datetime.fromisoformat(config["created_at"])
 
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/labelset/ls1",

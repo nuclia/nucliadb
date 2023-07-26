@@ -8,6 +8,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 import nucliadb_protos.utils_pb2
 import sys
 import typing
@@ -115,6 +116,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
     MIGRATION_VERSION_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     @property
@@ -124,6 +126,8 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     slug: builtins.str
     disable_vectors: builtins.bool
     migration_version: builtins.int
+    @property
+    def created_at(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
@@ -134,8 +138,11 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         slug: builtins.str = ...,
         disable_vectors: builtins.bool = ...,
         migration_version: builtins.int = ...,
+        created_at: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "slug", b"slug", "title", b"title"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_created_at", b"_created_at", "created_at", b"created_at"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_created_at", b"_created_at", "created_at", b"created_at", "description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "slug", b"slug", "title", b"title"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_created_at", b"_created_at"]) -> typing_extensions.Literal["created_at"] | None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 

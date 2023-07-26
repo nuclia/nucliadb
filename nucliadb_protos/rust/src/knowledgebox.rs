@@ -36,6 +36,8 @@ pub struct KnowledgeBoxConfig {
     pub disable_vectors: bool,
     #[prost(int64, tag="7")]
     pub migration_version: i64,
+    #[prost(message, optional, tag="8")]
+    pub created_at: ::core::option::Option<::prost_types::Timestamp>,
 }
 // NEW
 

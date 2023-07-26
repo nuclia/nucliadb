@@ -92,6 +92,7 @@ class KnowledgeBoxConfig(BaseModel):
     enabled_insights: List[str] = []
     disable_vectors: bool = False
     similarity: Optional[VectorSimilarity]
+    created_at: Optional[datetime] = None
 
     @validator("slug")
     def id_check(cls, v: str) -> str:

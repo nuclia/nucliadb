@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package knowledgebox;
-
+import "google/protobuf/timestamp.proto";
 import public "nucliadb_protos/utils.proto";
 
 
@@ -39,6 +39,7 @@ message KnowledgeBoxConfig {
     string slug = 5;
     bool disable_vectors = 6;
     int64 migration_version = 7;
+    optional google.protobuf.Timestamp created_at = 8;
 }
 
 // NEW

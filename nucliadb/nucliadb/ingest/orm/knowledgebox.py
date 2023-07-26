@@ -193,6 +193,7 @@ class KnowledgeBox:
         if config is None:
             config = KnowledgeBoxConfig()
 
+        config.created_at.FromDatetime(datetime.now())
         config.migration_version = get_latest_version()
         config.slug = slug
         await txn.set(
