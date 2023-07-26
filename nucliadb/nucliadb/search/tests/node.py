@@ -208,7 +208,6 @@ class _NodeRunner:
         else:
             # Valid when using github actions
             docker_internal_host = "172.17.0.1"
-        docker_internal_host = "172.17.0.1"
 
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
@@ -220,29 +219,21 @@ class _NodeRunner:
         reader2_host, reader2_port = nucliadb_node_2_reader.run(self.volume_node_2)
 
         natsd_server = self.natsd.replace("localhost", docker_internal_host)
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "INDEX_JETSTREAM_SERVERS"
-        ] = f'["{natsd_server}"]'
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "CACHE_PUBSUB_NATS_URL"
-        ] = f'["{natsd_server}"]'
         gcs_server = self.gcs.replace("localhost", docker_internal_host)
-        images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server
-        images.settings["nucliadb_node_sidecar"]["env"]["GCS_BUCKET"] = "test"
-        images.settings["nucliadb_node_sidecar"]["env"]["FILE_BACKEND"] = "gcs"
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "GCS_INDEXING_BUCKET"
-        ] = "indexing"
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "GCS_DEADLETTER_BUCKET"
-        ] = "deadletter"
 
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "READER_LISTEN_ADDRESS"
-        ] = f"{docker_internal_host}:{reader1_port}"
-        images.settings["nucliadb_node_sidecar"]["env"][
-            "WRITER_LISTEN_ADDRESS"
-        ] = f"{docker_internal_host}:{writer1_port}"
+        images.settings["nucliadb_node_sidecar"]["env"].update(
+            {
+                "INDEX_JETSTREAM_SERVERS": f'["{natsd_server}"]',
+                "CACHE_PUBSUB_NATS_URL": f'["{natsd_server}"]',
+                "GCS_ENDPOINT_URL": gcs_server,
+                "GCS_BUCKET": "test",
+                "FILE_BACKEND": "gcs",
+                "GCS_INDEXING_BUCKET": "indexing",
+                "GCS_DEADLETTER_BUCKET": "deadletter",
+                "READER_LISTEN_ADDRESS": f"{docker_internal_host}:{reader1_port}",
+                "WRITER_LISTEN_ADDRESS": f"{docker_internal_host}:{writer1_port}",
+            }
+        )
 
         sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(self.volume_node_1)
 
@@ -316,10 +307,6 @@ class _NodeRunner:
         self.volume_node_1.remove()
         self.volume_node_2.remove()
 
-    def restart(self):
-        self.stop()
-        return self.start()
-
     def setup_env(self):
         # reset on every test run in case something touches it
         cluster_settings.writer_port_map = {
@@ -339,21 +326,28 @@ class _NodeRunner:
         cluster_settings.node_reader_port = None  # type: ignore
         cluster_settings.node_sidecar_port = None  # type: ignore
 
+        cluster_settings.cluster_discovery_mode = "manual"
+        cluster_settings.cluster_discovery_manual_addresses = [
+            self.data["writer1_internal_host"],
+            self.data["writer2_internal_host"],
+        ]
+
 
 @pytest.fixture(scope="session", autouse=False)
-def _node_runner(natsd: str, gcs: str):
-    yield _NodeRunner(natsd, gcs)
-
-
-@pytest.fixture(scope="session", autouse=False)
-def _node(natsd: str, gcs: str, _node_runner: _NodeRunner):
-    yield _node_runner.start()
-
-    _node_runner.stop()
+def _node(natsd: str, gcs: str):
+    nr = _NodeRunner(natsd, gcs)
+    try:
+        cluster_info = nr.start()
+    except Exception:
+        nr.stop()
+        raise
+    nr.setup_env()
+    yield cluster_info
+    nr.stop()
 
 
 @pytest.fixture(scope="function")
-def node(_node, _node_runner: _NodeRunner, request):
+def node(_node, request):
     # clean up all shard data before each test
     channel1 = insecure_channel(
         f"{_node['writer1']['host']}:{_node['writer1']['port']}"
@@ -375,13 +369,4 @@ def node(_node, _node_runner: _NodeRunner, request):
     channel1.close()
     channel2.close()
 
-    _node_runner.setup_env()
-
     yield _node
-
-    _test_failed_statuses = getattr(request.node, "_test_failed_statuses", {})
-    if len(_test_failed_statuses) > 0 and any(_test_failed_statuses.values()):
-        logger.warning(
-            "Test failed with rerun, restarting node in case it's related to a node crash"
-        )
-        _node_runner.restart()
