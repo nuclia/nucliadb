@@ -69,7 +69,7 @@ async fn main() -> NodeResult<()> {
     lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
 
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
-    let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let (update_sender, _update_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
     let grpc_driver = NodeWriterGRPCDriver::new(Arc::clone(&settings)).with_sender(grpc_sender);
     grpc_driver.initialize().await?;
