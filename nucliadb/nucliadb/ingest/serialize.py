@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 from typing import List, Optional
 
 import nucliadb_models as models
@@ -426,7 +427,7 @@ async def serialize(
                             text=resource.data.generics[field.id].value
                         )
                     )
-    await txn.abort()
+    asyncio.create_task(txn.abort())
     return resource
 
 

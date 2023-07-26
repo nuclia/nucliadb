@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List, Optional
 
@@ -74,14 +75,25 @@ class Driver:
         yield
 
     @asynccontextmanager
-    async def transaction(self) -> AsyncGenerator[Transaction, None]:
+    async def transaction(
+        self, wait_for_abort: bool = True
+    ) -> AsyncGenerator[Transaction, None]:
         """
         Use to make sure transaction is always aborted
         """
         txn: Optional[Transaction] = None
+        error: bool = False
         try:
             txn = await self.begin()
             yield txn
+        except Exception:
+            error = True
+            raise
         finally:
-            if txn is not None and txn.open:
+            if txn is None or not txn.open:
+                # no need to abort
+                return
+            if wait_for_abort or error is True:
                 await txn.abort()
+            else:
+                asyncio.create_task(txn.abort())

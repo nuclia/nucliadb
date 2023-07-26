@@ -62,3 +62,26 @@ async def test_transaction_aborts_on_errors(driver):
         async with driver.transaction() as txn:
             raise ValueError()
     txn.abort.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_transaction_wait_for_abort(driver):
+    async with driver.transaction(wait_for_abort=False) as txn:
+        pass
+    txn.abort.assert_not_awaited()
+    txn.abort.assert_called_once()
+    txn.abort.reset_mock()
+
+    # Should wait for abort if there are errors
+    with pytest.raises(ValueError):
+        async with driver.transaction(wait_for_abort=False) as txn:
+            raise ValueError()
+    txn.abort.assert_awaited_once()
+    txn.abort.assert_called_once()
+    txn.abort.reset_mock()
+
+    async with driver.transaction(wait_for_abort=True) as txn:
+        pass
+    txn.abort.assert_awaited_once()
+    txn.abort.assert_called_once()
+    txn.abort.reset_mock()

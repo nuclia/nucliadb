@@ -141,7 +141,8 @@ class TiKVTransaction(Transaction):
                 # or the for loop found an unmatched key
                 break
         finally:
-            await txn.rollback()
+            with tikv_observer({"type": "rollback"}):
+                await txn.rollback()
 
 
 class TiKVDriver(Driver):
@@ -163,7 +164,9 @@ class TiKVDriver(Driver):
     async def begin(self) -> TiKVTransaction:
         if self.tikv is None:
             raise AttributeError()
-        return TiKVTransaction(await self.tikv.begin(pessimistic=False), driver=self)
+        with tikv_observer({"type": "begin"}):
+            txn = await self.tikv.begin(pessimistic=False)
+        return TiKVTransaction(txn, driver=self)
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
