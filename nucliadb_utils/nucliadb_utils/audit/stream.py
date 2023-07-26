@@ -24,7 +24,6 @@ from typing import List, Optional
 import mmh3  # type: ignore
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
-from nucliadb_models.search import ChatContextMessage
 from nucliadb_protos.audit_pb2 import (
     AuditField,
     AuditKBCounter,
@@ -250,7 +249,7 @@ class StreamAuditStorage(AuditStorage):
         timeit: float,
         question: str,
         rephrased_question: Optional[str],
-        context: List[ChatContextMessage],
+        context: List[ChatContext],
         answer: Optional[str],
     ):
         auditrequest = AuditRequest()
@@ -263,11 +262,9 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.time.FromDatetime(datetime.now())
         auditrequest.trace_id = get_trace_id()
         auditrequest.chat.question = question
+        auditrequest.chat.context.extend(context)
         if rephrased_question is not None:
             auditrequest.chat.rephrased_question = rephrased_question
-        for message in context:
-            context_pb = ChatContext(author=message.author, text=message.text)
-            auditrequest.chat.context.append(context_pb)
         if answer is not None:
             auditrequest.chat.answer = answer
         await self.send(auditrequest)

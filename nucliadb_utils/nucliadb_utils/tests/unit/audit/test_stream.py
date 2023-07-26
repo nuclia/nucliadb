@@ -20,8 +20,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_models.search import ChatContextMessage
-from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
+from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest, ChatContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -127,7 +126,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         timeit=-1,
         question="foo",
         rephrased_question="rephrased",
-        context=[ChatContextMessage(author="USER", text="epa")],
+        context=[ChatContext(author="USER", text="epa")],
         answer="bar",
     )
 

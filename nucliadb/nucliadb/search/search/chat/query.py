@@ -21,6 +21,7 @@ import base64
 from time import monotonic as time
 from typing import AsyncIterator, List, Optional
 
+from nucliadb_protos.audit_pb2 import ChatContext
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
@@ -96,6 +97,11 @@ async def generate_answer(
         audit_answer = (
             decoded_answer if decoded_answer != NOT_ENOUGH_CONTEXT_ANSWER else None
         )
+
+        context = [
+            ChatContext(author=message.author, text=message.text)
+            for message in chat_request.context or []
+        ]
         await audit.chat(
             kbid,
             user_id,
@@ -104,7 +110,7 @@ async def generate_answer(
             time() - start_time,
             question=user_query,
             rephrased_question=rephrase_query,
-            context=chat_request.context or [],
+            context=context,
             answer=audit_answer,
         )
 
