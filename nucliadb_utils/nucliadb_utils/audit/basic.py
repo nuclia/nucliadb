@@ -20,6 +20,7 @@
 from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
+from nucliadb_models.search import ChatContextMessage
 from nucliadb_protos.audit_pb2 import AuditField, AuditKBCounter, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
@@ -83,6 +84,8 @@ class BasicAuditStorage(AuditStorage):
         origin: str,
         timeit: float,
         question: str,
+        rephrased_question: Optional[str],
+        context: List[ChatContextMessage],
         answer: Optional[str],
     ):
         logger.debug(f"CHAT {kbid} {user} {origin} {timeit}")

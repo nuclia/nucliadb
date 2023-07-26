@@ -126,7 +126,7 @@ async def chat_knowledgebox(
         x_ndb_client,
         x_nucliadb_user,
         x_forwarded_for,
-        do_audit=False,
+        do_audit=True,
     )
     if incomplete:
         raise IncompleteFindResultsError()
@@ -134,6 +134,7 @@ async def chat_knowledgebox(
     return await chat(
         kbid,
         user_query,
+        rephrased_query,
         find_results,
         item,
         x_nucliadb_user,

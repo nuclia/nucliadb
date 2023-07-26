@@ -784,6 +784,8 @@ pub struct FieldId {
     #[prost(string, tag="2")]
     pub field: ::prost::alloc::string::String,
 }
+/// This message is used to store a list of all field ids of a particular 
+/// resource. Note that title and summary fields are not included.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AllFieldIDs {
     #[prost(message, repeated, tag="1")]
