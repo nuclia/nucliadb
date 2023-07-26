@@ -79,7 +79,11 @@ class Driver:
         self, wait_for_abort: bool = True
     ) -> AsyncGenerator[Transaction, None]:
         """
-        Use to make sure transaction is always aborted
+        Use to make sure transaction is always aborted.
+
+        :param wait_for_abort: If True, wait for abort to finish before returning.
+                               If False, abort is done in background (unless there
+                               is an error)
         """
         txn: Optional[Transaction] = None
         error: bool = False
@@ -93,7 +97,7 @@ class Driver:
             if txn is None or not txn.open:
                 # no need to abort
                 return
-            if wait_for_abort or error is True:
+            if wait_for_abort or error:
                 await txn.abort()
             else:
                 asyncio.create_task(txn.abort())
