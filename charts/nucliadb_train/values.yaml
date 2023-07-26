@@ -82,6 +82,6 @@ vs:
 zone:
 
 
-# extra_annotations:
+# extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
