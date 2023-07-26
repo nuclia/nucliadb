@@ -38,7 +38,9 @@ try:
 except ImportError:  # pragma: no cover
     TiKV = False
 
-tikv_observer = metrics.Observer("tikv_client", labels={"type": ""})
+tikv_observer = metrics.Observer(
+    "tikv_client", labels={"type": ""}, error_mappings={"conflict_error": ConflictError}
+)
 logger = logging.getLogger(__name__)
 
 
