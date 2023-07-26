@@ -24,7 +24,12 @@ from typing import List, Optional
 import mmh3  # type: ignore
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
-from nucliadb_protos.audit_pb2 import AuditField, AuditKBCounter, AuditRequest
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditKBCounter,
+    AuditRequest,
+    ChatContext,
+)
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from opentelemetry.trace import format_trace_id, get_current_span
@@ -243,6 +248,8 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         timeit: float,
         question: str,
+        rephrased_question: Optional[str],
+        context: List[ChatContext],
         answer: Optional[str],
     ):
         auditrequest = AuditRequest()
@@ -255,6 +262,9 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.time.FromDatetime(datetime.now())
         auditrequest.trace_id = get_trace_id()
         auditrequest.chat.question = question
+        auditrequest.chat.context.extend(context)
+        if rephrased_question is not None:
+            auditrequest.chat.rephrased_question = rephrased_question
         if answer is not None:
             auditrequest.chat.answer = answer
         await self.send(auditrequest)

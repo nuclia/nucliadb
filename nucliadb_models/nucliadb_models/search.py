@@ -631,9 +631,13 @@ class Author(str, Enum):
     USER = "USER"
 
 
-class Message(BaseModel):
+class ChatContextMessage(BaseModel):
     author: Author
     text: str
+
+
+# For bw compatibility
+Message = ChatContextMessage
 
 
 class ChatModel(BaseModel):
@@ -641,10 +645,12 @@ class ChatModel(BaseModel):
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    context: List[Message] = Field(
+    context: List[ChatContextMessage] = Field(
         [], description="The information retrieval context for the current question"
     )
-    conversation: List[Message] = Field([], description="The chat conversation history")
+    conversation: List[ChatContextMessage] = Field(
+        [], description="The chat conversation history"
+    )
     truncate: bool = Field(
         True,
         description="Truncate the chat context in case it doesn't fit the generative input",
@@ -653,7 +659,7 @@ class ChatModel(BaseModel):
 
 class RephraseModel(BaseModel):
     question: str
-    context: List[Message] = []
+    context: List[ChatContextMessage] = []
     user_id: str
 
 
@@ -692,7 +698,7 @@ class ChatRequest(BaseModel):
     ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     context: Optional[
-        List[Message]
+        List[ChatContextMessage]
     ] = SearchParamDefaults.chat_context.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
