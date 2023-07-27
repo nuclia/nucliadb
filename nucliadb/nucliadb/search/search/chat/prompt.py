@@ -119,6 +119,8 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
         kb = KnowledgeBoxORM(txn, storage, kbid)
         for field_path, paragraph in ordered_paras:
             text = paragraph.text.strip()
+            # Do not send highlight marks on prompt context
+            text = text.replace("<mark>", "").replace("</mark>", "")
             output[paragraph.id] = text
 
             # If the paragraph is a conversation and it matches semantically, we assume we
