@@ -69,3 +69,8 @@ vs:
   host:
 
 zone:
+
+
+# extra_pod_annotations:
+#   what: "add annotations"
+#   where: "in the pods"

@@ -22,6 +22,7 @@ import logging
 import time
 from typing import Optional
 
+import backoff
 import nats
 import nats.js.api
 from nats.aio.client import Msg
@@ -29,6 +30,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViolation
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
@@ -114,6 +116,7 @@ class IngestConsumer:
             f"Subscribed to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}"
         )
 
+    @backoff.on_exception(backoff.expo, (ConflictError,), max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
         await self.processor.process(pb, seqid, self.partition)
 
@@ -247,6 +250,7 @@ class IngestProcessedConsumer(IngestConsumer):
             f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
         )
 
+    @backoff.on_exception(backoff.expo, (ConflictError,), max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
         """
         We are setting `transaction_check` to False here because we can not mix

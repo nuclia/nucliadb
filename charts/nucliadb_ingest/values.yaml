@@ -124,3 +124,7 @@ ingest_subscriber_workers_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+
+# extra_pod_annotations:
+#   what: "add annotations"
+#   where: "in the pods"

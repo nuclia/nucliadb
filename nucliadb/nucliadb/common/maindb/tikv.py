@@ -28,6 +28,7 @@ from nucliadb.common.maindb.driver import (
     Driver,
     Transaction,
 )
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry import metrics
 
 try:
@@ -37,7 +38,9 @@ try:
 except ImportError:  # pragma: no cover
     TiKV = False
 
-tikv_observer = metrics.Observer("tikv_client", labels={"type": ""})
+tikv_observer = metrics.Observer(
+    "tikv_client", labels={"type": ""}, error_mappings={"conflict_error": ConflictError}
+)
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +65,14 @@ class TiKVTransaction(Transaction):
 
     async def commit(self):
         with tikv_observer({"type": "commit"}):
-            await self.txn.commit()
+            try:
+                await self.txn.commit()
+            except Exception as exc:
+                exc_text = str(exc)
+                if "WriteConflict" in exc_text:
+                    raise ConflictError(exc_text) from exc
+                else:
+                    raise
         self.open = False
 
     async def batch_get(self, keys: List[str]):

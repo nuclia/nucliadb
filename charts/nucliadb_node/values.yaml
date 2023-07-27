@@ -83,3 +83,7 @@ indexing:
   index_jetstream_auth:
   index_jetstream_servers:
     - nats1
+
+# extra_pod_annotations:
+#   what: "add annotations"
+#   where: "in the pods"

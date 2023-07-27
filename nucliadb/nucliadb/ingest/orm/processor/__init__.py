@@ -25,6 +25,7 @@ import aiohttp.client_exceptions
 
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     KnowledgeBoxConflict,
@@ -261,6 +262,7 @@ class Processor:
             asyncio.TimeoutError,
             asyncio.CancelledError,
             aiohttp.client_exceptions.ClientError,
+            ConflictError,
         ):  # pragma: no cover
             # Unhandled exceptions here that should bubble and hard fail
             # XXX We swallow too many exceptions here!

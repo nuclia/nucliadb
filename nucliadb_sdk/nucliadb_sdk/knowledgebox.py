@@ -39,12 +39,12 @@ from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
+    ChatContextMessage,
     ChatOptions,
     ChatRequest,
     FindRequest,
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
-    Message,
     Relations,
     ResourceProperties,
     SearchOptions,
@@ -440,7 +440,7 @@ class KnowledgeBox:
     def chat(
         self,
         text: str,
-        context: Optional[List[Message]] = None,
+        context: Optional[List[ChatContextMessage]] = None,
         filter: Optional[List[Union[Label, str]]] = None,
     ) -> Tuple[KnowledgeboxFindResults, str, Optional[Relations], Optional[str]]:
         response = self.client.chat(self.build_chat_request(text, filter))
@@ -466,7 +466,7 @@ class KnowledgeBox:
         show: List[ResourceProperties] = [ResourceProperties.BASIC],
         field_type_filter: List[FieldTypeName] = list(FieldTypeName),
         extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName),
-        context: Optional[List[Message]] = None,
+        context: Optional[List[ChatContextMessage]] = None,
         fields: Optional[List[str]] = None,
         range_creation_start: Optional[datetime] = None,
         range_creation_end: Optional[datetime] = None,
