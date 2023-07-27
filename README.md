@@ -69,7 +69,7 @@ following readings:
 
 - [Quick start!](https://docs.nuclia.dev/docs/docs/nucliadb/intro)
 - Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/docs/nucliadb/basics) section
-- [Upload a file](https://docs.nuclia.dev/docs/docs/quick-start/push)
+- [Upload a file](https://docs.nuclia.dev/docs/docs/getting-started/quick-start/push)
 
 # 💬 Community
 
@@ -119,4 +119,3 @@ We are always happy to have contributions: code, documentation, issues, feedback
 [discord]: https://discord.gg/AgevjFJUvk
 [blogs]: https://nuclia.com/blog
 [linkedin]: https://www.linkedin.com/company/nuclia/
-
