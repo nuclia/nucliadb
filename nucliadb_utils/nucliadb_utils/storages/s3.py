@@ -321,6 +321,12 @@ class S3Storage(Storage):
         self._aws_access_key = aws_client_id
         self._aws_secret_key = aws_client_secret
         self._region_name = region_name
+        self._bucket_creation_options = {}
+
+        if region_name is not None:
+            self._bucket_creation_options = {
+                "CreateBucketConfiguration": {"LocationConstraint": self._region_name}
+            }
 
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
@@ -391,8 +397,7 @@ class S3Storage(Storage):
 
         if missing:
             await self._s3aioclient.create_bucket(
-                Bucket=bucket_name,
-                CreateBucketConfiguration={"LocationConstraint": self._region_name},
+                Bucket=bucket_name, **self._bucket_creation_options
             )
             created = True
         return created
