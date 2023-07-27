@@ -63,6 +63,7 @@ async def rephrase_query_from_context(
 
 async def generate_answer(
     user_query: str,
+    user_context: List[ChatContextMessage],
     rephrase_query: Optional[str],
     results: KnowledgeboxFindResults,
     kbid: str,
@@ -100,7 +101,7 @@ async def generate_answer(
 
         context = [
             ChatContext(author=message.author, text=message.text)
-            for message in chat_request.context or []
+            for message in user_context
         ]
         await audit.chat(
             kbid,
@@ -153,8 +154,10 @@ async def chat(
     origin: str,
 ):
     predict = get_predict()
-    context = chat_request.context or []
-    context.append(
+
+    user_context = chat_request.context or []
+    chat_context = user_context[:]
+    chat_context.append(
         ChatContextMessage(
             author=Author.NUCLIA,
             text=await format_chat_prompt_content(kbid, find_results),
@@ -162,7 +165,7 @@ async def chat(
     )
     chat_model = ChatModel(
         user_id=user_id,
-        context=context,
+        context=chat_context,
         question=chat_request.query,
         truncate=True,
     )
@@ -172,6 +175,7 @@ async def chat(
     return StreamingResponse(
         generate_answer(
             user_query,
+            user_context,
             rephrased_query,
             find_results,
             kbid,
