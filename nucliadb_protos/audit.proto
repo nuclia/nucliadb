@@ -32,9 +32,16 @@ enum ClientType {
   CHROME_EXTENSION = 5;
 }
 
+message ChatContext {
+  string author = 1;
+  string text = 2;
+}
+
 message ChatAudit {
   string question = 1;
   optional string answer = 2;
+  optional string rephrased_question = 3;
+  repeated ChatContext context = 4;
 }
 
 message AuditRequest {

@@ -83,3 +83,7 @@ tracing:
   jaegerAgentTag: 1.34.1
   jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
   jaegerCollectorGrpcPort: 14250
+
+# extra_pod_annotations:
+#   what: "add annotations"
+#   where: "in the pods"

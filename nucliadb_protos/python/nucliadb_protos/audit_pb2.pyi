@@ -109,22 +109,50 @@ class AuditKBCounter(google.protobuf.message.Message):
 global___AuditKBCounter = AuditKBCounter
 
 @typing_extensions.final
+class ChatContext(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTHOR_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    author: builtins.str
+    text: builtins.str
+    def __init__(
+        self,
+        *,
+        author: builtins.str = ...,
+        text: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["author", b"author", "text", b"text"]) -> None: ...
+
+global___ChatContext = ChatContext
+
+@typing_extensions.final
 class ChatAudit(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     QUESTION_FIELD_NUMBER: builtins.int
     ANSWER_FIELD_NUMBER: builtins.int
+    REPHRASED_QUESTION_FIELD_NUMBER: builtins.int
+    CONTEXT_FIELD_NUMBER: builtins.int
     question: builtins.str
     answer: builtins.str
+    rephrased_question: builtins.str
+    @property
+    def context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ChatContext]: ...
     def __init__(
         self,
         *,
         question: builtins.str = ...,
         answer: builtins.str | None = ...,
+        rephrased_question: builtins.str | None = ...,
+        context: collections.abc.Iterable[global___ChatContext] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "answer", b"answer"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "answer", b"answer", "question", b"question"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "rephrased_question", b"rephrased_question"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "context", b"context", "question", b"question", "rephrased_question", b"rephrased_question"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_answer", b"_answer"]) -> typing_extensions.Literal["answer"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_rephrased_question", b"_rephrased_question"]) -> typing_extensions.Literal["rephrased_question"] | None: ...
 
 global___ChatAudit = ChatAudit
 

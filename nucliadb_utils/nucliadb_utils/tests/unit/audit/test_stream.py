@@ -20,7 +20,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
+from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest, ChatContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -119,8 +119,26 @@ async def test_suggest(audit_storage: StreamAuditStorage, nats):
 @pytest.mark.asyncio
 async def test_chat(audit_storage: StreamAuditStorage, nats):
     await audit_storage.chat(
-        "kbid", "user", 0, "origin", -1, question="foo", answer="bar"
+        kbid="kbid",
+        user="user",
+        client_type=0,
+        origin="origin",
+        timeit=-1,
+        question="foo",
+        rephrased_question="rephrased",
+        context=[ChatContext(author="USER", text="epa")],
+        answer="bar",
     )
 
     await wait_for_queue(audit_storage)
     nats.jetstream().publish.assert_called_once()
+
+    arg = nats.jetstream().publish.call_args[0][1]
+    pb = AuditRequest()
+    pb.ParseFromString(arg)
+
+    assert pb.chat.question == "foo"
+    assert pb.chat.rephrased_question == "rephrased"
+    assert pb.chat.answer == "bar"
+    assert pb.chat.context[0].author == "USER"
+    assert pb.chat.context[0].text == "epa"

@@ -28,6 +28,7 @@ from nucliadb.common.maindb.driver import (
     Driver,
     Transaction,
 )
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry import metrics
 
 try:
@@ -37,7 +38,9 @@ try:
 except ImportError:  # pragma: no cover
     TiKV = False
 
-tikv_observer = metrics.Observer("tikv_client", labels={"type": ""})
+tikv_observer = metrics.Observer(
+    "tikv_client", labels={"type": ""}, error_mappings={"conflict_error": ConflictError}
+)
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +65,14 @@ class TiKVTransaction(Transaction):
 
     async def commit(self):
         with tikv_observer({"type": "commit"}):
-            await self.txn.commit()
+            try:
+                await self.txn.commit()
+            except Exception as exc:
+                exc_text = str(exc)
+                if "WriteConflict" in exc_text:
+                    raise ConflictError(exc_text) from exc
+                else:
+                    raise
         self.open = False
 
     async def batch_get(self, keys: List[str]):
@@ -131,7 +141,8 @@ class TiKVTransaction(Transaction):
                 # or the for loop found an unmatched key
                 break
         finally:
-            await txn.rollback()
+            with tikv_observer({"type": "rollback"}):
+                await txn.rollback()
 
 
 class TiKVDriver(Driver):
@@ -153,7 +164,9 @@ class TiKVDriver(Driver):
     async def begin(self) -> TiKVTransaction:
         if self.tikv is None:
             raise AttributeError()
-        return TiKVTransaction(await self.tikv.begin(pessimistic=False), driver=self)
+        with tikv_observer({"type": "begin"}):
+            txn = await self.tikv.begin(pessimistic=False)
+        return TiKVTransaction(txn, driver=self)
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True

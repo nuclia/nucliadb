@@ -19,8 +19,9 @@
 #
 import base64
 from time import monotonic as time
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, Optional
 
+from nucliadb_protos.audit_pb2 import ChatContext
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
@@ -31,11 +32,11 @@ from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     Author,
+    ChatContextMessage,
     ChatModel,
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
-    Message,
     NucliaDBClientType,
     RephraseModel,
 )
@@ -47,7 +48,7 @@ NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 
 async def rephrase_query_from_context(
     kbid: str,
-    context: List[Message],
+    context: List[ChatContextMessage],
     query: str,
     user_id: str,
 ) -> str:
@@ -61,6 +62,9 @@ async def rephrase_query_from_context(
 
 
 async def generate_answer(
+    user_query: str,
+    user_context: List[ChatContextMessage],
+    rephrase_query: Optional[str],
     results: KnowledgeboxFindResults,
     kbid: str,
     user_id: str,
@@ -94,13 +98,20 @@ async def generate_answer(
         audit_answer = (
             decoded_answer if decoded_answer != NOT_ENOUGH_CONTEXT_ANSWER else None
         )
+
+        context = [
+            ChatContext(author=message.author, text=message.text)
+            for message in user_context
+        ]
         await audit.chat(
             kbid,
             user_id,
             client_type.to_proto(),
             origin,
             time() - start_time,
-            question=chat_request.query,
+            question=user_query,
+            rephrased_question=rephrase_query,
+            context=context,
             answer=audit_answer,
         )
 
@@ -134,6 +145,8 @@ async def generate_answer(
 
 async def chat(
     kbid: str,
+    user_query: str,
+    rephrased_query: Optional[str],
     find_results: KnowledgeboxFindResults,
     chat_request: ChatRequest,
     user_id: str,
@@ -141,16 +154,18 @@ async def chat(
     origin: str,
 ):
     predict = get_predict()
-    context = chat_request.context or []
-    context.append(
-        Message(
+
+    user_context = chat_request.context or []
+    chat_context = user_context[:]
+    chat_context.append(
+        ChatContextMessage(
             author=Author.NUCLIA,
             text=await format_chat_prompt_content(kbid, find_results),
         )
     )
     chat_model = ChatModel(
         user_id=user_id,
-        context=context,
+        context=chat_context,
         question=chat_request.query,
         truncate=True,
     )
@@ -159,6 +174,9 @@ async def chat(
 
     return StreamingResponse(
         generate_answer(
+            user_query,
+            user_context,
+            rephrased_query,
             find_results,
             kbid,
             user_id,
