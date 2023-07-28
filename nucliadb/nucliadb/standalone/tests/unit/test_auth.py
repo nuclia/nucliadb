@@ -17,9 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import time
 from unittest.mock import Mock
 
+import orjson
 import pytest
+from jwcrypto import jwe, jwk  # type: ignore
 
 from nucliadb.standalone import auth
 from nucliadb.standalone.settings import AuthPolicy, NucliaDBRoles, Settings
@@ -112,7 +115,7 @@ async def test_oauth2_backend(http_request):
 
 
 @pytest.mark.asyncio
-async def test_baseic_backend(http_request):
+async def test_basic_backend(http_request):
     backend = auth.get_auth_backend(
         settings=Settings(
             auth_policy=AuthPolicy.UPSTREAM_BASICAUTH,
@@ -133,3 +136,34 @@ async def test_baseic_backend(http_request):
     # bad auth header
     http_request.headers = {"Authorization": "lsdkf"}
     assert await backend.authenticate(http_request) is None
+
+
+@pytest.mark.asyncio
+async def test_auth_token_backend(http_request):
+    jwk_key = orjson.dumps(jwk.JWK.generate(kty="oct", size=256, kid="dyn")).decode(
+        "utf-8"
+    )
+    backend = auth.get_auth_backend(
+        settings=Settings(
+            auth_policy=AuthPolicy.UPSTREAM_BASICAUTH,
+            auth_policy_user_default_roles=[NucliaDBRoles.READER],
+            jwk_key=jwk_key,
+        )
+    )
+
+    claims = {
+        "iat": int(time.time()),
+        "exp": int(time.time() + 30),
+        "scopes": ["READER"],
+        "username": "display_name",
+    }
+    payload = orjson.dumps(claims)
+    jwetoken = jwe.JWE(payload, orjson.dumps({"alg": "A256KW", "enc": "A256CBC-HS512"}))
+    jwetoken.add_recipient(jwk.JWK(**orjson.loads(jwk_key)))
+    token = jwetoken.serialize(compact=True)
+
+    http_request.query_params["auth_token"] = token
+    auth_creds, nuclia_user = await backend.authenticate(http_request)
+
+    assert nuclia_user.display_name == "display_name"
+    assert auth_creds.scopes == [NucliaDBRoles.READER.value]
