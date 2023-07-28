@@ -27,7 +27,7 @@ from nucliadb.standalone.settings import AuthPolicy, NucliaDBRoles, Settings
 
 @pytest.fixture()
 def http_request():
-    yield Mock(headers={})
+    yield Mock(headers={}, query_params={})
 
 
 def test_get_mapped_roles():
