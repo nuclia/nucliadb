@@ -15,8 +15,8 @@ pub struct CloudFile {
     /// Temporal upload information
     #[prost(string, tag="7")]
     pub resumable_uri: ::prost::alloc::string::String,
-    #[prost(int64, tag="8")]
-    pub offset: i64,
+    #[prost(uint64, tag="8")]
+    pub offset: u64,
     #[prost(string, tag="9")]
     pub upload_uri: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="10")]
