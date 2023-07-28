@@ -20,7 +20,7 @@
 import uuid
 
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, ProcessedIngestMessage
 
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
@@ -62,10 +62,16 @@ async def test_separated_ingest_consumer(
     assert consumer_info1.delivered.stream_seq == 1
     assert consumer_info2.delivered.stream_seq == 0
 
-    await transaction_utility.commit(
-        bm_normal,
-        partition=1,
-        wait=True,
+    pim = ProcessedIngestMessage()
+    pim.uuid = bm_processed.uuid
+    pim.kbid = bm_processed.kbid
+    pim.processing_id = "foo"
+
+    await transaction_utility.push(
+        message=pim,
+        kbid=pim.kbid,
+        uuid=pim.uuid,
+        partition=-1,
         target_subject=const.Streams.INGEST_PROCESSED.subject,
     )
 

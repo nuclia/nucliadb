@@ -130,6 +130,7 @@ async def get_storage(
             project=storage_settings.gcs_project,
             deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
             indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
+            ingest_bucket=extended_storage_settings.gcs_ingest_bucket,
             executor=ThreadPoolExecutor(extended_storage_settings.gcs_threads),
             labels=storage_settings.gcs_bucket_labels,
             scopes=gcs_scopes,

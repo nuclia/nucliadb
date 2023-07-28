@@ -436,6 +436,7 @@ class GCSStorage(Storage):
         executor: Optional[ThreadPoolExecutor] = None,
         deadletter_bucket: Optional[str] = None,
         indexing_bucket: Optional[str] = None,
+        ingest_bucket: Optional[str] = None,
         labels: Optional[Dict[str, str]] = None,
         url: str = "https://www.googleapis.com",
         scopes: Optional[List[str]] = None,
@@ -449,6 +450,7 @@ class GCSStorage(Storage):
         self.source = CloudFile.GCS
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
+        self.ingest_bucket = ingest_bucket
         self.bucket = bucket
         self._location = location
         self._project = project
@@ -478,21 +480,14 @@ class GCSStorage(Storage):
             loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5)
         )
 
-        try:
-            if self.deadletter_bucket is not None and self.deadletter_bucket != "":
-                await self.create_bucket(self.deadletter_bucket)
-        except Exception:  # pragma: no cover
-            logger.exception(
-                f"Could not create bucket {self.deadletter_bucket}", exc_info=True
-            )
-
-        try:
-            if self.indexing_bucket is not None and self.indexing_bucket != "":
-                await self.create_bucket(self.indexing_bucket)
-        except Exception:  # pragma: no cover
-            logger.exception(
-                f"Could not create bucket {self.indexing_bucket}", exc_info=True
-            )
+        # Create required buckets
+        for bucket_attr in ["deadletter_bucket", "indexing_bucket", "ingest_bucket"]:
+            try:
+                bucket = getattr(self, bucket_attr)
+                if bucket is not None and bucket != "":
+                    await self.create_bucket(bucket)
+            except Exception:  # pragma: no cover
+                logger.exception(f"Could not create bucket {bucket}", exc_info=True)
 
     async def finalize(self):
         await self.session.close()

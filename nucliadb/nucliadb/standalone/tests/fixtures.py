@@ -44,6 +44,7 @@ async def nucliadb_api(
     transaction_utility,
     indexing_utility_registered,
     test_settings_search: None,
+    gcs_storage,
     event_loop,
 ):  # type: ignore
     from nucliadb.common.cluster import manager

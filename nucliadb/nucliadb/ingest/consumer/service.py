@@ -25,7 +25,11 @@ from typing import Awaitable, Callable, Optional
 from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
+from nucliadb.ingest.consumer.consumer import (
+    IngestConsumer,
+    IngestProcessedConsumer,
+    IngestProcessedConsumerV2,
+)
 from nucliadb.ingest.consumer.pull import PullWorker
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
@@ -141,6 +145,45 @@ async def start_ingest_processed_consumer(
     nats_connection_manager = get_nats_manager()
 
     consumer = IngestProcessedConsumer(
+        driver=driver,
+        partition="-1",
+        storage=storage,
+        cache=cache,
+        nats_connection_manager=nats_connection_manager,
+    )
+    await consumer.initialize()
+
+    return nats_connection_manager.finalize
+
+
+async def start_ingest_processed_consumer_v2(
+    service_name: Optional[str] = None,
+) -> Callable[[], Awaitable[None]]:
+    """
+    This is not meant to be deployed with a stateful set like the other consumers.
+
+    We are not maintaining transactionability based on the nats sequence id from this
+    consumer and we will start off by not separating writes by partition AND
+    allowing NATS to manage the queue group for us.
+    """
+    if transaction_settings.transaction_local:
+        raise ConfigurationError("Can not start ingest consumers in local mode")
+
+    while len(
+        manager.get_index_nodes()
+    ) == 0 and running_settings.running_environment not in (
+        "local",
+        "test",
+    ):
+        logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
+        await asyncio.sleep(1)
+
+    driver = await setup_driver()
+    cache = await get_cache()
+    storage = await get_storage(service_name=service_name or SERVICE_NAME)
+    nats_connection_manager = get_nats_manager()
+
+    consumer = IngestProcessedConsumerV2(
         driver=driver,
         partition="-1",
         storage=storage,

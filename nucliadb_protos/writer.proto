@@ -122,6 +122,13 @@ message BrokerMessage {
 }
 
 
+message ProcessedIngestMessage {
+    string kbid = 1;
+    string uuid = 2;
+    string processing_id = 3;
+}
+
+
 message WriterStatusResponse {
     repeated string knowledgeboxes = 1;
     // map of last message processed

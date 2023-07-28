@@ -308,6 +308,7 @@ class S3Storage(Storage):
         aws_client_secret: Optional[str] = None,
         deadletter_bucket: Optional[str] = None,
         indexing_bucket: Optional[str] = None,
+        ingest_bucket: Optional[str] = None,
         endpoint_url: Optional[str] = None,
         verify_ssl: bool = True,
         use_ssl: bool = True,
@@ -318,6 +319,7 @@ class S3Storage(Storage):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
+        self.ingest_bucket = ingest_bucket
         self._aws_access_key = aws_client_id
         self._aws_secret_key = aws_client_secret
         self._region_name = region_name

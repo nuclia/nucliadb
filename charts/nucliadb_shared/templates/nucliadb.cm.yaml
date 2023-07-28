@@ -22,6 +22,7 @@ data:
   GCS_BUCKET: {{ .Values.storage.gcs_bucket }}
   GCS_DEADLETTER_BUCKET: {{ .Values.storage.gcs_deadletter_bucket }}
   GCS_INDEXING_BUCKET: {{ .Values.storage.gcs_indexing_bucket }}
+  GCS_INGEST_BUCKET: {{ .Values.storage.gcs_ingest_bucket }}
   GCS_LOCATION: {{ .Values.storage.gcs_location }}
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}

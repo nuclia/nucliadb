@@ -70,3 +70,9 @@ class IndexDataNotFound(Exception):
     """
     Raised when the index data is not found in storage
     """
+
+
+class ProcessedMessageNotFound(Exception):
+    """
+    Raised when the processed data is not found in storage
+    """

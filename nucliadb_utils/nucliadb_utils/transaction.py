@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import nats
 from nats.aio.client import Client
+from nats.js.api import PubAck
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, OpStatusWriter
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
@@ -186,11 +187,16 @@ class TransactionUtility:
         if target_subject is None:
             target_subject = const.Streams.INGEST.subject.format(partition=partition)
 
-        res = await self.js.publish(target_subject, writer.SerializeToString())
+        res = await self.push(
+            writer, writer.kbid, writer.uuid, partition, target_subject
+        )
 
         waiting_for.seq = res.seq
 
         if wait and waiting_event is not None:
+            logger.info(
+                f" - Waiting for commit on: kb={writer.kbid} uuid={waiting_for.uuid}"
+            )
             try:
                 await asyncio.wait_for(waiting_event.wait(), timeout=30.0)
             except asyncio.TimeoutError:
@@ -198,7 +204,18 @@ class TransactionUtility:
             finally:
                 await self.stop_waiting(writer.kbid, request_id=request_id)
 
-        logger.info(
-            f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"  # noqa
-        )
         return res.seq
+
+    async def push(
+        self,
+        message: Any,
+        kbid: str,
+        uuid: str,
+        partition: int,
+        target_subject: str,
+    ) -> PubAck:
+        res = await self.js.publish(target_subject, message.SerializeToString())
+        logger.info(
+            f" - Pushed message to ingest [{target_subject}].  kb: {kbid}, resource: {uuid}, nucliadb seqid: {res.seq}, partition: {partition}"  # noqa
+        )
+        return res

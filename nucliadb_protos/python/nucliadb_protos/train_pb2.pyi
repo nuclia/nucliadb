@@ -146,6 +146,7 @@ from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupResponse as NewEntitiesGroupResponse,
     Notification as Notification,
     OpStatusWriter as OpStatusWriter,
+    ProcessedIngestMessage as ProcessedIngestMessage,
     ResourceFieldExistsResponse as ResourceFieldExistsResponse,
     ResourceFieldId as ResourceFieldId,
     ResourceIdRequest as ResourceIdRequest,

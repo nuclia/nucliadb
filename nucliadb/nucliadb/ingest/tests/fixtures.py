@@ -107,7 +107,9 @@ async def ingest_consumers(
 async def ingest_processed_consumer(
     redis_config, transaction_utility, gcs_storage, fake_node, nats_manager
 ):
-    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
+    ingest_consumer_finalizer = (
+        await consumer_service.start_ingest_processed_consumer_v2()
+    )
 
     yield
 
@@ -115,7 +117,7 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(redis_config, ingest_consumers, ingest_processed_consumer):
+async def grpc_servicer(redis_config, ingest_consumers, ingest_processed_consumer_v2):
     servicer = WriterServicer()
     await servicer.initialize()
 

@@ -20,13 +20,14 @@
 import asyncio
 import logging
 import time
+import warnings
 from typing import Optional
 
 import backoff
 import nats
 import nats.js.api
 from nats.aio.client import Msg
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, ProcessedIngestMessage
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
@@ -39,6 +40,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.storages.exceptions import ProcessedMessageNotFound
 from nucliadb_utils.storages.storage import Storage
 
 consumer_observer = metrics.Observer(
@@ -82,6 +84,7 @@ class IngestConsumer:
         self.initialized = False
 
         self.lock = asyncio.Lock()
+        self.storage = storage
         self.processor = Processor(driver, storage, cache, partition)
 
     async def initialize(self):
@@ -120,6 +123,11 @@ class IngestConsumer:
     async def _process(self, pb: BrokerMessage, seqid: int):
         await self.processor.process(pb, seqid, self.partition)
 
+    async def parse_broker_message(self, msg: Msg) -> BrokerMessage:
+        pb = BrokerMessage()
+        pb.ParseFromString(msg.data)
+        return pb
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -132,8 +140,7 @@ class IngestConsumer:
 
         async with self.lock:
             try:
-                pb = BrokerMessage()
-                pb.ParseFromString(msg.data)
+                pb = await self.parse_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
                     message_source = "processing"
                 elif pb.source == pb.MessageSource.WRITER:
@@ -192,7 +199,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
-            except (ShardsNotFound,) as e:
+            except (ShardsNotFound, ProcessedMessageNotFound) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
                 # - ShardsNotFound: /kb/{id}/shards key or the whole /kb/{kbid} is missing
@@ -221,6 +228,7 @@ class IngestConsumer:
 class IngestProcessedConsumer(IngestConsumer):
     """
     Consumer designed to write processed resources to the database.
+    Processed resources are retrieved from nats jetstream.
 
     This is so that we can have a single consumer for both the regular writer and writes
     coming from processor.
@@ -230,11 +238,11 @@ class IngestProcessedConsumer(IngestConsumer):
     """
 
     async def setup_nats_subscription(self):
-        subject = const.Streams.INGEST_PROCESSED.subject
+        stream = const.Streams.OLD_INGEST_PROCESSED
         await self.nats_connection_manager.subscribe(
-            subject=subject,
-            queue=const.Streams.INGEST_PROCESSED.group,
-            stream=const.Streams.INGEST_PROCESSED.name,
+            subject=stream.subject,
+            queue=stream.group,
+            stream=stream.name,
             flow_control=True,
             cb=self.subscription_worker,
             subscription_lost_cb=self.setup_nats_subscription,
@@ -246,9 +254,69 @@ class IngestProcessedConsumer(IngestConsumer):
                 idle_heartbeat=5.0,
             ),
         )
-        logger.info(
-            f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
+        logger.info(f"Subscribed to {stream.subject} on stream {stream.name}")
+
+    async def parse_broker_message(self, msg: Msg) -> BrokerMessage:
+        bm = BrokerMessage()
+        bm.ParseFromString(msg.data)
+        return bm
+
+    @backoff.on_exception(backoff.expo, (ConflictError,), max_tries=4)
+    async def _process(self, pb: BrokerMessage, seqid: int):
+        """
+        We are setting `transaction_check` to False here because we can not mix
+        transaction ids from regular ingest writes and writes coming from processor.
+        """
+        warnings.warn(
+            "This class is deprecated. You should be using IngestProcessedConsumerV2 instead.",
+            DeprecationWarning,
         )
+        await self.processor.process(pb, seqid, self.partition, transaction_check=False)
+
+
+class IngestProcessedConsumerV2(IngestConsumer):
+    """
+    Consumer designed to write processed resources to the database.
+    Processed resources are retrieved from storage. This is an optimized version of IngestProcessedConsumer,
+    since broker messages coming from processing pipeline can be huge.
+
+    This is so that we can have a single consumer for both the regular writer and writes
+    coming from processor.
+
+    This is important because writes coming from processor can be very large and slow and
+    other writes are going to be coming from user actions and we don't want to slow them down.
+    """
+
+    async def setup_nats_subscription(self):
+        stream = const.Streams.INGEST_PROCESSED
+        await self.nats_connection_manager.subscribe(
+            subject=stream.subject,
+            queue=stream.group,
+            stream=stream.name,
+            flow_control=True,
+            cb=self.subscription_worker,
+            subscription_lost_cb=self.setup_nats_subscription,
+            config=nats.js.api.ConsumerConfig(
+                ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                max_ack_pending=10,
+                max_deliver=10000,
+                ack_wait=self.ack_wait,
+                idle_heartbeat=5.0,
+            ),
+        )
+        logger.info(f"Subscribed to {stream.subject} on stream {stream.name}")
+
+    async def parse_broker_message(self, msg: Msg) -> BrokerMessage:
+        # Since messages coming from processsing can be huge, from now on
+        # they are stored in GCS (storage) and we only send a reference to them
+        # via the jetstream message.
+        pim = ProcessedIngestMessage()
+        pim.ParseFromString(msg.data)
+
+        bm = await self.storage.get_processed_message(
+            kbid=pim.kbid, uuid=pim.uuid, processing_id=pim.processing_id
+        )
+        return bm
 
     @backoff.on_exception(backoff.expo, (ConflictError,), max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):

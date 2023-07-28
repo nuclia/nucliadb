@@ -535,6 +535,27 @@ class BrokerMessage(google.protobuf.message.Message):
 global___BrokerMessage = BrokerMessage
 
 @typing_extensions.final
+class ProcessedIngestMessage(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    UUID_FIELD_NUMBER: builtins.int
+    PROCESSING_ID_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    uuid: builtins.str
+    processing_id: builtins.str
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+        uuid: builtins.str = ...,
+        processing_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "processing_id", b"processing_id", "uuid", b"uuid"]) -> None: ...
+
+global___ProcessedIngestMessage = ProcessedIngestMessage
+
+@typing_extensions.final
 class WriterStatusResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

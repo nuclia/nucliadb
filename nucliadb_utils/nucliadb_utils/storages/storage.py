@@ -41,7 +41,11 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
-from nucliadb_utils.storages.exceptions import IndexDataNotFound, InvalidCloudFile
+from nucliadb_utils.storages.exceptions import (
+    IndexDataNotFound,
+    InvalidCloudFile,
+    ProcessedMessageNotFound,
+)
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
@@ -53,6 +57,8 @@ STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
 DEADLETTER = "deadletter/{partition}/{seqid}/{seq}"
 OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
+
+PROCESSED_KEY = "processed/{kb}/{resource}/{processing_id}"
 
 
 class StorageField:
@@ -137,6 +143,7 @@ class Storage:
     field_klass: Type
     deadletter_bucket: Optional[str] = None
     indexing_bucket: Optional[str] = None
+    ingest_bucket: Optional[str] = None
     cached_buckets: List[str] = []
     chunk_size = CHUNK_SIZE
 
@@ -249,6 +256,31 @@ class Storage:
         pb.ParseFromString(bytes_buffer.read())
         bytes_buffer.flush()
         return pb
+
+    async def store_processed_message(
+        self, pb: BrokerMessage, processing_id: str
+    ) -> None:
+        assert self.ingest_bucket is not None, "No ingest bucket defined"
+        key = self.get_processed_storage_key(pb.kbid, pb.uuid, processing_id)
+        await self.uploadbytes(self.ingest_bucket, key, pb.SerializeToString())
+
+    async def get_processed_message(
+        self, kbid: str, uuid: str, processing_id: str
+    ) -> BrokerMessage:
+        assert self.ingest_bucket is not None, "No ingest bucket defined"
+        key = self.get_processed_storage_key(kbid, uuid, processing_id)
+        bytes_buffer = await self.downloadbytes(self.ingest_bucket, key)
+        if bytes_buffer.getbuffer().nbytes == 0:
+            raise ProcessedMessageNotFound(f'Indexing data not found for key "{key}"')
+        pb = BrokerMessage()
+        pb.ParseFromString(bytes_buffer.read())
+        bytes_buffer.flush()
+        return pb
+
+    def get_processed_storage_key(
+        self, kbid: str, uuid: str, processing_id: str
+    ) -> str:
+        return PROCESSED_KEY.format(kb=kbid, resource=uuid, processing_id=processing_id)
 
     async def delete_indexing(
         self,

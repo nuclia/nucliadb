@@ -62,6 +62,7 @@ setup(
             "nucliadb-ingest = nucliadb.ingest.app:run_consumer",
             #   - Only runs processed resources write consumer
             "nucliadb-ingest-processed-consumer = nucliadb.ingest.app:run_processed_consumer",
+            "nucliadb-ingest-processed-consumer-v2 = nucliadb.ingest.app:run_processed_consumer_v2",
             #   - Only runs GRPC Service
             "nucliadb-ingest-orm-grpc = nucliadb.ingest.app:run_orm_grpc",
             #   - Subscriber workers: auditing and shard creator

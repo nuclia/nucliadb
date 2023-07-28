@@ -145,6 +145,18 @@ async def main_ingest_processed_consumer():  # pragma: no cover
     )
 
 
+async def main_ingest_processed_consumer_v2():  # pragma: no cover
+    finalizers = await initialize()
+
+    metrics_server = await serve_metrics()
+    grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
+    consumer = await consumer_service.start_ingest_processed_consumer_v2(SERVICE_NAME)
+
+    await run_until_exit(
+        [grpc_health_finalizer, consumer, metrics_server.shutdown] + finalizers
+    )
+
+
 async def main_subscriber_workers():  # pragma: no cover
     finalizers = await initialize()
 
@@ -201,6 +213,15 @@ def run_processed_consumer() -> None:  # pragma: no cover
     """
     setup_configuration()
     asyncio.run(main_ingest_processed_consumer())
+
+
+def run_processed_consumer_v2() -> None:  # pragma: no cover
+    """
+    Runs:
+        - Consumer for processed messages from pull processor(CPU heavy)
+    """
+    setup_configuration()
+    asyncio.run(main_ingest_processed_consumer_v2())
 
 
 def run_subscriber_workers() -> None:  # pragma: no cover

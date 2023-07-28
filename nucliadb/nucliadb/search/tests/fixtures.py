@@ -56,6 +56,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     storage_settings.gcs_bucket = "test_{kbid}"
 
     extended_storage_settings.gcs_indexing_bucket = "indexing"
+    extended_storage_settings.gcs_ingest_bucket = "ingest"
     extended_storage_settings.gcs_deadletter_bucket = "deadletter"
 
     url = f"redis://{redis[0]}:{redis[1]}"

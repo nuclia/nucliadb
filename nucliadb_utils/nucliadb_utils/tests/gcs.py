@@ -55,7 +55,7 @@ class GCS(BaseImage):
                 f"http://{self.host}:{self.get_port()}/storage/v1/b"
             )
             return response.status_code == 200
-        except:  # pragma: no cover
+        except Exception:  # pragma: no cover
             return False
 
 
@@ -78,6 +78,7 @@ async def gcs_storage(gcs):
         executor=ThreadPoolExecutor(1),
         deadletter_bucket="deadletters",
         indexing_bucket="indexing",
+        ingest_bucket="ingest",
         labels={},
         url=gcs,
     )

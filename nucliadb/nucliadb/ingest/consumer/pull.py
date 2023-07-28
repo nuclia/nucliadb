@@ -19,12 +19,13 @@
 #
 import asyncio
 import base64
+import time
 from typing import List, Optional
 
 import nats
 from aiohttp.client_exceptions import ClientConnectorError
 from nats.aio.subscription import Subscription
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, ProcessedIngestMessage
 
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.common.maindb.driver import Driver
@@ -36,7 +37,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_transaction_utility
+from nucliadb_utils.utilities import get_transaction_utility, has_feature
 
 
 class PullWorker:
@@ -64,7 +65,7 @@ class PullWorker:
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.local_subscriber = local_subscriber
         self.cache = cache
-
+        self.storage = storage
         self.processor = Processor(driver, storage, cache, partition)
 
     def __str__(self) -> str:
@@ -82,15 +83,7 @@ class PullWorker:
         )
 
         if not self.local_subscriber:
-            transaction_utility = get_transaction_utility()
-            if transaction_utility is None:
-                raise Exception("No transaction utility defined")
-            await transaction_utility.commit(
-                writer=pb,
-                partition=int(self.partition),
-                # send to separate processor
-                target_subject=const.Streams.INGEST_PROCESSED.subject,
-            )
+            await self.send_to_processed_consumer(pb)
         else:
             # No nats defined == monolitic nucliadb
             await self.processor.process(
@@ -98,6 +91,37 @@ class PullWorker:
                 0,  # Fake sequence id as in local mode there's no transactions
                 partition=self.partition,
                 transaction_check=False,
+            )
+
+    async def send_to_processed_consumer(self, pb: BrokerMessage):
+        transaction_utility = get_transaction_utility()
+        if transaction_utility is None:
+            raise Exception("No transaction utility defined")
+
+        partition = int(self.partition)
+
+        if has_feature(const.Features.INGEST_PROCESSED_V2):
+            processing_id = str(int(time.time()))
+            # Store the broker message
+            await self.storage.store_processed_message(pb, processing_id)
+
+            # Send a message to the processed consumer stream so that it is processed
+            pim = ProcessedIngestMessage(
+                kbid=pb.kbid, uuid=pb.uuid, processing_id=processing_id
+            )
+            await transaction_utility.push(
+                message=pim,
+                kbid=pim.kbid,
+                uuid=pim.uuid,
+                partition=partition,
+                target_subject=const.Streams.INGEST_PROCESSED.subject,
+            )
+        else:
+            await transaction_utility.commit(
+                writer=pb,
+                partition=partition,
+                # send to separate processor
+                target_subject=const.Streams.OLD_INGEST_PROCESSED.subject,
             )
 
     async def loop(self):
