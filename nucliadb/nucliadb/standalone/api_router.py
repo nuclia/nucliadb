@@ -61,3 +61,10 @@ async def api_config_check(request: Request):
             },
         },
     )
+
+
+@standalone_api_router.get("/temp-access-token")
+@version(1)
+@requires([NucliaDBRoles.READER, NucliaDBRoles.WRITER, NucliaDBRoles.MANAGER])
+async def get_temp_access_token(request: Request):
+    ...
