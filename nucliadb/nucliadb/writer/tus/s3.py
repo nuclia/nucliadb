@@ -105,9 +105,11 @@ class S3FileStorageManager(FileStorageManager):
         )
 
     async def finish(self, dm: FileDataMangaer):
+        path = dm.get("path")
         if dm.get("mpu") is not None:
             await self._complete_multipart_upload(dm)
         await dm.finish()
+        return path
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _complete_multipart_upload(self, dm: FileDataMangaer):
@@ -217,7 +219,7 @@ class S3BlobStore(BlobStore):
         bucket,
     ):
         self.bucket = bucket
-        self.source = CloudFile.Source.GCS
+        self.source = CloudFile.Source.S3
 
         self._exit_stack = AsyncExitStack()
 
