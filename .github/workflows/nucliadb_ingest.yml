@@ -11,6 +11,7 @@ on:
 env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: ingest
+  TESTING_TIKV_LOCAL: "true"
 
 jobs:
   # Job to run pre-checks
@@ -56,6 +57,12 @@ jobs:
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
+
+      - name: Install tikv
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+          source /home/runner/.profile
+          tiup playground --mode tikv-slim --without-monitor &
 
       - name: Run tests
         run: |
