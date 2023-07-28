@@ -449,8 +449,8 @@ impl DataPoint {
         }
 
         // Telling the OS our expected access pattern
-        nodes.advise(memmap2::Advice::Random)?;
-        index.advise(memmap2::Advice::Random)?;
+        nodes.advise(memmap2::Advice::WillNeed)?;
+        index.advise(memmap2::Advice::Sequential)?;
 
         Ok(DataPoint {
             journal,
@@ -482,8 +482,8 @@ impl DataPoint {
         let journal: Journal = serde_json::from_reader(journal)?;
 
         // Telling the OS our expected access pattern
-        nodes.advise(memmap2::Advice::Random)?;
-        index.advise(memmap2::Advice::Random)?;
+        nodes.advise(memmap2::Advice::WillNeed)?;
+        index.advise(memmap2::Advice::Sequential)?;
 
         Ok(DataPoint {
             journal,
@@ -558,8 +558,8 @@ impl DataPoint {
         }
 
         // Telling the OS our expected access pattern
-        nodes.advise(memmap2::Advice::Random)?;
-        index.advise(memmap2::Advice::Random)?;
+        nodes.advise(memmap2::Advice::WillNeed)?;
+        index.advise(memmap2::Advice::Sequential)?;
 
         Ok(DataPoint {
             journal,
