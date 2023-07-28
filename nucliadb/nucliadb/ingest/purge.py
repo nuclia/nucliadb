@@ -35,6 +35,7 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
+from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 
 
 async def purge_kb(driver: Driver):
@@ -133,6 +134,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
 async def main():
     # Clean up all kb marked to delete
+    await setup_cluster()
     driver = await setup_driver()
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
@@ -144,6 +146,7 @@ async def main():
     finally:
         await storage.finalize()
         await teardown_driver()
+        await teardown_cluster()
 
 
 def run() -> int:  # pragma: no cover
