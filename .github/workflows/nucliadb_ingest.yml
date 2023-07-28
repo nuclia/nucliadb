@@ -57,12 +57,6 @@ jobs:
       - name: Install the package
         run: make -C nucliadb/ install-dev
 
-      - name: Install tikv
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
-          source /home/runner/.profile
-          tiup playground --mode tikv-slim --without-monitor &
-
       - name: Run tests
         run: |
           make -C nucliadb/ test-cov-ingest
