@@ -107,4 +107,9 @@ def application_factory(settings: Settings) -> FastAPI:
         name="widget",
     )
 
+    application.settings = settings
+    for route in application.router.routes:
+        if isinstance(route, Mount):
+            route.app.settings = settings
+
     return application
