@@ -8,7 +8,7 @@ import "google/protobuf/struct.proto";
 
 message CloudFile {
     string uri = 1;
-    int32 size = 2;
+    uint64 size = 2;
     string content_type = 3;
     string bucket_name = 4;
     enum Source {
