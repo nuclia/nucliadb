@@ -42,6 +42,17 @@ class Streams:
         subject = "ndb.consumer.processed"
         group = "nucliadb-processed"
 
+    class INGEST_PROCESSED_V2:
+        """
+        Pointer messages to resources that have been processed by learning need to be
+        written to the database and then Indexed. The resources are actually stored in
+        the storage layer.
+        """
+
+        name = "nucliadb"
+        subject = "ndb.consumer.processed-v2"
+        group = "nucliadb-processed-v2"
+
     class INDEX:
         """
         Indexing resources on the IndexNode
@@ -56,3 +67,4 @@ class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
     DEFAULT_MIN_SCORE = "nucliadb_default_min_score"
     ROLLOVER_SHARDS = "nuclaidb_rollover_shards"
+    INGEST_PROCESSED_V2 = "nucliadb_ingest_processed_v2"

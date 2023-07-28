@@ -36,7 +36,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_transaction_utility
+from nucliadb_utils.utilities import get_transaction_utility, has_feature
 
 
 class PullWorker:
@@ -82,15 +82,7 @@ class PullWorker:
         )
 
         if not self.local_subscriber:
-            transaction_utility = get_transaction_utility()
-            if transaction_utility is None:
-                raise Exception("No transaction utility defined")
-            await transaction_utility.commit(
-                writer=pb,
-                partition=int(self.partition),
-                # send to separate processor
-                target_subject=const.Streams.INGEST_PROCESSED.subject,
-            )
+            await self.commit_transaction(pb)
         else:
             # No nats defined == monolitic nucliadb
             await self.processor.process(
@@ -98,6 +90,32 @@ class PullWorker:
                 0,  # Fake sequence id as in local mode there's no transactions
                 partition=self.partition,
                 transaction_check=False,
+            )
+
+    async def commit_transaction(self, pb: BrokerMessage):
+        transaction_utility = get_transaction_utility()
+        if transaction_utility is None:
+            raise Exception("No transaction utility defined")
+
+        partition = int(self.partition)
+        if has_feature(const.Features.INGEST_PROCESSED_V2):
+            # TODO create transaction ingest message
+            message = IngestMessage()
+            kbid = pb.kbid
+            uuid = pb.uuid
+            await transaction_utility.push(
+                message,
+                kbid,
+                uuid,
+                partition,
+                target_subject=const.Streams.INGEST_PROCESSED_V2.subject,
+            )
+        else:
+            await transaction_utility.commit(
+                writer=pb,
+                partition=partition,
+                # send to separate processor
+                target_subject=const.Streams.INGEST_PROCESSED.subject,
             )
 
     async def loop(self):
