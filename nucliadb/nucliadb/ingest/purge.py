@@ -22,6 +22,7 @@ import asyncio
 import pkg_resources
 
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
+from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -133,6 +134,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
 async def main():
     # Clean up all kb marked to delete
+    await setup_cluster()
     driver = await setup_driver()
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
@@ -144,6 +146,7 @@ async def main():
     finally:
         await storage.finalize()
         await teardown_driver()
+        await teardown_cluster()
 
 
 def run() -> int:  # pragma: no cover
