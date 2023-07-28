@@ -25,7 +25,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from fastapi_versioning import version
-from jwcrypto import jwe, jwk
+from jwcrypto import jwe, jwk  # type: ignore
 
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_models.resource import NucliaDBRoles

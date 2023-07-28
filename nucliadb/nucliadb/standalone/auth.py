@@ -22,7 +22,7 @@ import time
 from typing import Optional, Tuple
 
 import orjson
-from jwcrypto import jwe, jwk
+from jwcrypto import jwe, jwk  # type: ignore
 from starlette.authentication import AuthCredentials, AuthenticationBackend, BaseUser
 from starlette.requests import HTTPConnection
 
@@ -67,14 +67,14 @@ class AuthTokenAuthenticationBackend(AuthenticationBackend):
             payload = jwetoken.payload
         except jwe.InvalidJWEOperation:
             logger.info(f"Invalid operation", exc_info=True)
-            return
+            return None
         except jwe.InvalidJWEData:
             logger.info(f"Error decrypting JWT token", exc_info=True)
-            return
+            return None
         json_payload = orjson.loads(payload)
         if json_payload["exp"] <= int(time.time()):
-            logger.debug(f"Expired token {jwt_token}", exc_info=True)
-            return
+            logger.debug(f"Expired token", exc_info=True)
+            return None
 
         username = json_payload["username"]
         auth_creds = AuthCredentials(json_payload["scopes"])
