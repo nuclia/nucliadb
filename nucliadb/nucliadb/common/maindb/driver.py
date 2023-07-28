@@ -94,10 +94,8 @@ class Driver:
             error = True
             raise
         finally:
-            if txn is None or not txn.open:
-                # no need to abort
-                return
-            if wait_for_abort or error:
-                await txn.abort()
-            else:
-                asyncio.create_task(txn.abort())
+            if txn is not None and txn.open:
+                if error or wait_for_abort:
+                    await txn.abort()
+                else:
+                    asyncio.create_task(txn.abort())
