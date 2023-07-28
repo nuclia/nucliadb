@@ -448,7 +448,9 @@ impl DataPoint {
             journalf_buffer.flush()?;
         }
 
-        // Mark it as a Datapoint in progress, since it needs to be commited.
+        // Telling the OS our expected access pattern
+        nodes.advise(memmap2::Advice::Random)?;
+        index.advise(memmap2::Advice::Random)?;
 
         Ok(DataPoint {
             journal,
@@ -478,6 +480,11 @@ impl DataPoint {
         let nodes = unsafe { Mmap::map(&nodes)? };
         let index = unsafe { Mmap::map(&hnswf)? };
         let journal: Journal = serde_json::from_reader(journal)?;
+
+        // Telling the OS our expected access pattern
+        nodes.advise(memmap2::Advice::Random)?;
+        index.advise(memmap2::Advice::Random)?;
+
         Ok(DataPoint {
             journal,
             nodes,
@@ -549,6 +556,10 @@ impl DataPoint {
             journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
             journalf_buffer.flush()?;
         }
+
+        // Telling the OS our expected access pattern
+        nodes.advise(memmap2::Advice::Random)?;
+        index.advise(memmap2::Advice::Random)?;
 
         Ok(DataPoint {
             journal,
