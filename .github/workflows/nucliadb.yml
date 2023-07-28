@@ -3,6 +3,7 @@ env:
   API_VERSION: 1
   COMPONENT: nucliadb
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  TESTING_TIKV_LOCAL: "true"
 permissions:
   contents: write
 on:
@@ -61,9 +62,9 @@ jobs:
       
       - name: Install tikv
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
           source /home/runner/.profile
-          tiup playground --mode tikv-slim --without-monitor &
+          tiup playground 5.3.1 --mode tikv-slim --without-monitor &
 
       - uses: dorny/paths-filter@v2
         id: filter
