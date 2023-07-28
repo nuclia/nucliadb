@@ -43,6 +43,16 @@ def driver() -> Driver:  # type: ignore
 
 
 @pytest.mark.asyncio
+async def test_transaction_handles_txn_begin_errors(driver):
+    driver.begin.side_effect = ValueError()
+    testmock = mock.AsyncMock()
+    with pytest.raises(ValueError):
+        async with driver.transaction():
+            testmock()
+    testmock.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_transaction_does_not_abotr_if_commited(driver):
     async with driver.transaction() as txn:
         await txn.commit()
