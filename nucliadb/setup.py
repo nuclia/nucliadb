@@ -75,7 +75,6 @@ setup(
             # Train
             "nucliadb-train = nucliadb.train.run:run",
             # utilities
-            "nucliadb-purge = nucliadb.purge:purge",
             "nucliadb-ingest-purge = nucliadb.ingest.purge:run",
             "nucliadb-migrate = nucliadb.migrator.command:main",
             "nucliadb-migration-runner = nucliadb.migrator.command:main_forever",

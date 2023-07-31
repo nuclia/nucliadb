@@ -66,9 +66,15 @@ class S3StorageField(StorageField):
             for key, value in kwargs["headers"].items():
                 kwargs[key] = value
             del kwargs["headers"]
-        return await self.storage._s3aioclient.get_object(
-            Bucket=bucket, Key=uri, **kwargs
-        )
+        try:
+            return await self.storage._s3aioclient.get_object(
+                Bucket=bucket, Key=uri, **kwargs
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"].get("Code") == "NoSuchKey":
+                raise KeyError(f"S3 cloud file not found : {uri}")
+            else:
+                raise
 
     async def iter_data(self, **kwargs):
         # Suports field and key based iter
@@ -120,7 +126,7 @@ class S3StorageField(StorageField):
                 content_type=cf.content_type,
                 bucket_name=self.bucket,
                 md5=cf.md5,
-                source=CloudFile.GCS,
+                source=CloudFile.S3,
                 old_uri=self.field.uri,
                 old_bucket=self.field.bucket_name,
             )
@@ -132,7 +138,7 @@ class S3StorageField(StorageField):
                 md5=cf.md5,
                 content_type=cf.content_type,
                 bucket_name=self.bucket,
-                source=CloudFile.GCS,
+                source=CloudFile.S3,
             )
             upload_uri = self.key
 
@@ -158,11 +164,21 @@ class S3StorageField(StorageField):
         size = 0
         if self.field is None:
             raise AttributeError("No field configured")
+
+        upload_chunk = b""  # s3 strict about chunk size
         async for chunk in iterable:
             size += len(chunk)
-            part = await self._upload_part(cf, chunk)
+            upload_chunk += chunk
+            if len(upload_chunk) >= CHUNK_SIZE:
+                part = await self._upload_part(cf, upload_chunk)
+                self.field.parts.append(part["ETag"])
+                self.field.offset += 1
+                upload_chunk = b""
+        if len(upload_chunk) > 0:
+            part = await self._upload_part(cf, upload_chunk)
             self.field.parts.append(part["ETag"])
             self.field.offset += 1
+
         return size
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
@@ -187,7 +203,7 @@ class S3StorageField(StorageField):
                     uri=self.field.old_uri, bucket=self.field.old_bucket
                 )
                 self.field.ClearField("old_uri")
-                self.field.CkearField("old_bucket")
+                self.field.ClearField("old_bucket")
             except botocore.exceptions.ClientError:
                 logger.error(
                     f"Referenced key {self.field.uri} could not be found", exc_info=True
@@ -304,6 +320,13 @@ class S3Storage(Storage):
         self.indexing_bucket = indexing_bucket
         self._aws_access_key = aws_client_id
         self._aws_secret_key = aws_client_secret
+        self._region_name = region_name
+        self._bucket_creation_options = {}
+
+        if region_name is not None:
+            self._bucket_creation_options = {
+                "CreateBucketConfiguration": {"LocationConstraint": self._region_name}
+            }
 
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
@@ -369,9 +392,13 @@ class S3Storage(Storage):
             error_code = int(e.response["Error"]["Code"])
             if error_code == 404:
                 missing = True
+            else:
+                raise
 
         if missing:
-            await self._s3aioclient.create_bucket(Bucket=bucket_name)
+            await self._s3aioclient.create_bucket(
+                Bucket=bucket_name, **self._bucket_creation_options
+            )
             created = True
         return created
 
