@@ -136,9 +136,6 @@ spec:
         - name: grpc-writer
           containerPort: {{ .Values.serving.grpc_writer }}
           protocol: TCP
-        - name: chitchat 
-          containerPort: {{ .Values.serving.chitchat_port }}
-          protocol: UDP
         - name: metrics
           containerPort: 3032
         resources:

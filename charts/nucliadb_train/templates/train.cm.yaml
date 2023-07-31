@@ -16,13 +16,3 @@ data:
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
 
-  CHITCHAT_BINDING_PORT: {{ .Values.chitchat.cluster_manager.port | quote }}
-  CHITCHAT_BINDING_HOST: {{ .Values.chitchat.cluster_manager.host }}
-
-  MONITOR_ADDR: "{{ .Values.chitchat.cluster_manager.host }}:{{ .Values.chitchat.cluster_manager.port }}"
-
-  LISTEN_PORT: {{ .Values.chitchat.node.chitchat_port | quote }}
-  NODE_TYPE: {{ .Values.chitchat.node.node_type }}
-  SEEDS: "{{ .Values.chitchat.node.node0_svc_fixed_ip }}:{{ .Values.chitchat.node.chitchat_port }}"
-  UPDATE_INTERVAL: {{ .Values.chitchat.cluster_manager.update_interval }}
-  LIVELINESS_UPDATE: {{ .Values.chitchat.cluster_manager.liveliness_update }}

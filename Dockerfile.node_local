@@ -38,7 +38,6 @@ COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
     /nucliadb/
-COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
@@ -73,7 +72,6 @@ COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
     /nucliadb/
-COPY nucliadb_cluster /nucliadb/nucliadb_cluster
 COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
@@ -99,8 +97,6 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
 
 FROM debian:bullseye-slim AS nucliadb
 
-ENV VECTORS_DIMENSION=768
-ENV VECTORS_DISTANCE=cosine
 ENV DATA_PATH=data
 ENV RUST_LOG=nucliadb_node=DEBUG
 ENV RUST_BACKTRACE=1

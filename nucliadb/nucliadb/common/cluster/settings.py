@@ -24,7 +24,6 @@ from pydantic import BaseSettings, Field
 
 
 class ClusterDiscoveryMode(str, enum.Enum):
-    CHITCHAT = "chitchat"
     MANUAL = "manual"
     KUBERNETES = "kubernetes"
 
@@ -34,9 +33,6 @@ class Settings(BaseSettings):
     standalone_mode: bool = False
 
     node_replicas: int = 2
-
-    chitchat_binding_host: str = "0.0.0.0"
-    chitchat_binding_port: int = 31337
 
     logging_config: Optional[str] = None
 
@@ -64,7 +60,7 @@ class Settings(BaseSettings):
     local_reader_threads: int = 5
     local_writer_threads: int = 5
 
-    cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.CHITCHAT
+    cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.KUBERNETES
     cluster_discovery_kubernetes_namespace: str = "nucliadb"
     cluster_discovery_manual_addresses: list[str] = []
 

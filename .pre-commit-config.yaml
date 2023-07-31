@@ -1,40 +1,39 @@
 repos:
-- repo: local
-  hooks:
+  - repo: local
+    hooks:
+      - id: isort_nucliadb
+        name: Isort
+        entry: isort --profile black -c
+        language: system
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+        types: ["python"]
 
-  - id: isort_nucliadb
-    name: Isort
-    entry: isort --profile black -c
-    language: system
-    files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
-    types: ["python"]
+      - id: black_nucliadb
+        name: Black
+        entry: black --check --verbose
+        language: system
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+        types: ["python"]
 
-  - id: black_nucliadb
-    name: Black
-    entry: black --check --verbose
-    language: system
-    files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
-    types: ["python"]
+      - id: flake8_nucliadb
+        name: Flake8
+        entry: flake8 --config=nucliadb/setup.cfg
+        language: system
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+        types: ["python"]
 
-  - id: flake8_nucliadb
-    name: Flake8
-    entry: flake8 --config=nucliadb/setup.cfg
-    language: system
-    files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
-    types: ["python"]
+      - id: rustfmt_nucliadb
+        name: fmt
+        entry: cargo +nightly fmt --check
+        language: system
+        files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
+        types: ["rust"]
+        pass_filenames: false
 
-  - id: rustfmt_nucliadb
-    name: fmt
-    entry: cargo +nightly fmt --check
-    language: system
-    files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_cluster/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
-    types: ["rust"]
-    pass_filenames: false
-
-  - id: clippy_nucliadb
-    name: clippy
-    entry: cargo clippy --all-features -- -D warnings
-    language: system
-    files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_cluster/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
-    types: ["rust"]
-    pass_filenames: false
+      - id: clippy_nucliadb
+        name: clippy
+        entry: cargo clippy --all-features -- -D warnings
+        language: system
+        files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
+        types: ["rust"]
+        pass_filenames: false

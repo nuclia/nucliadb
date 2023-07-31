@@ -105,7 +105,7 @@ async def homepage(request: Request) -> HTMLResponse:
     return HTMLResponse("NucliaDB Search Service")
 
 
-async def chitchat_members(request: Request) -> JSONResponse:
+async def node_members(request: Request) -> JSONResponse:
     return JSONResponse(
         [
             {
@@ -136,6 +136,6 @@ async def ready(request: Request) -> JSONResponse:
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/chitchat/members", chitchat_members)
+application.add_route("/node/members", node_members)
 application.add_route("/health/alive", alive)
 application.add_route("/health/ready", ready)

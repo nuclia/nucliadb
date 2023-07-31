@@ -96,28 +96,6 @@ pub mod env {
                 builder.writer_listen_address(addr);
             }
 
-            if let Ok(Ok(port)) = std::env::var("CHITCHAT_PORT").map(|v| v.parse::<u16>()) {
-                builder.chitchat_port(port);
-            }
-
-            if let Ok(seed_nodes) = std::env::var("SEED_NODES")
-                .map(|v| v.split(';').map(ToString::to_string).collect::<Vec<_>>())
-            {
-                builder.seed_nodes(seed_nodes);
-            }
-
-            if let Ok(Ok(interval)) =
-                std::env::var("LIVELINESS_UPDATE").map(|v| parse_duration::parse(&v))
-            {
-                builder.cluster_liveliness_update_interval(interval);
-            }
-
-            if let Ok(Ok(delay)) =
-                std::env::var("SHUTDOWN_DELAY").map(|v| parse_duration::parse(&v))
-            {
-                builder.shutdown_delay(delay);
-            }
-
             if let Ok(Ok(port)) = std::env::var("METRICS_PORT").map(|v| v.parse::<u16>()) {
                 builder.metrics_port(port);
             }

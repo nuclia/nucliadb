@@ -51,12 +51,9 @@ serviceMonitor:
   enabled: false
 
 serving:
-  chitchat_port: 4444
   grpc_reader: 10000
   grpc_writer: 10001
   grpc_sidecar: 10002
-  node0_svc_fixed_ip: 10.4.0.255
-  node_type: Io
   metricsPort: 3030
 
 storage:
@@ -65,7 +62,6 @@ storage:
 
 running:
   sentry_url:
-  shutdown_delay: "5s"
 
 tracing:
   enabled: false

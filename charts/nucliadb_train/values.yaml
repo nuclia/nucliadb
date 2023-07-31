@@ -64,17 +64,6 @@ tracing:
   jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
   jaegerCollectorGrpcPort: 14250
 
-chitchat:
-  cluster_manager:
-    port: 31337
-    host: "0.0.0.0"
-    update_interval: "5s"
-    liveliness_update: "500ms"
-  node:
-    node_type: Train
-    node0_svc_fixed_ip: 10.4.0.255
-    chitchat_port: 4444
-
 vs:
   gateway:
   host:

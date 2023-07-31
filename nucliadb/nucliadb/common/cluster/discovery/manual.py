@@ -27,6 +27,7 @@ from nucliadb.common.cluster.discovery.abc import (
     update_members,
 )
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
+from nucliadb.common.cluster.settings import settings
 from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
@@ -41,7 +42,12 @@ class ManualDiscovery(AbstractClusterDiscovery):
     async def discover(self) -> None:
         members = []
         for address in self.settings.cluster_discovery_manual_addresses:
-            grpc_address = f"{address}:{self.settings.node_writer_port}"
+            if address in settings.writer_port_map:
+                # test wiring
+                port = settings.writer_port_map[address]
+                grpc_address = f"localhost:{port}"
+            else:
+                grpc_address = f"{address}:{self.settings.node_writer_port}"
             channel = get_traced_grpc_channel(
                 grpc_address, "discovery", variant="_writer"
             )

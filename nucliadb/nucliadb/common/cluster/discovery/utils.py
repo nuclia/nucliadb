@@ -20,7 +20,6 @@
 from typing import Type, Union
 
 from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
-from nucliadb.common.cluster.discovery.chitchat import ChitchatAutoDiscovery
 from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
 from nucliadb.common.cluster.discovery.manual import ManualDiscovery
 from nucliadb.common.cluster.settings import ClusterDiscoveryMode, settings
@@ -37,12 +36,8 @@ async def setup_cluster_discovery() -> None:
         # already loaded
         return util
 
-    klass: Union[
-        Type[ChitchatAutoDiscovery], Type[ManualDiscovery], Type[KubernetesDiscovery]
-    ]
-    if settings.cluster_discovery_mode == ClusterDiscoveryMode.CHITCHAT:
-        klass = ChitchatAutoDiscovery
-    elif settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
+    klass: Union[Type[ManualDiscovery], Type[KubernetesDiscovery]]
+    if settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
         klass = ManualDiscovery
     elif settings.cluster_discovery_mode == ClusterDiscoveryMode.KUBERNETES:
         klass = KubernetesDiscovery

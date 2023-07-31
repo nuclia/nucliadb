@@ -34,7 +34,6 @@ pub mod providers;
 
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
-use std::time::Duration;
 
 use derive_builder::Builder;
 use nucliadb_core::tracing::{error, Level};
@@ -71,11 +70,11 @@ pub struct Settings {
     sentry_env: &'static str,
 
     // Logs and traces
-    #[builder(default = "parse_log_levels(\"nucliadb_node=WARN,nucliadb_cluster=WARN\")")]
+    #[builder(default = "parse_log_levels(\"nucliadb_node=WARN\")")]
     log_levels: Vec<(String, Level)>,
     #[rustfmt::skip]
     #[builder(
-        default = "parse_log_levels(\"nucliadb_node=INFO,nucliadb_cluster=INFO,nucliadb_core=INFO\")",
+        default = "parse_log_levels(\"nucliadb_node=INFO,nucliadb_core=INFO\")",
         setter(skip)
     )]
     span_levels: Vec<(String, Level)>,
@@ -92,17 +91,6 @@ pub struct Settings {
     reader_listen_address: SocketAddr,
     #[builder(default = "reliable_lookup_host(\"localhost:40101\")", setter(custom))]
     writer_listen_address: SocketAddr,
-
-    // Cluster
-    #[builder(default = "40100")]
-    chitchat_port: u16,
-    #[builder(default = "Vec::new()")]
-    seed_nodes: Vec<String>,
-    #[builder(default = "Duration::from_millis(500)")]
-    cluster_liveliness_update_interval: Duration,
-
-    #[builder(default = "Duration::from_secs(5)")]
-    shutdown_delay: Duration,
 
     #[builder(default = "3030")]
     metrics_port: u16,
@@ -187,26 +175,6 @@ impl Settings {
     /// Address where index node read will listen to
     pub fn writer_listen_address(&self) -> SocketAddr {
         self.writer_listen_address
-    }
-
-    pub fn chitchat_port(&self) -> u16 {
-        self.chitchat_port
-    }
-
-    /// List of known nodes to connect with in order to join the cluster
-    pub fn seed_nodes(&self) -> &[String] {
-        &self.seed_nodes
-    }
-
-    /// Liveliness update interval used by cluster node
-    pub fn cluster_liveliness_update_interval(&self) -> Duration {
-        self.cluster_liveliness_update_interval
-    }
-
-    /// Amount of time waited between a shutdown signal and a fully shutdown.
-    /// This gives time to close everything and finish ongoing work
-    pub fn shutdown_delay(&self) -> Duration {
-        self.shutdown_delay
     }
 
     pub fn metrics_port(&self) -> u16 {

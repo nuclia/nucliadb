@@ -48,18 +48,6 @@ services:
 running:
   sentry_url:
 
-chitchat:
-  cluster_manager:
-    port: 31337
-    host: "0.0.0.0"
-    update_interval: "5s"
-    liveliness_update: "500ms"
-  node:
-    node_type: Search
-    node0_svc_fixed_ip: 10.4.0.255
-    chitchat_port: 4444
-
-
 serviceMonitor:
   enabled: False
 

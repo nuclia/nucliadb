@@ -70,8 +70,6 @@ async fn main() -> NodeResult<()> {
 
     wait_for_sigkill().await?;
     info!("Shutting down NucliaDB Reader Node...");
-    // wait some time to handle latest gRPC calls
-    tokio::time::sleep(settings.shutdown_delay()).await;
     metrics_task.abort();
     let _ = metrics_task.await;
 
