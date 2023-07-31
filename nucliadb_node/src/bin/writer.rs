@@ -37,7 +37,7 @@ use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::{lifecycle, utils};
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedReceiver;
 use tonic::transport::Server;
 
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
@@ -69,7 +69,6 @@ async fn main() -> NodeResult<()> {
     lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
 
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
-    let (update_sender, _update_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
     let grpc_driver = NodeWriterGRPCDriver::new(Arc::clone(&settings)).with_sender(grpc_sender);
     grpc_driver.initialize().await?;
@@ -84,12 +83,7 @@ async fn main() -> NodeResult<()> {
         settings.writer_listen_address(),
     ));
     {
-        let task = update_node_metadata(
-            update_sender,
-            metadata_receiver,
-            node_metadata,
-            metadata_path,
-        );
+        let task = update_node_metadata(metadata_receiver, node_metadata, metadata_path);
         match metrics.task_monitor("UpdateNodeMetadata".to_string()) {
             Some(monitor) => {
                 let instrumented = monitor.instrument(task);
@@ -150,7 +144,6 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver, listen_addres
 }
 
 pub async fn update_node_metadata(
-    update_sender: UnboundedSender<NodeUpdate>,
     mut metadata_receiver: UnboundedReceiver<NodeWriterEvent>,
     mut node_metadata: NodeMetadata,
     path: PathBuf,
@@ -160,20 +153,10 @@ pub async fn update_node_metadata(
     while let Some(event) = metadata_receiver.recv().await {
         debug!("Receive metadata update event: {event:?}");
 
-        let result = match event {
-            NodeWriterEvent::ShardCreation => {
-                node_metadata.new_shard();
-                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
-            }
-            NodeWriterEvent::ShardDeletion => {
-                node_metadata.delete_shard();
-                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
-            }
+        match event {
+            NodeWriterEvent::ShardCreation => node_metadata.new_shard(),
+            NodeWriterEvent::ShardDeletion => node_metadata.delete_shard(),
         };
-
-        if let Err(e) = result {
-            warn!("Cannot send node update: {e:?}");
-        }
 
         if let Err(e) = node_metadata.save(&path) {
             error!("Node metadata update failed: {e}");
