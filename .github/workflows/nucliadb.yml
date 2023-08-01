@@ -172,10 +172,11 @@ jobs:
       - name: Get release version
         id: version_step
         run: |-
-          HASH=`git rev-parse --short HEAD`
-          python bump.py --build=$HASH
+          python bump.py --build=${{github.run_number}}
           VERSION=`cat VERSION`
+          HASH=`git rev-parse --short HEAD`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
 
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
@@ -190,6 +191,7 @@ jobs:
           tags: |
             nuclia/nucliadb:latest
             nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
+            nuclia/nucliadb:${{ steps.version_step.outputs.hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
 

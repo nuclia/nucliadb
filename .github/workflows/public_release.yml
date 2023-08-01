@@ -33,15 +33,13 @@ jobs:
         run: |-
           VERSION=`cat VERSION`
           HASH=`git rev-parse --short HEAD`
-          python bump.py --build=$HASH
-          IMAGE_VERSION=`cat VERSION`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
-          echo "image_version_number=$IMAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
 
       - name: Update image version
         uses: mikefarah/yq@master
         with:
-          cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.image_version_number }}"' 'charts/nucliadb/values.yaml'
+          cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.hash }}"' 'charts/nucliadb/values.yaml'
 
       - name: Set chart version
         uses: mikefarah/yq@master
