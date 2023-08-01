@@ -16,6 +16,9 @@ spec:
       name: "{{ .cronname }}"
       annotations:
         sidecar.istio.io/inject: "false"
+        {{- if hasKey .Values "extra_pod_annotations" }}
+{{ toYaml .Values.extra_pod_annotations | indent 8 }}
+        {{- end }}
       labels:
         app: {{ .Chart.Name }}
         role: cronjobs
