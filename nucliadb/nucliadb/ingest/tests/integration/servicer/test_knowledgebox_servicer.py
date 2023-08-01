@@ -75,7 +75,7 @@ async def test_create_knowledgebox(
 
     await tracer_provider.async_force_flush()
 
-    expected_spans = 6
+    expected_spans = 10
 
     client = AsyncClient()
     for _ in range(10):
