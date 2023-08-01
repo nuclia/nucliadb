@@ -13,7 +13,7 @@ opentelemetry-proto==1.11.1
 opentelemetry-exporter-jaeger==1.11.1
 opentelemetry-propagator-b3==1.11.1
 opentelemetry-instrumentation-fastapi==0.30b1
-opentelemetry-instrumentation-aiohttp-client>=0.30b1
+opentelemetry-instrumentation-aiohttp-client>=0.39b0
 opentelemetry-semantic-conventions>=0.30b1
 pydantic<2.0
 requests
