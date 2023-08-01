@@ -49,43 +49,42 @@ def get_mapped_roles(*, settings: Settings, data: dict[str, str]) -> list[str]:
     return list(set(output))
 
 
-class AuthTokenAuthenticationBackend(AuthenticationBackend):
+async def authenticate_auth_token(
+    settings: Settings, request: HTTPConnection
+) -> Optional[Tuple[AuthCredentials, BaseUser]]:
+    if "auth_token" not in request.query_params or settings.jwk_key is None:
+        return None
+
+    jwt_token = request.query_params["auth_token"].encode("utf-8")
+    try:
+        jwetoken = jwe.JWE()
+        jwetoken.deserialize(jwt_token.decode("utf-8"))
+        jwetoken.decrypt(jwk.JWK(**orjson.loads(settings.jwk_key)))
+        payload = jwetoken.payload
+    except jwe.InvalidJWEOperation:
+        logger.info(f"Invalid operation", exc_info=True)
+        return None
+    except jwe.InvalidJWEData:
+        logger.info(f"Error decrypting JWT token", exc_info=True)
+        return None
+    json_payload = orjson.loads(payload)
+    if json_payload["exp"] <= int(time.time()):
+        logger.debug(f"Expired token", exc_info=True)
+        return None
+
+    username = json_payload["username"]
+    auth_creds = AuthCredentials(json_payload["scopes"])
+    return auth_creds, NucliaUser(username=username)
+
+
+class AuthHeaderAuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
     async def authenticate(
         self, request: HTTPConnection
     ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
-        if "auth_token" not in request.query_params or self.settings.jwk_key is None:
-            return None
-
-        jwt_token = request.query_params["auth_token"].encode("utf-8")
-        try:
-            jwetoken = jwe.JWE()
-            jwetoken.deserialize(jwt_token.decode("utf-8"))
-            jwetoken.decrypt(jwk.JWK(**orjson.loads(self.settings.jwk_key)))
-            payload = jwetoken.payload
-        except jwe.InvalidJWEOperation:
-            logger.info(f"Invalid operation", exc_info=True)
-            return None
-        except jwe.InvalidJWEData:
-            logger.info(f"Error decrypting JWT token", exc_info=True)
-            return None
-        json_payload = orjson.loads(payload)
-        if json_payload["exp"] <= int(time.time()):
-            logger.debug(f"Expired token", exc_info=True)
-            return None
-
-        username = json_payload["username"]
-        auth_creds = AuthCredentials(json_payload["scopes"])
-        return auth_creds, NucliaUser(username=username)
-
-
-class AuthHeaderAuthenticationBackend(AuthTokenAuthenticationBackend):
-    async def authenticate(
-        self, request: HTTPConnection
-    ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
-        token_resp = await super().authenticate(request)
+        token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
 
@@ -105,16 +104,19 @@ class AuthHeaderAuthenticationBackend(AuthTokenAuthenticationBackend):
 _AUTHORIZATION_HEADER = "Authorization"
 
 
-class OAuth2AuthenticationBackend(AuthTokenAuthenticationBackend):
+class OAuth2AuthenticationBackend(NucliaCloudAuthenticationBackend):
     """
     Remember, this is still naive and expects upstream to validate
     the request before proxying here.
     """
 
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
     async def authenticate(
         self, request: HTTPConnection
     ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
-        token_resp = await super().authenticate(request)
+        token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
 
@@ -157,16 +159,19 @@ class OAuth2AuthenticationBackend(AuthTokenAuthenticationBackend):
         return auth_creds, nuclia_user
 
 
-class BasicAuthAuthenticationBackend(AuthTokenAuthenticationBackend):
+class BasicAuthAuthenticationBackend(NucliaCloudAuthenticationBackend):
     """
     Remember, this is still naive and expects upstream to validate
     the request before proxying here.
     """
 
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
     async def authenticate(
         self, request: HTTPConnection
     ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
-        token_resp = await super().authenticate(request)
+        token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
 
@@ -188,13 +193,10 @@ class BasicAuthAuthenticationBackend(AuthTokenAuthenticationBackend):
         return auth_creds, nuclia_user
 
 
-class UpstreamNaiveAuthenticationBackend(
-    AuthTokenAuthenticationBackend, NucliaCloudAuthenticationBackend
-):
+class UpstreamNaiveAuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
-        AuthTokenAuthenticationBackend.__init__(self, settings)
-        NucliaCloudAuthenticationBackend.__init__(
-            self,
+        self.settings = settings
+        super().__init__(
             roles_header=settings.auth_policy_roles_header,
             user_header=settings.auth_policy_user_header,
         )
@@ -202,11 +204,11 @@ class UpstreamNaiveAuthenticationBackend(
     async def authenticate(
         self, request: HTTPConnection
     ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
-        token_resp = await AuthTokenAuthenticationBackend.authenticate(self, request)
+        token_resp = await authenticate_auth_token(self.settings, request)
         if token_resp is not None:
             return token_resp
 
-        return await NucliaCloudAuthenticationBackend.authenticate(self, request)
+        return await super().authenticate(request)
 
 
 def get_auth_backend(settings: Settings) -> AuthenticationBackend:
