@@ -21,7 +21,6 @@ from typing import Optional
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.settings import nucliadb_settings
@@ -35,7 +34,6 @@ async def start_ingest(service_name: Optional[str] = None):
     if actual_service is not None:
         return
 
-    await setup_cluster()
     if nucliadb_settings.nucliadb_ingest is not None:
         # Its distributed lets create a GRPC client
         # We want Jaeger telemetry enabled
@@ -61,5 +59,3 @@ async def stop_ingest():
     if get_utility(Utility.INGEST):
         util = get_utility(Utility.INGEST)
         await util.finalize()
-
-    await teardown_cluster()
