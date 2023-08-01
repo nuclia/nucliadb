@@ -18,16 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+import time
 
+import orjson
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from fastapi_versioning import version
+from jwcrypto import jwe, jwk  # type: ignore
 
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.settings import nuclia_settings
+
+from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -61,3 +66,31 @@ async def api_config_check(request: Request):
             },
         },
     )
+
+
+TEMP_TOKEN_EXPIRATION = 5 * 60
+
+
+@standalone_api_router.get("/temp-access-token")
+@version(1)
+@requires([NucliaDBRoles.READER, NucliaDBRoles.WRITER, NucliaDBRoles.MANAGER])
+def get_temp_access_token(request: Request):
+    claims = {
+        "iat": int(time.time()),
+        "exp": int(time.time() + TEMP_TOKEN_EXPIRATION),
+        "scopes": request.auth.scopes,
+        "username": request.user.display_name,
+    }
+    payload = orjson.dumps(claims)
+    jwetoken = jwe.JWE(payload, orjson.dumps({"alg": "A256KW", "enc": "A256CBC-HS512"}))
+    settings: Settings = request.app.settings
+    if settings.jwk_key is None:
+        logger.warning(
+            "Dynamically generating JWK key. Please set JWK_KEY env variable to avoid this message."
+        )
+        settings.jwk_key = orjson.dumps(
+            jwk.JWK.generate(kty="oct", size=256, kid="dyn")
+        ).decode("utf-8")
+    jwetoken.add_recipient(jwk.JWK(**orjson.loads(settings.jwk_key)))
+    token = jwetoken.serialize(compact=True)
+    return JSONResponse({"token": token})

@@ -25,6 +25,7 @@ botocore
 google-cloud-storage
 gcloud
 oauth2client
+jwcrypto>=1.5.0
 
 fastapi-versioning>=0.10.0
 fastapi>=0.75.0,<0.89.0

@@ -97,3 +97,7 @@ Examples:
   `managers` on the jwt provided by upstream to the role `MANAGER` on `upstream_oauth2` policies.
 """,
     )
+
+    jwk_key: Optional[str] = pydantic.Field(
+        None, description="JWK key used for temporary token generation and validation."
+    )
