@@ -12,11 +12,11 @@ env:
   #NUA_API_KEY: "..."
 
 envSecrets:
-  - name: NUA_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: nuclia-api-key
-        key: api-key
+  # - name: NUA_API_KEY
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: nuclia-api-key
+  #       key: api-key
 
 affinity: {}
 nodeSelector: {}
