@@ -229,8 +229,8 @@ class Shards(BaseModel):
 
 
 FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {
-    resources_pb2.FieldType.FILE: FieldTypeName.FILE,
     resources_pb2.FieldType.LINK: FieldTypeName.LINK,
+    resources_pb2.FieldType.FILE: FieldTypeName.FILE,
     resources_pb2.FieldType.DATETIME: FieldTypeName.DATETIME,
     resources_pb2.FieldType.KEYWORDSET: FieldTypeName.KEYWORDSET,
     resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
