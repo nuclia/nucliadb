@@ -117,7 +117,7 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(redis_config, ingest_consumers, ingest_processed_consumer_v2):
+async def grpc_servicer(redis_config, ingest_consumers, ingest_processed_consumer):
     servicer = WriterServicer()
     await servicer.initialize()
 
