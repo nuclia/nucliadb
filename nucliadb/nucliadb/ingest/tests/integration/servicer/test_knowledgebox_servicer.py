@@ -78,13 +78,13 @@ async def test_create_knowledgebox(
     expected_spans = 10
 
     client = AsyncClient()
-    for _ in range(10):
+    for _ in range(40):
         resp = await client.get(
             f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces?service=GCS_SERVICE",
             headers={"Accept": "application/json"},
         )
         if resp.status_code != 200 or len(resp.json()["data"]) < expected_spans:
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
         else:
             break
 
