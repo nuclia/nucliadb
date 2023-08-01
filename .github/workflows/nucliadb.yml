@@ -172,7 +172,8 @@ jobs:
       - name: Get release version
         id: version_step
         run: |-
-          python bump.py --build=${{github.run_number}}
+          HASH=`git rev-parse --short HEAD`
+          python bump.py --build=$HASH
           VERSION=`cat VERSION`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
 
