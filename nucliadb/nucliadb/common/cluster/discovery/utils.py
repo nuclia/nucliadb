@@ -25,6 +25,7 @@ from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
 from nucliadb.common.cluster.discovery.manual import ManualDiscovery
 from nucliadb.common.cluster.settings import ClusterDiscoveryMode, settings
 from nucliadb_utils.utilities import clean_utility, get_utility, set_utility
+import asyncio
 
 UTIL_NAME = "cluster-discovery"
 
