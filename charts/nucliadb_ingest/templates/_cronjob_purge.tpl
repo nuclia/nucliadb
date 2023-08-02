@@ -34,9 +34,9 @@ spec:
             release: "{{ .Release.Name }}"
           annotations:
             sidecar.istio.io/inject: "false"
-        {{- if hasKey .Values "extra_pod_annotations" }}
+            {{- if hasKey .Values "extra_pod_annotations" }}
 {{ toYaml .Values.extra_pod_annotations | indent 12 }}
-        {{- end }}
+            {{- end }}
         spec:
           nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 12 }}
