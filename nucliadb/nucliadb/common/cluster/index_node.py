@@ -59,7 +59,7 @@ class IndexNode(AbstractIndexNode):
 
     @property
     def sidecar(self) -> NodeSidecarStub:
-        if self._sidecar is None and self.address not in SIDECAR_CONNECTIONS:
+        if self._sidecar is None or self.address not in SIDECAR_CONNECTIONS:
             if not self.dummy:
                 grpc_address = self._get_service_address(
                     settings.sidecar_port_map, settings.node_sidecar_port
@@ -70,13 +70,12 @@ class IndexNode(AbstractIndexNode):
                 SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)
             else:
                 SIDECAR_CONNECTIONS[self.address] = DummySidecarStub()
-        if self._sidecar is None:
             self._sidecar = SIDECAR_CONNECTIONS[self.address]
-        return self._sidecar
+        return self._sidecar  # type: ignore
 
     @property
     def writer(self) -> NodeWriterStub:
-        if self._writer is None and self.address not in WRITE_CONNECTIONS:
+        if self._writer is None or self.address not in WRITE_CONNECTIONS:
             if not self.dummy:
                 grpc_address = self._get_service_address(
                     settings.writer_port_map, settings.node_writer_port
@@ -87,13 +86,12 @@ class IndexNode(AbstractIndexNode):
                 WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
             else:
                 WRITE_CONNECTIONS[self.address] = DummyWriterStub()
-        if self._writer is None:
             self._writer = WRITE_CONNECTIONS[self.address]
-        return self._writer
+        return self._writer  # type: ignore
 
     @property
     def reader(self) -> NodeReaderStub:
-        if self._reader is None and self.address not in READ_CONNECTIONS:
+        if self._reader is None or self.address not in READ_CONNECTIONS:
             if not self.dummy:
                 grpc_address = self._get_service_address(
                     settings.reader_port_map, settings.node_reader_port
@@ -104,6 +102,5 @@ class IndexNode(AbstractIndexNode):
                 READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
             else:
                 READ_CONNECTIONS[self.address] = DummyReaderStub()
-        if self._reader is None:
             self._reader = READ_CONNECTIONS[self.address]
-        return self._reader
+        return self._reader  # type: ignore
