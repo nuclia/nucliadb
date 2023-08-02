@@ -53,10 +53,9 @@ jobs:
             --values e2e/chart.values.yaml \
             --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.version_step.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
-          sleep 10
+          sleep 60
           kubectl -n nucliadb get pods
           kubectl -n nucliadb describe pod nucliadb-0
-          kubectl -n nucliadb logs -l app=nucliadb
           kubectl -n nucliadb wait --timeout=5m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-0
           kubectl -n nucliadb wait --timeout=5m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
       
