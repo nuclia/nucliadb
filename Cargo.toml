@@ -3,7 +3,7 @@
 members = [
   "nucliadb_core",
   "nucliadb_node",
-  "nucliadb_node/binding",
+  "nucliadb_node_binding",
   "nucliadb_paragraphs",
   "nucliadb_protos/rust",
   "nucliadb_relations",

@@ -59,7 +59,7 @@ jobs:
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
-      
+
       - name: Install tikv
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
@@ -83,7 +83,7 @@ jobs:
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
         run: |
-          maturin build -m nucliadb_node/binding/Cargo.toml
+          maturin build -m nucliadb_node_binding/Cargo.toml
           pip install target/wheels/*_x86_64.whl
 
       - name: Run tests
