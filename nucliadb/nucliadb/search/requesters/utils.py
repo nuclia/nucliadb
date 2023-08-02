@@ -167,6 +167,17 @@ async def node_query(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
+        queried_node_details = []
+        for node, shard_id, node_id in queried_nodes:
+            queried_node_details.append(
+                {
+                    "id": node_id,
+                    "address": node.address,
+                }
+            )
+        logger.warning(
+            "Timeout while querying nodes", extra={"nodes": queried_node_details}
+        )
         results = [exc]
 
     error = validate_node_query_results(results or [])
