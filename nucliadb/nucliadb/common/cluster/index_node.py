@@ -71,7 +71,7 @@ class IndexNode(AbstractIndexNode):
             else:
                 SIDECAR_CONNECTIONS[self.address] = DummySidecarStub()
             self._sidecar = SIDECAR_CONNECTIONS[self.address]
-        return self._sidecar
+        return self._sidecar  # type: ignore
 
     @property
     def writer(self) -> NodeWriterStub:
@@ -87,7 +87,7 @@ class IndexNode(AbstractIndexNode):
             else:
                 WRITE_CONNECTIONS[self.address] = DummyWriterStub()
             self._writer = WRITE_CONNECTIONS[self.address]
-        return self._writer
+        return self._writer  # type: ignore
 
     @property
     def reader(self) -> NodeReaderStub:
@@ -103,4 +103,4 @@ class IndexNode(AbstractIndexNode):
             else:
                 READ_CONNECTIONS[self.address] = DummyReaderStub()
             self._reader = READ_CONNECTIONS[self.address]
-        return self._reader
+        return self._reader  # type: ignore
