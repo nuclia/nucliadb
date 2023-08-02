@@ -15,10 +15,7 @@ spec:
     metadata:
       name: "{{ .cronname }}"
       annotations:
-        sidecar.istio.io/inject: "false"
-        {{- if hasKey .Values "extra_pod_annotations" }}
-{{ toYaml .Values.extra_pod_annotations | indent 8 }}
-        {{- end }}
+        sidecar.istio.io/inject: "false"      
       labels:
         app: {{ .Chart.Name }}
         role: cronjobs
@@ -37,6 +34,9 @@ spec:
             release: "{{ .Release.Name }}"
           annotations:
             sidecar.istio.io/inject: "false"
+        {{- if hasKey .Values "extra_pod_annotations" }}
+{{ toYaml .Values.extra_pod_annotations | indent 8 }}
+        {{- end }}            
         spec:
           nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 12 }}
