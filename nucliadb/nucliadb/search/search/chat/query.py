@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import base64
 from time import monotonic as time
 from typing import AsyncIterator, List, Optional
@@ -70,8 +71,8 @@ async def generate_answer(
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-    predict: PredictEngine,
-    predict_generator: AsyncIterator[bytes],
+    predict: Optional[PredictEngine],
+    answer_generator: AsyncIterator[bytes],
     chat_request: ChatRequest,
     do_audit: bool = True,
 ):
@@ -81,13 +82,9 @@ async def generate_answer(
         yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
         yield bytes_results
 
-    if results.total == 0:
-        yield NOT_ENOUGH_CONTEXT_ANSWER.encode()
-        return
-
     start_time = time()
     answer = []
-    async for data in predict_generator:
+    async for data in answer_generator:
         answer.append(data)
         yield data
 
@@ -115,7 +112,7 @@ async def generate_answer(
             answer=audit_answer,
         )
 
-    if ChatOptions.RELATIONS in chat_request.features:
+    if ChatOptions.RELATIONS in chat_request.features and predict is not None:
         yield END_OF_STREAM
 
         detected_entities = await predict.detect_entities(kbid, text_answer.decode())
@@ -143,6 +140,11 @@ async def generate_answer(
         )
 
 
+async def not_enough_context_generator():
+    await asyncio.sleep(0)
+    yield NOT_ENOUGH_CONTEXT_ANSWER.encode()
+
+
 async def chat(
     kbid: str,
     user_query: str,
@@ -153,27 +155,11 @@ async def chat(
     client_type: NucliaDBClientType,
     origin: str,
 ):
-    predict = get_predict()
-
+    nuclia_learning_id: Optional[str] = None
     user_context = chat_request.context or []
-    chat_context = user_context[:]
-    chat_context.append(
-        ChatContextMessage(
-            author=Author.NUCLIA,
-            text=await format_chat_prompt_content(kbid, find_results),
-        )
-    )
-    chat_model = ChatModel(
-        user_id=user_id,
-        context=chat_context,
-        question=chat_request.query,
-        truncate=True,
-    )
 
-    ident, generator = await predict.chat_query(kbid, chat_model)
-
-    return StreamingResponse(
-        generate_answer(
+    if find_results.total == 0:
+        answer_stream = generate_answer(
             user_query,
             user_context,
             rephrased_query,
@@ -182,13 +168,48 @@ async def chat(
             user_id,
             client_type,
             origin,
-            predict,
-            generator,
+            predict=None,
+            answer_generator=not_enough_context_generator(),
             chat_request=chat_request,
-        ),
+        )
+
+    else:
+        predict = get_predict()
+        chat_context = user_context[:]
+        chat_context.append(
+            ChatContextMessage(
+                author=Author.NUCLIA,
+                text=await format_chat_prompt_content(kbid, find_results),
+            )
+        )
+        chat_model = ChatModel(
+            user_id=user_id,
+            context=chat_context,
+            question=chat_request.query,
+            truncate=True,
+        )
+        nuclia_learning_id, predict_generator = await predict.chat_query(
+            kbid, chat_model
+        )
+        answer_stream = generate_answer(
+            user_query,
+            user_context,
+            rephrased_query,
+            find_results,
+            kbid,
+            user_id,
+            client_type,
+            origin,
+            predict=predict,
+            answer_generator=predict_generator,
+            chat_request=chat_request,
+        )
+
+    return StreamingResponse(
+        answer_stream,
         media_type="plain/text",
         headers={
-            "NUCLIA-LEARNING-ID": ident or "unknown",
+            "NUCLIA-LEARNING-ID": nuclia_learning_id or "unknown",
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
