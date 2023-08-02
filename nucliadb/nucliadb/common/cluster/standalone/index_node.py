@@ -20,6 +20,7 @@
 import inspect
 from typing import Any
 
+from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
@@ -27,7 +28,6 @@ from nucliadb_protos import (
     standalone_pb2,
     standalone_pb2_grpc,
 )
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from ..abc import AbstractIndexNode

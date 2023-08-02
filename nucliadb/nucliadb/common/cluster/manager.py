@@ -178,7 +178,7 @@ class KBShardManager:
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
-        available_nodes = nodes = sorted_nodes(avoid_nodes=existing_kb_nodes)
+        nodes = sorted_nodes(avoid_nodes=existing_kb_nodes)
 
         sharduuid = uuid.uuid4().hex
         shard = writer_pb2.ShardObject(shard=sharduuid)
