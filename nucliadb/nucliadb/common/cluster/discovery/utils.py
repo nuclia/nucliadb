@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 from typing import Type, Union
 
 from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
@@ -24,7 +25,6 @@ from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
 from nucliadb.common.cluster.discovery.manual import ManualDiscovery
 from nucliadb.common.cluster.settings import ClusterDiscoveryMode, settings
 from nucliadb_utils.utilities import clean_utility, get_utility, set_utility
-import asyncio
 
 UTIL_NAME = "cluster-discovery"
 
