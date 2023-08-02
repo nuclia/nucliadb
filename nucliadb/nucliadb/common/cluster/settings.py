@@ -26,6 +26,7 @@ class ClusterDiscoveryMode(str, enum.Enum):
     MANUAL = "manual"
     KUBERNETES = "kubernetes"
     STANDALONE = "standalone"
+    SINGLE_NODE = "single_node"
 
 
 class Settings(BaseSettings):

@@ -20,7 +20,6 @@
 
 import logging
 import os
-from socket import gethostname
 
 from nucliadb.standalone.settings import Settings
 
@@ -97,11 +96,8 @@ def config_nucliadb(nucliadb_args: Settings):
     cluster_settings.cluster_discovery_mode = ClusterDiscoveryMode.STANDALONE
     cluster_settings.data_path = nucliadb_args.data_path
     if len(cluster_settings.cluster_discovery_manual_addresses) == 0:
-        cluster_settings.cluster_discovery_manual_addresses = [
-            f"{gethostname()}:{nucliadb_args.http_port}"
-        ]
+        cluster_settings.cluster_discovery_mode = ClusterDiscoveryMode.SINGLE_NODE
     ingest_settings.nuclia_partitions = 1
-    ingest_settings.total_replicas = 1
     ingest_settings.replica_number = 0
     ingest_settings.partitions = ["1"]
     nuclia_settings.onprem = True
