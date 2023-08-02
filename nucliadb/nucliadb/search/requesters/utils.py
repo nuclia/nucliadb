@@ -172,6 +172,7 @@ async def node_query(
             queried_node_details.append(
                 {
                     "id": node_id,
+                    "shard_id": shard_id,
                     "address": node.address,
                 }
             )
