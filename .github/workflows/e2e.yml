@@ -19,7 +19,7 @@ jobs:
       - uses: balchua/microk8s-actions@v0.3.2
         with:
           channel: '1.26/stable'
-          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
+          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage", "host-access"]'
       
       - name: "Set up Helm"
         uses: azure/setup-helm@v3
