@@ -35,8 +35,8 @@ spec:
           annotations:
             sidecar.istio.io/inject: "false"
         {{- if hasKey .Values "extra_pod_annotations" }}
-{{ toYaml .Values.extra_pod_annotations | indent 8 }}
-        {{- end }}            
+{{ toYaml .Values.extra_pod_annotations | indent 12 }}
+        {{- end }}
         spec:
           nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 12 }}
