@@ -20,7 +20,6 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use heed::flags::Flags;
 use heed::types::{SerdeBincode, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions, RoTxn, RwTxn};
 use serde::de::DeserializeOwned;
@@ -145,9 +144,6 @@ impl GraphDB {
         let mut env_builder = EnvOpenOptions::new();
         env_builder.max_dbs(Self::MAX_DBS);
         env_builder.map_size(db_size);
-        unsafe {
-            env_builder.flag(Flags::MdbNoLock);
-        }
         let env = env_builder.open(path)?;
         let nodes = env.create_database(Some(Self::NODES))?;
         let outedges = env.create_database(Some(Self::OUTEDGES))?;
