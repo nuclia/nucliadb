@@ -74,7 +74,7 @@ jobs:
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
         run: |
-          maturin build -m nucliadb_node/binding/Cargo.toml
+          maturin build -m nucliadb_node_binding/Cargo.toml
           pip install target/wheels/*_x86_64.whl
 
       - name: Run tests
