@@ -6,13 +6,13 @@ on:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node/binding/Cargo.toml"
+      - "nucliadb_node_binding/Cargo.toml"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node/binding/Cargo.toml"
+      - "nucliadb_node_binding/Cargo.toml"
 
 jobs:
   build:
@@ -82,7 +82,7 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           command: sdist
-          args: -m nucliadb_node/binding/Cargo.toml --out dist
+          args: -m nucliadb_node_binding/Cargo.toml --out dist
           rust-toolchain: stable
 
       - name: build wheels
@@ -91,7 +91,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node/binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9' }}
+          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.7 3.8 3.9 3.10 3.11 pypy3.7 pypy3.8 pypy3.9' }}
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/

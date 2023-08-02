@@ -16,6 +16,7 @@ on:
       - "nucliadb_core/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
+      - "nucliadb_node_binding/**"
       - "nucliadb_vectors/**"
       - "nucliadb_relations/**"
       - "nucliadb_telemetry/src/**"
@@ -35,6 +36,7 @@ on:
       - "nucliadb_core/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
+      - "nucliadb_node_binding/**"
       - "nucliadb_vectors/**"
       - "nucliadb_relations/**"
       - "nucliadb_telemetry/src/**"
@@ -194,7 +196,7 @@ jobs:
 
       - name: Install rust binding for testing
         run: |
-          maturin build -m nucliadb_node/binding/Cargo.toml
+          maturin build -m nucliadb_node_binding/Cargo.toml
           pip install target/wheels/*_x86_64.whl
 
       - uses: dorny/paths-filter@v2

@@ -449,8 +449,11 @@ impl DataPoint {
         }
 
         // Telling the OS our expected access pattern
-        nodes.advise(memmap2::Advice::WillNeed)?;
-        index.advise(memmap2::Advice::Sequential)?;
+        #[cfg(not(target_os = "windows"))]
+        {
+            nodes.advise(memmap2::Advice::WillNeed)?;
+            index.advise(memmap2::Advice::Sequential)?;
+        }
 
         Ok(DataPoint {
             journal,
@@ -482,8 +485,11 @@ impl DataPoint {
         let journal: Journal = serde_json::from_reader(journal)?;
 
         // Telling the OS our expected access pattern
-        nodes.advise(memmap2::Advice::WillNeed)?;
-        index.advise(memmap2::Advice::Sequential)?;
+        #[cfg(not(target_os = "windows"))]
+        {
+            nodes.advise(memmap2::Advice::WillNeed)?;
+            index.advise(memmap2::Advice::Sequential)?;
+        }
 
         Ok(DataPoint {
             journal,
@@ -558,8 +564,11 @@ impl DataPoint {
         }
 
         // Telling the OS our expected access pattern
-        nodes.advise(memmap2::Advice::WillNeed)?;
-        index.advise(memmap2::Advice::Sequential)?;
+        #[cfg(not(target_os = "windows"))]
+        {
+            nodes.advise(memmap2::Advice::WillNeed)?;
+            index.advise(memmap2::Advice::Sequential)?;
+        }
 
         Ok(DataPoint {
             journal,

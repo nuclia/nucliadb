@@ -25,7 +25,7 @@ RUN set -eux; \
     cargo --version; \
     rustc --version;
 
-RUN apt-get update -y && apt-get install --yes --no-install-recommends patchelf cmake && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 
+RUN apt-get update -y && apt-get install --yes --no-install-recommends patchelf cmake && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN pip install maturin
 
@@ -41,5 +41,5 @@ COPY . /nucliadb
 WORKDIR /nucliadb
 
 RUN set -eux; \
-    cd nucliadb_node/binding; \
+    cd nucliadb_node_binding; \
     maturin build --release
