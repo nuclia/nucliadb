@@ -262,7 +262,7 @@ class PredictEngine:
             headers=self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=200)
-        return await resp.text()
+        return await resp.json()
 
     @predict_observer.wrap({"type": "chat"})
     async def chat_query(
