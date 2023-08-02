@@ -80,6 +80,12 @@ class TestRequires:
 
         assert authentication.requires(["admin"])(lambda request: None)(req) is None
 
+        # test passed as kwargs
+        assert (
+            authentication.requires(["admin"])(lambda request: None)(request=req)
+            is None
+        )
+
     def test_requires_sync_returns_status(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
