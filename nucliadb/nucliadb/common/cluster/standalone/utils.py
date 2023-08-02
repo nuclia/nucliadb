@@ -49,13 +49,11 @@ def get_self() -> StandaloneIndexNode:
     global _SELF_INDEX_NODE
     if _SELF_INDEX_NODE is None:
         if "NUCLIADB_SERVICE_HOST" in os.environ:
-            host = os.environ["NUCLIADB_SERVICE_HOST"]
+            host = os.environ["HOSTNAME"] + ".nucliadb"
         else:
             host = gethostname()
         _SELF_INDEX_NODE = StandaloneIndexNode(
-            id=get_standalone_node_id(),
-            address=f"{host}:{cluster_settings.standalone_node_port}",
-            shard_count=0,
+            id=get_standalone_node_id(), address=f"{host}", shard_count=0
         )
     # XXX this is weird right? How silly is this?
     _SELF_INDEX_NODE.shard_count = len(

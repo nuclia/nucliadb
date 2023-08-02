@@ -27,6 +27,7 @@ from nucliadb_protos import (
     standalone_pb2,
     standalone_pb2_grpc,
 )
+from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from ..abc import AbstractIndexNode
@@ -89,13 +90,15 @@ class ProxyCallerWrapper:
         self._address = address
         self._type = type
         self._original_type = original_type
-        self._channel = get_traced_grpc_channel(address, "standalone_proxy")
+        self._channel = get_traced_grpc_channel(
+            f"{address}:{cluster_settings.standalone_node_port}", "standalone_proxy"
+        )
         self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)
 
     def __getattr__(self, name):
         async def call(request):
-            req = standalone_pb2.CallRequest(
-                service=self._type, method=name, request=request.SerializeToString()
+            req = standalone_pb2.NodeActionRequest(
+                service=self._type, action=name, payload=request.SerializeToString()
             )
             resp = await self._stub.NodeAction(req)
             return_type_str = inspect.signature(

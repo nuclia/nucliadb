@@ -56,7 +56,7 @@ jobs:
           sleep 10
           kubectl -n nucliadb get pods
           kubectl -n nucliadb logs -l app=nucliadb
-          kubeclt -n nucliadb describe pod nucliadb-0
+          kubectl -n nucliadb describe pod nucliadb-0
           kubectl -n nucliadb wait --timeout=5m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-0
           kubectl -n nucliadb wait --timeout=5m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
       

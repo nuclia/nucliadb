@@ -178,7 +178,7 @@ class KBShardManager:
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
-        nodes = sorted_nodes(avoid_nodes=existing_kb_nodes)
+        available_nodes = nodes = sorted_nodes(avoid_nodes=existing_kb_nodes)
 
         sharduuid = uuid.uuid4().hex
         shard = writer_pb2.ShardObject(shard=sharduuid)
@@ -203,7 +203,7 @@ class KBShardManager:
                     )
                 except Exception as e:
                     errors.capture_exception(e)
-                    logger.error(f"Error creating new shard at {node}: {e}")
+                    logger.exception(f"Error creating new shard at {node}: {e}")
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))

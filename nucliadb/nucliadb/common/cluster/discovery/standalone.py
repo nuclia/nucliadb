@@ -53,7 +53,12 @@ class StandaloneDiscovery(AbstractClusterDiscovery):
     async def discover(self) -> None:
         members = []
         for address in self.settings.cluster_discovery_manual_addresses:
-            members.append(await self._get_index_node_metadata(address))
+            try:
+                members.append(await self._get_index_node_metadata(address))
+            except Exception:
+                logger.exception(
+                    "Error while getting node info from %s. Skipping", address
+                )
         update_members(members)
 
     async def watch(self) -> None:

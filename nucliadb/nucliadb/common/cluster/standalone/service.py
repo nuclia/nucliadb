@@ -56,9 +56,9 @@ class StandaloneClusterServiceServicer(
                 f"Unknown request type {sig.parameters['request'].annotation}"
             )
 
-        request = request_type()
-        request.ParseFromString(request.payload)
-        response = await method(request)
+        action_request = request_type()
+        action_request.ParseFromString(request.payload)
+        response = await method(action_request)
         return standalone_pb2.NodeActionResponse(payload=response.SerializeToString())
 
     async def NodeInfo(  # type: ignore

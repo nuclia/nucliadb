@@ -35,8 +35,6 @@ _setup_lock = asyncio.Lock()
 
 
 async def setup_cluster_discovery() -> None:
-    if settings.standalone_mode:
-        return
     async with _setup_lock:
         util = get_utility(UTIL_NAME)
         if util is not None:
