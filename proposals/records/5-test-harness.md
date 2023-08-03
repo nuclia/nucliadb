@@ -29,13 +29,19 @@ when a test fails. These flags are not part of test runners in `Makefile` files.
 
 The next logical step to improve the situation is to start building in our monorepo
 a test harness framework that would replace all our `Makefile` files and consolidate our
-fixtures.
+fixtures and helpers.
 
-Let's add a `nucliadb_test` Python package and build on the top of `pytest` and other tools
-our own test harness that can be used in the root of our repo or in any package.
+Let's add a `nucliadb_test` Python package with 3 elements:
+
+- a test harness CLI, called `nucliadb-test`
+- our reusable pytest fixtures
+- test helpers
 
 The test harness will come as a single CLI command called `nucliadb-test`, and implement
-different actions that will be simple wrappers.
+different actions that will be simple wrappers and can be called from the root of the repo
+or in any package.
+
+Examples:
 
 - `nucliadb-test format` : formats the Python and Rust code.
 - `nucliadb-test test`: runs all the tests
