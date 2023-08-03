@@ -45,7 +45,7 @@ async def test_delay_task_handler():
     dth.schedule("key3", handler)
     dth.schedule("key4", handler)
 
-    # all should be scheduled and duplicates ignored
+    # all should be scheduled and duplicates ignored.
     assert len(dth.to_process) == 4
 
     await asyncio.sleep(0.06)

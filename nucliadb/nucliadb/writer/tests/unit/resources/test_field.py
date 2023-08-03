@@ -125,7 +125,7 @@ async def test_parse_conversation_field(storage_mock, processing_mock):
 
     await parse_conversation_field(key, conversation_field, bm, pp, kbid, uuid)
 
-    # Check push payload
+    # Check push payload.
     assert len(pp.conversationfield[key].messages) == 2
     ppm1 = pp.conversationfield[key].messages[0]
     assert ppm1.ident == "m1"
