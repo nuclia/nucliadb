@@ -26,7 +26,7 @@ jobs:
         with:
           channel: '1.27/stable'
           devMode: 'true'
-          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
+          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage", "host-access"]'
       
       - name: "Set up Helm"
         uses: azure/setup-helm@v3
