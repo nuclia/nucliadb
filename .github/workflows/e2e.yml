@@ -15,10 +15,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      
+      - name: Setup Ubuntu
+        run: |
+          iptables -P FORWARD ACCEPT 
 
       - uses: balchua/microk8s-actions@v0.3.2
         with:
-          channel: '1.25/stable'
+          channel: '1.27/stable'
           devMode: 'true'
           addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
       
@@ -54,6 +58,7 @@ jobs:
             --values e2e/chart.values.yaml \
             --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.version_step.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
+          microk8s status
           microk8s inspect
           sleep 60
           kubectl -n nucliadb get pods
