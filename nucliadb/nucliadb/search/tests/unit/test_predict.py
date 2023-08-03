@@ -338,3 +338,27 @@ async def test_ask_document_cloud():
         headers={"X-STF-KBID": "kbid"},
         timeout=None,
     )
+
+
+async def test_rephrase():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, json="rephrased", context_manager=False
+    )
+
+    item = RephraseModel(question="question", context=[], user_id="foo")
+    rephrased_query = await pe.rephrase_query("kbid", item)
+    # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
+    assert rephrased_query.strip('"') == rephrased_query
+    assert rephrased_query == "rephrased"
+
+    pe.session.post.assert_awaited_once_with(
+        url="cluster/api/internal/predict/rephrase",
+        json=item.dict(),
+        headers={"X-STF-KBID": "kbid"},
+    )
