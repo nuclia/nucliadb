@@ -14,6 +14,10 @@ on:
       - ".github/workflows/nucliadb_node_release.yml"
       - "nucliadb_node_binding/Cargo.toml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
