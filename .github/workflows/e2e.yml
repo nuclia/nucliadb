@@ -18,7 +18,8 @@ jobs:
       
       - name: Setup Ubuntu
         run: |
-          iptables -P FORWARD ACCEPT 
+          sudo ufw disable
+          sudo iptables -P FORWARD ACCEPT
 
       - uses: balchua/microk8s-actions@v0.3.2
         with:
