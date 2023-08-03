@@ -44,7 +44,7 @@ or in any package.
 Examples:
 
 - `nucliadb-test format` : formats the Python and Rust code.
-- `nucliadb-test test`: runs all the tests
+- `nucliadb-test test --debug`: runs all the tests in debug mode
 - `nucliadb-test test --python`: run only the Python tests
 - etc.
 
