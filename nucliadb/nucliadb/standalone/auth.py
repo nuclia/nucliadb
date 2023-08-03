@@ -52,10 +52,10 @@ def get_mapped_roles(*, settings: Settings, data: dict[str, str]) -> list[str]:
 async def authenticate_auth_token(
     settings: Settings, request: HTTPConnection
 ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
-    if "auth_token" not in request.query_params or settings.jwk_key is None:
+    if "eph-token" not in request.query_params or settings.jwk_key is None:
         return None
 
-    jwt_token = request.query_params["auth_token"].encode("utf-8")
+    jwt_token = request.query_params["eph-token"].encode("utf-8")
     try:
         jwetoken = jwe.JWE()
         jwetoken.deserialize(jwt_token.decode("utf-8"))
