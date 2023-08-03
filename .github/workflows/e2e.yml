@@ -18,8 +18,9 @@ jobs:
 
       - uses: balchua/microk8s-actions@v0.3.2
         with:
-          channel: '1.27/stable'
-          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage", "host-access"]'
+          channel: '1.25/stable'
+          devMode: 'true'
+          addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
       
       - name: "Set up Helm"
         uses: azure/setup-helm@v3
@@ -53,6 +54,7 @@ jobs:
             --values e2e/chart.values.yaml \
             --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.version_step.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
+          microk8s inspect
           sleep 60
           kubectl -n nucliadb get pods
           kubectl -n nucliadb describe pod nucliadb-0
