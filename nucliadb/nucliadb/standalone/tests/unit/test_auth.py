@@ -162,7 +162,7 @@ async def test_auth_token_backend(http_request):
     jwetoken.add_recipient(jwk.JWK(**orjson.loads(jwk_key)))
     token = jwetoken.serialize(compact=True)
 
-    http_request.query_params["auth_token"] = token
+    http_request.query_params["eph-token"] = token
     auth_creds, nuclia_user = await backend.authenticate(http_request)
 
     assert nuclia_user.display_name == "display_name"
