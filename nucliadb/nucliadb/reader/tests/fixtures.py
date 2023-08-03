@@ -119,7 +119,7 @@ async def test_pagination_resources(
     for i in range(1, 10 + 1):
         message = broker_simple_resource(knowledgebox_ingest, i)
         await processor.process(message=message, seqid=i)
-        # Give processed data some time to reach the node
+        # Give processed data some time to reach the node.
 
     from time import time
 
