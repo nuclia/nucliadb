@@ -16,23 +16,4 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-[build-system]
-requires = ["maturin>=0.12,<0.13"]
-build-backend = "maturin"
-
-[project]
-name = "nucliadb_node_binding"
-requires-python = ">=3.6"
-classifiers = [
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-
-[flake8]
-max-line-length = 120
-extend-ignore = "E203"
+#
