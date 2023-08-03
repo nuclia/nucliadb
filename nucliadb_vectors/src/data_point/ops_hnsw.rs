@@ -85,6 +85,28 @@ impl PartialOrd for Cnx {
 
 pub type Neighbours = Vec<(Address, f32)>;
 
+#[derive(Clone, Copy)]
+struct NodeFilter<'a, DR> {
+    tracker: &'a DR,
+    filter: &'a Formula,
+    blocked_addresses: &'a HashSet<Address>,
+    vec_counter: &'a RepCounter<'a>,
+}
+
+impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
+    pub fn is_valid(&self, n: Address, score: f32) -> bool {
+        !score.is_nan()
+        // The vector was deleted at some point and will be removed in a future merge
+        && !self.tracker.is_deleted(n)
+        // The vector is blocked, meaning that its key is part of the current version of the solution
+        && !self.blocked_addresses.contains(&n)
+        // The number of times this vector appears is 0
+        && self.vec_counter.get(self.tracker.get_vector(n)) == 0
+        // The vector satisfies the given filter
+        && self.filter.run(n, self.tracker)
+    }
+}
+
 pub struct HnswOps<'a, DR> {
     distribution: Uniform<f64>,
     layer_rng: SmallRng,
@@ -113,35 +135,23 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     fn closest_up_node<L: Layer>(
         &'a self,
         x: Address,
+        x_score: f32,
         query: Address,
         layer: L,
-        filter: &Formula,
-        blocked_addresses: &HashSet<Address>,
-        vec_counter: &RepCounter,
+        filter: NodeFilter<'a, DR>,
     ) -> Option<(Address, f32)> {
         let mut visited_nodes = HashSet::new();
-        let mut candidates = BinaryHeap::from([Cnx(x, self.similarity(x, query))]);
+        let mut candidates = BinaryHeap::from([Cnx(x, x_score)]);
         loop {
             match candidates.pop() {
                 None => break None,
                 Some(Cnx(_, score)) if score < self.tracker.min_score() => break None,
-                Some(Cnx(n, score))
-                        // The vector was deleted at some point and will be removed in a future merge
-                        if !self.tracker.is_deleted(n)
-                        // A score may be invalid if the index contains zero vectors 
-                        && !score.is_nan()
-                        // The vector is blocked, meaning that its key is part of the current version of the solution
-                        && !blocked_addresses.contains(&n)
-                        // The number of times this vector appears is 0
-                        && vec_counter.get(self.tracker.get_vector(n)) == 0
-                        // The vector satisfies the given filter
-                        && filter.run(n, self.tracker) =>
-                {
-                    break Some((n, self.similarity(n, query)));
+                Some(Cnx(n, score)) if filter.is_valid(n, score) => {
+                    break Some((n, self.similarity(n, query)))
                 }
-                Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, _)| {
+                Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, edge)| {
                     if !visited_nodes.contains(&n) {
-                        candidates.push(Cnx(n, self.similarity(n, query)));
+                        candidates.push(Cnx(n, edge.dist));
                         visited_nodes.insert(n);
                     }
                 }),
@@ -268,22 +278,26 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 sol_addresses.insert(addr);
                 vec_counter.add(self.tracker.get_vector(addr));
             });
-            result.into_iter().for_each(|(addr, _)| {
+            for (addr, addr_score) in result {
                 sol_addresses.remove(&addr);
                 vec_counter.sub(self.tracker.get_vector(addr));
-                if let Some((addr, score)) = self.closest_up_node(
+                let node_filter = NodeFilter {
+                    filter: with_filter,
+                    tracker: self.tracker,
+                    blocked_addresses: &sol_addresses,
+                    vec_counter: &vec_counter,
+                };
+                let Some((addr, score)) = self.closest_up_node(
                     addr,
+                    addr_score,
                     query,
                     hnsw.get_layer(0),
-                    with_filter,
-                    &sol_addresses,
-                    &vec_counter,
-                ) {
-                    filtered_result.push((addr, score));
-                    sol_addresses.insert(addr);
-                    vec_counter.add(self.tracker.get_vector(addr));
-                }
-            });
+                    node_filter,
+                ) else { continue };
+                filtered_result.push((addr, score));
+                sol_addresses.insert(addr);
+                vec_counter.add(self.tracker.get_vector(addr));
+            }
             // order may be lost
             filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
             filtered_result
