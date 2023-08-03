@@ -131,7 +131,14 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         if ready:
             node = manager.get_index_node(node_data.node_id)
             if node is None:
-                logger.warning(f"Adding node", extra={"node_id": node_data.node_id})
+                logger.warning(
+                    f"Adding node",
+                    extra={
+                        "node_id": node_data.node_id,
+                        "sts_name": sts_name,
+                        "address": node_data.address,
+                    },
+                )
                 manager.add_index_node(
                     IndexNode(
                         id=node_data.node_id,
@@ -149,7 +156,14 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         else:
             node = manager.get_index_node(node_data.node_id)
             if node is not None:
-                logger.warning(f"Remove node", extra={"node_id": node_data.node_id})
+                logger.warning(
+                    f"Remove node",
+                    extra={
+                        "node_id": node_data.node_id,
+                        "sts_name": sts_name,
+                        "address": node.address,
+                    },
+                )
                 manager.remove_index_node(node_data.node_id)
 
         AVAILABLE_NODES.set(len(manager.get_index_nodes()))
@@ -171,7 +185,10 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                         label_selector="app.kubernetes.io/instance=node",
                         timeout_seconds=30,
                     ):
-                        await self.update_node(event)
+                        try:
+                            await self.update_node(event)
+                        except Exception:  # pragma: no cover
+                            logger.exception("Error while updating node", exc_info=True)
                 except (
                     asyncio.CancelledError,
                     KeyboardInterrupt,

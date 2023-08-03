@@ -36,8 +36,8 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 
+from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
@@ -141,7 +141,9 @@ async def node_query(
 
     for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = choose_node(shard_obj, target_replicas=shards)
+            node, shard_id, node_id = cluster_manager.choose_node(
+                shard_obj, target_replicas=shards
+            )
         except KeyError:
             incomplete_results = True
         else:
@@ -166,7 +168,24 @@ async def node_query(
             asyncio.gather(*ops, return_exceptions=True),  # type: ignore
             timeout=settings.search_timeout,
         )
-    except asyncio.TimeoutError as exc:
+    except asyncio.TimeoutError as exc:  # pragma: no cover
+        queried_nodes_details = []
+        for _, shard_id, node_id in queried_nodes:
+            queried_node = cluster_manager.get_index_node(node_id)
+            if queried_node is None:
+                node_address = "unknown"
+            else:
+                node_address = node.address
+            queried_nodes_details.append(
+                {
+                    "id": node_id,
+                    "shard_id": shard_id,
+                    "address": node_address,
+                }
+            )
+        logger.warning(
+            "Timeout while querying nodes", extra={"nodes": queried_nodes_details}
+        )
         results = [exc]
 
     error = validate_node_query_results(results or [])
