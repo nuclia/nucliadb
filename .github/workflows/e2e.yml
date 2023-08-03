@@ -17,9 +17,11 @@ jobs:
         uses: actions/checkout@v2
       
       - name: Setup Ubuntu
+        # see if this is affecting microk8s
         run: |
-          sudo ufw disable
-          sudo iptables -P FORWARD ACCEPT
+          sudo ufw allow in on vxlan.calico && sudo ufw allow out on vxlan.calico
+          sudo ufw allow in on cali+ && sudo ufw allow out on cali+
+          sudo ufw default allow routed
 
       - uses: balchua/microk8s-actions@v0.3.2
         with:
