@@ -49,6 +49,8 @@ Examples:
 - etc.
 
 The `nucliadb_test` will also consolidate tests fixtures and any test helper that we might need.
+For example, we could provide a helper that creates a shard and instanciates
+a `NucliaDBClient` to play with it.
 
 ## Rollout plan
 
