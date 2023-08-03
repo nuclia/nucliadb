@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 from typing import Type, Union
 
 from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
@@ -28,27 +29,31 @@ from nucliadb_utils.utilities import clean_utility, get_utility, set_utility
 UTIL_NAME = "cluster-discovery"
 
 
+_setup_lock = asyncio.Lock()
+
+
 async def setup_cluster_discovery() -> None:
     if settings.standalone_mode:
         return
-    util = get_utility(UTIL_NAME)
-    if util is not None:
-        # already loaded
-        return util
+    async with _setup_lock:
+        util = get_utility(UTIL_NAME)
+        if util is not None:
+            # already loaded
+            return util
 
-    klass: Union[Type[ManualDiscovery], Type[KubernetesDiscovery]]
-    if settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
-        klass = ManualDiscovery
-    elif settings.cluster_discovery_mode == ClusterDiscoveryMode.KUBERNETES:
-        klass = KubernetesDiscovery
-    else:
-        raise NotImplementedError(
-            f"Cluster discovery mode {settings.cluster_discovery_mode} not implemented"
-        )
+        klass: Union[Type[ManualDiscovery], Type[KubernetesDiscovery]]
+        if settings.cluster_discovery_mode == ClusterDiscoveryMode.MANUAL:
+            klass = ManualDiscovery
+        elif settings.cluster_discovery_mode == ClusterDiscoveryMode.KUBERNETES:
+            klass = KubernetesDiscovery
+        else:
+            raise NotImplementedError(
+                f"Cluster discovery mode {settings.cluster_discovery_mode} not implemented"
+            )
 
-    disc = klass(settings)
-    await disc.initialize()
-    set_utility(UTIL_NAME, disc)
+        disc = klass(settings)
+        await disc.initialize()
+        set_utility(UTIL_NAME, disc)
 
 
 async def teardown_cluster_discovery() -> None:

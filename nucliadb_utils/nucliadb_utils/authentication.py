@@ -153,7 +153,10 @@ def requires(
             # Handle sync request/response functions.
             @functools.wraps(func)
             def sync_wrapper(*args: typing.Any, **kwargs: typing.Any) -> Response:
-                request = kwargs.get("request", args[idx])
+                try:
+                    request = kwargs["request"]
+                except KeyError:
+                    request = args[idx]
                 assert isinstance(request, Request)
 
                 if not has_required_scope(request, scopes_list):
