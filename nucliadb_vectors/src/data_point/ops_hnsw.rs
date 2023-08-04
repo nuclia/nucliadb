@@ -140,7 +140,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         filter: NodeFilter<'a, DR>,
     ) -> Option<(Address, f32)> {
         // We just need to perform BFS, the replacement is the closest node to the actual
-        // best solution. This algorithm takes a  lazy approach to computing the similarity of
+        // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
         let mut visited_nodes = HashSet::new();
         let mut candidates = vec![x];
