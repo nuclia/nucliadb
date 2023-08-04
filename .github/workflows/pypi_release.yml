@@ -86,3 +86,11 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Run Nuclia SDK tests
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_CICD_PUBLIC }}
+          repository: nuclia/nuclia.py
+          event-type: test-stage
+          client-payload: '{"component": "nucliadb", "commit": "${{ GITHUB_SHA }}", "user": "${{ github.actor }}"}'
