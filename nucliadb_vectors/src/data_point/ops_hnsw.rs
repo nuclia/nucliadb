@@ -19,7 +19,7 @@
 //
 
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use nucliadb_core::thread::*;
 use ram_hnsw::*;
@@ -143,18 +143,19 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         // best solution. This algorithm takes a lazy approach to computing the similarity of
         // candidates.
         let mut visited_nodes = HashSet::new();
-        let mut candidates = vec![x];
+        let mut candidates = VecDeque::from([x]);
         loop {
-            match candidates.pop().map(|n| (n, self.similarity(n, query))) {
+            let best_so_far = candidates.pop_front();
+            match best_so_far.map(|n| (n, self.similarity(n, query))) {
                 None => break None,
                 Some((_, score)) if score < self.tracker.min_score() => break None,
                 Some((n, score)) if filter.is_valid(n, score) => break Some((n, score)),
                 Some((down, _)) => {
                     let mut sorted_out: Vec<_> = layer.get_out_edges(down).collect();
-                    sorted_out.sort_by(|a, b| a.1.dist.total_cmp(&b.1.dist));
+                    sorted_out.sort_by(|a, b| b.1.dist.total_cmp(&a.1.dist));
                     sorted_out.into_iter().for_each(|(new_candidate, _)| {
                         if !visited_nodes.contains(&new_candidate) {
-                            candidates.push(new_candidate);
+                            candidates.push_back(new_candidate);
                             visited_nodes.insert(new_candidate);
                         }
                     });
@@ -263,7 +264,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         with_duplicates: bool,
     ) -> Neighbours {
         let Some(entry_point) = hnsw.get_entry_point() else {
-            return  Neighbours::default()
+            return Neighbours::default()
         };
         let mut crnt_layer = entry_point.layer;
         let mut neighbours = vec![(entry_point.node, 0.)];
