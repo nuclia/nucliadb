@@ -42,6 +42,10 @@ on:
       - "nucliadb_telemetry/src/**"
       - "nucliadb_utils/**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1

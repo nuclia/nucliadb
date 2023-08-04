@@ -29,6 +29,11 @@ on:
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
       - "nucliadb_node/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   API_VERSION: 1
   COMPONENT: nucliadb-search
