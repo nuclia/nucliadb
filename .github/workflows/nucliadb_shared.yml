@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  HASH: $(git rev-parse --short "${{github.sha}}")
+  HASH: $(git rev-parse --short "$GITHUB_SHA")
   BRANCH: ${GITHUB_REF##*/}
 
 jobs:
