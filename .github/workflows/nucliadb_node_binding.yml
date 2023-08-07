@@ -1,34 +1,6 @@
 name: nucliadb Node Binding (rust + python)
 
-on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/nucliadb_node_binding.yml"
-      - "charts/nucliadb_node/**"
-      - "Dockerfile.node"
-      - "Dockerfile.node_sidecar"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "nucliadb_core/**"
-      - "nucliadb_telemetry/**"
-      - "nucliadb_node/**"
-      - "nucliadb_node_binding/**"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/nucliadb_node_binding.yml"
-      - "charts/nucliadb_node/**"
-      - "Dockerfile.node"
-      - "Dockerfile.node_sidecar"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "nucliadb_core/**"
-      - "nucliadb_telemetry/**"
-      - "nucliadb_node/**"
-      - "nucliadb_node_binding/**"
+on: workflow_dispatch
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
