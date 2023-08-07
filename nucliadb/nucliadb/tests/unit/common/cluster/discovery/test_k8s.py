@@ -42,9 +42,9 @@ def writer_stub():
         node_id="node_id", shard_count=1
     )
     with patch(
-        "nucliadb.common.cluster.discovery.k8s.nodewriter_pb2_grpc.NodeWriterStub",
+        "nucliadb.common.cluster.discovery.abc.nodewriter_pb2_grpc.NodeWriterStub",
         return_value=writer_stub,
-    ), patch("nucliadb.common.cluster.discovery.k8s.get_traced_grpc_channel"):
+    ), patch("nucliadb.common.cluster.discovery.abc.get_traced_grpc_channel"):
         yield writer_stub
 
 
@@ -90,7 +90,7 @@ async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub
     ) == IndexNodeMetadata(
         node_id="node_id",
         shard_count=1,
-        name="node-0",
+        name="node_id",
         address="1.1.1.1",
     )
 
