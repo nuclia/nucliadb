@@ -19,7 +19,7 @@
 //
 
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use nucliadb_core::thread::*;
 use ram_hnsw::*;
@@ -85,6 +85,28 @@ impl PartialOrd for Cnx {
 
 pub type Neighbours = Vec<(Address, f32)>;
 
+#[derive(Clone, Copy)]
+struct NodeFilter<'a, DR> {
+    tracker: &'a DR,
+    filter: &'a Formula,
+    blocked_addresses: &'a HashSet<Address>,
+    vec_counter: &'a RepCounter<'a>,
+}
+
+impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
+    pub fn is_valid(&self, n: Address, score: f32) -> bool {
+        !score.is_nan()
+        // The vector was deleted at some point and will be removed in a future merge
+        && !self.tracker.is_deleted(n)
+        // The vector is blocked, meaning that its key is part of the current version of the solution
+        && !self.blocked_addresses.contains(&n)
+        // The number of times this vector appears is 0
+        && self.vec_counter.get(self.tracker.get_vector(n)) == 0
+        // The vector satisfies the given filter
+        && self.filter.run(n, self.tracker)
+    }
+}
+
 pub struct HnswOps<'a, DR> {
     distribution: Uniform<f64>,
     layer_rng: SmallRng,
@@ -115,36 +137,29 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         x: Address,
         query: Address,
         layer: L,
-        filter: &Formula,
-        blocked_addresses: &HashSet<Address>,
-        vec_counter: &RepCounter,
+        filter: NodeFilter<'a, DR>,
     ) -> Option<(Address, f32)> {
+        // We just need to perform BFS, the replacement is the closest node to the actual
+        // best solution. This algorithm takes a lazy approach to computing the similarity of
+        // candidates.
         let mut visited_nodes = HashSet::new();
-        let mut candidates = BinaryHeap::from([Cnx(x, self.similarity(x, query))]);
+        let mut candidates = VecDeque::from([x]);
         loop {
-            match candidates.pop() {
+            let best_so_far = candidates.pop_front();
+            match best_so_far.map(|n| (n, self.similarity(n, query))) {
                 None => break None,
-                Some(Cnx(_, score)) if score < self.tracker.min_score() => break None,
-                Some(Cnx(n, score))
-                        // The vector was deleted at some point and will be removed in a future merge
-                        if !self.tracker.is_deleted(n)
-                        // A score may be invalid if the index contains zero vectors 
-                        && !score.is_nan()
-                        // The vector is blocked, meaning that its key is part of the current version of the solution
-                        && !blocked_addresses.contains(&n)
-                        // The number of times this vector appears is 0
-                        && vec_counter.get(self.tracker.get_vector(n)) == 0
-                        // The vector satisfies the given filter
-                        && filter.run(n, self.tracker) =>
-                {
-                    break Some((n, self.similarity(n, query)));
+                Some((_, score)) if score < self.tracker.min_score() => break None,
+                Some((n, score)) if filter.is_valid(n, score) => break Some((n, score)),
+                Some((down, _)) => {
+                    let mut sorted_out: Vec<_> = layer.get_out_edges(down).collect();
+                    sorted_out.sort_by(|a, b| b.1.dist.total_cmp(&a.1.dist));
+                    sorted_out.into_iter().for_each(|(new_candidate, _)| {
+                        if !visited_nodes.contains(&new_candidate) {
+                            candidates.push_back(new_candidate);
+                            visited_nodes.insert(new_candidate);
+                        }
+                    });
                 }
-                Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, _)| {
-                    if !visited_nodes.contains(&n) {
-                        candidates.push(Cnx(n, self.similarity(n, query)));
-                        visited_nodes.insert(n);
-                    }
-                }),
             }
         }
     }
@@ -248,48 +263,50 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         with_filter: &Formula,
         with_duplicates: bool,
     ) -> Neighbours {
-        if let Some(entry_point) = hnsw.get_entry_point() {
-            let mut crnt_layer = entry_point.layer;
-            let mut neighbours = vec![(entry_point.node, 0.)];
-            while crnt_layer != 0 {
-                let layer = hnsw.get_layer(crnt_layer);
-                let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-                let layer_res = self.layer_search(query, layer, 1, &entry_points);
-                neighbours = layer_res;
-                crnt_layer -= 1;
-            }
-            let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
+        let Some(entry_point) = hnsw.get_entry_point() else {
+            return Neighbours::default()
+        };
+        let mut crnt_layer = entry_point.layer;
+        let mut neighbours = vec![(entry_point.node, 0.)];
+        while crnt_layer != 0 {
             let layer = hnsw.get_layer(crnt_layer);
-            let result = self.layer_search(query, layer, k_neighbours, &entry_points);
-            let mut sol_addresses = HashSet::new();
-            let mut vec_counter = RepCounter::new(!with_duplicates);
-            let mut filtered_result = Vec::new();
-            result.iter().copied().for_each(|(addr, _)| {
-                sol_addresses.insert(addr);
-                vec_counter.add(self.tracker.get_vector(addr));
-            });
-            result.into_iter().for_each(|(addr, _)| {
-                sol_addresses.remove(&addr);
-                vec_counter.sub(self.tracker.get_vector(addr));
-                if let Some((addr, score)) = self.closest_up_node(
+            let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
+            let layer_res = self.layer_search(query, layer, 1, &entry_points);
+            neighbours = layer_res;
+            crnt_layer -= 1;
+        }
+        let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
+        let layer = hnsw.get_layer(crnt_layer);
+        let result = self.layer_search(query, layer, k_neighbours, &entry_points);
+        let mut sol_addresses = HashSet::new();
+        let mut vec_counter = RepCounter::new(!with_duplicates);
+        let mut filtered_result = Vec::new();
+        result.iter().copied().for_each(|(addr, _)| {
+            sol_addresses.insert(addr);
+            vec_counter.add(self.tracker.get_vector(addr));
+        });
+        for (addr, _) in result {
+            sol_addresses.remove(&addr);
+            vec_counter.sub(self.tracker.get_vector(addr));
+            let node_filter = NodeFilter {
+                filter: with_filter,
+                tracker: self.tracker,
+                blocked_addresses: &sol_addresses,
+                vec_counter: &vec_counter,
+            };
+            let Some((addr, score)) = self.closest_up_node(
                     addr,
                     query,
                     hnsw.get_layer(0),
-                    with_filter,
-                    &sol_addresses,
-                    &vec_counter,
-                ) {
-                    filtered_result.push((addr, score));
-                    sol_addresses.insert(addr);
-                    vec_counter.add(self.tracker.get_vector(addr));
-                }
-            });
-            // order may be lost
-            filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
-            filtered_result
-        } else {
-            Neighbours::default()
+                    node_filter,
+                ) else { continue };
+            filtered_result.push((addr, score));
+            sol_addresses.insert(addr);
+            vec_counter.add(self.tracker.get_vector(addr));
         }
+        // order may be lost
+        filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
+        filtered_result
     }
 
     pub fn new(tracker: &DR) -> HnswOps<'_, DR> {
