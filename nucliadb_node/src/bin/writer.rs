@@ -61,6 +61,11 @@ async fn main() -> NodeResult<()> {
         std::fs::create_dir(data_path.clone())?;
     }
 
+    let shards_path = settings.shards_path();
+    if !shards_path.exists() {
+        std::fs::create_dir(shards_path.clone())?;
+    }
+
     let node_metadata = NodeMetadata::new()?;
 
     // XXX it probably should be moved to a more clear abstraction
