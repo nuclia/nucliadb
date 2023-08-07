@@ -89,7 +89,10 @@ class ShardCreatorHandler:
         metrics.total_messages.inc({"type": "shard_creator", "action": "scheduled"})
 
     def should_create_new_shard(self, counter: nodesidecar_pb2.Counter) -> bool:
-        return counter.paragraphs > settings.max_shard_paragraphs
+        return (
+            counter.paragraphs > settings.max_shard_paragraphs
+            or counter.fields > settings.max_shard_fields
+        )
 
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
