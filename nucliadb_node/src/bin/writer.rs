@@ -19,7 +19,6 @@
 //
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -62,8 +61,7 @@ async fn main() -> NodeResult<()> {
         std::fs::create_dir(data_path.clone())?;
     }
 
-    let metadata_path = settings.metadata_path();
-    let node_metadata = NodeMetadata::load_or_create(&metadata_path)?;
+    let node_metadata = NodeMetadata::new()?;
 
     // XXX it probably should be moved to a more clear abstraction
     lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
@@ -83,7 +81,7 @@ async fn main() -> NodeResult<()> {
         settings.writer_listen_address(),
     ));
     {
-        let task = update_node_metadata(metadata_receiver, node_metadata, metadata_path);
+        let task = update_node_metadata(metadata_receiver, node_metadata);
         match metrics.task_monitor("UpdateNodeMetadata".to_string()) {
             Some(monitor) => {
                 let instrumented = monitor.instrument(task);
@@ -146,7 +144,6 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver, listen_addres
 pub async fn update_node_metadata(
     mut metadata_receiver: UnboundedReceiver<NodeWriterEvent>,
     mut node_metadata: NodeMetadata,
-    path: PathBuf,
 ) {
     info!("Start node update task");
 
@@ -158,11 +155,6 @@ pub async fn update_node_metadata(
             NodeWriterEvent::ShardDeletion => node_metadata.delete_shard(),
         };
 
-        if let Err(e) = node_metadata.save(&path) {
-            error!("Node metadata update failed: {e}");
-        } else {
-            info!("Node metadata file updated successfully");
-        }
     }
 
     info!("Node update task stopped");

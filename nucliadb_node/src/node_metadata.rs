@@ -18,11 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
-use std::path::Path;
-
-use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 
@@ -65,43 +60,10 @@ impl NodeMetadata {
     pub fn delete_shard(&mut self) {
         self.shard_count -= 1;
     }
-    pub fn load_or_create(path: &Path) -> NodeResult<Self> {
-        if !path.exists() {
-            debug!("Node metadata file does not exist.");
 
-            let node_metadata = Self::create(path).unwrap_or_else(|e| {
-                warn!("Cannot create metadata file '{}': {e}", path.display());
-                debug!("Create default metadata file '{}'", path.display());
-
-                Self::default()
-            });
-
-            node_metadata.save(path)?;
-            Ok(node_metadata)
-        } else {
-            Self::load(path)
-        }
-    }
-
-    pub fn save(&self, path: &Path) -> NodeResult<()> {
-        debug!("Saving node metadata file '{}'", path.display());
-        let file = File::create(path)?;
-        let mut writer = BufWriter::new(file);
-        serde_json::to_writer(&mut writer, &self)?;
-        Ok(writer.flush()?)
-    }
-
-    pub fn load(path: &Path) -> NodeResult<Self> {
-        debug!("Loading node metadata file '{}'", path.display());
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        Ok(serde_json::from_reader(reader)?)
-    }
-
-    pub fn create(path: &Path) -> NodeResult<Self> {
-        debug!("Creating node metadata file '{}'", path.display());
-        number_of_shards()
-            .map(|i| i as u64)
-            .map(|shard_count| NodeMetadata { shard_count })
+    pub fn new() -> NodeResult<Self> {
+        Ok(Self {
+            shard_count: number_of_shards()?.try_into().unwrap(),
+        })
     }
 }

@@ -388,9 +388,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<NodeMetadata>, Status> {
-        let metadata_path = self.settings.metadata_path();
         let metadata = tokio::task::spawn_blocking(move || {
-            crate::node_metadata::NodeMetadata::load(&metadata_path)
+            crate::node_metadata::NodeMetadata::new()
         })
         .await
         .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
