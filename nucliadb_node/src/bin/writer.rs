@@ -154,7 +154,6 @@ pub async fn update_node_metadata(
             NodeWriterEvent::ShardCreation => node_metadata.new_shard(),
             NodeWriterEvent::ShardDeletion => node_metadata.delete_shard(),
         };
-
     }
 
     info!("Node update task stopped");

@@ -49,6 +49,12 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
 }
 
 impl NodeMetadata {
+    pub fn new() -> NodeResult<Self> {
+        Ok(Self {
+            shard_count: number_of_shards()?.try_into().unwrap(),
+        })
+    }
+
     pub fn shard_count(&self) -> u64 {
         self.shard_count
     }
@@ -59,11 +65,5 @@ impl NodeMetadata {
 
     pub fn delete_shard(&mut self) {
         self.shard_count -= 1;
-    }
-
-    pub fn new() -> NodeResult<Self> {
-        Ok(Self {
-            shard_count: number_of_shards()?.try_into().unwrap(),
-        })
     }
 }
