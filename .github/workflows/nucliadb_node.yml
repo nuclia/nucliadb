@@ -419,6 +419,10 @@ jobs:
           helm package charts/nucliadb_node
           curl --data-binary "@nucliadb_node-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      - name: Trigger internal Jenkins
-        run: |-
-          curl -u "${{ secrets.JENKINS_API_USER }}:${{ secrets.JENKINS_API_KEY }}" --data-urlencode "NUCLIADB_COMPONENT=node"  --data-urlencode "VERSION=${{ steps.version_step.outputs.version_number }}" ${{ secrets.JENKINS_WEBHOOK_URL }}
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_CICD_PUBLIC }}
+          repository: nuclia/nucliadb_deploy
+          event-type: promote
+          client-payload: '{"component": "nucliadb_node", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
