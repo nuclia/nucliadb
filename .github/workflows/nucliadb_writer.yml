@@ -76,7 +76,7 @@ jobs:
       - name: Extract docs
         run: |
           mkdir -p /tmp/openapi
-          nucliadb-extract-openapi-writer /tmp/openapi/$COMPONENT.json $API_VERSION $GITHUB_SHA
+          nucliadb-extract-openapi-writer /tmp/openapi/$COMPONENT.json $API_VERSION ${{github.sha}}
 
       - uses: actions/upload-artifact@v2
         with:

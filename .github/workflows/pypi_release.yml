@@ -93,4 +93,4 @@ jobs:
           token: ${{ secrets.GH_CICD_PUBLIC }}
           repository: nuclia/nuclia.py
           event-type: test-stage
-          client-payload: '{"component": "nucliadb", "commit": "${{ GITHUB_SHA }}", "user": "${{ github.actor }}"}'
+          client-payload: '{"component": "nucliadb", "commit": "${{ github.sha }}", "user": "${{ github.actor }}"}'

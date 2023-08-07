@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  HASH: $(git rev-parse --short "$GITHUB_SHA")
+  HASH: $(git rev-parse --short "${{github.sha}}")
   BRANCH: ${GITHUB_REF##*/}
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         id: version_step
         run: |-
           VERSION=`cat VERSION`
-          VERSION_SHA=$VERSION+$(echo $GITHUB_SHA | cut -c1-6)
+          VERSION_SHA=$VERSION+$(echo ${{github.sha}} | cut -c1-6)
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_shared/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
