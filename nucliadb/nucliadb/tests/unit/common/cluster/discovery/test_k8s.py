@@ -42,9 +42,9 @@ def writer_stub():
         node_id="node_id", shard_count=1
     )
     with patch(
-        "nucliadb.common.cluster.discovery.abc.nodewriter_pb2_grpc.NodeWriterStub",
+        "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",
         return_value=writer_stub,
-    ), patch("nucliadb.common.cluster.discovery.abc.get_traced_grpc_channel"):
+    ), patch("nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"):
         yield writer_stub
 
 
