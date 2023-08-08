@@ -27,8 +27,8 @@ import backoff
 async def test_backoff_retry_async_generator_ok():
     mock = MagicMock()
 
-#    @backoff_retry_async_generator((ValueError,), max_tries=2)
-    @backoff.on_exception(backoff.expo, ValueError, max_tries=2)
+    @backoff_retry_async_generator((ValueError,), max_tries=2)
+#    @backoff.on_exception(backoff.expo, ValueError, max_tries=2)
     async def gen(arg, kwarg=None):
         mock(arg, kwarg=kwarg)
         yield 1
@@ -41,8 +41,8 @@ async def test_backoff_retry_async_generator_ok():
 async def test_backoff_retry_async_generator_retries_on_error():
     mock = MagicMock()
 
-#    @backoff_retry_async_generator((ValueError,), max_tries=2)
-    @backoff.on_exception(backoff.expo, ValueError, max_tries=2)
+    @backoff_retry_async_generator((ValueError,), max_tries=2)
+#    @backoff.on_exception(backoff.expo, ValueError, max_tries=2)
     async def gen():
         mock()
         raise ValueError()
@@ -54,6 +54,7 @@ async def test_backoff_retry_async_generator_retries_on_error():
 
     assert mock.call_count == 2
 
+# What if the error happens in the middle of the generator traversal?
 
 # async def test_backoff_retry_async_generator_retries_single_error():
 #     mock = MagicMock()
