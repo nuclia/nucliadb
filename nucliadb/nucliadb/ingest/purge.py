@@ -38,9 +38,15 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 
+async def _iter_keys(driver: Driver, match: str) -> str:
+    async with driver.transaction() as keys_txn:
+        async for key in keys_txn.keys(match=match, count=-1):
+            yield key
+
+
 async def purge_kb(driver: Driver):
     logger.info("START PURGING KB")
-    async for key in driver.keys(match=KB_TO_DELETE_BASE, count=-1):
+    async for key in _iter_keys(driver, KB_TO_DELETE_BASE):
         logger.info(f"Purging kb {key}")
         try:
             kbid = key.split("/")[2]
@@ -91,7 +97,7 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
     # Last iteration deleted all kbs, and set their storages marked to be deleted also in tikv
     # Here we'll delete those storage buckets
     logger.info("START PURGING KB STORAGE")
-    async for key in driver.keys(match=KB_TO_DELETE_STORAGE_BASE, count=-1):
+    async for key in _iter_keys(driver, KB_TO_DELETE_STORAGE_BASE):
         logger.info(f"Purging storage {key}")
         try:
             kbid = key.split("/")[2]
