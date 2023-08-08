@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 
@@ -51,16 +50,8 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
 
 impl NodeMetadata {
     pub fn new() -> NodeResult<Self> {
-        let count = number_of_shards().unwrap_or_else(|e| {
-            warn!(
-                "Cannot read number of shards. '{}': {e}",
-                env::shards_path().display()
-            );
-            0
-        });
-
-        Ok(NodeMetadata {
-            shard_count: u64::try_from(count).unwrap(),
+        Ok(Self {
+            shard_count: number_of_shards()?.try_into().unwrap(),
         })
     }
 
