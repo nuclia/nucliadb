@@ -42,6 +42,7 @@ from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_pubsub, get_storage
+from lru import LRU  # type: ignore
 
 subscriber_observer = metrics.Observer(
     "message_processor",
@@ -78,7 +79,7 @@ class Worker:
         self.reader = reader
         self.subscriptions = []
         self.ack_wait = 10 * 60
-        self.shard_locks = {}
+        self.shard_locks = LRU(100)
         self.node = node
         self.gc_task = None
         self.publisher = IndexedPublisher()
