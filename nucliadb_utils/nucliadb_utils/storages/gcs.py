@@ -40,6 +40,7 @@ from nucliadb_telemetry import metrics
 from nucliadb_telemetry.utils import setup_telemetry
 
 from nucliadb_utils import logger
+from nucliadb_utils.retry import backoff_retry_async_generator
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
     CouldNotCopyNotFound,
@@ -142,7 +143,7 @@ class GCSStorageField(StorageField):
                 data = await resp.json()
                 assert data["resource"]["name"] == destination_uri
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff_retry_async_generator(RETRIABLE_EXCEPTIONS, max_tries=4)
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(self, headers=None):
         if headers is None:

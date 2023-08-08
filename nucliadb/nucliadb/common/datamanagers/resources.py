@@ -38,12 +38,7 @@ class ResourcesDataManager:
         self.storage = storage
 
     @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
-    async def iterate_resource_ids(self, kbid: str) -> AsyncGenerator[str, None]:
-        """
-        Currently, the implementation of this is optimizing for reducing
-        how long a transaction will be open since the caller controls
-        how long each item that is yielded will be processed.
-        """
+    async def get_all_resource_slugs(self, kbid) -> list[str]:
         all_slugs = []
         async with self.driver.transaction() as txn:
             async for key in txn.keys(
@@ -51,12 +46,26 @@ class ResourcesDataManager:
             ):
                 slug = key.split("/")[-1]
                 all_slugs.append(slug)
+        return all_slugs
 
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
+    async def get_resource_id_from_slug(self, kbid: str, slug: str) -> Optional[str]:
+        async with self.driver.transaction() as txn:
+            rid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
+        if rid is not None:
+            return rid.decode()
+
+    async def iterate_resource_ids(self, kbid: str) -> AsyncGenerator[str, None]:
+        """
+        Currently, the implementation of this is optimizing for reducing
+        how long a transaction will be open since the caller controls
+        how long each item that is yielded will be processed.
+        """
+        all_slugs = await self.get_all_resource_slugs(kbid)
         for slug in all_slugs:
-            async with self.driver.transaction() as txn:
-                rid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
+            rid = await self.get_resource_id_from_slug(kbid, slug)
             if rid is not None:
-                yield rid.decode()
+                yield rid
 
     @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
     async def get_resource_shard_id(self, kbid: str, rid: str) -> Optional[str]:
