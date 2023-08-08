@@ -95,6 +95,8 @@ class nucliadbNodeReader(BaseImage):
     def get_image_options(self):
         options = super(nucliadbNodeReader, self).get_image_options()
         options["volumes"] = {self._volume.name: {"bind": "/data"}}
+        # Forces the plaform so the test works on Apple Silicon series
+        options["platform"] = "linux/amd64"
         return options
 
     def check(self):
@@ -120,6 +122,8 @@ class nucliadbNodeWriter(BaseImage):
     def get_image_options(self):
         options = super(nucliadbNodeWriter, self).get_image_options()
         options["volumes"] = {self._volume.name: {"bind": "/data"}}
+        # Forces the plaform so the test works on Apple Silicon series
+        options["platform"] = "linux/amd64"
         return options
 
     def check(self):
