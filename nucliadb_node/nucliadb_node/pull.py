@@ -78,13 +78,13 @@ class Worker:
         self.reader = reader
         self.subscriptions = []
         self.ack_wait = 10 * 60
-        self.lock = asyncio.Lock()
-        self.event = asyncio.Event()
+        self.shard_locks = {}
         self.node = node
         self.gc_task = None
         self.publisher = IndexedPublisher()
         self.load_seqid()
         self.brain: Optional[Resource] = None
+        self.gc_event = asyncio.Event()  # when to run garbage collector
 
     async def finalize(self):
         if self.gc_task:
@@ -118,7 +118,6 @@ class Worker:
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
-        self.event.clear()
         await self.publisher.initialize()
         await self.subscriber_initialize()
         self.gc_task = asyncio.create_task(self.garbage())
@@ -166,21 +165,26 @@ class Worker:
 
     async def _garbage(self) -> None:
         while True:
-            await self.event.wait()
-            await asyncio.sleep(10)
-            if self.event.is_set():
-                async with self.lock:
-                    try:
-                        logger.info(f"Mr Propper working")
-                        shards: ShardIds = await self.writer.shards()
-                        for shard in shards.ids:
+            try:
+                if not self.gc_event.is_set():
+                    continue
+
+                # reset event until resource is indexed again and we try again
+                self.gc_event.clear()
+                shards: ShardIds = await self.writer.shards()
+                for shard in shards.ids:
+                    async with self.lock:
+                        try:
                             await self.writer.garbage_collector(shard)
-                        logger.info(f"Garbaged {len(shards.ids)}")
-                    except Exception:
-                        logger.exception(
-                            f"Could not garbage {shard.id}", stack_info=True
-                        )
-                await asyncio.sleep(24 * 3660)
+                        except Exception:
+                            logger.exception(
+                                f"Could not garbage {shard.id}", stack_info=True
+                            )
+                logger.info(f"Garbaged {len(shards.ids)}")
+            except Exception:
+                logger.exception("Unhandled error garbage collecting")
+            finally:
+                await asyncio.sleep(60)
 
     def store_seqid(self, seqid: int):
         if settings.data_path is None:
@@ -218,6 +222,11 @@ class Worker:
         logger.info(f"...done")
         return status
 
+    def _get_shard_lock(self, shard_id: str) -> asyncio.Lock:
+        if shard_id not in self.shard_locks:
+            self.shard_locks[shard_id] = asyncio.Lock()
+        return self.shard_locks[shard_id]
+
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
@@ -233,12 +242,11 @@ class Worker:
             await msg.ack()
             return
 
-        self.event.clear()
+        pb = IndexMessage()
+        pb.ParseFromString(msg.data)
         status: Optional[OpStatus] = None
-        async with self.lock:
+        async with self._get_shard_lock(pb.shard):
             try:
-                pb = IndexMessage()
-                pb.ParseFromString(msg.data)
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
                 elif pb.typemessage == TypeMessage.DELETION:
@@ -278,8 +286,8 @@ class Worker:
         try:
             self.store_seqid(seqid)
             await msg.ack()
-            self.event.set()
             await self.publisher.indexed(pb)
+            self.gc_event.set()
         except Exception as e:  # pragma: no cover
             errors.capture_exception(e)
             logger.error(
