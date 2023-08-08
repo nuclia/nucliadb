@@ -43,7 +43,7 @@ class StandaloneClusterServiceServicer(
             elif service == "writer":
                 request_type, _ = grpc_node_binding.WRITER_METHODS[action]
             else:
-                raise NotImplementedError(f"Unknown type {self._type}")
+                raise NotImplementedError(f"Unknown type {service}")
         except KeyError:
             raise NotImplementedError(f"Unknown method for type {service}: {action}")
 
