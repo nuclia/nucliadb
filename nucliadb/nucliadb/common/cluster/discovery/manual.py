@@ -20,7 +20,7 @@
 import asyncio
 import logging
 
-from nucliadb.common.cluster.discovery.abc import (
+from nucliadb.common.cluster.discovery.base import (
     AbstractClusterDiscovery,
     update_members,
 )

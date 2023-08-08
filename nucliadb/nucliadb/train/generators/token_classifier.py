@@ -28,7 +28,7 @@ from nucliadb_protos.dataset_pb2 import (
 )
 from nucliadb_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
-from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import get_resource_from_cache_or_db

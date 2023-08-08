@@ -25,6 +25,15 @@ from typing import Any, Awaitable, Callable, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.cluster.exceptions import (
+    ExhaustedNodesError,
+    NodeClusterSmall,
+    NodeError,
+    NodesUnsync,
+    ShardNotFound,
+    ShardsNotFound,
+)
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
@@ -33,15 +42,6 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
 
-from .abc import AbstractIndexNode
-from .exceptions import (
-    ExhaustedNodesError,
-    NodeClusterSmall,
-    NodeError,
-    NodesUnsync,
-    ShardNotFound,
-    ShardsNotFound,
-)
 from .index_node import IndexNode
 from .settings import settings
 from .standalone.index_node import ProxyStandaloneIndexNode

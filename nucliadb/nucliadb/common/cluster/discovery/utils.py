@@ -20,7 +20,7 @@
 import asyncio
 from typing import Type, Union
 
-from nucliadb.common.cluster.discovery.abc import AbstractClusterDiscovery
+from nucliadb.common.cluster.discovery.base import AbstractClusterDiscovery
 from nucliadb.common.cluster.discovery.k8s import KubernetesDiscovery
 from nucliadb.common.cluster.discovery.manual import ManualDiscovery
 from nucliadb.common.cluster.discovery.single import SingleNodeDiscovery

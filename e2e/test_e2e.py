@@ -83,15 +83,7 @@ def test_resource_processed(kbid: str, resource_id: str):
             headers={
                 "content-type": "application/json",
                 "X-NUCLIADB-ROLES": "READER",
-                "x-synchronous": "true",
                 "x-ndb-client": "web",
-            },
-            json={
-                "links": {"link": {"uri": "https://en.wikipedia.org/wiki/Cricket"}},
-                "usermetadata": {"classifications": []},
-                "title": "https://en.wikipedia.org/wiki/Cricket",
-                "icon": "application/stf-link",
-                "origin": {"url": "https://en.wikipedia.org/wiki/Cricket"},
             },
         )
 
@@ -119,7 +111,6 @@ def test_search(kbid: str, resource_id: str):
         headers={
             "content-type": "application/json",
             "X-NUCLIADB-ROLES": "READER",
-            "x-synchronous": "true",
             "x-ndb-client": "web",
         },
         json={

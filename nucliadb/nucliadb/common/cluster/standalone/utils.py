@@ -56,9 +56,13 @@ def get_self() -> StandaloneIndexNode:
             host = gethostname()
         _SELF_INDEX_NODE = StandaloneIndexNode(id=node_id, address=host, shard_count=0)
     try:
-        # XXX this is weird right? How silly is this?
+        _shards_dir = os.path.join(cluster_settings.data_path, "shards")
         _SELF_INDEX_NODE.shard_count = len(
-            os.listdir(os.path.join(cluster_settings.data_path, "shards"))
+            [
+                shard_dir
+                for shard_dir in os.listdir(_shards_dir)
+                if os.path.isdir(os.path.join(_shards_dir, shard_dir))
+            ]
         )
     except FileNotFoundError:  # pragma: no cover
         ...

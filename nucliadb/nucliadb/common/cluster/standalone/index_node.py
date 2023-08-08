@@ -20,7 +20,7 @@
 import inspect
 from typing import Any
 
-from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.grpc_node_dummy import (  # type: ignore
     DummyReaderStub,
     DummySidecarStub,

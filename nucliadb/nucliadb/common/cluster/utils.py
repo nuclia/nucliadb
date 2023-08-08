@@ -24,9 +24,9 @@ from nucliadb.common.cluster.discovery.utils import (
     teardown_cluster_discovery,
 )
 from nucliadb.common.cluster.manager import KBShardManager, StandaloneKBShardManager
+from nucliadb.common.cluster.settings import settings
+from nucliadb.common.cluster.standalone.service import start_grpc
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
-
-from .settings import settings
 
 _lock = asyncio.Lock()
 
@@ -42,8 +42,6 @@ async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
         await setup_cluster_discovery()
         mng: Union[KBShardManager, StandaloneKBShardManager]
         if settings.standalone_mode:
-            from .standalone.service import start_grpc
-
             server = await start_grpc()
             set_utility(_STANDALONE_SERVER, server)
             mng = StandaloneKBShardManager()

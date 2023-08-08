@@ -25,7 +25,7 @@ import pytest
 from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ExhaustedNodesError
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_utils.keys import KB_SHARDS

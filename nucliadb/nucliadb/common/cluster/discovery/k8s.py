@@ -32,7 +32,7 @@ import kubernetes_asyncio.config  # type: ignore
 import kubernetes_asyncio.watch  # type: ignore
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.discovery.abc import (
+from nucliadb.common.cluster.discovery.base import (
     AVAILABLE_NODES,
     AbstractClusterDiscovery,
 )

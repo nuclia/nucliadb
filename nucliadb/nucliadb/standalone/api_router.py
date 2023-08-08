@@ -120,4 +120,6 @@ async def alive(request: Request) -> JSONResponse:
 
 @standalone_api_router.get("/health/ready")
 async def ready(request: Request) -> JSONResponse:
+    if len(manager.get_index_nodes()) == 0:
+        return JSONResponse({"status": "not ready"}, status_code=503)
     return JSONResponse({"status": "ok"})
