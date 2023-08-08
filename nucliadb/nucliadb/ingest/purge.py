@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import AsyncGenerator
 
 import pkg_resources
 
@@ -38,7 +39,7 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 
-async def _iter_keys(driver: Driver, match: str) -> str:
+async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
     async with driver.transaction() as keys_txn:
         async for key in keys_txn.keys(match=match, count=-1):
             yield key
