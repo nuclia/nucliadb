@@ -24,7 +24,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List, Optional
 
 DEFAULT_SCAN_LIMIT = 10
-DEFAULT_BATCH_SCAN_LIMIT = 100
+DEFAULT_BATCH_SCAN_LIMIT = 2000
 
 
 class Transaction:
