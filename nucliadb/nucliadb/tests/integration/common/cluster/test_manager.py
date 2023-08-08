@@ -193,7 +193,7 @@ async def test_apply_for_all_shards(fake_kbid: str, shards, redis_driver: Driver
 @pytest.fixture(scope="function")
 def node_new_shard():
     with mock.patch(
-        "nucliadb.common.cluster.abc.AbstractIndexNode.new_shard",
+        "nucliadb.common.cluster.base.AbstractIndexNode.new_shard",
         side_effect=Exception(),
     ) as mocked:
         yield mocked
