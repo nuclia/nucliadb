@@ -51,8 +51,8 @@ class Writer:
     async def delete_resource(self, pb: ResourceID) -> OpStatus:
         return await self.stub.RemoveResource(pb)  # type: ignore
 
-    async def garbage_collector(self, pb: ShardId):
-        await self.stub.GC(pb)  # type: ignore
+    async def garbage_collector(self, shard_id: str):
+        await self.stub.GC(ShardId(id=shard_id))  # type: ignore
 
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()

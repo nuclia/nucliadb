@@ -84,7 +84,7 @@ class Worker:
         self.publisher = IndexedPublisher()
         self.load_seqid()
         self.brain: Optional[Resource] = None
-        self.gc_event = asyncio.Event()  # when to run garbage collector
+        self.shards_to_gc = []
 
     async def finalize(self):
         if self.gc_task:
@@ -164,23 +164,20 @@ class Worker:
             return
 
     async def _garbage(self) -> None:
+        # on start, gc everything
+        self.shards_to_gc = [shard.id for shard in (await self.writer.shards()).ids]
         while True:
             try:
-                if not self.gc_event.is_set():
-                    continue
-
-                # reset event until resource is indexed again and we try again
-                self.gc_event.clear()
-                shards: ShardIds = await self.writer.shards()
-                for shard in shards.ids:
-                    async with self.lock:
+                shard_ids = self.shards_to_gc
+                for shard_id in shard_ids:
+                    async with self._get_shard_lock(shard_id):
                         try:
-                            await self.writer.garbage_collector(shard)
+                            await self.writer.garbage_collector(shard_id)
                         except Exception:
                             logger.exception(
-                                f"Could not garbage {shard.id}", stack_info=True
+                                f"Could not garbage {shard_id}", stack_info=True
                             )
-                logger.info(f"Garbaged {len(shards.ids)}")
+                logger.info(f"Garbage collected {len(shard_ids)}")
             except Exception:
                 logger.exception("Unhandled error garbage collecting")
             finally:
@@ -287,7 +284,8 @@ class Worker:
             self.store_seqid(seqid)
             await msg.ack()
             await self.publisher.indexed(pb)
-            self.gc_event.set()
+            if pb.shard not in self.shards_to_gc:
+                self.shards_to_gc.append(pb.shard)
         except Exception as e:  # pragma: no cover
             errors.capture_exception(e)
             logger.error(
