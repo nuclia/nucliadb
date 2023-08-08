@@ -169,6 +169,7 @@ class Worker:
         while True:
             try:
                 shard_ids = self.shards_to_gc
+                self.shards_to_gc = []
                 for shard_id in shard_ids:
                     async with self._get_shard_lock(shard_id):
                         try:
