@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import inspect
 from typing import Any
 
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -110,10 +109,17 @@ class ProxyCallerWrapper:
                 service=self._type, action=name, payload=request.SerializeToString()
             )
             resp = await self._stub.NodeAction(req)
-            return_type_str = inspect.signature(
-                getattr(self._original_type, name)
-            ).return_annotation
-            return_type = getattr(grpc_node_binding, return_type_str)
+            try:
+                if self._type == "reader":
+                    _, return_type = grpc_node_binding.READER_METHODS[name]
+                elif self._type == "writer":
+                    _, return_type = grpc_node_binding.WRITER_METHODS[name]
+                else:
+                    raise NotImplementedError(f"Unknown type {self._type}")
+            except KeyError:
+                raise NotImplementedError(
+                    f"Unknown method for type {self._type}: {name}"
+                )
             return_value = return_type()
             return_value.ParseFromString(resp.payload)
             return return_value

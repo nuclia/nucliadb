@@ -38,21 +38,15 @@ class StandaloneClusterServiceServicer(
     ) -> standalone_pb2.NodeActionResponse:
         service = request.service
         action = request.action
-        if service == "reader":
-            method = getattr(grpc_node_binding.StandaloneReaderWrapper, action)
-        elif service == "writer":
-            method = getattr(grpc_node_binding.StandaloneWriterWrapper, action)
-        else:
-            raise Exception(f"Unknown service {service}")
-
-        sig = inspect.signature(method)
-        request_type = getattr(
-            grpc_node_binding, sig.parameters["request"].annotation, None
-        )
-        if request_type is None:
-            raise Exception(
-                f"Unknown request type {sig.parameters['request'].annotation}"
-            )
+        try:
+            if service == "reader":
+                request_type, _ = grpc_node_binding.READER_METHODS[action]
+            elif service == "writer":
+                request_type, _ = grpc_node_binding.WRITER_METHODS[action]
+            else:
+                raise NotImplementedError(f"Unknown type {self._type}")
+        except KeyError:
+            raise NotImplementedError(f"Unknown method for type {service}: {action}")
 
         index_node_action = getattr(getattr(get_self(), service), action)
         action_request = request_type()
