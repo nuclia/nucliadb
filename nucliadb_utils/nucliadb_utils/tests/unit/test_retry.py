@@ -21,14 +21,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from nucliadb_utils.retry import backoff_retry_async_generator
-import backoff
 
 
 async def test_backoff_retry_async_generator_ok():
     mock = MagicMock()
 
     @backoff_retry_async_generator((ValueError,), max_tries=2)
-#    @backoff.on_exception(backoff.expo, ValueError, max_tries=2)
     async def gen(arg, kwarg=None):
         mock(arg, kwarg=kwarg)
         yield 1
@@ -42,7 +40,6 @@ async def test_backoff_retry_async_generator_retries_on_error():
     mock = MagicMock()
 
     @backoff_retry_async_generator((ValueError,), max_tries=2)
-#    @backoff.on_exception(backoff.expo, ValueError, max_tries=2)
     async def gen():
         mock()
         raise ValueError()
@@ -53,22 +50,3 @@ async def test_backoff_retry_async_generator_retries_on_error():
             pass
 
     assert mock.call_count == 2
-
-# What if the error happens in the middle of the generator traversal?
-
-# async def test_backoff_retry_async_generator_retries_single_error():
-#     mock = MagicMock()
-#     iterator = list(range(4))
-#     @backoff_retry_async_generator((ValueError,), max_tries=2)
-#     async def gen(iterator):
-#         while len(iterator) > 0:
-#             i = iterator.pop(0)
-#             if i == 1 and mock.call_count == 0:
-#                 mock(i)
-#                 breakpoint()
-#                 iterator = [i] + iterator
-#                 raise ValueError()
-#             yield i
-
-#     assert [i async for i in gen(iterator)] == [0, 1, 2, 3]
-#     assert mock.call_count == 1

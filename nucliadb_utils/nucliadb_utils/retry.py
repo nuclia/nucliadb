@@ -19,7 +19,7 @@
 #
 import asyncio
 import functools
-from typing import AsyncGenerator, Iterable, Type
+from typing import Iterable, Type
 
 from nucliadb_utils import logger
 
