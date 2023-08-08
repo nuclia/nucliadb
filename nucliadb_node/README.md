@@ -9,12 +9,12 @@ Currently the main crates involved in making this system possible are shown in t
 
 ### nucliadb_core
 
-The node contains four different indexes that need to share certain functionality like error handling, tracing or handling protos types. `nucliadb_core` is the 
+The node contains four different indexes that need to share certain functionality like error handling, tracing or handling protos types. `nucliadb_core` is the
 crate where all this shared dependencies live.
 
 ### nucliadb_node
 
-Interacting with nucliadb's four indexes requiers going through `nucliadb_node`. This crate provides a grpc interface for adding, removing and searching informacion stored in 
+Interacting with nucliadb's four indexes requires going through `nucliadb_node`. This crate provides a grpc interface for adding, removing and searching informacion stored in
 the four indexes that live inside the node.
 
 ### nucliadb_vectors
@@ -24,7 +24,6 @@ Is possible to index vector embeddings using `nucliadb_node` thanks to this crat
 ### nucliadb_relations
 
 Is possible to index knowledge graphs using `nucliadb_node` thanks to this crate, nucliadb's own knowledge graph implementation built on top of [heed](https://github.com/meilisearch/heed).
-
 
 ### nucliadb_paragraphs and nucliadb_fields
 
