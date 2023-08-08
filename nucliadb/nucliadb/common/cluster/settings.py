@@ -31,7 +31,11 @@ class ClusterDiscoveryMode(str, enum.Enum):
 class Settings(BaseSettings):
     data_path: str = "./data/node"
     standalone_mode: bool = False
-    standalone_node_port: int = 10009
+    standalone_node_port: int = Field(
+        10009,
+        title="Standalone node port",
+        description="Port to use for standalone nodes to communication with each other through",
+    )
 
     node_replicas: int = 2
 
