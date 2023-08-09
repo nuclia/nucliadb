@@ -160,7 +160,7 @@ class TiKVTransaction(Transaction):
 
             if not keys[-1].startswith(original_match):
                 # done counting this range, find the correct size of the match
-                # and break out
+                # with a binary search and break out
                 left, right = 0, len(keys) - 1
                 result_index = 0
                 while left <= right:

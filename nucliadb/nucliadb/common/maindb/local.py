@@ -196,10 +196,6 @@ class LocalTransaction(Transaction):
                     yield new_key.replace(self.url, "")
 
     async def count(self, match: str) -> int:
-        """
-        This is not efficient but it works and redis is mostly for experiments
-        and should not be used for production environments
-        """
         value = 0
         async for _ in self.keys(match, count=-1):
             value += 1
