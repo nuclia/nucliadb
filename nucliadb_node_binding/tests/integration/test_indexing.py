@@ -33,7 +33,7 @@ from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
 
 
-class NucliaCluster:
+class IndexNode:
     def __init__(self):
         self.writer = NodeWriter()
         self.reader = NodeReader()
@@ -74,7 +74,7 @@ class NucliaCluster:
 
 @pytest.mark.asyncio
 async def test_set_and_search(data_path):
-    cluster = NucliaCluster()
+    cluster = IndexNode()
 
     shard_id = cluster.create_shard("test-kbid")
     cluster.create_resource(shard_id)
@@ -90,7 +90,7 @@ async def test_set_and_search(data_path):
 
 @pytest.mark.asyncio
 async def test_set_and_document_search(data_path):
-    cluster = NucliaCluster()
+    cluster = IndexNode()
     shard_id = cluster.create_shard("test-kbid")
     cluster.create_resource(shard_id)
 
