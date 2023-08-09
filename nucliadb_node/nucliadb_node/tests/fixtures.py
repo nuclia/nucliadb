@@ -59,6 +59,8 @@ images.settings["nucliadb_node_reader"] = {
         "command": [
             "/usr/local/bin/node_reader",
         ],
+        # Forces the plaform so the test works on Apple Silicon series
+        "platform": "linux/amd64",
         "ports": {"4445": None},
     },
 }
