@@ -7,4 +7,3 @@ grpcio-tools>=1.44.0
 grpcio-testing>=1.44.0
 grpcio-reflection>=1.44.0
 nucliadb-telemetry>=1.12.0
-lru-dict>=1.1.7
