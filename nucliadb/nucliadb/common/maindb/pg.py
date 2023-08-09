@@ -165,11 +165,3 @@ class PGDriver(Driver):
         txn = conn.transaction()
         await txn.start()
         return PGTransaction(conn, txn, driver=self)
-
-    async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ):
-        async with self.pool.acquire() as conn, conn.transaction():
-            dl = DataLayer(conn)
-            async for key in dl.scan_keys(match, count, include_start):
-                yield key
