@@ -20,6 +20,7 @@
 import asyncpg
 import pytest
 
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.common.maindb.tikv import TiKVDriver
@@ -62,7 +63,7 @@ async def test_local_driver(local_driver):
     await driver_basic(local_driver)
 
 
-async def driver_basic(driver):
+async def driver_basic(driver: Driver):
     await driver.initialize()
 
     # Test deleting a key that doesn't exist does not raise any error
@@ -91,8 +92,9 @@ async def driver_basic(driver):
     await txn.abort()
 
     current_internal_kbs_keys = set()
-    async for key in driver.keys("/internal/kbs/"):
-        current_internal_kbs_keys.add(key)
+    async with driver.transaction() as txn:
+        async for key in txn.keys("/internal/kbs/"):
+            current_internal_kbs_keys.add(key)
     assert current_internal_kbs_keys == {
         "/internal/kbs/kb1/title",
         "/internal/kbs/kb1/shards/shard1",
@@ -104,8 +106,9 @@ async def driver_basic(driver):
     await txn.commit()
 
     current_internal_kbs_keys = set()
-    async for key in driver.keys("/internal/kbs"):
-        current_internal_kbs_keys.add(key)
+    async with driver.transaction() as txn:
+        async for key in txn.keys("/internal/kbs"):
+            current_internal_kbs_keys.add(key)
 
     assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
 
@@ -116,8 +119,9 @@ async def driver_basic(driver):
     await txn.commit()
 
     current_internal_kbs_keys = set()
-    async for key in driver.keys("/internal/kbs"):
-        current_internal_kbs_keys.add(key)
+    async with driver.transaction() as txn:
+        async for key in txn.keys("/internal/kbs"):
+            current_internal_kbs_keys.add(key)
 
     assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
 
