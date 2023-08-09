@@ -69,7 +69,7 @@ class Settings(DriverSettings):
 
     # ingest consumer sts replica settings
     replica_number: int = -1
-    total_replicas: int = 1
+    total_replicas: int = 1  # number of ingest processor replicas in the cluster
     nuclia_partitions: int = 50
 
     max_receive_message_length: int = 4

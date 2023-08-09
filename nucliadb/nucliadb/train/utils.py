@@ -22,7 +22,7 @@ from typing import Optional
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
 
-from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.train.nodes import TrainShardManager  # type: ignore
 from nucliadb.train.settings import settings
 from nucliadb_protos import train_pb2_grpc
@@ -72,24 +72,26 @@ async def stop_train_grpc():
         clean_utility(Utility.TRAIN)
 
 
+_TRAIN_SM_NAME = "train_shard_manager"
+
+
 async def start_shard_manager():
     """
     XXX this is weird but too much to untangle right now
     """
     driver = await setup_driver()
     storage = await get_storage()
-    set_utility(
-        Utility.SHARD_MANAGER, TrainShardManager(driver=driver, storage=storage)
-    )
+    set_utility(_TRAIN_SM_NAME, TrainShardManager(driver=driver, storage=storage))
 
 
 async def stop_shard_manager():
-    if get_utility(Utility.SHARD_MANAGER):
-        clean_utility(Utility.SHARD_MANAGER)
+    if get_utility(_TRAIN_SM_NAME):
+        clean_utility(_TRAIN_SM_NAME)
+    await teardown_driver()
 
 
 def get_shard_manager() -> TrainShardManager:
-    util = get_utility(Utility.SHARD_MANAGER)
+    util = get_utility(_TRAIN_SM_NAME)
     if util is None:
         raise AttributeError("No Node Manager defined")
     return util

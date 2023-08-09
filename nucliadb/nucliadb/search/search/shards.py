@@ -32,7 +32,7 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import Shard
 
-from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_telemetry import metrics
 
 node_observer = metrics.Observer("node_client", labels={"type": ""})

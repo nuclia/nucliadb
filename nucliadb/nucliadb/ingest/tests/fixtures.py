@@ -32,7 +32,6 @@ from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.redis import RedisDriver
@@ -56,6 +55,7 @@ from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
+    clear_global_cache,
     get_utility,
     set_utility,
     start_nats_manager,
@@ -101,6 +101,7 @@ async def ingest_consumers(
     yield
 
     await ingest_consumers_finalizer()
+    clear_global_cache()
 
 
 @pytest.fixture(scope="function")
@@ -112,6 +113,7 @@ async def ingest_processed_consumer(
     yield
 
     await ingest_consumer_finalizer()
+    clear_global_cache()
 
 
 @pytest.fixture(scope="function")
@@ -162,20 +164,16 @@ async def fake_node(_natsd_reset, indexing_utility_ingest, shard_manager):
     uuid1 = str(uuid.uuid4())
     uuid2 = str(uuid.uuid4())
     manager.add_index_node(
-        IndexNode(
-            id=uuid1,
-            address="nohost:9999",
-            shard_count=0,
-            dummy=True,
-        )
+        id=uuid1,
+        address="nohost",
+        shard_count=0,
+        dummy=True,
     )
     manager.add_index_node(
-        IndexNode(
-            id=uuid2,
-            address="nohost:9999",
-            shard_count=0,
-            dummy=True,
-        )
+        id=uuid2,
+        address="nohost",
+        shard_count=0,
+        dummy=True,
     )
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,

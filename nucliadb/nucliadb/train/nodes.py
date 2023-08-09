@@ -32,7 +32,7 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_protos.writer_pb2 import ShardObject
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox

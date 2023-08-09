@@ -25,6 +25,15 @@ from typing import Any, Awaitable, Callable, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
 
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.cluster.exceptions import (
+    ExhaustedNodesError,
+    NodeClusterSmall,
+    NodeError,
+    NodesUnsync,
+    ShardNotFound,
+    ShardsNotFound,
+)
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
@@ -33,16 +42,10 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
 
-from .abc import AbstractIndexNode
-from .exceptions import (
-    ExhaustedNodesError,
-    NodeClusterSmall,
-    NodeError,
-    NodesUnsync,
-    ShardNotFound,
-    ShardsNotFound,
-)
+from .index_node import IndexNode
 from .settings import settings
+from .standalone.index_node import ProxyStandaloneIndexNode
+from .standalone.utils import get_self, get_standalone_node_id
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +60,19 @@ def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
     return INDEX_NODES.get(node_id)
 
 
-def add_index_node(node: AbstractIndexNode) -> None:
-    INDEX_NODES[node.id] = node
+def add_index_node(
+    *, id: str, address: str, shard_count: int, dummy: bool = False
+) -> None:
+    if settings.standalone_mode:
+        if id == get_standalone_node_id():
+            node = get_self()
+        else:
+            node = ProxyStandaloneIndexNode(
+                id=id, address=address, shard_count=shard_count, dummy=dummy
+            )
+    else:
+        node = IndexNode(id=id, address=address, shard_count=shard_count, dummy=dummy)  # type: ignore
+    INDEX_NODES[id] = node
 
 
 def remove_index_node(node_id: str) -> None:
@@ -189,7 +203,7 @@ class KBShardManager:
                     )
                 except Exception as e:
                     errors.capture_exception(e)
-                    logger.error(f"Error creating new shard at {node}: {e}")
+                    logger.exception(f"Error creating new shard at {node}: {e}")
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))
@@ -331,21 +345,6 @@ class StandaloneKBShardManager(KBShardManager):
                     f"Node {shardreplica.node} is not found or not available"
                 )
             await index_node.writer.SetResource(resource)  # type: ignore
-
-
-def setup_standalone_cluster():
-    from .standalone.index_node import StandaloneIndexNode
-
-    inode = StandaloneIndexNode(
-        # "LOCAL NODE" is the name of the node for all shards
-        # that have been created in standalone mode so far.
-        # When we switch to supporting clustering in standalone,
-        # we will need to generate a unique name for each node and update this
-        id="LOCAL NODE",
-        address="localhost",
-        shard_count=0,
-    )
-    INDEX_NODES[inode.id] = inode
 
 
 def choose_node(

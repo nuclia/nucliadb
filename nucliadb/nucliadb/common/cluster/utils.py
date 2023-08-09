@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import asyncio
 from typing import Union
 
 from nucliadb.common.cluster.discovery.utils import (
@@ -23,26 +24,44 @@ from nucliadb.common.cluster.discovery.utils import (
     teardown_cluster_discovery,
 )
 from nucliadb.common.cluster.manager import KBShardManager, StandaloneKBShardManager
+from nucliadb.common.cluster.settings import settings
+from nucliadb.common.cluster.standalone.service import (
+    start_grpc as start_standalone_grpc,
+)
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
-from .settings import settings
+_lock = asyncio.Lock()
+
+_STANDALONE_SERVER = "_standalone_service"
 
 
 async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
-    await setup_cluster_discovery()
-    mng: Union[KBShardManager, StandaloneKBShardManager]
-    if settings.standalone_mode:
-        mng = StandaloneKBShardManager()
-    else:
-        mng = KBShardManager()
-    set_utility(Utility.SHARD_MANAGER, mng)
-    return mng
+    async with _lock:
+        if get_utility(Utility.SHARD_MANAGER) is not None:
+            # already setup
+            return get_utility(Utility.SHARD_MANAGER)
+
+        await setup_cluster_discovery()
+        mng: Union[KBShardManager, StandaloneKBShardManager]
+        if settings.standalone_mode:
+            server = await start_standalone_grpc()
+            set_utility(_STANDALONE_SERVER, server)
+            mng = StandaloneKBShardManager()
+        else:
+            mng = KBShardManager()
+        set_utility(Utility.SHARD_MANAGER, mng)
+        return mng
 
 
 async def teardown_cluster():
     await teardown_cluster_discovery()
     if get_utility(Utility.SHARD_MANAGER):
         clean_utility(Utility.SHARD_MANAGER)
+
+    std_server = get_utility(_STANDALONE_SERVER)
+    if std_server is not None:
+        await std_server.stop(None)
+        clean_utility(_STANDALONE_SERVER)
 
 
 def get_shard_manager() -> KBShardManager:

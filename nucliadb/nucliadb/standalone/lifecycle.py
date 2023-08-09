@@ -19,6 +19,7 @@
 #
 import asyncio
 
+from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.ingest.app import initialize_grpc as initialize_ingest_grpc
 from nucliadb.ingest.app import initialize_pull_workers
 from nucliadb.ingest.settings import settings as ingest_settings
@@ -45,6 +46,7 @@ async def initialize():
     await initialize_reader()
     await initialize_search()
     await initialize_train()
+    await setup_cluster()
 
 
 async def finalize():
@@ -60,3 +62,4 @@ async def finalize():
     await finalize_search()
     await finalize_train()
     await finalize_utilities()
+    await teardown_cluster()

@@ -38,12 +38,12 @@ from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     AlreadyExists,
     EntitiesGroupNotFound,
     NodeError,
 )
-from nucliadb.common.cluster.index_node import AbstractIndexNode
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.keys import (

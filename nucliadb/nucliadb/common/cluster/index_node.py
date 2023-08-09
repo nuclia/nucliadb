@@ -24,7 +24,7 @@ from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
-from nucliadb.common.cluster.abc import AbstractIndexNode  # type: ignore
+from nucliadb.common.cluster.base import AbstractIndexNode  # type: ignore
 from nucliadb.common.cluster.grpc_node_dummy import (  # type: ignore
     DummyReaderStub,
     DummySidecarStub,

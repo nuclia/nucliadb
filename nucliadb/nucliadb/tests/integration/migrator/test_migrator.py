@@ -27,7 +27,7 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-async def execution_context(natsd, gcs_storage, redis_config):
+async def execution_context(knowledgebox, natsd, gcs_storage, redis_config):
     settings = Settings(redis_url=redis_config)
     context = ExecutionContext(settings)
     await context.initialize()

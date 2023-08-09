@@ -27,6 +27,7 @@ from fastapi.routing import APIRouter
 from fastapi_versioning import version
 from jwcrypto import jwe, jwk  # type: ignore
 
+from nucliadb.common.cluster import manager
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
@@ -94,3 +95,31 @@ def get_temp_access_token(request: Request):
     jwetoken.add_recipient(jwk.JWK(**orjson.loads(settings.jwk_key)))
     token = jwetoken.serialize(compact=True)
     return JSONResponse({"token": token})
+
+
+@standalone_api_router.get("/cluster/nodes")
+async def node_members(request: Request) -> JSONResponse:
+    return JSONResponse(
+        [
+            {
+                "id": node.id,
+                "listen_address": node.address,
+                "type": node.label,
+                "shard_count": node.shard_count,
+                "dummy": node.dummy,
+            }
+            for node in manager.get_index_nodes()
+        ]
+    )
+
+
+@standalone_api_router.get("/health/alive")
+async def alive(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
+
+@standalone_api_router.get("/health/ready")
+async def ready(request: Request) -> JSONResponse:
+    if len(manager.get_index_nodes()) == 0:
+        return JSONResponse({"status": "not ready"}, status_code=503)
+    return JSONResponse({"status": "ok"})
