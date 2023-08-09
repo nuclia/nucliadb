@@ -150,6 +150,7 @@ class UpdateResourcePayload(BaseModel):
     slug: Optional[SlugString] = FieldDefaults.slug
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
+    metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     uservectors: Optional[UserVectorsWrapper] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None

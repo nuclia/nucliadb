@@ -39,6 +39,7 @@ from nucliadb.ingest.orm.resource import (
     maybe_update_basic_icon,
     maybe_update_basic_summary,
     maybe_update_basic_thumbnail,
+    update_basic_languages,
 )
 
 
@@ -68,6 +69,30 @@ def test_maybe_update_basic_summary(basic, summary, updated):
         assert basic.summary == summary
     else:
         assert basic.summary != summary
+
+
+def test_update_basic_languages():
+    basic = Basic()
+    # Languages are updated the first time
+    assert update_basic_languages(basic, ["en"]) is True
+    assert basic.metadata.language == "en"
+    assert basic.metadata.languages == ["en"]
+
+    # Languages are not updated
+    assert update_basic_languages(basic, ["en"]) is False
+    assert basic.metadata.language == "en"
+    assert basic.metadata.languages == ["en"]
+
+    # Main language is not updated but new language is added
+    assert update_basic_languages(basic, ["de"]) is True
+    assert basic.metadata.language == "en"
+    assert basic.metadata.languages == ["en", "de"]
+
+    # Null values
+    assert update_basic_languages(basic, [""]) is False
+    assert update_basic_languages(basic, [None]) is False  # type: ignore
+    assert basic.metadata.language == "en"
+    assert basic.metadata.languages == ["en", "de"]
 
 
 @pytest.mark.parametrize(

@@ -25,12 +25,15 @@ from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
+    FieldID,
     FieldType,
+    FileExtractedData,
+    LinkExtractedData,
     Paragraph,
 )
 from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
@@ -602,7 +605,6 @@ async def test_resource_slug_validation(
         assert detail["msg"].startswith(f"Invalid slug: '{slug}'")
 
 
-@pytest.mark.asyncio
 async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -636,3 +638,86 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "text/plain"
+
+
+async def test_language_metadata(
+    nucliadb_writer,
+    nucliadb_reader,
+    nucliadb_grpc,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={"title": "My resource"},
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
+
+    # Detected language in processing should be stored in basic metadata
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = uuid
+    field = FieldID(field_type=FieldType.TEXT, field="text")
+
+    led = LinkExtractedData()
+    led.field = field.field
+    led.language = "ca"
+    bm.link_extracted_data.append(led)
+
+    fed = FileExtractedData()
+    fed.field = field.field
+    fed.language = "es"
+    bm.file_extracted_data.append(fed)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field)
+    fcmw.metadata.metadata.language = "en"
+    fcmw.metadata.split_metadata["foo"].language = "it"
+    bm.field_metadata.append(fcmw)
+
+    resp = await nucliadb_grpc.ProcessMessage([bm])
+    assert resp.status == OpStatusWriter.Status.OK
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
+    )
+    assert resp.status_code == 200
+    res = resp.json()
+    assert res["metadata"]["language"] == "ca"
+    assert set(res["metadata"]["languages"]) == {"ca", "es", "it", "en"}
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={"metadata": {"language": "en"}},
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
+    )
+    assert resp.status_code == 200
+    res = resp.json()
+    assert res["metadata"]["language"] == "en"
+    assert res["metadata"]["languages"] == []
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{uuid}",
+        json={"metadata": {"language": "de"}},
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
+    )
+    assert resp.status_code == 200
+    res = resp.json()
+    assert res["metadata"]["language"] == "de"
+    assert res["metadata"]["languages"] == []

@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
@@ -786,16 +786,23 @@ class Resource:
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
 
+        extracted_languages = []
+
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
             await self.maybe_update_title_metadata(link_extracted_data)
+            extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
             await self._apply_file_extracted_data(file_extracted_data)
+            extracted_languages.append(file_extracted_data.language)
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
             await self._apply_field_computed_metadata(field_metadata)
+            extracted_languages.extend(extract_field_metadata_languages(field_metadata))
+
+        update_basic_languages(self.basic, extracted_languages)
 
         # Upload to binary storage
         # Vector indexing
@@ -1451,8 +1458,38 @@ def maybe_update_basic_thumbnail(
     return True
 
 
+def update_basic_languages(basic: Basic, languages: List[str]) -> bool:
+    if len(languages) == 0:
+        return False
+
+    updated = False
+    for language in languages:
+        if not language:
+            continue
+
+        if basic.metadata.language == "":
+            basic.metadata.language = language
+            updated = True
+
+        if language not in basic.metadata.languages:
+            basic.metadata.languages.append(language)
+            updated = True
+
+    return updated
+
+
 def get_text_field_mimetype(bm: BrokerMessage) -> Optional[str]:
     if len(bm.texts) == 0:
         return None
     text_format = next(iter(bm.texts.values())).format
     return PB_TEXT_FORMAT_TO_MIMETYPE[text_format]
+
+
+def extract_field_metadata_languages(
+    field_metadata: FieldComputedMetadataWrapper,
+) -> list[str]:
+    languages: set[str] = set()
+    languages.add(field_metadata.metadata.metadata.language)
+    for _, splitted_metadata in field_metadata.metadata.split_metadata.items():
+        languages.add(splitted_metadata.language)
+    return list(languages)
