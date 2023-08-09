@@ -84,6 +84,7 @@ predict_observer = metrics.Observer(
 
 
 RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
+MAX_TRIES = 2
 
 
 async def start_predict_engine():
@@ -222,7 +223,7 @@ class PredictEngine:
         else:
             raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=2)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
         func = getattr(self.session, method.lower())
         return await func(**request_args)
