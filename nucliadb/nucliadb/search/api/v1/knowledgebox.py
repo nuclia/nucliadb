@@ -141,7 +141,7 @@ async def knowledgebox_counters(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
-        logger.error("Timeout querying shards", exc_info=shard)
+        logger.exception("Timeout querying shards")
         errors.capture_exception(exc)
         raise HTTPException(status_code=503, detail=f"Data query took too long")
     except AioRpcError as exc:
