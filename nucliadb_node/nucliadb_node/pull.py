@@ -28,7 +28,7 @@ from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.errors import NotFoundError as StreamNotFoundError
-from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
+from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
 
@@ -42,7 +42,6 @@ from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_pubsub, get_storage
-from lru import LRU  # type: ignore
 
 subscriber_observer = metrics.Observer(
     "message_processor",
@@ -65,6 +64,54 @@ subscriber_observer = metrics.Observer(
 )
 
 
+class ShardManager:
+    target_gc_resources = 10
+    schedule_delay_seconds = 5.0
+
+    def __init__(self, shard_id: str, writer: Writer, gc_lock: asyncio.Semaphore):
+        self.lock = asyncio.Lock()  # write lock for this shard
+
+        self._shard_id = shard_id
+        self._writer = writer
+
+        self._gc_lock = gc_lock  # global lock so we only gc one shard at a time
+        self._change_count = 0
+        self._gc_schedule_timer: Optional[asyncio.TimerHandle] = None
+
+    def shard_changed_event(self, delay: Optional[float] = None) -> None:
+        """
+        Signal shard has changed and should be garbage collected at some point
+        """
+        self._change_count += 1
+        if (
+            self._gc_schedule_timer is not None
+            and not self._gc_schedule_timer.cancelled()
+        ):
+            self._gc_schedule_timer.cancel()
+
+        if self._change_count >= self.target_gc_resources:
+            # need to force running it now
+            self._schedule_gc()
+        else:
+            # run it soon
+            if delay is None:
+                delay = self.schedule_delay_seconds
+            self._gc_schedule_timer = asyncio.get_event_loop().call_later(
+                delay, self._schedule_gc
+            )
+
+    def _schedule_gc(self) -> asyncio.Task:
+        return asyncio.create_task(self.gc())
+
+    async def gc(self):
+        async with self._gc_lock, self.lock:
+            self._change_count = 0
+            try:
+                await self._writer.garbage_collector(self._shard_id)
+            except Exception:
+                logger.exception(f"Could not garbage {self._shard_id}", stack_info=True)
+
+
 class Worker:
     subscriptions: List[Subscription]
     storage: Storage
@@ -79,18 +126,23 @@ class Worker:
         self.reader = reader
         self.subscriptions = []
         self.ack_wait = 10 * 60
-        self.shard_locks = LRU(100)
         self.node = node
-        self.gc_task = None
         self.publisher = IndexedPublisher()
         self.load_seqid()
         self.brain: Optional[Resource] = None
-        self.shards_to_gc = []
+
+        self.shard_managers: dict[str, ShardManager] = {}
+        # right now, only allow one gc at a time but
+        # can be expanded to allow multiple if we want with a semaphore
+        self.gc_lock = asyncio.Semaphore(1)
+
+    async def initialize(self):
+        self.storage = await get_storage(service_name=SERVICE_NAME)
+        await self.publisher.initialize()
+        await self.subscriber_initialize()
+        await self.garbage_collect_all()
 
     async def finalize(self):
-        if self.gc_task:
-            self.gc_task.cancel()
-
         await self.publisher.finalize()
         await self.subscriber_finalize()
 
@@ -116,12 +168,6 @@ class Worker:
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
-
-    async def initialize(self):
-        self.storage = await get_storage(service_name=SERVICE_NAME)
-        await self.publisher.initialize()
-        await self.subscriber_initialize()
-        self.gc_task = asyncio.create_task(self.garbage())
 
     async def subscriber_initialize(self):
         options = {
@@ -158,32 +204,20 @@ class Worker:
             # AttributeError: can be thrown by nats-py when handling shutdown
             pass
 
-    async def garbage(self) -> None:
-        try:
-            await self._garbage()
-        except (asyncio.CancelledError, RuntimeError):  # pragma: no cover
-            return
+    def get_shard_manager(self, shard_id: str) -> ShardManager:
+        if shard_id not in self.shard_managers:
+            self.shard_managers[shard_id] = ShardManager(
+                shard_id, self.writer, self.gc_lock
+            )
+        return self.shard_managers[shard_id]
 
-    async def _garbage(self) -> None:
-        # on start, gc everything
-        self.shards_to_gc = [shard.id for shard in (await self.writer.shards()).ids]
-        while True:
-            try:
-                shard_ids = self.shards_to_gc
-                self.shards_to_gc = []
-                for shard_id in shard_ids:
-                    async with self._get_shard_lock(shard_id):
-                        try:
-                            await self.writer.garbage_collector(shard_id)
-                        except Exception:
-                            logger.exception(
-                                f"Could not garbage {shard_id}", stack_info=True
-                            )
-                logger.info(f"Garbage collected {len(shard_ids)}")
-            except Exception:
-                logger.exception("Unhandled error garbage collecting")
-            finally:
-                await asyncio.sleep(60)
+    async def garbage_collect_all(self) -> None:
+        """
+        Schedule garbage collection for all shards on startup
+        """
+        for idx, shard in enumerate((await self.writer.shards()).ids):
+            sm = self.get_shard_manager(shard.id)
+            sm.shard_changed_event(idx * 0.01)
 
     def store_seqid(self, seqid: int):
         if settings.data_path is None:
@@ -221,11 +255,6 @@ class Worker:
         logger.info(f"...done")
         return status
 
-    def _get_shard_lock(self, shard_id: str) -> asyncio.Lock:
-        if shard_id not in self.shard_locks:
-            self.shard_locks[shard_id] = asyncio.Lock()
-        return self.shard_locks[shard_id]
-
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
@@ -244,7 +273,8 @@ class Worker:
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
         status: Optional[OpStatus] = None
-        async with self._get_shard_lock(pb.shard):
+        sm = self.get_shard_manager(pb.shard)
+        async with sm.lock:
             try:
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
@@ -252,7 +282,7 @@ class Worker:
                     status = await self.delete_resource(pb)
                 if status:
                     self.reader.update(pb.shard, status)
-
+                sm.shard_changed_event()
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exist {pb.shard}")
@@ -282,12 +312,11 @@ class Worker:
                     f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                 )
                 raise e
+
         try:
             self.store_seqid(seqid)
             await msg.ack()
             await self.publisher.indexed(pb)
-            if pb.shard not in self.shards_to_gc:
-                self.shards_to_gc.append(pb.shard)
         except Exception as e:  # pragma: no cover
             errors.capture_exception(e)
             logger.error(
