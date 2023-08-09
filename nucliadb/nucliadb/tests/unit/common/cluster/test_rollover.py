@@ -66,9 +66,16 @@ def shards():
 
 @pytest.fixture()
 def cluster_datamanager(shards):
-    mock = AsyncMock()
+    mock = MagicMock()
+    mock.get_kb_rollover_shards = AsyncMock()
     mock.get_kb_rollover_shards.return_value = None
+    mock.get_kb_shards = AsyncMock()
     mock.get_kb_shards.return_value = shards
+    mock.update_kb_rollover_shards = AsyncMock()
+    mock.update_kb_shards = AsyncMock()
+    mock.delete_kb_rollover_shard = AsyncMock()
+    mock.delete_kb_rollover_shards = AsyncMock()
+
     with patch(
         "nucliadb.common.cluster.rollover.ClusterDataManager", return_value=mock
     ):
@@ -82,17 +89,27 @@ def resource_ids():
 
 @pytest.fixture()
 def resources_datamanager(resource_ids):
-    mock = AsyncMock()
+    mock = MagicMock()
 
     async def iterate_resource_ids(kbid):
         for id in resource_ids:
             yield id
 
     mock.iterate_resource_ids = iterate_resource_ids
+    mock.get_resource_shard_id = AsyncMock()
     mock.get_resource_shard_id.return_value = "1"
+
     res = MagicMock()
+
     res.basic.modified.ToDatetime.return_value = datetime.now()
+
+    mock.get_resource = AsyncMock()
     mock.get_resource.return_value = res
+
+    mock.get_resource_index_message = AsyncMock()
+    metadata = MagicMock()
+    metadata.modified.ToDatetime.return_value = datetime.now()
+    mock.get_resource_index_message.return_value = metadata
 
     with patch(
         "nucliadb.common.cluster.rollover.ResourcesDataManager", return_value=mock
@@ -103,8 +120,12 @@ def resources_datamanager(resource_ids):
 @pytest.fixture()
 def app_context(cluster_datamanager, resources_datamanager, available_nodes):
     mock = MagicMock()
-    mock.shard_manager = AsyncMock()
-    mock.kv_driver = AsyncMock()
+    mock.shard_manager = MagicMock()
+    mock.shard_manager.rollback_shard = AsyncMock()
+    mock.shard_manager.add_resource = AsyncMock()
+    mock.shard_manager.delete_resource = AsyncMock()
+    mock.kv_driver = MagicMock()
+
     consumer_info = MagicMock()
     consumer_info.delivered.stream_seq = 0
     mock.nats_manager.js.consumer_info.return_value = consumer_info

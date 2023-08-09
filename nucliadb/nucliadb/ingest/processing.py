@@ -25,6 +25,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import aiohttp
+import backoff
 import jwt  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
@@ -43,6 +44,10 @@ if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
 else:
     SourceValue = int
+
+RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
+MAX_TRIES = 4
+
 
 processing_observer = metrics.Observer(
     "processing_engine",
@@ -272,6 +277,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @processing_observer.wrap({"type": "file_field_upload"})
     async def convert_filefield_to_str(self, file: models.FileField) -> str:
         # Upload file without storing on Nuclia DB
@@ -320,6 +326,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @processing_observer.wrap({"type": "file_field_upload_internal"})
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
@@ -355,6 +362,7 @@ class ProcessingEngine:
                     raise Exception(f"STATUS: {resp.status} - {text}")
         return jwttoken
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @processing_observer.wrap({"type": "cloud_file_upload"})
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
         if self.onprem is False:
@@ -384,6 +392,7 @@ class ProcessingEngine:
 
         return jwttoken
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def send_to_process(
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:

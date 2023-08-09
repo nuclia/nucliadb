@@ -112,7 +112,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
                 resp = await client.patch(
                     url,
-                    data=data,
+                    content=data,
                     headers=headers,
                 )
                 offset += len(data)
@@ -318,7 +318,7 @@ async def test_knowledgebox_file_tus_upload_field(
 
                 resp = await client.patch(
                     url,
-                    data=data,
+                    content=data,
                     headers=headers,
                 )
                 assert resp.status_code == 200
@@ -367,7 +367,7 @@ async def test_knowledgebox_file_upload_field_headers(
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
-                data=f.read(),
+                content=f.read(),
                 headers={
                     "X-FILENAME": encoded_filename,
                     "X-LANGUAGE": "ca",
@@ -414,7 +414,7 @@ async def test_knowledgebox_file_upload_field_sync(
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
-                data=f.read(),
+                content=f.read(),
                 headers={
                     "X-FILENAME": filename,
                     "X-LANGUAGE": "ca",
@@ -488,7 +488,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
 
                 resp = await client.patch(
                     url,
-                    data=data,
+                    content=data,
                     headers=headers,
                 )
                 assert resp.status_code == 200
@@ -552,7 +552,7 @@ async def test_multiple_tus_file_upload_tries(
         assert f"{RSLUG_PREFIX}/{rslug}" in url
         resp = await client.patch(
             url,
-            data=b"x" * 10000,
+            content=b"x" * 10000,
             headers={
                 "upload-offset": "0",
                 "content-length": "10000",
@@ -575,7 +575,7 @@ async def test_multiple_tus_file_upload_tries(
         assert f"{RSLUG_PREFIX}/{rslug}" in url
         resp = await client.patch(
             url,
-            data=b"x" * 10000,
+            content=b"x" * 10000,
             headers={
                 "upload-offset": "0",
                 "content-length": "10000",
@@ -608,7 +608,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
-                data=f.read(),
+                content=f.read(),
                 headers={
                     "X-FILENAME": filename,
                     "content-type": "image/jpg",
