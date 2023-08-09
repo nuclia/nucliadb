@@ -214,17 +214,3 @@ class LocalDriver(Driver):
         if self.url is None:
             raise AttributeError("Invalid url")
         return LocalTransaction(self.url, self)
-
-    async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ):
-        path = f"{self.url}/{match}"
-        actual_count = 0
-        for str_key in glob.glob(path + "**", recursive=True):
-            if os.path.isdir(str_key) or not os.path.exists(str_key):
-                continue
-
-            yield str_key.replace(self.url, "")
-            if actual_count >= count:
-                break
-            actual_count += 1

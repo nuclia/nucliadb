@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -45,9 +45,18 @@ def keys():
 
 
 @pytest.fixture
-def driver(keys):
+def txn(keys):
     mock = AsyncMock()
     mock.keys = DataIterator(keys)
+    yield mock
+
+
+@pytest.fixture
+def driver(txn):
+    mock = AsyncMock()
+    cm = AsyncMock()
+    cm.__aenter__.return_value = txn
+    mock.transaction = MagicMock(return_value=cm)
     yield mock
 
 
