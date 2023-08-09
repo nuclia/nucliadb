@@ -93,7 +93,7 @@ pub fn shared_lock(path: &Path) -> FsResult<SLock> {
     Ok(SLock::new(path)?)
 }
 
-pub fn persist_state<S>(lock: &ELock, state: &S) -> FsResult<()>
+pub fn persist_state<S>(lock: &Lock, state: &S) -> FsResult<()>
 where S: Serialize {
     write_state(lock.as_ref(), state)
 }
