@@ -169,6 +169,9 @@ class TestSubscriptionWorker:
     @pytest.mark.asyncio
     async def test_reconnected_cb(self, worker: Worker):
         await worker.initialize()
-        await worker.reconnected_cb()
+        try:
+            await worker.reconnected_cb()
 
-        assert worker.nc.jetstream().subscribe.call_count == 2
+            assert worker.nc.jetstream().subscribe.call_count == 2
+        finally:
+            await worker.finalize()

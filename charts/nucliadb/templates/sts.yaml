@@ -9,7 +9,8 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: Parallel
   serviceName: nucliadb
   selector:
     matchLabels:
@@ -21,6 +22,7 @@ spec:
       name: nucliadb
       labels:
         app: nucliadb
+        app.kubernetes.io/name: node
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
@@ -44,7 +46,7 @@ spec:
         livenessProbe:
           failureThreshold: 5
           httpGet:
-            path: /
+            path: /api/v1/health/alive
             port: 8080
           initialDelaySeconds: 20
           timeoutSeconds: 10
@@ -52,9 +54,9 @@ spec:
         readinessProbe:
           failureThreshold: 5
           httpGet:
-            path: /
+            path: /api/v1/health/ready
             port: 8080
-          initialDelaySeconds: 20
+          initialDelaySeconds: 1
           timeoutSeconds: 10
           periodSeconds: 20
         command: [
@@ -74,6 +76,10 @@ spec:
           {{- end }}
           - name: DATA_PATH
             value: "/data"
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         ports:
         - name: http
           containerPort: 8080
@@ -81,6 +87,8 @@ spec:
           containerPort: 8040
         - name: grpc
           containerPort: 8060
+        - name: node
+          containerPort: 10009
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:

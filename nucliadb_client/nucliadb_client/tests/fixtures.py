@@ -43,7 +43,7 @@ images.settings["nucliadb"] = {
         "DEBUG": "True",
     },
     "options": {
-        "ports": {"8080": None, "8030": None, "8040": None},
+        "ports": {"8080": None, "8030": None, "8040": None, "10009": None},
     },
 }
 
@@ -53,9 +53,7 @@ class NucliaDB(BaseImage):
     port = 8030
     train_port = 8040
     http_port = 8080
-
-    # def get_port(self):
-    #     return 8030
+    node_port = 10009
 
     def get_http(self):
         # return 8080
@@ -69,6 +67,14 @@ class NucliaDB(BaseImage):
     def get_train(self) -> Optional[int]:
         network = self.container_obj.attrs["NetworkSettings"]
         service_port = "{0}/tcp".format(self.train_port)
+        if service_port in network["Ports"]:
+            return network["Ports"][service_port][0]["HostPort"]
+        else:
+            return None
+
+    def get_node_port(self) -> Optional[int]:
+        network = self.container_obj.attrs["NetworkSettings"]
+        service_port = "{0}/tcp".format(self.node_port)
         if service_port in network["Ports"]:
             return network["Ports"][service_port][0]["HostPort"]
         else:
@@ -94,6 +100,7 @@ class NucliaDBFixture:
     grpc: int
     http: int
     train: int
+    node_port: int
 
 
 @pytest.fixture(scope="function")
@@ -101,8 +108,11 @@ def nucliadb():
     host, grpc_port = nucliadb_image.run()
     http_port = nucliadb_image.get_http()
     train_port = nucliadb_image.get_train()
+    node_port = nucliadb_image.get_node_port()
 
-    yield NucliaDBFixture(host=host, grpc=grpc_port, http=http_port, train=train_port)
+    yield NucliaDBFixture(
+        host=host, grpc=grpc_port, http=http_port, train=train_port, node_port=node_port
+    )
 
     nucliadb_image.stop()
 

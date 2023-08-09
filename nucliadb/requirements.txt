@@ -7,7 +7,8 @@ lru-dict>=1.1.7
 backoff
 aiofiles>=0.8.0
 types-aiofiles>=0.8.3
-protobuf>=3.20.2
+# the latest protobuf segfaults
+protobuf==4.22.3
 types-protobuf>=3.19.20,<4.0
 grpcio>=1.44.0
 grpcio-health-checking>=1.44.0
@@ -20,7 +21,7 @@ orjson>=3.6.7
 types-setuptools
 pydantic>=1.9.0,<2.0
 aiobotocore>=2.5.2
-botocore
+botocore<1.30.0
 google-cloud-storage
 gcloud
 oauth2client

@@ -27,6 +27,13 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import StorageSettings
 
 
+class StandaloneDiscoveryMode(str, Enum):
+    DEFAULT = "default"
+    MANUAL = "manual"
+    KUBERNETES = "kubernetes"
+    SINGLE_NODE = "single_node"
+
+
 class LogLevel(str, Enum):
     INFO = "INFO"
     ERROR = "ERROR"
@@ -50,12 +57,13 @@ class Settings(DriverSettings, StorageSettings):
     # in the app. These are helper settings to make things easier to
     # use with standalone app vs cluster app.
     nua_api_key: Optional[str] = pydantic.Field(
-        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/understanding/intro#get-a-nua-key"  # noqa
+        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key"  # noqa
     )
     zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
     http_port: int = pydantic.Field(8080, description="HTTP Port")
-    ingest_grpc_port: int = pydantic.Field(8030, description="Ingest GRPC Port int")
-    train_grpc_port: int = pydantic.Field(8031, description="Train GRPC Port int")
+    ingest_grpc_port: int = pydantic.Field(8030, description="Ingest GRPC Port")
+    train_grpc_port: int = pydantic.Field(8031, description="Train GRPC Port")
+    standalone_node_port: int = pydantic.Field(10009, description="Node GRPC Port")
 
     auth_policy: AuthPolicy = pydantic.Field(
         AuthPolicy.UPSTREAM_NAIVE,
@@ -101,3 +109,5 @@ Examples:
     jwk_key: Optional[str] = pydantic.Field(
         None, description="JWK key used for temporary token generation and validation."
     )
+
+    cluster_discovery_mode: StandaloneDiscoveryMode = StandaloneDiscoveryMode.DEFAULT

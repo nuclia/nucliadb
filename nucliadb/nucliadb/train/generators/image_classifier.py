@@ -29,7 +29,7 @@ from nucliadb_protos.dataset_pb2 import (
 from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb_protos.resources_pb2 import FieldType, PageStructure, VisualSelection
 
-from nucliadb.common.cluster.abc import AbstractIndexNode
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.train import logger

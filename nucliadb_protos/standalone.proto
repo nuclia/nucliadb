@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package standalone;
+
+message NodeActionRequest {
+    string service = 1;
+    string action = 2;
+    bytes payload = 3;
+}
+
+message NodeActionResponse {
+    bytes payload = 1;
+}
+
+message NodeInfoRequest {
+
+}
+
+message NodeInfoResponse {
+    string id = 1;
+    string address = 2;
+    uint32 shard_count = 3;
+}
+
+
+service StandaloneClusterService {
+    rpc NodeAction(NodeActionRequest) returns (NodeActionResponse) {}
+    rpc NodeInfo(NodeInfoRequest) returns (NodeInfoResponse) {}
+}

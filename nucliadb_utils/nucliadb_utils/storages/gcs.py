@@ -56,10 +56,11 @@ def strip_query_params(url: yarl.URL) -> str:
     return str(url.with_query(None))
 
 
-MAX_SIZE = 1073741824
+OBJECT_DATA_CHUNK_SIZE = 1024 * 1024
+
 
 DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.read_write"]
-MAX_RETRIES = 5
+MAX_TRIES = 4
 
 POLICY_DELETE = {
     "lifecycle": {
@@ -76,6 +77,10 @@ POLICY_DELETE = {
 
 
 class GoogleCloudException(Exception):
+    pass
+
+
+class ReadingResponseContentException(GoogleCloudException):
     pass
 
 
@@ -107,7 +112,7 @@ class GCSStorageField(StorageField):
         )
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @storage_ops_observer.wrap({"type": "copy"})
     async def copy(
         self,
@@ -142,9 +147,31 @@ class GCSStorageField(StorageField):
                 data = await resp.json()
                 assert data["resource"]["name"] == destination_uri
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(self, headers=None):
+        attempt = 1
+        while True:
+            try:
+                async for chunk in self._inner_iter_data(headers=headers):
+                    yield chunk
+                break
+            except ReadingResponseContentException:
+                # Do not retry any exception that may happen in the middle of
+                # reading the response chunks, as that could lead to duplicated
+                # chunks and data corruption.
+                raise
+            except RETRIABLE_EXCEPTIONS as ex:
+                if attempt >= MAX_TRIES:
+                    raise
+                wait_time = 2 ** (attempt - 1)
+                logger.warning(
+                    f"Error downloading from GCP. Retrying ({attempt} of {MAX_TRIES}) after {wait_time} seconds. Error: {ex}"  # noqa
+                )
+                await asyncio.sleep(wait_time)
+                attempt += 1
+
+    @storage_ops_observer.wrap({"type": "inner_iter_data"})
+    async def _inner_iter_data(self, headers=None):
         if headers is None:
             headers = {}
 
@@ -175,7 +202,10 @@ class GCSStorageField(StorageField):
                     )
                 raise GoogleCloudException(f"{api_resp.status}: {text}")
             while True:
-                chunk = await api_resp.content.read(1024 * 1024)
+                try:
+                    chunk = await api_resp.content.read(OBJECT_DATA_CHUNK_SIZE)
+                except Exception as ex:
+                    raise ReadingResponseContentException() from ex
                 if len(chunk) > 0:
                     yield chunk
                 else:
@@ -194,7 +224,7 @@ class GCSStorageField(StorageField):
         ):
             yield chunk
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @storage_ops_observer.wrap({"type": "start_upload"})
     async def start(self, cf: CloudFile) -> CloudFile:
         """Init an upload.
@@ -277,7 +307,7 @@ class GCSStorageField(StorageField):
         backoff.constant,
         RETRIABLE_EXCEPTIONS,
         interval=1,
-        max_tries=4,
+        max_tries=MAX_TRIES,
         jitter=backoff.random_jitter,
     )
     @storage_ops_observer.wrap({"type": "append_data"})
@@ -363,7 +393,7 @@ class GCSStorageField(StorageField):
         self.field.ClearField("upload_uri")
         self.field.ClearField("parts")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @storage_ops_observer.wrap({"type": "exists"})
     async def exists(self) -> Optional[Dict[str, str]]:
         """
@@ -504,7 +534,7 @@ class GCSStorage(Storage):
         token = await loop.run_in_executor(self._executor, self._get_access_token)
         return {"AUTHORIZATION": f"Bearer {token}"}
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
         if self.session is None:

@@ -257,6 +257,31 @@ class StandaloneReaderWrapper:
         return type_list
 
 
+async def Search(self, request: SearchRequest, retry: bool = False) -> SearchResponse:
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.search, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        pb = SearchResponse()
+        pb.ParseFromString(pb_bytes)
+        return pb
+    except IndexNodeException as exc:
+        if "IO error" not in str(exc):
+            # ignore any other error
+            raise
+
+        # try some mitigations...
+        logger.error(f"IndexNodeException in Search: {request}", exc_info=True)
+        if not retry:
+            # reinit?
+            self.reader = NodeReader()
+            return await self.Search(request, retry=True)
+        else:
+            raise
+
+
 class StandaloneWriterWrapper:
     writer: NodeWriter
 
@@ -370,3 +395,25 @@ class StandaloneWriterWrapper:
         op_status = OpStatus()
         op_status.ParseFromString(pb_bytes)
         return op_status
+
+
+# supported marshalled reader methods for standalone node support
+READER_METHODS = {
+    "Search": (SearchRequest, SearchResponse),
+    "ParagraphSearch": (ParagraphSearchRequest, ParagraphSearchResponse),
+    "RelationSearch": (RelationSearchRequest, RelationSearchResponse),
+    "GetShard": (GetShardRequest, NodeResourcesShard),
+    "Suggest": (SuggestRequest, SuggestResponse),
+}
+WRITER_METHODS = {
+    "NewShard": (ShardMetadata, ShardCreated),
+    "DeleteShard": (ShardId, ShardId),
+    "ListShards": (EmptyQuery, ShardIds),
+    "CleanAndUpgradeShard": (ShardId, ShardCleaned),
+    "RemoveVectorSet": (VectorSetID, OpStatus),
+    "AddVectorSet": (VectorSetID, OpStatus),
+    "ListVectorSets": (ShardId, VectorSetList),
+    "SetResource": (Resource, OpStatus),
+    "RemoveResource": (ResourceID, OpStatus),
+    "JoinGraph": (SetGraph, OpStatus),
+}

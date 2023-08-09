@@ -20,16 +20,10 @@
 import asyncio
 import logging
 
-from nucliadb_protos.noderesources_pb2 import EmptyQuery
-
-from nucliadb.common.cluster.discovery.abc import (
+from nucliadb.common.cluster.discovery.base import (
     AbstractClusterDiscovery,
     update_members,
 )
-from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
-from nucliadb.common.cluster.settings import settings
-from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
-from nucliadb_utils.grpc import get_traced_grpc_channel
 
 logger = logging.getLogger(__name__)
 
@@ -42,25 +36,7 @@ class ManualDiscovery(AbstractClusterDiscovery):
     async def discover(self) -> None:
         members = []
         for address in self.settings.cluster_discovery_manual_addresses:
-            if address in settings.writer_port_map:
-                # test wiring
-                port = settings.writer_port_map[address]
-                grpc_address = f"localhost:{port}"
-            else:
-                grpc_address = f"{address}:{self.settings.node_writer_port}"
-            channel = get_traced_grpc_channel(
-                grpc_address, "discovery", variant="_writer"
-            )
-            stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
-            metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(EmptyQuery())  # type: ignore
-            members.append(
-                IndexNodeMetadata(
-                    node_id=metadata.node_id,
-                    name=metadata.node_id,
-                    address=address,
-                    shard_count=metadata.shard_count,
-                )
-            )
+            members.append(await self._query_node_metadata(address))
         update_members(members)
 
     async def watch(self) -> None:

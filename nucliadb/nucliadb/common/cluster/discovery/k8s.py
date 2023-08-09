@@ -30,18 +30,14 @@ import kubernetes_asyncio.client.models.v1_pod  # type: ignore
 import kubernetes_asyncio.client.models.v1_pod_status  # type: ignore
 import kubernetes_asyncio.config  # type: ignore
 import kubernetes_asyncio.watch  # type: ignore
-from nucliadb_protos.noderesources_pb2 import EmptyQuery
 
 from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.discovery.abc import (
+from nucliadb.common.cluster.discovery.base import (
     AVAILABLE_NODES,
     AbstractClusterDiscovery,
 )
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
-from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.cluster.settings import Settings
-from nucliadb_protos import nodewriter_pb2, nodewriter_pb2_grpc
-from nucliadb_utils.grpc import get_traced_grpc_channel
 
 logger = logging.getLogger(__name__)
 
@@ -66,34 +62,10 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         self.node_id_cache: dict[str, IndexNodeMetadata] = {}
         self.update_lock = asyncio.Lock()
 
-    async def _query_node_metadata(self, address: str) -> nodewriter_pb2.NodeMetadata:
-        """
-        Get node metadata directly from the writer.
-
-        Establishes a new connection on every try on purpose to avoid long lived connections
-        and dns caching issues.
-
-        This method should be used carefully and results should be cached.
-        """
-        grpc_address = f"{address}:{self.settings.node_writer_port}"
-        channel = get_traced_grpc_channel(grpc_address, "discovery", variant="_writer")
-        stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
-        return await stub.GetMetadata(EmptyQuery())  # type: ignore
-
     async def get_node_metadata(self, sts_name: str, node_ip: str) -> IndexNodeMetadata:
         async with self.update_lock:
             if sts_name not in self.node_id_cache:
-                # hard coded assuming that nucliadb is used with current helm charts
-                # XXX right now, GRPC will not know when an IP has changed and
-                # istio is not able to handle this properly. This is a workaround for now.
-                # address = f"{sts_name}.node.{self.settings.cluster_discovery_kubernetes_namespace}.svc.cluster.local"
-                metadata = await self._query_node_metadata(node_ip)
-                self.node_id_cache[sts_name] = IndexNodeMetadata(
-                    node_id=metadata.node_id,
-                    name=sts_name,
-                    shard_count=metadata.shard_count,
-                    address=node_ip,
-                )
+                self.node_id_cache[sts_name] = await self._query_node_metadata(node_ip)
             else:
                 self.node_id_cache[sts_name].address = node_ip
         return self.node_id_cache[sts_name]
@@ -132,7 +104,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             node = manager.get_index_node(node_data.node_id)
             if node is None:
                 logger.warning(
-                    f"Adding node",
+                    "Adding node",
                     extra={
                         "node_id": node_data.node_id,
                         "sts_name": sts_name,
@@ -140,11 +112,9 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     },
                 )
                 manager.add_index_node(
-                    IndexNode(
-                        id=node_data.node_id,
-                        address=node_data.address,
-                        shard_count=node_data.shard_count,
-                    )
+                    id=node_data.node_id,
+                    address=node_data.address,
+                    shard_count=node_data.shard_count,
                 )
             else:
                 logger.debug(
@@ -181,8 +151,8 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 try:
                     async for event in watch.stream(
                         v1.list_namespaced_pod,
-                        namespace="nucliadb",
-                        label_selector="app.kubernetes.io/instance=node",
+                        namespace=self.settings.cluster_discovery_kubernetes_namespace,
+                        label_selector=self.settings.cluster_discovery_kubernetes_selector,
                         timeout_seconds=30,
                     ):
                         try:
@@ -214,12 +184,8 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     # force updating cache
                     async with self.update_lock:
                         existing = self.node_id_cache[sts_name]
-                        metadata = await self._query_node_metadata(existing.address)
-                        self.node_id_cache[sts_name] = IndexNodeMetadata(
-                            node_id=metadata.node_id,
-                            name=sts_name,
-                            shard_count=metadata.shard_count,
-                            address=existing.address,
+                        self.node_id_cache[sts_name] = await self._query_node_metadata(
+                            existing.address
                         )
             except (
                 asyncio.CancelledError,

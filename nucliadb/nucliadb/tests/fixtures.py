@@ -121,6 +121,7 @@ async def nucliadb(dummy_processing, telemetry_disabled):
             http_port=free_port(),
             ingest_grpc_port=free_port(),
             train_grpc_port=free_port(),
+            standalone_node_port=free_port(),
         )
 
         config_nucliadb(settings)
@@ -424,7 +425,6 @@ async def redis_config(redis):
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is not None:
         await pubsub.finalize()
-    clear_global_cache()
 
 
 @pytest.fixture(scope="function")

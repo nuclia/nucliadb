@@ -49,6 +49,7 @@ proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/train.proto         -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/dataset.proto       -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/migrations.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
+	python -m grpc_tools.protoc nucliadb_protos/standalone.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
 
 proto-rust:
 	cargo build -p nucliadb_protos
@@ -66,7 +67,7 @@ python-code-lint:
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
 	make -C nucliadb_node/ format
-#	make -C nucliadb_node_binding/ format
+	make -C nucliadb_node_binding/ format
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
@@ -79,7 +80,7 @@ python-code-lint:
 	make -C nucliadb_client/ lint
 	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
-#	make -C nucliadb_node_binding/ lint
+	make -C nucliadb_node_binding/ lint
 
 
 rust-code-lint:
