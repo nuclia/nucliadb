@@ -22,6 +22,7 @@ import os
 from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 import aiohttp
+import backoff
 from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q, Qm2023
@@ -80,6 +81,10 @@ predict_observer = metrics.Observer(
         "empty_vectors": PredictVectorMissing,
     },
 )
+
+
+RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
+MAX_TRIES = 2
 
 
 async def start_predict_engine():
@@ -218,6 +223,11 @@ class PredictEngine:
         else:
             raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
+    async def make_request(self, method: str, **request_args):
+        func = getattr(self.session, method.lower())
+        return await func(**request_args)
+
     @predict_observer.wrap({"type": "feedback"})
     async def send_feedback(
         self,
@@ -240,7 +250,8 @@ class PredictEngine:
         data["client"] = x_ndb_client
         data["forwarded"] = x_forwarded_for
 
-        resp = await self.session.post(
+        resp = await self.make_request(
+            "POST",
             url=self.get_predict_url(FEEDBACK),
             json=data,
             headers=self.get_predict_headers(kbid),
@@ -256,7 +267,8 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        resp = await self.session.post(
+        resp = await self.make_request(
+            "POST",
             url=self.get_predict_url(REPHRASE),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
@@ -275,7 +287,8 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        resp = await self.session.post(
+        resp = await self.make_request(
+            "POST",
             url=self.get_predict_url(CHAT),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
@@ -296,7 +309,8 @@ class PredictEngine:
             raise SendToPredictError(error)
 
         item = AskDocumentModel(question=question, blocks=blocks, user_id=user_id)
-        resp = await self.session.post(
+        resp = await self.make_request(
+            "POST",
             url=self.get_predict_url(ASK_DOCUMENT),
             json=item.dict(),
             headers=self.get_predict_headers(kbid),
@@ -315,7 +329,8 @@ class PredictEngine:
             )
             return []
 
-        resp = await self.session.get(
+        resp = await self.make_request(
+            "GET",
             url=self.get_predict_url(SENTENCE),
             params={"text": sentence},
             headers=self.get_predict_headers(kbid),
@@ -336,7 +351,8 @@ class PredictEngine:
             )
             return []
 
-        resp = await self.session.get(
+        resp = await self.make_request(
+            "GET",
             url=self.get_predict_url(TOKENS),
             params={"text": sentence},
             headers=self.get_predict_headers(kbid),
