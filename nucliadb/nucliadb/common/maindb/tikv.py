@@ -162,7 +162,7 @@ class TiKVTransaction(Transaction):
                 # done counting this range, find the correct size of the match
                 # and break out
                 left, right = 0, len(keys) - 1
-                result_index = None
+                result_index = 0
                 while left <= right:
                     mid = left + (right - left) // 2
 
