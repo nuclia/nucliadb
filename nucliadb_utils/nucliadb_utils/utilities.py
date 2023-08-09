@@ -34,9 +34,7 @@ from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.cache.redis import RedisPubsub
 from nucliadb_utils.cache.settings import settings as cache_settings
-from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
@@ -68,7 +66,6 @@ class Utility(str, Enum):
     PREDICT = "predict"
     PROCESSING = "processing"
     TRANSACTION = "transaction"
-    CACHE = "cache"
     SHARD_MANAGER = "shard_manager"
     COUNTER = "counter"
     PUBSUB = "pubsub"
@@ -190,35 +187,18 @@ async def get_nuclia_storage() -> NucliaStorage:
     return MAIN.get("nuclia_storage", None)
 
 
-async def get_cache() -> Optional[Cache]:
-    util: Optional[Cache] = get_utility(Utility.CACHE)
-    if util is None and cache_settings.cache_enabled:
-        driver = Cache()
-        set_utility(Utility.CACHE, driver)
-        logger.info("Configuring cache")
-
-    cache: Optional[Cache] = get_utility(Utility.CACHE)
-    if cache and not cache.initialized:
-        await cache.initialize()
-    return cache
-
-
-async def get_pubsub() -> PubSubDriver:
+async def get_pubsub() -> Optional[PubSubDriver]:
     driver: Optional[PubSubDriver] = get_utility(Utility.PUBSUB)
     if driver is None:
-        if cache_settings.cache_pubsub_driver == "redis":
-            driver = RedisPubsub(cache_settings.cache_pubsub_redis_url)
-            set_utility(Utility.PUBSUB, driver)
-            logger.info("Configuring redis pubsub")
-        elif cache_settings.cache_pubsub_driver == "nats":
+        if cache_settings.cache_pubsub_nats_url:
+            logger.info("Configuring nats pubsub")
             driver = NatsPubsub(
                 hosts=cache_settings.cache_pubsub_nats_url,
                 user_credentials_file=cache_settings.cache_pubsub_nats_auth,
             )
             set_utility(Utility.PUBSUB, driver)
-            logger.info("Configuring nats pubsub")
-        else:  # pragma: no cover
-            raise NotImplementedError("Invalid driver")
+        else:
+            return None
     if not driver.initialized:
         await driver.initialize()
     return driver

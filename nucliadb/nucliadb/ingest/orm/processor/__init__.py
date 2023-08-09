@@ -39,7 +39,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
-from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
@@ -65,14 +65,14 @@ class Processor:
         self,
         driver: Driver,
         storage: Storage,
-        cache: Optional[Cache] = None,
+        pubsub: Optional[PubSubDriver] = None,
         partition: Optional[str] = None,
     ):
         self.messages = {}
         self.driver = driver
         self.storage = storage
         self.partition = partition
-        self.cache = cache
+        self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
 
     async def process(
@@ -463,8 +463,8 @@ class Processor:
         )
 
     async def notify(self, channel, payload: bytes):
-        if self.cache is not None and self.cache.pubsub is not None:
-            await self.cache.pubsub.publish(channel, payload)
+        if self.pubsub is not None:
+            await self.pubsub.publish(channel, payload)
 
     # KB tools
     # XXX: Why are these utility functions here?

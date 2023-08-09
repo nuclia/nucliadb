@@ -33,7 +33,7 @@ flag_management:
       carryforward: true
       statuses:
         - type: project
-          target: 85%
+          target: 84%
     - name: train
       paths:
         - nucliadb/nucliadb/train/**

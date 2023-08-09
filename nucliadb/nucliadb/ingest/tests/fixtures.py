@@ -48,7 +48,6 @@ from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
-from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
@@ -68,14 +67,14 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def processor(maindb_driver, gcs_storage, cache):
-    proc = Processor(maindb_driver, gcs_storage, cache, partition="1")
+async def processor(maindb_driver, gcs_storage, pubsub):
+    proc = Processor(maindb_driver, gcs_storage, pubsub, partition="1")
     yield proc
 
 
 @pytest.fixture(scope="function")
-async def stream_processor(maindb_driver, gcs_storage, cache):
-    proc = Processor(maindb_driver, gcs_storage, cache, partition="1")
+async def stream_processor(maindb_driver, gcs_storage, pubsub):
+    proc = Processor(maindb_driver, gcs_storage, pubsub, partition="1")
     yield proc
 
 
@@ -148,14 +147,6 @@ async def pubsub(natsd):
     yield pubsub
     await pubsub.finalize()
     set_utility(Utility.PUBSUB, None)
-
-
-@pytest.fixture(scope="function")
-async def cache(pubsub):
-    che = Cache(pubsub)
-    await che.initialize()
-    yield che
-    await che.finalize()
 
 
 @pytest.fixture(scope="function")
@@ -286,7 +277,7 @@ async def nats_manager(natsd):
 
 
 @pytest.fixture(scope="function")
-async def transaction_utility(natsd):
+async def transaction_utility(natsd, pubsub):
     transaction_settings.transaction_jetstream_servers = [natsd]
     util = await start_transaction_utility()
     yield util

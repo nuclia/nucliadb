@@ -140,7 +140,7 @@ class TransactionUtility:
         return waiting_event
 
     async def initialize(self, service_name: Optional[str] = None):
-        self.pubsub = await get_pubsub()
+        self.pubsub = await get_pubsub()  # type: ignore
 
         options: Dict[str, Any] = {
             "error_cb": self.error_cb,

@@ -32,13 +32,13 @@ from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import running_settings, transaction_settings
 from nucliadb_utils.utilities import (
     get_audit,
-    get_cache,
     get_nats_manager,
     get_pubsub,
     get_storage,
 )
 
 from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
+from .materializer import MaterializerHandler
 from .shard_creator import ShardCreatorHandler
 
 
@@ -61,7 +61,7 @@ async def start_pull_workers(
     service_name: Optional[str] = None,
 ) -> Callable[[], Awaitable[None]]:
     driver = await setup_driver()
-    cache = await get_cache()
+    pubsub = await get_pubsub()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     tasks = []
     for partition in settings.partitions:
@@ -70,7 +70,7 @@ async def start_pull_workers(
             partition=partition,
             storage=storage,
             pull_time_error_backoff=settings.pull_time_error_backoff,
-            cache=cache,
+            pubsub=pubsub,
             local_subscriber=transaction_settings.transaction_local,
         )
         task = asyncio.create_task(worker.loop())
@@ -96,7 +96,7 @@ async def start_ingest_consumers(
         await asyncio.sleep(1)
 
     driver = await setup_driver()
-    cache = await get_cache()
+    pubsub = await get_pubsub()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     nats_connection_manager = get_nats_manager()
 
@@ -105,7 +105,7 @@ async def start_ingest_consumers(
             driver=driver,
             partition=partition,
             storage=storage,
-            cache=cache,
+            pubsub=pubsub,
             nats_connection_manager=nats_connection_manager,
         )
         await consumer.initialize()
@@ -136,7 +136,7 @@ async def start_ingest_processed_consumer(
         await asyncio.sleep(1)
 
     driver = await setup_driver()
-    cache = await get_cache()
+    pubsub = await get_pubsub()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     nats_connection_manager = get_nats_manager()
 
@@ -144,7 +144,7 @@ async def start_ingest_processed_consumer(
         driver=driver,
         partition="-1",
         storage=storage,
-        cache=cache,
+        pubsub=pubsub,
         nats_connection_manager=nats_connection_manager,
     )
     await consumer.initialize()
@@ -157,6 +157,7 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
     audit = get_audit()
     assert audit is not None
     pubsub = await get_pubsub()
+    assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)
     index_auditor = IndexAuditHandler(driver=driver, audit=audit, pubsub=pubsub)
     resource_writes_auditor = ResourceWritesAuditHandler(
@@ -174,9 +175,21 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
 async def start_shard_creator() -> Callable[[], Awaitable[None]]:
     driver = await setup_driver()
     pubsub = await get_pubsub()
+    assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)
 
     shard_creator = ShardCreatorHandler(driver=driver, storage=storage, pubsub=pubsub)
     await shard_creator.initialize()
 
     return shard_creator.finalize
+
+
+async def start_materializer() -> Callable[[], Awaitable[None]]:
+    driver = await setup_driver()
+    pubsub = await get_pubsub()
+    assert pubsub is not None, "Pubsub is not configured"
+    storage = await get_storage(service_name=SERVICE_NAME)
+    materializer = MaterializerHandler(driver=driver, storage=storage, pubsub=pubsub)
+    await materializer.initialize()
+
+    return materializer.finalize

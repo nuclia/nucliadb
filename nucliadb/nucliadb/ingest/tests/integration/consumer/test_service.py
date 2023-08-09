@@ -45,6 +45,7 @@ async def test_separated_ingest_consumer(
     knowledgebox_ingest,
     transaction_utility: TransactionUtility,
     nats_manager: NatsConnectionManager,
+    pubsub,
 ):
     bm_normal = create_broker_message(knowledgebox_ingest)
     bm_processed = create_broker_message(knowledgebox_ingest)

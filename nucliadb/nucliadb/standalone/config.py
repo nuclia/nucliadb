@@ -83,7 +83,6 @@ def config_nucliadb(nucliadb_args: Settings):
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb.train.settings import settings as train_settings
     from nucliadb.writer.settings import settings as writer_settings
-    from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
         audit_settings,
         http_settings,
@@ -109,7 +108,6 @@ def config_nucliadb(nucliadb_args: Settings):
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"
-    cache_settings.cache_enabled = False
     writer_settings.dm_enabled = False
 
     train_settings.grpc_port = nucliadb_args.train_grpc_port

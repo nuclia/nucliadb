@@ -166,6 +166,7 @@ async def send_indexing_message(worker: Worker, index: IndexMessage, node: str):
 
 async def wait_for_indexed_message(kbid: str):
     pubsub = await get_pubsub()
+    assert pubsub is not None
     future = asyncio.Future()  # type: ignore
     request_id = str(uuid.uuid4())
 

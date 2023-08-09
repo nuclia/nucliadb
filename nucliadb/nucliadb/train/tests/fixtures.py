@@ -43,12 +43,7 @@ from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import (
-    Utility,
-    clear_global_cache,
-    get_storage,
-    set_utility,
-)
+from nucliadb_utils.utilities import clear_global_cache, get_storage
 
 
 @pytest.fixture(scope="function")
@@ -264,7 +259,6 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
     storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
     settings.grpc_port = free_port()
-    set_utility(Utility.CACHE, cache)
     yield
     storage_settings.file_backend = old_file_backend
     storage_settings.gcs_endpoint_url = old_gcs_endpoint_url

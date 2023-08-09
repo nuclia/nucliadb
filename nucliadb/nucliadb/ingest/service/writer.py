@@ -103,12 +103,11 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
 from nucliadb_protos import writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
-from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
-    get_cache,
     get_partitioning,
+    get_pubsub,
     get_storage,
     get_transaction_utility,
 )
@@ -121,9 +120,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         self.driver = await setup_driver()
-        self.cache = await get_cache()
         self.proc = Processor(
-            driver=self.driver, storage=self.storage, cache=self.cache
+            driver=self.driver, storage=self.storage, pubsub=await get_pubsub()
         )
         self.shards_manager = get_shard_manager()
 
@@ -266,10 +264,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 break
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
-            if self.cache is not None:
-                await self.cache.delete(
-                    KB_COUNTER_CACHE.format(kbid=message.kbid), invalidate=True
-                )
         return response
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore

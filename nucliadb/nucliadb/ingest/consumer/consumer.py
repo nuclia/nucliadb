@@ -36,8 +36,7 @@ from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViola
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
-from nucliadb_utils.cache import KB_COUNTER_CACHE
-from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.storages.storage import Storage
 
@@ -72,17 +71,16 @@ class IngestConsumer:
         partition: str,
         storage: Storage,
         nats_connection_manager: NatsConnectionManager,
-        cache: Optional[Cache] = None,
+        pubsub: Optional[PubSubDriver] = None,
     ):
         self.driver = driver
         self.partition = partition
-        self.cache = cache
         self.nats_connection_manager = nats_connection_manager
         self.ack_wait = 10 * 60
         self.initialized = False
 
         self.lock = asyncio.Lock()
-        self.processor = Processor(driver, storage, cache, partition)
+        self.processor = Processor(driver, storage, pubsub, partition)
 
     async def initialize(self):
         await self.setup_nats_subscription()
@@ -178,10 +176,6 @@ class IngestConsumer:
                                 nucliadb seqid: {seqid}, partition: {self.partition} as {audit_time}, \
                                     total time: {time_to_process:.2f}s",
                     )
-                    if self.cache is not None:
-                        await self.cache.delete(
-                            KB_COUNTER_CACHE.format(kbid=pb.kbid), invalidate=True
-                        )
             except DeadletteredError as e:
                 # Messages that have been sent to deadletter at some point
                 # We don't want to process it again so it's ack'd
