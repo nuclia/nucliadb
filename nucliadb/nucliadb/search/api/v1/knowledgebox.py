@@ -34,7 +34,6 @@ from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -130,7 +129,6 @@ async def knowledgebox_counters(
                 queried_shards.append(shard_id)
 
     if not ops:
-        await abort_transaction()
         logger.info(f"No node found for any of this resources shards {kbid}")
         raise HTTPException(
             status_code=500,
@@ -144,7 +142,6 @@ async def knowledgebox_counters(
         )
     except asyncio.TimeoutError as exc:
         errors.capture_exception(exc)
-        await abort_transaction()
         raise HTTPException(status_code=503, detail=f"Data query took too long")
     except AioRpcError as exc:
         if exc.code() is GrpcStatusCode.UNAVAILABLE:
@@ -162,7 +159,6 @@ async def knowledgebox_counters(
     for shard in results:
         if isinstance(shard, Exception):
             errors.capture_exception(shard)
-            await abort_transaction()
             raise HTTPException(
                 status_code=500, detail=f"Error while geting shard data"
             )
@@ -171,23 +167,19 @@ async def knowledgebox_counters(
         paragraph_count += shard.paragraphs
         sentence_count += shard.sentences
 
-    # Get counters from maindb
-    driver = get_driver()
-    txn = await driver.begin()
-
-    try:
-        resource_count = 0
-        async for _ in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
-        ):
-            resource_count += 1
-    except Exception as exc:
-        errors.capture_exception(exc)
-        raise HTTPException(
-            status_code=500, detail="Couldn't retrieve counters right now"
-        )
-    finally:
-        await txn.abort()
+    # Calculate resource count
+    async with get_driver().transaction() as txn:
+        try:
+            resource_count = 0
+            async for _ in txn.keys(
+                match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
+            ):
+                resource_count += 1
+        except Exception as exc:
+            errors.capture_exception(exc)
+            raise HTTPException(
+                status_code=500, detail="Couldn't retrieve counters right now"
+            )
 
     counters = KnowledgeboxCounters(
         resources=resource_count,

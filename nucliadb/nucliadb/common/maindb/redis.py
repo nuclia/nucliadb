@@ -185,12 +185,3 @@ class RedisDriver(Driver):
 
     async def begin(self) -> RedisTransaction:
         return RedisTransaction(self.redis, driver=self)
-
-    async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ):
-        if self.redis is None:
-            raise AttributeError()
-        async with self.redis.client() as conn:
-            async for key in conn.scan_iter(match=match.encode() + b"*", count=count):
-                yield key.decode()
