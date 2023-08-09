@@ -170,11 +170,7 @@ async def knowledgebox_counters(
     # Calculate resource count
     async with get_driver().transaction() as txn:
         try:
-            resource_count = 0
-            async for _ in txn.keys(
-                match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
-            ):
-                resource_count += 1
+            resource_count = await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
         except Exception as exc:
             errors.capture_exception(exc)
             raise HTTPException(

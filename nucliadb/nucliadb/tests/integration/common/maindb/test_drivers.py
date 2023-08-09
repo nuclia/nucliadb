@@ -143,6 +143,9 @@ async def driver_basic(driver: Driver):
         "/internal/kbs",
     }
 
+    async with driver.transaction() as txn:
+        assert len(current_internal_kbs_keys) == await txn.count("/internal/kbs")
+
     # but with it it does not return the father
     txn = await driver.begin()
     current_internal_kbs_keys = set()

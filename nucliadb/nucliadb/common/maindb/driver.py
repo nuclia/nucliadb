@@ -24,7 +24,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List, Optional
 
 DEFAULT_SCAN_LIMIT = 10
-DEFAULT_BATCH_SCAN_LIMIT = 2000
+DEFAULT_BATCH_SCAN_LIMIT = 500
 
 
 class Transaction:
@@ -52,6 +52,9 @@ class Transaction:
     def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
     ) -> AsyncGenerator[str, None]:
+        raise NotImplementedError()
+
+    async def count(self, match: str) -> int:
         raise NotImplementedError()
 
 
