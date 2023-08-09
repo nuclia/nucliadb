@@ -33,11 +33,9 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils import logger
 from nucliadb_utils.storages.storage import Storage, StorageField
 
-MAX_SIZE = 1073741824
-
 MIN_UPLOAD_SIZE = 5 * 1024 * 1024
 CHUNK_SIZE = MIN_UPLOAD_SIZE
-MAX_RETRIES = 5
+MAX_TRIES = 3
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
@@ -60,7 +58,7 @@ POLICY_DELETE = {
 class S3StorageField(StorageField):
     storage: S3Storage
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def _download(self, uri, bucket, **kwargs):
         if "headers" in kwargs:
             for key, value in kwargs["headers"].items():
@@ -148,7 +146,7 @@ class S3StorageField(StorageField):
         field.upload_uri = upload_uri
         return field
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def _create_multipart(self, bucket_name: str, upload_id: str, cf: CloudFile):
         return await self.storage._s3aioclient.create_multipart_upload(
             Bucket=bucket_name,
@@ -181,7 +179,7 @@ class S3StorageField(StorageField):
 
         return size
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def _upload_part(self, cf: CloudFile, data: bytes):
         if self.field is None:
             raise AttributeError("No field configured")
@@ -219,7 +217,7 @@ class S3StorageField(StorageField):
         self.field.ClearField("upload_uri")
         self.field.ClearField("parts")
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def _complete_multipart_upload(self):
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
