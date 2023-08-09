@@ -126,7 +126,9 @@ async def create_resource(
 
     if item.slug:
         if await resource_slug_exists(kbid, item.slug):
-            raise HTTPException(status_code=409, detail="Resource slug already exists")
+            raise HTTPException(
+                status_code=409, detail=f"Resource slug {item.slug} already exists"
+            )
         writer.slug = item.slug
         toprocess.slug = item.slug
 
