@@ -79,6 +79,10 @@ class GoogleCloudException(Exception):
     pass
 
 
+class ReadingResponseContentException(GoogleCloudException):
+    pass
+
+
 RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
     aiohttp.client_exceptions.ClientPayloadError,
@@ -142,9 +146,32 @@ class GCSStorageField(StorageField):
                 data = await resp.json()
                 assert data["resource"]["name"] == destination_uri
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     @storage_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(self, headers=None):
+        max_tries = 4
+        attempt = 1
+        while True:
+            try:
+                async for chunk in self._inner_iter_data(headers=headers):
+                    yield chunk
+                break
+            except ReadingResponseContentException:
+                # Do not retry any exception that may happen in the middle of
+                # reading the response chunks, as that could lead to duplicated
+                # chunks and data corruption.
+                raise
+            except RETRIABLE_EXCEPTIONS as ex:
+                if attempt >= max_tries:
+                    raise
+                wait_time = 2 ** (attempt - 1)
+                logger.warning(
+                    f"Error downloading from GCP. Retrying ({attempt} of {max_tries}) after {wait_time} seconds. Error: {ex}"  # noqa
+                )
+                await asyncio.sleep(wait_time)
+                attempt += 1
+
+    @storage_ops_observer.wrap({"type": "inner_iter_data"})
+    async def _inner_iter_data(self, headers=None):
         if headers is None:
             headers = {}
 
@@ -175,7 +202,10 @@ class GCSStorageField(StorageField):
                     )
                 raise GoogleCloudException(f"{api_resp.status}: {text}")
             while True:
-                chunk = await api_resp.content.read(1024 * 1024)
+                try:
+                    chunk = await api_resp.content.read(1024 * 1024)
+                except Exception as ex:
+                    raise ReadingResponseContentException() from ex
                 if len(chunk) > 0:
                     yield chunk
                 else:
