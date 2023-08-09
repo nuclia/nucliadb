@@ -28,7 +28,7 @@ from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.errors import NotFoundError as StreamNotFoundError
-from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
+from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
 
@@ -64,6 +64,54 @@ subscriber_observer = metrics.Observer(
 )
 
 
+class ShardManager:
+    target_gc_resources = 10
+    schedule_delay_seconds = 5.0
+
+    def __init__(self, shard_id: str, writer: Writer, gc_lock: asyncio.Semaphore):
+        self.lock = asyncio.Lock()  # write lock for this shard
+
+        self._shard_id = shard_id
+        self._writer = writer
+
+        self._gc_lock = gc_lock  # global lock so we only gc one shard at a time
+        self._change_count = 0
+        self._gc_schedule_timer: Optional[asyncio.TimerHandle] = None
+
+    def shard_changed_event(self, delay: Optional[float] = None) -> None:
+        """
+        Signal shard has changed and should be garbage collected at some point
+        """
+        self._change_count += 1
+        if (
+            self._gc_schedule_timer is not None
+            and not self._gc_schedule_timer.cancelled()
+        ):
+            self._gc_schedule_timer.cancel()
+
+        if self._change_count >= self.target_gc_resources:
+            # need to force running it now
+            self._schedule_gc()
+        else:
+            # run it soon
+            if delay is None:
+                delay = self.schedule_delay_seconds
+            self._gc_schedule_timer = asyncio.get_event_loop().call_later(
+                delay, self._schedule_gc
+            )
+
+    def _schedule_gc(self) -> asyncio.Task:
+        return asyncio.create_task(self.gc())
+
+    async def gc(self):
+        async with self._gc_lock, self.lock:
+            self._change_count = 0
+            try:
+                await self._writer.garbage_collector(self._shard_id)
+            except Exception:
+                logger.exception(f"Could not garbage {self._shard_id}", stack_info=True)
+
+
 class Worker:
     subscriptions: List[Subscription]
     storage: Storage
@@ -78,18 +126,23 @@ class Worker:
         self.reader = reader
         self.subscriptions = []
         self.ack_wait = 10 * 60
-        self.lock = asyncio.Lock()
-        self.event = asyncio.Event()
         self.node = node
-        self.gc_task = None
         self.publisher = IndexedPublisher()
         self.load_seqid()
         self.brain: Optional[Resource] = None
 
-    async def finalize(self):
-        if self.gc_task:
-            self.gc_task.cancel()
+        self.shard_managers: dict[str, ShardManager] = {}
+        # right now, only allow one gc at a time but
+        # can be expanded to allow multiple if we want with a semaphore
+        self.gc_lock = asyncio.Semaphore(1)
 
+    async def initialize(self):
+        self.storage = await get_storage(service_name=SERVICE_NAME)
+        await self.publisher.initialize()
+        await self.subscriber_initialize()
+        await self.garbage_collect_all()
+
+    async def finalize(self):
         await self.publisher.finalize()
         await self.subscriber_finalize()
 
@@ -115,13 +168,6 @@ class Worker:
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
-
-    async def initialize(self):
-        self.storage = await get_storage(service_name=SERVICE_NAME)
-        self.event.clear()
-        await self.publisher.initialize()
-        await self.subscriber_initialize()
-        self.gc_task = asyncio.create_task(self.garbage())
 
     async def subscriber_initialize(self):
         options = {
@@ -158,29 +204,20 @@ class Worker:
             # AttributeError: can be thrown by nats-py when handling shutdown
             pass
 
-    async def garbage(self) -> None:
-        try:
-            await self._garbage()
-        except (asyncio.CancelledError, RuntimeError):  # pragma: no cover
-            return
+    def get_shard_manager(self, shard_id: str) -> ShardManager:
+        if shard_id not in self.shard_managers:
+            self.shard_managers[shard_id] = ShardManager(
+                shard_id, self.writer, self.gc_lock
+            )
+        return self.shard_managers[shard_id]
 
-    async def _garbage(self) -> None:
-        while True:
-            await self.event.wait()
-            await asyncio.sleep(10)
-            if self.event.is_set():
-                async with self.lock:
-                    try:
-                        logger.info(f"Mr Propper working")
-                        shards: ShardIds = await self.writer.shards()
-                        for shard in shards.ids:
-                            await self.writer.garbage_collector(shard)
-                        logger.info(f"Garbaged {len(shards.ids)}")
-                    except Exception:
-                        logger.exception(
-                            f"Could not garbage {shard.id}", stack_info=True
-                        )
-                await asyncio.sleep(24 * 3660)
+    async def garbage_collect_all(self) -> None:
+        """
+        Schedule garbage collection for all shards on startup
+        """
+        for idx, shard in enumerate((await self.writer.shards()).ids):
+            sm = self.get_shard_manager(shard.id)
+            sm.shard_changed_event(idx * 0.01)
 
     def store_seqid(self, seqid: int):
         if settings.data_path is None:
@@ -233,19 +270,19 @@ class Worker:
             await msg.ack()
             return
 
-        self.event.clear()
+        pb = IndexMessage()
+        pb.ParseFromString(msg.data)
         status: Optional[OpStatus] = None
-        async with self.lock:
+        sm = self.get_shard_manager(pb.shard)
+        async with sm.lock:
             try:
-                pb = IndexMessage()
-                pb.ParseFromString(msg.data)
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
                 elif pb.typemessage == TypeMessage.DELETION:
                     status = await self.delete_resource(pb)
                 if status:
                     self.reader.update(pb.shard, status)
-
+                sm.shard_changed_event()
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exist {pb.shard}")
@@ -275,10 +312,10 @@ class Worker:
                     f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                 )
                 raise e
+
         try:
             self.store_seqid(seqid)
             await msg.ack()
-            self.event.set()
             await self.publisher.indexed(pb)
         except Exception as e:  # pragma: no cover
             errors.capture_exception(e)
