@@ -141,6 +141,7 @@ async def knowledgebox_counters(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
+        logger.error("Timeout querying shards", exc_info=shard)
         errors.capture_exception(exc)
         raise HTTPException(status_code=503, detail=f"Data query took too long")
     except AioRpcError as exc:
@@ -158,6 +159,7 @@ async def knowledgebox_counters(
 
     for shard in results:
         if isinstance(shard, Exception):
+            logger.error("Error getting shard info", exc_info=shard)
             errors.capture_exception(shard)
             raise HTTPException(
                 status_code=500, detail=f"Error while geting shard data"
@@ -172,6 +174,7 @@ async def knowledgebox_counters(
         try:
             resource_count = await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
         except Exception as exc:
+            logger.exception("Error pulling resource count")
             errors.capture_exception(exc)
             raise HTTPException(
                 status_code=500, detail="Couldn't retrieve counters right now"
