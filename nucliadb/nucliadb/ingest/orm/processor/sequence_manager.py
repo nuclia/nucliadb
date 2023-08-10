@@ -34,7 +34,7 @@ async def get_last_seqid(driver: Driver, worker: str) -> Optional[int]:
     async with driver.transaction() as txn:
         key = TXNID.format(worker=worker)
         last_seq = await txn.get(key)
-        if last_seq is None:
+        if not last_seq:
             return None
         else:
             return int(last_seq)
