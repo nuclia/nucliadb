@@ -22,7 +22,7 @@ In order to test different scenarios we are splitting tests on this areas:
 
   - Storage: GCS
   - MainDB: Redis
-  - Nodes: 2 Nodes chitchat real cluster
+  - Nodes: 2 Nodes real cluster
   - TXN: Jetstream
   - Cache: Nats
 
@@ -30,7 +30,7 @@ In order to test different scenarios we are splitting tests on this areas:
 
   - Storage: GCS
   - MainDB: Redis
-  - Nodes: 2 Nodes chitchat real cluster
+  - Nodes: 2 Nodes real cluster
   - TXN: Jetstream
   - Cache: Nats
 

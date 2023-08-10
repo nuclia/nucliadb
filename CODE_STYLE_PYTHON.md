@@ -128,7 +128,7 @@ Limit the number of integration tests you write. Less is more. Integration tests
 
 ### Functional testing.
 
-Testing all the architecture is complex and packages like `nucliadb_one` and `nucliadb_search` starts all dependency layers on a distributed way with chitchat protocol, testing the real environment. Takes some time to fire all dependencies but provides a good real integration and functional test.
+Testing all the architecture is complex and packages like `nucliadb_one` and `nucliadb_search` starts all dependency layers on a distributed way with the cluster discovery protocol, testing the real environment. Takes some time to fire all dependencies but provides a good real integration and functional test.
 
 ### Beware of too many complex shared fixtures
 Shared fixtures are something that need to be supported across potentially many tests. As more logic is shoved into shared fixture, it is increasingly difficult to maintain.

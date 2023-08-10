@@ -96,10 +96,6 @@ jobs:
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
-      # we may need eu.gcr.io/stashify-218417/node
-      # or eu.gcr.io/stashify-218417/cluster_manager
-      # or eu.gcr.io/stashify-218417/node_sidecar
-
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
