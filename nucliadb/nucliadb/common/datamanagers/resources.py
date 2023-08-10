@@ -110,12 +110,13 @@ class ResourcesDataManager:
         This is usually not very fast at all.
 
         Long term, we could think about implementing a counter; however,
-        right now, a counter would be difficul, require a lot of
+        right now, a counter would be difficult, require a lot of
         refactoring and not worth much value for the APIs we need
         this feature for.
 
-        Finally, we could also querying this data from the node; however,
-        it is also not the source of truth here technically.
+        Finally, we could also query this data from the node; however,
+        it is not the source of truth for the value so it is not ideal
+        to move it to the node.
         """
         async with self.driver.transaction() as txn:
             return await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
