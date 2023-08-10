@@ -105,36 +105,46 @@ class TiKVTransaction(Transaction):
         until all matching keys are retrieved.
         With any other count, only up to count keys will be returned.
         """
+        assert self.driver.tikv is not None
+        with tikv_observer({"type": "begin"}):
+            # We need to create a new transaction
+            # this seems weird but is necessary with current usage of tikv_client
+            txn = await self.driver.tikv.begin(pessimistic=False)
+
         get_all_keys = count == -1
         limit = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
         start_key = match.encode()
         _include_start = include_start
 
-        while True:
-            with tikv_observer({"type": "scan_keys"}):
-                keys = await self.txn.scan_keys(
-                    start=start_key,
-                    end=None,
-                    limit=limit,
-                    include_start=_include_start,
-                )
-            for key in keys:
-                str_key = key.decode()
-                if str_key.startswith(match):
-                    yield str_key
+        try:
+            while True:
+                with tikv_observer({"type": "scan_keys"}):
+                    keys = await txn.scan_keys(
+                        start=start_key,
+                        end=None,
+                        limit=limit,
+                        include_start=_include_start,
+                    )
+                for key in keys:
+                    str_key = key.decode()
+                    if str_key.startswith(match):
+                        yield str_key
+                    else:
+                        break
                 else:
-                    break
-            else:
-                if len(keys) == limit and get_all_keys:
-                    # If all keys were requested and it may exist
-                    # some more keys to retrieve
-                    start_key = keys[-1]
-                    _include_start = False
-                    continue
+                    if len(keys) == limit and get_all_keys:
+                        # If all keys were requested and it may exist
+                        # some more keys to retrieve
+                        start_key = keys[-1]
+                        _include_start = False
+                        continue
 
-            # If not all keys were requested
-            # or the for loop found an unmatched key
-            break
+                # If not all keys were requested
+                # or the for loop found an unmatched key
+                break
+        finally:
+            with tikv_observer({"type": "rollback"}):
+                await txn.rollback()
 
     async def count(self, match: str) -> int:
         """
