@@ -114,13 +114,8 @@ class ResourcesDataManager:
         refactoring and not worth much value for the APIs we need
         this feature for.
         """
-        resource_count = 0
         async with self.driver.transaction() as txn:
-            async for _ in txn.keys(
-                match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
-            ):
-                resource_count += 1
-        return resource_count
+            return await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
 
     async def get_number_of_resources(self, kbid: str) -> int:
         """
