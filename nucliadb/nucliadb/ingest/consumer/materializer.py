@@ -39,6 +39,13 @@ class MaterializerHandler:
     """
     The purpose of this component is to materialize data that is
     expensive to calculate at read time and is okay to be stale.
+
+    This component will only materialize data on kbs that are
+    being written to. This is done by subscribing to the pubsub
+    notification channel and scheduling a task to materialize
+    the data. The task will be scheduled with a delay to allow
+    for multiple resources to be written but a single materialization
+    will be done.
     """
 
     subscription_id: str
