@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic
@@ -1458,7 +1458,7 @@ def maybe_update_basic_thumbnail(
     return True
 
 
-def update_basic_languages(basic: Basic, languages: List[str]) -> bool:
+def update_basic_languages(basic: Basic, languages: list[str]) -> bool:
     if len(languages) == 0:
         return False
 
