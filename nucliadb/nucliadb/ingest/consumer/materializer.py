@@ -95,7 +95,7 @@ class MaterializerHandler:
         )
 
     async def process(self, kbid: str) -> None:
-        logger.info(f"Materializing knowledgebox", {"kbid": kbid})
+        logger.info(f"Materializing knowledgebox", extra={"kbid": kbid})
         await self.resources_data_manager.set_number_of_resources(
             kbid, await self.resources_data_manager.calculate_number_of_resources(kbid)
         )
