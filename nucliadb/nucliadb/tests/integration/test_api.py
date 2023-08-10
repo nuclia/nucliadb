@@ -571,20 +571,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
     assert resp.json()["icon"] == "application/pdf"
 
-    # Check that if we change the icon specifically, the change is applied
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{uuid}",
-        json={
-            "icon": "text/plain",
-        },
-        headers={"X-SYNCHRONOUS": "True"},
-        timeout=None,
-    )
-    assert resp.status_code == 200
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
-    assert resp.json()["icon"] == "text/plain"
-
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -614,3 +600,39 @@ async def test_resource_slug_validation(
         detail = resp.json()["detail"][0]
         assert detail["loc"] == ["body", "slug"]
         assert detail["msg"].startswith(f"Invalid slug: '{slug}'")
+
+
+@pytest.mark.asyncio
+async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Foo",
+            "icon": "text/plain",
+            "texts": {"text": {"body": "my text"}},
+        },
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    assert resp.json()["icon"] == "text/plain"
+
+    # A subsequent file upload should not change the icon
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resource/{uuid}/file/file/upload",
+        content=b"foo" * 200,
+        headers={"X-SYNCHRONOUS": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}")
+    assert resp.json()["icon"] == "text/plain"

@@ -85,8 +85,6 @@ def parse_basic_modify(
         bm.basic.thumbnail = item.thumbnail
     if item.layout:
         bm.basic.layout = item.layout
-    if item.icon:
-        bm.basic.icon = item.icon
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
             userfieldmetadata = UserFieldMetadata()
