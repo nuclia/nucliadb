@@ -82,7 +82,12 @@ class MaterializerHandler:
         notification = writer_pb2.Notification()
         notification.ParseFromString(data)
 
-        if notification.action != writer_pb2.Notification.Action.COMMIT:
+        if (
+            notification.action
+            != writer_pb2.Notification.Action.COMMIT  # only on commits
+            or notification.write_type
+            == writer_pb2.Notification.WriteType.MODIFIED  # only on new resources and deletes
+        ):
             return
 
         self.task_handler.schedule(
