@@ -129,9 +129,7 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.JSON: "application/json",
 }
 
-BASIC_IMMUTABLE_FIELDS = [
-    "icon",
-]
+BASIC_IMMUTABLE_FIELDS = ("icon",)
 
 
 class Resource:
