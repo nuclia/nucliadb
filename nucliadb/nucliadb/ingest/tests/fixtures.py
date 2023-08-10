@@ -362,16 +362,13 @@ def make_extracted_vectors(field_id):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(
-    gcs_storage, redis_driver, cache, knowledgebox_ingest, fake_node
-):
+async def test_resource(gcs_storage, redis_driver, knowledgebox_ingest, fake_node):
     """
     Create a resource that has every possible bit of information
     """
     resource = await create_resource(
         storage=gcs_storage,
         driver=redis_driver,
-        cache=cache,
         knowledgebox_ingest=knowledgebox_ingest,
     )
     yield resource
@@ -498,7 +495,7 @@ def broker_resource(
     return message1
 
 
-async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: str):
+async def create_resource(storage, driver: Driver, knowledgebox_ingest: str):
     txn = await driver.begin()
 
     rid = str(uuid.uuid4())

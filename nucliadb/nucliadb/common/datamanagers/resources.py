@@ -113,6 +113,9 @@ class ResourcesDataManager:
         right now, a counter would be difficul, require a lot of
         refactoring and not worth much value for the APIs we need
         this feature for.
+
+        Finally, we could also querying this data from the node; however,
+        it is also not the source of truth here technically.
         """
         async with self.driver.transaction() as txn:
             return await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
