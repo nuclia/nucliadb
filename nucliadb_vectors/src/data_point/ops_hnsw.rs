@@ -264,7 +264,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         with_duplicates: bool,
     ) -> Neighbours {
         let Some(entry_point) = hnsw.get_entry_point() else {
-            return Neighbours::default()
+            return Neighbours::default();
         };
         let mut crnt_layer = entry_point.layer;
         let mut neighbours = vec![(entry_point.node, 0.)];
@@ -294,12 +294,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 blocked_addresses: &sol_addresses,
                 vec_counter: &vec_counter,
             };
-            let Some((addr, score)) = self.closest_up_node(
-                    addr,
-                    query,
-                    hnsw.get_layer(0),
-                    node_filter,
-                ) else { continue };
+            let Some((addr, score)) =
+                self.closest_up_node(addr, query, hnsw.get_layer(0), node_filter)
+            else {
+                continue;
+            };
             filtered_result.push((addr, score));
             sol_addresses.insert(addr);
             vec_counter.add(self.tracker.get_vector(addr));

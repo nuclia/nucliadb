@@ -64,6 +64,10 @@ pub mod env {
                 builder.hostname(hostname);
             }
 
+            if let Ok(Ok(true)) = std::env::var("DISABLE_SENTRY").map(|v| v.parse::<bool>()) {
+                builder.sentry_enabled(false);
+            }
+
             if let Ok(url) = std::env::var("SENTRY_URL") {
                 builder.sentry_url(url);
             }

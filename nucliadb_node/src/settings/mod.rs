@@ -64,6 +64,8 @@ pub struct Settings {
     public_ip: IpAddr,
 
     // Errors
+    #[builder(default = "true", setter(custom))]
+    sentry_enabled: bool,
     #[builder(default = "String::new()")]
     sentry_url: String,
     #[builder(default = "SENTRY_DEV", setter(custom))]
@@ -136,6 +138,11 @@ impl Settings {
     /// Host public IP
     pub fn public_ip(&self) -> IpAddr {
         self.public_ip
+    }
+
+    /// When enabled, sentry will be activated
+    pub fn sentry_enabled(&self) -> bool {
+        self.sentry_enabled
     }
 
     pub fn sentry_url(&self) -> String {

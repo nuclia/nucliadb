@@ -57,6 +57,8 @@ async fn main() -> NodeResult<()> {
     let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
     grpc_driver.initialize().await?;
 
+    nucliadb_telemetry::sync::start_telemetry_loop();
+
     let _grpc_task = tokio::spawn(start_grpc_service(
         grpc_driver,
         settings.reader_listen_address(),
