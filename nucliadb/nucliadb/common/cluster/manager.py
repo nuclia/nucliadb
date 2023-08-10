@@ -125,7 +125,7 @@ class KBShardManager:
     ) -> Optional[writer_pb2.Shards]:
         key = KB_SHARDS.format(kbid=kbid)
         kb_shards_bytes: Optional[bytes] = await txn.get(key)
-        if kb_shards_bytes is not None:
+        if kb_shards_bytes not in (b"", None):
             kb_shards = writer_pb2.Shards()
             kb_shards.ParseFromString(kb_shards_bytes)
             return kb_shards
