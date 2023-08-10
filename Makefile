@@ -113,7 +113,7 @@ base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
 
-build-search-images: build-local-node build-local-cluster-manager build-local-sidecar
+build-search-images: build-local-node build-local-sidecar
 
 build-node:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
@@ -121,9 +121,6 @@ build-node:
 # Not use the base image
 build-base-node-image-scratch:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_local .
-
-build-local-cluster-manager:
-	docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
 
 build-local-sidecar:
 	docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
@@ -171,7 +168,5 @@ public_images:
 	docker build -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker build -t nuclia/node:latest . -f Dockerfile.node
 	docker build -t nuclia/node_sidecar:latest . -f Dockerfile.node_sidecar
-	docker build -t nuclia/cluster_monitor:latest . -f Dockerfile.cluster_monitor
 	docker push nuclia/node:latest
 	docker push nuclia/node_sidecar:latest
-	docker push nuclia/cluster_monitor:latest

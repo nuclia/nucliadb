@@ -51,9 +51,8 @@ When a component needs to be configured, a namespace should be used that describ
 and dependency.
 
 Good example: audit settings
-Example 1 that needs fixing: chitchat `LISTEN_PORT` -> `CHITCHAT_LISTEN_PORT` and `SEEDS` -> `CHITCHAT_SEEDS`
-Example 2 that needs fixing: `RUNNING_PORT`-> `HTTP_PORT` and `RUNNING_HOST` -> `HTTP_PORT`
-Example 3 that needs fixing: `NUCLIADB_INGEST` -> `INGEST_HTTP_ADDR`
+Example 1 that needs fixing: `RUNNING_PORT`-> `HTTP_PORT` and `RUNNING_HOST` -> `HTTP_PORT`
+Example 2 that needs fixing: `NUCLIADB_INGEST` -> `INGEST_HTTP_ADDR`
 
 Settings where it makes sense to not use namespacing are ones where it makes sense
 to reuse them between different components. For example, `HTTP_HOST`

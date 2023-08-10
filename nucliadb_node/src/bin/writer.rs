@@ -99,7 +99,6 @@ async fn main() -> NodeResult<()> {
     wait_for_sigkill().await?;
 
     info!("Shutting down NucliaDB Writer Node...");
-    // abort all the tasks that hold a chitchat TCP/IP connection
     metrics_task.abort();
     let _ = metrics_task.await;
 

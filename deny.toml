@@ -115,12 +115,6 @@ exceptions = [
     { name = "nucliadb-node", allow = [
         "AGPL-3.0",
     ], version = "*" },
-    { name = "nucliadb-swim", allow = [
-        "MIT",
-    ], version = "*" },
-    { name = "nucliadb-cluster", allow = [
-        "AGPL-3.0",
-    ], version = "*" },
     { name = "target-lexicon", allow = [
         "Apache-2.0 WITH LLVM-exception",
     ], version = "*" },

@@ -106,10 +106,6 @@ jobs:
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
-      # we may need eu.gcr.io/stashify-218417/node
-      # or eu.gcr.io/stashify-218417/cluster_manager
-      # or eu.gcr.io/stashify-218417/node_sidecar
-
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         run: |
