@@ -105,7 +105,7 @@ class ResourcesDataManager:
 
     async def calculate_number_of_resources(self, kbid: str) -> int:
         """
-        Calculate and the number of resources in a knowledgebox.
+        Calculate the number of resources in a knowledgebox.
 
         This is usually not very fast at all.
 
