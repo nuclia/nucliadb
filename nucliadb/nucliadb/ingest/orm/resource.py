@@ -278,9 +278,9 @@ class Resource:
                             basic_user_field_metadata=user_field_metadata,
                         )
 
-        if slug not in ("", None):
-            slug = await self.kb.get_unique_slug(self.uuid, slug)
-            self.basic.slug = slug
+        if slug:
+            unique_slug = await self.kb.get_unique_slug(self.uuid, slug)
+            self.basic.slug = unique_slug
             self.slug_modified = True
 
         # Some basic fields are computed off field metadata.
