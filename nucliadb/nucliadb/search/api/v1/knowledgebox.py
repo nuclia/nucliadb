@@ -159,7 +159,7 @@ async def knowledgebox_counters(
     try:
         resource_count = await res_dm.get_number_of_resources(kbid)
         if resource_count == -1:
-            # WARNING: on prem, this value will never be cached
+            # WARNING: standalone, this value will never be cached
             resource_count = await res_dm.calculate_number_of_resources(kbid)
     except Exception as exc:
         errors.capture_exception(exc)
