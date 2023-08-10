@@ -105,7 +105,7 @@ async def list_resources(
 
             # Fetch and Add wanted item
             rid = await txn.get(key)
-            if rid is not None:
+            if rid:
                 result = await serialize(
                     kbid,
                     rid.decode(),

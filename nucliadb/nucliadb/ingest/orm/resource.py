@@ -679,7 +679,7 @@ class Resource:
     async def get_all_field_ids(self) -> Optional[PBAllFieldIDs]:
         key = KB_RESOURCE_ALL_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
         payload = await self.txn.get(key)
-        if payload is None:
+        if not payload:
             return None
         all_fields = PBAllFieldIDs()
         all_fields.ParseFromString(payload)

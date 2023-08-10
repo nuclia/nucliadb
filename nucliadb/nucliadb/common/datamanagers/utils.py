@@ -30,7 +30,7 @@ async def get_kv_pb(
     txn: Transaction, key: str, pb_type: Type[PB_TYPE]
 ) -> Optional[PB_TYPE]:
     kb_shards_bytes: Optional[bytes] = await txn.get(key)
-    if kb_shards_bytes is not None:
+    if kb_shards_bytes:
         kb_shards = pb_type()
         kb_shards.ParseFromString(kb_shards_bytes)
         return kb_shards

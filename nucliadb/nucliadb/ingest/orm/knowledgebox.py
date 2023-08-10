@@ -316,7 +316,7 @@ class KnowledgeBox:
         async for key in self.txn.keys(labels_key, count=-1):
             labelset = await self.txn.get(key)
             id = key.split("/")[-1]
-            if labelset is not None:
+            if labelset:
                 ls = LabelSet()
                 ls.ParseFromString(labelset)
                 labels.labelset[id].CopyFrom(ls)
@@ -433,7 +433,7 @@ class KnowledgeBox:
     async def get_shards_object(self) -> writer_pb2.Shards:
         key = KB_SHARDS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
-        if payload is None:
+        if not payload:
             await self.txn.abort()
             raise ShardsNotFound(self.kbid)
         pb = writer_pb2.Shards()
@@ -512,7 +512,7 @@ class KnowledgeBox:
         key_ok = False
         while key_ok is False:
             found = await self.txn.get(key)
-            if found is not None and found.decode() != uuid:
+            if found and found.decode() != uuid:
                 slug += ".c"
                 key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
             else:
@@ -524,7 +524,8 @@ class KnowledgeBox:
         self, txn: Transaction, kbid: str, slug: str
     ) -> bool:
         key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
-        return await txn.get(key) is not None
+        encoded_slug: Optional[bytes] = await txn.get(key)
+        return encoded_slug not in (None, b"")
 
     async def add_resource(
         self, uuid: str, slug: str, basic: Optional[Basic] = None
