@@ -388,16 +388,7 @@ class Processor:
         elif resource is not None:
             # It's an update of an existing resource, can come either from writer or
             # from processing
-            if (
-                message.HasField("basic")
-                or message.slug != ""
-                or len(message.delete_fields) > 0
-            ):
-                await resource.set_basic(
-                    message.basic,
-                    slug=message.slug,
-                    deleted_fields=message.delete_fields,  # type: ignore
-                )
+            await self.maybe_update_resource_basic(resource, message)
         elif resource is None and message.source is message.MessageSource.PROCESSOR:
             # It's a new resource, and somehow we received the message coming from processing before
             # the "fast" one, this shouldn't happen
@@ -418,6 +409,21 @@ class Processor:
             return (resource, created)
 
         return None
+
+    async def maybe_update_resource_basic(
+        self, resource: Resource, message: writer_pb2.BrokerMessage
+    ) -> None:
+        basic_field_updates = message.HasField("basic")
+        slug_updates = message.slug != ""
+        deleted_fields = len(message.delete_fields) > 0
+        if not (basic_field_updates or slug_updates or deleted_fields):
+            return
+
+        await resource.set_basic(
+            message.basic,
+            slug=message.slug,
+            deleted_fields=message.delete_fields,  # type: ignore
+        )
 
     async def notify_commit(
         self,

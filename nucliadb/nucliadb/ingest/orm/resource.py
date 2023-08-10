@@ -129,6 +129,10 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.JSON: "application/json",
 }
 
+BASIC_IMMUTABLE_FIELDS = [
+    "icon",
+]
+
 
 class Resource:
     def __init__(
@@ -213,11 +217,18 @@ class Resource:
         slug: Optional[str] = None,
         deleted_fields: Optional[list[FieldID]] = None,
     ):
-        """
-        Some basic fields are computed off field metadata. This means we need to recompute upon field deletions.
-        """
         await self.get_basic()
-        if self.basic is not None and self.basic != payload:
+
+        if self.basic is None:
+            self.basic = payload
+
+        elif self.basic != payload:
+            for field in BASIC_IMMUTABLE_FIELDS:
+                # Immutable basic fields that are already set are cleared
+                # from the payload so that they are not overwritten
+                if getattr(self.basic, field, "") != "":
+                    payload.ClearField(field)
+
             self.basic.MergeFrom(payload)
 
             self.set_processing_status(self.basic, payload)
@@ -267,12 +278,13 @@ class Resource:
                             basic_user_field_metadata=user_field_metadata,
                         )
 
-        else:
-            self.basic = payload
-        if slug is not None and slug != "":
+        if slug not in ("", None):
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
             self.slug_modified = True
+
+        # Some basic fields are computed off field metadata.
+        # This means we need to recompute upon field deletions.
         if deleted_fields is not None and len(deleted_fields) > 0:
             remove_field_classifications(self.basic, deleted_fields=deleted_fields)
 
@@ -288,6 +300,7 @@ class Resource:
             )
             if payload is None:
                 return None
+
             pb.ParseFromString(payload)
             self.origin = pb
         return self.origin
