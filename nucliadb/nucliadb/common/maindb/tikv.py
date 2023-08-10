@@ -105,44 +105,86 @@ class TiKVTransaction(Transaction):
         until all matching keys are retrieved.
         With any other count, only up to count keys will be returned.
         """
-        assert self.driver.tikv is not None
-        with tikv_observer({"type": "begin"}):
-            txn = await self.driver.tikv.begin(pessimistic=False)
-
         get_all_keys = count == -1
         limit = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
         start_key = match.encode()
         _include_start = include_start
 
-        try:
-            while True:
-                with tikv_observer({"type": "scan_keys"}):
-                    keys = await txn.scan_keys(
-                        start=start_key,
-                        end=None,
-                        limit=limit,
-                        include_start=_include_start,
-                    )
-                for key in keys:
-                    str_key = key.decode()
-                    if str_key.startswith(match):
-                        yield str_key
-                    else:
-                        break
+        while True:
+            with tikv_observer({"type": "scan_keys"}):
+                keys = await self.txn.scan_keys(
+                    start=start_key,
+                    end=None,
+                    limit=limit,
+                    include_start=_include_start,
+                )
+            for key in keys:
+                str_key = key.decode()
+                if str_key.startswith(match):
+                    yield str_key
                 else:
-                    if len(keys) == limit and get_all_keys:
-                        # If all keys were requested and it may exist
-                        # some more keys to retrieve
-                        start_key = keys[-1]
-                        _include_start = False
-                        continue
+                    break
+            else:
+                if len(keys) == limit and get_all_keys:
+                    # If all keys were requested and it may exist
+                    # some more keys to retrieve
+                    start_key = keys[-1]
+                    _include_start = False
+                    continue
 
-                # If not all keys were requested
-                # or the for loop found an unmatched key
+            # If not all keys were requested
+            # or the for loop found an unmatched key
+            break
+
+    async def count(self, match: str) -> int:
+        """
+        Count the number of keys that match the given prefix
+        as efficiently as possible with the available API.
+        """
+        original_match = match.encode()
+        start_key = original_match
+        _include_start = True
+        batch_size = 5000
+
+        value = 0
+        while True:
+            with tikv_observer({"type": "scan_keys"}):
+                keys = await self.txn.scan_keys(
+                    start=start_key,
+                    end=None,
+                    limit=batch_size,
+                    include_start=_include_start,
+                )
+            if len(keys) == 0:
                 break
-        finally:
-            with tikv_observer({"type": "rollback"}):
-                await txn.rollback()
+
+            if not keys[-1].startswith(original_match):
+                # done counting this range, find the correct size of the match
+                # with a binary search and break out
+                left, right = 0, len(keys) - 1
+                result_index = 0
+                while left <= right:
+                    mid = left + (right - left) // 2
+
+                    if keys[mid].startswith(original_match):
+                        left = mid + 1  # Move to the right half
+                        result_index = mid
+                    else:
+                        right = mid - 1  # Move to the left half
+
+                value += result_index + 1
+                break
+            else:
+                value += len(keys)
+
+            if len(keys) == batch_size:
+                start_key = keys[-1]
+                _include_start = False
+                continue
+            else:
+                # done counting
+                break
+        return value
 
 
 class TiKVDriver(Driver):

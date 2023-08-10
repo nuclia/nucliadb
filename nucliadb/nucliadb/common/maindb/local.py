@@ -195,6 +195,12 @@ class LocalTransaction(Transaction):
                 if match in new_key:
                     yield new_key.replace(self.url, "")
 
+    async def count(self, match: str) -> int:
+        value = 0
+        async for _ in self.keys(match, count=-1):
+            value += 1
+        return value
+
 
 class LocalDriver(Driver):
     url: str

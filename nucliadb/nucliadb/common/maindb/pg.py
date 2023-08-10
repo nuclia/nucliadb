@@ -84,6 +84,12 @@ DO UPDATE SET value = EXCLUDED.value
                 continue
             yield record["key"]
 
+    async def count(self, match: str) -> int:
+        results = await self.connection.fetch(
+            "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
+        )
+        return results[0]["count"]
+
 
 class PGTransaction(Transaction):
     driver: PGDriver
@@ -135,6 +141,9 @@ class PGTransaction(Transaction):
         include_start: bool = True,
     ):
         return self.data_layer.scan_keys(match, count, include_start=include_start)
+
+    async def count(self, match: str) -> int:
+        return await self.data_layer.count(match)
 
 
 class PGDriver(Driver):
