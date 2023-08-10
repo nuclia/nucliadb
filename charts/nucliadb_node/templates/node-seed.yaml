@@ -12,7 +12,7 @@ metadata:
 spec:
   selector:
     app: node
-    chart: "{{ .Chart.Name }}"t
+    chart: "{{ .Chart.Name }}"
     statefulset.kubernetes.io/pod-name: node-0
   clusterIP: {{ .Values.serving.node0_svc_fixed_ip }}
   ports:
