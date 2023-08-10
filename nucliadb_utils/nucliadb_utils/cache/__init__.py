@@ -16,6 +16,3 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-CACHE_PREFIX = "gcache2-"
-KB_COUNTER_CACHE = "kb_{kbid}_counters"

@@ -33,7 +33,7 @@ from nucliadb.ingest.orm.exceptions import ReallyStopPulling
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
-from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction_utility
@@ -55,7 +55,7 @@ class PullWorker:
         partition: str,
         storage: Storage,
         pull_time_error_backoff: int,
-        cache: Optional[Cache] = None,
+        pubsub: Optional[PubSubDriver] = None,
         local_subscriber: bool = False,
         pull_time_empty_backoff: float = 5.0,
     ):
@@ -63,9 +63,8 @@ class PullWorker:
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.local_subscriber = local_subscriber
-        self.cache = cache
 
-        self.processor = Processor(driver, storage, cache, partition)
+        self.processor = Processor(driver, storage, pubsub, partition)
 
     def __str__(self) -> str:
         return f"PullWorker(partition={self.partition})"

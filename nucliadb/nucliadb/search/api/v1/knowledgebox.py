@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import json
 from typing import List, Optional
 
 from fastapi import HTTPException, Request
@@ -32,8 +31,8 @@ from nucliadb_protos.writer_pb2 import Shards
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -47,8 +46,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
-from nucliadb_utils.cache import KB_COUNTER_CACHE
-from nucliadb_utils.utilities import get_cache
+from nucliadb_utils.utilities import get_storage
 
 
 @api.get(
@@ -89,18 +87,6 @@ async def knowledgebox_counters(
     vectorset: str = fastapi_query(SearchParamDefaults.vectorset),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> KnowledgeboxCounters:
-    cache = await get_cache()
-
-    if cache is not None:
-        cached_counters = await cache.get(KB_COUNTER_CACHE.format(kbid=kbid))
-
-        if cached_counters is not None:
-            cached_counters_obj = json.loads(cached_counters)
-            # In case shards get cached, we don't want it to be retrieved if we are not debugging
-            if not debug:
-                cached_counters_obj.pop("shards", None)
-            return KnowledgeboxCounters.parse_obj(cached_counters_obj)
-
     shard_manager = get_shard_manager()
 
     try:
@@ -169,16 +155,17 @@ async def knowledgebox_counters(
         paragraph_count += shard.paragraphs
         sentence_count += shard.sentences
 
-    # Calculate resource count
-    async with get_driver().transaction() as txn:
-        try:
-            resource_count = await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
-        except Exception as exc:
-            logger.exception("Error pulling resource count")
-            errors.capture_exception(exc)
-            raise HTTPException(
-                status_code=500, detail="Couldn't retrieve counters right now"
-            )
+    res_dm = ResourcesDataManager(get_driver(), await get_storage())
+    try:
+        resource_count = await res_dm.get_number_of_resources(kbid)
+        if resource_count == -1:
+            # WARNING: standalone, this value will never be cached
+            resource_count = await res_dm.calculate_number_of_resources(kbid)
+    except Exception as exc:
+        errors.capture_exception(exc)
+        raise HTTPException(
+            status_code=500, detail="Couldn't retrieve counters right now"
+        )
 
     counters = KnowledgeboxCounters(
         resources=resource_count,
@@ -189,6 +176,4 @@ async def knowledgebox_counters(
 
     if debug:
         counters.shards = queried_shards
-    if cache is not None:
-        await cache.set(KB_COUNTER_CACHE.format(kbid=kbid), counters.json())
     return counters

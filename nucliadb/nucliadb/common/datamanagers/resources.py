@@ -31,6 +31,8 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos import noderesources_pb2
 from nucliadb_utils.storages.storage import Storage
 
+KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
+
 
 class ResourcesDataManager:
     def __init__(self, driver: Driver, storage: Storage):
@@ -100,3 +102,38 @@ class ResourcesDataManager:
             if res is None:
                 return None
             return (await res.generate_index_message()).brain
+
+    async def calculate_number_of_resources(self, kbid: str) -> int:
+        """
+        Calculate the number of resources in a knowledgebox.
+
+        This is usually not very fast at all.
+
+        Long term, we could think about implementing a counter; however,
+        right now, a counter would be difficult, require a lot of
+        refactoring and not worth much value for the APIs we need
+        this feature for.
+
+        Finally, we could also query this data from the node; however,
+        it is not the source of truth for the value so it is not ideal
+        to move it to the node.
+        """
+        async with self.driver.transaction() as txn:
+            return await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
+
+    async def get_number_of_resources(self, kbid: str) -> int:
+        """
+        Return cached number of resources in a knowledgebox.
+        """
+        async with self.driver.transaction() as txn:
+            raw_value = await txn.get(KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid))
+            if raw_value is None:
+                return -1
+            return int(raw_value)
+
+    async def set_number_of_resources(self, kbid: str, value: int) -> None:
+        async with self.driver.transaction() as txn:
+            await txn.set(
+                KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid), str(value).encode()
+            )
+            await txn.commit()

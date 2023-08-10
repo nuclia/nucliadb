@@ -213,7 +213,6 @@ async def worker(
     settings.force_host_id = "node1"
     settings.data_path = data_path
     indexing_settings.index_jetstream_servers = [natsd]
-    cache_settings.cache_pubsub_driver = "nats"
     cache_settings.cache_pubsub_nats_url = [natsd]
 
     worker = await start_worker(writer, reader)

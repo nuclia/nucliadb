@@ -39,7 +39,7 @@ from nucliadb_utils.utilities import clear_global_cache
 
 
 @pytest.fixture(scope="function")
-def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
+def test_settings_search(gcs, natsd, node, maindb_driver):  # type: ignore
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
@@ -58,10 +58,7 @@ def test_settings_search(gcs, redis, node, maindb_driver):  # type: ignore
     extended_storage_settings.gcs_indexing_bucket = "indexing"
     extended_storage_settings.gcs_deadletter_bucket = "deadletter"
 
-    url = f"redis://{redis[0]}:{redis[1]}"
-    cache_settings.cache_pubsub_driver = "redis"
-    cache_settings.cache_pubsub_channel = "pubsub-nuclia"
-    cache_settings.cache_pubsub_redis_url = url
+    cache_settings.cache_pubsub_nats_url = [natsd]
 
     running_settings.debug = False
 

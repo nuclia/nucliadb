@@ -32,10 +32,10 @@ def reset_main():
 
 
 def test_clean_utility():
-    utilities.set_utility(utilities.Utility.CACHE, "test")
-    assert utilities.get_utility(utilities.Utility.CACHE) == "test"
-    utilities.clean_utility(utilities.Utility.CACHE)
-    assert utilities.get_utility(utilities.Utility.CACHE) is None
+    utilities.set_utility(utilities.Utility.PUBSUB, "test")
+    assert utilities.get_utility(utilities.Utility.PUBSUB) == "test"
+    utilities.clean_utility(utilities.Utility.PUBSUB)
+    assert utilities.get_utility(utilities.Utility.PUBSUB) is None
 
 
 @pytest.mark.asyncio
@@ -91,12 +91,6 @@ async def test_get_local_storage():
 @pytest.mark.asyncio
 async def test_get_nuclia_storage():
     assert await utilities.get_nuclia_storage() is not None
-
-
-@pytest.mark.asyncio
-async def test_get_cache():
-    with patch("nucliadb_utils.utilities.Cache", return_value=AsyncMock()):
-        assert await utilities.get_cache() is not None
 
 
 @pytest.mark.asyncio

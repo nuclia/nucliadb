@@ -47,7 +47,6 @@ from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
-from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
@@ -402,11 +401,8 @@ def metrics_registry():
 @pytest.fixture(scope="function")
 async def redis_config(redis):
     ingest_settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
-    cache_settings.cache_pubsub_redis_url = f"redis://{redis[0]}:{redis[1]}"
     default_driver = ingest_settings.driver
-    default_driver_pubsub = cache_settings.cache_pubsub_driver
 
-    cache_settings.cache_pubsub_driver = "redis"
     ingest_settings.driver = "redis"
 
     storage_settings.local_testing_files = f"{dirname(__file__)}"
@@ -416,9 +412,7 @@ async def redis_config(redis):
     yield ingest_settings.driver_redis_url
 
     ingest_settings.driver_redis_url = None
-    cache_settings.cache_pubsub_redis_url = None
     ingest_settings.driver = default_driver
-    cache_settings.cache_pubsub_driver = default_driver_pubsub
     await driver.flushall()
     await driver.close(close_connection_pool=True)
 

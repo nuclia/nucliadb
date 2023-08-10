@@ -29,7 +29,7 @@ from starlette.routing import Mount
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.reader import API_PREFIX
-from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility
+from nucliadb_utils.utilities import clear_global_cache
 
 
 @pytest.fixture(scope="function")
@@ -47,7 +47,6 @@ def test_settings_reader(cache, gcs, fake_node, maindb_driver):  # type: ignore
     storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test"
 
-    set_utility(Utility.CACHE, cache)
     yield
 
 

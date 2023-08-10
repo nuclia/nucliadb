@@ -61,11 +61,6 @@ cache:
   cache_pubsub_nats_url:
     - nats1
   cache_pubsub_nats_auth:
-  # quote cache_memory_size to prevent Helm from converting it to scientific notation
-  cache_memory_size: "209715200"
-  cache_pubsub_channel: nucliadb.cache.invalidations
-  cache_pubsub_redis_url:
-  cache_pubsub_driver: nats # nats | redis
 
 audit:
   driver: basic
