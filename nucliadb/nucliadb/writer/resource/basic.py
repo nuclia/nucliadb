@@ -85,6 +85,14 @@ def parse_basic_modify(
         bm.basic.thumbnail = item.thumbnail
     if item.layout:
         bm.basic.layout = item.layout
+
+    if item.metadata is not None:
+        bm.basic.metadata.metadata.update(item.metadata.metadata)
+        if item.metadata.language:
+            bm.basic.metadata.language = item.metadata.language
+        if item.metadata.languages:
+            bm.basic.metadata.languages.extend(item.metadata.languages)
+
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
             userfieldmetadata = UserFieldMetadata()
@@ -194,16 +202,6 @@ def parse_basic_modify(
 
 def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushPayload):
     bm.basic.created.FromDatetime(datetime.now())
-
-    if item.metadata is not None:
-        bm.basic.metadata.Clear()
-        bm.basic.metadata.metadata.update(item.metadata.metadata)
-        if item.metadata.language:
-            bm.basic.metadata.language = item.metadata.language
-        if item.metadata.languages:
-            bm.basic.metadata.languages.extend(item.metadata.languages)
-        # basic.metadata.useful = item.metadata.useful
-        # basic.metadata.status = item.metadata.status
 
     if item.title is None:
         item.title = compute_title(item, bm.uuid)
