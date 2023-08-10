@@ -20,14 +20,21 @@
 
 use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 use crate::{env, utils};
 
-fn number_of_shards() -> NodeResult<usize> {
-    Ok(std::fs::read_dir(env::shards_path())?
-        .flatten()
-        .filter(|entry| entry.path().is_dir())
-        .count())
+async fn number_of_shards() -> NodeResult<usize> {
+    let mut count = 0;
+    let mut entries = fs::read_dir(env::shards_path()).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+            count += 1;
+        }
+    }
+
+    Ok(count)
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -49,9 +56,9 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
 }
 
 impl NodeMetadata {
-    pub fn new() -> NodeResult<Self> {
+    pub async fn new() -> NodeResult<Self> {
         Ok(Self {
-            shard_count: number_of_shards()?.try_into().unwrap(),
+            shard_count: number_of_shards().await?.try_into().unwrap(),
         })
     }
 

@@ -64,7 +64,7 @@ async fn main() -> NodeResult<()> {
     // XXX it probably should be moved to a more clear abstraction
     lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
 
-    let node_metadata = NodeMetadata::new()?;
+    let node_metadata = NodeMetadata::new().await?;
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
     let grpc_driver = NodeWriterGRPCDriver::new(Arc::clone(&settings)).with_sender(grpc_sender);
