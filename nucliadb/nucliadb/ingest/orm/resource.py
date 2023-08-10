@@ -227,7 +227,7 @@ class Resource:
                 # Immutable basic fields that are already set are cleared
                 # from the payload so that they are not overwritten
                 if getattr(self.basic, field, "") != "":
-                    payload.ClearField(field)
+                    payload.ClearField(field)  # type: ignore
 
             self.basic.MergeFrom(payload)
 
