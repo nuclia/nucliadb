@@ -52,6 +52,7 @@ pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitG
         let sentry = sentry_layer();
         layers.push(sentry);
     } else {
+        eprintln!("Sentry disabled");
         sentry_guard = None;
     }
 
@@ -119,7 +120,9 @@ fn sentry_layer() -> Box<dyn Layer<Registry> + Send + Sync> {
 }
 
 pub fn run_with_telemetry<F, R>(current: Span, f: F) -> R
-where F: FnOnce() -> R {
+where
+    F: FnOnce() -> R,
+{
     let tid = current.context().span().span_context().trace_id();
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
