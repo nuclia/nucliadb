@@ -327,7 +327,7 @@ def from_resource_to_payload(
     payload.slug = item.slug  # type: ignore
     payload.title = item.title
     payload.summary = item.summary
-    if item.icon is not None:
+    if item.icon is not None and not update:
         payload.icon = item.icon
     payload.thumbnail = item.thumbnail
     payload.layout = item.layout
