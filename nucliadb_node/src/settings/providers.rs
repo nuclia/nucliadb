@@ -65,7 +65,7 @@ pub mod env {
             }
 
             if let Ok(Ok(true)) = std::env::var("DISABLE_SENTRY").map(|v| v.parse::<bool>()) {
-                builder.sentry_enabled(false);
+                builder.sentry_enabled = Some(false);
             }
 
             if let Ok(url) = std::env::var("SENTRY_URL") {
@@ -131,6 +131,15 @@ pub mod env {
             let settings = EnvSettingsProvider::generate_settings().unwrap();
             assert_eq!(settings.shards_path().to_str().unwrap(), "mydata/shards");
             std::env::remove_var("DATA_PATH");
+        }
+
+        #[test]
+        #[serial]
+        fn test_disable_sentry() {
+            std::env::set_var("DISABLE_SENTRY", "true");
+            let settings = EnvSettingsProvider::generate_settings().unwrap();
+            assert!(!settings.sentry_enabled);
+            std::env::remove_var("DISABLE_SENTRY");
         }
     }
 }

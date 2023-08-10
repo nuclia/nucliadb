@@ -290,6 +290,7 @@ mod tests {
             Ok(settings.public_ip()) == "127.0.0.1".parse()
                 || Ok(settings.public_ip()) == "::1".parse()
         );
+        assert!(settings.sentry_enabled);
         assert_eq!(settings.sentry_env, SENTRY_PROD);
         assert!(
             Ok(settings.reader_listen_address()) == "127.0.0.1:2020".parse()
