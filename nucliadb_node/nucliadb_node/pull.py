@@ -62,6 +62,22 @@ subscriber_observer = metrics.Observer(
         float("inf"),
     ],
 )
+gc_observer = metrics.Observer(
+    "gc_processor",
+    buckets=[
+        0.025,
+        0.05,
+        0.1,
+        1.0,
+        5.0,
+        10.0,
+        30.0,
+        60.0,
+        120.0,
+        300.0,
+        float("inf"),
+    ],
+)
 
 
 class ShardManager:
@@ -108,7 +124,8 @@ class ShardManager:
             logger.info("Running garbage collection", extra={"shard": self._shard_id})
             self._change_count = 0
             try:
-                await self._writer.garbage_collector(self._shard_id)
+                with gc_observer():
+                    await self._writer.garbage_collector(self._shard_id)
             except Exception:
                 logger.exception(
                     "Could not garbage collect", extra={"shard": self._shard_id}
