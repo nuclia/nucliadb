@@ -16,6 +16,12 @@ on:
       - "nucliadb/nucliadb/search/**"
       - "nucliadb_models/**"
       - "nucliadb_protos/**"
+      - "nucliadb_node/**"
+      - "nucliadb_vectors/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_core/**"
+      - "nucliadb_relations/**"
   push:
     branches:
       - main
@@ -92,7 +98,12 @@ jobs:
         with:
           filters: |
             node_modified:
-              - 'nucliadb_node/src/**'
+              - 'nucliadb_node/**'
+              - 'nucliadb_core/**'
+              - 'nucliadb_paragraphs/**'
+              - 'nucliadb_texts/**'
+              - 'nucliadb_vectors/**'
+              - 'nucliadb_relations/**'
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
