@@ -61,6 +61,55 @@ segments to provide the shard's full dataset.
 - No advanced query support
 
 
+### Primary / Secondary Node Types
+
+There will be 1 node service that can operate in 2 modes:
+
+- Primary: Responsible for writes and replication
+- Secondary: Read only copy of Primary shards. Responsible for servicing search requests.
+
+Both node operation types have the full database implementation. This is in contrast to the
+current implementation which has logical and phsyical process boundaries between read
+and write paths. This implementation puts an explicit physical boundary on the scalable
+read path on the secondary nodes but allows read path in Primary node as well. This allows
+us to design an index implementation that does not require file locking between a shared
+file system with separate processes.
+
+#### Primary details
+
+Operational details:
+- GRPC service
+  - Indexing
+  - Replication
+  - Search
+- Designed to allow indexing to multiple shards simultaneously(different than current design)
+- Replication:
+  - responsible for pushing changes to commit log
+  - responsible for facilitating health beat/health checks with secondaries
+- StatefulSet(only 1 replica of course), dedicated node pool
+
+Physical properties:
+- Persistent disks: start with standard ssd, consider moving to extreme disks if performance is a problem
+- CPU: Start with minimum 4 CPU, scale up as needs around concurrent writes/replication increase
+
+
+#### Secondary details
+
+Operational details:
+- GRPC Service
+  - Search
+  - Should throw error `READ ONLY ERROR` if writes attempted or replication attempted
+  - Otherwise, same code base as primary
+- Designed to service search requests
+- Health check to signal kubernetes traffic should be directed to it
+- Kubernetes Deployment + HPA/PDB, dedicated node pool
+- Custom instance type with auto provision raided of local ssd disks depending on size requirements
+
+
+Physical properties:
+- local ssd disks: Fast and cheap
+
+
 ### Replication
 
 Each node will have a commit log to track changes through time,
@@ -72,7 +121,8 @@ communicate changes and track replication to secondary node replicas.
     - 2 phase "commit". First write files everywhere. Second, "turn on" new files.
     - Having Primary nodes responsible for replication allows us to avoid needing
       to implement something like raft to coordinate read replica state
-- Each node on the system will have a configured set of physical read replicas
+- Each node on the system will have a configured set of physical secondary read only replicas
+  at the kubernetes layer that will connect to the primary nodes
 
 
 ### Index coordinator
@@ -84,7 +134,7 @@ The Index coordinator is the only component that should "know" about
 what shards a Knowledge Box has and how to correctly query or write to them.
 
 Responsibilities:
-- Know Primary and secondary health
+- Know primary health, secondary health(through k8s service)
 - Balancing shards across cluster
     - Place new shards appropriately
     - Move shards when things are unbalanced
