@@ -114,7 +114,7 @@ class JetStreamContextTelemetry:
         async def wrapper(origin_cb, tracer, msg: Msg):
             # Execute the callback without tracing
             if msg.headers is None:
-                logger.warning("Message received without headers, skipping span")
+                logger.debug("Message received without headers, skipping span")
                 await origin_cb(msg)
                 return
 
@@ -183,7 +183,7 @@ class JetStreamContextTelemetry:
 
         # Execute the callback without tracing
         if message.headers is None:
-            logger.warning("Message received without headers, skipping span")
+            logger.debug("Message received without headers, skipping span")
             return await cb(message)
 
         with start_span_message_receiver(tracer, message) as span:
@@ -215,7 +215,7 @@ class NatsClientTelemetry:
         async def wrapper(origin_cb, tracer, msg: Msg):
             # Execute the callback without tracing
             if msg.headers is None:
-                logger.warning("Message received without headers, skipping span")
+                logger.debug("Message received without headers, skipping span")
                 await origin_cb(msg)
                 return
 
