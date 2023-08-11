@@ -18,18 +18,40 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
+use std::{fs, thread};
 
+use byte_unit::Byte;
 use nucliadb_vectors::data_point_provider::{Index, IndexCheck, IndexMetadata, Merger};
 use vectors_benchmark::cli_interface::*;
+
+fn dir_size(path: &Path) -> Byte {
+    let mut total_size: u128 = 0;
+
+    if path.is_dir() {
+        for entry in fs::read_dir(path).unwrap() {
+            let entry = entry.unwrap();
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                total_size += dir_size(&entry_path).get_bytes();
+            } else {
+                total_size += entry.metadata().unwrap().len() as u128;
+            }
+        }
+    }
+    Byte::from_bytes(total_size)
+}
+
 fn main() {
     let _ = Merger::install_global().map(std::thread::spawn);
     let args = Args::new();
     let stop_point = Arc::new(AtomicBool::new(false));
     let at = tempfile::TempDir::new().unwrap();
     let location = at.path().join("vectors");
+    println!("Vector location: {:?}", location);
+
     let writer = Index::new(&location, IndexMetadata::default()).unwrap();
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
@@ -48,4 +70,9 @@ fn main() {
     writer_handler.join().unwrap();
     stop_point.store(true, Ordering::SeqCst);
     reader_handler.join().unwrap();
+
+    println!(
+        "Total vector storage size: {}",
+        dir_size(location.as_ref()).get_appropriate_unit(true)
+    );
 }

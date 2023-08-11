@@ -23,6 +23,8 @@ use std::io;
 use std::io::Write;
 use std::time::SystemTime;
 
+use memory_stats::memory_stats;
+
 pub struct PlotWriter {
     start: SystemTime,
     idx: usize,
@@ -39,9 +41,15 @@ impl PlotWriter {
     }
     pub fn add(&mut self) -> io::Result<()> {
         let x = self.idx;
-        let y = self.start.elapsed().unwrap().as_millis();
+        let elapsed = self.start.elapsed().unwrap().as_millis();
+        let mut rss = 0;
+        let mut vms = 0;
+        if let Some(usage) = memory_stats() {
+            rss = usage.physical_mem;
+            vms = usage.virtual_mem;
+        }
         self.idx += 1;
-        writeln!(self.file, "{x} {y}")
+        writeln!(self.file, "{x} {elapsed} {rss} {vms}")
     }
 }
 
