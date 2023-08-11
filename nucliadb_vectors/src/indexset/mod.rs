@@ -73,14 +73,11 @@ impl IndexSet {
     }
     fn update(&self, lock: &fs_state::Lock) -> VectorR<()> {
         let disk_v = fs_state::crnt_version(lock)?;
-        let date = *self.date.read().unwrap();
-        if disk_v > date {
-            let new_state = fs_state::load_state(lock)?;
-            let mut state = self.state.write().unwrap();
-            let mut date = self.date.write().unwrap();
-            *state = new_state;
-            *date = disk_v;
-        }
+        let new_state = fs_state::load_state(lock)?;
+        let mut state = self.state.write().unwrap();
+        let mut date = self.date.write().unwrap();
+        *state = new_state;
+        *date = disk_v;
         Ok(())
     }
     pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C, _: &Lock) {
