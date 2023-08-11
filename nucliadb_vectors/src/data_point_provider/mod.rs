@@ -197,7 +197,7 @@ impl Index {
     }
     pub fn collect_garbage(&self, _: &ELock) -> VectorR<()> {
         use std::collections::HashSet;
-        let work_flag = self.work_flag.try_to_start_working()?;
+        let work_flag = self.work_flag.work_or_block();
         let state = self.read_state();
         let in_use_dp: HashSet<_> = state.dpid_iter().collect();
         for dir_entry in std::fs::read_dir(&self.location)? {
