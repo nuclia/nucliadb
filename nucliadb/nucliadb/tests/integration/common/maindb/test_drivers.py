@@ -145,6 +145,7 @@ async def driver_basic(driver: Driver):
 
     async with driver.transaction() as txn:
         assert len(current_internal_kbs_keys) == await txn.count("/internal/kbs")
+        assert await txn.count("/internal/a/foobar") == 0
 
     # but with it it does not return the father
     txn = await driver.begin()
