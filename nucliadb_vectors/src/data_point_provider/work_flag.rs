@@ -28,9 +28,6 @@ impl MergerWriterSync {
     pub fn new() -> MergerWriterSync {
         MergerWriterSync(Arc::new(Mutex::new(())))
     }
-    pub fn work_or_block(&self) -> MutexGuard<'_, ()> {
-        self.0.lock().unwrap_or_else(|e| e.into_inner())
-    }
     pub fn try_to_start_working(&self) -> VectorR<MutexGuard<'_, ()>> {
         match self.0.try_lock() {
             Ok(lock) => Ok(lock),
