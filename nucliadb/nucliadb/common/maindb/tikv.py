@@ -173,16 +173,18 @@ class TiKVTransaction(Transaction):
                 # with a binary search and break out
                 left, right = 0, len(keys) - 1
                 result_index = 0
+                match_found = False
                 while left <= right:
                     mid = left + (right - left) // 2
 
                     if keys[mid].startswith(original_match):
+                        match_found = True
                         left = mid + 1  # Move to the right half
                         result_index = mid
                     else:
                         right = mid - 1  # Move to the left half
-
-                value += result_index + 1
+                if match_found:
+                    value += result_index + 1
                 break
             else:
                 value += len(keys)
