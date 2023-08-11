@@ -16,6 +16,7 @@ nucliadb_vectors = {path= "../nucliadb_vectors"}
 lazy_static = "1.4.0"
 memory-stats = "1.0.0"
 byte-unit = "4.0.19"
+samply = "0.11.0"
 
 [[bin]]
 name = "vectors_benchmark"
