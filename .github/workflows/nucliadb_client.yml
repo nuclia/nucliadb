@@ -64,6 +64,11 @@ jobs:
           filters: |
             nucliadb_node_modified:
               - 'nucliadb_node/**'
+              - 'nucliadb_core/**'
+              - 'nucliadb_paragraphs/**'
+              - 'nucliadb_texts/**'
+              - 'nucliadb_vectors/**'
+              - 'nucliadb_relations/**'
             nucliadb_modified:
               - 'nucliadb/**'
 
