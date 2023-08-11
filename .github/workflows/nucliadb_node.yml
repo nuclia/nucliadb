@@ -16,11 +16,11 @@ on:
       - "nucliadb_core/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
-      - "nucliadb_node_binding/**"
       - "nucliadb_vectors/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_core/**"
       - "nucliadb_relations/**"
-      - "nucliadb_telemetry/src/**"
-      - "nucliadb_utils/**"
   push:
     branches:
       - main
@@ -209,6 +209,11 @@ jobs:
           filters: |
             node_modified:
               - 'nucliadb_node/src/**'
+              - 'nucliadb_core/**'
+              - 'nucliadb_paragraphs/**'
+              - 'nucliadb_texts/**'
+              - 'nucliadb_vectors/**'
+              - 'nucliadb_relations/**'
 
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx
