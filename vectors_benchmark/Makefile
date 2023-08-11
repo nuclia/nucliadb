@@ -8,4 +8,4 @@ build:
 
 .PHONY: vector-bench
 vector-bench:
-	cargo run --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
+	cargo run --release --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
