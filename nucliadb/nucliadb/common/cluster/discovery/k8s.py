@@ -143,38 +143,41 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             kubernetes_asyncio.config.load_incluster_config()
         else:
             await kubernetes_asyncio.config.load_kube_config()
-        v1 = kubernetes_asyncio.client.CoreV1Api()
 
-        watch = kubernetes_asyncio.watch.Watch()
-        try:
-            while True:
-                try:
-                    async for event in watch.stream(
-                        v1.list_namespaced_pod,
-                        namespace=self.settings.cluster_discovery_kubernetes_namespace,
-                        label_selector=self.settings.cluster_discovery_kubernetes_selector,
-                        timeout_seconds=30,
-                    ):
-                        try:
-                            await self.update_node(event)
-                        except Exception:  # pragma: no cover
-                            logger.exception("Error while updating node", exc_info=True)
-                except (
-                    asyncio.CancelledError,
-                    KeyboardInterrupt,
-                    SystemExit,
-                    RuntimeError,
-                ):  # pragma: no cover
-                    return
-                except Exception:  # pragma: no cover
-                    logger.exception(
-                        "Error while watching kubernetes. Trying again in 5 seconds.",
-                        exc_info=True,
-                    )
-                    await asyncio.sleep(5)
-        finally:
-            watch.stop()
-            await watch.close()
+        async with kubernetes_asyncio.client.ApiClient() as api:
+            v1 = kubernetes_asyncio.client.CoreV1Api(api)
+            watch = kubernetes_asyncio.watch.Watch()
+            try:
+                while True:
+                    try:
+                        async for event in watch.stream(
+                            v1.list_namespaced_pod,
+                            namespace=self.settings.cluster_discovery_kubernetes_namespace,
+                            label_selector=self.settings.cluster_discovery_kubernetes_selector,
+                            timeout_seconds=30,
+                        ):
+                            try:
+                                await self.update_node(event)
+                            except Exception:  # pragma: no cover
+                                logger.exception(
+                                    "Error while updating node", exc_info=True
+                                )
+                    except (
+                        asyncio.CancelledError,
+                        KeyboardInterrupt,
+                        SystemExit,
+                        RuntimeError,
+                    ):  # pragma: no cover
+                        return
+                    except Exception:  # pragma: no cover
+                        logger.exception(
+                            "Error while watching kubernetes. Trying again in 5 seconds.",
+                            exc_info=True,
+                        )
+                        await asyncio.sleep(5)
+            finally:
+                watch.stop()
+                await watch.close()
 
     async def update_node_data_cache(self) -> None:
         while True:
@@ -202,6 +205,8 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         self.update_node_data_cache_task = asyncio.create_task(
             self.update_node_data_cache()
         )
+        # Give some time to initialize and discover nodes
+        await asyncio.sleep(2)
 
     async def finalize(self) -> None:
         self.cluster_task.cancel()
