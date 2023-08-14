@@ -107,7 +107,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: rustfmt
-        run: cargo +nightly fmt -p nucliadb_node -- --check
+        run: make fmt-check-package PACKAGE=nucliadb_node
 
   clippy-rust:
     name: Clippy lint

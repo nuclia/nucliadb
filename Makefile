@@ -30,9 +30,19 @@ license-check:
 license-fix:
 	docker run -it --rm -v $(shell pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye header fix
 
-fmt:
+
+# we are pinning rustfmt to 1.6.0-nightly
+check-rustfmt:
+	cargo +nightly fmt --version | grep "1.6.0" > /dev/null || (rustup component add rustfmt --toolchain nightly && rustup upgrade)
+
+fmt-all: check-rustfmt
 	@echo "Formatting Rust files"
-	@(rustup toolchain list | ( ! grep -q nightly && echo "Toolchain 'nightly' is not installed. Please install using 'rustup toolchain install nightly'.") ) || cargo +nightly fmt
+	cargo +nightly fmt
+
+fmt-check-package: check-rustfmt
+	@echo "Formatting Rust files from specific package"
+	cargo +nightly fmt -p $(PACKAGE) --check
+
 
 protos: proto-py proto-rust
 
@@ -83,8 +93,7 @@ python-code-lint:
 	make -C nucliadb_node_binding/ lint
 
 
-rust-code-lint:
-	cargo +nightly fmt
+rust-code-lint: fmt-all
 	cargo clippy --tests
 
 
