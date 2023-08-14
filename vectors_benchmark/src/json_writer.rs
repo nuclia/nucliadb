@@ -17,29 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod cli;
-pub mod engines;
-pub mod file_vectors;
-pub mod json_writer;
-pub mod plot_writer;
-pub mod random_vectors;
-pub mod reader;
-pub mod stats;
-pub mod writer;
 
-pub mod cli_interface {
-    pub use super::cli::Args;
-    pub use super::file_vectors::*;
-    pub use super::plot_writer::*;
-    pub use super::random_vectors::*;
-    pub use super::{engines, reader, writer};
-}
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
-pub trait VectorEngine {
-    fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>);
-    fn search(&self, no_results: usize, query: &[f32]);
-}
-
-pub trait Logger {
-    fn report(&mut self) -> cli::BenchR<()>;
+pub fn write_json(filename: String, values: Vec<serde_json::Value>) -> Result<(), std::io::Error> {
+    let file = File::create(filename)?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, &values)?;
+    writer.flush()?;
+    Ok(())
 }

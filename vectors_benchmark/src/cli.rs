@@ -56,6 +56,9 @@ pub struct Args {
     /// Batch size
     #[clap(short, long, default_value_t = 5000)]
     batch_size: usize,
+    /// Path of the json output file
+    #[clap(short, long, default_value_t = String::from("./benchmark.json"))]
+    json_output: String,
 }
 
 impl Default for Args {
@@ -120,5 +123,8 @@ impl Args {
     }
     pub fn embedding_dim(&self) -> usize {
         self.embedding_dim
+    }
+    pub fn json_output(&self) -> String {
+        self.json_output.clone()
     }
 }

@@ -9,8 +9,12 @@ build:
 vector-bench:
 	cargo run --release --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
 
+.PHONY: samply
+samply:
+	samply --help > /dev/null | cargo install samply
+
 .PHONY: samply-vector-bench
-samply-vector-bench:
+samply-vector-bench: samply
 	samply record ../target/release/vectors_benchmark -b $(BATCH_SIZE) -i $(INDEX_SIZE)
 
 
