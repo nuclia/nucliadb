@@ -50,12 +50,12 @@ class Settings(BaseSettings):
 
     # Node limits
     max_shard_paragraphs: int = Field(
-        500_000,
+        1_000_000,
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
     max_shard_fields: int = Field(
-        300_000,
+        500_000,
         title="Max shard fields",
         description="Maximum number of fields to target per shard. "
         "If this is reached before max_shard_paragraphs, we will create a new shard",
