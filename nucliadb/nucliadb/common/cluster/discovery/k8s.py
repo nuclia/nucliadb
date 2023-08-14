@@ -21,6 +21,7 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+import time
 from typing import TypedDict
 
 import kubernetes_asyncio.client  # type: ignore
@@ -200,13 +201,32 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             except Exception:  # pragma: no cover
                 logger.exception("Error while updating shard info.")
 
+    async def _wait_ready(self, max_wait: int = 60) -> None:
+        """
+        Attempt to wait for the cluster to be ready.
+        Since we don't know the number of nodes that the cluster will have, we assume
+        that the cluster is ready when the number of nodes is stable for 3 consecutive checks.
+        """
+        ready = False
+        probes = []
+        start = time.monotonic()
+        logger.info("Waiting for cluster to be ready.")
+        while time.monotonic() - start < max_wait:
+            await asyncio.sleep(0.25)
+            probes.append(len(manager.get_index_nodes()))
+            if len(probes) >= 3:
+                if probes[-1] == probes[-2] == probes[-3] != 0:
+                    ready = True
+                    break
+        if not ready:
+            logger.warning(f"Cluster not ready after {max_wait} seconds.")
+
     async def initialize(self) -> None:
         self.cluster_task = asyncio.create_task(self.watch_k8s_for_updates())
         self.update_node_data_cache_task = asyncio.create_task(
             self.update_node_data_cache()
         )
-        # Give some time to initialize and discover nodes
-        await asyncio.sleep(2)
+        await self._wait_ready()
 
     async def finalize(self) -> None:
         self.cluster_task.cancel()
