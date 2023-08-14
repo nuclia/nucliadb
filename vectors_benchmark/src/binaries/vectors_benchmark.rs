@@ -25,7 +25,9 @@ use std::{fs, thread};
 
 use byte_unit::Byte;
 use nucliadb_vectors::data_point_provider::{Index, IndexCheck, IndexMetadata, Merger};
+use serde_json::json;
 use vectors_benchmark::cli_interface::*;
+use vectors_benchmark::json_writer::write_json;
 
 fn dir_size(path: &Path) -> Byte {
     let mut total_size: u128 = 0;
@@ -44,7 +46,7 @@ fn dir_size(path: &Path) -> Byte {
     Byte::from_bytes(total_size)
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let _ = Merger::install_global().map(std::thread::spawn);
     let args = Args::new();
     let stop_point = Arc::new(AtomicBool::new(false));
@@ -71,8 +73,19 @@ fn main() {
     stop_point.store(true, Ordering::SeqCst);
     reader_handler.join().unwrap();
 
+    let storage_size = dir_size(location.as_ref());
+
+    let json_results = vec![json!({
+        "name": "Total Storage Size",
+        "unit": "bytes",
+        "value": storage_size.get_bytes(),
+    })];
+
+    write_json(args.json_output(), json_results)?;
+
     println!(
         "Total vector storage size: {}",
-        dir_size(location.as_ref()).get_appropriate_unit(true)
+        storage_size.get_appropriate_unit(true)
     );
+    Ok(())
 }

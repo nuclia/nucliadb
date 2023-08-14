@@ -1,0 +1,39 @@
+name: nucliadb (rust vector db benchmarks)
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: 0 0 * * 0
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Rust Vector DB Benchmark
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Run benchmarks
+        run: |
+          make -C vectors_benchmark vector-bench
+
+      - name: Store on GH Pages
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: "customSmallerIsBetter"
+          output-file-path: vectors_benchmark/benchmark.json
+          auto-push: true
+          github-token: ${{ secrets.PERFORMANCE_TOKEN }}
+          gh-repository: github.com/nuclia/nucliadb_performance
+          gh-pages-branch: main
