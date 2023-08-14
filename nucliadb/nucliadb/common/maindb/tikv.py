@@ -90,6 +90,9 @@ class TiKVTransaction(Transaction):
             try:
                 return await self.txn.get(key.encode())
             except Exception as exc:
+                # The tikv_client library does not provide specific exceptions and simply
+                # raises generic Exception class with different error strings. That forces
+                # us to parse the error string to determine the type of error...
                 exc_text = str(exc)
                 if "4-DEADLINE_EXCEEDED" in exc_text:
                     raise TimeoutError(exc_text) from exc
