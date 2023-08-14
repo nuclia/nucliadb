@@ -21,6 +21,7 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+import time
 from typing import TypedDict
 
 import kubernetes_asyncio.client  # type: ignore
@@ -143,38 +144,41 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             kubernetes_asyncio.config.load_incluster_config()
         else:
             await kubernetes_asyncio.config.load_kube_config()
-        v1 = kubernetes_asyncio.client.CoreV1Api()
 
-        watch = kubernetes_asyncio.watch.Watch()
-        try:
-            while True:
-                try:
-                    async for event in watch.stream(
-                        v1.list_namespaced_pod,
-                        namespace=self.settings.cluster_discovery_kubernetes_namespace,
-                        label_selector=self.settings.cluster_discovery_kubernetes_selector,
-                        timeout_seconds=30,
-                    ):
-                        try:
-                            await self.update_node(event)
-                        except Exception:  # pragma: no cover
-                            logger.exception("Error while updating node", exc_info=True)
-                except (
-                    asyncio.CancelledError,
-                    KeyboardInterrupt,
-                    SystemExit,
-                    RuntimeError,
-                ):  # pragma: no cover
-                    return
-                except Exception:  # pragma: no cover
-                    logger.exception(
-                        "Error while watching kubernetes. Trying again in 5 seconds.",
-                        exc_info=True,
-                    )
-                    await asyncio.sleep(5)
-        finally:
-            watch.stop()
-            await watch.close()
+        async with kubernetes_asyncio.client.ApiClient() as api:
+            v1 = kubernetes_asyncio.client.CoreV1Api(api)
+            watch = kubernetes_asyncio.watch.Watch()
+            try:
+                while True:
+                    try:
+                        async for event in watch.stream(
+                            v1.list_namespaced_pod,
+                            namespace=self.settings.cluster_discovery_kubernetes_namespace,
+                            label_selector=self.settings.cluster_discovery_kubernetes_selector,
+                            timeout_seconds=30,
+                        ):
+                            try:
+                                await self.update_node(event)
+                            except Exception:  # pragma: no cover
+                                logger.exception(
+                                    "Error while updating node", exc_info=True
+                                )
+                    except (
+                        asyncio.CancelledError,
+                        KeyboardInterrupt,
+                        SystemExit,
+                        RuntimeError,
+                    ):  # pragma: no cover
+                        return
+                    except Exception:  # pragma: no cover
+                        logger.exception(
+                            "Error while watching kubernetes. Trying again in 5 seconds.",
+                            exc_info=True,
+                        )
+                        await asyncio.sleep(5)
+            finally:
+                watch.stop()
+                await watch.close()
 
     async def update_node_data_cache(self) -> None:
         while True:
@@ -197,11 +201,32 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             except Exception:  # pragma: no cover
                 logger.exception("Error while updating shard info.")
 
+    async def _wait_ready(self, max_wait: int = 60) -> None:
+        """
+        Attempt to wait for the cluster to be ready.
+        Since we don't know the number of nodes that the cluster will have, we assume
+        that the cluster is ready when the number of nodes is stable for 3 consecutive checks.
+        """
+        ready = False
+        probes = []
+        start = time.monotonic()
+        logger.info("Waiting for cluster to be ready.")
+        while time.monotonic() - start < max_wait:
+            await asyncio.sleep(0.25)
+            probes.append(len(manager.get_index_nodes()))
+            if len(probes) >= 3:
+                if probes[-1] == probes[-2] == probes[-3] != 0:
+                    ready = True
+                    break
+        if not ready:
+            logger.warning(f"Cluster not ready after {max_wait} seconds.")
+
     async def initialize(self) -> None:
         self.cluster_task = asyncio.create_task(self.watch_k8s_for_updates())
         self.update_node_data_cache_task = asyncio.create_task(
             self.update_node_data_cache()
         )
+        await self._wait_ready()
 
     async def finalize(self) -> None:
         self.cluster_task.cancel()

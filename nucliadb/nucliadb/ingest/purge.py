@@ -140,7 +140,9 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
 
 async def main():
-    # Clean up all kb marked to delete
+    """
+    This script will purge all knowledge boxes marked to be deleted in maindb.
+    """
     await setup_cluster()
     driver = await setup_driver()
     storage = await get_storage(

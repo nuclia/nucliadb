@@ -109,7 +109,6 @@ class GCloudBlobStore(BlobStore):
         self.upload_url = (
             object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"
         )  # noqa
-        self.session = aiohttp.ClientSession()
 
         self._credentials = None
 
