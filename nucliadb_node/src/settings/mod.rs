@@ -64,6 +64,8 @@ pub struct Settings {
     public_ip: IpAddr,
 
     // Errors
+    #[builder(default = "true", setter(custom))]
+    sentry_enabled: bool,
     #[builder(default = "String::new()")]
     sentry_url: String,
     #[builder(default = "SENTRY_DEV", setter(custom))]
@@ -136,6 +138,11 @@ impl Settings {
     /// Host public IP
     pub fn public_ip(&self) -> IpAddr {
         self.public_ip
+    }
+
+    /// When enabled, sentry will be activated
+    pub fn sentry_enabled(&self) -> bool {
+        self.sentry_enabled
     }
 
     pub fn sentry_url(&self) -> String {
@@ -283,6 +290,7 @@ mod tests {
             Ok(settings.public_ip()) == "127.0.0.1".parse()
                 || Ok(settings.public_ip()) == "::1".parse()
         );
+        assert!(settings.sentry_enabled);
         assert_eq!(settings.sentry_env, SENTRY_PROD);
         assert!(
             Ok(settings.reader_listen_address()) == "127.0.0.1:2020".parse()

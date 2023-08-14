@@ -34,7 +34,7 @@ use crate::settings::Settings;
 
 const TRACE_ID: &str = "trace-id";
 
-pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<ClientInitGuard> {
+pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitGuard>> {
     let mut layers = Vec::new();
 
     let stdout = stdout_layer(settings);
@@ -45,9 +45,16 @@ pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<ClientInitGuard> {
         layers.push(jaeger);
     }
 
-    let sentry_guard = setup_sentry(settings.sentry_env(), settings.sentry_url());
-    let sentry = sentry_layer();
-    layers.push(sentry);
+    let sentry_guard;
+
+    if settings.sentry_enabled() {
+        sentry_guard = Some(setup_sentry(settings.sentry_env(), settings.sentry_url()));
+        let sentry = sentry_layer();
+        layers.push(sentry);
+    } else {
+        eprintln!("Sentry disabled");
+        sentry_guard = None;
+    }
 
     tracing_subscriber::registry()
         .with(layers)
