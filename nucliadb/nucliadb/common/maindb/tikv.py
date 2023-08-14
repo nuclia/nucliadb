@@ -22,6 +22,8 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional
 
+import backoff
+
 from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
     DEFAULT_SCAN_LIMIT,
@@ -39,7 +41,9 @@ except ImportError:  # pragma: no cover
     TiKV = False
 
 tikv_observer = metrics.Observer(
-    "tikv_client", labels={"type": ""}, error_mappings={"conflict_error": ConflictError}
+    "tikv_client",
+    labels={"type": ""},
+    error_mappings={"conflict_error": ConflictError, "timeout_error": TimeoutError},
 )
 logger = logging.getLogger(__name__)
 
@@ -80,9 +84,20 @@ class TiKVTransaction(Transaction):
         with tikv_observer({"type": "batch_get"}):
             return await self.txn.batch_get(bytes_keys)
 
+    @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
     async def get(self, key: str) -> Optional[bytes]:
         with tikv_observer({"type": "get"}):
-            return await self.txn.get(key.encode())
+            try:
+                return await self.txn.get(key.encode())
+            except Exception as exc:
+                # The tikv_client library does not provide specific exceptions and simply
+                # raises generic Exception class with different error strings. That forces
+                # us to parse the error string to determine the type of error...
+                exc_text = str(exc)
+                if "4-DEADLINE_EXCEEDED" in exc_text:
+                    raise TimeoutError(exc_text) from exc
+                else:
+                    raise
 
     async def set(self, key: str, value: bytes):
         with tikv_observer({"type": "put"}):
