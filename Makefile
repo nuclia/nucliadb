@@ -33,7 +33,7 @@ license-fix:
 
 # we are pinning rustfmt to 1.6.0-nightly
 check-rustfmt:
-	cargo +nightly fmt --version | grep "1.6.0" > /dev/null || (rustup component add rustfmt --toolchain nightly && rustup upgrade)
+	@cargo +nightly fmt --version | grep "1.6.0" > /dev/null || (rustup component add rustfmt --toolchain nightly && rustup upgrade)
 
 fmt-all: check-rustfmt
 	@echo "Formatting Rust files"
