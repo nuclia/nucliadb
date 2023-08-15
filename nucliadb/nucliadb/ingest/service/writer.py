@@ -91,6 +91,7 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import clean_and_upgrade, get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -124,6 +125,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             driver=self.driver, storage=self.storage, pubsub=await get_pubsub()
         )
         self.shards_manager = get_shard_manager()
+        self.kb_data_manager = KnowledgeBoxDataManager(self.driver)
 
     async def finalize(self):
         ...
@@ -729,7 +731,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
                     if shard is None:
                         # no shard currently exists, create one
-                        model = await kbobj.get_model_metadata()
+                        model = await self.kb_data_manager.get_model_metadata(
+                            request.kbid
+                        )
                         shard = await self.shards_manager.create_shard_by_kbid(
                             txn, request.kbid, semantic_model=model
                         )

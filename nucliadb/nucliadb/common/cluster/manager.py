@@ -35,9 +35,9 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
@@ -327,11 +327,10 @@ class KBShardManager:
     ):
         if self.should_create_new_shard(shard_info):
             logger.warning({"message": "Adding shard", "kbid": kbid})
+            kbdm = KnowledgeBoxDataManager(get_driver())
+            model = await kbdm.get_model_metadata(kbid)
             driver = get_driver()
-            storage = await get_storage()
             async with driver.transaction() as txn:
-                kb = KnowledgeBox(txn, storage, kbid)
-                model = await kb.get_model_metadata()
                 await self.create_shard_by_kbid(txn, kbid, semantic_model=model)
                 await txn.commit()
 

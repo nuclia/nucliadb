@@ -62,3 +62,7 @@ class SequenceOrderViolation(Exception):
 
 class EntitiesGroupNotFound(NotFound):
     pass
+
+
+class KnowledgeBoxNotFound(NotFound):
+    pass

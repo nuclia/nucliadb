@@ -24,6 +24,7 @@ from typing import Dict, List, Optional, Tuple
 import aiohttp.client_exceptions
 
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.exceptions import (
@@ -74,6 +75,7 @@ class Processor:
         self.partition = partition
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
+        self.kb_data_manager = KnowledgeBoxDataManager(driver)
 
     async def process(
         self,
@@ -318,7 +320,7 @@ class Processor:
             shard = await self.shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
-                model = await kb.get_model_metadata()
+                model = await self.kb_data_manager.get_model_metadata(kbid)
                 shard = await self.shard_manager.create_shard_by_kbid(
                     txn, kbid, semantic_model=model
                 )
