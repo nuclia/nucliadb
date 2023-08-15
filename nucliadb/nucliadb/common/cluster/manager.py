@@ -380,6 +380,13 @@ class StandaloneKBShardManager(KBShardManager):
             index_node = get_index_node(shardreplica.node)
             await index_node.writer.RemoveResource(req)  # type: ignore
 
+        if index_node is not None:
+            asyncio.create_task(
+                self._resource_change_event(
+                    kb, shardreplica.node, shardreplica.shard.id
+                )
+            )
+
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
