@@ -23,6 +23,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::{fs, thread};
 
+use crate::unified::NodeRole;
 use http::Uri;
 use nucliadb_core::tracing::{info, Level};
 use nucliadb_core::{Context, NodeResult};
@@ -100,6 +101,14 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
     Ok(host_key)
 }
 
+pub fn parse_node_role(role: &str) -> NodeRole {
+    match role {
+        "primary" => NodeRole::Primary,
+        "secondary" => NodeRole::Secondary,
+        _ => panic!("Invalid node role '{}'", role),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,5 +120,11 @@ mod tests {
             let lookup = reliable_lookup_host(host).ip().to_string();
             assert!(lookup == "127.0.0.1" || lookup == "::1");
         }
+    }
+
+    #[test]
+    fn test_parse_node_role() {
+        matches!(parse_node_role("primary"), NodeRole::Primary);
+        matches!(parse_node_role("secondary"), NodeRole::Secondary);
     }
 }

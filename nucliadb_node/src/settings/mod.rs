@@ -35,12 +35,13 @@ pub mod providers;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 
+use crate::unified::NodeRole;
 use derive_builder::Builder;
 use nucliadb_core::tracing::{error, Level};
 pub use providers::{EnvSettingsProvider, SettingsProvider};
 
 use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
-use crate::utils::{parse_log_levels, reliable_lookup_host};
+use crate::utils::{parse_log_levels, parse_node_role, reliable_lookup_host};
 
 #[derive(Builder)]
 #[builder(pattern = "mutable", setter(strip_option, into))]
@@ -96,6 +97,9 @@ pub struct Settings {
 
     #[builder(default = "3030")]
     metrics_port: u16,
+
+    #[builder(default = "parse_node_role(\"primary\")")]
+    node_role: NodeRole,
 }
 
 impl Settings {
@@ -186,6 +190,10 @@ impl Settings {
 
     pub fn metrics_port(&self) -> u16 {
         self.metrics_port
+    }
+
+    pub fn node_role(&self) -> NodeRole {
+        self.node_role.clone()
     }
 }
 

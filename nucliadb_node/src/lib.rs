@@ -36,6 +36,7 @@ pub mod node_metadata;
 pub mod settings;
 pub mod shards;
 pub mod telemetry;
+pub mod unified;
 pub mod utils;
 
 mod disk_structure;

@@ -16,22 +16,16 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-#![allow(clippy::derive_partial_eq_without_eq)]
+//! This module provides tools for managing shards
 
-pub mod fdbwriter;
-pub mod knowledgebox;
-pub mod nodereader;
-pub mod noderesources;
-pub mod nodewriter;
-pub mod resources;
-pub mod unified;
-pub mod utils;
+pub mod node;
+pub mod replication;
+pub mod service;
+pub mod shards;
 
-pub mod prelude {
-    pub use super::nodereader::*;
-    pub use super::noderesources::*;
-    pub use super::nodewriter::*;
-    pub use super::utils::*;
+#[derive(Clone, PartialEq)]
+pub enum NodeRole {
+    Primary,
+    Secondary,
 }

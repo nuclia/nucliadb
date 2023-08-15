@@ -73,6 +73,8 @@ nucliadb_texts = { path = "../nucliadb_texts" }
 nucliadb_paragraphs = { path = "../nucliadb_paragraphs" }
 nucliadb_vectors = { path = "../nucliadb_vectors" }
 nucliadb_relations = { path = "../nucliadb_relations" }
+nucliadb_protos = { path = "../nucliadb_protos/rust" }
+nucliadb_index = { path = "../nucliadb_index" }
 
 # sentry sdk
 sentry = "0.26.0"

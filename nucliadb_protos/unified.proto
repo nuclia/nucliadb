@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package unified;
+
+
+message ShardReplicationPosition {
+    string shard_id = 1;
+    uint64 position = 2;
+}
+
+message SecondaryReplicateRequest {
+    string secondary_id = 1;
+    repeated ShardReplicationPosition positions = 2;
+}
+
+message PrimaryReplicateCommit {
+    string shard_id = 1;
+    uint64 position = 2;
+    repeated string segments = 3;
+}
+
+message PrimaryReplicateResponse {
+    repeated PrimaryReplicateCommit commits = 1;
+}
+
+message DownloadSegmentRequest {
+    string shard_id = 1;
+    string segment_id = 2;
+    uint64 chunk_size = 3;
+}
+
+message DownloadSegmentResponse {
+    bytes data = 1;
+    uint32 chunk = 2;
+    uint64 read_position = 3;
+    uint64 total_size = 4;
+}
+
+message CreateShardRequest {
+    string shard_id = 1;
+}
+
+message CreateShardResponse {
+}
+
+message DeleteShardRequest {
+    string shard_id = 1;
+}
+
+message DeleteShardResponse {
+}
+
+message SearchRequest {
+    string shard_id = 1;
+    string query = 2;
+    repeated float vector = 3;
+    uint64 limit = 4;
+    uint64 offset = 5;
+}
+
+message ResultItem {
+    string resource_id = 1;
+    string field_id = 2;
+    float score = 3;
+    string score_type = 4;
+}
+
+message SearchResponse {
+    repeated ResultItem items = 1;
+    uint64 total = 2;
+}
+
+message IndexRequest {
+    string shard_id = 1;
+    string resource_id = 2;
+}
+
+message IndexResponse {
+}
+
+message DeleteRequest {
+    string shard_id = 1;
+    string resource_id = 2;
+}
+
+message DeleteResponse {
+
+}
+
+service NodeService {
+    // Shard replication RPCs
+    rpc Replicate(stream SecondaryReplicateRequest) returns (stream PrimaryReplicateResponse) {}
+    rpc DownloadSegment(DownloadSegmentRequest) returns (stream DownloadSegmentResponse) {}
+
+    // Shard management RPCs
+    rpc CreateShard(CreateShardRequest) returns (CreateShardResponse) {}
+    rpc DeleteShard(DeleteShardRequest) returns (DeleteShardResponse) {}
+
+    // Indexing RPCs
+    rpc Index(IndexRequest) returns (IndexResponse) {}
+    rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+    rpc Search(SearchRequest) returns (SearchResponse) {}
+}
