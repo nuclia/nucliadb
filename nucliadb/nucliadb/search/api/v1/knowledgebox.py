@@ -157,10 +157,14 @@ async def knowledgebox_counters(
 
     res_dm = ResourcesDataManager(get_driver(), await get_storage())
     try:
-        resource_count = await res_dm.get_number_of_resources(kbid)
-        if resource_count == -1:
-            # WARNING: standalone, this value will never be cached
+        if len(shard_groups) <= 1:
+            # for smaller kbs, this is faster and more up to date
             resource_count = await res_dm.calculate_number_of_resources(kbid)
+        else:
+            resource_count = await res_dm.get_number_of_resources(kbid)
+            if resource_count == -1:
+                # WARNING: standalone, this value will never be cached
+                resource_count = await res_dm.calculate_number_of_resources(kbid)
     except Exception as exc:
         errors.capture_exception(exc)
         raise HTTPException(
