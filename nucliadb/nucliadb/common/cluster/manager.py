@@ -37,7 +37,13 @@ from nucliadb.common.cluster.exceptions import (
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_protos import noderesources_pb2, nodewriter_pb2, writer_pb2
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos import (
+    nodereader_pb2,
+    noderesources_pb2,
+    nodewriter_pb2,
+    writer_pb2,
+)
 from nucliadb_telemetry import errors
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -310,8 +316,52 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
+    def should_create_new_shard(self, shard_info: noderesources_pb2.Shard) -> bool:
+        return (
+            shard_info.paragraphs > settings.max_shard_paragraphs
+            or shard_info.fields > settings.max_shard_fields
+        )
+
+    async def maybe_create_new_shard(
+        self, kbid: str, shard_info: noderesources_pb2.Shard
+    ):
+        if self.should_create_new_shard(shard_info):
+            logger.warning({"message": "Adding shard", "kbid": kbid})
+            driver = get_driver()
+            storage = await get_storage()
+            async with driver.transaction() as txn:
+                kb = KnowledgeBox(txn, storage, kbid)
+                model = await kb.get_model_metadata()
+                await self.create_shard_by_kbid(txn, kbid, semantic_model=model)
+                await txn.commit()
+
 
 class StandaloneKBShardManager(KBShardManager):
+    max_ops_before_checks = 25
+
+    def __init__(self):
+        super().__init__()
+        self._lock = asyncio.Lock()
+        self._change_count: dict[(str, str), int] = {}
+
+    async def _resource_change_event(
+        self, kb: str, node_id: str, shard_id: str
+    ) -> None:
+        if (node_id, shard_id) not in self._change_count:
+            self._change_count[(node_id, shard_id)] = 0
+        self._change_count[(node_id, shard_id)] += 1
+        if self._change_count[(node_id, shard_id)] < self.max_ops_before_checks:
+            return
+
+        self._change_count[shard_id] = 0
+        async with self._lock:
+            index_node = get_index_node(node_id)
+            shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
+                nodereader_pb2.GetShardRequest(shard_id=shard_id)  # type: ignore
+            )
+            await self.maybe_create_new_shard(kb, shard_info)
+            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -345,6 +395,11 @@ class StandaloneKBShardManager(KBShardManager):
                     f"Node {shardreplica.node} is not found or not available"
                 )
             await index_node.writer.SetResource(resource)  # type: ignore
+
+        shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
+            nodereader_pb2.GetShardRequest(shard_id=shardreplica.shard.id)  # type: ignore
+        )
+        asyncio.create_task(self.maybe_create_new_shard(kb, shard_info))
 
 
 def choose_node(
