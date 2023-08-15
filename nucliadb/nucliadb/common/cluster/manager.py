@@ -342,10 +342,10 @@ class StandaloneKBShardManager(KBShardManager):
     def __init__(self):
         super().__init__()
         self._lock = asyncio.Lock()
-        self._change_count: dict[(str, str), int] = {}
+        self._change_count: dict[tuple[str, str], int] = {}  # type: ignore
 
     async def _resource_change_event(
-        self, kb: str, node_id: str, shard_id: str
+        self, kbid: str, node_id: str, shard_id: str
     ) -> None:
         if (node_id, shard_id) not in self._change_count:
             self._change_count[(node_id, shard_id)] = 0
@@ -353,13 +353,15 @@ class StandaloneKBShardManager(KBShardManager):
         if self._change_count[(node_id, shard_id)] < self.max_ops_before_checks:
             return
 
-        self._change_count[shard_id] = 0
+        self._change_count[(node_id, shard_id)] = 0
         async with self._lock:
             index_node = get_index_node(node_id)
+            if index_node is None:
+                return
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=shard_id)  # type: ignore
             )
-            await self.maybe_create_new_shard(kb, shard_info)
+            await self.maybe_create_new_shard(kbid, shard_info)
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
     async def delete_resource(
@@ -387,6 +389,7 @@ class StandaloneKBShardManager(KBShardManager):
         kb: str,
         reindex_id: Optional[str] = None,
     ) -> None:
+        index_node = None
         for shardreplica in shard.replicas:
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
             index_node = get_index_node(shardreplica.node)
@@ -396,10 +399,12 @@ class StandaloneKBShardManager(KBShardManager):
                 )
             await index_node.writer.SetResource(resource)  # type: ignore
 
-        shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
-            nodereader_pb2.GetShardRequest(shard_id=shardreplica.shard.id)  # type: ignore
-        )
-        asyncio.create_task(self.maybe_create_new_shard(kb, shard_info))
+        if index_node is not None:
+            asyncio.create_task(
+                self._resource_change_event(
+                    kb, shardreplica.node, shardreplica.shard.id
+                )
+            )
 
 
 def choose_node(

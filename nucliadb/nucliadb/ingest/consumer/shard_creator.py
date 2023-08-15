@@ -23,10 +23,8 @@ import uuid
 from functools import partial
 
 from nucliadb.common.cluster.manager import choose_node
-from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import noderesources_pb2, nodesidecar_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -95,7 +93,10 @@ class ShardCreatorHandler:
         current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
 
         node, shard_id, _ = choose_node(current_shard)
+        # we could also call `reader.GetShard`; however, the `GetCount`
+        # is cached at the sidecar so we're cheating for now until
+        # the `reader.GetShard` is faster
         shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
-        await self.shard_manager.maybe_create_new_shard(shard_counter)
+        await self.shard_manager.maybe_create_new_shard(kbid, shard_counter)  # type: ignore
