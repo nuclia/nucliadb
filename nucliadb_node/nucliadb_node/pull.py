@@ -121,7 +121,7 @@ class ShardManager:
                 delay, self._schedule_gc
             )
 
-    def _schedule_gc(self) -> asyncio.Task:
+    def _schedule_gc(self) -> None:
         self._gc_task = asyncio.create_task(self.gc())
 
     async def gc(self):
