@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::fs;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -124,14 +125,18 @@ impl NodeWriter {
     }
 
     pub fn list_shards<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_ids = self
-            .shards
-            .list_loaded_ids()
+        let entries = fs::read_dir(self.shards.shards_path.clone())?;
+        let shard_ids = entries
             .into_iter()
-            .map(|shard_id| ShardId { id: shard_id })
+            .filter(|entry| entry.is_ok())
+            .map(|entry| ShardId {
+                id: entry.unwrap().file_name().to_str().unwrap().to_string(),
+            })
             .collect();
-        let response = ShardIds { ids: shard_ids };
-        Ok(PyList::new(py, response.encode_to_vec()))
+        Ok(PyList::new(
+            py,
+            (ShardIds { ids: shard_ids }).encode_to_vec(),
+        ))
     }
 
     pub fn set_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {

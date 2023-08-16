@@ -36,7 +36,7 @@ use crate::{disk_structure, env};
 #[derive(Default)]
 pub struct UnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
-    shards_path: PathBuf,
+    pub shards_path: PathBuf,
 }
 
 impl UnboundedShardWriterCache {
@@ -45,14 +45,6 @@ impl UnboundedShardWriterCache {
             cache: RwLock::new(HashMap::new()),
             shards_path,
         }
-    }
-
-    pub fn list_loaded_ids(&self) -> Vec<ShardId> {
-        self.read()
-            .iter()
-            .map(|(shard_id, _)| shard_id)
-            .cloned()
-            .collect()
     }
 
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardWriter>>> {

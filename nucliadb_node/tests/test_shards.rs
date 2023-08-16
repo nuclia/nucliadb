@@ -118,11 +118,6 @@ async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
 
     let request_ids = create_shards(&mut writer, 5).await;
 
-    // XXX We should have a better way to list shards independently of the cache
-    for shard_id in request_ids.iter() {
-        bring_shard_to_cache(&mut writer, shard_id.to_owned()).await;
-    }
-
     let response = writer
         .list_shards(Request::new(EmptyQuery {}))
         .await
@@ -156,10 +151,6 @@ async fn test_delete_shards() -> anyhow::Result<()> {
     assert_eq!(response.get_ref().ids.len(), 0);
 
     let request_ids = create_shards(&mut writer, 5).await;
-    // XXX We should have a better way to list shards independently of the cache
-    for shard_id in request_ids.iter() {
-        bring_shard_to_cache(&mut writer, shard_id.to_owned()).await;
-    }
 
     // XXX why are we doing this?
     for id in request_ids.iter().cloned() {
@@ -201,31 +192,4 @@ async fn create_shards(writer: &mut TestNodeWriter, n: usize) -> Vec<String> {
     }
 
     shard_ids
-}
-
-async fn bring_shard_to_cache(writer: &mut TestNodeWriter, shard_id: String) {
-    // XXX We use set_resource to ensure shard is being loaded in writer cache
-    let rid = Uuid::new_v4();
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
-    let timestamp = Timestamp {
-        seconds: now.as_secs() as i64,
-        nanos: 0,
-    };
-    writer
-        .set_resource(Request::new(Resource {
-            shard_id: shard_id.clone(),
-            resource: Some(ResourceId {
-                shard_id: shard_id.clone(),
-                uuid: rid.to_string(),
-            }),
-            metadata: Some(IndexMetadata {
-                created: Some(timestamp.clone()),
-                modified: Some(timestamp),
-            }),
-            ..Default::default()
-        }))
-        .await
-        .expect("Error in set_resource request");
 }

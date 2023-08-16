@@ -39,6 +39,7 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
+use tokio::fs;
 
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,
@@ -169,13 +170,22 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<ShardIds>, Status> {
-        let shard_ids = self
-            .shards
-            .list_loaded_ids()
-            .await
-            .into_iter()
-            .map(|shard_id| ShardId { id: shard_id })
-            .collect();
+        let mut entries = fs::read_dir(self.shards.shards_path.clone()).await?;
+        let mut shard_ids = Vec::new();
+        while let Some(entry) = entries.next_entry().await? {
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                shard_ids.push(ShardId {
+                    id: entry_path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                })
+            }
+        }
+
         Ok(tonic::Response::new(ShardIds { ids: shard_ids }))
     }
 
