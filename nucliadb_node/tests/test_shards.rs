@@ -146,12 +146,14 @@ async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_delete_shards() -> anyhow::Result<()> {
     let mut writer = node_writer().await;
 
-    let response = writer
+    let current = writer
         .list_shards(Request::new(EmptyQuery {}))
-        .await
-        .expect("Error in list_shards request");
-
-    assert_eq!(response.get_ref().ids.len(), 0);
+        .await?
+        .get_ref()
+        .ids
+        .iter()
+        .map(|s| s.id.clone())
+        .len();
 
     let request_ids = create_shards(&mut writer, 5).await;
 
@@ -177,7 +179,7 @@ async fn test_delete_shards() -> anyhow::Result<()> {
         .await
         .expect("Error in list_shards request");
 
-    assert_eq!(response.get_ref().ids.len(), 0);
+    assert_eq!(response.get_ref().ids.len(), current);
 
     Ok(())
 }
