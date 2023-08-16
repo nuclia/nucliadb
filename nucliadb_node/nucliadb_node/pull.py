@@ -93,11 +93,16 @@ class ShardManager:
         self._gc_lock = gc_lock  # global lock so we only gc one shard at a time
         self._change_count = 0
         self._gc_schedule_timer: Optional[asyncio.TimerHandle] = None
+        self._gc_task: Optional[asyncio.Task] = None
 
     def shard_changed_event(self, delay: Optional[float] = None) -> None:
         """
         Signal shard has changed and should be garbage collected at some point
         """
+        if self._gc_task is not None and not self._gc_task.done():
+            # already running or scheduled
+            return
+
         self._change_count += 1
         if (
             self._gc_schedule_timer is not None
@@ -117,7 +122,7 @@ class ShardManager:
             )
 
     def _schedule_gc(self) -> asyncio.Task:
-        return asyncio.create_task(self.gc())
+        self._gc_task = asyncio.create_task(self.gc())
 
     async def gc(self):
         async with self._gc_lock, self.lock:
