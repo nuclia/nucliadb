@@ -20,15 +20,9 @@
 
 mod common;
 
-use std::time::SystemTime;
-
 use common::{node_reader, node_writer, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::{
-    EmptyQuery, GetShardRequest, IndexMetadata, NewShardRequest, Resource, ResourceId, ShardId,
-};
+use nucliadb_core::protos::{EmptyQuery, GetShardRequest, NewShardRequest, ShardId};
 use tonic::Request;
-use uuid::Uuid;
 
 #[tokio::test]
 async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
