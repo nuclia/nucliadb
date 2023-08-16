@@ -17,4 +17,10 @@ samply:
 samply-vector-bench: samply
 	samply record ../target/release/vectors_benchmark -b $(BATCH_SIZE) -i $(INDEX_SIZE)
 
+.PHONY: label-bench
+label-bench:
+	cargo run --release --bin labels_benchmark
+
+
+
 

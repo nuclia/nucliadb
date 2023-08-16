@@ -95,6 +95,7 @@ header:
     - "nucliadb_paragraphs/stop_words"
     - "**/.gitignore"
     - "nucliadb/nucliadb/tests/testdata/*"
+    - "**/*.drawio.svg"
 
   comment: on-failure
 

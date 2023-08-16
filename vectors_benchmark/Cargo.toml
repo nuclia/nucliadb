@@ -24,3 +24,7 @@ path = "src/binaries/vectors_benchmark.rs"
 [[bin]]
 name = "1m_stats"
 path = "src/binaries/1m_stats.rs"
+
+[[bin]]
+name = "labels_benchmark"
+path = "src/binaries/labels_benchmark.rs"
