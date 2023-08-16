@@ -75,6 +75,18 @@ class TestShardManager:
 
         writer.garbage_collector.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_schedule_gc_after_target_multiple_times(
+        self, shard_manager: ShardManager, writer
+    ):
+        for _ in range(shard_manager.target_gc_resources):
+            shard_manager.shard_changed_event()
+            shard_manager.shard_changed_event()
+
+        await asyncio.sleep(0.1)
+
+        writer.garbage_collector.assert_awaited_once()
+
 
 class TestIndexedPublisher:
     @pytest.fixture(scope="function")
