@@ -30,6 +30,7 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_core::NodeResult;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
+use tokio::fs;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
@@ -39,7 +40,6 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
-use tokio::fs;
 
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,
