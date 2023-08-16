@@ -316,18 +316,7 @@ impl WriterChild for VectorWriterService {
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
-
         self.collect_garbage_for(&self.index)?;
-        let indexset_slock = self.indexset.get_slock()?;
-        let mut index_keys = vec![];
-        self.indexset.index_keys(&mut index_keys, &indexset_slock);
-        for index_key in index_keys {
-            let Some(index) = self.indexset.get(&index_key, &indexset_slock)? else {
-                return Err(node_error!("Unknown state for {index_key}"));
-            };
-            self.collect_garbage_for(&index)?;
-        }
-
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
         let metric = request_time::RequestTimeKey::vectors("garbage_collection".to_string());
