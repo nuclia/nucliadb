@@ -20,15 +20,9 @@
 
 mod common;
 
-use std::time::SystemTime;
-
 use common::{node_reader, node_writer, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::{
-    EmptyQuery, GetShardRequest, IndexMetadata, NewShardRequest, Resource, ResourceId, ShardId,
-};
+use nucliadb_core::protos::{EmptyQuery, GetShardRequest, NewShardRequest, ShardId};
 use tonic::Request;
-use uuid::Uuid;
 
 #[tokio::test]
 async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
@@ -116,12 +110,16 @@ async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = node_writer().await;
 
-    let request_ids = create_shards(&mut writer, 5).await;
+    let current = writer
+        .list_shards(Request::new(EmptyQuery {}))
+        .await?
+        .get_ref()
+        .ids
+        .iter()
+        .map(|s| s.id.clone())
+        .len();
 
-    // XXX We should have a better way to list shards independently of the cache
-    for shard_id in request_ids.iter() {
-        bring_shard_to_cache(&mut writer, shard_id.to_owned()).await;
-    }
+    let request_ids = create_shards(&mut writer, 5).await;
 
     let response = writer
         .list_shards(Request::new(EmptyQuery {}))
@@ -136,7 +134,7 @@ async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     assert!(!request_ids.is_empty());
-    assert_eq!(request_ids.len(), response_ids.len());
+    assert_eq!(request_ids.len() + current, response_ids.len());
     assert!(request_ids
         .iter()
         .all(|item| { response_ids.contains(item) }));
@@ -156,10 +154,6 @@ async fn test_delete_shards() -> anyhow::Result<()> {
     assert_eq!(response.get_ref().ids.len(), 0);
 
     let request_ids = create_shards(&mut writer, 5).await;
-    // XXX We should have a better way to list shards independently of the cache
-    for shard_id in request_ids.iter() {
-        bring_shard_to_cache(&mut writer, shard_id.to_owned()).await;
-    }
 
     // XXX why are we doing this?
     for id in request_ids.iter().cloned() {
@@ -201,31 +195,4 @@ async fn create_shards(writer: &mut TestNodeWriter, n: usize) -> Vec<String> {
     }
 
     shard_ids
-}
-
-async fn bring_shard_to_cache(writer: &mut TestNodeWriter, shard_id: String) {
-    // XXX We use set_resource to ensure shard is being loaded in writer cache
-    let rid = Uuid::new_v4();
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
-    let timestamp = Timestamp {
-        seconds: now.as_secs() as i64,
-        nanos: 0,
-    };
-    writer
-        .set_resource(Request::new(Resource {
-            shard_id: shard_id.clone(),
-            resource: Some(ResourceId {
-                shard_id: shard_id.clone(),
-                uuid: rid.to_string(),
-            }),
-            metadata: Some(IndexMetadata {
-                created: Some(timestamp.clone()),
-                modified: Some(timestamp),
-            }),
-            ..Default::default()
-        }))
-        .await
-        .expect("Error in set_resource request");
 }

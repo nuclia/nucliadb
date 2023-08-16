@@ -30,6 +30,7 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_core::NodeResult;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
+use tokio::fs;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
@@ -169,13 +170,17 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<ShardIds>, Status> {
-        let shard_ids = self
-            .shards
-            .list_loaded_ids()
-            .await
-            .into_iter()
-            .map(|shard_id| ShardId { id: shard_id })
-            .collect();
+        let mut entries = fs::read_dir(self.shards.shards_path.clone()).await?;
+        let mut shard_ids = Vec::new();
+        while let Some(entry) = entries.next_entry().await? {
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                if let Some(id) = entry_path.file_name().map(|s| s.to_str().map(String::from)) {
+                    shard_ids.push(ShardId { id: id.unwrap() });
+                }
+            }
+        }
+
         Ok(tonic::Response::new(ShardIds { ids: shard_ids }))
     }
 
