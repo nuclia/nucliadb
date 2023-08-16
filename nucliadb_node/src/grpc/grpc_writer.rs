@@ -175,14 +175,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         while let Some(entry) = entries.next_entry().await? {
             let entry_path = entry.path();
             if entry_path.is_dir() {
-                shard_ids.push(ShardId {
-                    id: entry_path
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                })
+                if let Some(id) = entry_path.file_name().map(|s| s.to_str().map(String::from)) {
+                    shard_ids.push(ShardId { id: id.unwrap() });
+                }
             }
         }
 

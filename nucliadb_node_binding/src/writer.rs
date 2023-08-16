@@ -126,13 +126,15 @@ impl NodeWriter {
 
     pub fn list_shards<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let entries = fs::read_dir(self.shards.shards_path.clone())?;
-        let shard_ids = entries
-            .into_iter()
-            .filter(|entry| entry.is_ok())
-            .map(|entry| ShardId {
-                id: entry.unwrap().file_name().to_str().unwrap().to_string(),
-            })
-            .collect();
+        let mut shard_ids = Vec::new();
+        for entry in entries {
+            let entry_path = entry.unwrap().path();
+            if entry_path.is_dir() {
+                if let Some(id) = entry_path.file_name().map(|s| s.to_str().map(String::from)) {
+                    shard_ids.push(ShardId { id: id.unwrap() });
+                }
+            }
+        }
         Ok(PyList::new(
             py,
             (ShardIds { ids: shard_ids }).encode_to_vec(),
