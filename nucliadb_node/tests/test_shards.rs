@@ -110,6 +110,15 @@ async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = node_writer().await;
 
+    let current = writer
+        .list_shards(Request::new(EmptyQuery {}))
+        .await?
+        .get_ref()
+        .ids
+        .iter()
+        .map(|s| s.id.clone())
+        .len();
+
     let request_ids = create_shards(&mut writer, 5).await;
 
     let response = writer
@@ -125,7 +134,7 @@ async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     assert!(!request_ids.is_empty());
-    assert_eq!(request_ids.len(), response_ids.len());
+    assert_eq!(request_ids.len() + current, response_ids.len());
     assert!(request_ids
         .iter()
         .all(|item| { response_ids.contains(item) }));
