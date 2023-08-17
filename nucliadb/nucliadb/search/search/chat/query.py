@@ -104,7 +104,7 @@ async def generate_answer(
 
     if do_audit and audit is not None:
         audit_answer: Optional[str] = text_answer.decode()
-        if status_code and status_code == AnswerStatusCode.NO_CONTEXT:
+        if status_code == AnswerStatusCode.NO_CONTEXT:
             audit_answer = None
 
         context = [
