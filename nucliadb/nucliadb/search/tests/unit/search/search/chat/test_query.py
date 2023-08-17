@@ -20,7 +20,7 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.search.search.chat.query import chat
+from nucliadb.search.search.chat.query import async_gen_lookahead, chat
 from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
@@ -57,3 +57,16 @@ async def test_chat_does_not_call_predict_if_no_find_results(
     )
 
     predict.chat_query.assert_not_called()
+
+
+async def test_async_gen_lookahead():
+    async def gen(n):
+        for i in range(n):
+            yield i
+
+    assert [item async for item in async_gen_lookahead(gen(0))] == []
+    assert [item async for item in async_gen_lookahead(gen(1))] == [(0, True)]
+    assert [item async for item in async_gen_lookahead(gen(2))] == [
+        (0, False),
+        (1, True),
+    ]

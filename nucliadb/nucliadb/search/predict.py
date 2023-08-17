@@ -19,6 +19,7 @@
 #
 import json
 import os
+from enum import Enum
 from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 import aiohttp
@@ -87,6 +88,12 @@ RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
 MAX_TRIES = 2
 
 
+class AnswerStatusCode(str, Enum):
+    SUCCESS = "0"
+    ERROR = "-1"
+    NO_CONTEXT = "-2"
+
+
 async def start_predict_engine():
     if nuclia_settings.dummy_predict:
         predict_util = DummyPredictEngine()
@@ -146,6 +153,7 @@ class DummyPredictEngine:
         async def generate():
             for i in [b"valid ", b"answer ", b" to"]:
                 yield i
+            yield AnswerStatusCode.SUCCESS.encode()
 
         return (DUMMY_LEARNING_ID, generate())
 
