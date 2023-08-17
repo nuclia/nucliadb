@@ -44,6 +44,7 @@ use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
+const ALLOWED_BEFORE_MERGE: usize = 5;
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -257,14 +258,15 @@ impl Index {
         if let Some(journal) = possible_merge {
             state.replace_work_unit(journal)
         }
+
         fs_state::persist_state::<State>(&self.location, &state)?;
         *date = fs_state::crnt_version(&self.location)?;
         let work_stack_len = state.work_stack_len();
-
         std::mem::drop(state);
         std::mem::drop(date);
 
-        if matches!(self.merger_status, MergerStatus::Free) && work_stack_len > 5 {
+        if matches!(self.merger_status, MergerStatus::Free) && work_stack_len > ALLOWED_BEFORE_MERGE
+        {
             let location = self.location.clone();
             let similarity = self.metadata.similarity;
             let (sender, receiver) = channel::unbounded();
