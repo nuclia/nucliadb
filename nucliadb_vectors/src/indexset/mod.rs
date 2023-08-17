@@ -25,7 +25,7 @@ use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use state::State;
 
 use crate::data_point::Similarity;
-use crate::data_point_provider::{Index, IndexCheck};
+use crate::data_point_provider::Index;
 use crate::VectorR;
 pub trait IndexKeyCollector {
     fn add_key(&mut self, key: String);
@@ -37,17 +37,13 @@ pub struct IndexSet {
     location: PathBuf,
 }
 impl IndexSet {
-    pub fn new(path: &Path, with_check: IndexCheck) -> VectorR<IndexSet> {
+    pub fn new(path: &Path) -> VectorR<IndexSet> {
         if !path.exists() {
             std::fs::create_dir(path)?;
         }
         fs_state::initialize_disk(path, || State::new(path.to_path_buf()))?;
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
-        if let IndexCheck::Sanity = with_check {
-            state.do_sanity_checks()?;
-        }
+        let state = fs_state::load_state::<State>(path)?;
+        let date = fs_state::crnt_version(path)?;
         let index = IndexSet {
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -71,9 +67,9 @@ impl IndexSet {
         let mut write = self.state.write().unwrap();
         write.get_or_create(index, similarity)
     }
-    fn update(&self, lock: &fs_state::Lock) -> VectorR<()> {
-        let disk_v = fs_state::crnt_version(lock)?;
-        let new_state = fs_state::load_state(lock)?;
+    fn update(&self, _lock: &fs_state::Lock) -> VectorR<()> {
+        let disk_v = fs_state::crnt_version(&self.location)?;
+        let new_state = fs_state::load_state(&self.location)?;
         let mut state = self.state.write().unwrap();
         let mut date = self.date.write().unwrap();
         *state = new_state;
@@ -101,11 +97,11 @@ impl IndexSet {
     pub fn get_location(&self) -> &Path {
         &self.location
     }
-    pub fn commit(&self, lock: ELock) -> VectorR<()> {
+    pub fn commit(&self, _: ELock) -> VectorR<()> {
         let state = self.state.read().unwrap();
         let mut date = self.date.write().unwrap();
-        fs_state::persist_state::<State>(&lock, &state)?;
-        *date = fs_state::crnt_version(&lock)?;
+        fs_state::persist_state::<State>(&self.location, &state)?;
+        *date = fs_state::crnt_version(&self.location)?;
         Ok(())
     }
 }

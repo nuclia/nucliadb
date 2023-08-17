@@ -21,7 +21,7 @@
 mod merge_worker;
 mod merger;
 mod state;
-mod work_flag;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::mem;
@@ -29,21 +29,22 @@ use std::path::{Path, PathBuf};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::SystemTime;
 
+use crossbeam::channel::{self, Receiver};
 pub use merger::Merger;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use nucliadb_core::tracing::*;
 use serde::{Deserialize, Serialize};
 use state::*;
-use work_flag::MergerWriterSync;
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{DataPoint, DpId, Similarity};
+use crate::data_point::{DataPoint, DpId, Journal, Similarity};
 use crate::data_point_provider::merge_worker::Worker;
 use crate::formula::Formula;
 use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
+const ALLOWED_BEFORE_MERGE: usize = 5;
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -51,12 +52,6 @@ pub trait SearchRequest {
     fn no_results(&self) -> usize;
     fn with_duplicates(&self) -> bool;
     fn min_score(&self) -> f32;
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum IndexCheck {
-    None,
-    Sanity,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -80,9 +75,16 @@ impl IndexMetadata {
     }
 }
 
+#[derive(Default)]
+enum MergerStatus {
+    #[default]
+    Free,
+    WorkScheduled(Receiver<Journal>),
+}
+
 pub struct Index {
     metadata: IndexMetadata,
-    work_flag: MergerWriterSync,
+    merger_status: MergerStatus,
     state: RwLock<State>,
     date: RwLock<Version>,
     location: PathBuf,
@@ -107,13 +109,13 @@ impl Index {
     fn write_date(&self) -> RwLockWriteGuard<'_, Version> {
         self.date.write().unwrap_or_else(|e| e.into_inner())
     }
-    fn update(&self, lock: &Lock) -> VectorR<()> {
+    fn update(&self, _lock: &Lock) -> VectorR<()> {
         let location = self.location();
-        let disk_v = fs_state::crnt_version(lock)?;
+        let disk_v = fs_state::crnt_version(location)?;
         let date = self.read_date();
         if disk_v > *date {
             mem::drop(date);
-            let new_state: State = fs_state::load_state(lock)?;
+            let new_state: State = fs_state::load_state(location)?;
             let new_dimension = new_state.stored_len(location)?;
             let mut state = self.write_state();
             let mut date = self.write_date();
@@ -125,18 +127,9 @@ impl Index {
         }
         Ok(())
     }
-    fn notify_merger(&self) {
-        let worker = Worker::request(
-            self.location.clone(),
-            self.work_flag.clone(),
-            self.metadata.similarity,
-        );
-        merger::send_merge_request(worker);
-    }
-    pub fn open(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
+    pub fn open(path: &Path) -> VectorR<Index> {
+        let state = fs_state::load_state::<State>(path)?;
+        let date = fs_state::crnt_version(path)?;
         let dimension_used = state.stored_len(path)?;
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
             // Old indexes may not have this file so in that case the
@@ -146,29 +139,23 @@ impl Index {
         })?;
         let index = Index {
             metadata,
-            work_flag: MergerWriterSync::new(),
+            merger_status: MergerStatus::Free,
             dimension: RwLock::new(dimension_used),
             state: RwLock::new(state),
             date: RwLock::new(date),
             location: path.to_path_buf(),
         };
-        if let IndexCheck::Sanity = with_check {
-            let mut state = index.write_state();
-            let merge_work = state.work_stack_len();
-            (0..merge_work).for_each(|_| index.notify_merger());
-        }
         Ok(index)
     }
     pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
         std::fs::create_dir(path)?;
         fs_state::initialize_disk(path, State::new)?;
         metadata.write(path)?;
-        let lock = fs_state::shared_lock(path)?;
-        let state = fs_state::load_state::<State>(&lock)?;
-        let date = fs_state::crnt_version(&lock)?;
+        let state = fs_state::load_state::<State>(path)?;
+        let date = fs_state::crnt_version(path)?;
         let index = Index {
             metadata,
-            work_flag: MergerWriterSync::new(),
+            merger_status: MergerStatus::Free,
             dimension: RwLock::new(None),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -176,7 +163,7 @@ impl Index {
         };
         Ok(index)
     }
-    pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &ELock) {
+    pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &Lock) {
         let mut state = self.write_state();
         state.remove(prefix.as_ref(), temporal_mark);
     }
@@ -195,9 +182,21 @@ impl Index {
     pub fn no_nodes(&self, _: &Lock) -> usize {
         self.read_state().no_nodes()
     }
-    pub fn collect_garbage(&self, _: &ELock) -> VectorR<()> {
-        use std::collections::HashSet;
-        let work_flag = self.work_flag.try_to_start_working()?;
+    pub fn collect_garbage(&mut self, _lock: &ELock) -> VectorR<()> {
+        // A merge may be waiting to be recorded.
+        let possible_merge = self.take_available_merge();
+        let mut state = self.write_state();
+        let mut date = self.write_date();
+        if let Some(journal) = possible_merge {
+            state.replace_work_unit(journal)
+        }
+        fs_state::persist_state::<State>(&self.location, &state)?;
+        *date = fs_state::crnt_version(&self.location)?;
+        std::mem::drop(state);
+        std::mem::drop(date);
+
+        // At this point there are no merges available, so we can
+        // start collecting garbage.
         let state = self.read_state();
         let in_use_dp: HashSet<_> = state.dpid_iter().collect();
         for dir_entry in std::fs::read_dir(&self.location)? {
@@ -219,35 +218,62 @@ impl Index {
                 warn!("{name} is garbage and could not be deleted because of {err}");
             }
         }
-        std::mem::drop(work_flag);
         Ok(())
     }
-    pub fn add(&mut self, dp: DataPoint, _: &ELock) -> VectorR<()> {
+    pub fn add(&mut self, dp: DataPoint, _lock: &Lock) -> VectorR<()> {
         let mut state = self.write_state();
         let Some(new_dp_vector_len) = dp.stored_len() else {
             return Ok(());
         };
         let Some(state_vector_len) = self.get_dimension() else {
-            // There is not a len in the state, therefore adding the datapoint can not
-            // create a merging requirement.
             self.set_dimension(dp.stored_len());
-            let _ = state.add(dp);
+            state.add(dp.meta());
             std::mem::drop(state);
             return Ok(());
         };
         if state_vector_len != new_dp_vector_len {
             return Err(VectorErr::InconsistentDimensions);
         }
-        if state.add(dp) {
-            self.notify_merger()
-        }
+        state.add(dp.meta());
         Ok(())
     }
-    pub fn commit(&self, lock: ELock) -> VectorR<()> {
-        let state = self.read_state();
+
+    fn take_available_merge(&mut self) -> Option<Journal> {
+        let MergerStatus::WorkScheduled(rcv) = std::mem::take(&mut self.merger_status) else {
+            return None;
+        };
+        match rcv.try_recv() {
+            Ok(journal) => Some(journal),
+            Err(channel::TryRecvError::Disconnected) => None,
+            Err(channel::TryRecvError::Empty) => {
+                self.merger_status = MergerStatus::WorkScheduled(rcv);
+                None
+            }
+        }
+    }
+    pub fn commit(&mut self, _lock: &Lock) -> VectorR<()> {
+        let possible_merge = self.take_available_merge();
+        let mut state = self.write_state();
         let mut date = self.write_date();
-        fs_state::persist_state::<State>(&lock, &state)?;
-        *date = fs_state::crnt_version(&lock)?;
+        if let Some(journal) = possible_merge {
+            state.replace_work_unit(journal)
+        }
+
+        fs_state::persist_state::<State>(&self.location, &state)?;
+        *date = fs_state::crnt_version(&self.location)?;
+        let work_stack_len = state.work_stack_len();
+        std::mem::drop(state);
+        std::mem::drop(date);
+
+        if matches!(self.merger_status, MergerStatus::Free) && work_stack_len > ALLOWED_BEFORE_MERGE
+        {
+            let location = self.location.clone();
+            let similarity = self.metadata.similarity;
+            let (sender, receiver) = channel::unbounded();
+            let worker = Worker::request(location, sender, similarity);
+            self.merger_status = MergerStatus::WorkScheduled(receiver);
+            merger::send_merge_request(worker);
+        }
         Ok(())
     }
     pub fn get_elock(&self) -> VectorR<ELock> {
@@ -278,12 +304,14 @@ mod test {
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let vectors_path = dir.path().join("vectors");
-        let index = Index::new(&vectors_path, IndexMetadata::default())?;
+        let mut index = Index::new(&vectors_path, IndexMetadata::default())?;
+        let lock = index.get_elock()?;
+
         let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
             DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
         }
-        let lock = index.get_elock()?;
+
         index.collect_garbage(&lock)?;
         let no_entries = std::fs::read_dir(&vectors_path)?.count();
         assert_eq!(no_entries, empty_no_entries);

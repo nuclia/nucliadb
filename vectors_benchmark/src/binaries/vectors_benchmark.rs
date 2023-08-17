@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::{fs, thread};
 
 use byte_unit::Byte;
-use nucliadb_vectors::data_point_provider::{Index, IndexCheck, IndexMetadata, Merger};
+use nucliadb_vectors::data_point_provider::{Index, IndexMetadata, Merger};
 use serde_json::json;
 use vectors_benchmark::cli_interface::*;
 use vectors_benchmark::json_writer::write_json;
@@ -62,7 +62,7 @@ fn main() -> std::io::Result<()> {
         thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 
     let stop = stop_point.clone();
-    let reader = Index::open(&location, IndexCheck::None).unwrap();
+    let reader = Index::open(&location).unwrap();
     let no_results = args.neighbours();
     let plotw = PlotWriter::new(args.reader_plot().unwrap());
     let query_it = RandomVectors::new(args.embedding_dim());
