@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 
 use super::IndexKeyCollector;
 use crate::data_point::Similarity;
-use crate::data_point_provider::{Index, IndexCheck, IndexMetadata};
+use crate::data_point_provider::{Index, IndexMetadata};
 use crate::VectorR;
 #[derive(Serialize, Deserialize)]
 pub struct State {
@@ -42,13 +42,6 @@ impl State {
     pub fn index_keys<C: IndexKeyCollector>(&self, c: &mut C) {
         self.indexes.iter().cloned().for_each(|s| c.add_key(s));
     }
-    pub fn do_sanity_checks(&self) -> VectorR<()> {
-        for index in &self.indexes {
-            let index_path = self.location.join(index);
-            Index::open(&index_path, IndexCheck::Sanity)?;
-        }
-        Ok(())
-    }
     pub fn remove_index(&mut self, index: &str) -> VectorR<()> {
         if self.indexes.remove(index) {
             let index_path = self.location.join(index);
@@ -59,7 +52,7 @@ impl State {
     pub fn get(&self, index: &str) -> VectorR<Option<Index>> {
         if self.indexes.contains(index) {
             let location = self.location.join(index);
-            Some(Index::open(&location, IndexCheck::None)).transpose()
+            Some(Index::open(&location)).transpose()
         } else {
             Ok(None)
         }
@@ -70,7 +63,7 @@ impl State {
         if self.indexes.contains(index.as_ref()) {
             let index = index.as_ref();
             let location = self.location.join(index);
-            Index::open(&location, IndexCheck::None)
+            Index::open(&location)
         } else {
             let index = index.to_string();
             let location = self.location.join(&index);
@@ -102,7 +95,6 @@ mod test {
         assert!(vectorset.get("Index2").unwrap().is_some());
         assert!(vectorset.get("Index3").unwrap().is_some());
         assert!(vectorset.get("Index4").unwrap().is_none());
-        vectorset.do_sanity_checks().unwrap();
         vectorset.remove_index("Index1").unwrap();
         assert!(vectorset.get("Index1").unwrap().is_none());
         assert!(vectorset.get("Index2").unwrap().is_some());

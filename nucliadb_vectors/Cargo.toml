@@ -18,6 +18,7 @@ thiserror = "1.0.31"
 serde_json = "1.0.82"
 nucliadb_core = { path = "../nucliadb_core" }
 itertools = "0.10.5"
+crossbeam = "0.8.2"
 
 [dev-dependencies]
 lazy_static = "1.4.0"

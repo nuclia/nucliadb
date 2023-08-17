@@ -48,7 +48,25 @@ mod names {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version(SystemTime);
 
-fn write_state<S>(path: &Path, state: &S) -> FsResult<()>
+pub fn initialize_disk<S, F>(path: &Path, with: F) -> FsResult<()>
+where
+    F: Fn() -> S,
+    S: Serialize,
+{
+    if !path.join(names::STATE).is_file() {
+        persist_state(path, &with())?;
+    }
+    Ok(())
+}
+
+pub fn exclusive_lock(path: &Path) -> FsResult<ELock> {
+    Ok(ELock::new(path)?)
+}
+pub fn shared_lock(path: &Path) -> FsResult<SLock> {
+    Ok(SLock::new(path)?)
+}
+
+pub fn persist_state<S>(path: &Path, state: &S) -> FsResult<()>
 where S: Serialize {
     let temporal_path = path.join(names::TEMP);
     let state_path = path.join(names::STATE);
@@ -65,7 +83,7 @@ where S: Serialize {
     Ok(())
 }
 
-fn read_state<S>(path: &Path) -> FsResult<S>
+pub fn load_state<S>(path: &Path) -> FsResult<S>
 where S: DeserializeOwned {
     let mut file = BufReader::new(
         OpenOptions::new()
@@ -74,36 +92,8 @@ where S: DeserializeOwned {
     );
     Ok(bincode::deserialize_from(&mut file)?)
 }
-
-pub fn initialize_disk<S, F>(path: &Path, with: F) -> FsResult<()>
-where
-    F: Fn() -> S,
-    S: Serialize,
-{
-    if !path.join(names::STATE).is_file() {
-        write_state(path, &with())?;
-    }
-    Ok(())
-}
-
-pub fn exclusive_lock(path: &Path) -> FsResult<ELock> {
-    Ok(ELock::new(path)?)
-}
-pub fn shared_lock(path: &Path) -> FsResult<SLock> {
-    Ok(SLock::new(path)?)
-}
-
-pub fn persist_state<S>(lock: &ELock, state: &S) -> FsResult<()>
-where S: Serialize {
-    write_state(lock.as_ref(), state)
-}
-
-pub fn load_state<S>(lock: &Lock) -> FsResult<S>
-where S: DeserializeOwned {
-    read_state(lock.as_ref())
-}
-pub fn crnt_version(lock: &Lock) -> FsResult<Version> {
-    let meta = std::fs::metadata(lock.path.join(names::STATE))?;
+pub fn crnt_version(path: &Path) -> FsResult<Version> {
+    let meta = std::fs::metadata(path.join(names::STATE))?;
     Ok(Version(meta.modified()?))
 }
 
@@ -198,15 +188,14 @@ mod tests {
         let lock = exclusive_lock(dir.path()).unwrap();
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
-        let v0 = crnt_version(&lock).unwrap();
+        let v0 = crnt_version(dir.path()).unwrap();
         std::mem::drop(lock);
-        let lock = exclusive_lock(dir.path()).unwrap();
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
-        assert_eq!(v0, crnt_version(&lock).unwrap());
+        assert_eq!(v0, crnt_version(dir.path()).unwrap());
         std::thread::sleep(std::time::Duration::from_millis(100));
-        write_state(dir.path(), &State::default()).unwrap();
-        let new_version = crnt_version(&lock).unwrap();
+        persist_state(dir.path(), &State::default()).unwrap();
+        let new_version = crnt_version(dir.path()).unwrap();
         assert!(v0 < new_version);
     }
 }
