@@ -107,7 +107,7 @@ async def driver_basic(driver: Driver):
 
     current_internal_kbs_keys = set()
     async with driver.transaction() as txn:
-        async for key in txn.keys("/internal/kbs"):
+        async for key in txn.keys("/internal/kbs/"):
             current_internal_kbs_keys.add(key)
 
     assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}

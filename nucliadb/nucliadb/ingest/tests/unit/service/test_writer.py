@@ -136,7 +136,9 @@ class TestWriterServicer:
         servicer.proc.driver = servicer.driver
         servicer.storage = AsyncMock()
         servicer.cache = AsyncMock()
-        with patch("nucliadb.ingest.service.writer.get_driver"):
+        with patch(
+            "nucliadb.ingest.orm.knowledgebox.get_driver", return_value=servicer.driver
+        ):
             yield servicer
 
     @pytest.fixture
