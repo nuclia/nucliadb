@@ -114,33 +114,26 @@ def driver(txn):
 
 
 @pytest.fixture()
-def storage():
-    storage = unittest.mock.AsyncMock()
-    with unittest.mock.patch(f"{QUERY_MODULE}.get_storage", return_value=storage):
-        yield storage
+def kbdm(driver):
+    kbdm = unittest.mock.AsyncMock()
+    with unittest.mock.patch(
+        f"{QUERY_MODULE}.KnowledgeBoxDataManager", return_value=kbdm
+    ):
+        yield kbdm
 
 
-@pytest.fixture()
-def kb_get_model_metadata(driver, storage):
-    with unittest.mock.patch(f"{QUERY_MODULE}.KnowledgeBox.get_model_metadata") as mock:
-        yield mock
-
-
-async def test_get_kb_model_default_min_score(has_feature, kb_get_model_metadata):
+async def test_get_kb_model_default_min_score(has_feature, kbdm):
     # If min_score is set, it should return it
-    kb_get_model_metadata.return_value = SemanticModelMetadata(
+    kbdm.get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE,
         default_min_score=1.5,
     )
     assert await get_kb_model_default_min_score("kbid") == 1.5
 
 
-async def test_get_kb_model_default_min_score_backward_compatible(
-    has_feature,
-    kb_get_model_metadata,
-):
+async def test_get_kb_model_default_min_score_backward_compatible(has_feature, kbdm):
     # If min_score is not set yet, it should return None
-    kb_get_model_metadata.return_value = SemanticModelMetadata(
+    kbdm.get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE
     )
     assert await get_kb_model_default_min_score("kbid") is None
