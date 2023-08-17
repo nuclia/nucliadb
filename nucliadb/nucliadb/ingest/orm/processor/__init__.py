@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Tuple
 
 import aiohttp.client_exceptions
 
+from nucliadb.common.cluster.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -30,7 +31,6 @@ from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     KnowledgeBoxConflict,
-    KnowledgeBoxNotFound,
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox

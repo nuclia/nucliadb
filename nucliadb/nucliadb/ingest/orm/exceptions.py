@@ -27,10 +27,6 @@ class KnowledgeBoxConflict(Exception):
     pass
 
 
-class KnowledgeBoxNotFound(NotFound):
-    pass
-
-
 class DeadletteredError(Exception):
     pass
 
