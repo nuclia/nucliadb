@@ -227,8 +227,8 @@ impl VectorReaderService {
             return Err(node_error!("Invalid path {:?}", config.vectorset));
         }
         Ok(VectorReaderService {
-            index: Index::open(&config.path, IndexCheck::None)?,
-            indexset: IndexSet::new(&config.vectorset, IndexCheck::None)?,
+            index: Index::open(&config.path)?,
+            indexset: IndexSet::new(&config.vectorset)?,
         })
     }
 }

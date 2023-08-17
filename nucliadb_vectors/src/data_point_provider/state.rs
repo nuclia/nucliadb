@@ -214,20 +214,16 @@ impl State {
     pub fn remove(&mut self, id: &str, deleted_since: SystemTime) {
         self.delete_log.insert(id.as_bytes(), deleted_since);
     }
-    #[must_use]
-    pub fn add(&mut self, dp: DataPoint) -> bool {
-        let meta = dp.meta();
-        self.no_nodes += meta.no_nodes();
-        self.current.add_unit(meta);
+    pub fn add(&mut self, journal: Journal) {
+        self.no_nodes += journal.no_nodes();
+        self.current.add_unit(journal);
         if self.current.size() == BUFFER_CAP {
             self.close_work_unit();
         }
-        self.current.size() == 0
     }
-    #[must_use]
-    pub fn replace_work_unit(&mut self, new: DataPoint) -> bool {
+    pub fn replace_work_unit(&mut self, journal: Journal) {
         let Some(unit) = self.work_stack.pop_back() else {
-            return false;
+            return;
         };
         let age_cap = self
             .work_stack
@@ -241,7 +237,7 @@ impl State {
             self.data_points.remove(&dp.id());
             self.no_nodes -= dp.no_nodes();
         });
-        self.add(new)
+        self.add(journal);
     }
     pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
         self.data_point_iterator()
@@ -268,7 +264,7 @@ impl State {
     pub fn no_nodes(&self) -> usize {
         self.no_nodes
     }
-    pub fn work_stack_len(&mut self) -> usize {
+    pub fn work_stack_len(&self) -> usize {
         self.work_stack.len()
     }
     pub fn current_work_unit(&self) -> Option<&[Journal]> {
@@ -347,8 +343,9 @@ mod test {
         let no_nodes = DataPointProducer::new(dir.path())
             .take(5)
             .map(|dp| {
-                let no_nodes = dp.meta().no_nodes();
-                let _ = state.add(dp);
+                let journal = dp.meta();
+                let no_nodes = journal.no_nodes();
+                state.add(journal);
                 no_nodes
             })
             .sum::<usize>();
@@ -362,7 +359,7 @@ mod test {
             .collect::<Vec<_>>();
         let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
         std::mem::drop(work);
-        let _ = state.replace_work_unit(new);
+        let _ = state.replace_work_unit(new.meta());
         assert!(state.current_work_unit().is_none());
         assert_eq!(state.work_stack.len(), 0);
         assert_eq!(state.current.size(), 1);
