@@ -26,7 +26,7 @@ from nucliadb_protos.audit_pb2 import ChatContext
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
-from nucliadb.search.predict import PredictEngine
+from nucliadb.search.predict import AnswerStatusCode, PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import format_chat_prompt_content
 from nucliadb.search.search.merge import merge_relations_results
@@ -84,17 +84,28 @@ async def generate_answer(
 
     start_time = time()
     answer = []
-    async for data in answer_generator:
-        answer.append(data)
-        yield data
+    status_code: Optional[AnswerStatusCode] = None
+    async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
+        if is_last_chunk:
+            try:
+                status_code = AnswerStatusCode(answer_chunk.decode())
+            except ValueError:
+                # TODO: remove this in the future, it's
+                # just for bw compatibility until predict
+                # is updated to the new protocol
+                status_code = AnswerStatusCode.SUCCESS
+                answer.append(answer_chunk)
+                yield answer_chunk
+            break
+        answer.append(answer_chunk)
+        yield answer_chunk
 
     text_answer = b"".join(answer)
 
     if do_audit and audit is not None:
-        decoded_answer = text_answer.decode()
-        audit_answer = (
-            decoded_answer if decoded_answer != NOT_ENOUGH_CONTEXT_ANSWER else None
-        )
+        audit_answer: Optional[str] = text_answer.decode()
+        if status_code and status_code == AnswerStatusCode.NO_CONTEXT:
+            audit_answer = None
 
         context = [
             ChatContext(author=message.author, text=message.text)
@@ -143,6 +154,7 @@ async def generate_answer(
 async def not_enough_context_generator():
     await asyncio.sleep(0)
     yield NOT_ENOUGH_CONTEXT_ANSWER.encode()
+    yield AnswerStatusCode.NO_CONTEXT.encode()
 
 
 async def chat(
@@ -213,3 +225,23 @@ async def chat(
             "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
         },
     )
+
+
+async def async_gen_lookahead(gen):
+    """
+    Async generator that yields the next chunk and whether it's the last one.
+    """
+    buffered_chunk = None
+    async for chunk in gen:
+        if buffered_chunk is None:
+            # Buffer the first chunk
+            buffered_chunk = chunk
+            continue
+
+        # Yield the previous chunk and buffer the current one
+        yield buffered_chunk, False
+        buffered_chunk = chunk
+
+    # Yield the last chunk if there is one
+    if buffered_chunk is not None:
+        yield buffered_chunk, True
