@@ -153,9 +153,9 @@ impl Index {
             location: path.to_path_buf(),
         };
         if let IndexCheck::Sanity = with_check {
-            let mut state = index.write_state();
-            let merge_work = state.work_stack_len();
-            (0..merge_work).for_each(|_| index.notify_merger());
+            let state = index.read_state();
+            let work = state.work_stack_len();
+            (0..work).for_each(|_| index.notify_merger());
         }
         Ok(index)
     }
@@ -176,7 +176,7 @@ impl Index {
         };
         Ok(index)
     }
-    pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &ELock) {
+    pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &Lock) {
         let mut state = self.write_state();
         state.remove(prefix.as_ref(), temporal_mark);
     }
@@ -222,7 +222,7 @@ impl Index {
         std::mem::drop(work_flag);
         Ok(())
     }
-    pub fn add(&mut self, dp: DataPoint, _: &ELock) -> VectorR<()> {
+    pub fn add(&mut self, dp: DataPoint, _: &Lock) -> VectorR<()> {
         let mut state = self.write_state();
         let Some(new_dp_vector_len) = dp.stored_len() else {
             return Ok(());
@@ -231,23 +231,21 @@ impl Index {
             // There is not a len in the state, therefore adding the datapoint can not
             // create a merging requirement.
             self.set_dimension(dp.stored_len());
-            let _ = state.add(dp);
+            state.add(dp);
             std::mem::drop(state);
             return Ok(());
         };
         if state_vector_len != new_dp_vector_len {
             return Err(VectorErr::InconsistentDimensions);
         }
-        if state.add(dp) {
-            self.notify_merger()
-        }
         Ok(())
     }
-    pub fn commit(&self, lock: ELock) -> VectorR<()> {
+    pub fn commit(&self, lock: &Lock) -> VectorR<()> {
         let state = self.read_state();
         let mut date = self.write_date();
-        fs_state::persist_state::<State>(&lock, &state)?;
-        *date = fs_state::crnt_version(&lock)?;
+        fs_state::persist_state::<State>(lock, &state)?;
+        *date = fs_state::crnt_version(lock)?;
+        self.notify_merger();
         Ok(())
     }
     pub fn get_elock(&self) -> VectorR<ELock> {

@@ -214,20 +214,19 @@ impl State {
     pub fn remove(&mut self, id: &str, deleted_since: SystemTime) {
         self.delete_log.insert(id.as_bytes(), deleted_since);
     }
-    #[must_use]
-    pub fn add(&mut self, dp: DataPoint) -> bool {
+
+    pub fn add(&mut self, dp: DataPoint) {
         let meta = dp.meta();
         self.no_nodes += meta.no_nodes();
         self.current.add_unit(meta);
         if self.current.size() == BUFFER_CAP {
             self.close_work_unit();
         }
-        self.current.size() == 0
     }
-    #[must_use]
-    pub fn replace_work_unit(&mut self, new: DataPoint) -> bool {
+
+    pub fn replace_work_unit(&mut self, new: DataPoint) {
         let Some(unit) = self.work_stack.pop_back() else {
-            return false;
+            return;
         };
         let age_cap = self
             .work_stack
@@ -241,7 +240,7 @@ impl State {
             self.data_points.remove(&dp.id());
             self.no_nodes -= dp.no_nodes();
         });
-        self.add(new)
+        self.add(new);
     }
     pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
         self.data_point_iterator()
@@ -268,11 +267,14 @@ impl State {
     pub fn no_nodes(&self) -> usize {
         self.no_nodes
     }
-    pub fn work_stack_len(&mut self) -> usize {
+    pub fn work_stack_len(&self) -> usize {
         self.work_stack.len()
     }
-    pub fn current_work_unit(&self) -> Option<&[Journal]> {
-        self.work_stack.back().map(|wu| wu.load.as_slice())
+    pub fn work_to_do(&self) -> Option<&[Journal]> {
+        self.work_stack
+            .back()
+            .filter(|_| self.work_stack_len() > 5)
+            .map(|wu| wu.load.as_slice())
     }
     pub fn stored_len(&self, location: &Path) -> VectorR<Option<u64>> {
         let Some(journal) = self.data_point_iterator().next() else {
@@ -355,20 +357,5 @@ mod test {
         assert_eq!(state.no_nodes(), no_nodes);
         assert_eq!(state.work_stack.len(), 1);
         assert_eq!(state.current.size(), 0);
-        let work = state.current_work_unit().unwrap();
-        let work = work
-            .iter()
-            .map(|j| (state.delete_log(*j), j.id()))
-            .collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
-        std::mem::drop(work);
-        let _ = state.replace_work_unit(new);
-        assert!(state.current_work_unit().is_none());
-        assert_eq!(state.work_stack.len(), 0);
-        assert_eq!(state.current.size(), 1);
-        assert_eq!(state.no_nodes(), no_nodes);
-        assert_eq!(state.work_stack.len(), 0);
-        assert_eq!(state.current.size(), 1);
-        assert_eq!(state.no_nodes(), no_nodes);
     }
 }

@@ -138,9 +138,9 @@ impl WriterChild for VectorWriterService {
 
         let id = Some(&resource_id.shard_id);
         let temporal_mark = TemporalMark::now();
-        let lock = self.index.get_elock()?;
+        let lock = self.index.get_slock()?;
         self.index.delete(&resource_id.uuid, temporal_mark, &lock);
-        self.index.commit(lock)?;
+        self.index.commit(&lock)?;
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -215,7 +215,7 @@ impl WriterChild for VectorWriterService {
             debug!("{id:?} - Datapoint creation: ends {v} ms");
         }
 
-        let lock = self.index.get_elock()?;
+        let lock = self.index.get_slock()?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Processing Sentences to delete: starts {v} ms");
         }
@@ -230,9 +230,10 @@ impl WriterChild for VectorWriterService {
             debug!("{id:?} - Indexing datapoint: starts {v} ms");
         }
         match new_dp.map(|i| self.index.add(i, &lock)).unwrap_or(Ok(())) {
-            Ok(_) => self.index.commit(lock)?,
+            Ok(_) => self.index.commit(&lock)?,
             Err(e) => tracing::error!("{id:?}/default could insert vectors: {e:?}"),
         }
+        std::mem::drop(lock);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Indexing datapoint: ends {v} ms");
         }
@@ -251,11 +252,11 @@ impl WriterChild for VectorWriterService {
         });
         for (vectorlist, index) in index_iter {
             let index = index?;
-            let index_lock = index.get_elock()?;
+            let index_lock = index.get_slock()?;
             vectorlist.vectors.iter().for_each(|vector| {
                 index.delete(vector, temporal_mark, &index_lock);
             });
-            index.commit(index_lock)?;
+            index.commit(&index_lock)?;
         }
         std::mem::drop(indexset_slock);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -294,9 +295,9 @@ impl WriterChild for VectorWriterService {
                 let similarity = index.metadata().similarity;
                 let location = index.location();
                 let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
-                let lock = index.get_elock()?;
+                let lock = index.get_slock()?;
                 match index.add(new_dp, &lock) {
-                    Ok(_) => index.commit(lock)?,
+                    Ok(_) => index.commit(&lock)?,
                     Err(e) => tracing::error!("Could not insert at {id:?}/{index_key}: {e:?}"),
                 }
             }

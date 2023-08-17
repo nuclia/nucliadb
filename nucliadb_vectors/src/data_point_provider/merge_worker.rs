@@ -28,7 +28,6 @@ use super::merger::{MergeQuery, MergeRequest};
 use super::work_flag::MergerWriterSync;
 use super::State;
 use crate::data_point::{DataPoint, DpId, Similarity};
-use crate::data_point_provider::merger;
 use crate::VectorR;
 
 const SLEEP_TIME: Duration = Duration::from_millis(100);
@@ -64,14 +63,6 @@ impl Worker {
         write!(msg, "==> {new}").unwrap();
         msg
     }
-    fn notify_merger(&self) {
-        let worker = Worker::request(
-            self.location.clone(),
-            self.work_flag.clone(),
-            self.similarity,
-        );
-        merger::send_merge_request(worker);
-    }
     fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
         loop {
             match self.work_flag.try_to_start_working() {
@@ -92,7 +83,7 @@ impl Worker {
         let state: State = fs_state::load_state(&lock)?;
         std::mem::drop(lock);
 
-        let Some(work) = state.current_work_unit().map(|work| {
+        let Some(work) = state.work_to_do().map(|work| {
             work.iter()
                 .rev()
                 .map(|journal| (state.delete_log(*journal), journal.id()))
@@ -108,16 +99,12 @@ impl Worker {
 
         let lock = fs_state::exclusive_lock(subscriber)?;
         let mut state: State = fs_state::load_state(&lock)?;
-        let creates_work = state.replace_work_unit(new_dp);
+        state.replace_work_unit(new_dp);
         std::mem::drop(work_flag);
 
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
         info!("Merge on {subscriber:?}:\n{report}");
-        if creates_work {
-            self.notify_merger();
-        }
-        info!("Merge request completed");
         Ok(())
     }
 }
