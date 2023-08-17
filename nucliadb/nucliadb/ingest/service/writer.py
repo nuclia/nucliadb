@@ -88,13 +88,10 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse,
 )
 
-from nucliadb.common.cluster.exceptions import (
-    AlreadyExists,
-    EntitiesGroupNotFound,
-    KnowledgeBoxNotFound,
-)
+from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
 from nucliadb.common.cluster.manager import clean_and_upgrade, get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import setup_driver

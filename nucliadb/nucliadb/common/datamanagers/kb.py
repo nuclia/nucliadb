@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.common.cluster.exceptions import KnowledgeBoxNotFound, ShardsNotFound
+from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.keys import KB_SHARDS

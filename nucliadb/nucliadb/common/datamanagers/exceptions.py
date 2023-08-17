@@ -17,48 +17,5 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
-class AlreadyExists(Exception):
-    pass
-
-
-class NotFound(Exception):
-    pass
-
-
-class NodeClusterSmall(Exception):
-    pass
-
-
-class ShardNotFound(NotFound):
-    pass
-
-
-class ShardsNotFound(NotFound):
-    pass
-
-
-class NodesUnsync(Exception):
-    pass
-
-
-class NodeError(Exception):
-    pass
-
-
-class ExhaustedNodesError(Exception):
-    pass
-
-
-class ReallyStopPulling(Exception):
-    pass
-
-
-class SequenceOrderViolation(Exception):
-    def __init__(self, last_seqid: int):
-        self.last_seqid = last_seqid
-
-
-class EntitiesGroupNotFound(NotFound):
+class KnowledgeBoxNotFound(Exception):
     pass

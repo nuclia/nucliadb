@@ -34,9 +34,10 @@ from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import KnowledgeBoxNotFound, ShardNotFound
+from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.utils import get_driver
