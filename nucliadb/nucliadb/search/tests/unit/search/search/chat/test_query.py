@@ -22,9 +22,9 @@ import pytest
 
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import (
+    _parse_answer_status_code,
     async_gen_lookahead,
     chat,
-    parse_answer_status_code,
 )
 from nucliadb_models.search import (
     ChatRequest,
@@ -93,6 +93,6 @@ async def test_async_gen_lookahead():
 def test_parse_status_code(chunk, status_code, error):
     if error:
         with pytest.raises(ValueError):
-            parse_answer_status_code(chunk)
+            _parse_answer_status_code(chunk)
     else:
-        assert parse_answer_status_code(chunk) == status_code
+        assert _parse_answer_status_code(chunk) == status_code
