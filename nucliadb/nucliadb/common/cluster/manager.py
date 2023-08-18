@@ -354,7 +354,7 @@ class StandaloneKBShardManager(KBShardManager):
 
         self._change_count[(node_id, shard_id)] = 0
         async with self._lock:
-            index_node = get_index_node(node_id)
+            index_node: Optional[ProxyStandaloneIndexNode] = get_index_node(node_id)  # type: ignore
             if index_node is None:
                 return
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
