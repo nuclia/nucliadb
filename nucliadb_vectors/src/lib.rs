@@ -23,11 +23,16 @@ pub mod data_point_provider;
 mod data_types;
 pub mod formula;
 pub mod indexset;
+pub mod labels;
 pub mod service;
 
 use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum VectorErr {
+    #[error("Error using bincode: {0}")]
+    BincodeError(#[from] bincode::Error),
+    #[error("Error using fst: {0}")]
+    FstError(#[from] fst::Error),
     #[error("json error: {0}")]
     SJ(#[from] serde_json::Error),
     #[error("IO error: {0}")]

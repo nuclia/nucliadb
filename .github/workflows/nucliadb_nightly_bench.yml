@@ -24,9 +24,24 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Run benchmarks
+      - name: Run Vectors benchmarks
         run: |
           make -C vectors_benchmark vector-bench
+
+      - name: Store on GH Pages
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: "customSmallerIsBetter"
+          output-file-path: vectors_benchmark/benchmark.json
+          auto-push: true
+          github-token: ${{ secrets.PERFORMANCE_TOKEN }}
+          gh-repository: github.com/nuclia/nucliadb_performance
+          gh-pages-branch: main
+
+      - name: Run Labels benchmarks
+        run: |
+          rm -rf ./benchmark-data-repository
+          make -C vectors_benchmark label-bench
 
       - name: Store on GH Pages
         uses: benchmark-action/github-action-benchmark@v1
