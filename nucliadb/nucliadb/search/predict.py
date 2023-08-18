@@ -372,9 +372,14 @@ class PredictEngine:
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):
+    """
+    Returns an async generator that yields the chunks of the response
+    in the same way as received from the server.
+    See: https://docs.aiohttp.org/en/stable/streams.html#aiohttp.StreamReader.iter_chunks
+    """
+
+    async def _iter_answer_chunks(gen):
+        async for chunk, _ in gen:
+            yield chunk
+
     return _iter_answer_chunks(response.content.iter_chunks())
-
-
-async def _iter_answer_chunks(gen):
-    async for chunk, _ in gen:
-        yield chunk
