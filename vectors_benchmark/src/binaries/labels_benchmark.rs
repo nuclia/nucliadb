@@ -17,22 +17,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::io::Write;
+use std::iter::Iterator;
+use std::time::Instant;
+use std::{fs, mem};
+
+use byte_unit::Byte;
+use nucliadb_vectors::labels::{Label, LabelDictionary};
+use nucliadb_vectors::VectorR;
 use rand::distributions::Alphanumeric;
 use rand::seq::index::sample;
 use rand::Rng;
-use std::fs;
-use std::io::Write;
-use std::iter::Iterator;
-use std::mem;
-use std::time::Instant;
-
-use byte_unit::Byte;
 use serde_json::json;
 use tempfile::{tempdir, TempDir};
-
-use nucliadb_vectors::labels::{Label, LabelDictionary};
-use nucliadb_vectors::VectorR;
-
 use vectors_benchmark::cli_interface::*;
 use vectors_benchmark::json_writer::write_json;
 
