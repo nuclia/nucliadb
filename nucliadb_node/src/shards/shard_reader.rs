@@ -312,6 +312,8 @@ impl ShardReader {
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
         let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
+        let skip_relations =
+            search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
 
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
@@ -329,13 +331,7 @@ impl ShardReader {
             ..Default::default()
         };
         let text_reader_service = self.text_reader.clone();
-        let text_task = move || {
-            if !skip_fields {
-                Some(text_reader_service.search(&field_request))
-            } else {
-                None
-            }
-        };
+        let text_task = move || Some(text_reader_service.search(&field_request));
 
         let paragraph_request = ParagraphSearchRequest {
             id: "".to_string(),
@@ -355,13 +351,7 @@ impl ShardReader {
             ..Default::default()
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
-        let paragraph_task = move || {
-            if !skip_paragraphs {
-                Some(paragraph_reader_service.search(&paragraph_request))
-            } else {
-                None
-            }
-        };
+        let paragraph_task = move || Some(paragraph_reader_service.search(&paragraph_request));
 
         let vector_request = VectorSearchRequest {
             id: "".to_string(),
@@ -381,13 +371,7 @@ impl ShardReader {
             ..Default::default()
         };
         let vector_reader_service = self.vector_reader.clone();
-        let vector_task = move || {
-            if !skip_vectors {
-                Some(vector_reader_service.search(&vector_request))
-            } else {
-                None
-            }
-        };
+        let vector_task = move || Some(vector_reader_service.search(&vector_request));
 
         let relation_request = RelationSearchRequest {
             shard_id: search_request.shard.clone(),
@@ -413,10 +397,18 @@ impl ShardReader {
         let mut rrelation = None;
 
         thread::scope(|s| {
-            s.spawn(|_| rtext = text_task());
-            s.spawn(|_| rparagraph = paragraph_task());
-            s.spawn(|_| rvector = vector_task());
-            s.spawn(|_| rrelation = relation_task());
+            if !skip_fields {
+                s.spawn(|_| rtext = text_task());
+            }
+            if !skip_paragraphs {
+                s.spawn(|_| rparagraph = paragraph_task());
+            }
+            if !skip_vectors {
+                s.spawn(|_| rvector = vector_task());
+            }
+            if !skip_relations {
+                s.spawn(|_| rrelation = relation_task());
+            }
         });
 
         let metrics = metrics::get_metrics();
