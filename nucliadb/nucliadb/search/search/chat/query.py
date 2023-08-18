@@ -88,7 +88,7 @@ async def generate_answer(
     async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
         if is_last_chunk:
             try:
-                status_code = AnswerStatusCode(answer_chunk.decode())
+                status_code = parse_answer_status_code(answer_chunk)
             except ValueError:
                 # TODO: remove this in the future, it's
                 # just for bw compatibility until predict
@@ -245,3 +245,19 @@ async def async_gen_lookahead(gen):
     # Yield the last chunk if there is one
     if buffered_chunk is not None:
         yield buffered_chunk, True
+
+
+def parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
+    """
+    Parses the status code from the chunk.
+    """
+    try:
+        return AnswerStatusCode(chunk.decode())
+    except ValueError:
+        # In some cases, due to a bug in aiohttp, the final status
+        # chunk is appended to the previous chunk...
+        if chunk == b"":
+            raise
+        if chunk.endswith(b"0"):
+            return AnswerStatusCode.SUCCESS
+        return AnswerStatusCode(chunk[-2:].decode())

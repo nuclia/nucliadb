@@ -379,7 +379,11 @@ def get_answer_generator(response: aiohttp.ClientResponse):
     """
 
     async def _iter_answer_chunks(gen):
-        async for chunk, _ in gen:
-            yield chunk
+        buffer = b""
+        async for chunk, end_of_chunk in gen:
+            buffer += chunk
+            if end_of_chunk:
+                yield buffer
+                buffer = b""
 
     return _iter_answer_chunks(response.content.iter_chunks())
