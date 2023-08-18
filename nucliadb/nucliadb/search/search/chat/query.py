@@ -255,7 +255,10 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         return AnswerStatusCode(chunk.decode())
     except ValueError:
         # In some cases, even if the status code was yield separately
-        # at the server side, the status code is appended to the previous chunk.
+        # at the server side, the status code is appended to the previous chunk...
+        # It may be a bug in the aiohttp.StreamResponse implementation,
+        # but we haven't spotted it yet. For now, we just try to parse the status code
+        # from the tail of the chunk.
         if chunk == b"":
             raise
         if chunk.endswith(b"0"):
