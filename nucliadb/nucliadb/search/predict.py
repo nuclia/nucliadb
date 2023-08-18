@@ -303,7 +303,7 @@ class PredictEngine:
         )
         await self.check_response(resp, expected=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
-        return ident, resp.content.iter_any()
+        return ident, get_answer_generator(resp)
 
     @predict_observer.wrap({"type": "ask_document"})
     async def ask_document(
@@ -369,3 +369,12 @@ class PredictEngine:
         data = await resp.json()
 
         return convert_relations(data)
+
+
+def get_answer_generator(response: aiohttp.ClientResponse):
+    return _iter_answer_chunks(response.content.iter_chunks())
+
+
+async def _iter_answer_chunks(gen):
+    async for chunk, _ in gen:
+        yield chunk
