@@ -34,12 +34,15 @@ from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import ShardNotFound, ShardsNotFound
+from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.resource import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
@@ -78,6 +81,8 @@ class KnowledgeBox:
         self.kbid = kbid
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
+        # b/w compatible, long term this class would change dramatically
+        self.data_manager = KnowledgeBoxDataManager(get_driver())
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
@@ -264,7 +269,7 @@ class KnowledgeBox:
         return uuid
 
     async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractIndexNode, str]]:
-        shards_obj = await self.get_shards_object()
+        shards_obj = await self.data_manager.get_shards_object(self.kbid)
 
         for shard in shards_obj.shards:
             for replica in shard.replicas:
@@ -424,33 +429,11 @@ class KnowledgeBox:
     async def get_resource_shard(
         self, shard_id: str
     ) -> Optional[writer_pb2.ShardObject]:
-        pb = await self.get_shards_object()
+        pb = await self.data_manager.get_shards_object(self.kbid)
         for shard in pb.shards:
             if shard.shard == shard_id:
                 return shard
         return None
-
-    async def get_shards_object(self) -> writer_pb2.Shards:
-        key = KB_SHARDS.format(kbid=self.kbid)
-        payload = await self.txn.get(key)
-        if not payload:
-            await self.txn.abort()
-            raise ShardsNotFound(self.kbid)
-        pb = writer_pb2.Shards()
-        pb.ParseFromString(payload)
-        return pb
-
-    async def get_model_metadata(self) -> SemanticModelMetadata:
-        try:
-            shards_obj = await self.get_shards_object()
-        except ShardsNotFound:
-            raise KnowledgeBoxNotFound(self.kbid)
-        if shards_obj.HasField("model"):
-            return shards_obj.model
-        else:
-            # B/c code for old KBs that do not have the `model` attribute set in the Shards object.
-            # Cleanup this code after a migration is done unifying all fields under `model` (on-prem and cloud).
-            return SemanticModelMetadata(similarity_function=shards_obj.similarity)
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

@@ -23,10 +23,8 @@ import uuid
 from functools import partial
 
 from nucliadb.common.cluster.manager import choose_node
-from nucliadb.common.cluster.settings import settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import noderesources_pb2, nodesidecar_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -88,12 +86,6 @@ class ShardCreatorHandler:
         )
         metrics.total_messages.inc({"type": "shard_creator", "action": "scheduled"})
 
-    def should_create_new_shard(self, counter: nodesidecar_pb2.Counter) -> bool:
-        return (
-            counter.paragraphs > settings.max_shard_paragraphs
-            or counter.fields > settings.max_shard_fields
-        )
-
     @metrics.handler_histo.wrap({"type": "shard_creator"})
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
@@ -101,15 +93,10 @@ class ShardCreatorHandler:
         current_shard: writer_pb2.ShardObject = kb_shards.shards[kb_shards.actual]
 
         node, shard_id, _ = choose_node(current_shard)
+        # we could also call `reader.GetShard`; however, the `GetCount`
+        # is cached at the sidecar so we're cheating for now until
+        # the `reader.GetShard` is faster
         shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
-        if self.should_create_new_shard(shard_counter):
-            logger.warning({"message": "Adding shard", "kbid": kbid})
-            async with self.driver.transaction() as txn:
-                kb = KnowledgeBox(txn, self.storage, kbid)
-                model = await kb.get_model_metadata()
-                await self.shard_manager.create_shard_by_kbid(
-                    txn, kbid, semantic_model=model
-                )
-                await txn.commit()
+        await self.shard_manager.maybe_create_new_shard(kbid, shard_counter)  # type: ignore

@@ -25,8 +25,8 @@ from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.service.writer import (
     WriterServicer,
     update_shards_with_updated_replica,
@@ -136,7 +136,10 @@ class TestWriterServicer:
         servicer.proc.driver = servicer.driver
         servicer.storage = AsyncMock()
         servicer.cache = AsyncMock()
-        yield servicer
+        with patch(
+            "nucliadb.ingest.orm.knowledgebox.get_driver", return_value=servicer.driver
+        ):
+            yield servicer
 
     @pytest.fixture
     def field_value(self):

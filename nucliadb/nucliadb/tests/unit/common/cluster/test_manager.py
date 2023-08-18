@@ -17,24 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_protos.nodesidecar_pb2 import Counter
+
+from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.cluster.settings import settings
 
 
-class NotFound(Exception):
-    pass
+def test_should_create_new_shard():
+    sm = KBShardManager()
+    low_para_counter = Counter(paragraphs=settings.max_shard_paragraphs - 1)
+    high_para_counter = Counter(paragraphs=settings.max_shard_paragraphs + 1)
+    assert sm.should_create_new_shard(low_para_counter) is False
+    assert sm.should_create_new_shard(high_para_counter) is True
 
-
-class KnowledgeBoxConflict(Exception):
-    pass
-
-
-class DeadletteredError(Exception):
-    pass
-
-
-class ReallyStopPulling(Exception):
-    pass
-
-
-class SequenceOrderViolation(Exception):
-    def __init__(self, last_seqid: int):
-        self.last_seqid = last_seqid
+    low_fields_counter = Counter(fields=settings.max_shard_fields - 1)
+    high_fields_counter = Counter(fields=settings.max_shard_fields + 1)
+    assert sm.should_create_new_shard(low_fields_counter) is False
+    assert sm.should_create_new_shard(high_fields_counter) is True

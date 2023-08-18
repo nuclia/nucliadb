@@ -17,24 +17,5 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
-class NotFound(Exception):
+class KnowledgeBoxNotFound(Exception):
     pass
-
-
-class KnowledgeBoxConflict(Exception):
-    pass
-
-
-class DeadletteredError(Exception):
-    pass
-
-
-class ReallyStopPulling(Exception):
-    pass
-
-
-class SequenceOrderViolation(Exception):
-    def __init__(self, last_seqid: int):
-        self.last_seqid = last_seqid

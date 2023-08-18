@@ -35,9 +35,15 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.datamanagers.cluster import ClusterDataManager
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_protos import noderesources_pb2, nodewriter_pb2, writer_pb2
+from nucliadb_protos import (
+    nodereader_pb2,
+    noderesources_pb2,
+    nodewriter_pb2,
+    writer_pb2,
+)
 from nucliadb_telemetry import errors
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -310,8 +316,53 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
+    def should_create_new_shard(self, shard_info: noderesources_pb2.Shard) -> bool:
+        return (
+            shard_info.paragraphs > settings.max_shard_paragraphs
+            or shard_info.fields > settings.max_shard_fields
+        )
+
+    async def maybe_create_new_shard(
+        self, kbid: str, shard_info: noderesources_pb2.Shard
+    ):
+        if self.should_create_new_shard(shard_info):
+            logger.warning({"message": "Adding shard", "kbid": kbid})
+            kbdm = KnowledgeBoxDataManager(get_driver())
+            model = await kbdm.get_model_metadata(kbid)
+            driver = get_driver()
+            async with driver.transaction() as txn:
+                await self.create_shard_by_kbid(txn, kbid, semantic_model=model)
+                await txn.commit()
+
 
 class StandaloneKBShardManager(KBShardManager):
+    max_ops_before_checks = 25
+
+    def __init__(self):
+        super().__init__()
+        self._lock = asyncio.Lock()
+        self._change_count: dict[tuple[str, str], int] = {}  # type: ignore
+
+    async def _resource_change_event(
+        self, kbid: str, node_id: str, shard_id: str
+    ) -> None:
+        if (node_id, shard_id) not in self._change_count:
+            self._change_count[(node_id, shard_id)] = 0
+        self._change_count[(node_id, shard_id)] += 1
+        if self._change_count[(node_id, shard_id)] < self.max_ops_before_checks:
+            return
+
+        self._change_count[(node_id, shard_id)] = 0
+        async with self._lock:
+            index_node: Optional[ProxyStandaloneIndexNode] = get_index_node(node_id)  # type: ignore
+            if index_node is None:
+                return
+            shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
+                nodereader_pb2.GetShardRequest(shard_id=shard_id)  # type: ignore
+            )
+            await self.maybe_create_new_shard(kbid, shard_info)
+            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -328,6 +379,13 @@ class StandaloneKBShardManager(KBShardManager):
             index_node = get_index_node(shardreplica.node)
             await index_node.writer.RemoveResource(req)  # type: ignore
 
+        if index_node is not None:
+            asyncio.create_task(
+                self._resource_change_event(
+                    kb, shardreplica.node, shardreplica.shard.id
+                )
+            )
+
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -337,6 +395,7 @@ class StandaloneKBShardManager(KBShardManager):
         kb: str,
         reindex_id: Optional[str] = None,
     ) -> None:
+        index_node = None
         for shardreplica in shard.replicas:
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
             index_node = get_index_node(shardreplica.node)
@@ -345,6 +404,13 @@ class StandaloneKBShardManager(KBShardManager):
                     f"Node {shardreplica.node} is not found or not available"
                 )
             await index_node.writer.SetResource(resource)  # type: ignore
+
+        if index_node is not None:
+            asyncio.create_task(
+                self._resource_change_event(
+                    kb, shardreplica.node, shardreplica.shard.id
+                )
+            )
 
 
 def choose_node(
