@@ -146,7 +146,12 @@ impl NodeReader for NodeReaderGRPCDriver {
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
         let shard = self.obtain_shard(shard_id).await?;
-        match shard.get_info(&request) {
+        let shard_info = tokio::task::spawn_blocking(move || shard.get_info(&request))
+            .await
+            .map_err(|error| {
+                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+            })?;
+        match shard_info {
             Ok(shard) => Ok(tonic::Response::new(shard)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
