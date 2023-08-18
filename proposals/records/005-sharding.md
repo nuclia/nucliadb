@@ -182,12 +182,16 @@ if performance required.
 Secondary read only replicas are "dumb" and are mostly only responsible for serving
 requests from the replicated state.
 
-Read path diagram:
-![Read Path Diagram](./images/005/read-path-ndb-coor.drawio.png)
-
 #### Disks
 
 To improve secondary read only replica performance, utilize local SSDs
+
+
+### Overview
+
+Proposal diagram overview:
+
+![Read Path Diagram](./images/005/overview.drawio.png)
 
 ## Alternatives
 
