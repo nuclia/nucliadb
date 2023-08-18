@@ -41,12 +41,14 @@ pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
+use crate::labels::LabelDictionary;
 use crate::VectorR;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
     pub const JOURNAL: &str = "journal.json";
+    pub const LABELS_DIR: &str = "labels";
 }
 
 pub struct NoDLog;
@@ -196,33 +198,14 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
 }
 
 #[derive(Clone, Debug)]
-pub struct LabelDictionary(Vec<u8>);
-impl Default for LabelDictionary {
-    fn default() -> Self {
-        LabelDictionary::new(vec![])
-    }
-}
-impl LabelDictionary {
-    pub fn new(mut labels: Vec<String>) -> LabelDictionary {
-        labels.sort();
-        let ram_trie = trie_ram::create_trie(&labels);
-        LabelDictionary(trie::serialize(ram_trie))
-    }
-}
-#[derive(Clone, Debug)]
 pub struct Elem {
     pub key: Vec<u8>,
     pub vector: Vec<u8>,
     pub metadata: Option<Vec<u8>>,
-    pub labels: LabelDictionary,
+    pub labels: Vec<u8>,
 }
 impl Elem {
-    pub fn new(
-        key: String,
-        vector: Vec<f32>,
-        labels: LabelDictionary,
-        metadata: Option<Vec<u8>>,
-    ) -> Elem {
+    pub fn new(key: String, vector: Vec<f32>, labels: Vec<u8>, metadata: Option<Vec<u8>>) -> Elem {
         Elem {
             labels,
             metadata,
@@ -318,6 +301,7 @@ pub struct DataPoint {
     journal: Journal,
     nodes: Mmap,
     index: Mmap,
+    labels: LabelDictionary,
 }
 
 impl AsRef<DataPoint> for DataPoint {
