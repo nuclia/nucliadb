@@ -359,7 +359,7 @@ mod test {
             .collect::<Vec<_>>();
         let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
         std::mem::drop(work);
-        let _ = state.replace_work_unit(new.meta());
+        state.replace_work_unit(new.meta());
         assert!(state.current_work_unit().is_none());
         assert_eq!(state.work_stack.len(), 0);
         assert_eq!(state.current.size(), 1);
