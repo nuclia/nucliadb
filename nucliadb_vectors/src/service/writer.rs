@@ -28,7 +28,7 @@ use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 
-use crate::data_point::{DataPoint, Elem, LabelDictionary};
+use crate::data_point::{DataPoint, Elem};
 use crate::data_point_provider::*;
 use crate::indexset::{IndexKeyCollector, IndexSet};
 
@@ -165,15 +165,13 @@ impl WriterChild for VectorWriterService {
             for (paragraph_field, paragraph) in resource.paragraphs.iter() {
                 let field = &[paragraph_field.clone()];
                 for index in paragraph.paragraphs.values() {
-                    let labels = LabelDictionary::new(
-                        resource
-                            .labels
-                            .iter()
-                            .chain(index.labels.iter())
-                            .chain(field.iter())
-                            .cloned()
-                            .collect(),
-                    );
+                    let labels: Vec<String> = resource
+                        .labels
+                        .iter()
+                        .chain(index.labels.iter())
+                        .chain(field.iter())
+                        .cloned()
+                        .collect();
                     for (key, sentence) in index.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();
@@ -283,7 +281,7 @@ impl WriterChild for VectorWriterService {
                 let key = vectorset.clone();
                 let vector = user_vector.vector.clone();
                 let bucket = lengths.entry(vector.len()).or_default();
-                let labels = LabelDictionary::new(user_vector.labels.clone());
+                let labels = user_vector.labels.clone();
                 elems.push(Elem::new(key, vector, labels, None));
                 bucket.push(vectorset);
             }

@@ -39,9 +39,9 @@ use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
 pub use uuid::Uuid as DpId;
 
-use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
+use crate::data_types::{key_value, vector, DeleteLog};
 use crate::formula::Formula;
-use crate::labels::LabelDictionary;
+use crate::labels::{Label, LabelDictionary};
 use crate::VectorR;
 
 mod file_names {
@@ -202,10 +202,15 @@ pub struct Elem {
     pub key: Vec<u8>,
     pub vector: Vec<u8>,
     pub metadata: Option<Vec<u8>>,
-    pub labels: Vec<u8>,
+    pub labels: Vec<String>,
 }
 impl Elem {
-    pub fn new(key: String, vector: Vec<f32>, labels: Vec<u8>, metadata: Option<Vec<u8>>) -> Elem {
+    pub fn new(
+        key: String,
+        vector: Vec<f32>,
+        labels: Vec<String>,
+        metadata: Option<Vec<u8>>,
+    ) -> Elem {
         Elem {
             labels,
             metadata,
@@ -217,21 +222,10 @@ impl Elem {
 
 impl key_value::KVElem for Elem {
     fn serialized_len(&self) -> usize {
-        Node::serialized_len(
-            &self.key,
-            &self.vector,
-            &self.labels.0,
-            self.metadata.as_ref(),
-        )
+        Node::serialized_len(&self.key, &self.vector, self.metadata.as_ref())
     }
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
-        Node::serialize_into(
-            w,
-            self.key,
-            self.vector,
-            self.labels.0,
-            self.metadata.as_ref(),
-        )
+        Node::serialize_into(w, self.key, self.vector, self.metadata.as_ref())
     }
 }
 
@@ -285,7 +279,9 @@ impl Neighbour {
         Node.get_key(&self.node)
     }
     pub fn labels(&self) -> Vec<String> {
-        Node::labels(&self.node)
+        //Node::labels(&self.node)
+        // TODO: search in the new Labels
+        vec!["TODO".to_string()]
     }
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = Node::metadata(&self.node);
@@ -443,6 +439,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            labels,
         })
     }
     pub fn delete(dir: &path::Path, uid: DpId) -> VectorR<()> {
@@ -479,6 +476,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            labels,
         })
     }
     pub fn new(
@@ -517,6 +515,26 @@ impl DataPoint {
         }
         let nodes = unsafe { Mmap::map(&nodesf)? };
         let no_nodes = key_value::get_no_elems(&nodes);
+
+        // TODO: fill it
+        let mut labels: Vec<Label> = vec![
+            Label {
+                key: "key3".to_owned(),
+                doc_ids: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            },
+            Label {
+                key: "key2".to_owned(),
+                doc_ids: vec![1, 2, 3, 4, 5],
+            },
+            Label {
+                key: "key1".to_owned(),
+                doc_ids: vec![7, 8],
+            },
+        ];
+
+        // needs to be sorted by keys
+        labels.sort_by_key(|label| label.key.clone());
+        let labels_dict = LabelDictionary::new(file_names::LABELS_DIR, labels.iter());
 
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -558,6 +576,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            labels,
         })
     }
 }
