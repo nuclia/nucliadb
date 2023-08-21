@@ -24,12 +24,12 @@
 // - `labels.idx`: a file storing labels as records, each label is a (key, doc_ids) tuple
 // - `labels.fst`: an FST map that stores the label value along with an offset in `label.idx`
 //
-// Indexing labels is done by calling the `LabelDictionary::new` function,
-// which returns an instance of `LabelDictionary`.
+// Indexing labels is done by calling the `LabelIndex::new` function,
+// which returns an instance of `LabelIndex`.
 //
-// Searching for a label is done with the `get_label` method of the `LabelDictionary` class.
+// Searching for a label is done with the `get_label` method of the `LabelIndex` class.
 //
-// For read-only access, you can use `LabelDictionary::open`
+// For read-only access, you can use `LabelIndex::open`
 //
 // There's a benchmark in `nucliadb/vectors_benchmark` you can call with `make label-bench`
 //
@@ -61,14 +61,14 @@ pub struct Label {
     pub doc_ids: Vec<u64>,
 }
 
-pub struct LabelDictionary {
+pub struct LabelIndex {
     pub fst_file_path: PathBuf,
     pub records_file_path: PathBuf,
     records_file: RwLock<File>,
     fst_map: Map<Mmap>,
 }
 
-impl LabelDictionary {
+impl LabelIndex {
     const LABELS_FST: &str = "labels.fst";
     const LABELS_IDX: &str = "labels.idx";
 
@@ -101,7 +101,9 @@ impl LabelDictionary {
     }
 
     pub fn new<'a, I>(path: &Path, labels: I) -> VectorR<Self>
-    where I: Iterator<Item = &'a Label> {
+    where
+        I: Iterator<Item = &'a Label>,
+    {
         let records_file_path = path.join(Self::LABELS_IDX);
         let fst_file_path = path.join(Self::LABELS_FST);
 
@@ -167,24 +169,24 @@ mod tests {
         // needs to be sorted by keys
         labels.sort_by_key(|label| label.key.clone());
         let dir = tempfile::tempdir().unwrap();
-        let labels_dict = LabelDictionary::new(dir.path(), labels.iter())?;
+        let label_index = LabelIndex::new(dir.path(), labels.iter())?;
 
         // now let's search for key1
-        match labels_dict.get_label("key1") {
+        match label_index.get_label("key1") {
             Err(err) => panic!("{err:?}"),
             Ok(None) => panic!("Should be some"),
             Ok(Some(label)) => assert_eq!(label.doc_ids, vec![7, 8]),
         }
 
         // and key 3
-        match labels_dict.get_label("key3") {
+        match label_index.get_label("key3") {
             Err(err) => panic!("{err:?}"),
             Ok(None) => panic!("Should be some"),
             Ok(Some(label)) => assert_eq!(label.doc_ids, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
         }
 
         // key23 can't be found
-        match labels_dict.get_label("key23") {
+        match label_index.get_label("key23") {
             Err(err) => panic!("{err:?}"),
             Ok(Some(label)) => panic!("Should be None, found: {label:?}"),
             Ok(None) => (),
