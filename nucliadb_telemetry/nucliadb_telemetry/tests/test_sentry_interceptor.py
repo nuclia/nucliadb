@@ -40,10 +40,10 @@ class SimpleGreeter(
     helloworld_pb2_grpc.GreeterServicer,
     hellostreamingworld_pb2_grpc.MultiGreeterServicer,
 ):
-    async def SayHello(self, request: helloworld_pb2.HelloRequest, context):
+    async def SayHello(self, request, context):
         return helloworld_pb2.HelloReply(message=f"Hello, {request.name}!")
 
-    async def sayHello(self, request: hellostreamingworld_pb2.HelloRequest, context):
+    async def sayHello(self, request, context):
         for _ in range(10):
             yield hellostreamingworld_pb2.HelloReply(message=f"Hello, {request.name}!")
 
@@ -52,10 +52,10 @@ class FaultyGreeter(
     helloworld_pb2_grpc.GreeterServicer,
     hellostreamingworld_pb2_grpc.MultiGreeterServicer,
 ):
-    async def SayHello(self, request: helloworld_pb2.HelloRequest, context):
+    async def SayHello(self, request, context):
         raise UnhanldedError("Unhandled error at the server")
 
-    async def sayHello(self, request: hellostreamingworld_pb2.HelloRequest, context):
+    async def sayHello(self, request, context):
         yield hellostreamingworld_pb2.HelloReply(message=f"Hello, {request.name}!")
         raise UnhanldedError("Unhandled error at the server")
 
@@ -116,7 +116,7 @@ async def test_sentry_interceptor_without_streaming_errors(
     with patch(
         "nucliadb_telemetry.grpc_sentry.capture_exception"
     ) as mock_capture_exception:
-        async for response in stub.sayHello(
+        async for response in stub.sayHello(  # type: ignore
             hellostreamingworld_pb2.HelloRequest(name="you")
         ):
             assert response.message == "Hello, you!"
@@ -136,7 +136,7 @@ async def test_sentry_interceptor_raises_unhandled_exception(
     ) as mock_capture_exception:
         with pytest.raises(AioRpcError):
             with pytest.raises(UnhanldedError):
-                await stub.SayHello(
+                await stub.SayHello(  # type: ignore
                     helloworld_pb2.HelloRequest(name="you"),
                 )
         assert mock_capture_exception.called is True
@@ -156,7 +156,7 @@ async def test_sentry_interceptor_raises_unhandled_exception_stream(
     ) as mock_capture_exception:
         with pytest.raises(AioRpcError):
             with pytest.raises(UnhanldedError):
-                async for _ in stub.sayHello(
+                async for _ in stub.sayHello(  # type: ignore
                     hellostreamingworld_pb2.HelloRequest(name="you")
                 ):
                     pass
