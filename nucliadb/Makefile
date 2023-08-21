@@ -19,6 +19,7 @@ freeze-requirements:
 	.freeze-venv/bin/pip install -e .
 	.freeze-venv/bin/pip freeze > requirements.lock.txt.raw
 	rm -rf .freeze-venv
+# filter out all nucliadb packages from requirements.lock.txt
 	grep -v 'nucliadb' requirements.lock.txt.raw > requirements.lock.txt
 	rm requirements.lock.txt.raw
 
