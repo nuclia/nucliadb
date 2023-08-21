@@ -1,35 +1,11 @@
-DOCKER_SERVICES ?= all
-
 help:
 	@grep '^[^#[:space:]].*:' Makefile
-
-# Usage:
-# `make docker-compose-start` starts all the services.
-# `make docker-compose-start DOCKER_SERVICES='jaeger,localstack'` starts the subset of services matching the profiles.
-docker-compose-deps-up:
-	@echo "Launching ${DOCKER_SERVICES} Docker service(s)"
-	COMPOSE_PROFILES=$(DOCKER_SERVICES) docker-compose -f docker-compose-deps.yml up --remove-orphans
-
-docker-compose-deps-down:
-	docker-compose -f docker-compose.yml down
-
-docker-compose-deps-clean:
-	docker-compose -f docker-compose.yml rm -v
-
-docker-compose-deps-nats-clean:
-	nats consumer del --server=localhost:4222 --force nucliadb-1 | true
-	nats stream del --server=localhost:4222 --force nucliadb | true
-
-docker-compose-deps-nats-init:
-	nats stream add --server=localhost:4222 --subjects="nucliadb.*" --retention=limits --replicas=2 --discard=old --max-msgs=-1 --max-msgs-per-subject=-1 --max-msg-size=1000000 --max-bytes=100000000 --max-age=-1 --dupe-window=2m --storage=file nucliadb
-	nats consumer add --server=localhost:4222 --filter=nucliadb.1  --target=ndb.consumer.1 --deliver=all --replay=instant --deliver-group=nucliadb-1 --ack=explicit --max-deliver=-1 --max-pending=1 --heartbeat=1s --flow-control nucliadb nucliadb-1
 
 license-check:
 	docker run -it --rm -v $(shell pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye header check
 
 license-fix:
 	docker run -it --rm -v $(shell pwd):/github/workspace ghcr.io/apache/skywalking-eyes/license-eye header fix
-
 
 # we are pinning rustfmt to 1.6.0-nightly
 check-rustfmt:
