@@ -23,8 +23,8 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_utils import const, logger
 from nucliadb_utils.nats import get_traced_jetstream
 

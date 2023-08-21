@@ -23,9 +23,9 @@ from typing import Optional
 
 from grpc import aio  # type: ignore
 from grpc import ChannelCredentials
+
 from nucliadb_telemetry.grpc import GRPCTelemetry
 from nucliadb_telemetry.utils import get_telemetry
-
 from nucliadb_utils.sentry_interceptor import SentryInterceptor
 
 logger = logging.getLogger(__name__)

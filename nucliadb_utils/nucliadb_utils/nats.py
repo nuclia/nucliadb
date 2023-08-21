@@ -30,6 +30,7 @@ from nats.aio.client import Client as NATSClient
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
+
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 
