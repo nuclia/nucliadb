@@ -42,6 +42,8 @@ With a unified index implementation, it is feasible to provide more
 capabilities around sharding(physical read replicas, rebalancing).
 
 
+
+
 ### Unified Index
 
 By "unified index," we are referring to an index that stores all data
@@ -112,15 +114,12 @@ Physical properties:
 
 ### Replication
 
-Each node will have a commit log to track changes through time,
+Each shard will have a commit log to track changes through time,
 communicate changes and track replication to secondary node replicas.
 
 - Commit log is append only file which tracks all shard segments
   and their files. This is then used for replication to secondary node replicas.
 - Primary nodes are responsible for replicating data to secondary read only nodes consistently
-    - 2 phase "commit". First write files everywhere. Second, "turn on" new files.
-    - Having Primary nodes responsible for replication allows us to avoid needing
-      to implement something like raft to coordinate read replica state
 - Each node on the system will have a configured set of physical secondary read only replicas
   at the kubernetes layer that will connect to the primary nodes
 
@@ -143,6 +142,7 @@ Responsibilities:
     - Usage stats
 - Index queue consuming, operations
   - Allow writing to multiple shards on a node at a time(right now, we only write to 1 at a time)
+- Auto scale based on k8s resource usage
 
 APIs:
 - Create Shard
@@ -170,10 +170,6 @@ Changes to ingest/etc:
 - sync changes of commit log to configured secondary read only copies
 - shard create/delete is also part of commit log
 
-Write path diagram:
-![Write Path Diagram](./images/005/write-path-ndb-coor.drawio.png)
-
-
 #### Disks
 
 Use best performing persistent disks.
@@ -186,12 +182,16 @@ if performance required.
 Secondary read only replicas are "dumb" and are mostly only responsible for serving
 requests from the replicated state.
 
-Read path diagram:
-![Read Path Diagram](./images/005/read-path-ndb-coor.drawio.png)
-
 #### Disks
 
 To improve secondary read only replica performance, utilize local SSDs
+
+
+### Overview
+
+Proposal diagram overview:
+
+![Read Path Diagram](./images/005/overview.drawio.png)
 
 ## Alternatives
 
