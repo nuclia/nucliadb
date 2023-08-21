@@ -27,8 +27,8 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, OpStatusWriter
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_utils import const, logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import get_traced_jetstream

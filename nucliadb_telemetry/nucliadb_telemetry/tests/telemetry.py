@@ -19,6 +19,7 @@
 
 import asyncio
 import os
+from typing import AsyncIterator
 
 import nats
 import pytest
@@ -106,6 +107,7 @@ async def telemetry_grpc(set_telemetry_settings):
     await init_telemetry(tracer_provider)
     util = GRPCTelemetry("test_telemetry", tracer_provider)
     yield util
+    await clean_telemetry("GRPC_SERVICE")
 
 
 class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
@@ -277,7 +279,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
 
 @pytest.fixture(scope="function")
-async def greeter(set_telemetry_settings, natsd: str):
+async def greeter(set_telemetry_settings, natsd: str) -> AsyncIterator[Greeter]:
     obj = Greeter(natsd)
     await obj.initialize()
     yield obj
@@ -285,7 +287,9 @@ async def greeter(set_telemetry_settings, natsd: str):
 
 
 @pytest.fixture(scope="function")
-async def greeter_streaming(set_telemetry_settings, natsd: str):
+async def greeter_streaming(
+    set_telemetry_settings, natsd: str
+) -> AsyncIterator[GreeterStreaming]:
     obj = GreeterStreaming(natsd)
     await obj.initialize()
     yield obj

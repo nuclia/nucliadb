@@ -36,9 +36,9 @@ import google.auth.transport.requests  # type: ignore
 import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
+
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.utils import setup_telemetry
-
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
