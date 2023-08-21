@@ -171,7 +171,8 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             false
         } else {
             let x = key_value::get_value(Node, self.nodes, x);
-            Node::has_label(x, label)
+            // TODO: what do we put here... FST
+            true
         }
     }
     fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
@@ -435,6 +436,9 @@ impl DataPoint {
             index.advise(memmap2::Advice::Sequential)?;
         }
 
+        let labels_dir = id.join(file_names::LABELS_DIR);
+        let labels = LabelDictionary::open(&labels_dir)?;
+
         Ok(DataPoint {
             journal,
             nodes,
@@ -471,6 +475,9 @@ impl DataPoint {
             nodes.advise(memmap2::Advice::WillNeed)?;
             index.advise(memmap2::Advice::Sequential)?;
         }
+
+        let labels_dir = id.join(file_names::LABELS_DIR);
+        let labels = LabelDictionary::open(&labels_dir)?;
 
         Ok(DataPoint {
             journal,
@@ -534,7 +541,8 @@ impl DataPoint {
 
         // needs to be sorted by keys
         labels.sort_by_key(|label| label.key.clone());
-        let labels_dict = LabelDictionary::new(file_names::LABELS_DIR, labels.iter());
+        let labels_dir = id.join(file_names::LABELS_DIR);
+        let labels_dict = LabelDictionary::new(&labels_dir, labels.iter())?;
 
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -576,7 +584,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
-            labels,
+            labels: labels_dict,
         })
     }
 }

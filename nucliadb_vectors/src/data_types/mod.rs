@@ -20,8 +20,6 @@
 
 pub mod dtrie_ram;
 pub mod key_value;
-pub mod trie;
-pub mod trie_ram;
 pub mod vector;
 
 pub mod usize_utils {

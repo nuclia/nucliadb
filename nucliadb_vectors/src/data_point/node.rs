@@ -21,7 +21,6 @@
 use std::io;
 
 use crate::data_types::key_value::Slot;
-use crate::data_types::trie;
 use crate::data_types::usize_utils::*;
 
 // Nodes are the main element of the system. The following data is stored inside them:
@@ -137,12 +136,8 @@ impl Node {
         let xvec_start = xvec_ptr + USIZE_LEN;
         &x[xvec_start..(xvec_start + xvec_len)]
     }
-    // x must be serialized using Node, may have trailing bytes.
-    pub fn has_label(x: &[u8], label: &[u8]) -> bool {
-        let xlabel_ptr = usize_from_slice_le(&x[LABEL_START.0..LABEL_START.1]);
-        trie::has_word(&x[xlabel_ptr..], label)
-    }
 }
+
 impl Slot for Node {
     fn cmp_keys(&self, x: &[u8], key: &[u8]) -> std::cmp::Ordering {
         let xkey = self.get_key(x);

@@ -287,7 +287,7 @@ mod test {
     use uuid::Uuid;
 
     use super::*;
-    use crate::data_point::{Elem, LabelDictionary, Similarity};
+    use crate::data_point::{Elem, Similarity};
     #[test]
     fn fssv_test() {
         let values: &[Neighbour] = &[
@@ -326,7 +326,7 @@ mod test {
             let mut elems = vec![];
             for _ in 0..no_vectors {
                 let key = Uuid::new_v4().to_string();
-                let labels = LabelDictionary::new(vec![]);
+                let labels = vec![];
                 let vector = (0..self.dimension)
                     .map(|_| random::<f32>())
                     .collect::<Vec<_>>();

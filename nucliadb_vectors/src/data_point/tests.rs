@@ -20,7 +20,7 @@
 
 use std::collections::HashSet;
 
-use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary, Similarity};
+use crate::data_point::{DataPoint, DeleteLog, Elem, Similarity};
 use crate::formula::{AtomClause, Formula};
 
 const SIMILARITY: Similarity = Similarity::Cosine;
@@ -50,12 +50,10 @@ fn simple_flow() {
         queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let mut expected_keys = vec![];
-    let label_dictionary = LabelDictionary::new(labels.clone());
     for i in 0..50 {
         let key = format!("KEY_{}", i);
         let vector = vec![rand::random::<f32>(); 8];
-        let labels = label_dictionary.clone();
-        elems.push(Elem::new(key.clone(), vector, labels, None));
+        elems.push(Elem::new(key.clone(), vector, labels.clone(), None));
         expected_keys.push(key);
     }
     let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
@@ -91,13 +89,11 @@ fn accuracy_test() {
         labels.push(format!("LABEL_{}", i));
         queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
-    let labels_dictionary = LabelDictionary::new(labels.clone());
     let mut elems = Vec::new();
     for i in 0..100 {
         let key = format!("KEY_{}", i);
         let vector = create_query();
-        let labels = labels_dictionary.clone();
-        elems.push(Elem::new(key, vector, labels, None));
+        elems.push(Elem::new(key, vector, labels.clone(), None));
     }
     let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
     let query = create_query();
@@ -140,13 +136,9 @@ fn single_graph() {
     let temp_dir = tempfile::tempdir().unwrap();
     let key = "KEY_0".to_string();
     let vector = create_query();
+    let labels = vec![];
 
-    let elems = vec![Elem::new(
-        key.clone(),
-        vector.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
+    let elems = vec![Elem::new(key.clone(), vector.clone(), labels.clone(), None)];
     let reader = DataPoint::new(temp_dir.path(), elems.clone(), None, SIMILARITY).unwrap();
     let formula = Formula::new();
     let result = reader.search(
@@ -183,20 +175,10 @@ fn data_merge() {
 
     let key0 = "KEY_0".to_string();
     let vector0 = create_query();
-    let elems0 = vec![Elem::new(
-        key0.clone(),
-        vector0.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
+    let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), Vec::new(), None)];
     let key1 = "KEY_1".to_string();
     let vector1 = create_query();
-    let elems1 = vec![Elem::new(
-        key1.clone(),
-        vector1.clone(),
-        LabelDictionary::default(),
-        None,
-    )];
+    let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), Vec::new(), None)];
     let dp_0 = DataPoint::new(temp_dir.path(), elems0, None, SIMILARITY).unwrap();
     let dp_1 = DataPoint::new(temp_dir.path(), elems1, None, SIMILARITY).unwrap();
     let dp = DataPoint::merge(
