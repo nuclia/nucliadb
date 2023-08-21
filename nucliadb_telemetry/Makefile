@@ -15,13 +15,13 @@ install-dev:
 
 .PHONY: format
 format:
-	isort --profile black .
+	cd .. && isort --profile black nucliadb_telemetry
 	black .
 
 .PHONY: lint
 lint:
 	flake8 nucliadb_telemetry --config=setup.cfg
-	isort -c --profile black .
+	cd .. && isort -c --profile black nucliadb_telemetry
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
