@@ -25,7 +25,6 @@ from grpc import aio  # type: ignore
 from grpc import ChannelCredentials
 
 from nucliadb_telemetry.grpc import GRPCTelemetry
-from nucliadb_telemetry.grpc_sentry import SentryInterceptor
 from nucliadb_telemetry.utils import get_telemetry
 
 logger = logging.getLogger(__name__)
@@ -80,10 +79,7 @@ def get_traced_grpc_server(service_name: str, max_receive_message: int = 100):
     tracer_provider = get_telemetry(service_name)
     if tracer_provider is not None:  # pragma: no cover
         otgrpc = GRPCTelemetry(f"{service_name}_grpc", tracer_provider)
-        server = otgrpc.init_server(
-            max_receive_message=max_receive_message,
-            interceptors=[SentryInterceptor()],
-        )
+        server = otgrpc.init_server(max_receive_message=max_receive_message)
     else:
         options = [
             ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024)
