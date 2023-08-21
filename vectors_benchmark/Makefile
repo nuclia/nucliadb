@@ -3,7 +3,7 @@ INDEX_SIZE:=10000
 
 .PHONY: build
 build:
-	cargo build --release
+	cargo build --release --frozen
 
 .PHONY: vector-bench
 vector-bench:
