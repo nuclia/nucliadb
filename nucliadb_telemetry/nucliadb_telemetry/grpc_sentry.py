@@ -23,7 +23,8 @@ from typing import Any, Awaitable, Callable
 from grpc import HandlerCallDetails, RpcMethodHandler
 from grpc.experimental import wrap_server_method_handler  # type: ignore
 from grpc.experimental import aio
-from sentry_sdk import capture_exception
+
+from nucliadb_telemetry.errors import capture_exception
 
 
 class SentryInterceptor(aio.ServerInterceptor):
