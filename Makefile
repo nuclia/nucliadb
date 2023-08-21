@@ -136,22 +136,3 @@ build-nucliadb-local:
 
 build-nucliadb-local-withbinding:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
-
-build-nucliadb-rustbase_arm64:
-	docker build -t nuclia/nucliadb_rust_base:arm64 . -f Dockerfile.rust
-	docker push nuclia/nucliadb_rust_base:arm64
-
-build-nucliadb-rustbase_amd64:
-	docker build -t nuclia/nucliadb_rust_base:amd64 . -f Dockerfile.rust
-	docker push nuclia/nucliadb_rust_base:amd64
-
-link_docker_images:
-	docker manifest create nuclia/nucliadb_rust_base:latest --amend nuclia/nucliadb_rust_base:amd64 --amend nuclia/nucliadb_rust_base:arm64
-	docker manifest push nuclia/nucliadb_rust_base:latest
-
-public_images:
-	docker build -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
-	docker build -t nuclia/node:latest . -f Dockerfile.node
-	docker build -t nuclia/node_sidecar:latest . -f Dockerfile.node_sidecar
-	docker push nuclia/node:latest
-	docker push nuclia/node_sidecar:latest
