@@ -9,6 +9,20 @@ install-dev:
 		-r nucliadb/requirements-test.txt
 	pip install -e .
 
+freeze-requirements:
+# create venv only for freezing requirements
+	python -m venv .freeze-venv
+	.freeze-venv/bin/pip install --upgrade pip wheel
+	cd .. && nucliadb/.freeze-venv/bin/pip install \
+		-r nucliadb/requirements.txt \
+		-r nucliadb/requirements-sources.txt
+	.freeze-venv/bin/pip install -e .
+	.freeze-venv/bin/pip freeze > requirements.lock.txt.raw
+	rm -rf .freeze-venv
+# filter out all nucliadb packages from requirements.lock.txt
+	grep -v 'nucliadb' requirements.lock.txt.raw > requirements.lock.txt
+	rm requirements.lock.txt.raw
+
 .PHONY: format
 format:
 	cd .. && isort --profile black nucliadb
