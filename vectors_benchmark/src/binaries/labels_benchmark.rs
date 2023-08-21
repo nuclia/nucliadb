@@ -23,7 +23,7 @@ use std::time::Instant;
 use std::{fs, mem};
 
 use byte_unit::Byte;
-use nucliadb_vectors::labels::{Label, LabelDictionary};
+use nucliadb_vectors::labels::{Label, LabelIndex};
 use nucliadb_vectors::VectorR;
 use rand::distributions::Alphanumeric;
 use rand::seq::index::sample;
@@ -65,14 +65,14 @@ fn generate_labels(num_structs: usize) -> Vec<Label> {
 }
 
 fn search_benchmark(dir: &TempDir, keys: Vec<String>) -> VectorR<u128> {
-    let labels_dict = LabelDictionary::open(dir.path())?;
+    let label_index = LabelIndex::open(dir.path())?;
     let mut total_elapsed_micros = 0;
 
     for (cycle, key) in keys.iter().enumerate() {
         print!("{} ", cycle);
         let _ = std::io::stdout().flush();
         let start_time = Instant::now();
-        let _ = match labels_dict.get_label(key)? {
+        let _ = match label_index.get_label(key)? {
             None => {
                 println!("Could not find `{}`", key);
                 Err("Not found")
@@ -91,7 +91,7 @@ fn indexing_benchmark(dir: &TempDir, random_labels: Vec<Label>) -> VectorR<u128>
         print!("{} ", cycle);
         let _ = std::io::stdout().flush();
         let start_time = Instant::now();
-        let _ = LabelDictionary::new(dir.path(), random_labels.iter());
+        let _ = LabelIndex::new(dir.path(), random_labels.iter());
         total_elapsed_ms += start_time.elapsed().as_millis();
     }
     println!(" - OK.");
