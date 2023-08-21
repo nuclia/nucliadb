@@ -107,6 +107,7 @@ async def telemetry_grpc(set_telemetry_settings):
     await init_telemetry(tracer_provider)
     util = GRPCTelemetry("test_telemetry", tracer_provider)
     yield util
+    await clean_telemetry("GRPC_SERVICE")
 
 
 class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
