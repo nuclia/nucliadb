@@ -51,6 +51,18 @@ Using a good old procedural for-loop is fine and recommended in that case.
 
 **example needed**
 
+## Dependencies and Cargo.lock
+
+Each NucliaDB library comes with a `Cargo.toml` file with pinned dependencies and we commit
+a single, global `Cargo.lock` file at the root of the repository for all the components.
+
+When you are building the project or one of its components, it will use the list of versions
+from the lock file as long as you use the `--locked` option. If your code change does
+not require updating a dependencies, make sure you do not commit changes to the lock file.
+
+If you need to update a dependency, make sure you are explicit about it in the PR, in order
+to make it easy to track down issues that could be related to a dependency update.
+
 ## Naming
 
 Function and variable names are key for readability.

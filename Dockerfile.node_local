@@ -87,6 +87,7 @@ COPY vectors_benchmark /nucliadb/vectors_benchmark
 # Build application (only run when sources are modified)
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && cargo build \
+    --locked \
     --features $CARGO_FEATURES \
     -p nucliadb_node \
     $(test "$CARGO_PROFILE" = "release" && echo "--release") \
