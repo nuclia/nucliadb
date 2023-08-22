@@ -362,6 +362,13 @@ impl DataPoint {
         similarity: Similarity,
         min_score: f32,
     ) -> impl Iterator<Item = Neighbour> + '_ {
+        // TODO: before searching for the nodes, we check the labels using the FSTs
+        // 1. get the list of labels from the filter
+        // 2. for each label, we get in LabelIndex the list of node ids
+        // 3. using the KeyIndex FST, we get back to the nodes keys from the ids.
+        // 4. we do the intersection of matching nodes
+        // 5. we pass that list of nodes to XXX???
+
         let encoded_query = vector::encode_vector(query);
         let tracker = Retriever::new(
             &encoded_query,
