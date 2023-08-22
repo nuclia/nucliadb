@@ -22,8 +22,8 @@ pub mod data_point;
 pub mod data_point_provider;
 mod data_types;
 pub mod formula;
+pub mod fst_index;
 pub mod indexset;
-pub mod labels;
 pub mod service;
 
 use thiserror::Error;

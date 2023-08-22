@@ -68,10 +68,14 @@ pub struct LabelIndex {
     fst_map: Map<Mmap>,
 }
 
+/// LabelIndex manages an FST file along with an index file.
+/// They are created by iterating on Label objects.
 impl LabelIndex {
     const LABELS_FST: &str = "labels.fst";
     const LABELS_IDX: &str = "labels.idx";
 
+    /// Opens the index for read access.
+    /// `path` is the directory where the FST and index files are located.
     pub fn open(path: &Path) -> VectorR<Self> {
         let records_file_path = path.join(Self::LABELS_IDX);
         let fst_file_path = path.join(Self::LABELS_FST);
@@ -88,6 +92,9 @@ impl LabelIndex {
         })
     }
 
+    /// Looks for a label in the FST map
+    /// If found, load the Label record from the index file.
+    /// Otherwise, returns None.
     pub fn get_label(&self, key: &str) -> VectorR<Option<Label>> {
         let Some(offset) = self.fst_map.get(key) else {
             return Ok(None);
@@ -100,6 +107,9 @@ impl LabelIndex {
         Ok(bincode::deserialize_from(&*records_file).map(Some)?)
     }
 
+    /// Creates an index and returns an instance with read access.
+    /// `path` is the directory to store the FST and index file.
+    /// `labels` is an iterator of Label objects.
     pub fn new<'a, I>(path: &Path, labels: I) -> VectorR<Self>
     where
         I: Iterator<Item = &'a Label>,
@@ -139,6 +149,66 @@ impl LabelIndex {
             fst_file_path,
             records_file_path,
             records_file: RwLock::new(records_file),
+            fst_map,
+        })
+    }
+}
+
+pub struct KeyIndex {
+    pub fst_file_path: PathBuf,
+    fst_map: Map<Mmap>,
+}
+
+/// KeyIndex stores a (key, doc_id) tuple used to speed up lookups.
+impl KeyIndex {
+    const KEYS_FST: &str = "keys.fst";
+
+    /// Opens the index for read access.
+    /// `path` is the directory where the FST file is located.
+    pub fn open(path: &Path) -> VectorR<Self> {
+        let fst_file_path = path.join(Self::KEYS_FST);
+        let mmap = unsafe { Mmap::map(&File::open(&fst_file_path)?)? };
+        let fst_map = Map::new(mmap)?;
+
+        Ok(Self {
+            fst_file_path,
+            fst_map,
+        })
+    }
+
+    /// Looks for a key in the FST map
+    pub fn get_doc_id(&self, key: &str) -> VectorR<Option<u64>> {
+        Ok(self.fst_map.get(key))
+    }
+
+    /// Creates an index and returns an instance with read access.
+    /// `path` is the directory to store the FST and index file.
+    /// `labels` is an iterator of Label objects.
+    pub fn new<'a, I>(path: &Path, keys: I) -> VectorR<Self>
+    where
+        I: Iterator<Item = &'a (String, u64)>,
+    {
+        let fst_file_path = path.join(Self::KEYS_FST);
+
+        // create the fst file
+        let mut fst_file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .read(true)
+            .open(&fst_file_path)?;
+
+        let fst_writer = BufWriter::new(&mut fst_file);
+        let mut fst_builder = MapBuilder::new(fst_writer)?;
+
+        for (key, doc_id) in keys {
+            fst_builder.insert(key.clone(), *doc_id)?;
+        }
+        fst_builder.finish()?;
+
+        let mmap = unsafe { Mmap::map(&fst_file)? };
+        let fst_map = Map::new(mmap)?;
+        Ok(Self {
+            fst_file_path,
             fst_map,
         })
     }
@@ -191,6 +261,39 @@ mod tests {
             Ok(Some(label)) => panic!("Should be None, found: {label:?}"),
             Ok(None) => (),
         }
+
+        // let's create the id lookup
+        let mut keys = vec![
+            ("key-for-1".to_owned(), 1),
+            ("key-for-2".to_owned(), 2),
+            ("key-for-3".to_owned(), 3),
+        ];
+
+        // needs to be sorted by keys
+        keys.sort();
+        let key_index = KeyIndex::new(dir.path(), keys.iter())?;
+
+        // now let's search for key1
+        match key_index.get_doc_id("key-for-1") {
+            Err(err) => panic!("{err:?}"),
+            Ok(None) => panic!("Should be some"),
+            Ok(Some(doc_id)) => assert_eq!(doc_id, 1),
+        }
+
+        // and key 3
+        match key_index.get_doc_id("key-for-3") {
+            Err(err) => panic!("{err:?}"),
+            Ok(None) => panic!("Should be some"),
+            Ok(Some(doc_id)) => assert_eq!(doc_id, 3),
+        }
+
+        // key23 can't be found
+        match key_index.get_doc_id("key23") {
+            Err(err) => panic!("{err:?}"),
+            Ok(Some(doc_id)) => panic!("Should be None, found: {doc_id:?}"),
+            Ok(None) => (),
+        }
+
         Ok(())
     }
 }

@@ -23,7 +23,7 @@ use std::time::Instant;
 use std::{fs, mem};
 
 use byte_unit::Byte;
-use nucliadb_vectors::labels::{Label, LabelIndex};
+use nucliadb_vectors::fst_index::{Label, LabelIndex};
 use nucliadb_vectors::VectorR;
 use rand::distributions::Alphanumeric;
 use rand::seq::index::sample;
