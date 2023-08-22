@@ -59,7 +59,7 @@ $(format_subpackages_targets):
 
 .PHONY: lint
 lint:
-	flake8 nucliadb --config=setup.cfg
+	ruff nucliadb --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb
 	black --check .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
@@ -94,7 +94,7 @@ format-%:
 	black nucliadb/$*
 
 lint-%:
-	flake8 nucliadb/$* --config=setup.cfg
+	ruff nucliadb/$* --config=pyproject.toml
 	cd .. && isort -c --profile black nucliadb/nucliadb/$*
 	black --check nucliadb/$*
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini nucliadb/$*
