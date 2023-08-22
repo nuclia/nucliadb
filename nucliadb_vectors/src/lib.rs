@@ -49,6 +49,8 @@ pub enum VectorErr {
     EmptyMerge,
     #[error("Inconsistent dimensions")]
     InconsistentDimensions,
+    #[error("UTF8 decoding error: {0}")]
+    FromUtf8Error(#[from] std::string::FromUtf8Error),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

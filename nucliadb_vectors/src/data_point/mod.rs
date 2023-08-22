@@ -41,12 +41,14 @@ pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
+use crate::fst_index::{KeyIndex, LabelIndex};
 use crate::VectorR;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
     pub const JOURNAL: &str = "journal.json";
+    pub const FST: &str = "fst";
 }
 
 pub struct NoDLog;
@@ -318,6 +320,7 @@ pub struct DataPoint {
     journal: Journal,
     nodes: Mmap,
     index: Mmap,
+    key_index: KeyIndex,
 }
 
 impl AsRef<DataPoint> for DataPoint {
@@ -454,11 +457,16 @@ impl DataPoint {
             nodes.advise(memmap2::Advice::WillNeed)?;
             index.advise(memmap2::Advice::Sequential)?;
         }
+        // creating the FSTs
+        let fst_dir = id.join(file_names::FST);
+        let key_tuple = Vec::new();
+        let key_index = KeyIndex::new(&fst_dir, key_tuple.into_iter())?;
 
         Ok(DataPoint {
             journal,
             nodes,
             index,
+            key_index,
         })
     }
     pub fn delete(dir: &path::Path, uid: DpId) -> VectorR<()> {
@@ -483,6 +491,8 @@ impl DataPoint {
         let nodes = unsafe { Mmap::map(&nodes)? };
         let index = unsafe { Mmap::map(&hnswf)? };
         let journal: Journal = serde_json::from_reader(journal)?;
+        let fst_dir = id.join(file_names::FST);
+        let key_index = KeyIndex::open(&fst_dir)?;
 
         // Telling the OS our expected access pattern
         #[cfg(not(target_os = "windows"))]
@@ -495,6 +505,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            key_index,
         })
     }
     pub fn new(
@@ -524,6 +535,14 @@ impl DataPoint {
 
         elems.sort_by(|a, b| a.key.cmp(&b.key));
         elems.dedup_by(|a, b| a.key.cmp(&b.key).is_eq());
+
+        // TODO: I have to do this because elems is moved into `create_key_value`
+        let mut elems_keys = Vec::new();
+        for elem in elems.iter() {
+            let key = String::from_utf8(elem.key.clone())?;
+            elems_keys.push(key.clone());
+        }
+
         {
             // Serializing nodes on disk
             // Nodes are stored on disk and mmaped.
@@ -533,6 +552,26 @@ impl DataPoint {
         }
         let nodes = unsafe { Mmap::map(&nodesf)? };
         let no_nodes = key_value::get_no_elems(&nodes);
+
+        // creating the FSTs
+        let fst_dir = id.join(file_names::FST);
+
+        // reopening the node file to get the ids
+        let nodes_file = fs::OpenOptions::new()
+            .read(true)
+            .open(id.join(file_names::NODES))?;
+        let nodes = unsafe { Mmap::map(&nodes_file)? };
+
+        let mut node_num = 0;
+
+        let mut key_tuple: Vec<(String, u64)> = Vec::new();
+        for key in elems_keys {
+            // the id is stored in the header of the file, given a node number
+            let record_id = key_value::get_pointer(&nodes, node_num);
+            node_num += 1;
+            key_tuple.push((key.clone(), record_id.try_into().unwrap()));
+        }
+        let key_index = KeyIndex::new(&fst_dir, key_tuple.into_iter())?;
 
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -574,6 +613,7 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            key_index,
         })
     }
 }

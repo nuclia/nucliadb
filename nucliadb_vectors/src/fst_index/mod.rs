@@ -184,9 +184,9 @@ impl KeyIndex {
     /// Creates an index and returns an instance with read access.
     /// `path` is the directory to store the FST and index file.
     /// `labels` is an iterator of Label objects.
-    pub fn new<'a, I>(path: &Path, keys: I) -> VectorR<Self>
+    pub fn new<I>(path: &Path, keys: I) -> VectorR<Self>
     where
-        I: Iterator<Item = &'a (String, u64)>,
+        I: Iterator<Item = (String, u64)>,
     {
         let fst_file_path = path.join(Self::KEYS_FST);
 
@@ -201,7 +201,7 @@ impl KeyIndex {
         let mut fst_builder = MapBuilder::new(fst_writer)?;
 
         for (key, doc_id) in keys {
-            fst_builder.insert(key.clone(), *doc_id)?;
+            fst_builder.insert(key.clone(), doc_id)?;
         }
         fst_builder.finish()?;
 
