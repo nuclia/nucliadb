@@ -49,7 +49,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [3.11]
+        python-version: ["3.11"]
 
     steps:
       - name: Checkout the repository
