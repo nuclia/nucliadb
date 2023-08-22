@@ -57,7 +57,7 @@ Each NucliaDB library comes with a `Cargo.toml` file with pinned dependencies an
 a single, global `Cargo.lock` file at the root of the repository for all the components.
 
 When you are building the project or one of its components, it will use the list of versions
-from the lock file as long as you use the `--frozen` option. If your code change does
+from the lock file as long as you use the `--locked` option. If your code change does
 not require updating a dependencies, make sure you do not commit changes to the lock file.
 
 If you need to update a dependency, make sure you are explicit about it in the PR, in order
