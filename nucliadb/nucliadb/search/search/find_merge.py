@@ -186,13 +186,15 @@ async def fetch_find_metadata(
                 )
 
             operations.append(
-                set_text_value(
-                    kbid=kbid,
-                    result_paragraph=result_paragraph,
-                    highlight=highlight,
-                    ematches=ematches,
-                    max_operations=max_operations,
-                    extracted_text_cache=etcache,
+                asyncio.create_task(
+                    set_text_value(
+                        kbid=kbid,
+                        result_paragraph=result_paragraph,
+                        highlight=highlight,
+                        ematches=ematches,
+                        max_operations=max_operations,
+                        extracted_text_cache=etcache,
+                    )
                 )
             )
             resources.add(result_paragraph.rid)
@@ -205,14 +207,16 @@ async def fetch_find_metadata(
 
     for resource in resources:
         operations.append(
-            set_resource_metadata_value(
-                kbid=kbid,
-                resource=resource,
-                show=show,
-                field_type_filter=field_type_filter,
-                extracted=extracted,
-                find_resources=find_resources,
-                max_operations=max_operations,
+            asyncio.create_task(
+                set_resource_metadata_value(
+                    kbid=kbid,
+                    resource=resource,
+                    show=show,
+                    field_type_filter=field_type_filter,
+                    extracted=extracted,
+                    find_resources=find_resources,
+                    max_operations=max_operations,
+                )
             )
         )
 
