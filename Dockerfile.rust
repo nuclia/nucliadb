@@ -1,4 +1,4 @@
-FROM python:3.9 as python_rust
+FROM python:3.11 as python_rust
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
