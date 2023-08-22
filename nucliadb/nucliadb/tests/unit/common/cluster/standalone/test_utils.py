@@ -26,8 +26,6 @@ import pytest
 from nucliadb.common.cluster.settings import Settings
 from nucliadb.common.cluster.standalone import utils
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def cluster_settings():
