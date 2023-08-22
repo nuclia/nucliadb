@@ -263,15 +263,15 @@ mod tests {
         }
 
         // let's create the id lookup
-        let mut keys = vec![
-            ("key-for-1".to_owned(), 1),
-            ("key-for-2".to_owned(), 2),
-            ("key-for-3".to_owned(), 3),
+        let mut keys: Vec<(String, u64)> = vec![
+            ("key-for-1".to_string(), 1),
+            ("key-for-2".to_string(), 2),
+            ("key-for-3".to_string(), 3),
         ];
 
         // needs to be sorted by keys
         keys.sort();
-        let key_index = KeyIndex::new(dir.path(), keys.iter())?;
+        let key_index = KeyIndex::new(dir.path(), keys.into_iter())?;
 
         // now let's search for key1
         match key_index.get_doc_id("key-for-1") {

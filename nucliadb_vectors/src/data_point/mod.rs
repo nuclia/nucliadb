@@ -458,7 +458,9 @@ impl DataPoint {
             index.advise(memmap2::Advice::Sequential)?;
         }
         // creating the FSTs
+        // TODO: merge
         let fst_dir = id.join(file_names::FST);
+        fs::create_dir(&fst_dir)?;
         let key_tuple = Vec::new();
         let key_index = KeyIndex::new(&fst_dir, key_tuple.into_iter())?;
 
@@ -555,6 +557,7 @@ impl DataPoint {
 
         // creating the FSTs
         let fst_dir = id.join(file_names::FST);
+        fs::create_dir(&fst_dir)?;
 
         // reopening the node file to get the ids
         let nodes_file = fs::OpenOptions::new()

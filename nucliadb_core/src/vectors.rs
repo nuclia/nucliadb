@@ -31,7 +31,6 @@ pub struct VectorConfig {
     pub similarity: Option<VectorSimilarity>,
     pub path: PathBuf,
     pub vectorset: PathBuf,
-    pub fst_indices: PathBuf,
 }
 
 pub trait VectorReader:
