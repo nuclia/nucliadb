@@ -27,7 +27,12 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 from nucliadb_protos.noderesources_pb2 import Resource
-from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus, ShardCreated
+from nucliadb_protos.nodewriter_pb2 import (
+    NewShardRequest,
+    OpStatus,
+    ShardCreated,
+    ReleaseChannel,
+)
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 
 from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
@@ -58,10 +63,10 @@ class IndexNode:
         assert op_status.status == OpStatus.OK
         return resource
 
-    def create_shard(self, name):
+    def create_shard(self, name, channel=ReleaseChannel.STABLE):
         # create a shard
         shard_req = NewShardRequest(
-            kbid=name, similarity=VectorSimilarity.COSINE
+            kbid=name, similarity=VectorSimilarity.COSINE, release_channel=channel
         )  # NOQA
         pb = self.request(self.writer.new_shard, shard_req, ShardCreated)
         shard_id = pb.id
@@ -74,9 +79,18 @@ class IndexNode:
 
 @pytest.mark.asyncio
 async def test_set_and_search(data_path):
+    return await _test_set_and_search(ReleaseChannel.STABLE)
+
+
+@pytest.mark.asyncio
+async def test_set_and_search_exp(data_path):
+    return await _test_set_and_search(ReleaseChannel.EXPERIMENTAL)
+
+
+async def _test_set_and_search(channel):
     cluster = IndexNode()
 
-    shard_id = cluster.create_shard("test-kbid")
+    shard_id = cluster.create_shard("test-kbid", channel)
     cluster.create_resource(shard_id)
 
     # search using the generic search API

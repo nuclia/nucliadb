@@ -32,6 +32,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::Channel;
 use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
@@ -176,10 +177,13 @@ impl ShardReader {
             num_threads: env::num_paragraph_search_threads(),
         };
 
+        let channel = metadata.channel.unwrap_or_default();
+
         let vsc = VectorConfig {
             similarity: None,
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),
+            channel,
         };
         let rsc = RelationConfig {
             path: shard_path.join(RELATIONS_DIR),

@@ -20,6 +20,8 @@
 
 use std::collections::HashSet;
 
+use nucliadb_core::Channel;
+
 use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary, Similarity};
 use crate::formula::{AtomClause, Formula};
 
@@ -58,7 +60,14 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
+    let reader = DataPoint::new(
+        temp_dir.path(),
+        elems,
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
     let id = reader.get_id();
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
@@ -99,7 +108,14 @@ fn accuracy_test() {
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
+    let reader = DataPoint::new(
+        temp_dir.path(),
+        elems,
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -147,7 +163,14 @@ fn single_graph() {
         LabelDictionary::default(),
         None,
     )];
-    let reader = DataPoint::new(temp_dir.path(), elems.clone(), None, SIMILARITY).unwrap();
+    let reader = DataPoint::new(
+        temp_dir.path(),
+        elems.clone(),
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
     let formula = Formula::new();
     let result = reader.search(
         &HashSet::from([key.clone()]),
@@ -160,7 +183,14 @@ fn single_graph() {
     );
     assert_eq!(result.count(), 0);
 
-    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
+    let reader = DataPoint::new(
+        temp_dir.path(),
+        elems,
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
     let result = reader
         .search(
             &HashSet::new(),
@@ -197,8 +227,22 @@ fn data_merge() {
         LabelDictionary::default(),
         None,
     )];
-    let dp_0 = DataPoint::new(temp_dir.path(), elems0, None, SIMILARITY).unwrap();
-    let dp_1 = DataPoint::new(temp_dir.path(), elems1, None, SIMILARITY).unwrap();
+    let dp_0 = DataPoint::new(
+        temp_dir.path(),
+        elems0,
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
+    let dp_1 = DataPoint::new(
+        temp_dir.path(),
+        elems1,
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
     let dp = DataPoint::merge(
         temp_dir.path(),
         &[
@@ -206,6 +250,7 @@ fn data_merge() {
             (HashSet::default(), dp_0.get_id()),
         ],
         Similarity::Cosine,
+        Channel::EXPERIMENTAL,
     )
     .unwrap();
     let formula = Formula::new();
@@ -242,7 +287,58 @@ fn data_merge() {
         temp_dir.path(),
         &[(&dlog, dp_1.get_id()), (&dlog, dp_0.get_id())],
         Similarity::Cosine,
+        Channel::EXPERIMENTAL,
     )
     .unwrap();
     assert_eq!(dp.meta().no_nodes(), 0);
+}
+
+#[test]
+fn prefiltering_test() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut labels = vec![];
+    let mut queries = vec![];
+    for i in 0..100 {
+        labels.push(format!("LABEL_{}", i));
+    }
+    for i in 0..5 {
+        queries.push(AtomClause::label(format!("LABEL_{}", i)));
+    }
+    let mut elems = Vec::new();
+    for i in 0..100 {
+        let key = format!("KEY_{}", i);
+        let vector = create_query();
+
+        let labels = LabelDictionary::new(vec![format!("LABEL_{}", i)]);
+        elems.push(Elem::new(key, vector, labels, None));
+    }
+    let reader = DataPoint::new(
+        temp_dir.path(),
+        elems,
+        None,
+        SIMILARITY,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
+    let query = create_query();
+    let no_results = 10;
+
+    for i in 0..5 {
+        let formula = queries[i..i + 1].iter().fold(Formula::new(), |mut acc, i| {
+            acc.extend(i.clone());
+            acc
+        });
+        let mut result_0 = reader
+            .search(
+                &HashSet::new(),
+                &query,
+                &formula,
+                true,
+                no_results,
+                Similarity::Cosine,
+                -1.0,
+            )
+            .collect::<Vec<_>>();
+        result_0.sort_by(|i, j| i.id().cmp(j.id()));
+    }
 }

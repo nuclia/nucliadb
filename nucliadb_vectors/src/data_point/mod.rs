@@ -25,6 +25,7 @@ pub mod ram_hnsw;
 #[cfg(test)]
 mod tests;
 
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use std::{fs, io, path};
 
@@ -33,6 +34,7 @@ use io::{BufWriter, Write};
 use key_value::Slot;
 use memmap2::Mmap;
 use node::Node;
+use nucliadb_core::Channel;
 pub use ops_hnsw::DataRetriever;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
@@ -41,12 +43,14 @@ pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
+use crate::fst_index::{KeyIndex, Label, LabelIndex};
 use crate::VectorR;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
     pub const JOURNAL: &str = "journal.json";
+    pub const FST: &str = "fst";
 }
 
 pub struct NoDLog;
@@ -100,6 +104,87 @@ impl Address {
     #[cfg(test)]
     pub const fn dummy() -> Address {
         Address(0)
+    }
+}
+
+pub struct FormulaFilter<'a> {
+    pub matching_nodes: HashSet<u64>,
+    empty_formula: bool,
+    filter: &'a Formula,
+    pub use_fst: bool,
+    total_nodes: usize,
+}
+
+impl FormulaFilter<'_> {
+    pub fn new<'a>(
+        filter: &'a Formula,
+        key_index: Option<&'a KeyIndex>,
+        label_index: Option<&'a LabelIndex>,
+        total_nodes: usize,
+    ) -> FormulaFilter<'a> {
+        let (Some(key_index), Some(label_index)) = (key_index, label_index) else {
+            return FormulaFilter {
+                filter,
+                total_nodes,
+                matching_nodes: HashSet::new(),
+                empty_formula: true,
+                use_fst: false,
+            };
+        };
+
+        let collector = filter.get_atoms();
+        let empty_formula = collector.labels.is_empty() && collector.key_prefixes.is_empty();
+
+        // preparing the list of matching nodes
+        let matching_nodes: HashSet<u64> = if empty_formula {
+            HashSet::new()
+        } else {
+            // collecting all node ids from the labels and key prefixes
+            let results: HashSet<u64> = label_index.get_nodes(&collector.labels).unwrap();
+            results
+                .union(&key_index.get_nodes(&collector.key_prefixes).unwrap())
+                .cloned()
+                .collect()
+        };
+
+        FormulaFilter {
+            matching_nodes,
+            empty_formula,
+            filter,
+            use_fst: true,
+            total_nodes,
+        }
+    }
+
+    /// Returns the ratio of matching nodes
+    pub fn matching_ratio(&self) -> Option<f64> {
+        if !self.use_fst || self.empty_formula {
+            return None;
+        }
+
+        if self.matching_nodes.is_empty() {
+            return Some(0.0);
+        }
+
+        Some(self.matching_nodes.len() as f64 / self.total_nodes as f64)
+    }
+
+    pub fn run<DR: DataRetriever>(&self, address: Address, tracker: &DR) -> bool {
+        if !self.use_fst {
+            // we don't use FST, calling legacy run
+            self.filter.run(address, tracker)
+        } else {
+            // if we did not have any filtering, it's always a match
+            if self.empty_formula {
+                return true;
+            }
+            // if we have no matches at all, we can return false
+            if self.matching_nodes.is_empty() {
+                return false;
+            }
+            // O(1) on average
+            self.matching_nodes.contains(&(address.0 as u64))
+        }
     }
 }
 
@@ -318,6 +403,8 @@ pub struct DataPoint {
     journal: Journal,
     nodes: Mmap,
     index: Mmap,
+    label_index: Option<LabelIndex>,
+    key_index: Option<KeyIndex>,
 }
 
 impl AsRef<DataPoint> for DataPoint {
@@ -367,6 +454,16 @@ impl DataPoint {
             similarity,
             min_score,
         );
+
+        let no_nodes = key_value::get_no_elems(&self.nodes);
+
+        let filter = FormulaFilter::new(
+            filter,
+            self.key_index.as_ref(),
+            self.label_index.as_ref(),
+            no_nodes,
+        );
+
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(
             Address(self.journal.nodes),
@@ -384,6 +481,7 @@ impl DataPoint {
         dir: &path::Path,
         operants: &[(Dlog, DpId)],
         similarity: Similarity,
+        channel: Channel,
     ) -> VectorR<DataPoint>
     where
         Dlog: DeleteLog,
@@ -421,6 +519,14 @@ impl DataPoint {
 
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = key_value::get_no_elems(&nodes);
+
+        // Creating the FSTs with the new nodes
+        let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
+            Self::create_fsts(&id, &nodes)?
+        } else {
+            (None, None)
+        };
+
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
         let mut ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();
@@ -459,6 +565,8 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            label_index,
+            key_index,
         })
     }
     pub fn delete(dir: &path::Path, uid: DpId) -> VectorR<()> {
@@ -484,6 +592,18 @@ impl DataPoint {
         let index = unsafe { Mmap::map(&hnswf)? };
         let journal: Journal = serde_json::from_reader(journal)?;
 
+        let fst_dir = id.join(file_names::FST);
+
+        let (label_index, key_index) = if LabelIndex::exists(&fst_dir) && KeyIndex::exists(&fst_dir)
+        {
+            (
+                Some(LabelIndex::open(&fst_dir)?),
+                Some(KeyIndex::open(&fst_dir)?),
+            )
+        } else {
+            (None, None)
+        };
+
         // Telling the OS our expected access pattern
         #[cfg(not(target_os = "windows"))]
         {
@@ -495,13 +615,71 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            label_index,
+            key_index,
         })
     }
+
+    fn create_fsts(
+        root_dir: &path::Path,
+        nodes: &[u8],
+    ) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
+        let no_nodes = key_value::get_no_elems(nodes);
+
+        // building the KeyIndex and LabelIndex FSTs
+        let fst_dir = root_dir.join(file_names::FST);
+        fs::create_dir(&fst_dir)?;
+
+        // Memory representations of the FSTs we want to store
+        // - node_keys holds (key, record id) tuples
+        // - labels_map holds a mapping of (label, record ids)
+        // - labels_list holds (label, record ids) tuples
+        let mut node_keys: Vec<(String, u64)> = Vec::new();
+        let mut labels_map: HashMap<String, Vec<u64>> = HashMap::new();
+
+        // we iterate on each node to fill `keys`
+        for node_id in 0..no_nodes {
+            let node = key_value::get_value(Node, nodes, node_id);
+            let key: String = String::from_utf8(Node::key(node).to_vec())?;
+            let node_labels = Node::labels(node);
+
+            for label in &node_labels {
+                if let Some(vec) = labels_map.get_mut(label) {
+                    vec.push(node_id as u64);
+                } else {
+                    let new_vec = vec![node_id as u64];
+                    labels_map.insert(label.to_string(), new_vec);
+                }
+            }
+            node_keys.push((key.clone(), node_id as u64));
+        }
+        node_keys.sort();
+        // create the KeyIndex
+        let key_index = KeyIndex::new(&fst_dir, node_keys.into_iter())?;
+
+        // we convert `labels_map` into a list
+        let mut labels_list: Vec<Label> = Vec::new();
+        for (key, mut node_addresses) in labels_map {
+            node_addresses.sort();
+            labels_list.push(Label {
+                key,
+                node_addresses,
+            })
+        }
+        labels_list.sort_by_key(|label| label.key.clone());
+
+        // creating the LabelIndex
+        let label_index = LabelIndex::new(&fst_dir, labels_list.into_iter())?;
+
+        Ok((Some(label_index), Some(key_index)))
+    }
+
     pub fn new(
         dir: &path::Path,
         mut elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
+        channel: Channel,
     ) -> VectorR<DataPoint> {
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
@@ -533,6 +711,13 @@ impl DataPoint {
         }
         let nodes = unsafe { Mmap::map(&nodesf)? };
         let no_nodes = key_value::get_no_elems(&nodes);
+
+        // Creating the FSTs
+        let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
+            Self::create_fsts(&id, &nodes)?
+        } else {
+            (None, None)
+        };
 
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -574,6 +759,8 @@ impl DataPoint {
             journal,
             nodes,
             index,
+            label_index,
+            key_index,
         })
     }
 }

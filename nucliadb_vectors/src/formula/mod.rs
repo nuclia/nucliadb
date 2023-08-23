@@ -111,6 +111,20 @@ impl From<CompoundClause> for Clause {
     }
 }
 
+#[derive(Default)]
+pub struct AtomCollector {
+    pub labels: Vec<String>,
+    pub key_prefixes: Vec<String>,
+}
+impl AtomCollector {
+    fn add(&mut self, atom: AtomClause) {
+        match atom.kind {
+            AtomKind::KeyPrefix => self.key_prefixes.push(atom.value),
+            AtomKind::Label => self.labels.push(atom.value),
+        }
+    }
+}
+
 /// Formulas are boolean expressions in conjuctive normal form, but for labels.
 /// The clauses in a formula are connected by intersections, and they are formed
 /// by strings. Once applied to a given address, the formula becomes a boolean
@@ -129,6 +143,21 @@ impl Formula {
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         self.clauses.iter().all(|q| q.run(x, retriever))
+    }
+    /// Returns the atoms that form a formula
+    pub fn get_atoms(&self) -> AtomCollector {
+        let mut collector = AtomCollector::default();
+        for clause in self.clauses.iter() {
+            match clause {
+                Clause::Compound(q) => {
+                    for label in q.labels.iter() {
+                        collector.add(label.clone());
+                    }
+                }
+                Clause::Atom(q) => collector.add(q.clone()),
+            }
+        }
+        collector
     }
 }
 
