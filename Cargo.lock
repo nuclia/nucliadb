@@ -1938,6 +1938,7 @@ dependencies = [
  "lazy_static",
  "levenshtein_automata",
  "nucliadb_core",
+ "nucliadb_procs",
  "once_cell",
  "regex",
  "serde_json",

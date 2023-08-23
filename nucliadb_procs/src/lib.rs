@@ -125,7 +125,7 @@ impl Parse for MeasureArgs {
 
         Ok(MeasureArgs {
             actor: actor.unwrap(),
-            metric: metric,
+            metric,
         })
     }
 }
