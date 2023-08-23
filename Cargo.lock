@@ -1948,6 +1948,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nucliadb_procs"
+version = "0.1.0"
+dependencies = [
+ "nucliadb_core",
+ "quote",
+ "syn 2.0.29",
+]
+
+[[package]]
 name = "nucliadb_protos"
 version = "0.0.1"
 dependencies = [
