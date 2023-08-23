@@ -16,7 +16,8 @@ What are "Relations"?:
 - field/paragraphs
 
 
-REST API Integration:
+API Usage/Integration:
+- Processing produces entities that are indexed
 - Find/Search
     - `features`: `relations` is a search option
         - When enabled, we will call NUA `/tokens` endpoint to pull out NER values
@@ -31,11 +32,11 @@ REST API Integration:
         - on changes, need to update all nodes
 
 GRPC Interfaces:
-    - RelationSearch: used in entities storage implementation
-    - RelationTypes: used in entities storage implementation
-    - RelationEdges: not used anywhere
-    - RelationIds: not used anywhere
-    - JoinGraph: used in entities storage/indexing
+- RelationSearch: used in entities storage implementation
+- RelationTypes: used in entities storage implementation
+- RelationEdges: not used anywhere
+- RelationIds: not used anywhere
+- JoinGraph: used in entities storage/indexing
 
 
 Problems:
