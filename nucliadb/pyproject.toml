@@ -1,0 +1,9 @@
+[tool.ruff]
+select = ["E", "F", "B"]
+line-length = 120
+ignore = ["E701", "F901", "E252", "E203", "F541"]
+
+[tool.pytest.ini_options]
+# pytest is requiring this for async projects otherwise
+# we'd need to change all our fixtures
+asyncio_mode= "auto"
