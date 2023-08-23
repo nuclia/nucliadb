@@ -32,4 +32,4 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 
 1. Install Python > 3.9 with a virtualenv with your prefered tool (pyenv, conda, pipenv,...)
 2. Install NucliaDB Dev Dependencies `make install`
-3. Run `pytest nucliadb`
+3. Run `pytest nucliadb/nucliadb/tests`
