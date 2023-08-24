@@ -29,6 +29,8 @@ from pydantic import BaseModel
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
+    EntitiesGroup,
+    KnowledgeBoxEntities,
     UpdateEntitiesGroupPayload,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -429,7 +431,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "show_entities"),
         request_type=None,
-        response_type=KnowledgeBoxLabels,
+        response_type=KnowledgeBoxEntities,
     )
     get_entitygroup = _request_builder(
         name="get_entitygroup",
@@ -437,7 +439,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "group"),
         request_type=None,
-        response_type=LabelSet,
+        response_type=EntitiesGroup,
     )
 
     # Vectorsets
