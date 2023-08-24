@@ -19,6 +19,7 @@
 #
 
 import logging
+import os
 import time
 
 import docker  # type: ignore
@@ -53,6 +54,7 @@ images.settings["nucliadb_node_reader"] = {
         ],
         "ports": {"4445": None},
         "mem_limit": "2g",  # default is 1g, need to override
+        "platform": "linux/amd64",
     },
 }
 
@@ -73,6 +75,7 @@ images.settings["nucliadb_node_writer"] = {
         ],
         "ports": {"4446": None},
         "mem_limit": "2g",  # default is 1g, need to override
+        "platform": "linux/amd64",
     },
 }
 
@@ -89,12 +92,14 @@ images.settings["nucliadb_node_sidecar"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "PYTHONUNBUFFERED": "1",
         "LOG_LEVEL": "DEBUG",
+        "DEBUG": "1",
     },
     "options": {
         "command": [
             "node_sidecar",
         ],
         "ports": {"4447": None},
+        "platform": "linux/amd64",
     },
 }
 
@@ -198,7 +203,7 @@ class _NodeRunner:
         docker_platform_name = self.docker_client.api.version()["Platform"][
             "Name"
         ].upper()
-        if (
+        if "GITHUB_ACTION" not in os.environ and (
             "DESKTOP" in docker_platform_name
             # newer versions use community
             or "DOCKER ENGINE - COMMUNITY" == docker_platform_name

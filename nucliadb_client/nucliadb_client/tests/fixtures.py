@@ -44,6 +44,7 @@ images.settings["nucliadb"] = {
     },
     "options": {
         "ports": {"8080": None, "8030": None, "8040": None, "10009": None},
+        "platform": "linux/amd64",
     },
 }
 

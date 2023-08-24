@@ -17,18 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 import pytest
-from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
 async def test_fieldmetadata_crud(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    knowledgebox_one,
+    nucliadb_reader,
+    nucliadb_writer,
 ) -> None:
     """Test description:
 
@@ -116,69 +115,63 @@ async def test_fieldmetadata_crud(
 
     # Step 1
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resources",
-            headers={"X-SYNCHRONOUS": "True"},
-            json={
-                "texts": {
-                    "textfield1": {"body": "Some text", "format": "PLAIN"},
-                    "textfield2": {"body": "Some other text", "format": "PLAIN"},
-                },
-                "fieldmetadata": [fieldmetadata_0],
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        headers={"X-SYNCHRONOUS": "True"},
+        json={
+            "texts": {
+                "textfield1": {"body": "Some text", "format": "PLAIN"},
+                "textfield2": {"body": "Some other text", "format": "PLAIN"},
             },
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
+            "fieldmetadata": [fieldmetadata_0],
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
-        fieldmetadata = resp.json()["fieldmetadata"]
-        assert len(fieldmetadata) == 1
-        assert fieldmetadata[0] == fieldmetadata_0
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
+    fieldmetadata = resp.json()["fieldmetadata"]
+    assert len(fieldmetadata) == 1
+    assert fieldmetadata[0] == fieldmetadata_0
 
     # Step 2
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
-            json={"fieldmetadata": [fieldmetadata_1]},
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        headers={"X-SYNCHRONOUS": "True"},
+        json={"fieldmetadata": [fieldmetadata_1]},
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
-        )
-        assert resp.status_code == 200
-        fieldmetadata = resp.json()["fieldmetadata"]
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+    )
+    assert resp.status_code == 200
+    fieldmetadata = resp.json()["fieldmetadata"]
 
-        assert len(fieldmetadata) == 2
-        assert fieldmetadata[0] == fieldmetadata_0
-        assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
-        assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
-        assert fieldmetadata[1]["token"] == []
+    assert len(fieldmetadata) == 2
+    assert fieldmetadata[0] == fieldmetadata_0
+    assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
+    assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
+    assert fieldmetadata[1]["token"] == []
 
     # Step 3
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-            headers={"X-SYNCHRONOUS": "True"},
-            json={"fieldmetadata": [fieldmetadata_2]},
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        headers={"X-SYNCHRONOUS": "True"},
+        json={"fieldmetadata": [fieldmetadata_2]},
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
-        )
-        assert resp.status_code == 200
-        fieldmetadata = resp.json()["fieldmetadata"]
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+    )
+    assert resp.status_code == 200
+    fieldmetadata = resp.json()["fieldmetadata"]
 
-        assert len(fieldmetadata) == 2
-        assert fieldmetadata[0] == fieldmetadata_2
-        assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
-        assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
-        assert fieldmetadata[1]["token"] == []
+    assert len(fieldmetadata) == 2
+    assert fieldmetadata[0] == fieldmetadata_2
+    assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
+    assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
+    assert fieldmetadata[1]["token"] == []
