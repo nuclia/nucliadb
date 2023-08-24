@@ -18,23 +18,51 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, ItemFn, LitStr, Token};
+//! `nucliadb_procs` is the procedural macro crate for nucliadb
+//!
 
-/// Measure time elapsed during the wrapped function call.
+mod measure;
+
+use measure::MeasureArgs;
+use quote::{format_ident, quote};
+use syn::{parse_macro_input, ItemFn};
+
+/// Measure time elapsed during the wrapped function call and export it to the
+/// configured `nucliadb_core` `Meter`.
 ///
-/// It records a `nucliadb_core` request time metric, so `nucliadb_core` *must*
-/// be available when using this macro.
+/// This macro records a `nucliadb_core` request time metric. To use, apply over
+/// a function to record how much it took to execute in the current meter
+/// configured in nucliadb_core.
+///
+/// ATENTION! `nucliadb_core` **must** be available when using this macro.
+///
+/// # Arguments
+///
+/// * `actor` - `RequestTimeKey` actor (`RequestActor`) as a literal string in
+/// lower case.
+///
+/// * `metric` - name of the metric to record. This value is part of the metric
+/// key and it's used to distinguish operations. For example, `count`,
+/// `set_resource`... If not set, defaults to the wrapped function name.
+///
+/// # Example
+///
+/// ```rust
+/// use nucliadb_procs::measure;
+///
+/// #[measure(actor = "vectors", metric = "my_function")]
+/// fn my_function() {
+///     // do something
+/// }
+/// ```
+///
+/// this will measure how much `my_function` takes to execute and automatically
+/// export `vectors/my_function` metric to the corresponding meter.
 #[proc_macro_attribute]
 pub fn measure(
     args: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    println!("Args: {}", args);
-    println!("Item: {}", item);
-
     let MeasureArgs { actor, metric } = parse_macro_input!(args as MeasureArgs);
 
     let ItemFn {
@@ -42,7 +70,7 @@ pub fn measure(
         vis,
         sig,
         block,
-    } = parse_macro_input!(item as ItemFn);
+    } = parse_macro_input!(input as ItemFn);
 
     let actor = format_ident!("{}", actor);
     let metric = match metric {
@@ -71,63 +99,7 @@ pub fn measure(
         }
     };
 
-    println!("Expanded: {}", expanded);
-
-    TokenStream::from(expanded)
-}
-
-mod kw {
-    syn::custom_keyword!(actor);
-    syn::custom_keyword!(metric);
-}
-
-struct MeasureArgs {
-    actor: String,
-    metric: Option<String>,
-}
-
-impl Parse for MeasureArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut actor = None;
-        let mut metric = None;
-        while !input.is_empty() {
-            let lookahead = input.lookahead1();
-            println!("Parsing input: {:?}", input);
-            println!("Actor: {:?} and Metric: {:?}", actor, metric);
-            if lookahead.peek(kw::actor) {
-                if actor.is_some() {
-                    return Err(input.error("Argument `actor` is expected only once"));
-                }
-                let _ = input.parse::<kw::actor>()?;
-                let _ = input.parse::<Token![=]>()?;
-                let value = input.parse::<LitStr>()?.value().to_string();
-                // ignore comma if found
-                let _ = input.parse::<Token![,]>();
-                actor = Some(value)
-            } else if lookahead.peek(kw::metric) {
-                if metric.is_some() {
-                    return Err(input.error("Argument `metric` is expected only once"));
-                }
-                let _ = input.parse::<kw::metric>()?;
-                let _ = input.parse::<Token![=]>()?;
-                let value = input.parse::<LitStr>()?.value().to_string();
-                // ignore comma if found
-                let _ = input.parse::<Token![,]>();
-                metric = Some(value)
-            } else {
-                return Err(lookahead.error());
-            }
-        }
-
-        if actor.is_none() {
-            return Err(input.error("Argument `actor` must be defined"));
-        }
-
-        Ok(MeasureArgs {
-            actor: actor.unwrap(),
-            metric,
-        })
-    }
+    proc_macro::TokenStream::from(expanded)
 }
 
 /// Useless proc macro for testing purposes. It literally does nothing to the
