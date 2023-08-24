@@ -311,6 +311,7 @@ async def test_entitygroups(
     knowledgebox: str,
 ):
     entitygroup = {
+        "group": "group1",
         "title": "Kitchen",
         "custom": True,
         "color": "blue",
@@ -324,7 +325,7 @@ async def test_entitygroups(
         },
     }
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/entitiesgroup/group1", json=entitygroup
+        f"/kb/{knowledgebox}/entitiesgroups", json=entitygroup
     )
     assert resp.status_code == 200
 
