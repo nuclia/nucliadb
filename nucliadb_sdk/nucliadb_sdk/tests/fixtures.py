@@ -47,6 +47,9 @@ images.settings["nucliadb"] = {
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
         "DEBUG": "True",
     },
+    "options": {
+        "platform": "linux/amd64"
+    }
 }
 
 NUCLIA_DOCS_dataset = (
