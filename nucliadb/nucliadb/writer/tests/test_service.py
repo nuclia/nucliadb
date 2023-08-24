@@ -20,7 +20,7 @@
 import pytest
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
-from nucliadb_models.entities import EntitiesGroup, Entity
+from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
 from nucliadb_models.labels import Label, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
@@ -43,14 +43,18 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
         kbid = data["uuid"]
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        eg = EntitiesGroup()
-        eg.title = "My group"
-        eg.color = "#0000000"
-        eg.entities["ent1"] = Entity(value="asd", merged=False)
-        eg.entities["ent2"] = Entity(value="asd", merged=False)
-        eg.entities["ent3"] = Entity(value="asd", merged=False)
+        eg = CreateEntitiesGroupPayload(
+            group="0",
+            title="My group",
+            color="#0000000",
+            entities={
+                "ent1": Entity(value="asd", merged=False),
+                "ent2": Entity(value="asd", merged=False),
+                "ent3": Entity(value="asd", merged=False),
+            },
+        )
 
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroup/0", json=eg.dict())
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.dict())
         assert resp.status_code == 200
 
         ingest = get_ingest()
@@ -60,10 +64,11 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
         assert set(result.groups.keys()) == {"0"}
         assert result.groups["0"].title == eg.title
         assert result.groups["0"].color == eg.color
-        assert set(result.groups["0"].entities.keys()) == {"ent3", "ent1", "ent2"}
+        assert set(result.groups["0"].entities.keys()) == {"ent1", "ent2", "ent3"}
         assert result.groups["0"].entities["ent1"].value == "asd"
 
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroup/1", json=eg.dict())
+        eg.group = "1"
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.dict())
         assert resp.status_code == 200
         result = await ingest.GetEntities(
             writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
@@ -72,15 +77,14 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
 
 
 @pytest.mark.asyncio
-async def test_entities_custom_field(writer_api, entities_manager_mock):
+async def test_entities_custom_field_for_user_defined_groups(
+    writer_api, entities_manager_mock
+):
     """
     Test description:
 
     - Create an entity group and check that the default value for the `custom`
-      field is False
-
-    - Create another entity group and set `custom` to True. Check that on a
-      subsequent get, the value is correct.
+      field is True
     """
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
@@ -95,23 +99,15 @@ async def test_entities_custom_field(writer_api, entities_manager_mock):
         kbid = data["uuid"]
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        eg = EntitiesGroup()
-        custom_eg = EntitiesGroup(custom=True)
-
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroup/0", json=eg.dict())
-        assert resp.status_code == 200
-
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/entitiesgroup/1", json=custom_eg.dict()
-        )
+        eg = CreateEntitiesGroupPayload(group="0")
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.dict())
         assert resp.status_code == 200
 
         ingest = get_ingest()
         result = await ingest.GetEntities(
             writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
         )
-        assert result.groups["0"].custom is False
-        assert result.groups["1"].custom is True
+        assert result.groups["0"].custom is True
 
 
 @pytest.mark.asyncio
