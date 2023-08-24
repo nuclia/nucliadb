@@ -526,7 +526,7 @@ class SearchParamDefaults:
     )
 
     chat_features = ParamDefault(
-        default=[ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
+        default=[ChatOptions.PARAGRAPHS],
         title="Chat features",
         description="Features enabled for the chat endpoint. If `paragraphs` is included, the paragraphs from which the answer is generated are returned. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
     )
