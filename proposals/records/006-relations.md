@@ -48,6 +48,7 @@ Problems:
 - Inconsistent relation search results
 - Should relation lookups be part of the search request or a separate endpoint?
 - Not shown/used with chat
+- Removing entities does not work
 
 ## Proposed Solution
 
@@ -62,10 +63,12 @@ Clean up the interfaces and remove functionality that is not providing customer 
 that makes it more difficult for us to move forward:
 
 - Remove `RelationEdges` and `RelationIds` endpoints: unused right now, remove
-- Remove feature of adding/removing entities globally
+- Do not index added/removed global entities
 - Remove `JoinGraph` as they will be unused after removing above feature
 - Remove relation search results at search/find/chat
 - Add new endpoint to lookup relations
+- Added/removed entities is a post filter on retrieving entity results
+- Removed is more like a "hide"
 
 
 ### Medium term
