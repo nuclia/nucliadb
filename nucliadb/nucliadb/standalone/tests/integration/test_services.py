@@ -17,104 +17,95 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
-
 import pytest
-from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
 async def test_disable_vectors_service(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    nucliadb_reader, nucliadb_manager, knowledgebox_one
 ) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        data = {"disable_vectors": True}
-        resp = await client.patch(f"/{KB_PREFIX}/{knowledgebox_one}", json=data)
-        assert resp.status_code == 200
+    data = {"disable_vectors": True}
+    resp = await nucliadb_manager.patch(f"/{KB_PREFIX}/{knowledgebox_one}", json=data)
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}")
-        assert resp.json()["config"]["disable_vectors"]
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}")
+    assert resp.json()["config"]["disable_vectors"]
 
 
 @pytest.mark.asyncio
 async def test_entities_service(
-    nucliadb_api: Callable[..., AsyncClient],
+    nucliadb_reader,
+    nucliadb_writer,
     knowledgebox_one,
     entities_manager_mock,
 ) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        entitygroup = {
-            "title": "Kitchen",
-            "custom": True,
-            "entities": {
-                "cupboard": {"value": "Cupboard"},
-                "fork": {"value": "Fork"},
-                "fridge": {"value": "Fridge"},
-                "knife": {"value": "Knife"},
-                "sink": {"value": "Sink"},
-                "spoon": {"value": "Spoon"},
-            },
-        }
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1", json=entitygroup
-        )
-        assert resp.status_code == 200
+    entitygroup = {
+        "title": "Kitchen",
+        "custom": True,
+        "entities": {
+            "cupboard": {"value": "Cupboard"},
+            "fork": {"value": "Fork"},
+            "fridge": {"value": "Fridge"},
+            "knife": {"value": "Knife"},
+            "sink": {"value": "Sink"},
+            "spoon": {"value": "Spoon"},
+        },
+    }
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1", json=entitygroup
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups?show_entities=true"
-        )
-        assert resp.status_code == 200
-        groups = resp.json()["groups"]
-        assert len(groups) == 1
-        assert groups["group1"]["custom"] is True
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups?show_entities=true"
+    )
+    assert resp.status_code == 200
+    groups = resp.json()["groups"]
+    assert len(groups) == 1
+    assert groups["group1"]["custom"] is True
 
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1")
-        assert resp.status_code == 200
-        assert resp.json()["custom"] is True
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["custom"] is True
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1"
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
-        assert len(resp.json()["groups"]) == 0
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
+    assert len(resp.json()["groups"]) == 0
 
 
 @pytest.mark.asyncio
 async def test_labelsets_service(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    nucliadb_reader, nucliadb_writer, knowledgebox_one
 ) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        payload = {
-            "title": "labelset1",
-            "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],
-        }
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1", json=payload
-        )
-        assert resp.status_code == 200
+    payload = {
+        "title": "labelset1",
+        "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],
+    }
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1", json=payload
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
-        assert len(resp.json()["labelsets"]) == 1
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
+    assert len(resp.json()["labelsets"]) == 1
 
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1")
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{knowledgebox_one}/labelset/labelset1"
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
-        assert len(resp.json()["labelsets"]) == 0
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}/labelsets")
+    assert len(resp.json()["labelsets"]) == 0

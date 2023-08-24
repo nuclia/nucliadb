@@ -17,51 +17,46 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 import pytest
-from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.writer.tests.test_fields import TEST_TEXT_PAYLOAD
-from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
 async def test_delete_field(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    knowledgebox_one,
+    nucliadb_reader,
+    nucliadb_writer,
 ) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resources",
-            headers={"X-SYNCHRONOUS": "True"},
-            json={
-                "slug": "resource1",
-                "title": "Resource 1",
-                "texts": {"text1": TEST_TEXT_PAYLOAD, "text2": TEST_TEXT_PAYLOAD},
-            },
-        )
-        assert resp.status_code == 201
-        uuid = resp.json()["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        headers={"X-SYNCHRONOUS": "True"},
+        json={
+            "slug": "resource1",
+            "title": "Resource 1",
+            "texts": {"text1": TEST_TEXT_PAYLOAD, "text2": TEST_TEXT_PAYLOAD},
+        },
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp1 = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
-        )
-        assert resp1.status_code == 200
+    resp1 = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
+    )
+    assert resp1.status_code == 200
 
     assert "text1" in resp1.json()["data"]["texts"]
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}/text/text1",
-            headers={"X-SYNCHRONOUS": "True"},
-        )
-        assert resp.status_code == 204
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}/text/text1",
+        headers={"X-SYNCHRONOUS": "True"},
+    )
+    assert resp.status_code == 204
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
-        )
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
+    )
 
     assert "text1" not in resp.json()["data"]["texts"]

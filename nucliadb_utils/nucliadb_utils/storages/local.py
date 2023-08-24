@@ -260,7 +260,8 @@ class LocalStorage(Storage):
     async def delete_upload(self, uri: str, bucket_name: str):
         path = self.get_bucket_path(bucket_name)
         file_path = f"{path}/{uri}"
-        os.remove(file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
     async def schedule_delete_kb(self, kbid: str):
         bucket = self.get_bucket_name(kbid)

@@ -17,54 +17,47 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 import pytest
-from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio
 async def test_basic_patch_thumbnail_sc_2390(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    knowledgebox_one, nucliadb_reader, nucliadb_writer
 ) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resources",
-            json={
-                "title": "Resource title",
-                "summary": "A simple summary",
-                "thumbnail": "thumbnail-on-creation",
-            },
-            headers={"X-Synchronous": "true"},
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+        json={
+            "title": "Resource title",
+            "summary": "A simple summary",
+            "thumbnail": "thumbnail-on-creation",
+        },
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
-        assert resource["thumbnail"] == "thumbnail-on-creation"
+    resource = resp.json()
+    assert resource["thumbnail"] == "thumbnail-on-creation"
 
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-            json={"thumbnail": "thumbnail-modified"},
-            headers={"X-Synchronous": "true"},
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+        json={"thumbnail": "thumbnail-modified"},
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 200
 
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
-        assert resource["thumbnail"] == "thumbnail-modified"
+    resource = resp.json()
+    assert resource["thumbnail"] == "thumbnail-modified"

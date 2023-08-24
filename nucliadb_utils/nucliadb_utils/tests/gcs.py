@@ -29,6 +29,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.tests import free_port
 
 # IMPORTANT!
 # Without this, tests running in a remote docker host won't work
@@ -38,16 +39,24 @@ DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS els
 images.settings["gcs"] = {
     "image": "fsouza/fake-gcs-server",
     "version": "1.44.1",
-    "options": {
-        "command": f"-scheme http -external-url http://{DOCKER_HOST}:4443 -port 4443",
-        "ports": {"4443": "4443"},
-    },
+    "options": {},
 }
 
 
 class GCS(BaseImage):
     name = "gcs"
-    port = 4443
+
+    def __init__(self):
+        super().__init__()
+        self.port = free_port()
+
+    def get_image_options(self):
+        options = super().get_image_options()
+        options["ports"] = {str(self.port): str(self.port)}
+        options[
+            "command"
+        ] = f"-scheme http -external-url http://{DOCKER_HOST}:{self.port} -port {self.port}"
+        return options
 
     def check(self):
         try:
