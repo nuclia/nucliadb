@@ -19,6 +19,7 @@
 #
 
 import logging
+import os
 import time
 
 import docker  # type: ignore
@@ -202,7 +203,7 @@ class _NodeRunner:
         docker_platform_name = self.docker_client.api.version()["Platform"][
             "Name"
         ].upper()
-        if (
+        if "GITHUB_ACTION" not in os.environ and (
             "DESKTOP" in docker_platform_name
             # newer versions use community
             or "DOCKER ENGINE - COMMUNITY" == docker_platform_name
