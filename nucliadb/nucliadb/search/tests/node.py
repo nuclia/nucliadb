@@ -213,6 +213,8 @@ class _NodeRunner:
         else:
             # Valid when using github actions
             docker_internal_host = "172.17.0.1"
+        # Always use IP
+        docker_internal_host = "172.17.0.1"
 
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
