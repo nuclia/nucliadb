@@ -322,6 +322,7 @@ class Worker:
                         and self.brain.HasField("metadata")
                     ):
                         # Hard fail if we have the correct data
+                        await msg.nak()
                         raise grpc_error
 
             except IndexDataNotFound as storage_error:
@@ -336,13 +337,15 @@ class Worker:
                 logger.error(
                     f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                 )
+                await msg.nak()
                 raise e
 
         try:
-            self.store_seqid(seqid)
             await msg.ack()
             await self.publisher.indexed(pb)
+            self.store_seqid(seqid)
         except Exception as e:  # pragma: no cover
+            await msg.nak()
             errors.capture_exception(e)
             logger.error(
                 f"An error on subscription_worker. Check sentry for more details."
