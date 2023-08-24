@@ -35,6 +35,12 @@ from typing import (
 )
 
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.entities import (
+    CreateEntitiesGroupPayload,
+    EntitiesGroup,
+    Entity,
+    UpdateEntitiesGroupPayload,
+)
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -372,14 +378,44 @@ class KnowledgeBox:
         return resp
 
     def set_entities(self, entity_group: str, entities: List[str]):
-        resp = self.client.writer_session.post(
-            f"/entitiesgroup/{entity_group}",
-            json={
-                "title": entity_group,
-                "entities": {entity: {"value": entity} for entity in entities},
-            },
-        )
-        assert resp.status_code == 200
+        # Old set API has been deprecated. Now we only have create and update
+        # operations. For bw/ compat, use new endpoints to provide the same
+        # functionality
+
+        resp = self.client.reader_session.get(f"/entitiesgroup/{entity_group}")
+        assert resp.status_code in (200, 404)
+
+        if resp.status_code == 404:
+            payload = CreateEntitiesGroupPayload(
+                group=entity_group,
+                title=entity_group,
+                entities={entity: {"value": entity} for entity in entities},
+            )
+            resp = self.client.writer_session.post(
+                "/entitiesgroups",
+                json=payload.dict(),
+            )
+            assert resp.status_code == 200
+
+        else:
+            current = EntitiesGroup.parse_obj(resp.json())
+            update = UpdateEntitiesGroupPayload()
+
+            for entity in entities:
+                if entity in current.entities:
+                    update.update[entity] = Entity(value=entity)
+                else:
+                    update.add[entity] = Entity(value=entity)
+
+            for entity in current.entities:
+                if entity not in entities:
+                    update.delete.append(entity)
+
+            resp = self.client.writer_session.patch(
+                f"/entitiesgroup/{entity_group}",
+                json=update.dict(),
+            )
+            assert resp.status_code == 200
 
     def search(
         self,
