@@ -400,6 +400,7 @@ class KnowledgeBox:
         else:
             current = EntitiesGroup.parse_obj(resp.json())
             update = UpdateEntitiesGroupPayload()
+            update.title = entity_group
 
             for entity in entities:
                 if entity in current.entities:
