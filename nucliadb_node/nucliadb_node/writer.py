@@ -20,6 +20,8 @@
 import asyncio
 from typing import Optional
 
+import backoff
+from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery,
     Resource,
@@ -54,6 +56,7 @@ class Writer:
     async def garbage_collector(self, shard_id: str):
         await self.stub.GC(ShardId(id=shard_id))  # type: ignore
 
+    @backoff.on_exception(backoff.expo, (AioRpcError,), max_tries=4)
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()
         return await self.stub.ListShards(pb)  # type: ignore
