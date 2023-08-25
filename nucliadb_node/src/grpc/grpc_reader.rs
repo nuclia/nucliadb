@@ -23,6 +23,7 @@ use std::sync::Arc;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
+use nucliadb_core::tracing::{info_span, Span};
 use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
@@ -30,6 +31,7 @@ use crate::settings::Settings;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardReaderCache;
 use crate::shards::providers::AsyncShardReaderProvider;
 use crate::shards::reader::ShardReader;
+use crate::telemetry::run_with_telemetry;
 
 pub struct NodeReaderGRPCDriver {
     shards: AsyncUnboundedShardReaderCache,
@@ -140,17 +142,18 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<GetShardRequest>,
     ) -> Result<tonic::Response<ShardPB>, tonic::Status> {
+        let span = Span::current();
         let request = request.into_inner();
         let shard_id = match request.shard_id {
             Some(ref shard_id) => shard_id.id.clone(),
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
         let shard = self.obtain_shard(shard_id).await?;
-        let shard_info = tokio::task::spawn_blocking(move || shard.get_info(&request))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "get shard");
+        let task = || run_with_telemetry(info, move || shard.get_info(&request));
+        let shard_info = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match shard_info {
             Ok(shard) => Ok(tonic::Response::new(shard)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -161,14 +164,15 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
+        let span = Span::current();
         let search_request = request.into_inner();
         let shard_id = search_request.shard.clone();
         let shard = self.obtain_shard(shard_id).await?;
-        let response = tokio::task::spawn_blocking(move || shard.search(search_request))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "search");
+        let task = || run_with_telemetry(info, move || shard.search(search_request));
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -179,14 +183,15 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<SuggestRequest>,
     ) -> Result<tonic::Response<SuggestResponse>, tonic::Status> {
+        let span = Span::current();
         let suggest_request = request.into_inner();
         let shard_id = suggest_request.shard.clone();
         let shard = self.obtain_shard(shard_id).await?;
-        let response = tokio::task::spawn_blocking(move || shard.suggest(suggest_request))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "suggest");
+        let task = || run_with_telemetry(info, move || shard.suggest(suggest_request));
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -197,14 +202,15 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<VectorSearchRequest>,
     ) -> Result<tonic::Response<VectorSearchResponse>, tonic::Status> {
+        let span = Span::current();
         let vector_request = request.into_inner();
         let shard_id = vector_request.id.clone();
         let shard = self.obtain_shard(shard_id).await?;
-        let response = tokio::task::spawn_blocking(move || shard.vector_search(vector_request))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "vector search");
+        let task = || run_with_telemetry(info, move || shard.vector_search(vector_request));
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -215,14 +221,15 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<RelationSearchRequest>,
     ) -> Result<tonic::Response<RelationSearchResponse>, tonic::Status> {
+        let span = Span::current();
         let relation_request = request.into_inner();
         let shard_id = relation_request.shard_id.clone();
         let shard = self.obtain_shard(shard_id).await?;
-        let response = tokio::task::spawn_blocking(move || shard.relation_search(relation_request))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "relations search");
+        let task = || run_with_telemetry(info, move || shard.relation_search(relation_request));
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -233,14 +240,15 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<DocumentSearchRequest>,
     ) -> Result<tonic::Response<DocumentSearchResponse>, tonic::Status> {
+        let span = Span::current();
         let document_request = request.into_inner();
         let shard_id = document_request.id.clone();
         let shard = self.obtain_shard(shard_id).await?;
-        let response = tokio::task::spawn_blocking(move || shard.document_search(document_request))
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "document search");
+        let task = || run_with_telemetry(info, move || shard.document_search(document_request));
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -251,15 +259,15 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ParagraphSearchRequest>,
     ) -> Result<tonic::Response<ParagraphSearchResponse>, tonic::Status> {
+        let span = Span::current();
         let paragraph_request = request.into_inner();
         let shard_id = paragraph_request.id.clone();
         let shard = self.obtain_shard(shard_id).await?;
-        let response =
-            tokio::task::spawn_blocking(move || shard.paragraph_search(paragraph_request))
-                .await
-                .map_err(|error| {
-                    tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-                })?;
+        let info = info_span!(parent: &span, "paragraph search");
+        let task = || run_with_telemetry(info, move || shard.paragraph_search(paragraph_request));
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -270,15 +278,16 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let span = Span::current();
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = tokio::task::spawn_blocking(move || {
-            shard.get_text_keys().map(|ids| IdCollection { ids })
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "document ids");
+        let task = || run_with_telemetry(info, move || shard.get_text_keys());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
+            Ok(ids) => Ok(tonic::Response::new(IdCollection { ids })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
@@ -287,15 +296,16 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let span = Span::current();
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = tokio::task::spawn_blocking(move || {
-            shard.get_paragraphs_keys().map(|ids| IdCollection { ids })
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "paragraph ids");
+        let task = || run_with_telemetry(info, move || shard.get_paragraphs_keys());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
+            Ok(ids) => Ok(tonic::Response::new(IdCollection { ids })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
@@ -304,15 +314,17 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let span = Span::current();
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = tokio::task::spawn_blocking(move || {
-            shard.get_vectors_keys().map(|ids| IdCollection { ids })
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "vector ids");
+        let task = || run_with_telemetry(info, move || shard.get_vectors_keys());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
+
         match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
+            Ok(ids) => Ok(tonic::Response::new(IdCollection { ids })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
@@ -321,15 +333,16 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let span = Span::current();
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = tokio::task::spawn_blocking(move || {
-            shard.get_relations_keys().map(|ids| IdCollection { ids })
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "relation ids");
+        let task = || run_with_telemetry(info, move || shard.get_relations_keys());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
+            Ok(ids) => Ok(tonic::Response::new(IdCollection { ids })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
@@ -338,13 +351,14 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<EdgeList>, tonic::Status> {
+        let span = Span::current();
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = tokio::task::spawn_blocking(move || shard.get_relations_edges())
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "relation edges");
+        let task = || run_with_telemetry(info, move || shard.get_relations_edges());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
@@ -355,13 +369,14 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<TypeList>, tonic::Status> {
+        let span = Span::current();
         let shard_id = request.into_inner().id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let response = tokio::task::spawn_blocking(move || shard.get_relations_types())
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let info = info_span!(parent: &span, "relation types");
+        let task = || run_with_telemetry(info, move || shard.get_relations_types());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

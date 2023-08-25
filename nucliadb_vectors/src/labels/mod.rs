@@ -101,9 +101,7 @@ impl LabelIndex {
     }
 
     pub fn new<'a, I>(path: &Path, labels: I) -> VectorR<Self>
-    where
-        I: Iterator<Item = &'a Label>,
-    {
+    where I: Iterator<Item = &'a Label> {
         let records_file_path = path.join(Self::LABELS_IDX);
         let fst_file_path = path.join(Self::LABELS_FST);
 

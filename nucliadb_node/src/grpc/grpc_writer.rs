@@ -26,7 +26,7 @@ use nucliadb_core::protos::{
     NodeMetadata, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId,
     ShardIds, VectorSetId, VectorSetList,
 };
-use nucliadb_core::tracing::{self, *};
+use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::NodeResult;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
@@ -40,6 +40,7 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
+use crate::telemetry::run_with_telemetry;
 
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,
@@ -186,16 +187,21 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     // Incremental call that can be call multiple times for the same resource
     async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
         let resource = request.into_inner();
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(&shard_id).await?;
-        let status = tokio::task::spawn_blocking(move || {
-            shard
-                .set_resource(&resource)
-                .and_then(|()| shard.get_opstatus())
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "set resource");
+        let task = || {
+            run_with_telemetry(info, move || {
+                shard
+                    .set_resource(&resource)
+                    .and_then(|()| shard.get_opstatus())
+            })
+        };
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -219,16 +225,21 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<ResourceId>,
     ) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
         let resource = request.into_inner();
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(&shard_id).await?;
-        let status = tokio::task::spawn_blocking(move || {
-            shard
-                .remove_resource(&resource)
-                .and_then(|()| shard.get_opstatus())
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "remove resource");
+        let task = || {
+            run_with_telemetry(info, move || {
+                shard
+                    .remove_resource(&resource)
+                    .and_then(|()| shard.get_opstatus())
+            })
+        };
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -249,6 +260,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
         let request = request.into_inner();
         let shard_id = match request.shard_id {
             Some(ref shard_id) => &shard_id.id,
@@ -259,13 +271,17 @@ impl NodeWriter for NodeWriterGRPCDriver {
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
         let shard = self.obtain_shard(shard_id).await?;
-        let status = tokio::task::spawn_blocking(move || {
-            shard
-                .join_relations_graph(&graph)
-                .and_then(|()| shard.get_opstatus())
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "join graph");
+        let task = || {
+            run_with_telemetry(info, move || {
+                shard
+                    .join_relations_graph(&graph)
+                    .and_then(|()| shard.get_opstatus())
+            })
+        };
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -280,19 +296,24 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<DeleteGraphNodes>,
     ) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
         let request = request.into_inner();
         let shard_id = match request.shard_id {
             Some(ref shard_id) => &shard_id.id,
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
         let shard = self.obtain_shard(shard_id).await?;
-        let status = tokio::task::spawn_blocking(move || {
-            shard
-                .delete_relation_nodes(&request)
-                .and_then(|()| shard.get_opstatus())
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "delete relations nodes");
+        let task = || {
+            run_with_telemetry(info, move || {
+                shard
+                    .delete_relation_nodes(&request)
+                    .and_then(|()| shard.get_opstatus())
+            })
+        };
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -307,6 +328,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<NewVectorSetRequest>,
     ) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
         let request = request.into_inner();
         let vectorset_id = match request.id {
             Some(ref vectorset_id) => vectorset_id.clone(),
@@ -322,13 +344,17 @@ impl NodeWriter for NodeWriterGRPCDriver {
         };
 
         let shard = self.obtain_shard(shard_id).await?;
-        let status = tokio::task::spawn_blocking(move || {
-            shard
-                .add_vectorset(&vectorset_id, request.similarity())
-                .and_then(|()| shard.get_opstatus())
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "add vector set");
+        let task = || {
+            run_with_telemetry(info, move || {
+                shard
+                    .add_vectorset(&vectorset_id, request.similarity())
+                    .and_then(|()| shard.get_opstatus())
+            })
+        };
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -343,19 +369,24 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<VectorSetId>,
     ) -> Result<Response<OpStatus>, Status> {
+        let span = Span::current();
         let request = request.into_inner();
         let shard_id = match request.shard {
             Some(ref shard_id) => &shard_id.id,
             None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
         };
         let shard = self.obtain_shard(shard_id).await?;
-        let status = tokio::task::spawn_blocking(move || {
-            shard
-                .remove_vectorset(&request)
-                .and_then(|()| shard.get_opstatus())
-        })
-        .await
-        .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
+        let info = info_span!(parent: &span, "remove vector set");
+        let task = || {
+            run_with_telemetry(info, move || {
+                shard
+                    .remove_vectorset(&request)
+                    .and_then(|()| shard.get_opstatus())
+            })
+        };
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match status {
             Ok(mut status) => {
                 status.status = 0;
@@ -370,18 +401,19 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<ShardId>,
     ) -> Result<Response<VectorSetList>, Status> {
+        let span = Span::current();
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(shard_id.id.clone()).await?;
-        let vector_sets = tokio::task::spawn_blocking(move || shard.list_vectorsets())
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
-        match vector_sets {
-            Ok(vector_sets) => {
+        let info = info_span!(parent: &span, "list vector sets");
+        let task = || run_with_telemetry(info, move || shard.list_vectorsets());
+        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
+        match status {
+            Ok(vectorset) => {
                 let list = VectorSetList {
+                    vectorset,
                     shard: Some(shard_id),
-                    vectorset: vector_sets,
                 };
                 Ok(tonic::Response::new(list))
             }
@@ -404,11 +436,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
-        let result = tokio::task::spawn_blocking(move || shard.gc())
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-            })?;
+        let span = Span::current();
+        let info = info_span!(parent: &span, "list vector sets");
+        let task = || run_with_telemetry(info, move || shard.gc());
+        let result = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
         match result {
             Ok(()) => Ok(tonic::Response::new(EmptyResponse {})),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
