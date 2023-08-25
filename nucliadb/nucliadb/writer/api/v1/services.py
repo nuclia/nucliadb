@@ -29,7 +29,6 @@ from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
-    SetEntitiesRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
     UpdateEntitiesGroupRequest,
@@ -46,7 +45,6 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
-    EntitiesGroup,
     UpdateEntitiesGroupPayload,
 )
 from nucliadb_models.labels import LabelSet
@@ -55,46 +53,6 @@ from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
-
-
-@api.post(
-    f"/{KB_PREFIX}/{{kbid}}/entitiesgroup/{{group}}",
-    status_code=200,
-    name="Set Knowledge Box Entities",
-    tags=["Knowledge Box Services"],
-    openapi_extra={"x-operation_order": 1},
-    deprecated=True,
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGroup):
-    ingest = get_ingest()
-    pbrequest: SetEntitiesRequest = SetEntitiesRequest()
-    pbrequest.kb.uuid = kbid
-    pbrequest.group = group
-    if item.title:
-        pbrequest.entities.title = item.title
-    if item.color:
-        pbrequest.entities.color = item.color
-
-    pbrequest.entities.custom = item.custom
-
-    for key, entity in item.entities.items():
-        entitypb = pbrequest.entities.entities[key]
-        entitypb.value = entity.value
-        entitypb.merged = entity.merged
-        entitypb.deleted = False
-        entitypb.represents.extend(entity.represents)
-
-    status: OpStatusWriter = await ingest.SetEntities(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return None
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on settings entities on a Knowledge box"
-        )
 
 
 @api.post(

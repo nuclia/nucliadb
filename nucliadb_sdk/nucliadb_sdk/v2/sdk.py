@@ -30,6 +30,7 @@ from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     EntitiesGroup,
+    KnowledgeBoxEntities,
     UpdateEntitiesGroupPayload,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -416,14 +417,6 @@ class _NucliaDBBase:
         request_type=UpdateEntitiesGroupPayload,
         response_type=None,
     )
-    set_entitygroup_entities = _request_builder(
-        name="set_entitygroup_entities",
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="POST",
-        path_params=("kbid", "group"),
-        request_type=EntitiesGroup,
-        response_type=None,
-    )
     delete_entitygroup = _request_builder(
         name="delete_entitygroup",
         path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
@@ -438,7 +431,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "show_entities"),
         request_type=None,
-        response_type=KnowledgeBoxLabels,
+        response_type=KnowledgeBoxEntities,
     )
     get_entitygroup = _request_builder(
         name="get_entitygroup",
@@ -446,7 +439,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "group"),
         request_type=None,
-        response_type=LabelSet,
+        response_type=EntitiesGroup,
     )
 
     # Vectorsets
