@@ -101,9 +101,10 @@ async def chat_knowledgebox(
 
     find_request = FindRequest()
     find_request.features = [
-        SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
     ]
+    if "paragraphs" in item.features:
+        find_request.features.append(SearchOptions.PARAGRAPH)
     find_request.query = rephrased_query or user_query
     find_request.fields = item.fields
     find_request.filters = item.filters
