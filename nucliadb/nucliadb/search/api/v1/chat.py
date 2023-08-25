@@ -31,6 +31,7 @@ from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
+    ChatOptions,
     ChatRequest,
     FindRequest,
     NucliaDBClientType,
@@ -101,9 +102,10 @@ async def chat_knowledgebox(
 
     find_request = FindRequest()
     find_request.features = [
-        SearchOptions.PARAGRAPH,
         SearchOptions.VECTOR,
     ]
+    if ChatOptions.PARAGRAPHS in item.features:
+        find_request.features.append(SearchOptions.PARAGRAPH)
     find_request.query = rephrased_query or user_query
     find_request.fields = item.fields
     find_request.filters = item.filters
