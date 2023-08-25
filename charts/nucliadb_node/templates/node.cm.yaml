@@ -24,7 +24,7 @@ data:
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
   DATA_PATH: "{{.Values.config.data_path}}"
 {{- if .Values.config.lazyloading }}
-  LAZY_LOADING: "true"
+  LAZY_LOADING: {{ .Values.config.lazyloading }}
 {{- end }}
 
   INDEX_JETSTREAM_AUTH: {{ .Values.indexing.index_jetstream_auth }}
