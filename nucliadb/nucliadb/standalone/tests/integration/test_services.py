@@ -41,24 +41,23 @@ async def test_entities_service(
     knowledgebox_one,
     entities_manager_mock,
 ) -> None:
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        entitygroup = {
-            "group": "group1",
-            "title": "Kitchen",
-            "custom": True,
-            "entities": {
-                "cupboard": {"value": "Cupboard"},
-                "fork": {"value": "Fork"},
-                "fridge": {"value": "Fridge"},
-                "knife": {"value": "Knife"},
-                "sink": {"value": "Sink"},
-                "spoon": {"value": "Spoon"},
-            },
-        }
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups", json=entitygroup
-        )
-        assert resp.status_code == 200
+    entitygroup = {
+        "group": "group1",
+        "title": "Kitchen",
+        "custom": True,
+        "entities": {
+            "cupboard": {"value": "Cupboard"},
+            "fork": {"value": "Fork"},
+            "fridge": {"value": "Fridge"},
+            "knife": {"value": "Knife"},
+            "sink": {"value": "Sink"},
+            "spoon": {"value": "Spoon"},
+        },
+    }
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups", json=entitygroup
+    )
+    assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
         f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups?show_entities=true"
