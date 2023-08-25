@@ -25,17 +25,20 @@ use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{node_error, NodeResult};
+use nucliadb_node::env;
 use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
+use nucliadb_node::shards::providers::unbounded_cache::AsyncUnboundedShardReaderCache;
 use nucliadb_node::telemetry::init_telemetry;
+use rand::seq::IteratorRandom;
+use std::fs;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
-
 type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 
 #[tokio::main]
@@ -91,6 +94,68 @@ async fn wait_for_sigkill() -> NodeResult<()> {
     Ok(())
 }
 
+async fn _check_random_shard(
+    shards: Arc<AsyncUnboundedShardReaderCache>,
+) -> Result<(), std::io::Error> {
+    //
+    // This function is used to check pulling a random shard.
+    // This is used to report on the health of the reader service.
+    //
+    let entries = fs::read_dir(env::shards_path())?;
+
+    let entry_picked = entries.choose(&mut rand::thread_rng());
+    if entry_picked.is_none() {
+        return Ok(());
+    }
+
+    let path = entry_picked.unwrap()?.path();
+    if !path.is_dir() {
+        return Ok(());
+    }
+    let shard_id = path.file_name().unwrap().to_str().unwrap();
+
+    let shard = shards
+        .cache
+        .read()
+        .await
+        .get(&shard_id.to_string())
+        .map(Arc::clone);
+    let shard = shard.unwrap();
+    match tokio::task::spawn_blocking(move || shard.as_ref().text_count()).await? {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            error!("Error checking shard: {:?}", err);
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Error checking shard",
+            ))
+        }
+    }
+}
+
+async fn health_checker(
+    mut health_reporter: tonic_health::server::HealthReporter,
+    shards: Arc<AsyncUnboundedShardReaderCache>,
+) -> Result<(), std::io::Error> {
+    //
+    // Periodically check the health of the reader service
+    // and set the health reporter grpc service to not health if unable to get shard
+    //
+    health_reporter.set_serving::<GrpcServer>().await;
+
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        match _check_random_shard(shards.clone()).await {
+            Ok(_) => {
+                health_reporter.set_serving::<GrpcServer>().await;
+            }
+            Err(_) => {
+                health_reporter.set_not_serving::<GrpcServer>().await;
+            }
+        }
+    }
+}
+
 pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver, listen_address: SocketAddr) {
     info!(
         "Reader listening for gRPC requests at: {:?}",
@@ -101,8 +166,8 @@ pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver, listen_addres
     let debug_logs_middleware = GrpcDebugLogsLayer::default();
     let metrics_middleware = MetricsLayer::default();
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter.set_serving::<GrpcServer>().await;
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    tokio::spawn(health_checker(health_reporter, grpc_driver.shards.clone()));
 
     Server::builder()
         .layer(tracing_middleware)

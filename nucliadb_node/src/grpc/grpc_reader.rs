@@ -32,14 +32,14 @@ use crate::shards::providers::AsyncShardReaderProvider;
 use crate::shards::reader::ShardReader;
 
 pub struct NodeReaderGRPCDriver {
-    shards: AsyncUnboundedShardReaderCache,
+    pub shards: Arc<AsyncUnboundedShardReaderCache>,
     settings: Arc<Settings>,
 }
 
 impl NodeReaderGRPCDriver {
     pub fn new(settings: Arc<Settings>) -> Self {
         Self {
-            shards: AsyncUnboundedShardReaderCache::new(settings.shards_path()),
+            shards: Arc::new(AsyncUnboundedShardReaderCache::new(settings.shards_path())),
             settings,
         }
     }

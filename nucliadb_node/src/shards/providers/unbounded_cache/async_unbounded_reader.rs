@@ -33,7 +33,7 @@ use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct AsyncUnboundedShardReaderCache {
-    cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
+    pub cache: RwLock<HashMap<ShardId, Arc<ShardReader>>>,
     shards_path: PathBuf,
 }
 
