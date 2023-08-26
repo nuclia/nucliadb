@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import logging
 from typing import Optional
 
 from grpc import StatusCode
@@ -31,6 +32,7 @@ from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_node import SERVICE_NAME  # type: ignore
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
+logger = logging.getLogger(__name__)
 CACHE = LRU(128)
 
 
@@ -51,6 +53,7 @@ class Reader:
             except AioRpcError as exc:
                 if exc.code() != StatusCode.NOT_FOUND:
                     raise
+                logger.warning("Shard not found", {"shard_id": pb.id})
                 return None
             CACHE[pb.id] = shard
             return CACHE[pb.id]
