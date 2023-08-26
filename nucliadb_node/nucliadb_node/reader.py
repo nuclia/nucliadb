@@ -20,6 +20,8 @@
 import asyncio
 from typing import Optional
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
@@ -44,7 +46,12 @@ class Reader:
         if pb.id not in CACHE:
             req = GetShardRequest()
             req.shard_id.id = pb.id
-            shard: Shard = await self.stub.GetShard(req)  # type: ignore
+            try:
+                shard: Shard = await self.stub.GetShard(req)  # type: ignore
+            except AioRpcError as exc:
+                if exc.code() != StatusCode.NOT_FOUND:
+                    raise
+                return None
             CACHE[pb.id] = shard
             return CACHE[pb.id]
         else:
