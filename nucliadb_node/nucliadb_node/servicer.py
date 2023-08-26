@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodesidecar_pb2 import Counter
 
