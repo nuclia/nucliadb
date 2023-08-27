@@ -22,11 +22,13 @@ use std::task::{Context, Poll};
 use futures::future::BoxFuture;
 use hyper::Body;
 use nucliadb_core::tracing::instrument::Instrument;
-use nucliadb_core::tracing::{debug, info_span, warn};
+use nucliadb_core::tracing::{debug, info_span, warn, Span};
 use opentelemetry::propagation::Extractor;
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+
+use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug, Clone, Default)]
 pub struct GrpcInstrumentorLayer;
@@ -70,35 +72,38 @@ where
         // https://docs.rs/tower/0.4.13/tower/trait.Service.html#be-careful-when-cloning-inner-services
         // for more details
         let mut inner = std::mem::replace(&mut self.inner, clone);
+        let span = Span::current();
+        let info = info_span!(parent: &span, "telemetry middleware");
+        run_with_telemetry(info, move || {
+            let name = req.uri().path();
+            let (service, method) = match name.strip_prefix('/').and_then(|s| s.split_once('/')) {
+                Some((service, method)) => (service, method),
+                None => {
+                    warn!("gRPC server called with unexpected format: {name:?}");
+                    ("Unknown", name)
+                }
+            };
 
-        let name = req.uri().path();
-        let (service, method) = match name.strip_prefix('/').and_then(|s| s.split_once('/')) {
-            Some((service, method)) => (service, method),
-            None => {
-                warn!("gRPC server called with unexpected format: {name:?}");
-                ("Unknown", name)
-            }
-        };
+            let span = info_span!(
+                target: "NUCLIADB_NODE",
+                "nucliadb_node:grpc-call", // placeholder that will be substituted by otel.name
+                otel.name = name,
+                rpc.system = "grpc",
+                rpc.service = service,
+                rpc.method = method
+            );
+            let parent_context = opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.extract(&HeaderMapWrapper {
+                    inner: req.headers(),
+                })
+            });
 
-        let span = info_span!(
-            target: "NUCLIADB_NODE",
-            "nucliadb_node:grpc-call", // placeholder that will be substituted by otel.name
-            otel.name = name,
-            rpc.system = "grpc",
-            rpc.service = service,
-            rpc.method = method
-        );
-        let parent_context = opentelemetry::global::get_text_map_propagator(|propagator| {
-            propagator.extract(&HeaderMapWrapper {
-                inner: req.headers(),
-            })
-        });
+            span.set_parent(parent_context);
 
-        span.set_parent(parent_context);
-
-        let fut = inner.call(req).instrument(span);
-        debug!("telemetry call finishes");
-        Box::pin(fut)
+            let fut = inner.call(req).instrument(span);
+            debug!("telemetry call finishes");
+            Box::pin(fut)
+        })
     }
 }
 
