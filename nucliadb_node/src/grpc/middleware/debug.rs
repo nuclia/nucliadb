@@ -21,9 +21,11 @@ use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
 use hyper::Body;
-use nucliadb_core::tracing::debug;
+use nucliadb_core::tracing::{debug, info_span, Span};
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
+
+use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug, Clone, Default)]
 pub struct GrpcDebugLogsLayer;
@@ -56,6 +58,7 @@ where
     }
 
     fn call(&mut self, req: hyper::Request<Body>) -> Self::Future {
+        debug!("debug middleware starts");
         // This is necessary because tonic internally uses `tower::buffer::Buffer`.
         // See https://github.com/tower-rs/tower/issues/547#issuecomment-767629149
         // for details on why this is necessary
@@ -66,22 +69,29 @@ where
         // for more details
         let mut inner = std::mem::replace(&mut self.inner, clone);
 
-        let name = req.uri().path();
-        let method = name.split('/').last().unwrap_or(name).to_string();
+        let span = Span::current();
+        let info = info_span!(parent: &span, "debug middleware");
+        run_with_telemetry(info, move || {
+            let name = req.uri().path();
+            let method = name.split('/').last().unwrap_or(name).to_string();
 
-        Box::pin(async move {
-            debug!("gRPC call {method} starts");
-            let response = inner.call(req).await;
-            match response {
-                Ok(response) => {
-                    debug!("gRPC call {method} ended correctly");
-                    Ok(response)
+            debug!("debugger call is pinned");
+            let pin = Box::pin(async move {
+                debug!("gRPC call {method} starts");
+                let response = inner.call(req).await;
+                match response {
+                    Ok(response) => {
+                        debug!("gRPC call {method} ended correctly");
+                        Ok(response)
+                    }
+                    Err(error) => {
+                        debug!("gRPC call {method} failed: {error:?}");
+                        Err(error)
+                    }
                 }
-                Err(error) => {
-                    debug!("gRPC call {method} failed: {error:?}");
-                    Err(error)
-                }
-            }
+            });
+            debug!("debug pin completed");
+            pin
         })
     }
 }
