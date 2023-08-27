@@ -22,7 +22,7 @@ use std::task::{Context, Poll};
 use futures::future::BoxFuture;
 use hyper::Body;
 use nucliadb_core::tracing::instrument::Instrument;
-use nucliadb_core::tracing::{info_span, warn};
+use nucliadb_core::tracing::{debug, info_span, warn};
 use opentelemetry::propagation::Extractor;
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
@@ -60,6 +60,7 @@ where
     }
 
     fn call(&mut self, req: hyper::Request<Body>) -> Self::Future {
+        debug!("telemetry middleware starts");
         // This is necessary because tonic internally uses `tower::buffer::Buffer`.
         // See https://github.com/tower-rs/tower/issues/547#issuecomment-767629149
         // for details on why this is necessary
@@ -96,6 +97,7 @@ where
         span.set_parent(parent_context);
 
         let fut = inner.call(req).instrument(span);
+        debug!("telemetry call finishes");
         Box::pin(fut)
     }
 }
