@@ -20,12 +20,7 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import (
-    _parse_answer_status_code,
-    async_gen_lookahead,
-    chat,
-)
+from nucliadb.search.search.chat.query import async_gen_lookahead, chat
 from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
@@ -75,24 +70,3 @@ async def test_async_gen_lookahead():
         (0, False),
         (1, True),
     ]
-
-
-@pytest.mark.parametrize(
-    "chunk,status_code,error",
-    [
-        (b"", None, True),
-        (b"errorcodeisnotpresetn", None, True),
-        (b"0", AnswerStatusCode.SUCCESS, False),
-        (b"-1", AnswerStatusCode.ERROR, False),
-        (b"-2", AnswerStatusCode.NO_CONTEXT, False),
-        (b"foo.0", AnswerStatusCode.SUCCESS, False),
-        (b"bar.-1", AnswerStatusCode.ERROR, False),
-        (b"baz.-2", AnswerStatusCode.NO_CONTEXT, False),
-    ],
-)
-def test_parse_status_code(chunk, status_code, error):
-    if error:
-        with pytest.raises(ValueError):
-            _parse_answer_status_code(chunk)
-    else:
-        assert _parse_answer_status_code(chunk) == status_code
