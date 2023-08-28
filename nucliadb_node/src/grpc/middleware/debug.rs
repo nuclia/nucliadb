@@ -56,6 +56,7 @@ where
     }
 
     fn call(&mut self, req: hyper::Request<Body>) -> Self::Future {
+        debug!("debug middleware starts");
         // This is necessary because tonic internally uses `tower::buffer::Buffer`.
         // See https://github.com/tower-rs/tower/issues/547#issuecomment-767629149
         // for details on why this is necessary
@@ -69,7 +70,7 @@ where
         let name = req.uri().path();
         let method = name.split('/').last().unwrap_or(name).to_string();
 
-        Box::pin(async move {
+        let pin = Box::pin(async move {
             debug!("gRPC call {method} starts");
             let response = inner.call(req).await;
             match response {
@@ -82,6 +83,8 @@ where
                     Err(error)
                 }
             }
-        })
+        });
+        debug!("debug middleware ends");
+        pin
     }
 }
