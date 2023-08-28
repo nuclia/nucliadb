@@ -88,7 +88,7 @@ async def generate_answer(
     async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
         if is_last_chunk:
             try:
-                status_code = _parse_answer_status_code(answer_chunk)
+                status_code = AnswerStatusCode(answer_chunk.decode())
             except ValueError:
                 # TODO: remove this in the future, it's
                 # just for bw compatibility until predict
@@ -245,22 +245,3 @@ async def async_gen_lookahead(gen):
     # Yield the last chunk if there is one
     if buffered_chunk is not None:
         yield buffered_chunk, True
-
-
-def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
-    """
-    Parses the status code from the last chunk of the answer.
-    """
-    try:
-        return AnswerStatusCode(chunk.decode())
-    except ValueError:
-        # In some cases, even if the status code was yield separately
-        # at the server side, the status code is appended to the previous chunk...
-        # It may be a bug in the aiohttp.StreamResponse implementation,
-        # but we haven't spotted it yet. For now, we just try to parse the status code
-        # from the tail of the chunk.
-        if chunk == b"":
-            raise
-        if chunk.endswith(b"0"):
-            return AnswerStatusCode.SUCCESS
-        return AnswerStatusCode(chunk[-2:].decode())
