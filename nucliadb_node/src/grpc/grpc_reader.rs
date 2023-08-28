@@ -58,15 +58,11 @@ impl NodeReaderGRPCDriver {
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
         let id = id.into();
 
-        // NOTE: Taking into account we use an unbounded shard cache, we only request
-        // loading a shard into memory when lazy loading is enabled. Otherwise,
-        // we rely on all shards (stored on disk) been brought to memory before
-        // the driver is online on `initialize`.
-        if self.settings.lazy_loading() {
-            self.shards.load(id.clone()).await.map_err(|error| {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            })?;
-        }
+        // Always try to load a shard as, for example, new shards created by the
+        // writer won't be loaded automatically
+        self.shards.load(id.clone()).await.map_err(|error| {
+            tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+        })?;
 
         match self.shards.get(id.clone()).await {
             Some(shard) => Ok(shard),
