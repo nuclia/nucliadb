@@ -170,7 +170,7 @@ async def chat(
     nuclia_learning_id: Optional[str] = None
     user_context = chat_request.context or []
 
-    if find_results.total == 0:
+    if len(find_results.resources) == 0:
         answer_stream = generate_answer(
             user_query,
             user_context,
