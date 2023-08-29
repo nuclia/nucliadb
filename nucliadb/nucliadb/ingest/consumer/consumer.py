@@ -206,6 +206,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await asyncio.sleep(2)
+                await msg.nak()
                 raise e
             else:
                 # Successful processing
