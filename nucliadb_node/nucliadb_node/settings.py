@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     data_path: Optional[str] = None
 
+    max_resources_before_gc: int = 1000
+
 
 settings = Settings()
 indexing_settings = utils_settings.IndexingSettings()
