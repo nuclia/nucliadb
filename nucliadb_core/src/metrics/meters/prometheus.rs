@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, TryLockError};
 
 use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
@@ -105,23 +105,29 @@ impl PrometheusMeter {
     }
 
     fn collect_runtime_metrics(&self) -> NodeResult<()> {
-        match self.runtime_intervals.try_lock() {
-            Ok(ref mut intervals) => {
-                if let Some(metrics) = intervals.next() {
-                    self.tokio_runtime_metrics.collect(metrics);
-                } else {
-                    return Err(node_error!(
-                        "Cannot export tokio runtime metrics, iterator didn't return values"
-                    ));
-                }
+        let mut intervals = match self.runtime_intervals.try_lock() {
+            Ok(intervals) => intervals,
+            Err(TryLockError::Poisoned(inner)) => {
+                // This should never happen, as only one thread should be
+                // calling this. Still, if it happens, we recover and continue
+                // exporting metrics
+                inner.into_inner()
             }
-            Err(error) => {
+            Err(TryLockError::WouldBlock) => {
                 return Err(node_error!(
-                    "Cannot acquire runtime metrics lock. There's a concurrent export going on? \
-                     {error}"
+                    "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
                 ));
             }
+        };
+
+        if let Some(metrics) = intervals.next() {
+            self.tokio_runtime_metrics.collect(metrics);
+        } else {
+            return Err(node_error!(
+                "Cannot export tokio runtime metrics, iterator didn't return values"
+            ));
         }
+
         Ok(())
     }
 }
