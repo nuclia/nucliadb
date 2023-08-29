@@ -163,6 +163,7 @@ jobs:
         env:
           DEBUG: 1
           RUST_BACKTRACE: 1
+          RUSTFLAGS: --cfg tokio_unstable
         name: cargo test
         with:
           command: test
