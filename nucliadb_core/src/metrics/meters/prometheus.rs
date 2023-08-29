@@ -17,20 +17,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Mutex;
+
 use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
+use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metric::tokio_tasks::TaskLabels;
-use crate::metrics::metric::{request_time, tokio_tasks};
+use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
+use crate::metrics::metric::tokio_runtime::TokioRuntimeMetrics;
+use crate::metrics::metric::tokio_tasks::{TaskLabels, TokioTaskMetrics};
+use crate::metrics::metric::{request_time, tokio_runtime, tokio_tasks};
 use crate::metrics::task_monitor::{Monitor, MultiTaskMonitor, TaskId};
-use crate::NodeResult;
+use crate::tracing::error;
+use crate::{node_error, NodeResult};
 
 pub struct PrometheusMeter {
     registry: Registry,
-    request_time_metric: request_time::RequestTimeMetric,
-    tokio_task_metrics: tokio_tasks::TokioTaskMetrics,
+    request_time_metric: RequestTimeMetric,
+    tokio_runtime_metrics: TokioRuntimeMetrics,
+    tokio_task_metrics: TokioTaskMetrics,
     tasks_monitor: MultiTaskMonitor,
+
+    // We need a Mutex here because Meters are Send and we need a mutable
+    // RuntimeIntervals. We need to store the RuntimeIntervals iterator instead
+    // of RuntimeMontior because metrics are cumulative in it. Creating a
+    // RuntimeIntervals object per export does not get metrics correctly
+    runtime_intervals: Mutex<RuntimeIntervals>,
 }
 
 impl Default for PrometheusMeter {
@@ -48,16 +61,16 @@ impl Meter for PrometheusMeter {
                 self.tokio_task_metrics.collect(labels, metrics.to_owned());
             });
 
+        if let Err(error) = self.collect_runtime_metrics() {
+            error!("{error:?}");
+        }
+
         let mut buf = String::new();
         encoding::text::encode(&mut buf, &self.registry)?;
         Ok(buf)
     }
 
-    fn record_request_time(
-        &self,
-        metric: request_time::RequestTimeKey,
-        value: request_time::RequestTimeValue,
-    ) {
+    fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue) {
         self.request_time_metric
             .get_or_create(&metric)
             .observe(value);
@@ -69,20 +82,46 @@ impl Meter for PrometheusMeter {
 }
 
 impl PrometheusMeter {
-    pub fn new() -> PrometheusMeter {
+    pub fn new() -> Self {
         let mut registry = Registry::default();
 
         // This must be done for every metric
         let request_time_metric = request_time::register_request_time(&mut registry);
+        let tokio_runtime_metrics = tokio_runtime::register_tokio_runtime_metrics(&mut registry);
         let tokio_task_metrics = tokio_tasks::register_tokio_task_metrics(&mut registry);
 
         let tasks_monitor = MultiTaskMonitor::new();
+        let runtime_monitor = RuntimeMonitor::new(&tokio::runtime::Handle::current());
+        let runtime_intervals = Mutex::new(runtime_monitor.intervals());
 
-        PrometheusMeter {
+        Self {
             registry,
             request_time_metric,
+            tokio_runtime_metrics,
             tokio_task_metrics,
             tasks_monitor,
+            runtime_intervals,
         }
+    }
+
+    fn collect_runtime_metrics(&self) -> NodeResult<()> {
+        match self.runtime_intervals.try_lock() {
+            Ok(ref mut intervals) => {
+                if let Some(metrics) = intervals.next() {
+                    self.tokio_runtime_metrics.collect(metrics);
+                } else {
+                    return Err(node_error!(
+                        "Cannot export tokio runtime metrics, iterator didn't return values"
+                    ));
+                }
+            }
+            Err(error) => {
+                return Err(node_error!(
+                    "Cannot acquire runtime metrics lock. There's a concurrent export going on? \
+                     {error}"
+                ));
+            }
+        }
+        Ok(())
     }
 }

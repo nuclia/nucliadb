@@ -28,11 +28,17 @@ use tonic::Request;
 async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = node_writer().await;
     let mut reader = node_reader().await;
+    let metrics = nucliadb_core::metrics::get_metrics();
+    metrics.export()?;
 
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest::default()))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
+
+    println!("METRICS BEGIN --->");
+    println!("{}", metrics.export()?);
+    println!("METRICS ENDS <---");
 
     let response = reader
         .get_shard(Request::new(GetShardRequest {

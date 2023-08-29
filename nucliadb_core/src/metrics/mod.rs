@@ -21,6 +21,9 @@ mod meters;
 mod metric;
 mod task_monitor;
 
+#[cfg(test)]
+mod tests;
+
 use std::sync::Arc;
 
 use lazy_static::lazy_static;
