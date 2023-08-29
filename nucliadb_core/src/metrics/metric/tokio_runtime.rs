@@ -379,7 +379,6 @@ impl TokioRuntimeMetrics {
     }
 
     pub fn collect(&self, metrics: RuntimeMetrics) {
-        println!("METRICS: {metrics:?}\n");
         self.workers_count.set(metrics.workers_count as i64);
         self.total_park_count.inc_by(metrics.total_park_count);
         self.max_park_count.set(metrics.total_park_count as i64);
