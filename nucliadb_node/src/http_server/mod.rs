@@ -22,6 +22,9 @@
 
 mod metrics_service;
 
+#[cfg(target_os = "linux")]
+mod traces_service;
+
 use std::net::SocketAddr;
 
 use axum::routing::get;
@@ -33,13 +36,14 @@ pub struct MetricsServerOptions {
     pub default_http_port: u16,
 }
 
-pub async fn run_http_metrics_server(options: MetricsServerOptions) {
+pub async fn run_http_server(options: MetricsServerOptions) {
     // Add routes to services
     let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
     let metrics = Router::new().route("/metrics", get(metrics_service::metrics_service));
-    axum_server::bind(addr)
-        // Services will be added here
-        .serve(metrics.into_make_service())
-        .await
-        .expect("Error starting the HTTP server");
+    #[cfg(target_os = "linux")]
+    let thread_dump = Router::new().route("/__dump", get(traces_service::thread_dump_service));
+    let server = axum_server::bind(addr).serve(metrics.into_make_service());
+    #[cfg(target_os = "linux")]
+    let server = server.serve(thread_dump.into_make_service());
+    server.await.expect("Error starting the HTTP server");
 }
