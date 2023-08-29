@@ -21,29 +21,29 @@ use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
 use hyper::Body;
+use nucliadb_core::metrics;
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
 
-use crate::metrics;
-
 #[derive(Debug, Clone, Default)]
-pub struct MetricsLayer;
+pub struct GrpcTasksMetricsLayer;
 
-impl<S> Layer<S> for MetricsLayer {
-    type Service = EndpointMetrics<S>;
+impl<S> Layer<S> for GrpcTasksMetricsLayer {
+    type Service = GrpcTasksMetrics<S>;
 
     fn layer(&self, service: S) -> Self::Service {
-        EndpointMetrics { inner: service }
+        GrpcTasksMetrics { inner: service }
     }
 }
 
-/// Dynamically instrument service calls by HTTP path / gRPC method.
+/// Dynamically instrument gRPC server endpoints to extract async tokio task
+/// metrics
 #[derive(Debug, Clone)]
-pub struct EndpointMetrics<S> {
+pub struct GrpcTasksMetrics<S> {
     inner: S,
 }
 
-impl<S> Service<hyper::Request<Body>> for EndpointMetrics<S>
+impl<S> Service<hyper::Request<Body>> for GrpcTasksMetrics<S>
 where
     S: Service<hyper::Request<Body>, Response = hyper::Response<BoxBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,

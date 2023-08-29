@@ -22,11 +22,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
-use nucliadb_core::metrics::middleware::MetricsLayer;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::tracing::*;
 use nucliadb_core::{metrics, NodeResult};
-use nucliadb_node::grpc::middleware::{GrpcDebugLogsLayer, GrpcInstrumentorLayer};
+use nucliadb_node::grpc::middleware::{
+    GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
+};
 use nucliadb_node::grpc::writer::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::http_server::{run_http_metrics_server, MetricsServerOptions};
 use nucliadb_node::node_metadata::NodeMetadata;
@@ -123,7 +124,7 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver, listen_addres
 
     let tracing_middleware = GrpcInstrumentorLayer::default();
     let debug_logs_middleware = GrpcDebugLogsLayer::default();
-    let metrics_middleware = MetricsLayer::default();
+    let metrics_middleware = GrpcTasksMetricsLayer::default();
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;

@@ -18,7 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 mod debug;
+mod metrics;
 mod telemetry;
 
 pub use debug::GrpcDebugLogsLayer;
+pub use metrics::GrpcTasksMetricsLayer;
 pub use telemetry::GrpcInstrumentorLayer;
