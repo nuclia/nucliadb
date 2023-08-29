@@ -23,5 +23,5 @@ futures = "0.3.17"
 tonic = "0.7"
 hyper = "0.14.26"
 tower = "0.4.13"
-tokio-metrics = { version = "0.2.2", default-features = false }
+tokio-metrics = "0.3.0"
 dashmap = "5.4.0"
