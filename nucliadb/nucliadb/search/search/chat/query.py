@@ -96,6 +96,12 @@ async def generate_answer(
                 status_code = AnswerStatusCode.SUCCESS
                 answer.append(answer_chunk)
                 yield answer_chunk
+            else:
+                # TODO: this should be needed but, in case we receive the status
+                # code mixed with text, we strip it and return the text
+                if len(answer_chunk) != len(status_code.encode()):
+                    answer_chunk = answer_chunk.rstrip(status_code.encode())
+                    yield answer_chunk
             break
         answer.append(answer_chunk)
         yield answer_chunk
