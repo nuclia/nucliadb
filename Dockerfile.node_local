@@ -59,7 +59,7 @@ FROM base as builder
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 
-ENV RUSTFLAGS="--cfg prometheus_metrics"
+ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
