@@ -233,7 +233,7 @@ mod test {
             .max_depth(1)
             .build()
             .unwrap();
-        let expected = vec![nodes[0], nodes[1], nodes[3]];
+        let expected = [nodes[0], nodes[1], nodes[3]];
         let result = bfs.search().unwrap();
         let mut result = result.map(|cnx| cnx.to()).collect::<Vec<_>>();
         result.push(nodes[0]);

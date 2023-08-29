@@ -120,6 +120,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - uses: actions-rs/clippy-check@v1
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: -p nucliadb_node --tests
@@ -139,6 +141,8 @@ jobs:
 
       - uses: actions-rs/cargo@v1
         name: cargo prebuild tests
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
         with:
           command: build
           args: --profile test
@@ -159,6 +163,7 @@ jobs:
         env:
           DEBUG: 1
           RUST_BACKTRACE: 1
+          RUSTFLAGS: --cfg tokio_unstable
         name: cargo test
         with:
           command: test
@@ -199,6 +204,8 @@ jobs:
         run: make -C nucliadb_node/ install-dev
 
       - name: Install rust binding for testing
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
         run: |
           maturin build -m nucliadb_node_binding/Cargo.toml
           pip install target/wheels/*_x86_64.whl

@@ -98,9 +98,9 @@ pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver, listen_addres
         listen_address
     );
 
-    let tracing_middleware = GrpcInstrumentorLayer::default();
-    let debug_logs_middleware = GrpcDebugLogsLayer::default();
-    let metrics_middleware = GrpcTasksMetricsLayer::default();
+    let tracing_middleware = GrpcInstrumentorLayer;
+    let debug_logs_middleware = GrpcDebugLogsLayer;
+    let metrics_middleware = GrpcTasksMetricsLayer;
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;

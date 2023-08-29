@@ -38,6 +38,7 @@ COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
     /nucliadb/
+COPY .cargo/config.toml /nucliadb/.cargo/
 COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
@@ -58,7 +59,7 @@ FROM base as builder
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 
-ENV RUSTFLAGS="--cfg prometheus_metrics"
+ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
@@ -73,6 +74,7 @@ COPY Cargo.toml \
     Cargo.lock \
     rust-toolchain.toml \
     /nucliadb/
+COPY .cargo/config.toml /nucliadb/.cargo/
 COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
