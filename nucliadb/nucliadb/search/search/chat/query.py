@@ -26,6 +26,7 @@ from nucliadb_protos.audit_pb2 import ChatContext
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
+from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode, PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import format_chat_prompt_content
@@ -105,6 +106,8 @@ async def generate_answer(
             break
         answer.append(answer_chunk)
         yield answer_chunk
+    if is_last_chunk is False:
+        logger.warning("BUG: /chat endpoint without last chunk")
 
     text_answer = b"".join(answer)
 
