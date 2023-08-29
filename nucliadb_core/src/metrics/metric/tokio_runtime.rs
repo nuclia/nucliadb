@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
@@ -24,36 +25,36 @@ use tokio_metrics::RuntimeMetrics;
 
 pub struct TokioRuntimeMetrics {
     workers_count: Gauge,
-    total_park_count: Gauge,
+    total_park_count: Counter,
     max_park_count: Gauge,
     min_park_count: Gauge,
     mean_poll_duration: Histogram,
     mean_poll_duration_worker_min: Histogram,
     mean_poll_duration_worker_max: Histogram,
-    total_noop_count: Gauge,
+    total_noop_count: Counter,
     max_noop_count: Gauge,
     min_noop_count: Gauge,
-    total_steal_count: Gauge,
+    total_steal_count: Counter,
     max_steal_count: Gauge,
     min_steal_count: Gauge,
-    total_steal_operations: Gauge,
+    total_steal_operations: Counter,
     max_steal_operations: Gauge,
     min_steal_operations: Gauge,
     num_remote_schedules: Gauge,
-    total_local_schedule_count: Gauge,
+    total_local_schedule_count: Counter,
     max_local_schedule_count: Gauge,
     min_local_schedule_count: Gauge,
-    total_overflow_count: Gauge,
+    total_overflow_count: Counter,
     max_overflow_count: Gauge,
     min_overflow_count: Gauge,
-    total_polls_count: Gauge,
+    total_polls_count: Counter,
     max_polls_count: Gauge,
     min_polls_count: Gauge,
     total_busy_duration: Histogram,
     max_busy_duration: Histogram,
     min_busy_duration: Histogram,
     injection_queue_depth: Gauge,
-    total_local_queue_depth: Gauge,
+    total_local_queue_depth: Counter,
     max_local_queue_depth: Gauge,
     min_local_queue_depth: Gauge,
     elapsed: Histogram,
@@ -78,7 +79,7 @@ impl TokioRuntimeMetrics {
             workers_count.clone(),
         );
 
-        let total_park_count = Gauge::default();
+        let total_park_count = Counter::default();
         registry.register(
             "nucliadb_node_total_park_count",
             "The number of times worker threads parked. [...]",
@@ -130,7 +131,7 @@ impl TokioRuntimeMetrics {
         //     poll_count_histogram.clone(),
         // );
 
-        let total_noop_count = Gauge::default();
+        let total_noop_count = Counter::default();
         registry.register(
             "nucliadb_node_total_noop_count",
             "The number of times worker threads unparked but performed no work before parking \
@@ -154,7 +155,7 @@ impl TokioRuntimeMetrics {
             min_noop_count.clone(),
         );
 
-        let total_steal_count = Gauge::default();
+        let total_steal_count = Counter::default();
         registry.register(
             "nucliadb_node_total_steal_count",
             "The number of tasks worker threads stole from another worker thread. [...]",
@@ -175,7 +176,7 @@ impl TokioRuntimeMetrics {
             min_steal_count.clone(),
         );
 
-        let total_steal_operations = Gauge::default();
+        let total_steal_operations = Counter::default();
         registry.register(
             "nucliadb_node_total_steal_operations",
             "The number of times worker threads stole tasks from another worker thread. [...]",
@@ -203,7 +204,7 @@ impl TokioRuntimeMetrics {
             num_remote_schedules.clone(),
         );
 
-        let total_local_schedule_count = Gauge::default();
+        let total_local_schedule_count = Counter::default();
         registry.register(
             "nucliadb_node_total_local_schedule_count",
             "The number of tasks scheduled from worker threads. [...]",
@@ -224,7 +225,7 @@ impl TokioRuntimeMetrics {
             min_local_schedule_count.clone(),
         );
 
-        let total_overflow_count = Gauge::default();
+        let total_overflow_count = Counter::default();
         registry.register(
             "nucliadb_node_total_overflow_count",
             "The number of times worker threads staurated their local queues. [...]",
@@ -245,7 +246,7 @@ impl TokioRuntimeMetrics {
             min_overflow_count.clone(),
         );
 
-        let total_polls_count = Gauge::default();
+        let total_polls_count = Counter::default();
         registry.register(
             "nucliadb_node_total_polls_count",
             "The number of tasks that have been polled across all worker threads. [...]",
@@ -294,7 +295,7 @@ impl TokioRuntimeMetrics {
             injection_queue_depth.clone(),
         );
 
-        let total_local_queue_depth = Gauge::default();
+        let total_local_queue_depth = Counter::default();
         registry.register(
             "nucliadb_node_total_local_queue_depth",
             "The total number of tasks currently scheduled in workers' local queues. [...]",
@@ -378,8 +379,9 @@ impl TokioRuntimeMetrics {
     }
 
     pub fn collect(&self, metrics: RuntimeMetrics) {
+        println!("METRICS: {metrics:?}\n");
         self.workers_count.set(metrics.workers_count as i64);
-        self.total_park_count.set(metrics.total_park_count as i64);
+        self.total_park_count.inc_by(metrics.total_park_count);
         self.max_park_count.set(metrics.total_park_count as i64);
         self.min_park_count.set(metrics.min_park_count as i64);
         self.mean_poll_duration
@@ -388,14 +390,14 @@ impl TokioRuntimeMetrics {
             .observe(metrics.mean_poll_duration_worker_min.as_secs_f64());
         self.mean_poll_duration_worker_max
             .observe(metrics.mean_poll_duration_worker_max.as_secs_f64());
-        self.total_noop_count.set(metrics.total_noop_count as i64);
+        self.total_noop_count.inc_by(metrics.total_noop_count);
         self.max_noop_count.set(metrics.max_noop_count as i64);
         self.min_noop_count.set(metrics.min_noop_count as i64);
-        self.total_steal_count.set(metrics.total_steal_count as i64);
+        self.total_steal_count.inc_by(metrics.total_steal_count);
         self.max_steal_count.set(metrics.max_steal_count as i64);
         self.min_steal_count.set(metrics.min_steal_count as i64);
         self.total_steal_operations
-            .set(metrics.total_steal_operations as i64);
+            .inc_by(metrics.total_steal_operations);
         self.max_steal_operations
             .set(metrics.max_steal_operations as i64);
         self.min_steal_operations
@@ -403,18 +405,18 @@ impl TokioRuntimeMetrics {
         self.num_remote_schedules
             .set(metrics.num_remote_schedules as i64);
         self.total_local_schedule_count
-            .set(metrics.total_local_schedule_count as i64);
+            .inc_by(metrics.total_local_schedule_count);
         self.max_local_schedule_count
             .set(metrics.max_local_schedule_count as i64);
         self.min_local_schedule_count
             .set(metrics.min_local_schedule_count as i64);
         self.total_overflow_count
-            .set(metrics.total_overflow_count as i64);
+            .inc_by(metrics.total_overflow_count);
         self.max_overflow_count
             .set(metrics.max_overflow_count as i64);
         self.min_overflow_count
             .set(metrics.min_overflow_count as i64);
-        self.total_polls_count.set(metrics.total_polls_count as i64);
+        self.total_polls_count.inc_by(metrics.total_polls_count);
         self.max_polls_count.set(metrics.max_polls_count as i64);
         self.min_polls_count.set(metrics.min_polls_count as i64);
         self.total_busy_duration
@@ -426,7 +428,7 @@ impl TokioRuntimeMetrics {
         self.injection_queue_depth
             .set(metrics.injection_queue_depth as i64);
         self.total_local_queue_depth
-            .set(metrics.total_local_queue_depth as i64);
+            .inc_by(metrics.total_local_queue_depth as u64);
         self.max_local_queue_depth
             .set(metrics.max_local_queue_depth as i64);
         self.min_local_queue_depth

@@ -43,7 +43,7 @@ async fn test_export_runtime_metrics_with_prometheus_meter_polls_count() {
     let export = meter.export().unwrap();
 
     assert!(export.contains("nucliadb_node_workers_count 1"));
-    assert!(export.contains("nucliadb_node_total_polls_count 100"));
+    assert!(export.contains("nucliadb_node_total_polls_count_total 100"));
     assert!(export.contains("nucliadb_node_min_polls_count 100"));
     assert!(export.contains("nucliadb_node_max_polls_count 100"));
 }
