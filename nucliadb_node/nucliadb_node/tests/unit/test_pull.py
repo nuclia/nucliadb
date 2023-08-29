@@ -50,7 +50,9 @@ class TestShardManager:
 
     @pytest.fixture()
     def shard_manager(self, writer, gc_lock):
-        yield ShardManager("shard_id", writer, gc_lock)
+        sm = ShardManager("shard_id", writer, gc_lock)
+        sm.target_gc_resources = 5
+        yield sm
 
     @pytest.mark.asyncio
     async def test_gc(self, shard_manager: ShardManager, writer):
