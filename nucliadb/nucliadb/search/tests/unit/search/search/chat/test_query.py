@@ -77,6 +77,17 @@ async def test_async_gen_lookahead():
     ]
 
 
+async def test_async_gen_lookahead_last_chunk_is_empty():
+    async def gen():
+        for chunk in [b"empty", b"chunk", b""]:
+            yield chunk
+
+    assert [item async for item in async_gen_lookahead(gen())] == [
+        (b"empty", False),
+        (b"chunk", True),
+    ]
+
+
 @pytest.mark.parametrize(
     "chunk,status_code,error",
     [

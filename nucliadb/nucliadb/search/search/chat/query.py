@@ -236,15 +236,19 @@ async def chat(
     )
 
 
-async def async_gen_lookahead(gen):
-    """
-    Async generator that yields the next chunk and whether it's the last one.
+async def async_gen_lookahead(gen: AsyncIterator[bytes]):
+    """Async generator that yields the next chunk and whether it's the last one.
+    Empty chunks are ignored.
+
     """
     buffered_chunk = None
     async for chunk in gen:
         if buffered_chunk is None:
             # Buffer the first chunk
             buffered_chunk = chunk
+            continue
+
+        if chunk == b"":
             continue
 
         # Yield the previous chunk and buffer the current one
