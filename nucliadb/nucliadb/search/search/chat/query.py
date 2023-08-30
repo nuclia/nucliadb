@@ -248,7 +248,7 @@ async def async_gen_lookahead(gen: AsyncIterator[bytes]):
             buffered_chunk = chunk
             continue
 
-        if chunk == b"":
+        if len(chunk) == 0:
             continue
 
         # Yield the previous chunk and buffer the current one
