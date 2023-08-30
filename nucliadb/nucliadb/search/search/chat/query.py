@@ -106,7 +106,7 @@ async def generate_answer(
             break
         answer.append(answer_chunk)
         yield answer_chunk
-    if is_last_chunk is False:
+    if not is_last_chunk:
         logger.warning("BUG: /chat endpoint without last chunk")
 
     text_answer = b"".join(answer)
@@ -268,6 +268,9 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         # It may be a bug in the aiohttp.StreamResponse implementation,
         # but we haven't spotted it yet. For now, we just try to parse the status code
         # from the tail of the chunk.
+        logger.warning(
+            f"Error decoding status code from /chat's last chunk. Chunk: {chunk!r}"
+        )
         if chunk == b"":
             raise
         if chunk.endswith(b"0"):
