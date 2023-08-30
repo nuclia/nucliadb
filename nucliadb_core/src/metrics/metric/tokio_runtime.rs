@@ -311,8 +311,8 @@ impl TokioRuntimeMetrics {
 
         let min_local_queue_depth = Gauge::default();
         registry.register(
-            "nucliadb_node_The minimum number of tasks currenly scheduled any worker's local queue",
-            "",
+            "nucliadb_node_min_local_queue_depth",
+            "The minimum number of tasks currenly scheduled any worker's local queue",
             min_local_queue_depth.clone(),
         );
 
