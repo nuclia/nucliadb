@@ -45,7 +45,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3 :: Only",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.8",
     include_package_data=True,
     package_data={"": ["*.txt", "*.md"], "nucliadb_dataset": ["py.typed"]},
     packages=find_packages(),
