@@ -72,7 +72,7 @@ def run():
     app, server = get_server(settings)
     instrument_app(app, excluded_urls=["/"], metrics=True)
 
-    if settings.fork:
+    if settings.fork:  # pragma: no cover
         pid = os.fork()
         if pid != 0:
             logger.warning(f"Server forked and running on pid {pid}")
