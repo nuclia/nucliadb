@@ -42,7 +42,7 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
     ],
     url="https://nucliadb.com",
-    python_requires=">=3.9, <4",
+    python_requires=">=3.8, <4",
     license="BSD",
     zip_safe=True,
     include_package_data=True,
