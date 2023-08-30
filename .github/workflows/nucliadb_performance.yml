@@ -1,8 +1,8 @@
 name: Performance Regression
 on:
   push:
-    branches:
-      - main
+    #  branches:
+    #  - main
   issue_comment:
     types: [created]
 
@@ -34,7 +34,7 @@ jobs:
           influxdb_org: tarek
           influxdb_bucket: benchmarks
   check-perf-pr:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
+    #if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
     runs-on: ubuntu-latest
     name: Check performance on the PR
     steps:
