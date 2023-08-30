@@ -37,15 +37,12 @@ logger = logging.getLogger(__name__)
 def setup() -> Settings:
     setup_logging()
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
-    if os.environ.get("NUCLIADB_ENV"):
-        nucliadb_args = Settings()
-    else:
-        parser = pydantic_argparse.ArgumentParser(
-            model=Settings,
-            prog="NucliaDB",
-            description="NucliaDB Starting script",
-        )
-        nucliadb_args = parser.parse_typed_args()
+    parser = pydantic_argparse.ArgumentParser(
+        model=Settings,
+        prog="NucliaDB",
+        description="NucliaDB Starting script",
+    )
+    nucliadb_args = parser.parse_typed_args()
 
     config_nucliadb(nucliadb_args)
 
