@@ -19,7 +19,6 @@
 #
 # Standalone purge command
 import asyncio
-import os
 
 import pydantic_argparse
 
