@@ -71,6 +71,13 @@ def run():
     settings = setup()
     app, server = get_server(settings)
     instrument_app(app, excluded_urls=["/"], metrics=True)
+
+    if settings.fork:
+        pid = os.fork()
+        if pid != 0:
+            logger.warning(f"Server forked and running on pid {pid}")
+            return
+
     logger.warning(
         f"======= Starting server on http://0.0.0.0:{settings.http_port}/ ======"
     )
