@@ -58,7 +58,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     url="https://nuclia.com",
-    python_requires=">=3.9, <4",
+    python_requires=">=3.8, <4",
     license="BSD",
     setup_requires=[
         "pytest-runner",
