@@ -21,7 +21,6 @@
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
-use nucliadb_core::thread::*;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
@@ -204,7 +203,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
         ms_neighbours
             .into_sorted_vec()
-            .into_par_iter()
+            .into_iter()
             .map(|Reverse(Cnx(n, d))| (n, d))
             .collect()
     }
