@@ -63,8 +63,21 @@ async def test_local_driver(local_driver):
     await driver_basic(local_driver)
 
 
+async def _clear_db(driver: Driver):
+    all_keys = []
+    async with driver.transaction() as txn:
+        async for key in txn.keys("/"):
+            all_keys.append(key)
+
+    async with driver.transaction() as txn:
+        for key in all_keys:
+            await txn.delete(key)
+
+
 async def driver_basic(driver: Driver):
     await driver.initialize()
+
+    await _clear_db(driver)
 
     # Test deleting a key that doesn't exist does not raise any error
     txn = await driver.begin()
