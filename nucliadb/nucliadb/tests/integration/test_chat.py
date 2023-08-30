@@ -17,14 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
+import io
+import json
 from unittest import mock
 
 import pytest
+from httpx import AsyncClient
 
 
 @pytest.mark.asyncio()
 async def test_chat(
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
     resp = await nucliadb_reader.post(
@@ -49,7 +53,7 @@ def find_incomplete_results():
 
 @pytest.mark.asyncio()
 async def test_chat_handles_incomplete_find_results(
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
     knowledgebox,
     find_incomplete_results,
 ):
@@ -60,3 +64,85 @@ async def test_chat_handles_incomplete_find_results(
     assert resp.json() == {
         "detail": "Temporary error on information retrieval. Please try again."
     }
+
+
+@pytest.fixture
+async def resource(nucliadb_writer, knowledgebox):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "The title",
+            "summary": "The summary",
+            "texts": {"text_field": {"body": "The body of the text field"}},
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code in (200, 201)
+    rid = resp.json()["uuid"]
+
+    import asyncio
+
+    await asyncio.sleep(1)
+
+    yield rid
+
+
+@pytest.mark.asyncio
+async def test_chat_handles_status_codes_in_a_different_chunk(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource,
+):
+    async def fake_generator():
+        for chunk in [b"some ", b"text ", b"with ", b"status.", b"-2"]:
+            yield chunk
+
+    m = mock.AsyncMock(return_value=("00", fake_generator()))
+    with mock.patch("nucliadb.search.predict.DummyPredictEngine.chat_query", new=m):
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/chat", json={"query": "title"}
+        )
+        assert resp.status_code == 200
+        find_result, answer, relations_result = parse_chat_response(resp.content)
+
+        assert answer == b"some text with status."
+
+
+@pytest.mark.asyncio
+async def test_chat_handles_status_codes_in_the_same_chunk(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource,
+):
+    async def fake_generator():
+        for chunk in [b"some ", b"text ", b"with ", b"status.-2"]:
+            yield chunk
+
+    m = mock.AsyncMock(return_value=("00", fake_generator()))
+    with mock.patch("nucliadb.search.predict.DummyPredictEngine.chat_query", new=m):
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/chat", json={"query": "title"}
+        )
+        assert resp.status_code == 200
+        find_result, answer, relations_result = parse_chat_response(resp.content)
+
+        assert answer == b"some text with status."
+
+
+def parse_chat_response(content: bytes):
+    raw = io.BytesIO(content)
+    header = raw.read(4)
+    payload_size = int.from_bytes(header, byteorder="big", signed=False)
+    data = raw.read(payload_size)
+    find_result = json.loads(base64.b64decode(data))
+    data = raw.read()
+    try:
+        answer, relations_payload = data.split(b"_END_")
+    except ValueError:
+        answer = data
+        relations_payload = b""
+    relations_result = None
+    if len(relations_payload) > 0:
+        relations_result = json.loads(base64.b64decode(relations_payload))
+    return find_result, answer, relations_result

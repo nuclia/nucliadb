@@ -26,6 +26,7 @@ from nucliadb_protos.audit_pb2 import ChatContext
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
+from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode, PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import format_chat_prompt_content
@@ -88,7 +89,7 @@ async def generate_answer(
     async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
         if is_last_chunk:
             try:
-                status_code = AnswerStatusCode(answer_chunk.decode())
+                status_code = _parse_answer_status_code(answer_chunk)
             except ValueError:
                 # TODO: remove this in the future, it's
                 # just for bw compatibility until predict
@@ -96,9 +97,17 @@ async def generate_answer(
                 status_code = AnswerStatusCode.SUCCESS
                 answer.append(answer_chunk)
                 yield answer_chunk
+            else:
+                # TODO: this should be needed but, in case we receive the status
+                # code mixed with text, we strip it and return the text
+                if len(answer_chunk) != len(status_code.encode()):
+                    answer_chunk = answer_chunk.rstrip(status_code.encode())
+                    yield answer_chunk
             break
         answer.append(answer_chunk)
         yield answer_chunk
+    if not is_last_chunk:
+        logger.warning("BUG: /chat endpoint without last chunk")
 
     text_answer = b"".join(answer)
 
@@ -245,3 +254,25 @@ async def async_gen_lookahead(gen):
     # Yield the last chunk if there is one
     if buffered_chunk is not None:
         yield buffered_chunk, True
+
+
+def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
+    """
+    Parses the status code from the last chunk of the answer.
+    """
+    try:
+        return AnswerStatusCode(chunk.decode())
+    except ValueError:
+        # In some cases, even if the status code was yield separately
+        # at the server side, the status code is appended to the previous chunk...
+        # It may be a bug in the aiohttp.StreamResponse implementation,
+        # but we haven't spotted it yet. For now, we just try to parse the status code
+        # from the tail of the chunk.
+        logger.warning(
+            f"Error decoding status code from /chat's last chunk. Chunk: {chunk!r}"
+        )
+        if chunk == b"":
+            raise
+        if chunk.endswith(b"0"):
+            return AnswerStatusCode.SUCCESS
+        return AnswerStatusCode(chunk[-2:].decode())

@@ -303,7 +303,7 @@ class PredictEngine:
         )
         await self.check_response(resp, expected=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
-        return ident, resp.content.iter_any()
+        return ident, get_answer_generator(resp)
 
     @predict_observer.wrap({"type": "ask_document"})
     async def ask_document(
@@ -369,3 +369,21 @@ class PredictEngine:
         data = await resp.json()
 
         return convert_relations(data)
+
+
+def get_answer_generator(response: aiohttp.ClientResponse):
+    """
+    Returns an async generator that yields the chunks of the response
+    in the same way as received from the server.
+    See: https://docs.aiohttp.org/en/stable/streams.html#aiohttp.StreamReader.iter_chunks
+    """
+
+    async def _iter_answer_chunks(gen):
+        buffer = b""
+        async for chunk, end_of_chunk in gen:
+            buffer += chunk
+            if end_of_chunk:
+                yield buffer
+                buffer = b""
+
+    return _iter_answer_chunks(response.content.iter_chunks())
