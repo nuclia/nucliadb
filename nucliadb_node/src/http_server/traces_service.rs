@@ -28,5 +28,5 @@ pub async fn thread_dump_service() -> String {
     let Ok(trace) = rstack_self::trace(Command::new(exe).arg("child")) else {
         return String::default();
     };
-    format!("{:#?}", trace);
+    format!("{:#?}", trace)
 }
