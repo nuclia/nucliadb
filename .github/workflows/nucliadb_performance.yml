@@ -5,10 +5,38 @@ on:
       - main
   issue_comment:
     types: [created]
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
 
 permissions: write-all
 
 jobs:
+  check-perf-main-nightly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: Record performance on main (nightly)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      - name: Run the bench
+        run: |
+          make -C vectors_benchmark nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: vectors_benchmark/benchmark.json
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
+
   check-perf-main:
     if: github.event_name == 'push'
     name: Record performance on main

@@ -5,6 +5,12 @@ INDEX_SIZE:=10000
 build:
 	cargo build --release --locked
 
+
+.PHONY: nightly
+nightly:
+	cargo run --release --bin 1m_stats
+
+
 .PHONY: vector-bench
 vector-bench:
 	cargo run --release --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
@@ -20,7 +26,3 @@ samply-vector-bench: samply
 .PHONY: label-bench
 label-bench:
 	cargo run --release --bin labels_benchmark
-
-
-
-
