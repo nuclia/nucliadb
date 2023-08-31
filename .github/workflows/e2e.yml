@@ -34,7 +34,7 @@ jobs:
       - name: Install PostgreSQL with Helm
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm install my-postgresql bitnami/postgresql
+          helm install my-postgresql bitnami/postgresql --version 12.9.0
 
       - name: Wait for PostgreSQL to be ready
         run: |
