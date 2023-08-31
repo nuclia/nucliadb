@@ -130,6 +130,27 @@ async def test_chat_handles_status_codes_in_the_same_chunk(
         assert answer == b"some text with status."
 
 
+@pytest.mark.asyncio
+async def test_chat_handles_status_codes_with_last_chunk_empty(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource,
+):
+    async def fake_generator():
+        for chunk in [b"some ", b"text ", b"with ", b"status.", b"-2", b""]:
+            yield chunk
+
+    m = mock.AsyncMock(return_value=("00", fake_generator()))
+    with mock.patch("nucliadb.search.predict.DummyPredictEngine.chat_query", new=m):
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/chat", json={"query": "title"}
+        )
+        assert resp.status_code == 200
+        find_result, answer, relations_result = parse_chat_response(resp.content)
+
+        assert answer == b"some text with status."
+
+
 def parse_chat_response(content: bytes):
     raw = io.BytesIO(content)
     header = raw.read(4)

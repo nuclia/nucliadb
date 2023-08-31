@@ -67,13 +67,24 @@ async def test_chat_does_not_call_predict_if_no_find_results(
 async def test_async_gen_lookahead():
     async def gen(n):
         for i in range(n):
-            yield i
+            yield f"{i}".encode()
 
     assert [item async for item in async_gen_lookahead(gen(0))] == []
-    assert [item async for item in async_gen_lookahead(gen(1))] == [(0, True)]
+    assert [item async for item in async_gen_lookahead(gen(1))] == [(b"0", True)]
     assert [item async for item in async_gen_lookahead(gen(2))] == [
-        (0, False),
-        (1, True),
+        (b"0", False),
+        (b"1", True),
+    ]
+
+
+async def test_async_gen_lookahead_last_chunk_is_empty():
+    async def gen():
+        for chunk in [b"empty", b"chunk", b""]:
+            yield chunk
+
+    assert [item async for item in async_gen_lookahead(gen())] == [
+        (b"empty", False),
+        (b"chunk", True),
     ]
 
 
