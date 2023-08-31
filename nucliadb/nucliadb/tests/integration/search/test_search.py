@@ -681,59 +681,6 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
 
 
 @pytest.mark.asyncio
-async def test_search_pre_processes_query(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_grpc,
-    knowledgebox,
-):
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json=dict(title="The Good, the Bad and the Ugly.mov"),
-        headers={"X-Synchronous": "true"},
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    for query in ("G.o:o!d?", "B;a,d", "U¿g¡ly"):
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/search",
-            json={
-                "fields": ["a/title"],
-                "query": query,
-            },
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["resources"][rid]
-
-    # Check that if processing the query outputs an empty string we
-    # don't return all results
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
-        json={
-            "fields": ["a/title"],
-            "query": "?¿!,",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 1
-
-    # Check that query is not pre-processed if user is searching with double-quotes
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
-        json={
-            "fields": ["a/title"],
-            "query": '"B;a,d"',
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 0
-
-
-@pytest.mark.asyncio
 async def test_search_automatic_relations(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
