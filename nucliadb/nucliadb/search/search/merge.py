@@ -287,13 +287,19 @@ async def merge_vectors_results(
                 index,
                 position,
             ) = result.doc_id.id.split("/")
-        start, end = position.split("-")
-        start_int = int(start)
-        end_int = int(end)
-        try:
-            index_int = int(index)
-        except ValueError:
-            index_int = -1
+        if result.metadata.HasField("position"):
+            start_int = result.metadata.position.start
+            end_int = result.metadata.position.end
+            index_int = result.metadata.position.index
+        else:
+            # bbb pull position from key
+            start, end = position.split("-")
+            start_int = int(start)
+            end_int = int(end)
+            try:
+                index_int = int(index)
+            except ValueError:
+                index_int = -1
         text = await get_text_sentence(
             rid, field_type, field, kbid, index_int, start_int, end_int, subfield
         )
