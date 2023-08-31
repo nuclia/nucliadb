@@ -92,8 +92,6 @@ ENV NUA_ZONE=europe-1
 ENV NUA_API_KEY=
 ENV NUCLIA_PUBLIC_URL=https://{zone}.nuclia.cloud
 
-ENV NUCLIADB_ENV=True
-
 ENV DRIVER=LOCAL
 ENV MAINDB=/data/maindb
 ENV BLOB=/data/blobs
