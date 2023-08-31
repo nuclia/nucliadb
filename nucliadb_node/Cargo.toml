@@ -87,7 +87,7 @@ opentelemetry-zipkin = "0.15.0"
 sentry-tracing = "0.27.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rstack-self = "0.3.0"
+rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }
