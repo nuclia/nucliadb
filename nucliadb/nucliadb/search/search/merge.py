@@ -292,7 +292,8 @@ async def merge_vectors_results(
             end_int = result.metadata.position.end
             index_int = result.metadata.position.index
         else:
-            # bbb pull position from key
+            # bbb pull position from key for old results that were
+            # not properly filling metadata
             start, end = position.split("-")
             start_int = int(start)
             end_int = int(end)
