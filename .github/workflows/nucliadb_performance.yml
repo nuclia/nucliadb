@@ -26,12 +26,12 @@ jobs:
           profile: minimal
           override: true
       - name: Store performance data
-        uses: tarekziade/alwaysfast@main
+        uses: nuclia/nucliadb_performance@main
         with:
           metrics_file: vectors_benchmark/benchmark.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
-          influxdb_org: tarek
+          influxdb_org: nuclia
           influxdb_bucket: benchmarks
   check-perf-pr:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
@@ -56,11 +56,11 @@ jobs:
         run: |
           make -C vectors_benchmark vector-bench
       - name: Store Performance data and report back
-        uses: tarekziade/alwaysfast@main
+        uses: nuclia/nucliadb_performance@main
         with:
           metrics_file: vectors_benchmark/benchmark.json
           head_ref: ${{ steps.comment-branch.outputs.head_ref }}
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
-          influxdb_org: tarek
+          influxdb_org: nuclia
           influxdb_bucket: benchmarks
