@@ -8,6 +8,7 @@ WORKDIR /nucliadb
 RUN apt-get -y update \
     && apt-get -y install ca-certificates \
     cmake \
+    libdw-dev \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -60,10 +61,6 @@ ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 
 ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
-
-# Install libdw
-RUN apt-get update
-RUN apt-get install -y libdw-dev
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 

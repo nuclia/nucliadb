@@ -84,6 +84,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install system deps
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y libdw-dev
+
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
         run: |
