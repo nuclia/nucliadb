@@ -62,7 +62,8 @@ ARG CARGO_PROFILE=release
 ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
 # Install libdw
-RUN apt-get install libdw-dev
+RUN apt-get update
+RUN apt-get install -y libdw-dev
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
