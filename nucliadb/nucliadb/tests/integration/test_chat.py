@@ -95,7 +95,7 @@ async def test_chat_handles_status_codes_in_a_different_chunk(
     nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
     predict = get_predict()
-    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]  # type: ignore
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat", json={"query": "title"}
@@ -111,7 +111,7 @@ async def test_chat_handles_status_codes_in_the_same_chunk(
     nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
     predict = get_predict()
-    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.-2"]
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.-2"]  # type: ignore
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat", json={"query": "title"}
@@ -127,7 +127,7 @@ async def test_chat_handles_status_codes_with_last_chunk_empty(
     nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
     predict = get_predict()
-    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2", b""]
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2", b""]  # type: ignore
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/chat", json={"query": "title"}
