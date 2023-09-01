@@ -29,6 +29,9 @@ ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
+# Install libdw
+RUN apt-get install libdw-dev
+
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
 # Build dependencies (this is the cached docker layer)
@@ -54,7 +57,6 @@ COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
-# Build application (only run when sources are modified)
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && cargo build \
     --locked \

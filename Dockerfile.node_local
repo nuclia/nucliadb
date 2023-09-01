@@ -61,6 +61,9 @@ ARG CARGO_PROFILE=release
 
 ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
+# Install libdw
+RUN apt-get install libdw-dev
+
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
 # Build dependencies (this is the cached docker layer)
