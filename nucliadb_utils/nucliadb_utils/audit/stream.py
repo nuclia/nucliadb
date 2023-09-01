@@ -30,6 +30,7 @@ from nucliadb_protos.audit_pb2 import (
     AuditRequest,
     ChatContext,
 )
+import backoff
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from opentelemetry.trace import format_trace_id, get_current_span
@@ -121,6 +122,7 @@ class StreamAuditStorage(AuditStorage):
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
 
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
     async def _send(self, message: AuditRequest):
         if self.js is None:  # pragma: no cover
             raise AttributeError()
@@ -129,7 +131,7 @@ class StreamAuditStorage(AuditStorage):
 
         res = await self.js.publish(
             self.nats_target.format(partition=partition, type=message.type),
-            message.SerializeToString(),
+            payload=message.SerializeToString(),
         )
         logger.debug(
             f"Pushed message to audit.  kb: {message.kbid}, resource: {message.rid}, partition: {partition}"
