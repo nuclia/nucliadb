@@ -117,6 +117,8 @@ class StreamAuditStorage(AuditStorage):
                 return
             except Exception:  # pragma: no cover
                 logger.exception("Could not send audit", stack_info=True)
+            finally:
+                self.queue.task_done()
 
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
