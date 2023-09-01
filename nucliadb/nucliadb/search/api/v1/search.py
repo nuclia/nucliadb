@@ -33,11 +33,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import (
-    get_default_min_score,
-    global_query_to_pb,
-    pre_process_query,
-)
+from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
 from nucliadb.search.search.utils import (
     parse_sort_options,
     should_disable_vector_search,
@@ -313,11 +309,10 @@ async def search(
         min_score = await get_default_min_score(kbid)
 
     # We need to query all nodes
-    processed_query = pre_process_query(item.query)
     pb_query, incomplete_results, autofilters = await global_query_to_pb(
         kbid,
         features=item.features,
-        query=processed_query,
+        query=item.query,
         filters=item.filters,
         faceted=item.faceted,
         sort=sort_options,

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import re
 from datetime import datetime
 from typing import List, Optional, Tuple
 
@@ -48,8 +47,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
-
-REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
 
 async def global_query_to_pb(
@@ -292,33 +289,6 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.BLOCKED: Resource.ResourceStatus.BLOCKED,
     ResourceProcessingStatus.EXPIRED: Resource.ResourceStatus.EXPIRED,
 }
-
-
-def pre_process_query(user_query: str) -> str:
-    # NOTE: if this logic grows in the future, consider using a Strategy pattern.
-    user_terms = user_query.split()
-    result = []
-    in_quote = False
-    for term in user_terms:
-        term = term.strip()
-        if in_quote:
-            result.append(term)
-            continue
-
-        if term.startswith('"'):
-            in_quote = True
-            result.append(term)
-            continue
-
-        if term.endswith('"'):
-            in_quote = False
-
-        term = REMOVABLE_CHARS.sub("", term)
-        term = term.strip()
-        if len(term):
-            result.append(term)
-
-    return " ".join(result)
 
 
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
