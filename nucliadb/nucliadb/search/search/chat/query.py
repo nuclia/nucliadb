@@ -76,9 +76,7 @@ async def generate_answer(
     predict: Optional[PredictEngine],
     answer_generator: AsyncIterator[bytes],
     chat_request: ChatRequest,
-    do_audit: bool = True,
 ):
-    audit = get_audit()
     if ChatOptions.PARAGRAPHS in chat_request.features:
         bytes_results = base64.b64encode(results.json().encode())
         yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
@@ -112,7 +110,8 @@ async def generate_answer(
 
     text_answer = b"".join(answer)
 
-    if do_audit and audit is not None:
+    audit = get_audit()
+    if audit is not None:
         audit_answer: Optional[str] = text_answer.decode()
         if status_code == AnswerStatusCode.NO_CONTEXT:
             audit_answer = None
