@@ -13,6 +13,12 @@ env:
   API_VERSION: 1
 
 jobs:
+  set-up:
+    runs-on: ubuntu-latest
+    if: runner.os == 'Linux'
+    run: |
+      apt-get update
+      apt-get install -y libdw-dev
   tests:
     runs-on: ubuntu-latest
 

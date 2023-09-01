@@ -58,6 +58,12 @@ env:
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
 
 jobs:
+  set-up:
+    runs-on: ubuntu-latest
+    if: runner.os == 'Linux'
+    run: |
+      apt-get update
+      apt-get install -y libdw-dev
   pre-checks-python:
     runs-on: ubuntu-latest
     strategy:
@@ -93,6 +99,7 @@ jobs:
 
   format-rust:
     name: Rust code Format
+    needs: set-up
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -111,6 +118,7 @@ jobs:
 
   clippy-rust:
     name: Clippy lint
+    needs: set-up
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -130,6 +138,7 @@ jobs:
   # will be compiled and cached
   prebuild-tests-rust:
     name: Prebuild rust tests
+    needs: set-up
     runs-on: ubuntu-latest
 
     steps:
@@ -149,6 +158,7 @@ jobs:
 
   tests-rust:
     name: Rust tests
+    needs: set-up
     runs-on: ubuntu-latest
     needs: [clippy-rust, format-rust, licenses, prebuild-tests-rust]
 
@@ -206,6 +216,7 @@ jobs:
       - name: Install rust binding for testing
         env:
           RUSTFLAGS: --cfg tokio_unstable
+        needs: set-up
         run: |
           maturin build -m nucliadb_node_binding/Cargo.toml
           pip install target/wheels/*_x86_64.whl
