@@ -131,7 +131,7 @@ class StreamAuditStorage(AuditStorage):
 
         res = await self.js.publish(
             self.nats_target.format(partition=partition, type=message.type),
-            payload=message.SerializeToString(),
+            message.SerializeToString(),
         )
         logger.debug(
             f"Pushed message to audit.  kb: {message.kbid}, resource: {message.rid}, partition: {partition}"
