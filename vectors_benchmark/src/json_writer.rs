@@ -17,14 +17,46 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use serde_json::Value;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufWriter, Write};
+use std::path::Path;
 
-use std::fs::File;
-use std::io::{BufWriter, Write};
+pub fn write_json(
+    filename: String,
+    values: Vec<Value>,
+    merge: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Check if the file exists and merging is enabled
+    if merge && Path::new(&filename).exists() {
+        // Load existing JSON data from the file
+        let file = File::open(&filename)?;
+        let reader = BufReader::new(file);
+        let existing_values: Vec<Value> = serde_json::from_reader(reader)?;
 
-pub fn write_json(filename: String, values: Vec<serde_json::Value>) -> Result<(), std::io::Error> {
-    let file = File::create(filename)?;
-    let mut writer = BufWriter::new(file);
-    serde_json::to_writer(&mut writer, &values)?;
-    writer.flush()?;
+        // Merge existing and new values
+        let mut merged_values = existing_values.clone();
+        for new_value in values {
+            merged_values.push(new_value);
+        }
+
+        // Write merged values back to the file
+        let file = File::create(&filename)?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, &merged_values)?;
+        writer.flush()?;
+    } else {
+        // Create or overwrite the file with new values
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&filename)?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, &values)?;
+        writer.flush()?;
+    }
+
+    println!("File written: {}", filename);
     Ok(())
 }
