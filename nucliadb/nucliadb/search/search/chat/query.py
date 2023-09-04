@@ -22,7 +22,6 @@ import base64
 from time import monotonic as time
 from typing import AsyncIterator, List, Optional
 
-from nucliadb_protos.audit_pb2 import ChatContext
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 from starlette.responses import StreamingResponse
 
@@ -42,6 +41,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     RephraseModel,
 )
+from nucliadb_protos import audit_pb2
 from nucliadb_utils.utilities import get_audit
 
 END_OF_STREAM = "_END_"
@@ -64,9 +64,10 @@ async def rephrase_query_from_context(
 
 
 async def generate_answer(
+    *,
     user_query: str,
-    user_context: List[ChatContextMessage],
-    rephrase_query: Optional[str],
+    chat_context: List[ChatContextMessage],
+    rephrased_query: Optional[str],
     results: KnowledgeboxFindResults,
     kbid: str,
     user_id: str,
@@ -116,8 +117,8 @@ async def generate_answer(
             audit_answer = None
 
         context = [
-            ChatContext(author=message.author, text=message.text)
-            for message in user_context
+            audit_pb2.ChatContext(author=message.author, text=message.text)
+            for message in chat_context
         ]
         await audit.chat(
             kbid,
@@ -126,7 +127,7 @@ async def generate_answer(
             origin,
             time() - start_time,
             question=user_query,
-            rephrased_question=rephrase_query,
+            rephrased_question=rephrased_query,
             context=context,
             answer=audit_answer,
         )
@@ -181,17 +182,17 @@ async def chat(
 
     if len(find_results.resources) == 0:
         answer_stream = generate_answer(
-            user_query,
-            user_context,
-            rephrased_query,
-            find_results,
-            kbid,
-            user_id,
-            client_type,
-            origin,
+            user_query=user_query,
+            rephrased_query=rephrased_query,
+            results=find_results,
+            kbid=kbid,
+            user_id=user_id,
+            client_type=client_type,
+            origin=origin,
             predict=predict,
             answer_generator=not_enough_context_generator(),
             chat_request=chat_request,
+            chat_context=user_context,
         )
 
     else:
@@ -212,14 +213,14 @@ async def chat(
             kbid, chat_model
         )
         answer_stream = generate_answer(
-            user_query,
-            user_context,
-            rephrased_query,
-            find_results,
-            kbid,
-            user_id,
-            client_type,
-            origin,
+            user_query=user_query,
+            chat_context=chat_context,
+            rephrased_query=rephrased_query,
+            results=find_results,
+            kbid=kbid,
+            user_id=user_id,
+            client_type=client_type,
+            origin=origin,
             predict=predict,
             answer_generator=predict_generator,
             chat_request=chat_request,
