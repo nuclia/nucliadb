@@ -72,20 +72,18 @@ async def generate_answer(
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-    predict: Optional[PredictEngine],
+    predict: PredictEngine,
     answer_generator: AsyncIterator[bytes],
     chat_request: ChatRequest,
-    do_audit: bool = True,
 ):
-    audit = get_audit()
-    if ChatOptions.PARAGRAPHS in chat_request.features:
-        bytes_results = base64.b64encode(results.json().encode())
-        yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
-        yield bytes_results
+    bytes_results = base64.b64encode(results.json().encode())
+    yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+    yield bytes_results
 
     start_time = time()
     answer = []
     status_code: Optional[AnswerStatusCode] = None
+    is_last_chunk = False
     async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
         if is_last_chunk:
             try:
@@ -111,7 +109,8 @@ async def generate_answer(
 
     text_answer = b"".join(answer)
 
-    if do_audit and audit is not None:
+    audit = get_audit()
+    if audit is not None:
         audit_answer: Optional[str] = text_answer.decode()
         if status_code == AnswerStatusCode.NO_CONTEXT:
             audit_answer = None
@@ -132,9 +131,9 @@ async def generate_answer(
             answer=audit_answer,
         )
 
-    if ChatOptions.RELATIONS in chat_request.features and predict is not None:
-        yield END_OF_STREAM
+    yield END_OF_STREAM
 
+    if ChatOptions.RELATIONS in chat_request.features:
         detected_entities = await predict.detect_entities(kbid, text_answer.decode())
         relation_request = RelationSearchRequest()
         relation_request.subgraph.entry_points.extend(detected_entities)
@@ -178,6 +177,7 @@ async def chat(
 ):
     nuclia_learning_id: Optional[str] = None
     user_context = chat_request.context or []
+    predict = get_predict()
 
     if len(find_results.resources) == 0:
         answer_stream = generate_answer(
@@ -189,13 +189,12 @@ async def chat(
             user_id,
             client_type,
             origin,
-            predict=None,
+            predict=predict,
             answer_generator=not_enough_context_generator(),
             chat_request=chat_request,
         )
 
     else:
-        predict = get_predict()
         chat_context = user_context[:]
         chat_context.append(
             ChatContextMessage(

@@ -123,6 +123,12 @@ def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNod
 class DummyPredictEngine:
     def __init__(self):
         self.calls = []
+        self.generated_answer = [
+            b"valid ",
+            b"answer ",
+            b" to",
+            AnswerStatusCode.SUCCESS.encode(),
+        ]
 
     async def initialize(self):
         pass
@@ -151,9 +157,8 @@ class DummyPredictEngine:
         self.calls.append(item)
 
         async def generate():
-            for i in [b"valid ", b"answer ", b" to"]:
+            for i in self.generated_answer:
                 yield i
-            yield AnswerStatusCode.SUCCESS.encode()
 
         return (DUMMY_LEARNING_ID, generate())
 
