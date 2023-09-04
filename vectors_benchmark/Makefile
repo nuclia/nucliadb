@@ -8,12 +8,16 @@ build:
 
 .PHONY: nightly
 nightly:
-	cargo run --release --bin 1m_stats
+	cargo run --release --locked --bin vectors_benchmark
+	cargo run --release --locked --bin 1m_stats -- --merge
+	cargo run --release --locked --bin labels_benchmark -- --merge
 
 
-.PHONY: vector-bench
-vector-bench:
-	cargo run --release --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
+.PHONY: fast-bench
+fast-bench:
+	cargo run --release --locked --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
+	cargo run --release --locked --bin 1m_stats -- -b $(BATCH_SIZE) -i $(INDEX_SIZE) --merge
+	cargo run --release --locked --bin labels_benchmark -- --merge
 
 .PHONY: samply
 samply:
@@ -25,4 +29,4 @@ samply-vector-bench: samply
 
 .PHONY: label-bench
 label-bench:
-	cargo run --release --bin labels_benchmark
+	cargo run --release --locked --bin labels_benchmark

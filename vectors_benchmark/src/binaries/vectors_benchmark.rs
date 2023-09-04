@@ -81,7 +81,7 @@ fn main() -> std::io::Result<()> {
         "value": storage_size.get_bytes(),
     })];
 
-    write_json(args.json_output(), json_results)?;
+    write_json(args.json_output(), json_results, args.merge).unwrap();
 
     println!(
         "Total vector storage size: {}",

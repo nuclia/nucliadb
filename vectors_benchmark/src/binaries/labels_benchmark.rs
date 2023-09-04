@@ -166,7 +166,7 @@ fn main() -> VectorR<()> {
         ),
     ];
 
-    write_json(args.json_output(), json_results)?;
+    write_json(args.json_output(), json_results, args.merge).unwrap();
 
     Ok(())
 }
