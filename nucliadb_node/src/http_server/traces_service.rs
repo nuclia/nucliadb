@@ -21,12 +21,19 @@
 use std::env;
 use std::process::Command;
 
+#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 use rstack_self;
 
+#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 pub async fn thread_dump_service() -> String {
     let exe = env::current_exe().unwrap();
     let Ok(trace) = rstack_self::trace(Command::new(exe).arg("child")) else {
         return String::default();
     };
     format!("{:#?}", trace)
+}
+
+#[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
+pub async fn thread_dump_service() -> String {
+    "Not supported on this platform".to_string()
 }

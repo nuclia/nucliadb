@@ -19,12 +19,6 @@ env:
   IMAGE_NAME: nucliadb_train
 
 jobs:
-  set-up:
-    runs-on: ubuntu-latest
-    if: runner.os == 'Linux'
-    run: |
-      apt-get update
-      apt-get install -y libdw-dev
   # Job to run pre-checks
   pre-checks:
     runs-on: ubuntu-latest
@@ -83,7 +77,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Install rust binding for testing
-        needs: set-up
         if: steps.filter.outputs.workflows == 'true'
         run: |
           maturin build -m nucliadb_node_binding/Cargo.toml

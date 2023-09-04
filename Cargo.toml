@@ -1,6 +1,5 @@
 [workspace]
 resolver = "1"
-
 members = [
   "nucliadb_core",
   "nucliadb_node",

@@ -19,12 +19,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  set-up:
-    runs-on: ubuntu-latest
-    if: runner.os == 'Linux'
-    run: |
-      apt-get update
-      apt-get install -y libdw-dev
   build:
     name: Build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
     strategy:
@@ -87,8 +81,11 @@ jobs:
 
       - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
+      - name: Check system deps
+        if: ${{ matrix.os != 'windows' }}
+        run: make -C nucliadb check-system
+
       - name: build sdist
-        needs: set-up
         if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' && matrix.manylinux == 'auto' }}
         uses: messense/maturin-action@v1
         with:
@@ -97,9 +94,11 @@ jobs:
           rust-toolchain: stable
 
       - name: build wheels
-        needs: set-up
         uses: messense/maturin-action@v1
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
         with:
+          before-script-linux: scripts/install-system-deps.sh
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}

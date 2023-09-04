@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 .PHONY: install-dev
-install-dev:
+install-dev: check-system
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
@@ -10,6 +10,11 @@ install-dev:
 		-r nucliadb_node/requirements.txt \
 		./nucliadb_node/
 	pip install -e .
+
+.PHONY: check-system
+check-system:
+	../scripts/install-system-deps.sh
+
 
 .PHONY: format
 format:
