@@ -34,7 +34,7 @@ from opentelemetry.trace import Tracer  # type: ignore
 from nucliadb_telemetry import logger, metrics
 from nucliadb_telemetry.common import set_span_exception
 
-msg_time_histo = metrics.Histogram(
+msg_consume_time_histo = metrics.Histogram(
     # time it takes from when msg was queue to when it finished processing
     "nuclia_nats_msg_op_time",
     labels={
@@ -57,6 +57,10 @@ msg_time_histo = metrics.Histogram(
         600.0,
         metrics.INF,
     ],
+)
+
+msg_sent_counter = metrics.Counter(
+    "nuclia_nats_msg_sent", labels={"subject": "", "status": metrics.OK}
 )
 
 
@@ -125,7 +129,7 @@ class JetStreamContextTelemetry:
                     set_span_exception(span, error)
                     raise error
                 finally:
-                    msg_time_histo.observe(
+                    msg_consume_time_histo.observe(
                         (datetime.now() - msg.metadata.timestamp).total_seconds(),
                         {
                             "stream": msg.metadata.stream,
@@ -150,8 +154,10 @@ class JetStreamContextTelemetry:
         with start_span_message_publisher(tracer, subject) as span:
             try:
                 result = await self.js.publish(subject, body, headers=headers, **kwargs)
+                msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
+                msg_sent_counter.inc({"subject": subject, "status": metrics.ERROR})
                 raise error
 
         return result
@@ -193,7 +199,7 @@ class JetStreamContextTelemetry:
                 set_span_exception(span, error)
                 raise error
             finally:
-                msg_time_histo.observe(
+                msg_consume_time_histo.observe(
                     (datetime.now() - message.metadata.timestamp).total_seconds(),
                     {
                         "stream": message.metadata.stream,
@@ -243,8 +249,10 @@ class NatsClientTelemetry:
         with start_span_message_publisher(tracer, subject) as span:
             try:
                 result = await self.nc.publish(subject, body, headers=headers, **kwargs)
+                msg_sent_counter.inc({"subject": subject, "status": metrics.OK})
             except Exception as error:
                 set_span_exception(span, error)
+                msg_sent_counter.inc({"subject": subject, "status": metrics.ERROR})
                 raise error
 
         return result
