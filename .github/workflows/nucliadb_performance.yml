@@ -1,8 +1,6 @@
 name: Performance Regression
 on:
   push:
-    branches:
-      - main
   issue_comment:
     types: [created]
   schedule:
