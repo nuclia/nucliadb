@@ -22,7 +22,7 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, List
 
 import aiohttp
 import backoff
@@ -70,6 +70,13 @@ class ProcessingInfo(BaseModel):
     queue: QueueType
 
 
+class LearningConfig(BaseModel):
+    semantic_model = str
+    anonymization_model = str
+    generative_model = str
+    ner_model = str
+
+
 class PushPayload(BaseModel):
     # There are multiple options of payload
     uuid: str
@@ -103,12 +110,11 @@ class PushPayload(BaseModel):
         default_factory=models.PushProcessingOptions
     )
 
+    learning_config: Optional[LearningConfig] = None
+
 
 class PushResponse(BaseModel):
     seqid: Optional[int] = None
-
-
-DUMMY_JWT = "DUMMYJWT"
 
 
 async def start_processing_engine():
@@ -131,7 +137,13 @@ async def start_processing_engine():
 
 class DummyProcessingEngine:
     def __init__(self):
-        self.calls: list[list[Any]] = []  # type: ignore
+        self.calls: List[List[Any]] = []  # type: ignore
+        self.values: Dict[str, List[Any]] = {}
+        self.values["convert_filefield_to_str"] = []
+        self.values["convert_external_filefield_to_str"] = []
+        self.values["convert_internal_filefield_to_str"] = []
+        self.values["convert_internal_cf_to_str"] = []
+        self.values["send_to_process"] = []
 
     async def initialize(self):
         pass
@@ -141,26 +153,35 @@ class DummyProcessingEngine:
 
     async def convert_filefield_to_str(self, file: models.FileField) -> str:
         self.calls.append([file])
-        return DUMMY_JWT
+        index = len(self.values["convert_filefield_to_str"])
+        self.values["convert_filefield_to_str"].append(file)
+        return f"convert_filefield_to_str,{index}"
 
     def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
         self.calls.append([file_field])
-        return DUMMY_JWT
+        index = len(self.values["convert_external_filefield_to_str"])
+        self.values["convert_external_filefield_to_str"].append(file_field)
+        return f"convert_external_filefield_to_str,{index}"
 
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
     ) -> str:
         self.calls.append([file, storage])
-        return DUMMY_JWT
+        index = len(self.values["convert_internal_filefield_to_str"])
+        self.values["convert_internal_filefield_to_str"].append([file, storage])
+        return f"convert_internal_filefield_to_str,{index}"
 
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
         self.calls.append([cf, storage])
-        return DUMMY_JWT
+        index = len(self.values["convert_internal_cf_to_str"])
+        self.values["convert_internal_cf_to_str"].append([cf, storage])
+        return f"convert_internal_cf_to_str,{index}"
 
     async def send_to_process(
         self, item: PushPayload, partition: int
     ) -> ProcessingInfo:
         self.calls.append([item, partition])
+        self.values["send_to_process"].append([item, partition])
         return ProcessingInfo(
             seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
         )
