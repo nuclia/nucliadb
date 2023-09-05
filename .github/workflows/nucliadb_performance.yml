@@ -14,7 +14,7 @@ permissions: write-all
 jobs:
   check-perf-main-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    name: Record performance on main (nightly)
+    name: Record performance on ${{ env.GITHUB_REF }} (long run)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -55,7 +55,7 @@ jobs:
 
   check-perf-main:
     if: github.event_name == 'push'
-    name: Record performance on main
+    name: Record performance on ${{ env.GITHUB_REF }} (fast run)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
