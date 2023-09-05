@@ -17,23 +17,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use axum::response::{Json, IntoResponse, Response};
+use serde::Serialize;
 
+#[derive(Serialize)]
+struct Traces {
+    trace: String,
+}
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 use std::env;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 use std::process::Command;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 use rstack_self;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-pub async fn thread_dump_service() -> String {
+pub async fn thread_dump_service() -> Response {
     let exe = env::current_exe().unwrap();
     let Ok(trace) = rstack_self::trace(Command::new(exe).arg("child")) else {
         return String::default();
     };
-    format!("{:#?}", trace)
+    let traces = Traces {
+        trace: trace,
+    };
+    Json(traces).into_response()
 }
 
 #[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
-pub async fn thread_dump_service() -> String {
-    "Not supported on this platform".to_string()
+pub async fn thread_dump_service() -> Response {
+    let traces = Traces {
+        trace: String::from("Not supported on this platform"),
+    };
+    Json(traces).into_response()
 }
