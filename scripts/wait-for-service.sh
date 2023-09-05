@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MAX_TIMEOUT=90
+MAX_TIMEOUT=60
 COMMAND="nc -zv 127.0.0.1 $1"
 
 start_time=$(date +%s)
