@@ -337,7 +337,7 @@ class KBShardManager:
 
 
 class StandaloneKBShardManager(KBShardManager):
-    max_ops_before_checks = 25
+    max_ops_before_checks = 200
 
     def __init__(self):
         super().__init__()
