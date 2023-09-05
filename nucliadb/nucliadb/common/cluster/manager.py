@@ -358,7 +358,7 @@ class StandaloneKBShardManager(KBShardManager):
             if index_node is None:
                 return
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
-                nodereader_pb2.GetShardRequest(shard_id=shard_id)  # type: ignore
+                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
             await self.maybe_create_new_shard(kbid, shard_info)
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
