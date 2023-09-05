@@ -364,4 +364,89 @@ mod tests {
         };
         assert!(reader.search(&bad_request).is_err());
     }
+
+    #[test]
+    fn test_vectors_deduplication() {
+        let dir = TempDir::new().unwrap();
+        let vsc = VectorConfig {
+            similarity: Some(VectorSimilarity::Cosine),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorset"),
+        };
+        let raw_sentences = [
+            ("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]),
+            ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0]),
+        ];
+        let resource_id = ResourceId {
+            shard_id: "DOC".to_string(),
+            uuid: "DOC/KEY".to_string(),
+        };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
+        let paragraph = IndexParagraph {
+            start: 0,
+            end: 0,
+            sentences,
+            field: "".to_string(),
+            labels: vec!["1".to_string()],
+            index: 3,
+            split: "".to_string(),
+            repeated_in_field: false,
+            metadata: None,
+        };
+        let paragraphs = IndexParagraphs {
+            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+        };
+        let resource = Resource {
+            resource: Some(resource_id),
+            metadata: None,
+            texts: HashMap::with_capacity(0),
+            status: ResourceStatus::Processed as i32,
+            labels: vec!["2".to_string()],
+            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs_to_delete: vec![],
+            sentences_to_delete: vec![],
+            relations_to_delete: vec![],
+            relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
+            shard_id: "DOC".to_string(),
+        };
+        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let res = writer.set_resource(&resource);
+        assert!(res.is_ok());
+        let reader = VectorReaderService::start(&vsc).unwrap();
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: true,
+            ..Default::default()
+        };
+        let result = reader.search(&request).unwrap();
+        assert_eq!(result.documents.len(), 2);
+
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: false,
+            ..Default::default()
+        };
+        let result = reader.search(&request).unwrap();
+        assert_eq!(result.documents.len(), 1);
+    }
 }
