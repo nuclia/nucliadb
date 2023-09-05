@@ -22,7 +22,7 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import aiohttp
 import backoff
