@@ -31,8 +31,6 @@ from nucliadb_utils.utilities import get_storage
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
-PROMPT_TEXT_RESULT_SEP = " \n\n "
-
 
 async def get_next_conversation_messages(
     *,
@@ -102,7 +100,9 @@ async def get_expanded_conversation_messages(
         )
 
 
-async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults):
+async def get_chat_prompt_context(
+    kbid: str, results: KnowledgeboxFindResults
+) -> list[str]:
     ordered_paras = []
     for result in results.resources.values():
         for field_path, field in result.fields.items():
@@ -139,4 +139,4 @@ async def format_chat_prompt_content(kbid: str, results: KnowledgeboxFindResults
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
 
-    return PROMPT_TEXT_RESULT_SEP.join(output.values())
+    return list(output.values())
