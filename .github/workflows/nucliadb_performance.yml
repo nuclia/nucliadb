@@ -25,13 +25,29 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Run the bench
+      - name: Run the Rust bench
         run: |
           make -C vectors_benchmark nightly
       - name: Store performance data
         uses: nuclia/nucliadb_performance@main
         with:
           metrics_file: vectors_benchmark/benchmark.json
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
+      - name: Run the Python benches
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE -s --tb=native -v --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: benchmars.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
@@ -61,6 +77,23 @@ jobs:
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
           influxdb_bucket: benchmarks
+      - name: Run the Python benches
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE -s --tb=native -v --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: benchmars.json
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
+
   check-perf-pr:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
     runs-on: ubuntu-latest
@@ -88,6 +121,22 @@ jobs:
         with:
           metrics_file: vectors_benchmark/benchmark.json
           head_ref: ${{ steps.comment-branch.outputs.head_ref }}
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
+      - name: Run the Python benches
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE -s --tb=native -v --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: benchmars.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
