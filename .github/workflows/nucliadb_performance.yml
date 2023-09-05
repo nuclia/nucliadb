@@ -14,7 +14,7 @@ permissions: write-all
 jobs:
   check-perf-main-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    name: Record performance on ${{ env.GITHUB_REF }} (long run)
+    name: Record performance (long run)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -70,7 +70,7 @@ jobs:
 
   check-perf-main:
     if: github.event_name == 'push'
-    name: Record performance on ${{ env.GITHUB_REF }} (fast run)
+    name: Record performance (fast run)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -112,7 +112,7 @@ jobs:
   check-perf-pr:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
     runs-on: ubuntu-latest
-    name: Check performance on the PR
+    name: Record performance on PR (fast run)
     steps:
       - name: Get PR branch
         uses: xt0rted/pull-request-comment-branch@v1
