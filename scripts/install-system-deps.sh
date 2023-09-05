@@ -19,7 +19,7 @@ if [ "$machine" == "linux" ]; then
 	source /etc/os-release
 	case $ID in
 	debian | ubuntu | mint)
-		$SUDO apt-get update
+		$SUDO apt-get -y update
 		$SUDO apt-get install -y libdw-dev pkg-config
 		;;
 

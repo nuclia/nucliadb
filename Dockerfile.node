@@ -29,11 +29,9 @@ ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
-# Install libdw-dev
-RUN apt-get -y update && \
-    apt-get install -y libdw-dev && \
-    rm -rf /var/lib/apt/lists/*
-
+# Install system dependencies
+COPY scripts/install-system-deps.sh /tmp/
+RUN /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh && rm -rf /var/lib/apt/lists/*
 
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
