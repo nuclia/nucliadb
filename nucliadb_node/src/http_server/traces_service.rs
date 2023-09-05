@@ -41,7 +41,7 @@ pub async fn thread_dump_service() -> Response {
         return String::default();
     };
     let traces = Traces {
-        trace: format!(trace),
+        trace: format!("{:#?}", trace),
     };
     Json(traces).into_response()
 }
