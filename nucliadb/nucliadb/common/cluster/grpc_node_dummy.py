@@ -25,6 +25,7 @@ from nucliadb_protos.nodereader_pb2 import (
     RelationSearchResponse,
     TypeList,
 )
+from nucliadb_protos.noderesources_pb2 import EmptyResponse
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
@@ -89,6 +90,10 @@ class DummyWriterStub:  # pragma: no cover
         result = OpStatus()
         result.field_count = 1
         return result
+
+    async def GC(self, request: ShardId) -> EmptyResponse:
+        self.calls.setdefault("GC", []).append(request)
+        return EmptyResponse()
 
 
 class DummyReaderStub:  # pragma: no cover

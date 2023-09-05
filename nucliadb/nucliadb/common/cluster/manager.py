@@ -68,7 +68,7 @@ def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
 
 def add_index_node(
     *, id: str, address: str, shard_count: int, dummy: bool = False
-) -> None:
+) -> AbstractIndexNode:
     if settings.standalone_mode:
         if id == get_standalone_node_id():
             node = get_self()
@@ -79,6 +79,7 @@ def add_index_node(
     else:
         node = IndexNode(id=id, address=address, shard_count=shard_count, dummy=dummy)  # type: ignore
     INDEX_NODES[id] = node
+    return node
 
 
 def remove_index_node(node_id: str) -> None:
