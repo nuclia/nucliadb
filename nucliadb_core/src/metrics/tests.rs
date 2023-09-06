@@ -21,6 +21,14 @@ use tokio;
 
 use crate::metrics::meters::{Meter, PrometheusMeter};
 
+#[tokio::test(flavor = "current_thread")]
+async fn test_export_metric_name() {
+    let meter = PrometheusMeter::new();
+    let export = meter.export().unwrap();
+    assert!(export.contains("\n# TYPE nucliadb_node_workers_count gauge\n"));
+    assert!(export.contains("\n# TYPE nucliadb_node_instrumented_count counter\n"))
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_export_runtime_metrics_with_prometheus_meter_workers_count() {
     let meter = PrometheusMeter::new();
