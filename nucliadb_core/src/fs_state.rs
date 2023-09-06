@@ -67,7 +67,9 @@ pub fn shared_lock(path: &Path) -> FsResult<SLock> {
 }
 
 pub fn persist_state<S>(path: &Path, state: &S) -> FsResult<()>
-where S: Serialize {
+where
+    S: Serialize,
+{
     let temporal_path = path.join(names::TEMP);
     let state_path = path.join(names::STATE);
     let mut file = BufWriter::new(
@@ -84,12 +86,18 @@ where S: Serialize {
 }
 
 pub fn load_state<S>(path: &Path) -> FsResult<S>
-where S: DeserializeOwned {
+where
+    S: DeserializeOwned,
+{
+    println!("Loading state at {:?}", path.join(names::STATE));
+
     let mut file = BufReader::new(
         OpenOptions::new()
             .read(true)
             .open(path.join(names::STATE))?,
     );
+    println!("OK");
+
     Ok(bincode::deserialize_from(&mut file)?)
 }
 pub fn crnt_version(path: &Path) -> FsResult<Version> {

@@ -1,0 +1,15 @@
+{
+  "datasets": [
+    {
+      "name": "large",
+      "shards": {
+        "url": "https://storage.cloud.google.com/somewhere.tgz"
+      },
+      "queries": [
+        {
+          "query": "blah"
+        }
+      ]
+    }
+  ]
+}

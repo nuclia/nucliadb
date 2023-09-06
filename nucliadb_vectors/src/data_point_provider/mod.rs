@@ -67,6 +67,8 @@ impl IndexMetadata {
     }
     pub fn open(path: &Path) -> VectorR<Option<IndexMetadata>> {
         let path = &path.join(METADATA);
+        println!("{:?}", path);
+
         if !path.is_file() {
             return Ok(None);
         }
@@ -91,7 +93,7 @@ pub struct Index {
     dimension: RwLock<Option<u64>>,
 }
 impl Index {
-    fn get_dimension(&self) -> Option<u64> {
+    pub fn get_dimension(&self) -> Option<u64> {
         *self.dimension.read().unwrap_or_else(|e| e.into_inner())
     }
     fn set_dimension(&self, dimension: Option<u64>) {
@@ -128,6 +130,8 @@ impl Index {
         Ok(())
     }
     pub fn open(path: &Path) -> VectorR<Index> {
+        println!("{:?}", path);
+
         let state = fs_state::load_state::<State>(path)?;
         let date = fs_state::crnt_version(path)?;
         let dimension_used = state.stored_len(path)?;
