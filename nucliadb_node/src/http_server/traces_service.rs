@@ -37,19 +37,27 @@ use rstack_self;
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 pub async fn thread_dump_service() -> Response {
     let exe = env::current_exe().unwrap();
-    let Ok(trace) = rstack_self::trace(Command::new(exe).arg("child")) else {
-        return String::default();
-    };
-    let traces = Traces {
-        trace: format!("{:#?}", trace),
-    };
-    Json(traces).into_response()
+    let trace = rstack_self::trace(Command::new(exe).arg("child"));
+
+    match trace {
+        Ok(res) => Json(
+            Traces {
+                trace: format!("{:#?}", res)
+            }
+        ).into_response(),
+        Err(err) => Json(
+            Traces {
+                trace: format!("Could not retrieve thread dump {:?}", err)
+            }
+        ).into_response(),
+    }
 }
 
 #[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
 pub async fn thread_dump_service() -> Response {
-    let traces = Traces {
-        trace: String::from("Not supported on this platform"),
-    };
-    Json(traces).into_response()
+    Json(
+        Traces {
+            trace: String::from("Not supported on this platform"),
+        }
+    ).into_response()
 }
