@@ -24,9 +24,9 @@ from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.search import predict
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
@@ -66,12 +66,22 @@ async def resource_chat_endpoint(
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except SendToPredictError:
+    except predict.SendToPredictError:
         return HTTPClientError(status_code=503, detail="Chat service not available")
     except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,
             detail="Temporary error on information retrieval. Please try again.",
+        )
+    except predict.RephraseMissingContextError:
+        return HTTPClientError(
+            status_code=412,
+            detail="Unable to rephrase the query with the provided context.",
+        )
+    except predict.RephraseError as err:
+        return HTTPClientError(
+            status_code=529,
+            detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
         )
 
 
