@@ -81,6 +81,10 @@ jobs:
 
       - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
+      - name: Check system deps
+        if: ${{ matrix.os != 'windows' }}
+        run: make -C nucliadb check-system
+
       - name: build sdist
         if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' && matrix.manylinux == 'auto' }}
         uses: messense/maturin-action@v1
@@ -91,7 +95,10 @@ jobs:
 
       - name: build wheels
         uses: messense/maturin-action@v1
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
         with:
+          before-script-linux: scripts/install-system-deps.sh
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
