@@ -28,7 +28,7 @@ use nucliadb_node::grpc::middleware::{
     GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
 };
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
-use nucliadb_node::http_server::{run_http_server, MetricsServerOptions};
+use nucliadb_node::http_server::{run_http_server, ServerOptions};
 use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
@@ -64,7 +64,7 @@ async fn main() -> NodeResult<()> {
         grpc_driver,
         settings.reader_listen_address(),
     ));
-    let metrics_task = tokio::spawn(run_http_server(MetricsServerOptions {
+    let metrics_task = tokio::spawn(run_http_server(ServerOptions {
         default_http_port: 3031,
     }));
 
