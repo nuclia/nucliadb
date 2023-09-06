@@ -165,6 +165,9 @@ jobs:
         with:
           shared-key: "test_prebuild"
 
+      - name: Check system
+        run: make -C nucliadb_node/ check-system
+
       - uses: actions-rs/cargo@v1
         env:
           DEBUG: 1
