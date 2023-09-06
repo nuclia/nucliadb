@@ -121,7 +121,7 @@ jobs:
   clippy-rust:
     name: Clippy lint
     runs-on: ubuntu-latest
-    needs: pre-check-rust
+    needs: pre-checks-rust
     steps:
       - uses: actions/checkout@v3
 
@@ -141,7 +141,7 @@ jobs:
   prebuild-tests-rust:
     name: Prebuild rust tests
     runs-on: ubuntu-latest
-    needs: pre-check-rust
+    needs: pre-checks-rust
 
     steps:
       - uses: actions/checkout@v3
