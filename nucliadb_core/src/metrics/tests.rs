@@ -75,6 +75,22 @@ async fn test_export_runtime_metrics_with_prometheus_meter_polls_count() {
     assert!(export.contains("nucliadb_node_total_polls_count_total 100"));
     assert!(export.contains("nucliadb_node_min_polls_count 100"));
     assert!(export.contains("nucliadb_node_max_polls_count 100"));
+
+    // do some more async work
+    for _ in 0..N {
+        let _ = tokio::spawn(async {}).await;
+    }
+
+    flush_metrics().await;
+
+    let export = meter.export().unwrap();
+
+    assert!(export.contains("nucliadb_node_workers_count 1"));
+    // total is a global couter while min and max are gauges updated per
+    // sampling interval
+    assert!(export.contains("nucliadb_node_total_polls_count_total 200"));
+    assert!(export.contains("nucliadb_node_min_polls_count 100"));
+    assert!(export.contains("nucliadb_node_max_polls_count 100"));
 }
 
 async fn flush_metrics() {
