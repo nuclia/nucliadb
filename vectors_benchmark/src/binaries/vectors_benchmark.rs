@@ -42,7 +42,7 @@ fn dir_size(path: &Path) -> Result<Byte, Box<dyn Error>> {
                     Ok(size) => total_size += u128::from(size),
                     Err(err) => {
                         eprintln!("Error calculating directory size: {}", err);
-                        return Err(err);
+                        return Ok(Byte::from_bytes(0));
                     }
                 }
             } else {
@@ -50,7 +50,7 @@ fn dir_size(path: &Path) -> Result<Byte, Box<dyn Error>> {
                     Ok(metadata) => total_size += metadata.len() as u128,
                     Err(err) => {
                         eprintln!("Error getting file metadata: {}", err);
-                        return Err(err.into());
+                        return Ok(Byte::from_bytes(0));
                     }
                 }
             }
