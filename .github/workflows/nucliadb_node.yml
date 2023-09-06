@@ -58,6 +58,15 @@ env:
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
 
 jobs:
+  pre-checks-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Check system
+        run: make -C nucliadb_node/ check-system
+
   pre-checks-python:
     runs-on: ubuntu-latest
     strategy:
@@ -112,6 +121,7 @@ jobs:
   clippy-rust:
     name: Clippy lint
     runs-on: ubuntu-latest
+    needs: pre-check-rust
     steps:
       - uses: actions/checkout@v3
 
@@ -131,6 +141,7 @@ jobs:
   prebuild-tests-rust:
     name: Prebuild rust tests
     runs-on: ubuntu-latest
+    needs: pre-check-rust
 
     steps:
       - uses: actions/checkout@v3
