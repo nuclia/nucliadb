@@ -68,7 +68,7 @@ def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
 
 def add_index_node(
     *, id: str, address: str, shard_count: int, dummy: bool = False
-) -> None:
+) -> AbstractIndexNode:
     if settings.standalone_mode:
         if id == get_standalone_node_id():
             node = get_self()
@@ -79,6 +79,7 @@ def add_index_node(
     else:
         node = IndexNode(id=id, address=address, shard_count=shard_count, dummy=dummy)  # type: ignore
     INDEX_NODES[id] = node
+    return node
 
 
 def remove_index_node(node_id: str) -> None:
@@ -336,7 +337,7 @@ class KBShardManager:
 
 
 class StandaloneKBShardManager(KBShardManager):
-    max_ops_before_checks = 25
+    max_ops_before_checks = 200
 
     def __init__(self):
         super().__init__()
@@ -358,7 +359,7 @@ class StandaloneKBShardManager(KBShardManager):
             if index_node is None:
                 return
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
-                nodereader_pb2.GetShardRequest(shard_id=shard_id)  # type: ignore
+                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
             await self.maybe_create_new_shard(kbid, shard_info)
             await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore

@@ -1,5 +1,5 @@
 .PHONY: install-dev
-install-dev:
+install-dev: check-system
 	pip install --upgrade pip wheel
 	cd .. && pip install \
 		-r test-requirements.txt \
@@ -8,6 +8,10 @@ install-dev:
 		-r nucliadb/requirements.txt \
 		-r nucliadb/requirements-test.txt
 	pip install -e .
+
+.PHONY: check-system
+check-system:
+	../scripts/install-system-deps.sh
 
 freeze-requirements:
 # create venv only for freezing requirements

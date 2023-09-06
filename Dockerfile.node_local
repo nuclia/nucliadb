@@ -5,6 +5,10 @@ LABEL org.opencontainers.image.vendor="Nuclia Inc."
 
 WORKDIR /nucliadb
 
+# Install system dependencies
+COPY scripts/install-system-deps.sh /tmp/
+RUN /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh
+
 RUN apt-get -y update \
     && apt-get -y install ca-certificates \
     cmake \

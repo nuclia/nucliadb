@@ -359,7 +359,7 @@ impl ShardReader {
             vector: search_request.vector.clone(),
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
-            with_duplicates: true,
+            with_duplicates: search_request.with_duplicates,
             key_filters: search_request.key_filters.clone(),
             tags: search_request
                 .filter
