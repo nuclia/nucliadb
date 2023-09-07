@@ -370,7 +370,7 @@ class _NucliaDBBase:
         name="set_configuration",
         path_template="/v1/kb/{kbid}/configuration",
         method="POST",
-        path_params=("kbid"),
+        path_params=("kbid",),
         request_type=KBConfiguration,
         response_type=None,
     )
@@ -378,7 +378,7 @@ class _NucliaDBBase:
         name="delete_configuration",
         path_template="/v1/kb/{kbid}/configuration",
         method="DELETE",
-        path_params=("kbid"),
+        path_params=("kbid",),
         request_type=None,
         response_type=None,
     )
