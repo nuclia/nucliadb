@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import httpx
 from pydantic import BaseModel
 from shared import (
@@ -78,14 +80,43 @@ def import_binaries(client, kbid: str, binaries: dict[str, bytes]) -> None:
     assert resp.status_code == 200
 
 
+def export_tarfile(client, kbid: str, path: Path):
+    resp = client.get(f"/export/{kbid}")
+    assert resp.status_code == 200
+    with path.open("wb") as f:
+        for chunk in resp.iter_bytes():
+            f.write(chunk)
+
+
+def import_tarfile(client, kbid: str, path: Path) -> None:
+    def upload_generator():
+        with path.open("rb") as f:
+            while True:
+                chunk = f.read(1024 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+
+    resp = client.post(f"/import/{kbid}", content=upload_generator())
+    assert resp.status_code == 200
+
+
+def list_resources(client, kbid) -> list[str]:
+    resp = client.get(f"/{kbid}/resources")
+    assert resp.status_code == 200
+    return resp.json()
+
+
+def list_binaries(client, kbid) -> list[str]:
+    resp = client.get(f"/{kbid}/binaries")
+    assert resp.status_code == 200
+    return resp.json()
+
+
 if __name__ == "__main__":
     client = httpx.Client(base_url=f"http://{SERVER_HOST}:{SERVER_PORT}", timeout=None)
-
-    crafted_export = KnowledgeBoxExport(kbid="kb1")
-    crafted_export.resources = [get_resource("1"), get_resource("2")]
-    crafted_export.binaries = {"1": get_binary(), "2": get_binary()}
-
-    import_kb(client, "kb1", crafted_export)
-    kb1_export = export_kb(client, "kb1")
-
-    assert kb1_export == crafted_export
+    path = Path("kb1.tar.gz")
+    export_tarfile(client, "kb1", path)
+    import_tarfile(client, "kb2", path)
+    assert list_resources(client, "kb2") == list_resources(client, "kb1")
+    assert list_binaries(client, "kb2") == list_binaries(client, "kb1")

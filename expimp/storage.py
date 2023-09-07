@@ -1,6 +1,12 @@
+from shared import Resource
+
 STORAGE = {
-    "resources": {},
-    "binaries": {},
+    "resources": {
+        "kb1": [Resource(id="rid1", data="D" * 1)],
+    },
+    "binaries": {
+        "kb1": {"rid1": b"B" * 5},
+    },
 }
 
 
