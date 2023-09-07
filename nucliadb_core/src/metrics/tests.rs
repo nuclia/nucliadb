@@ -29,6 +29,34 @@ async fn test_export_metric_name() {
     assert!(export.contains("\n# TYPE nucliadb_node_instrumented_count counter\n"))
 }
 
+async fn test_export_tasks_instrumented_count() {
+    let meter = PrometheusMeter::new();
+    let task_id = "my-task".to_string();
+
+    meter
+        .task_monitor(task_id.clone())
+        .unwrap()
+        .instrument(async {  })
+        .await;
+
+    let export = meter.export().unwrap();
+    assert!(export.contains("nucliadb_node_instrumented_count_total{request=\"my-task\"} 1"));
+
+    meter
+        .task_monitor(task_id.clone())
+        .unwrap()
+        .instrument(async {})
+        .await;
+    meter
+        .task_monitor(task_id)
+        .unwrap()
+        .instrument(async {})
+        .await;
+
+    let export = meter.export().unwrap();
+    assert!(export.contains("nucliadb_node_instrumented_count_total{request=\"my-task\"} 3"));
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_export_runtime_metrics_with_prometheus_meter_workers_count() {
     let meter = PrometheusMeter::new();
@@ -52,6 +80,22 @@ async fn test_export_runtime_metrics_with_prometheus_meter_polls_count() {
 
     assert!(export.contains("nucliadb_node_workers_count 1"));
     assert!(export.contains("nucliadb_node_total_polls_count_total 100"));
+    assert!(export.contains("nucliadb_node_min_polls_count 100"));
+    assert!(export.contains("nucliadb_node_max_polls_count 100"));
+
+    // do some more async work
+    for _ in 0..N {
+        let _ = tokio::spawn(async {}).await;
+    }
+
+    flush_metrics().await;
+
+    let export = meter.export().unwrap();
+
+    assert!(export.contains("nucliadb_node_workers_count 1"));
+    // total is a global couter while min and max are gauges updated per
+    // sampling interval
+    assert!(export.contains("nucliadb_node_total_polls_count_total 200"));
     assert!(export.contains("nucliadb_node_min_polls_count 100"));
     assert!(export.contains("nucliadb_node_max_polls_count 100"));
 }
