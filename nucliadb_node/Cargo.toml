@@ -10,6 +10,10 @@ homepage = "https://nuclia.com/"
 documentation = "https://nuclia.com"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "node_stack"
+path = "src/bin/node_stack.rs"
+
 
 [[bin]]
 name = "payload_test"
@@ -87,7 +91,7 @@ opentelemetry-zipkin = "0.15.0"
 sentry-tracing = "0.27.0"
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))'.dependencies]
-rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
+rstack = { version = "0.3.3", features = ["dw"], default-features = false }
 
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }
