@@ -199,7 +199,7 @@ impl TokioRuntimeMetrics {
 
         let num_remote_schedules = Gauge::default();
         registry.register(
-            "num_remote",
+            "num_remote_schedules",
             "The number of tasks scheduled from outside the runtime. [...]",
             num_remote_schedules.clone(),
         );
