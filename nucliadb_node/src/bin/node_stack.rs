@@ -68,7 +68,7 @@ fn main() {
         println!("\"frames\":");
         println!("[");
         for frame in thread.frames() {
-            println!("{");
+            println!("{{");
 
             match frame.symbol() {
                 Some(symbol) => {

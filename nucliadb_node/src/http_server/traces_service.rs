@@ -48,14 +48,13 @@ pub async fn thread_dump_service() -> Response {
         }
     };
 
-    let result: String;
-    if output.status.success() {
+    let result = if output.status.success() {
         // Convert the stdout bytes into a String
-        result = String::from_utf8_lossy(&output.stdout).to_string();
+        String::from_utf8_lossy(&output.stdout).to_string()
     } else {
         // Print the error message
-        result = format!("Command failed with error: {:?}", output.status);
-    }
+        format!("Command failed with error: {:?}", output.status)
+    };
 
     Json(Traces { trace: result }).into_response()
 }
