@@ -22,23 +22,30 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, TypeVar
 
 import aiohttp
 import backoff
-import jwt  # type: ignore
+import jwt
+from async_lru import alru_cache
+from google.protobuf.json_format import MessageToDict
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
+from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
 from nucliadb_models.resource import QueueType
+from nucliadb_protos import knowledgebox_pb2
 from nucliadb_telemetry import metrics
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, get_ingest, set_utility
+
+_T = TypeVar("_T")
 
 if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
@@ -71,10 +78,19 @@ class ProcessingInfo(BaseModel):
 
 
 class LearningConfig(BaseModel):
-    semantic_model = str
-    anonymization_model = str
-    generative_model = str
-    ner_model = str
+    semantic_model = Optional[str] = None
+    anonymization_model = Optional[str] = None
+    generative_model = Optional[str] = None
+    ner_model = Optional[str] = None
+
+    @classmethod
+    def from_message(cls: Type[_T], message: knowledgebox_pb2.KBConfiguration) -> _T:
+        entity = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=False,
+        )
+        return cls(**entity)
 
 
 class PushPayload(BaseModel):
@@ -247,6 +263,19 @@ class ProcessingEngine:
 
     async def finalize(self):
         await self.session.close()
+
+    @alru_cache(maxsize=None)
+    async def get_configuration(self, kbid: str, item: PushPayload):
+        if self.onprem is False:
+            return
+
+        ingest = get_ingest()
+
+        kb_obj = KnowledgeBoxID()
+        kb_obj.uuid = kbid
+        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)
+        if pb_response.status.status == OpStatusWriter.Status.OK:
+            item.learning_config.from_message(pb_response.config)
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
@@ -429,6 +458,7 @@ class ProcessingEngine:
                     headers=headers,
                 )
             else:
+                await self.get_configuration(item.kbid, item)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
