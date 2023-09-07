@@ -1934,6 +1934,7 @@ dependencies = [
  "nucliadb_telemetry",
  "nucliadb_texts",
  "nucliadb_vectors",
+ "num_cpus",
  "once_cell",
  "openssl",
  "opentelemetry",

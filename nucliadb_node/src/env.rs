@@ -83,3 +83,17 @@ pub fn host_key_path() -> PathBuf {
         Err(_) => PathBuf::from("host_key"),
     }
 }
+
+pub fn num_paragraph_search_threads() -> usize {
+    match env::var("NUM_PARAGRAPH_SEARCH_THREADS") {
+        Ok(threadstr) => {
+            if let Ok(threads) = threadstr.parse() {
+                threads
+            } else {
+                error!("NUM_PARAGRAPH_SEARCH_THREADS defined incorrectly. Defaulting to num cpus");
+                num_cpus::get()
+            }
+        }
+        Err(_) => num_cpus::get(),
+    }
+}

@@ -28,12 +28,15 @@ pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
 
 pub struct ParagraphConfig {
     pub path: PathBuf,
+    pub num_threads: usize,
 }
 
 pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
 impl ParagraphIterator {
     pub fn new<I>(inner: I) -> ParagraphIterator
-    where I: Iterator<Item = ParagraphItem> + Send + 'static {
+    where
+        I: Iterator<Item = ParagraphItem> + Send + 'static,
+    {
         ParagraphIterator(Box::new(inner))
     }
 }

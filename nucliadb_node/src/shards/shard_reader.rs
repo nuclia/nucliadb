@@ -35,6 +35,7 @@ use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
 
 use crate::disk_structure::*;
+use crate::env;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
@@ -164,8 +165,9 @@ impl ShardReader {
             path: shard_path.join(TEXTS_DIR),
         };
 
-        let psc = ParagraphConfig {
+        let psc: ParagraphConfig = ParagraphConfig {
             path: shard_path.join(PARAGRAPHS_DIR),
+            num_threads: env::num_paragraph_search_threads(),
         };
 
         let vsc = VectorConfig {
