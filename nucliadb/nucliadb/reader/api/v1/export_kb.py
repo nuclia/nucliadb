@@ -17,10 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import field  # noqa
-from . import import_kb  # noqa
-from . import knowledgebox  # noqa
-from . import resource  # noqa
-from . import services  # noqa
-from . import upload  # noqa
-from .router import api  # noqa
+from fastapi_versioning import version  # type: ignore
+from starlette.requests import Request
+
+from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.resource import KnowledgeBoxObj, NucliaDBRoles
+from nucliadb_utils.authentication import requires_one
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/export",
+    status_code=200,
+    name="Export a Knowledge Box",
+    response_model=KnowledgeBoxObj,
+    tags=["Knowledge Boxes"],
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
+@version(1)
+async def export_kb_endpoint(request: Request, kbid: str) -> KnowledgeBoxObj:
+    pass
