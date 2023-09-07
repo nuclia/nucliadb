@@ -54,23 +54,42 @@ fn main() {
         }
     };
 
+    println!("{");
+    println!("  \"threads\":");
+
+    println!("[");
     for thread in process.threads() {
+        println!("{}");
+        println!("\"thread_id\": {},", thread.id());
         println!(
-            "thread {} - {}",
-            thread.id(),
+            "\"thread_name\": \"{}\",",
             thread.name().unwrap_or("<unknown>")
         );
+
+        println!("\"frames\":");
+        println!("[");
         for frame in thread.frames() {
+            println!("{");
+
             match frame.symbol() {
-                Some(symbol) => println!(
-                    "{:#016x} - {} + {:#x}",
-                    frame.ip(),
-                    symbol.name(),
-                    symbol.offset(),
-                ),
-                None => println!("{:#016x} - ???", frame.ip()),
+                Some(symbol) => {
+                    println!("\"ip\": \"{:#016x}\",", frame.ip());
+                    println!("\"symbol_name\": \"{}\",", symbol.name());
+                    println!("\"symbol_offset\": \"{:#x}\",", symbol.offset());
+                }
+                None => {
+                    println!("\"ip\": \"{:#016x}\",", frame.ip());
+                    println!("\"symbol_name\": \"???\",");
+                    println!("\"symbol_offset\": \"???\",");
+                }
             }
+            println!("}");
+            println!(",");
         }
-        println!();
+        println!("]");
+        println!("}");
+        println!(",");
     }
+    println!("]");
+    println!("}");
 }
