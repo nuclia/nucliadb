@@ -54,12 +54,11 @@ fn main() {
         }
     };
 
-    println!("{");
+    println!("{{");
     println!("  \"threads\":");
-
     println!("[");
     for thread in process.threads() {
-        println!("{}");
+        println!("{{");
         println!("\"thread_id\": {},", thread.id());
         println!(
             "\"thread_name\": \"{}\",",
@@ -83,13 +82,13 @@ fn main() {
                     println!("\"symbol_offset\": \"???\",");
                 }
             }
-            println!("}");
+            println!("}}");
             println!(",");
         }
         println!("]");
-        println!("}");
+        println!("}}");
         println!(",");
     }
     println!("]");
-    println!("}");
+    println!("}}");
 }
