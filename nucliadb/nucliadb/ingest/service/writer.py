@@ -25,6 +25,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse,
     GCKnowledgeBoxResponse,
+    KBConfiguration,
     KnowledgeBox,
     KnowledgeBoxID,
     KnowledgeBoxNew,
@@ -35,15 +36,12 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
-    KBConfiguration,
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
-    SetKBConfigurationRequest,
-    GetConfigurationResponse,
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
@@ -51,6 +49,7 @@ from nucliadb_protos.writer_pb2 import (
     ExtractedVectorsWrapper,
     FileRequest,
     FileUploaded,
+    GetConfigurationResponse,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -76,6 +75,7 @@ from nucliadb_protos.writer_pb2 import (
     ResourceIdRequest,
     ResourceIdResponse,
     SetEntitiesRequest,
+    SetKBConfigurationRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
     SetVectorSetRequest,

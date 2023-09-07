@@ -20,9 +20,9 @@
 from fastapi import HTTPException
 from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2 import (
+    GetConfigurationResponse,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -34,7 +34,6 @@ from nucliadb_protos.writer_pb2 import (
     GetSynonymsResponse,
     GetVectorSetsRequest,
     GetVectorSetsResponse,
-    GetConfigurationResponse,
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
     OpStatusWriter,
@@ -42,6 +41,7 @@ from nucliadb_protos.writer_pb2 import (
 from starlette.requests import Request
 
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles

@@ -19,7 +19,6 @@
 #
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
-from nucliadb_models.configuration import KBConfiguration
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
@@ -30,11 +29,11 @@ from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
     OpStatusWriter,
+    SetKBConfigurationRequest,
     SetLabelsRequest,
     SetSynonymsRequest,
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
-    SetKBConfigurationRequest,
 )
 from starlette.requests import Request
 
@@ -45,6 +44,7 @@ from nucliadb.models.responses import (
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     UpdateEntitiesGroupPayload,

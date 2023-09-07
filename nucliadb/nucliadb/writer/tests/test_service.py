@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_models.configuration import KBConfiguration
 import pytest
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
 from nucliadb_models.labels import Label, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
