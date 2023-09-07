@@ -78,10 +78,10 @@ class ProcessingInfo(BaseModel):
 
 
 class LearningConfig(BaseModel):
-    semantic_model = Optional[str] = None
-    anonymization_model = Optional[str] = None
-    generative_model = Optional[str] = None
-    ner_model = Optional[str] = None
+    semantic_model: Optional[str] = None
+    anonymization_model: Optional[str] = None
+    generative_model: Optional[str] = None
+    ner_model: Optional[str] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: knowledgebox_pb2.KBConfiguration) -> _T:
