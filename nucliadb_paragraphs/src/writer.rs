@@ -468,6 +468,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
+            num_threads: 4,
         };
 
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();

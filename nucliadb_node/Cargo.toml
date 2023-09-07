@@ -63,6 +63,7 @@ opentelemetry = { version = "0.17", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.17.2"
 reqwest = "0.11.16"
 derive_builder = "0.12.0"
+num_cpus = "1.16.0"
 
 # Text Service
 async-stream = "0.3.2"
