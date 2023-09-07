@@ -24,110 +24,6 @@ use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
 use tokio_metrics::TaskMetrics;
 
-const INSTRUMENTED_COUNT: (&str, &str) = (
-    "nucliadb_node_instrumented_count",
-    "The number of tasks instrumented",
-);
-
-const DROPPED_COUNT: (&str, &str) = ("nucliadb_node_dropped_count", "The number of tasks dropped");
-
-const FIRST_POLL_COUNT: (&str, &str) = (
-    "nucliadb_node_first_poll_count",
-    "The number of tasks polled for the first time",
-);
-
-const TOTAL_FIRST_POLL_DELAY: (&str, &str) = (
-    "nucliadb_node_total_first_poll_delay",
-    "The total duration elapsed between the instant tasks are instrumented, and the instant they \
-     are first polled",
-);
-
-const TOTAL_IDLED_COUNT: (&str, &str) = (
-    "nucliadb_node_total_idled_count",
-    "The total number of times that tasks idled, waiting to be awoken. [...]",
-);
-
-const TOTAL_IDLE_DURATION: (&str, &str) = (
-    "nucliadb_node_total_idle_duration",
-    "The total duration that tasks idled. [...]",
-);
-
-const TOTAL_SCHEDULED_COUNT: (&str, &str) = (
-    "nucliadb_node_total_scheduled_count",
-    "The total number of times that tasks were awoken (and then, presumably, scheduled for \
-     execution)",
-);
-
-const TOTAL_SCHEDULED_DURATION: (&str, &str) = (
-    "nucliadb_node_total_scheduled_duration",
-    "The total duration that tasks spent waiting to be polled after awakening",
-);
-
-const TOTAL_POLL_COUNT: (&str, &str) = (
-    "nucliadb_node_total_poll_count",
-    "The total number of times that tasks where polled",
-);
-
-const TOTAL_POLL_DURATION: (&str, &str) = (
-    "nucliadb_node_total_poll_duration",
-    "The total duration elapsed during polls",
-);
-
-const TOTAL_FAST_POLL_COUNT: (&str, &str) = (
-    "nucliadb_node_total_fast_poll_count",
-    "The total number of times that polling tasks completed swiftly. [...]",
-);
-
-const TOTAL_FAST_POLL_DURATION: (&str, &str) = (
-    "nucliadb_node_total_fast_poll_duration",
-    "The total duration of fast polls. [...]",
-);
-
-const TOTAL_SLOW_POLL_COUNT: (&str, &str) = (
-    "nucliadb_node_total_slow_poll_count",
-    "The total number of times that polling tasks completed slowly. [...]",
-);
-
-const TOTAL_SLOW_POLL_DURATION: (&str, &str) = (
-    "nucliadb_node_total_slow_poll_duration",
-    "The total duration of slow polls. [...]",
-);
-
-const TOTAL_SHORT_DELAY_COUNT: (&str, &str) = (
-    "nucliadb_node_total_short_delay_count",
-    "The total count of tasks with short scheduling delays. [...]",
-);
-
-const TOTAL_LONG_DELAY_COUNT: (&str, &str) = (
-    "nucliadb_node_total_long_delay_count",
-    "The total count of tasks with long scheduling delays. [...]",
-);
-
-const TOTAL_SHORT_DELAY_DURATION: (&str, &str) = (
-    "nucliadb_node_total_short_delay_duration",
-    "The total duration of tasks with short scheduling delays. [...]",
-);
-
-const TOTAL_LONG_DELAY_DURATION: (&str, &str) = (
-    "nucliadb_node_total_long_delay_duration",
-    "The total duration of tasks with long scheduling delays. [...]",
-);
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-pub struct TaskLabels {
-    pub request: String, // gRPC method (/NewShard, /SetResource...)
-}
-
-// Tasks in tokio should never block longer than 10-100µs
-
-// TODO we are trying bucket values for everything. After an evaluation on
-// production, we should reconsider changing them and customize for every
-// Histogram metric
-const BUCKETS: [f64; 15] = [
-    0.000010, 0.000025, 0.000050, 0.000100, 0.000250, 0.000500, 0.001, 0.002, 0.005, 0.010, 0.100,
-    0.250, 0.500, 1.0, 5.0,
-];
-
 pub struct TokioTaskMetrics {
     instrumented_count: Family<TaskLabels, Counter>,
     dropped_count: Family<TaskLabels, Counter>,
@@ -149,137 +45,158 @@ pub struct TokioTaskMetrics {
     total_long_delay_duration: Family<TaskLabels, Histogram>,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct TaskLabels {
+    pub request: String, // gRPC method (/NewShard, /SetResource...)
+}
+
+// Tasks in tokio should never block longer than 10-100µs
+
+// TODO we are trying bucket values for everything. After an evaluation on
+// production, we should reconsider changing them and customize for every
+// Histogram metric
+const BUCKETS: [f64; 15] = [
+    0.000010, 0.000025, 0.000050, 0.000100, 0.000250, 0.000500, 0.001, 0.002, 0.005, 0.010, 0.100,
+    0.250, 0.500, 1.0, 5.0,
+];
+
 impl TokioTaskMetrics {
     fn new(registry: &mut Registry) -> Self {
         let histogram_constructor = || Histogram::new(BUCKETS.iter().copied());
 
         let instrumented_count = Family::default();
         registry.register(
-            INSTRUMENTED_COUNT.0,
-            INSTRUMENTED_COUNT.1,
+            "instrumented_count",
+            "The number of tasks instrumented",
             instrumented_count.clone(),
         );
 
         let dropped_count = Family::default();
-        registry.register(DROPPED_COUNT.0, DROPPED_COUNT.1, dropped_count.clone());
+        registry.register(
+            "dropped_count",
+            "The number of tasks dropped",
+            dropped_count.clone(),
+        );
 
         let first_poll_count = Family::default();
         registry.register(
-            FIRST_POLL_COUNT.0,
-            FIRST_POLL_COUNT.1,
+            "first_poll_count",
+            "The number of tasks polled for the first time",
             first_poll_count.clone(),
         );
 
         let total_first_poll_delay =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_FIRST_POLL_DELAY.0,
-            TOTAL_FIRST_POLL_DELAY.1,
+            "total_first_poll_delay",
+            "The total duration elapsed between the instant tasks are instrumented, and the \
+             instant they are first polled",
             total_first_poll_delay.clone(),
         );
 
         let total_idled_count = Family::default();
         registry.register(
-            TOTAL_IDLED_COUNT.0,
-            TOTAL_IDLED_COUNT.1,
+            "total_idled_count",
+            "The total number of times that tasks idled, waiting to be awoken. [...]",
             total_idled_count.clone(),
         );
 
         let total_idle_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_IDLE_DURATION.0,
-            TOTAL_IDLE_DURATION.1,
+            "total_idle_duration",
+            "The total duration that tasks idled. [...]",
             total_idle_duration.clone(),
         );
 
         let total_scheduled_count = Family::default();
         registry.register(
-            TOTAL_SCHEDULED_COUNT.0,
-            TOTAL_SCHEDULED_COUNT.1,
+            "total_scheduled_count",
+            "The total number of times that tasks were awoken (and then, presumably, scheduled \
+             for execution)",
             total_scheduled_count.clone(),
         );
 
         let total_scheduled_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_SCHEDULED_DURATION.0,
-            TOTAL_SCHEDULED_DURATION.1,
+            "total_scheduled_duration",
+            "The total duration that tasks spent waiting to be polled after awakening",
             total_scheduled_duration.clone(),
         );
 
         let total_poll_count = Family::default();
         registry.register(
-            TOTAL_POLL_COUNT.0,
-            TOTAL_POLL_COUNT.1,
+            "total_poll_count",
+            "The total number of times that tasks where polled",
             total_poll_count.clone(),
         );
 
         let total_poll_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_POLL_DURATION.0,
-            TOTAL_POLL_DURATION.1,
+            "total_poll_duration",
+            "The total duration elapsed during polls",
             total_poll_duration.clone(),
         );
 
         let total_fast_poll_count = Family::default();
         registry.register(
-            TOTAL_FAST_POLL_COUNT.0,
-            TOTAL_FAST_POLL_COUNT.1,
+            "total_fast_poll_count",
+            "The total number of times that polling tasks completed swiftly. [...]",
             total_fast_poll_count.clone(),
         );
 
         let total_fast_poll_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_FAST_POLL_DURATION.0,
-            TOTAL_FAST_POLL_DURATION.1,
+            "total_fast_poll_duration",
+            "The total duration of fast polls. [...]",
             total_fast_poll_duration.clone(),
         );
 
         let total_slow_poll_count = Family::default();
         registry.register(
-            TOTAL_SLOW_POLL_COUNT.0,
-            TOTAL_SLOW_POLL_COUNT.1,
+            "total_slow_poll_count",
+            "The total number of times that polling tasks completed slowly. [...]",
             total_slow_poll_count.clone(),
         );
 
         let total_slow_poll_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_SLOW_POLL_DURATION.0,
-            TOTAL_SLOW_POLL_DURATION.1,
+            "total_slow_poll_duration",
+            "The total duration of slow polls. [...]",
             total_slow_poll_duration.clone(),
         );
 
         let total_short_delay_count = Family::default();
         registry.register(
-            TOTAL_SHORT_DELAY_COUNT.0,
-            TOTAL_SHORT_DELAY_COUNT.1,
+            "total_short_delay_count",
+            "The total count of tasks with short scheduling delays. [...]",
             total_short_delay_count.clone(),
         );
 
         let total_long_delay_count = Family::default();
         registry.register(
-            TOTAL_LONG_DELAY_COUNT.0,
-            TOTAL_LONG_DELAY_COUNT.1,
+            "total_long_delay_count",
+            "The total count of tasks with long scheduling delays. [...]",
             total_long_delay_count.clone(),
         );
 
         let total_short_delay_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_SHORT_DELAY_DURATION.0,
-            TOTAL_SHORT_DELAY_DURATION.1,
+            "total_short_delay_duration",
+            "The total duration of tasks with short scheduling delays. [...]",
             total_short_delay_duration.clone(),
         );
 
         let total_long_delay_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            TOTAL_LONG_DELAY_DURATION.0,
-            TOTAL_LONG_DELAY_DURATION.1,
+            "total_long_delay_duration",
+            "The total duration of tasks with long scheduling delays. [...]",
             total_long_delay_duration.clone(),
         );
 

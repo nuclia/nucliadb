@@ -22,6 +22,13 @@ use tokio;
 use crate::metrics::meters::{Meter, PrometheusMeter};
 
 #[tokio::test(flavor = "current_thread")]
+async fn test_export_metric_name() {
+    let meter = PrometheusMeter::new();
+    let export = meter.export().unwrap();
+    assert!(export.contains("\n# TYPE nucliadb_node_workers_count gauge\n"));
+    assert!(export.contains("\n# TYPE nucliadb_node_instrumented_count counter\n"))
+}
+
 async fn test_export_tasks_instrumented_count() {
     let meter = PrometheusMeter::new();
     let task_id = "my-task".to_string();
