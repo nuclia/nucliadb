@@ -25,7 +25,10 @@ from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
     PredictVectorMissing,
+    RephraseError,
+    RephraseMissingContextError,
     SendToPredictError,
+    _parse_rephrase_response,
 )
 from nucliadb_models.search import (
     AskDocumentModel,
@@ -362,3 +365,22 @@ async def test_rephrase():
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
     )
+
+
+@pytest.mark.parametrize(
+    "content,exception",
+    [
+        ("foobar", None),
+        ("foobar0", None),
+        ("foobar-1", RephraseError),
+        ("foobar-2", RephraseMissingContextError),
+    ],
+)
+async def test_parse_rephrase_response(content, exception):
+    resp = Mock()
+    resp.json = AsyncMock(return_value=content)
+    if exception:
+        with pytest.raises(exception):
+            await _parse_rephrase_response(resp)
+    else:
+        assert await _parse_rephrase_response(resp) == content.rstrip("0")
