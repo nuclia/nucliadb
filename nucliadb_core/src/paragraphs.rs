@@ -28,7 +28,7 @@ pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
 
 pub struct ParagraphConfig {
     pub path: PathBuf,
-    pub num_threads: usize,
+    pub num_threads: u8,
 }
 
 pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
