@@ -29,6 +29,7 @@ _T = TypeVar("_T")
 
 
 class KBConfiguration(BaseModel):
+    # Do not touch this model synced on Processing side
     semantic_model: Optional[str] = None
     generative_model: Optional[str] = None
     ner_model: Optional[str] = None
