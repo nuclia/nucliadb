@@ -63,12 +63,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "antidote"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34fde25430d87a9388dadbe6e34d7f72a462c8b43ac8d309b42b0a8505d7e2a5"
-
-[[package]]
 name = "anyhow"
 version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1942,7 +1936,7 @@ dependencies = [
  "rand",
  "regex",
  "reqwest",
- "rstack-self",
+ "rstack",
  "sentry",
  "sentry-tracing",
  "serde",
@@ -2805,21 +2799,6 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
-]
-
-[[package]]
-name = "rstack-self"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dd5030da3aba0ec731502f74ec38e63798eea6bc8b8ba5972129afe3eababd2"
-dependencies = [
- "antidote",
- "backtrace",
- "bincode",
- "lazy_static",
- "libc",
- "rstack",
- "serde",
 ]
 
 [[package]]
