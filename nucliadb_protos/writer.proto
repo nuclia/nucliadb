@@ -490,6 +490,18 @@ message GetSynonymsResponse {
     knowledgebox.Synonyms synonyms = 2;
 }
 
+message SetKBConfigurationRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    knowledgebox.KBConfiguration config = 2;
+}
+
+message GetConfigurationResponse {
+    OpStatusWriter status = 1;
+    knowledgebox.KBConfiguration config = 2;
+}
+
+
+
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
@@ -531,6 +543,11 @@ service Writer {
     rpc SetSynonyms(SetSynonymsRequest) returns (OpStatusWriter) {}
     rpc DelSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
 
+    // Configuration
+    rpc NewConfiguration(SetKBConfigurationRequest) returns (OpStatusWriter) {}
+    rpc DelConfiguration(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
+    rpc GetConfiguration(knowledgebox.KnowledgeBoxID) returns (GetConfigurationResponse) {}
+    
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
     rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);

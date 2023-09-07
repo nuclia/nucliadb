@@ -221,8 +221,10 @@ class PredictEngine:
         else:
             return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
-    def get_predict_headers(self, kbid: str) -> dict[str, str]:
+    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:
+            # get the configuration of the KB id not cached
+
             return {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
         else:
             return {"X-STF-KBID": kbid}

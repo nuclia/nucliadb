@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_models.configuration import KBConfiguration
 import pytest
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
@@ -134,4 +135,25 @@ async def test_service_lifecycle_labels(writer_api):
         resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.dict())
         assert resp.status_code == 200
         resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.dict())
+        assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_service_lifecycle_configuration(writer_api):
+    async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
+        resp = await client.post(
+            f"/{KBS_PREFIX}",
+            json={
+                "slug": "kbid1",
+                "title": "My Knowledge Box",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["slug"] == "kbid1"
+        kbid = data["uuid"]
+
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        conf = KBConfiguration(semantic_model="test")
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/configuration", json=conf.dict())
         assert resp.status_code == 200

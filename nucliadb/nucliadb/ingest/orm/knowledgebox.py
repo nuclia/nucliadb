@@ -24,6 +24,7 @@ from uuid import uuid4
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import (
+    KBConfiguration,
     KnowledgeBoxConfig,
     Labels,
     LabelSet,
@@ -63,6 +64,7 @@ KB_UUID = "/kbs/{kbid}/config"
 KB_LABELSET = "/kbs/{kbid}/labels/{id}"
 KB_LABELS = "/kbs/{kbid}/labels"
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
+KB_CONFIGURATION = "/kbs/{kbid}/configuration"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
 KB_SLUGS = KB_SLUGS_BASE + "{slug}"
@@ -276,6 +278,27 @@ class KnowledgeBox:
                 node = get_index_node(replica.node)
                 if node is not None:
                     yield node, replica.shard.id
+
+    # Configuration
+    async def get_configuration(self, response: KBConfiguration):
+        configuration_key = KB_CONFIGURATION.format(kbid=self.kbid)
+        payload = await self.txn.get(configuration_key)
+        if payload is not None:
+            response.ParseFromString(payload)
+
+    async def del_configuration(self):
+        configuration_key = KB_CONFIGURATION.format(kbid=self.kbid)
+        await self.txn.delete(configuration_key)
+
+    async def set_configuration(self, config: KBConfiguration):
+        configuration_key = KB_CONFIGURATION.format(kbid=self.kbid)
+        payload = await self.txn.get(configuration_key)
+        kb_conf = KBConfiguration()
+        if payload is not None:
+            kb_conf.ParseFromString(payload)
+        kb_conf.MergeFrom(config)
+        payload = kb_conf.SerializeToString()
+        await self.txn.set(configuration_key, payload)
 
     # Vectorset
     async def get_vectorsets(self, response: writer_pb2.GetVectorSetsResponse):

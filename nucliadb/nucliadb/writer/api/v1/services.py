@@ -19,6 +19,7 @@
 #
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
@@ -33,6 +34,7 @@ from nucliadb_protos.writer_pb2 import (
     SetSynonymsRequest,
     UpdateEntitiesGroupRequest,
     UpdateEntitiesGroupResponse,
+    SetKBConfigurationRequest,
 )
 from starlette.requests import Request
 
@@ -332,3 +334,69 @@ async def delete_custom_synonyms(request: Request, kbid: str):
         raise HTTPException(
             status_code=500, detail="Error deleting synonyms of a Knowledge box"
         )
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/configuration",
+    status_code=200,
+    name="Set KB configuration for On Premise deployments",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-hidden-operation": True},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def create_configuration(
+    request: Request,
+    kbid: str,
+    item: KBConfiguration,
+):
+    ingest = get_ingest()
+
+    pbrequest: SetKBConfigurationRequest = SetKBConfigurationRequest()
+    pbrequest.kb.uuid = kbid
+    if item.semantic_model:
+        pbrequest.config.semantic_model = item.semantic_model
+    if item.generative_model:
+        pbrequest.config.generative_model = item.generative_model
+    if item.ner_model:
+        pbrequest.config.ner_model = item.ner_model
+    if item.anonymization_model:
+        pbrequest.config.anonymization_model = item.anonymization_model
+    if item.visual_labeling:
+        pbrequest.config.visual_labeling = item.visual_labeling
+    status: NewEntitiesGroupResponse = await ingest.SetConfiguration(pbrequest)  # type: ignore
+    if status.status == NewEntitiesGroupResponse.Status.OK:
+        return
+    elif status.status == NewEntitiesGroupResponse.Status.KB_NOT_FOUND:
+        return HTTPNotFound(detail="Knowledge Box does not exist")
+    elif status.status == NewEntitiesGroupResponse.Status.ERROR:
+        return HTTPInternalServerError(
+            detail="Error on settings entities on a Knowledge box"
+        )
+
+
+@api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/configuration",
+    status_code=200,
+    name="Delete KB configuration for On Premise deployments",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-hidden-operation": True},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_configuration(request: Request, kbid: str):
+    ingest = get_ingest()
+    pbrequest: KnowledgeBoxID = KnowledgeBoxID()
+    pbrequest.uuid = kbid
+
+    status: OpStatusWriter = await ingest.DelConfiguration(pbrequest)  # type: ignore
+    if status.status == OpStatusWriter.Status.OK:
+        return None
+    elif status.status == OpStatusWriter.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif status.status == OpStatusWriter.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error on deleting entities from a Knowledge box"
+        )
+
+    return Response(status_code=204)

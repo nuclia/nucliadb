@@ -219,6 +219,21 @@ pub struct SemanticModelMetadata {
     #[prost(float, optional, tag="3")]
     pub default_min_score: ::core::option::Option<f32>,
 }
+// Do not update this model without confirmation of internal Learning Config API
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KbConfiguration {
+    #[prost(string, tag="2")]
+    pub semantic_model: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub generative_model: ::prost::alloc::string::String,
+    #[prost(string, tag="4")]
+    pub ner_model: ::prost::alloc::string::String,
+    #[prost(string, tag="5")]
+    pub anonymization_model: ::prost::alloc::string::String,
+    #[prost(string, tag="6")]
+    pub visual_labeling: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum KnowledgeBoxResponseStatus {

@@ -35,12 +35,15 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
+    KBConfiguration,
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
+    SetKBConfigurationRequest,
+    GetConfigurationResponse,
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
@@ -551,6 +554,68 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await txn.commit()
                 response.status = OpStatusWriter.Status.OK
             return response
+
+    async def SetConfiguration(
+        self, request: SetKBConfigurationRequest, context=None
+    ) -> OpStatusWriter:
+        response = OpStatusWriter()
+        txn: Transaction
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            if kbobj is None:
+                response.status = OpStatusWriter.Status.NOTFOUND
+                return response
+            try:
+                await kbobj.set_configuration(request.config)
+                await txn.commit()
+                response.status = OpStatusWriter.Status.OK
+                return response
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.exception("Errors setting configuration")
+                response.status = OpStatusWriter.Status.ERROR
+                return response
+
+    async def GetConfiguration(
+        self, request: KnowledgeBoxID, context=None
+    ) -> KBConfiguration:
+        response = GetConfigurationResponse()
+        txn: Transaction
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request)
+            if kbobj is None:
+                response.status.status = OpStatusWriter.Status.NOTFOUND
+                return response
+            try:
+                await kbobj.get_configuration(response.config)
+                response.status.status = OpStatusWriter.Status.OK
+                return response
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.exception("Errors getting configuration")
+                response.status.status = OpStatusWriter.Status.ERROR
+                return response
+
+    async def DelConfiguration(
+        self, request: KnowledgeBoxID, context=None
+    ) -> OpStatusWriter:
+        response = OpStatusWriter()
+        txn: Transaction
+        async with self.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request)
+            if kbobj is None:
+                response.status = OpStatusWriter.Status.NOTFOUND
+                return response
+            try:
+                await kbobj.del_configuration()
+                await txn.commit()
+                response.status = OpStatusWriter.Status.OK
+                return response
+            except Exception as e:
+                errors.capture_exception(e)
+                logger.exception("Errors setting synonyms")
+                response.status = OpStatusWriter.Status.ERROR
+                return response
 
     async def GetSynonyms(  # type: ignore
         self, request: KnowledgeBoxID, context=None
