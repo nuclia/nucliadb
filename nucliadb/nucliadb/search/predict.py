@@ -57,6 +57,14 @@ class NUAKeyMissingError(Exception):
     pass
 
 
+class RephraseError(Exception):
+    pass
+
+
+class RephraseMissingContextError(Exception):
+    pass
+
+
 DUMMY_RELATION_NODE = [
     RelationNode(value="Ferran", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
     RelationNode(
@@ -321,7 +329,7 @@ class PredictEngine:
             headers=await self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=200)
-        return await resp.json()
+        return await _parse_rephrase_response(resp)
 
     @predict_observer.wrap({"type": "chat"})
     async def chat_query(
@@ -426,3 +434,24 @@ def get_answer_generator(response: aiohttp.ClientResponse):
                 buffer = b""
 
     return _iter_answer_chunks(response.content.iter_chunks())
+
+
+async def _parse_rephrase_response(
+    resp: aiohttp.ClientResponse,
+) -> str:
+    """
+    Predict api is returning a json payload that is a string with the following format:
+    <rephrased_query><status_code>
+    where status_code is "0" for success, "-1" for error and "-2" for no context
+    it will raise an exception if the status code is not 0
+    """
+    content = await resp.json()
+    if content.endswith("0"):
+        return content[:-1]
+    elif content.endswith("-1"):
+        raise RephraseError(content[:-2])
+    elif content.endswith("-2"):
+        raise RephraseMissingContextError(content[:-2])
+    else:
+        # bw compatibility
+        return content

@@ -87,8 +87,11 @@ impl PrometheusMeter {
 
         // This must be done for every metric
         let request_time_metric = request_time::register_request_time(&mut registry);
-        let tokio_runtime_metrics = tokio_runtime::register_tokio_runtime_metrics(&mut registry);
-        let tokio_task_metrics = tokio_tasks::register_tokio_task_metrics(&mut registry);
+
+        let prefixed_subregistry = registry.sub_registry_with_prefix("nucliadb_node");
+        let tokio_runtime_metrics =
+            tokio_runtime::register_tokio_runtime_metrics(prefixed_subregistry);
+        let tokio_task_metrics = tokio_tasks::register_tokio_task_metrics(prefixed_subregistry);
 
         let tasks_monitor = MultiTaskMonitor::new();
         let runtime_monitor = RuntimeMonitor::new(&tokio::runtime::Handle::current());

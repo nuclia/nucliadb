@@ -115,6 +115,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Check system
+        run: make -C nucliadb_node/ check-system
+
       - run: rustup component add clippy
 
       - uses: Swatinem/rust-cache@v2
@@ -139,6 +142,9 @@ jobs:
         with:
           shared-key: "test_prebuild"
 
+      - name: Check system
+        run: make -C nucliadb_node/ check-system
+
       - uses: actions-rs/cargo@v1
         name: cargo prebuild tests
         env:
@@ -158,6 +164,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "test_prebuild"
+
+      - name: Check system
+        run: make -C nucliadb_node/ check-system
 
       - uses: actions-rs/cargo@v1
         env:

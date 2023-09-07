@@ -29,6 +29,10 @@ ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
 ENV RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable"
 
+# Install system dependencies
+COPY scripts/install-system-deps.sh /tmp/
+RUN /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh && rm -rf /var/lib/apt/lists/*
+
 COPY --from=planner /nucliadb/recipe.json recipe.json
 
 # Build dependencies (this is the cached docker layer)
@@ -54,7 +58,6 @@ COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
-# Build application (only run when sources are modified)
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && cargo build \
     --locked \
@@ -78,6 +81,7 @@ RUN apt-get -y update \
     && apt-get -y install ca-certificates curl \
     libssl1.1 \
     lmdb-utils \
+    libdw-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
