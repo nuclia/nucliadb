@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use rstack;
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 use std::env;
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 use std::process;
+
+#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
+use rstack;
 
 #[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
 fn main() {

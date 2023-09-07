@@ -17,18 +17,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::process;
+use std::process::Command;
+use std::{env, process};
+
 use axum::response::{IntoResponse, Json, Response};
 use serde::Serialize;
-use std::env;
-use std::process::Command;
-
 
 #[derive(Serialize)]
 struct Traces {
     trace: String,
 }
-
 
 pub async fn thread_dump_service() -> Response {
     let pid = process::id();
@@ -44,8 +42,9 @@ pub async fn thread_dump_service() -> Response {
         Ok(output) => output,
         Err(e) => {
             return Json(Traces {
-                trace: format!("Failed to execute {:?} command: {}", cmd, e)
-            }).into_response();
+                trace: format!("Failed to execute {:?} command: {}", cmd, e),
+            })
+            .into_response();
         }
     };
 
@@ -53,15 +52,10 @@ pub async fn thread_dump_service() -> Response {
     if output.status.success() {
         // Convert the stdout bytes into a String
         result = String::from_utf8_lossy(&output.stdout).to_string();
-
     } else {
         // Print the error message
         result = format!("Command failed with error: {:?}", output.status);
     }
 
-    Json(Traces {
-            trace: result,
-        })
-        .into_response()
+    Json(Traces { trace: result }).into_response()
 }
-
