@@ -98,13 +98,13 @@ pub fn num_paragraph_search_threads() -> usize {
     }
 }
 
-pub fn num_rayon_threads() -> usize {
-    match env::var("NUM_RAYON_THREADS") {
+pub fn num_global_rayon_threads() -> usize {
+    match env::var("NUM_GLOBAL_RAYON_THREADS") {
         Ok(threadstr) => {
             if let Ok(threads) = threadstr.parse() {
                 threads
             } else {
-                error!("NUM_RAYON_THREADS defined incorrectly. Defaulting to num cpus");
+                error!("NUM_GLOBAL_RAYON_THREADS defined incorrectly. Defaulting to num cpus");
                 10
             }
         }

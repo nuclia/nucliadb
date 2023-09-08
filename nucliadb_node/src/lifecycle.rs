@@ -44,7 +44,7 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
 
     // We shallow the error if the threadpools were already initialized
     let _ = ThreadPoolBuilder::new()
-        .num_threads(env::num_rayon_threads())
+        .num_threads(env::num_global_rayon_threads())
         .build_global();
     let _ = VectorsMerger::install_global().map(std::thread::spawn);
 
@@ -56,6 +56,6 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
 pub fn initialize_reader() {
     // We swallow the error if the threadpool was already initialized
     let _ = ThreadPoolBuilder::new()
-        .num_threads(env::num_rayon_threads())
+        .num_threads(env::num_global_rayon_threads())
         .build_global();
 }
