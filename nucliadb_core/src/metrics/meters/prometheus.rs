@@ -26,7 +26,7 @@ use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, Re
 use crate::metrics::metric::tokio_runtime::TokioRuntimeObserver;
 use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
 use crate::metrics::task_monitor::{Monitor, TaskId};
-use crate::tracing::error;
+use crate::tracing::{debug, error};
 use crate::NodeResult;
 
 pub struct PrometheusMeter {
@@ -56,6 +56,7 @@ impl Meter for PrometheusMeter {
     }
 
     fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue) {
+        debug!("{metric:?} : {value:?}");
         self.request_time_metric
             .get_or_create(&metric)
             .observe(value);
