@@ -101,6 +101,19 @@ async fn test_export_runtime_metrics_with_prometheus_meter_polls_count() {
     assert!(export.contains("nucliadb_node_max_polls_count 100"));
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn test_export_runtime_metrics_blocking_threads_count() {
+    let meter = PrometheusMeter::new();
+
+    let export = meter.export().unwrap();
+    assert!(export.contains("nucliadb_node_blocking_threads_count 0"));
+
+    tokio::task::spawn_blocking(|| std::thread::sleep(std::time::Duration::from_millis(10)));
+
+    let export = meter.export().unwrap();
+    assert!(export.contains("nucliadb_node_blocking_threads_count 1"));
+}
+
 async fn flush_metrics() {
     let _ = tokio::task::yield_now().await;
 }

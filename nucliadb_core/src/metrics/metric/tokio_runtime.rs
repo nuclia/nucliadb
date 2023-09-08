@@ -80,6 +80,7 @@ impl TokioRuntimeObserver {
 }
 
 pub struct TokioRuntimeMetrics {
+    // From tokio_metrics::RuntimeMetrics
     workers_count: Gauge,
     total_park_count: Counter,
     max_park_count: Gauge,
@@ -116,6 +117,12 @@ pub struct TokioRuntimeMetrics {
     elapsed: Histogram,
     budget_forced_yield_count: Gauge,
     io_driver_ready_count: Gauge,
+
+    // From tokio::runtime::RuntimeMetrics
+    blocking_threads_count: Gauge,
+    idle_blocking_threads_count: Gauge,
+    active_tasks_count: Gauge,
+    blocking_queue_depth: Gauge,
 }
 
 // TODO we are trying bucket values for everything. After an evaluation on
@@ -394,6 +401,35 @@ impl TokioRuntimeMetrics {
             io_driver_ready_count.clone(),
         );
 
+        let blocking_threads_count = Gauge::default();
+        registry.register(
+            "blocking_threads_count",
+            "Number of additional threads spawned by the runtime (using spawn_blocking)",
+            blocking_threads_count.clone(),
+        );
+
+        let idle_blocking_threads_count = Gauge::default();
+        registry.register(
+            "idle_blocking_threads_count",
+            "Number of idle threads spawned by the runtime (using spawn_blocking)",
+            idle_blocking_threads_count.clone(),
+        );
+
+        let active_tasks_count = Gauge::default();
+        registry.register(
+            "active_tasks_count",
+            "Number of active tasks in the runtime",
+            active_tasks_count.clone(),
+        );
+
+        let blocking_queue_depth = Gauge::default();
+        registry.register(
+            "blocking_queue_depth",
+            "number of tasks currently scheduled in the blocking thread pool, spawned using \
+             spawn_blocking",
+            blocking_queue_depth.clone(),
+        );
+
         Self {
             workers_count,
             total_park_count,
@@ -431,12 +467,16 @@ impl TokioRuntimeMetrics {
             elapsed,
             budget_forced_yield_count,
             io_driver_ready_count,
+            blocking_threads_count,
+            idle_blocking_threads_count,
+            active_tasks_count,
+            blocking_queue_depth,
         }
     }
 
     fn update(
         &self,
-        _raw_metrics: tokio::runtime::RuntimeMetrics,
+        raw_metrics: tokio::runtime::RuntimeMetrics,
         metrics: tokio_metrics::RuntimeMetrics,
     ) {
         self.workers_count.set(metrics.workers_count as i64);
@@ -497,5 +537,14 @@ impl TokioRuntimeMetrics {
             .set(metrics.budget_forced_yield_count as i64);
         self.io_driver_ready_count
             .set(metrics.io_driver_ready_count as i64);
+
+        self.blocking_threads_count
+            .set(raw_metrics.num_blocking_threads() as i64);
+        self.idle_blocking_threads_count
+            .set(raw_metrics.num_idle_blocking_threads() as i64);
+        self.active_tasks_count
+            .set(raw_metrics.active_tasks_count() as i64);
+        self.blocking_queue_depth
+            .set(raw_metrics.blocking_queue_depth() as i64);
     }
 }
