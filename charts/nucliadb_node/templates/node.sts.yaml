@@ -112,8 +112,6 @@ spec:
       - name: writer
         securityContext:
           privileged: true
-          capabilities:
-          add: ["SYS_PTRACE"]
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         livenessProbe:
@@ -148,8 +146,6 @@ spec:
       - name: reader
         securityContext:
           privileged: true
-          capabilities:
-          add: ["SYS_PTRACE"]
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
