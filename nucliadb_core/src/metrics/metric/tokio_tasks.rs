@@ -45,7 +45,7 @@ impl TokioTasksObserver {
             .for_each(|(task_id, metrics)| {
                 let labels = TaskLabels { request: task_id };
                 self.metrics.update(labels, metrics);
-            })
+            });
     }
 
     pub fn get_monitor(&self, task_id: TaskId) -> Monitor {

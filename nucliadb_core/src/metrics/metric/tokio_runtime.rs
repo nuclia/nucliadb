@@ -17,11 +17,67 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{Mutex, MutexGuard, TryLockError};
+
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
-use tokio_metrics::RuntimeMetrics;
+use tokio::runtime::Handle;
+use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
+
+use crate::{node_error, NodeResult};
+
+pub struct TokioRuntimeObserver {
+    runtime: Handle,
+    intervals: Mutex<RuntimeIntervals>,
+    metrics: TokioRuntimeMetrics,
+}
+
+impl TokioRuntimeObserver {
+    pub fn new(registry: &mut Registry) -> Self {
+        let runtime = Handle::current();
+        let monitor = RuntimeMonitor::new(&runtime);
+        // We need to store RuntimeIntervals iterator instead of RuntimeMonitor to
+        // get incremental values. We need a Mutex to be Send and Sync (for our
+        // Meter users)
+        let intervals = Mutex::new(monitor.intervals());
+        Self {
+            runtime,
+            intervals,
+            metrics: TokioRuntimeMetrics::new(registry),
+        }
+    }
+
+    pub fn observe(&self) -> NodeResult<()> {
+        let interval = self.next_interval()?;
+        let raw_metrics = self.runtime.metrics();
+
+        self.metrics.update(raw_metrics, interval);
+
+        Ok(())
+    }
+
+    fn next_interval(&self) -> NodeResult<tokio_metrics::RuntimeMetrics> {
+        let mut intervals = self.unpoisoned_intervals()?;
+        match intervals.next() {
+            Some(metrics) => Ok(metrics),
+            None => Err(node_error!(
+                "Cannot export tokio runtime metrics, iterator didn't return values"
+            )),
+        }
+    }
+
+    fn unpoisoned_intervals(&self) -> NodeResult<MutexGuard<'_, RuntimeIntervals>> {
+        match self.intervals.try_lock() {
+            Ok(intervals) => Ok(intervals),
+            Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
+            Err(TryLockError::WouldBlock) => Err(node_error!(
+                "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
+            )),
+        }
+    }
+}
 
 pub struct TokioRuntimeMetrics {
     workers_count: Gauge,
@@ -378,7 +434,11 @@ impl TokioRuntimeMetrics {
         }
     }
 
-    pub fn collect(&self, metrics: RuntimeMetrics) {
+    fn update(
+        &self,
+        _raw_metrics: tokio::runtime::RuntimeMetrics,
+        metrics: tokio_metrics::RuntimeMetrics,
+    ) {
         self.workers_count.set(metrics.workers_count as i64);
         self.total_park_count.inc_by(metrics.total_park_count);
         self.max_park_count.set(metrics.total_park_count as i64);
@@ -438,8 +498,4 @@ impl TokioRuntimeMetrics {
         self.io_driver_ready_count
             .set(metrics.io_driver_ready_count as i64);
     }
-}
-
-pub fn register_tokio_runtime_metrics(registry: &mut Registry) -> TokioRuntimeMetrics {
-    TokioRuntimeMetrics::new(registry)
 }
