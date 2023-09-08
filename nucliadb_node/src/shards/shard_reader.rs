@@ -17,6 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
+use std::thread as std_thread;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics::{self, request_time};
@@ -33,7 +34,6 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
-use std::thread as std_thread;
 
 use crate::disk_structure::*;
 use crate::env;
