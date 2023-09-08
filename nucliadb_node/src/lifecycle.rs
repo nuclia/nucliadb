@@ -22,10 +22,11 @@
 
 use std::path::Path;
 
-use crate::env;
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
+
+use crate::env;
 
 /// Initialize the index node writer. This function must be called before using
 /// a writer
