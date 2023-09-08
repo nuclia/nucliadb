@@ -63,7 +63,70 @@ mod node_stack {
         threads: Vec<ThreadInfo>,
     }
 
+    struct DwarfInfo {
+        dwarf: Dwarf<gimli::EndianSlice<gimli::LittleEndian>>,
+    }
+
+    impl DwarfInfo {
+        pub fn new(elf_binary_path: &str) -> Result<Self, gimli::Error> {
+            let file = std::fs::File::open(elf_binary_path)?;
+            let file = std::io::BufReader::new(file);
+            let debug_info = gimli::read::DebugInfo::new(file);
+            let dwarf = Dwarf::new(debug_info);
+            Ok(Self { dwarf })
+        }
+
+        pub fn get_line_info(
+            &self,
+            symbol_offset: u64,
+        ) -> Result<Option<(String, u64, u64)>, gimli::Error> {
+            let mut unwind_context = UninitializedUnwindContext::new();
+            let register_number = gimli::Register(0);
+
+            let result =
+                self.dwarf
+                    .find_fde_from_pc(&unwind_context, symbol_offset, register_number)?;
+
+            if let Ok(fde) = result {
+                let cfi_program = fde.cie().cie_def().initial_instructions();
+
+                let mut rows = cfi_program.rows(&self.dwarf);
+                while let Some(row) = rows.next_row()? {
+                    if let Some(pc) = row.address() {
+                        if pc == symbol_offset {
+                            if let Some(file) = row.file_index() {
+                                let file_entry = self.dwarf.line_program(file)?.header().file(file);
+                                let line = row.line().unwrap_or(0);
+                                let column = row.column().unwrap_or(0);
+                                return Ok(Some((file_entry.directory.to_string(), line, column)));
+                            }
+                        }
+                    }
+                }
+            }
+
+            Ok(None)
+        }
+    }
+
+    fn get_binary_path(pid: u32) -> io::Result<String> {
+        let exe_path = format!("/proc/{}/exe", pid);
+        let path = fs::read_link(exe_path)?;
+        Ok(path.to_string_lossy().to_string())
+    }
+
     fn print_stack() {
+        let dwarf_info = DwarfInfo::new(elf_binary_path).expect("Failed to initialize DwarfInfo");
+
+        // Get trace
+        let process = match rstack::trace(pid) {
+            Ok(threads) => threads,
+            Err(e) => {
+                eprintln!("error tracing threads: {}", e);
+                process::exit(1);
+            }
+        };
+
         // Create ProcessInfo struct to store the JSON data
         let mut process_info = ProcessInfo { threads: vec![] };
 
