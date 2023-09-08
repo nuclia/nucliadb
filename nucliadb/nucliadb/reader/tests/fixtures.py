@@ -52,12 +52,13 @@ def test_settings_reader(cache, gcs, fake_node, maindb_driver):  # type: ignore
 
 @pytest.fixture(scope="function")
 async def reader_api(test_settings_reader: None, local_files, event_loop):  # type: ignore
-    from nucliadb.reader.app import application
+    from nucliadb.reader.app import get_application
 
     async def handler(req, exc):  # type: ignore
         raise exc
 
     # Little hack to raise exeptions from VersionedFastApi
+    application = get_application()
     for route in application.routes:
         if isinstance(route, Mount):
             route.app.middleware_stack.handler = handler  # type: ignore

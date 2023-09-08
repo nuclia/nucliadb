@@ -530,7 +530,6 @@ async def upload(
         content_type = guess_content_type(filename)
 
     metadata = {"content_type": content_type, "filename": filename}
-
     await dm.update(
         upload_file_id=f"{upload_id}",
         size=request.headers.get("content-length", None),

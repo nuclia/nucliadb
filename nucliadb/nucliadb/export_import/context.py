@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from fastapi import FastAPI
+
 from nucliadb.common.context import ApplicationContext
 
 from .datamanager import KBExporterDataManager
@@ -32,3 +34,11 @@ class ExporterContext(ApplicationContext):
 
     async def finalize(self) -> None:
         await super().finalize()
+
+
+def set_exporter_context_in_app(app: FastAPI, context: ExporterContext):
+    app.state.exporter_context = context
+
+
+def get_exporter_context_from_app(app: FastAPI) -> ExporterContext:
+    return app.state.exporter_context

@@ -9,6 +9,13 @@ from shared import SERVER_HOST, SERVER_PORT, decode_resource, encode_resource
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
+
+class DataManager:
+    pass
+
+
+dm = DataManager()
+
 api = FastAPI()
 
 

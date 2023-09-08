@@ -25,7 +25,10 @@ from fastapi_versioning import version  # type: ignore
 from starlette.requests import Request
 
 from nucliadb.export_import import exporter
-from nucliadb.export_import.context import ExporterContext
+from nucliadb.export_import.context import (
+    ExporterContext,
+    get_exporter_context_from_app,
+)
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
@@ -60,9 +63,8 @@ async def stream_export(context: ExporterContext, kbid: str):
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def export_kb_endpoint(
-    request: Request, kbid: str, context: ExporterContext
-) -> StreamingResponse:
+async def export_kb_endpoint(request: Request, kbid: str) -> StreamingResponse:
+    context = get_exporter_context_from_app(request.app)
     return StreamingResponse(
         stream_export(context, kbid),
         status_code=200,
