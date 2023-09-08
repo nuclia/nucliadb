@@ -3,6 +3,7 @@ mod node_stack {
     use addr2line;
     use async_std::io;
     use memmap2;
+    #[allow(clippy::all)]
     use rstack;
     use rustc_demangle::demangle;
     use serde::{Deserialize, Serialize};
