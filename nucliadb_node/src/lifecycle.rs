@@ -22,6 +22,7 @@
 
 use std::path::Path;
 
+use crate::env;
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
@@ -41,7 +42,9 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
     }
 
     // We shallow the error if the threadpools were already initialized
-    let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
+    let _ = ThreadPoolBuilder::new()
+        .num_threads(env::num_rayon_threads())
+        .build_global();
     let _ = VectorsMerger::install_global().map(std::thread::spawn);
 
     Ok(())
@@ -51,5 +54,7 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
 /// a reader
 pub fn initialize_reader() {
     // We swallow the error if the threadpool was already initialized
-    let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
+    let _ = ThreadPoolBuilder::new()
+        .num_threads(env::num_rayon_threads())
+        .build_global();
 }

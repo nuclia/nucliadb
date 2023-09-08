@@ -97,3 +97,17 @@ pub fn num_paragraph_search_threads() -> usize {
         Err(_) => num_cpus::get(),
     }
 }
+
+pub fn num_rayon_threads() -> usize {
+    match env::var("NUM_RAYON_THREADS") {
+        Ok(threadstr) => {
+            if let Ok(threads) = threadstr.parse() {
+                threads
+            } else {
+                error!("NUM_RAYON_THREADS defined incorrectly. Defaulting to num cpus");
+                10
+            }
+        }
+        Err(_) => 10,
+    }
+}
