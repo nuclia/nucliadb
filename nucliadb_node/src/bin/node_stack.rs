@@ -1,41 +1,14 @@
-// Copyright (C) 2021 Bosutech XXI S.L.
-//
-// nucliadb is offered under the AGPL v3.0 and as commercial software.
-// For commercial licensing, contact us at info@nuclia.com.
-//
-// AGPL:
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
-
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 mod node_stack {
-    extern crate gimli;
-    extern crate rustc_demangle;
-    extern crate serde;
-    extern crate serde_json;
-
-    use std::{env, process};
-
-    use gimli::{
-        DebugInfo, Dwarf, LineProgramRow, LittleEndian, Reader, RegisterRule,
-        UninitializedUnwindContext,
-    };
+    use addr2line;
+    use async_std::io;
+    use memmap2;
     use rstack;
     use rustc_demangle::demangle;
-    use serde::{Deserialize, Serialize}; // Add Serde traits
+    use serde::{Deserialize, Serialize};
+    use std::fs::File;
+    use std::{env, fs, process};
 
-    // Define Rust structs to represent your JSON data
     #[derive(Debug, Serialize, Deserialize)]
     struct LineInfo {
         file: String,
@@ -48,7 +21,7 @@ mod node_stack {
         ip: String,
         symbol_name: String,
         symbol_offset: String,
-        line_info: Option<LineInfo>, // Add line_info field
+        line_info: Option<LineInfo>,
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -63,60 +36,32 @@ mod node_stack {
         threads: Vec<ThreadInfo>,
     }
 
-    struct DwarfInfo {
-        dwarf: Dwarf<gimli::EndianSlice<gimli::LittleEndian>>,
-    }
-
-    impl DwarfInfo {
-        pub fn new(elf_binary_path: &str) -> Result<Self, gimli::Error> {
-            let file = std::fs::File::open(elf_binary_path)?;
-            let file = std::io::BufReader::new(file);
-            let debug_info = gimli::read::DebugInfo::new(file);
-            let dwarf = Dwarf::new(debug_info);
-            Ok(Self { dwarf })
-        }
-
-        pub fn get_line_info(
-            &self,
-            symbol_offset: u64,
-        ) -> Result<Option<(String, u64, u64)>, gimli::Error> {
-            let mut unwind_context = UninitializedUnwindContext::new();
-            let register_number = gimli::Register(0);
-
-            let result =
-                self.dwarf
-                    .find_fde_from_pc(&unwind_context, symbol_offset, register_number)?;
-
-            if let Ok(fde) = result {
-                let cfi_program = fde.cie().cie_def().initial_instructions();
-
-                let mut rows = cfi_program.rows(&self.dwarf);
-                while let Some(row) = rows.next_row()? {
-                    if let Some(pc) = row.address() {
-                        if pc == symbol_offset {
-                            if let Some(file) = row.file_index() {
-                                let file_entry = self.dwarf.line_program(file)?.header().file(file);
-                                let line = row.line().unwrap_or(0);
-                                let column = row.column().unwrap_or(0);
-                                return Ok(Some((file_entry.directory.to_string(), line, column)));
-                            }
-                        }
-                    }
-                }
-            }
-
-            Ok(None)
-        }
-    }
-
     fn get_binary_path(pid: u32) -> io::Result<String> {
         let exe_path = format!("/proc/{}/exe", pid);
         let path = fs::read_link(exe_path)?;
         Ok(path.to_string_lossy().to_string())
     }
 
-    fn print_stack() {
-        let dwarf_info = DwarfInfo::new(elf_binary_path).expect("Failed to initialize DwarfInfo");
+    pub fn print_stack() {
+        let args = env::args().collect::<Vec<_>>();
+        if args.len() != 2 {
+            eprintln!("Usage: {} <pid>", args[0]);
+            process::exit(1);
+        }
+
+        let pid = match args[1].parse() {
+            Ok(pid) => pid,
+            Err(e) => {
+                eprintln!("error parsing PID: {}", e);
+                process::exit(1);
+            }
+        };
+
+        let binary_path = get_binary_path(pid).unwrap();
+        let binary = File::open(binary_path).unwrap();
+        let map = unsafe { memmap2::Mmap::map(&binary).unwrap() };
+        let file = addr2line::object::File::parse(&*map).unwrap();
+        let map = addr2line::ObjectContext::new(&file).expect("debug symbols not found");
 
         // Get trace
         let process = match rstack::trace(pid) {
@@ -142,7 +87,7 @@ mod node_stack {
                     ip: format!("{:#016x}", frame.ip()),
                     symbol_name: String::new(),
                     symbol_offset: String::new(),
-                    line_info: None, // Initialize line_info as None
+                    line_info: None,
                 };
 
                 match frame.symbol() {
@@ -150,12 +95,16 @@ mod node_stack {
                         frame_info.symbol_name = demangle(symbol.name()).to_string();
                         frame_info.symbol_offset = format!("{:#x}", symbol.offset());
 
-                        // Use dwarf_info.get_line_info and store it in frame_info.line_info
-                        match dwarf_info.get_line_info(symbol.offset()) {
-                            Ok(Some((file, line, column))) => {
-                                frame_info.line_info = Some(LineInfo { file, line, column });
-                            }
-                            _ => {}
+                        // Convert the offset to file, line, col
+                        let loc = map.find_location(symbol.offset()).unwrap();
+
+                        if let Some(loc) = loc {
+                            let line_info = LineInfo {
+                                file: loc.file.unwrap_or("???").to_string(),
+                                line: loc.line.unwrap_or(0) as u64,
+                                column: loc.column.unwrap_or(0) as u64,
+                            };
+                            frame_info.line_info = Some(line_info);
                         }
                     }
                     None => {
