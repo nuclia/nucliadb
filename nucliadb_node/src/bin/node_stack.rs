@@ -17,78 +17,109 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use std::env;
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use std::process;
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use rstack;
+mod node_stack {
+    extern crate gimli;
+    extern crate rustc_demangle;
+    extern crate serde;
+    extern crate serde_json;
 
-#[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
-fn main() {
-    println!("error: rstack is only supported on Linux");
+    use std::{env, process};
+
+    use gimli::{
+        DebugInfo, Dwarf, LineProgramRow, LittleEndian, Reader, RegisterRule,
+        UninitializedUnwindContext,
+    };
+    use rstack;
+    use rustc_demangle::demangle;
+    use serde::{Deserialize, Serialize}; // Add Serde traits
+
+    // Define Rust structs to represent your JSON data
+    #[derive(Debug, Serialize, Deserialize)]
+    struct LineInfo {
+        file: String,
+        line: u64,
+        column: u64,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct FrameInfo {
+        ip: String,
+        symbol_name: String,
+        symbol_offset: String,
+        line_info: Option<LineInfo>, // Add line_info field
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct ThreadInfo {
+        thread_id: u32,
+        thread_name: String,
+        frames: Vec<FrameInfo>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct ProcessInfo {
+        threads: Vec<ThreadInfo>,
+    }
+
+    fn print_stack() {
+        // Create ProcessInfo struct to store the JSON data
+        let mut process_info = ProcessInfo { threads: vec![] };
+
+        for thread in process.threads() {
+            let mut thread_info = ThreadInfo {
+                thread_id: thread.id(),
+                thread_name: thread.name().unwrap_or("<unknown>").to_string(),
+                frames: vec![],
+            };
+
+            for frame in thread.frames() {
+                let mut frame_info = FrameInfo {
+                    ip: format!("{:#016x}", frame.ip()),
+                    symbol_name: String::new(),
+                    symbol_offset: String::new(),
+                    line_info: None, // Initialize line_info as None
+                };
+
+                match frame.symbol() {
+                    Some(symbol) => {
+                        frame_info.symbol_name = demangle(symbol.name()).to_string();
+                        frame_info.symbol_offset = format!("{:#x}", symbol.offset());
+
+                        // Use dwarf_info.get_line_info and store it in frame_info.line_info
+                        match dwarf_info.get_line_info(symbol.offset()) {
+                            Ok(Some((file, line, column))) => {
+                                frame_info.line_info = Some(LineInfo { file, line, column });
+                            }
+                            _ => {}
+                        }
+                    }
+                    None => {
+                        frame_info.symbol_name = "???".to_string();
+                        frame_info.symbol_offset = "???".to_string();
+                    }
+                }
+
+                thread_info.frames.push(frame_info);
+            }
+
+            process_info.threads.push(thread_info);
+        }
+
+        // Serialize process_info to JSON using serde_json
+        let json_output = serde_json::to_string_pretty(&process_info)
+            .expect("Failed to serialize process_info to JSON");
+
+        // Print the JSON output
+        println!("{}", json_output);
+    }
 }
 
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 fn main() {
-    let args = env::args().collect::<Vec<_>>();
-    if args.len() != 2 {
-        eprintln!("Usage: {} <pid>", args[0]);
-        process::exit(1);
-    }
+    #[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
+    println!("error: rstack is only supported on Linux");
 
-    let pid = match args[1].parse() {
-        Ok(pid) => pid,
-        Err(e) => {
-            eprintln!("error parsing PID: {}", e);
-            process::exit(1);
-        }
-    };
-
-    let process = match rstack::trace(pid) {
-        Ok(threads) => threads,
-        Err(e) => {
-            eprintln!("error tracing threads: {}", e);
-            process::exit(1);
-        }
-    };
-
-    println!("{{");
-    println!("  \"threads\":");
-    println!("[");
-    for thread in process.threads() {
-        println!("{{");
-        println!("\"thread_id\": {},", thread.id());
-        println!(
-            "\"thread_name\": \"{}\",",
-            thread.name().unwrap_or("<unknown>")
-        );
-
-        println!("\"frames\":");
-        println!("[");
-        for frame in thread.frames() {
-            println!("{{");
-
-            match frame.symbol() {
-                Some(symbol) => {
-                    println!("\"ip\": \"{:#016x}\",", frame.ip());
-                    println!("\"symbol_name\": \"{}\",", symbol.name());
-                    println!("\"symbol_offset\": \"{:#x}\",", symbol.offset());
-                }
-                None => {
-                    println!("\"ip\": \"{:#016x}\",", frame.ip());
-                    println!("\"symbol_name\": \"???\",");
-                    println!("\"symbol_offset\": \"???\",");
-                }
-            }
-            println!("}}");
-            println!(",");
-        }
-        println!("]");
-        println!("}}");
-        println!(",");
-    }
-    println!("]");
-    println!("}}");
+    #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
+    node_stack::print_stack();
 }

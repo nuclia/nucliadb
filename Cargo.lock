@@ -1938,6 +1938,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rstack",
+ "rustc-demangle",
  "sentry",
  "sentry-tracing",
  "serde",
