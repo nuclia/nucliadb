@@ -74,6 +74,14 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
             return Ok(());
         }
 
+        let mut cache = self.cache.write().await;
+        if cache.contains_key(&id) {
+            // recheck after lock in case while waiting for lock, another thread
+            // filled the cache
+            debug!("Recheck shard {shard_path:?} is already on memory");
+            return Ok(());
+        }
+
         // Avoid blocking while interacting with the file system
         let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
@@ -89,8 +97,7 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         .await
         .context("Blocking task panicked")??;
 
-        self.cache.write().await.insert(id_, Arc::new(shard));
-
+        cache.insert(id_, Arc::new(shard));
         Ok(())
     }
 
