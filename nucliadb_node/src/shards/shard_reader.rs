@@ -17,7 +17,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::thread as std_thread;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics::{self, request_time};
@@ -110,10 +109,10 @@ impl ShardReader {
         let mut text_result = Ok(0);
         let mut paragraph_result = Ok(0);
         let mut vector_result = Ok(0);
-        std_thread::scope(|s| {
-            s.spawn(|| text_result = text_task());
-            s.spawn(|| paragraph_result = paragraph_task());
-            s.spawn(|| vector_result = vector_task());
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
         });
 
         let metrics = metrics::get_metrics();
@@ -198,11 +197,11 @@ impl ShardReader {
         let mut paragraph_result = None;
         let mut vector_result = None;
         let mut relation_result = None;
-        std_thread::scope(|s| {
-            s.spawn(|| text_result = text_task());
-            s.spawn(|| paragraph_result = paragraph_task());
-            s.spawn(|| vector_result = vector_task());
-            s.spawn(|| relation_result = relation_task());
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
         });
         let fields = text_result.transpose()?;
         let paragraphs = paragraph_result.transpose()?;
@@ -399,18 +398,18 @@ impl ShardReader {
         let mut rvector = None;
         let mut rrelation = None;
 
-        std_thread::scope(|s| {
+        thread::scope(|s| {
             if !skip_fields {
-                s.spawn(|| rtext = text_task());
+                s.spawn(|_| rtext = text_task());
             }
             if !skip_paragraphs {
-                s.spawn(|| rparagraph = paragraph_task());
+                s.spawn(|_| rparagraph = paragraph_task());
             }
             if !skip_vectors {
-                s.spawn(|| rvector = vector_task());
+                s.spawn(|_| rvector = vector_task());
             }
             if !skip_relations {
-                s.spawn(|| rrelation = relation_task());
+                s.spawn(|_| rrelation = relation_task());
             }
         });
 
