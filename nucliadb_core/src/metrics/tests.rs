@@ -29,6 +29,7 @@ async fn test_export_metric_name() {
     assert!(export.contains("\n# TYPE nucliadb_node_instrumented_count counter\n"))
 }
 
+#[tokio::test(flavor = "current_thread")]
 async fn test_export_tasks_instrumented_count() {
     let meter = PrometheusMeter::new();
     let task_id = "my-task".to_string();
@@ -36,7 +37,7 @@ async fn test_export_tasks_instrumented_count() {
     meter
         .task_monitor(task_id.clone())
         .unwrap()
-        .instrument(async {  })
+        .instrument(async {})
         .await;
 
     let export = meter.export().unwrap();

@@ -26,9 +26,9 @@ use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
 use crate::metrics::meters::Meter;
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
 use crate::metrics::metric::tokio_runtime::TokioRuntimeMetrics;
-use crate::metrics::metric::tokio_tasks::{TaskLabels, TokioTaskMetrics};
-use crate::metrics::metric::{request_time, tokio_runtime, tokio_tasks};
-use crate::metrics::task_monitor::{Monitor, MultiTaskMonitor, TaskId};
+use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
+use crate::metrics::metric::{request_time, tokio_runtime};
+use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::error;
 use crate::{node_error, NodeResult};
 
@@ -36,8 +36,7 @@ pub struct PrometheusMeter {
     registry: Registry,
     request_time_metric: RequestTimeMetric,
     tokio_runtime_metrics: TokioRuntimeMetrics,
-    tokio_task_metrics: TokioTaskMetrics,
-    tasks_monitor: MultiTaskMonitor,
+    tokio_tasks_observer: TokioTasksObserver,
 
     // We need a Mutex here because Meters are Send and we need a mutable
     // RuntimeIntervals. We need to store the RuntimeIntervals iterator instead
@@ -54,12 +53,7 @@ impl Default for PrometheusMeter {
 
 impl Meter for PrometheusMeter {
     fn export(&self) -> NodeResult<String> {
-        self.tasks_monitor
-            .export_all()
-            .for_each(|(task_id, metrics)| {
-                let labels = TaskLabels { request: task_id };
-                self.tokio_task_metrics.collect(labels, metrics.to_owned());
-            });
+        self.tokio_tasks_observer.observe();
 
         if let Err(error) = self.collect_runtime_metrics() {
             error!("{error:?}");
@@ -77,7 +71,7 @@ impl Meter for PrometheusMeter {
     }
 
     fn task_monitor(&self, task_id: TaskId) -> Option<Monitor> {
-        Some(self.tasks_monitor.task_monitor(task_id))
+        Some(self.tokio_tasks_observer.get_monitor(task_id))
     }
 }
 
@@ -89,11 +83,10 @@ impl PrometheusMeter {
         let request_time_metric = request_time::register_request_time(&mut registry);
 
         let prefixed_subregistry = registry.sub_registry_with_prefix("nucliadb_node");
+        let tokio_tasks_observer = TokioTasksObserver::new(prefixed_subregistry);
         let tokio_runtime_metrics =
             tokio_runtime::register_tokio_runtime_metrics(prefixed_subregistry);
-        let tokio_task_metrics = tokio_tasks::register_tokio_task_metrics(prefixed_subregistry);
 
-        let tasks_monitor = MultiTaskMonitor::new();
         let runtime_monitor = RuntimeMonitor::new(&tokio::runtime::Handle::current());
         let runtime_intervals = Mutex::new(runtime_monitor.intervals());
 
@@ -101,8 +94,7 @@ impl PrometheusMeter {
             registry,
             request_time_metric,
             tokio_runtime_metrics,
-            tokio_task_metrics,
-            tasks_monitor,
+            tokio_tasks_observer,
             runtime_intervals,
         }
     }
