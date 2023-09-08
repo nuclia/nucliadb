@@ -12,10 +12,10 @@ from starlette.responses import StreamingResponse
 api = FastAPI()
 
 
-def stream_from_tarfile(kbid: str):
+def stream_tarfile_from_disk(kbid: str):
     # Store everything in a temporary tar file and stream it to the client
     with tempfile.TemporaryDirectory() as tempfolder:
-        path = generate_tarfile(kbid, tempfolder)
+        path = export_to_tarfile(kbid, tempfolder)
         for chunk in iter_file_chunks(path):
             yield chunk
 
@@ -29,16 +29,16 @@ def iter_file_chunks(path):
             yield chunk
 
 
-async def stream_to_tarfile(request, kbid, tempfolder):
+async def save_tarfile_to_disk(request, kbid, tempfolder) -> str:
     # Store everything in a temporary tar file
-    path = Path(f"{tempfolder}/{kbid}.tar.bz2")
+    path = f"{tempfolder}/{kbid}.tar.bz2"
     with open(path, "wb+") as file:
         async for chunk in request.stream():
             file.write(chunk)
     return path
 
 
-def generate_tarfile(kbid: str, tempfolder: str):
+def export_to_tarfile(kbid: str, tempfolder: str):
     # Create a file where all encoded resources are stored
     resources_file_path = Path(f"{tempfolder}/resources")
     with open(resources_file_path, "w+") as resources_file:
@@ -58,24 +58,29 @@ def generate_tarfile(kbid: str, tempfolder: str):
     return tarfile_path
 
 
-def import_tarfile(kbid, tempfolder, path):
+def import_from_tarfile(kbid, tempfolder, path):
     with tarfile.open(path, mode="r:bz2") as tar:
-        extracted_path = Path(f"{tempfolder}/extracted")
+        # Extract all members of the tar file to a temporary folder
+        extracted_path = f"{tempfolder}/extracted"
         tar.extractall(path=extracted_path)
-        with open(f"{extracted_path}/resources", "r") as resources_file:
-            for line in resources_file.readlines():
-                resource = decode_resource(line)
-                storage.store_resource(kbid, resource)
+
+        # Read all binaries and import them
         for member in tar.getmembers():
             if member.name != "resources":
                 with open(f"{extracted_path}/{member.name}", "rb") as binary_file:
                     storage.store_binary(kbid, member.name, binary_file.read())
 
+        # Read the resources file and import them
+        with open(f"{extracted_path}/resources", "r") as resources_file:
+            for line in resources_file.readlines():
+                resource = decode_resource(line)
+                storage.store_resource(kbid, resource)
+
 
 @api.get("/export/{kbid}")
 async def export_endpoint(kbid: str):
     return StreamingResponse(
-        stream_from_tarfile(kbid),
+        stream_tarfile_from_disk(kbid),
         status_code=200,
         media_type="application/octet-stream",
         headers={
@@ -87,8 +92,8 @@ async def export_endpoint(kbid: str):
 @api.post("/import/{kbid}")
 async def import_endpoint(request: Request, kbid: str):
     with tempfile.TemporaryDirectory() as tempfolder:
-        path = await stream_to_tarfile(request, kbid, tempfolder)
-        import_tarfile(kbid, tempfolder, path)
+        path = await save_tarfile_to_disk(request, kbid, tempfolder)
+        import_from_tarfile(kbid, tempfolder, path)
 
 
 @api.get("/{kbid}/binaries")

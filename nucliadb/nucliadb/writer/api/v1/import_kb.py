@@ -21,7 +21,7 @@ from fastapi_versioning import version  # type: ignore
 from starlette.requests import Request
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb_models.resource import KnowledgeBoxObj, NucliaDBRoles
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
 
@@ -29,10 +29,9 @@ from nucliadb_utils.authentication import requires_one
     f"/{KB_PREFIX}/{{kbid}}/import",
     status_code=200,
     name="Import a Knowledge Box",
-    response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def import_kb_endpoint(request: Request, kbid: str) -> KnowledgeBoxObj:
-    pass
+async def import_kb_endpoint(request: Request, kbid: str):
+    return
