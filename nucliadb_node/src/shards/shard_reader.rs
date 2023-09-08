@@ -311,6 +311,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+        let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
         let time = SystemTime::now();
 
@@ -321,7 +322,7 @@ impl ShardReader {
             search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
 
         let field_request = DocumentSearchRequest {
-            id: "".to_string(),
+            id: search_id.clone(),
             body: search_request.body.clone(),
             fields: search_request.fields.clone(),
             filter: search_request.filter.clone(),
@@ -339,7 +340,7 @@ impl ShardReader {
         let text_task = move || Some(text_reader_service.search(&field_request));
 
         let paragraph_request = ParagraphSearchRequest {
-            id: "".to_string(),
+            id: search_id.clone(),
             uuid: "".to_string(),
             with_duplicates: search_request.with_duplicates,
             body: search_request.body.clone(),
@@ -359,7 +360,7 @@ impl ShardReader {
         let paragraph_task = move || Some(paragraph_reader_service.search(&paragraph_request));
 
         let vector_request = VectorSearchRequest {
-            id: "".to_string(),
+            id: search_id.clone(),
             vector_set: search_request.vectorset.clone(),
             vector: search_request.vector.clone(),
             page_number: search_request.page_number,
@@ -379,6 +380,7 @@ impl ShardReader {
         let vector_task = move || Some(vector_reader_service.search(&vector_request));
 
         let relation_request = RelationSearchRequest {
+            id: search_id.clone(),
             shard_id: search_request.shard.clone(),
             prefix: search_request.relation_prefix.clone(),
             subgraph: search_request.relation_subgraph,

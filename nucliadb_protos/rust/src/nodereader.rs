@@ -371,6 +371,8 @@ pub struct RelationSearchRequest {
     /// RelationPathsSearchRequest paths = 13;
     #[prost(message, optional, tag="12")]
     pub subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
+    #[prost(string, tag="14")]
+    pub id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchResponse {
