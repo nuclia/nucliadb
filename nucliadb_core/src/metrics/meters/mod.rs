@@ -17,11 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-mod console;
 mod noop;
 mod prometheus;
 
-pub use console::ConsoleMeter;
 pub use noop::NoOpMeter;
 pub use prometheus::PrometheusMeter;
 
