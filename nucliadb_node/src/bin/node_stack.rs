@@ -19,15 +19,15 @@
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 mod node_stack {
-    use addr2line;
+    use std::fs::File;
+    use std::{env, fs, process};
+
     use async_std::io;
-    use memmap2;
     #[allow(clippy::all)]
     use rstack;
     use rustc_demangle::demangle;
     use serde::{Deserialize, Serialize};
-    use std::fs::File;
-    use std::{env, fs, process};
+    use {addr2line, memmap2};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct LineInfo {
