@@ -40,12 +40,7 @@ fn create_metrics() -> Arc<dyn Meter> {
     Arc::new(meters::PrometheusMeter::new())
 }
 
-#[cfg(log_metrics)]
-fn create_metrics() -> Arc<dyn Meter> {
-    Arc::new(meters::ConsoleMeter)
-}
-
-#[cfg(not(any(prometheus_metrics, log_metrics)))]
+#[cfg(not(prometheus_metrics))]
 fn create_metrics() -> Arc<dyn Meter> {
     Arc::new(meters::NoOpMeter)
 }

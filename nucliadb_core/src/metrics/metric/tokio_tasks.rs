@@ -24,7 +24,36 @@ use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
 use tokio_metrics::TaskMetrics;
 
-pub struct TokioTaskMetrics {
+use crate::metrics::task_monitor::{Monitor, MultiTaskMonitor, TaskId};
+
+pub struct TokioTasksObserver {
+    tasks_monitor: MultiTaskMonitor,
+    metrics: TokioTasksMetrics,
+}
+
+impl TokioTasksObserver {
+    pub fn new(registry: &mut Registry) -> Self {
+        Self {
+            tasks_monitor: MultiTaskMonitor::new(),
+            metrics: TokioTasksMetrics::new(registry),
+        }
+    }
+
+    pub fn observe(&self) {
+        self.tasks_monitor
+            .export_all()
+            .for_each(|(task_id, metrics)| {
+                let labels = TaskLabels { request: task_id };
+                self.metrics.update(labels, metrics);
+            });
+    }
+
+    pub fn get_monitor(&self, task_id: TaskId) -> Monitor {
+        self.tasks_monitor.task_monitor(task_id)
+    }
+}
+
+struct TokioTasksMetrics {
     instrumented_count: Family<TaskLabels, Counter>,
     dropped_count: Family<TaskLabels, Counter>,
     first_poll_count: Family<TaskLabels, Counter>,
@@ -60,7 +89,7 @@ const BUCKETS: [f64; 15] = [
     0.250, 0.500, 1.0, 5.0,
 ];
 
-impl TokioTaskMetrics {
+impl TokioTasksMetrics {
     fn new(registry: &mut Registry) -> Self {
         let histogram_constructor = || Histogram::new(BUCKETS.iter().copied());
 
@@ -224,7 +253,7 @@ impl TokioTaskMetrics {
 
     /// Collected metrics must belong to the interval from last `collect` call
     /// until the current call.
-    pub fn collect(&self, labels: TaskLabels, metrics: TaskMetrics) {
+    fn update(&self, labels: TaskLabels, metrics: TaskMetrics) {
         // TODO? Should we add a declarative macro to improve this?
 
         self.instrumented_count
@@ -299,8 +328,4 @@ impl TokioTaskMetrics {
             .get_or_create(&labels)
             .observe(metrics.total_long_delay_duration.as_secs_f64());
     }
-}
-
-pub fn register_tokio_task_metrics(registry: &mut Registry) -> TokioTaskMetrics {
-    TokioTaskMetrics::new(registry)
 }
