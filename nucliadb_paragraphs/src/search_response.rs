@@ -64,6 +64,7 @@ pub struct SearchBm25Response<'a> {
     pub page_number: i32,
     pub results_per_page: i32,
     pub termc: TermCollector,
+    pub searcher: tantivy::LeasedItem<tantivy::Searcher>,
 }
 
 pub struct SearchIntResponse<'a> {
@@ -76,6 +77,7 @@ pub struct SearchIntResponse<'a> {
     pub page_number: i32,
     pub results_per_page: i32,
     pub termc: TermCollector,
+    pub searcher: tantivy::LeasedItem<tantivy::Searcher>,
 }
 
 pub struct SearchFacetsResponse<'a> {
@@ -107,7 +109,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
         let next_page = obtained > requested;
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
-        let searcher = response.text_service.reader.searcher();
+        let searcher = response.searcher;
         let default_split = Value::Str("".to_string());
         for (_, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc(doc_address) {
@@ -214,7 +216,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
         let next_page = obtained > requested;
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
-        let searcher = response.text_service.reader.searcher();
+        let searcher = response.searcher;
         let default_split = Value::Str("".to_string());
         for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc(doc_address) {
