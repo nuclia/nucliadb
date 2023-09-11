@@ -32,7 +32,7 @@ pub async fn thread_dump_service() -> Response {
     let pid = process::id();
     let mut node_trace = env::current_exe().unwrap();
     node_trace.pop();
-    node_trace.push("node_stack");
+    node_trace.push("rust-spy");
     let mut cmd = Command::new(node_trace);
     let args = [format!("{}", pid)];
 
