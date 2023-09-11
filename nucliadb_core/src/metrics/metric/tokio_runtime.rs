@@ -123,6 +123,10 @@ pub struct TokioRuntimeMetrics {
     idle_blocking_threads_count: Gauge,
     active_tasks_count: Gauge,
     blocking_queue_depth: Gauge,
+
+    // Derived metrics
+    busy_ratio: Gauge,
+    mean_polls_per_park: Gauge,
 }
 
 // TODO we are trying bucket values for everything. After an evaluation on
@@ -430,6 +434,20 @@ impl TokioRuntimeMetrics {
             blocking_queue_depth.clone(),
         );
 
+        let busy_ratio = Gauge::default();
+        registry.register(
+            "busy_ratio",
+            "Busy ratio during scrapes (busy duration / elapsed)",
+            busy_ratio.clone(),
+        );
+
+        let mean_polls_per_park = Gauge::default();
+        registry.register(
+            "mean_polls_per_park",
+            "Mean polls done per useful park (park - noop). 0 means either no polls or no parks",
+            mean_polls_per_park.clone(),
+        );
+
         Self {
             workers_count,
             total_park_count,
@@ -471,6 +489,8 @@ impl TokioRuntimeMetrics {
             idle_blocking_threads_count,
             active_tasks_count,
             blocking_queue_depth,
+            busy_ratio,
+            mean_polls_per_park,
         }
     }
 
@@ -546,5 +566,12 @@ impl TokioRuntimeMetrics {
             .set(raw_metrics.active_tasks_count() as i64);
         self.blocking_queue_depth
             .set(raw_metrics.blocking_queue_depth() as i64);
+
+        // Gauges are signed integers but our ratio is a float. We multiply by
+        // 10^3 to get 3 decimals and lose less precision (it should be divided
+        // by 1000 on its dashboard)
+        self.busy_ratio.set((metrics.busy_ratio() * 1000.0) as i64);
+        self.mean_polls_per_park
+            .set((metrics.mean_polls_per_park() * 1000.0) as i64);
     }
 }
