@@ -88,6 +88,6 @@ COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bi
 
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer
-COPY --from=builder /nucliadb/bin/node_stack /usr/local/bin/node_stack
+COPY --from=builder /nucliadb/bin/rust-spy /usr/local/bin/rust-spy
 
 EXPOSE 4444/udp

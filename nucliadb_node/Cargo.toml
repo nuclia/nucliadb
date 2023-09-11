@@ -11,10 +11,6 @@ documentation = "https://nuclia.com"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-name = "node_stack"
-path = "src/bin/node_stack.rs"
-
-[[bin]]
 name = "payload_test"
 path = "src/bin/payload_test.rs"
 
@@ -89,13 +85,7 @@ tracing-subscriber = { version = "0.3.11", features = [
 tracing-log = { version = "0.1.3", features = ["env_logger"] }
 opentelemetry-zipkin = "0.15.0"
 sentry-tracing = "0.27.0"
-rustc-demangle = "0.1.23"
-gimli = "0.28.0"
-addr2line = "0.21.0"
-memmap2 = "0.7.1"
-
-[target.'cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))'.dependencies]
-rstack = { version = "0.3.3", features = ["dw"], default-features = false }
+rust-spy = "0.1.0"
 
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }

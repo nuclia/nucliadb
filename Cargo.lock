@@ -1266,7 +1266,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fb8d784f27acf97159b40fc4db5ecd8aa23b9ad5ef69cdd136d3bc80665f0c0"
 dependencies = [
  "fallible-iterator",
- "indexmap 2.0.0",
  "stable_deref_trait",
 ]
 
@@ -1965,7 +1964,6 @@ dependencies = [
 name = "nucliadb_node"
 version = "0.1.0"
 dependencies = [
- "addr2line 0.21.0",
  "anyhow",
  "async-std",
  "async-stream",
@@ -1978,13 +1976,11 @@ dependencies = [
  "futures",
  "futures-core",
  "futures-util",
- "gimli 0.28.0",
  "http",
  "hyper",
  "itertools",
  "lazy_static",
  "log",
- "memmap2 0.7.1",
  "nucliadb_core",
  "nucliadb_paragraphs",
  "nucliadb_relations",
@@ -2000,8 +1996,7 @@ dependencies = [
  "rand",
  "regex",
  "reqwest",
- "rstack",
- "rustc-demangle",
+ "rust-spy",
  "sentry",
  "sentry-tracing",
  "serde",
@@ -2875,6 +2870,20 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
+]
+
+[[package]]
+name = "rust-spy"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ad60d73eadd3219d144a6c00894c18657be17700d0ffb9905fbe32f6285842e"
+dependencies = [
+ "addr2line 0.21.0",
+ "memmap2 0.7.1",
+ "rstack",
+ "rustc-demangle",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
