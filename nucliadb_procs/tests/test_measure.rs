@@ -34,7 +34,6 @@ fn test_measure_simple_function() {
     assert_eq!(add_two(2), 4);
 }
 
-
 #[test]
 fn test_metric_not_defined() {
     #[measure(actor = "vectors")]
@@ -47,5 +46,4 @@ fn test_metric_not_defined() {
     }
 
     assert_eq!(add_two(2), 4);
-
 }

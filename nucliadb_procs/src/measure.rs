@@ -75,7 +75,6 @@ impl Parse for MeasureArgs {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     #[test]
@@ -83,5 +82,4 @@ mod tests {
         let t = trybuild::TestCases::new();
         t.compile_fail("tests/dont_compile/*.rs")
     }
-
 }

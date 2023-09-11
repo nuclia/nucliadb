@@ -19,7 +19,6 @@
 //
 
 //! `nucliadb_procs` is the procedural macro crate for nucliadb
-//!
 
 mod measure;
 
