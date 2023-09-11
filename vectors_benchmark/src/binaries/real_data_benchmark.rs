@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -137,7 +137,8 @@ fn create_filtered_request(dimension: usize) -> Request {
 fn download_and_decompress_tarball(
     url: &str,
     destination_dir: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+    dataset_name: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     // Create a progress bar
     let pb = ProgressBar::new(0);
     pb.set_style(ProgressStyle::default_bar()
@@ -145,7 +146,6 @@ fn download_and_decompress_tarball(
         .unwrap()
         .progress_chars("#>-"));
 
-    // Get the download path
     let download_path = format!("{}/download.tar.gz", destination_dir);
 
     // Check if the partially downloaded file exists
@@ -161,7 +161,7 @@ fn download_and_decompress_tarball(
         downloaded_bytes = file.seek(SeekFrom::End(0))?;
     } else {
         // Create a new file for downloading
-        let mut file = File::create(&download_path)?;
+        let file = File::create(&download_path)?;
         file.set_len(0)?;
     }
 
@@ -179,12 +179,12 @@ fn download_and_decompress_tarball(
             .append(true)
             .open(&download_path)?;
 
-        let mut buffer = vec![0; CHUNK_SIZE];
         let mut content = response.bytes()?;
 
         while !content.is_empty() {
-            let chunk_size = std::cmp::min(buffer.len(), content.len());
+            let chunk_size = std::cmp::min(CHUNK_SIZE, content.len());
             let chunk = content.split_to(chunk_size);
+            file.write_all(&chunk)?;
             downloaded_bytes += chunk.len() as u64;
             pb.set_position(downloaded_bytes);
         }
@@ -195,10 +195,15 @@ fn download_and_decompress_tarball(
     let tarball_file = File::open(&download_path)?;
     let tar = flate2::read::GzDecoder::new(tarball_file);
     let mut archive = Archive::new(tar);
+
+    let mut destination_dir = PathBuf::from(destination_dir);
+    destination_dir.push(dataset_name);
+    fs::create_dir_all(destination_dir.as_path())?;
+
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?;
-        let entry_destination = format!("{}/{}", destination_dir, path.display());
+        let entry_destination = format!("{}/{}", destination_dir.display(), path.display());
 
         if entry.header().entry_type().is_dir() {
             std::fs::create_dir_all(&entry_destination)?;
@@ -209,17 +214,13 @@ fn download_and_decompress_tarball(
     }
 
     std::fs::remove_file(&download_path)?;
-    Ok(())
+    Ok(destination_dir.into_os_string().into_string().unwrap())
 }
 
-fn test_datapoint(cycles: usize) -> Stats {
+fn test_datapoint(db_location: &Path, cycles: usize) -> Stats {
+    println!("Opening Shared located at {:?}", db_location);
     let _ = Merger::install_global().map(std::thread::spawn);
-
-    // let at = tempfile::TempDir::new().unwrap();
-    let db_location = Path::new(
-        "/Users/tarekziade/Downloads/huge_data/shards/4508ea2f-b3e2-41ca-89b6-224172f5bb3e/vectors",
-    );
-    let reader = Index::open(&db_location).unwrap();
+    let reader = Index::open(db_location).unwrap();
     let vector_dims = reader.get_dimension().unwrap() as usize;
 
     let mut stats = Stats {
@@ -240,7 +241,7 @@ fn test_datapoint(cycles: usize) -> Stats {
         vector: RandomVectors::new(vector_dims).next().unwrap(),
     };
 
-    for cycle in 0..0 {
+    for cycle in 0..cycles {
         print!(
             "Unfiltered Search => cycle {} of {}      \r",
             (cycle + 1),
@@ -291,29 +292,47 @@ fn main() {
 
     let defs = dataset_definition["datasets"].as_array().unwrap();
 
+    let mut found: bool = false;
+    let mut target = PathBuf::from(args.datasets.clone());
+    target.pop();
+    let root_dir = target.clone();
+    target = fs::canonicalize(&target).unwrap();
+    target.push(args.dataset_name.clone());
+
     for dataset in defs {
         if dataset["name"] == args.dataset_name {
             let url = dataset["shards"]["url"].as_str().unwrap();
             println!("Shard located at : {}", url);
-            let mut target = PathBuf::from(args.datasets.clone());
-            target.pop();
-            let root_dir = target.clone();
-            target = fs::canonicalize(&target).unwrap();
-            target.push(args.dataset_name.clone());
-
             println!("Target path is {:?}", target);
             if target.exists() {
                 println!("Already exists");
             } else {
                 println!("Downloading {:?} to {:?}", url, root_dir);
-                download_and_decompress_tarball(url, root_dir.to_str().unwrap()).unwrap();
+                download_and_decompress_tarball(
+                    url,
+                    root_dir.to_str().unwrap(),
+                    &args.dataset_name,
+                )
+                .unwrap();
             }
+            target.push(dataset["shards"]["root_path"].as_str().unwrap());
+            // picking the first id for now
+            target.push(dataset["shards"]["ids"][0].as_str().unwrap());
+            found = true;
+            break;
         }
+    }
+
+    if !found {
+        println!("{:?} dataset not found", args.dataset_name);
+        return;
     }
 
     let mut json_results = vec![];
 
-    let stats = test_datapoint(args.cycles);
+    target.push("vectors");
+
+    let stats = test_datapoint(&target, args.cycles);
 
     json_results.extend(vec![
         json!({

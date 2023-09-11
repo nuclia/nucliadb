@@ -3,7 +3,11 @@
     {
       "name": "large",
       "shards": {
-        "url": "https://storage.cloud.google.com/somewhere.tgz"
+        "url": "http://ziade.org/cov.tgz",
+        "root_path": "shards",
+        "ids": [
+          "4508ea2f-b3e2-41ca-89b6-224172f5bb3e"
+        ]
       },
       "queries": [
         {
