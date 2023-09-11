@@ -13,4 +13,5 @@ syn = { version = "2.0.29", features = ["full"] }
 quote = "1.0.33"
 
 [dev-dependencies]
+trybuild = "1.0.84"
 nucliadb_core = { path = "../nucliadb_core" }

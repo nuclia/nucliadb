@@ -74,3 +74,14 @@ impl Parse for MeasureArgs {
         })
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_compilation_errors() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/dont_compile/*.rs")
+    }
+
+}
