@@ -40,8 +40,34 @@ impl ShardManager {
         }
     }
 
+    pub fn load(&mut self) -> Result<(), String> {
+        // go through every directory in data_dir and load shards
+        for entry in std::fs::read_dir(self.data_dir.as_path()).unwrap() {
+            let entry = entry.unwrap();
+            let shard_id = entry.file_name().into_string().unwrap();
+            self.load_shard(shard_id.as_str())?;
+        }
+
+        Ok(())
+    }
+
+    pub fn load_shard(&mut self, shard_id: &str) -> Result<(), String> {
+        if self.exists(shard_id) {
+            // already loaded
+            return Ok(());
+        }
+
+        let shard_path = self.data_dir.join(shard_id);
+        let context = Context::new(shard_path.as_path());
+        let idx = index::Index::open(context).unwrap();
+        self.shards
+            .insert(shard_id.to_string(), Arc::new(Mutex::new(idx)));
+
+        Ok(())
+    }
+
     pub fn create_shard(&mut self, shard_id: &str) -> Result<(), String> {
-        if self.shards.contains_key(shard_id) {
+        if self.exists(shard_id) {
             return Err(format!("Shard {} already exists", shard_id));
         }
 
@@ -59,7 +85,7 @@ impl ShardManager {
     }
 
     pub fn delete_shard(&mut self, shard_id: &str) -> Result<(), String> {
-        if !self.shards.contains_key(shard_id) {
+        if !self.exists(shard_id) {
             return Err(format!("Shard {} does not exist", shard_id));
         }
 
@@ -68,8 +94,12 @@ impl ShardManager {
         Ok(())
     }
 
+    pub fn exists(&self, shard_id: &str) -> bool {
+        return self.shards.contains_key(shard_id);
+    }
+
     pub fn get_shard(&self, shard_id: &str) -> Result<Arc<Mutex<index::Index>>, String> {
-        if !self.shards.contains_key(shard_id) {
+        if !self.exists(shard_id) {
             return Err(format!("Shard {} does not exist", shard_id));
         }
 

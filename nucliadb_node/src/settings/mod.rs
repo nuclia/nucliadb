@@ -98,6 +98,11 @@ pub struct Settings {
     #[builder(default = "3030")]
     metrics_port: u16,
 
+    // unified settings
+    #[builder(default = "reliable_lookup_host(\"localhost:10000\")", setter(custom))]
+    listen_address: SocketAddr,
+    #[builder(default = "\"http://localhost:10000\".into()")]
+    primary_address: String,
     #[builder(default = "parse_node_role(\"primary\")")]
     node_role: NodeRole,
 }
@@ -192,6 +197,16 @@ impl Settings {
         self.metrics_port
     }
 
+    /// Address where unified node read will listen to
+    pub fn listen_address(&self) -> SocketAddr {
+        self.listen_address
+    }
+
+    /// Address where unified node read will listen to
+    pub fn primary_address(&self) -> String {
+        self.primary_address.clone()
+    }
+
     pub fn node_role(&self) -> NodeRole {
         self.node_role.clone()
     }
@@ -237,6 +252,17 @@ impl SettingsBuilder {
 
     pub fn with_jaeger_enabled(&mut self) -> &mut Self {
         self.jaeger_enabled = Some(true);
+        self
+    }
+
+    pub fn listen_address(&mut self, addr: impl Into<String>) -> &mut Self {
+        let addr = addr.into();
+        self.listen_address = Some(
+            addr.to_socket_addrs()
+                .unwrap_or_else(|_| panic!("Invalid reader listen address: {}", addr))
+                .next()
+                .expect("Error parsing socket reader listen address"),
+        );
         self
     }
 

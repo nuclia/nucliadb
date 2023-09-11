@@ -33,6 +33,7 @@ pub mod env {
     use crate::settings::providers::SettingsProvider;
     use crate::settings::Settings;
     use crate::utils::parse_log_levels;
+    use crate::utils::parse_node_role;
 
     /// Provide a settings configuration using environment variables. If an env
     /// var is missing, it defaults to `Settings` defaults.
@@ -92,6 +93,14 @@ pub mod env {
                 builder.jaeger_agent_port(port);
             }
 
+            if let Ok(addr) = std::env::var("LISTEN_ADDRESS") {
+                builder.listen_address(addr);
+            }
+
+            if let Ok(addr) = std::env::var("PRIMARY_ADDRESS") {
+                builder.primary_address(addr);
+            }
+
             if let Ok(addr) = std::env::var("READER_LISTEN_ADDRESS") {
                 builder.reader_listen_address(addr);
             }
@@ -102,6 +111,10 @@ pub mod env {
 
             if let Ok(Ok(port)) = std::env::var("METRICS_PORT").map(|v| v.parse::<u16>()) {
                 builder.metrics_port(port);
+            }
+
+            if let Ok(node_role) = std::env::var("NODE_ROLE") {
+                builder.node_role(parse_node_role(node_role.as_str()));
             }
 
             let settings = builder.build()?;

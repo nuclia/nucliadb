@@ -16,7 +16,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-
+use crate::settings::Settings;
 use std::cmp::min;
 use std::io::Read;
 use std::net::SocketAddr;
@@ -37,28 +37,19 @@ use super::shards;
 const REPLICATION_COMMIT_SIZE: u16 = 200;
 
 pub struct NodeGRPCDriver {
+    settings: Arc<Settings>,
     shard_manager: Arc<Mutex<shards::ShardManager>>,
     primary_replicator: Option<Arc<Mutex<replication::PrimaryReplicator>>>,
 }
 
 impl NodeGRPCDriver {
-    // pub fn new(settings: Arc<Settings>) -> Self {
-    //     let mut primary_replicator = None;
-    //     if settings.node_role() == NodeRole::Primary {
-    //         primary_replicator = Some(Arc::new(Mutex::new(replication::PrimaryReplicator::new(
-    //             settings.clone(),
-    //         ))));
-    //     }
-    //     return Self {
-    //         shard_manager: Arc::new(Mutex::new(shards::ShardManager::new())),
-    //         primary_replicator: primary_replicator,
-    //     };
-    // }
     pub fn new(
+        settings: Arc<Settings>,
         shard_manager: Arc<Mutex<shards::ShardManager>>,
         primary_replicator: Option<Arc<Mutex<replication::PrimaryReplicator>>>,
     ) -> Self {
         return Self {
+            settings,
             shard_manager,
             primary_replicator,
         };
@@ -122,14 +113,11 @@ impl unified::node_service_server::NodeService for NodeGRPCDriver {
             return Err(tonic::Status::unimplemented("Not a primary node"));
         }
         let rdata = request.into_inner();
-        let filepath = self
-            .primary_replicator
-            .as_ref()
-            .unwrap()
-            .clone()
-            .lock()
-            .unwrap()
-            .get_segment_filepath(rdata.shard_id.as_str(), rdata.segment_id.as_str());
+        let filepath = replication::get_segment_filepath(
+            self.settings.clone(),
+            rdata.shard_id.as_str(),
+            rdata.segment_id.as_str(),
+        );
         let chunk_size = rdata.chunk_size.clone();
 
         let receiver = tokio::sync::mpsc::channel(4);
@@ -273,19 +261,21 @@ impl unified::node_service_server::NodeService for NodeGRPCDriver {
 }
 
 pub async fn run_server(
+    settings: Arc<Settings>,
     address: SocketAddr,
     shard_manager: Arc<Mutex<shards::ShardManager>>,
     primary_replicator: Option<Arc<Mutex<replication::PrimaryReplicator>>>,
 ) {
-    let service = NodeGRPCDriver::new(shard_manager, primary_replicator);
+    let service = NodeGRPCDriver::new(settings, shard_manager, primary_replicator);
     let server = unified::node_service_server::NodeServiceServer::new(service);
 
     println!("server listening on {}", address);
 
-    let _ = Server::builder()
+    Server::builder()
         // GrpcWeb is over http1 so we must enable it.
         .accept_http1(true)
         .add_service(server)
         .serve(address)
-        .await;
+        .await
+        .expect("failed to start server");
 }

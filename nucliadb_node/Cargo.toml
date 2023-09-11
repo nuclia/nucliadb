@@ -22,6 +22,11 @@ path = "src/bin/reader.rs"
 name = "node_writer"
 path = "src/bin/writer.rs"
 
+[[bin]]
+name = "node"
+path = "src/bin/unified.rs"
+
+
 [dependencies]
 axum = "0.6.15"
 axum-server = "0.4.7"

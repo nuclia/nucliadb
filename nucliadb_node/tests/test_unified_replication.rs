@@ -42,6 +42,10 @@ fn get_available_port() -> Option<u16> {
 
 #[tokio::test]
 async fn test_replicate() -> Result<(), Box<dyn std::error::Error>> {
+    use nucliadb_node::settings::providers::env::EnvSettingsProvider;
+    use nucliadb_node::settings::providers::SettingsProvider;
+
+    let settings = Arc::new(EnvSettingsProvider::generate_settings()?);
     let workspace = tempfile::tempdir().unwrap();
     let port = get_available_port().unwrap();
 
@@ -63,6 +67,7 @@ async fn test_replicate() -> Result<(), Box<dyn std::error::Error>> {
         return Err(err_str.into());
     }
     let servicer_task = tokio::spawn(run_server(
+        settings.clone(),
         address.unwrap(),
         shard_manager.clone(),
         Some(primary_replicator.clone()),
@@ -75,6 +80,7 @@ async fn test_replicate() -> Result<(), Box<dyn std::error::Error>> {
         "http://".to_string() + &address_raw,
         "node_id".to_string(),
         secondary_replicator.clone(),
+        settings.clone(),
     ));
 
     shard_manager.lock().unwrap().create_shard("shard_id1")?;

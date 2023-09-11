@@ -57,9 +57,9 @@ impl ShardWriter {
             self.primary_replicator
                 .lock()
                 .unwrap()
-                .commit(shard_id, indexing_result.segment_entry_id);
+                .commit(shard_id, indexing_result.position_id);
 
-            Ok(indexing_result.segment_entry_id)
+            Ok(indexing_result.position_id)
         }
     }
 
@@ -78,9 +78,9 @@ impl ShardWriter {
             self.primary_replicator
                 .lock()
                 .unwrap()
-                .commit(shard_id, indexing_result.segment_entry_id);
+                .commit(shard_id, indexing_result.position_id);
 
-            Ok(indexing_result.segment_entry_id)
+            Ok(indexing_result.position_id)
         }
     }
 }

@@ -16,12 +16,15 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+use crate::settings::Settings;
+use nucliadb_index::core::SegmentID;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+use tokio::io::AsyncWriteExt;
 
-use nucliadb_protos::unified;
+use nucliadb_protos::unified::{self, PrimaryReplicateCommit};
 use tokio_stream;
 use tonic::Request;
 
@@ -39,6 +42,16 @@ pub struct PrimaryReplicator {
 
 pub struct SecondaryReplicator {
     shard_manager: Arc<Mutex<super::shards::ShardManager>>,
+}
+
+pub fn get_segment_filepath(settings: Arc<Settings>, shard_id: &str, segment_id: &str) -> String {
+    // get segment file
+    format!(
+        "{}/{}/{}",
+        settings.shards_path().to_str().unwrap(),
+        shard_id,
+        segment_id
+    )
 }
 
 impl PrimaryReplicator {
@@ -75,7 +88,7 @@ impl PrimaryReplicator {
         // XXX
         // Called to allow a "hook" to signal replicator to push out
         // more commits but not implemented yet so
-        // we do it only on a poll.
+        // we do it only on a poll interval.
         // XXX
     }
 
@@ -123,13 +136,7 @@ impl PrimaryReplicator {
                 break;
             }
         }
-
         commits
-    }
-
-    pub fn get_segment_filepath(&self, shard_id: &str, segment_id: &str) -> String {
-        // get segment file
-        format!("{}/{}", shard_id, segment_id)
     }
 }
 
@@ -140,22 +147,24 @@ impl SecondaryReplicator {
         }
     }
 
-    pub fn commit(&mut self, shard_id: &str, _segments: Vec<String>, position: u64) {
-        // XXX
-        // download all missing segments
-        // update list of segments
-        // commit
-        // delete old segments
+    pub fn commit(&mut self, shard_id: &str, all_segments: Vec<String>, position: u64) {
+        let index_shard = self
+            .shard_manager
+            .lock()
+            .unwrap()
+            .get_shard(shard_id)
+            .unwrap();
 
-        // let idx_shard = self
-        //     .shard_manager
-        //     .lock()
-        //     .unwrap()
-        //     .get_shard(shard_id)
-        //     .unwrap();
-        // let idx_shard = idx_shard.lock().unwrap();
+        let all_segments: Vec<SegmentID> = all_segments
+            .into_iter()
+            .map(|v| SegmentID::from(v))
+            .collect();
 
-        // let existing_segments = idx_shard.alive_segments().into_iter().collect::<Vec<_>>();
+        index_shard
+            .lock()
+            .unwrap()
+            .update_segments(all_segments, position)
+            .expect("Failed to update segments");
     }
 
     pub fn get_position(&self, shard_id: &str) -> u64 {
@@ -172,11 +181,7 @@ impl SecondaryReplicator {
         let sm = self.shard_manager.lock().unwrap();
 
         for shard_id in sm.get_shard_ids() {
-            let index_shard = self
-                .shard_manager
-                .lock()
-                .unwrap()
-                .get_shard(shard_id.as_str());
+            let index_shard = sm.get_shard(shard_id.as_str());
             if index_shard.is_err() {
                 continue;
             }
@@ -189,30 +194,86 @@ impl SecondaryReplicator {
     }
 }
 
+async fn sync_shard_segments(
+    mut primary_client: unified::node_service_client::NodeServiceClient<tonic::transport::Channel>,
+    replicator: Arc<Mutex<SecondaryReplicator>>,
+    commit: PrimaryReplicateCommit,
+    settings: Arc<Settings>,
+) {
+    if !replicator
+        .lock()
+        .unwrap()
+        .shard_manager
+        .lock()
+        .unwrap()
+        .exists(commit.shard_id.as_str())
+    {
+        replicator
+            .lock()
+            .unwrap()
+            .shard_manager
+            .lock()
+            .unwrap()
+            .create_shard(commit.shard_id.as_str())
+            .expect("Failed to create shard");
+    }
+
+    for segment in commit.segments.iter() {
+        // need to be smarter about not replicating segments that already exist
+
+        let segment_filepath =
+            get_segment_filepath(settings.clone(), commit.shard_id.as_str(), segment.as_str());
+        println!("Downloading segment {} to {}", segment, segment_filepath);
+        let mut file = tokio::fs::File::create(segment_filepath).await.unwrap();
+
+        let mut stream = primary_client
+            .download_segment(unified::DownloadSegmentRequest {
+                chunk_size: 1024 * 1024,
+                shard_id: commit.shard_id.clone(),
+                segment_id: segment.clone(),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        while let Some(resp) = stream.message().await.unwrap() {
+            file.write_all(&resp.data).await.unwrap();
+        }
+    }
+    replicator
+        .lock()
+        .unwrap()
+        .commit(&commit.shard_id, commit.segments, commit.position);
+}
+
 pub async fn connect_to_primary_and_replicate(
     primary_address: String,
     secondary_id: String,
     replicator: Arc<Mutex<SecondaryReplicator>>,
+    settings: Arc<Settings>,
 ) -> Result<(), tonic::transport::Error> {
     let mut client =
-        unified::node_service_client::NodeServiceClient::connect(primary_address).await?;
+        unified::node_service_client::NodeServiceClient::connect(primary_address.clone())
+            .await
+            .expect("Failed to connect to primary");
     // .max_decoding_message_size(256 * 1024 * 1024)
-    // .max_encoding_message_size(256 * 1024 * 1024);
-
+    // .max_encoding_message_size(256 * 1024 * 1024);address);
     loop {
+        println!("Requesting commits from primary");
         let mut stream_data = Vec::new();
+        let positions: Vec<unified::ShardReplicationPosition> = replicator
+            .lock()
+            .unwrap()
+            .get_positions()
+            .into_iter()
+            .map(|(k, v)| unified::ShardReplicationPosition {
+                shard_id: k,
+                position: v,
+            })
+            .collect();
         stream_data.push(unified::SecondaryReplicateRequest {
             secondary_id: secondary_id.clone(),
-            positions: replicator
-                .lock()
-                .unwrap()
-                .get_positions()
-                .into_iter()
-                .map(|(k, v)| unified::ShardReplicationPosition {
-                    shard_id: k,
-                    position: v,
-                })
-                .collect(),
+            positions,
         });
         // start streaming request
         let mut stream = client
@@ -223,6 +284,9 @@ pub async fn connect_to_primary_and_replicate(
 
         let mut no_new_commits = true;
         while let Some(resp) = stream.message().await.unwrap() {
+            if resp.commits.len() > 0 {
+                println!("Processing commits {}", resp.commits.len());
+            }
             for commit in resp.commits {
                 if replicator
                     .lock()
@@ -230,11 +294,13 @@ pub async fn connect_to_primary_and_replicate(
                     .get_position(commit.shard_id.as_str())
                     < commit.position
                 {
-                    replicator.lock().unwrap().commit(
-                        &commit.shard_id,
-                        commit.segments,
-                        commit.position,
-                    );
+                    sync_shard_segments(
+                        client.clone(),
+                        replicator.clone(),
+                        commit,
+                        settings.clone(),
+                    )
+                    .await;
                     no_new_commits = false;
                 }
             }
