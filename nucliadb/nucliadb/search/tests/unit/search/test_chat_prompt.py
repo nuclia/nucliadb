@@ -162,12 +162,12 @@ def _create_find_result(
     )
 
 
-async def test_format_chat_prompt_content(kb):
+async def test_get_chat_prompt_context(kb):
     result_text = " ".join(["text"] * 10)
     with patch("nucliadb.search.search.chat.prompt.get_driver"), patch(
         "nucliadb.search.search.chat.prompt.get_storage"
     ), patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb):
-        prompt_result = await chat_prompt.format_chat_prompt_content(
+        prompt_result = await chat_prompt.get_chat_prompt_context(
             "kbid",
             KnowledgeboxFindResults(
                 facets={},
@@ -182,6 +182,4 @@ async def test_format_chat_prompt_content(kb):
                 min_score=-1,
             ),
         )
-        assert prompt_result == chat_prompt.PROMPT_TEXT_RESULT_SEP.join(
-            [result_text, result_text]
-        )
+        assert prompt_result == [result_text, result_text]

@@ -27,7 +27,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
+from nucliadb.search.search.chat.query import chat, rephrase_query_from_chat_history
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -97,7 +97,7 @@ async def resource_chat(
     user_query = item.query
     rephrased_query = None
     if item.context and len(item.context) > 0:
-        rephrased_query = await rephrase_query_from_context(
+        rephrased_query = await rephrase_query_from_chat_history(
             kbid, item.context, item.query, x_nucliadb_user
         )
 

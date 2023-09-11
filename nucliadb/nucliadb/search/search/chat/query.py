@@ -28,7 +28,7 @@ from starlette.responses import StreamingResponse
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode, PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.chat.prompt import format_chat_prompt_content
+from nucliadb.search.search.chat.prompt import get_chat_prompt_context
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -46,18 +46,19 @@ from nucliadb_utils.utilities import get_audit
 
 END_OF_STREAM = "_END_"
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
+AUDIT_TEXT_RESULT_SEP = " \n\n "
 
 
-async def rephrase_query_from_context(
+async def rephrase_query_from_chat_history(
     kbid: str,
-    context: List[ChatContextMessage],
+    chat_history: List[ChatContextMessage],
     query: str,
     user_id: str,
 ) -> str:
     predict = get_predict()
     req = RephraseModel(
         question=query,
-        context=context,
+        chat_history=chat_history,
         user_id=user_id,
     )
     return await predict.rephrase_query(kbid, req)
@@ -66,7 +67,8 @@ async def rephrase_query_from_context(
 async def generate_answer(
     *,
     user_query: str,
-    chat_context: List[ChatContextMessage],
+    query_context: List[str],
+    chat_history: List[ChatContextMessage],
     rephrased_query: Optional[str],
     results: KnowledgeboxFindResults,
     kbid: str,
@@ -110,27 +112,19 @@ async def generate_answer(
 
     text_answer = b"".join(answer)
 
-    audit = get_audit()
-    if audit is not None:
-        audit_answer: Optional[str] = text_answer.decode()
-        if status_code == AnswerStatusCode.NO_CONTEXT:
-            audit_answer = None
-
-        context = [
-            audit_pb2.ChatContext(author=message.author, text=message.text)
-            for message in chat_context
-        ]
-        await audit.chat(
-            kbid,
-            user_id,
-            client_type.to_proto(),
-            origin,
-            time() - start_time,
-            question=user_query,
-            rephrased_question=rephrased_query,
-            context=context,
-            answer=audit_answer,
-        )
+    await maybe_audit_chat(
+        kbid=kbid,
+        user_id=user_id,
+        client_type=client_type,
+        origin=origin,
+        duration=time() - start_time,
+        user_query=user_query,
+        rephrased_query=rephrased_query,
+        text_answer=text_answer,
+        status_code=status_code,
+        chat_history=chat_history,
+        query_context=query_context,
+    )
 
     yield END_OF_STREAM
 
@@ -177,7 +171,7 @@ async def chat(
     origin: str,
 ):
     nuclia_learning_id: Optional[str] = None
-    user_context = chat_request.context or []
+    chat_history = chat_request.context or []
     predict = get_predict()
 
     if len(find_results.resources) == 0:
@@ -192,20 +186,16 @@ async def chat(
             predict=predict,
             answer_generator=not_enough_context_generator(),
             chat_request=chat_request,
-            chat_context=user_context,
+            query_context=[],
+            chat_history=chat_history,
         )
 
     else:
-        chat_context = user_context[:]
-        chat_context.append(
-            ChatContextMessage(
-                author=Author.NUCLIA,
-                text=await format_chat_prompt_content(kbid, find_results),
-            )
-        )
+        query_context = await get_chat_prompt_context(kbid, find_results)
         chat_model = ChatModel(
             user_id=user_id,
-            context=chat_context,
+            query_context=query_context,
+            chat_history=chat_history,
             question=chat_request.query,
             truncate=True,
         )
@@ -214,7 +204,6 @@ async def chat(
         )
         answer_stream = generate_answer(
             user_query=user_query,
-            chat_context=chat_context,
             rephrased_query=rephrased_query,
             results=find_results,
             kbid=kbid,
@@ -224,6 +213,8 @@ async def chat(
             predict=predict,
             answer_generator=predict_generator,
             chat_request=chat_request,
+            query_context=query_context,
+            chat_history=chat_history,
         )
 
     return StreamingResponse(
@@ -280,3 +271,49 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         if chunk.endswith(b"0"):
             return AnswerStatusCode.SUCCESS
         return AnswerStatusCode(chunk[-2:].decode())
+
+
+async def maybe_audit_chat(
+    *,
+    kbid: str,
+    user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
+    duration: float,
+    user_query: str,
+    rephrased_query: Optional[str],
+    text_answer: bytes,
+    status_code: Optional[AnswerStatusCode],
+    chat_history: List[ChatContextMessage],
+    query_context: List[str],
+):
+    audit = get_audit()
+    if audit is None:
+        return
+
+    audit_answer: Optional[str] = text_answer.decode()
+    if status_code == AnswerStatusCode.NO_CONTEXT:
+        audit_answer = None
+
+    # Append chat history and query context
+    audit_context = [
+        audit_pb2.ChatContext(author=message.author, text=message.text)
+        for message in chat_history
+    ]
+    audit_context.append(
+        audit_pb2.ChatContext(
+            author=Author.NUCLIA,
+            text=AUDIT_TEXT_RESULT_SEP.join(query_context),
+        )
+    )
+    await audit.chat(
+        kbid,
+        user_id,
+        client_type.to_proto(),
+        origin,
+        duration,
+        question=user_query,
+        rephrased_question=rephrased_query,
+        context=audit_context,
+        answer=audit_answer,
+    )
