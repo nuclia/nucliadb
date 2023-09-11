@@ -1,4 +1,5 @@
 from base64 import b64decode, b64encode
+from enum import Enum
 from typing import Tuple, Union
 
 from pydantic import BaseModel
@@ -14,10 +15,20 @@ class Resource(BaseModel):
     id: str
     data: str
 
+class Codec(str, Enum):
+    BINARY = "BIN:"
+    RESOURCE = "RES:"
+
+
+def encode_binary(binary: bytes) -> bytes:
+    return Codec.BINARY.encode("utf-8") + b64encode(binary)
+
 
 def encode_resource(resource: Resource) -> bytes:
     serialized = resource.json().encode("utf-8")
-    return b64encode(serialized) + b"\n"
+    return Codec.RESOURCE.encode("utf-8") + b64encode(serialized)
+
+
 
 
 def decode_resource(line: Union[bytes, str]) -> Resource:
@@ -28,10 +39,6 @@ def decode_resource(line: Union[bytes, str]) -> Resource:
     line = line.rstrip(line_separator)
     decoded = b64decode(line)
     return Resource.parse_raw(decoded)
-
-
-def encode_binary(rid: str, data: bytes) -> bytes:
-    return rid.encode("utf-8") + BINARY_SEPARATOR + data + b"\n"
 
 
 def decode_binary(line: Union[bytes, str]) -> Tuple[str, bytes]:

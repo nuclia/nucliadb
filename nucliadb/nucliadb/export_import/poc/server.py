@@ -1,30 +1,13 @@
-import tarfile
-import tempfile
-from pathlib import Path
-from uuid import uuid4
-
 import storage
 from fastapi import FastAPI
-from shared import SERVER_HOST, SERVER_PORT, decode_resource, encode_resource
+from shared import SERVER_HOST, SERVER_PORT, encode_resource, encode_binary
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
 
-class DataManager:
-    pass
-
-
-dm = DataManager()
-
 api = FastAPI()
 
-
-def stream_tarfile_from_disk(kbid: str):
-    # Store everything in a temporary tar file and stream it to the client
-    with tempfile.TemporaryDirectory() as tempfolder:
-        path = export_to_tarfile(kbid, tempfolder)
-        for chunk in iter_file_chunks(path):
-            yield chunk
+EOL = b"\n"
 
 
 def iter_file_chunks(path):
@@ -36,58 +19,49 @@ def iter_file_chunks(path):
             yield chunk
 
 
-async def save_tarfile_to_disk(request, kbid, tempfolder) -> str:
-    # Store everything in a temporary tar file
-    path = f"{tempfolder}/{kbid}.tar.bz2"
-    with open(path, "wb+") as file:
-        async for chunk in request.stream():
-            file.write(chunk)
-    return path
+
+def export_to_stream(kbid: str):
+    bins = storage.get_binaries(kbid)
+
+    for resource in storage.get_resources(kbid):
+        enc_res = encode_resource(resource)
+        enc_res_size = len(enc_res).to_bytes(4, byteorder="big")
+
+        yield enc_res_size + EOL
+        yield enc_res + EOL
+
+        rbin = bins.get(resource.id, None)
+        if rbin is not None:
+            enc_bin = encode_binary(rbin)
+            enc_bin_size = len(enc_bin).to_bytes(4, byteorder="big")
+
+            yield enc_bin_size + EOL
+            yield enc_bin + EOL
 
 
-def export_to_tarfile(kbid: str, tempfolder: str):
-    # Create a file where all encoded resources are stored
-    resources_file_path = Path(f"{tempfolder}/resources")
-    with open(resources_file_path, "w+") as resources_file:
-        for resource in storage.get_resources(kbid):
-            resources_file.write(encode_resource(resource).decode("utf-8"))
-
-    # Create a tar file with all binaries and the resources file
-    tarfile_path = Path(f"{tempfolder}/{kbid}.tar.bz2")
-    with tarfile.open(f"{tempfolder}/{kbid}.tar.bz2", mode="w:bz2") as tar:
-        tar.add(resources_file_path, "resources")
-        for rid, bin in storage.get_binaries(kbid):
-            filename = f"{tempfolder}/{uuid4().hex}"
-            with open(filename, "wb+") as binary_file:
-                binary_file.write(bin)
-            tar.add(filename, rid)
-
-    return tarfile_path
+async def stream_lines(request: Request):
+    async for chunk in request.stream():
+        lines = chunk.split(EOL)
+        for line in lines:
+            yield line
 
 
-def import_from_tarfile(kbid, tempfolder, path):
-    with tarfile.open(path, mode="r:bz2") as tar:
-        # Extract all members of the tar file to a temporary folder
-        extracted_path = f"{tempfolder}/extracted"
-        tar.extractall(path=extracted_path)
-
-        # Read all binaries and import them
-        for member in tar.getmembers():
-            if member.name != "resources":
-                with open(f"{extracted_path}/{member.name}", "rb") as binary_file:
-                    storage.store_binary(kbid, member.name, binary_file.read())
-
-        # Read the resources file and import them
-        with open(f"{extracted_path}/resources", "r") as resources_file:
-            for line in resources_file.readlines():
-                resource = decode_resource(line)
-                storage.store_resource(kbid, resource)
+async def import_from_stream(request: Request, kbid: str):
+    gen = stream_lines(request)
+    while True:
+        try:
+            line = await gen.__anext__()
+            if not line:
+                continue
+            print(line)
+        except StopAsyncIteration:
+            break
 
 
 @api.get("/export/{kbid}")
 async def export_endpoint(kbid: str):
     return StreamingResponse(
-        stream_tarfile_from_disk(kbid),
+        export_to_stream(kbid),
         status_code=200,
         media_type="application/octet-stream",
         headers={
@@ -98,9 +72,8 @@ async def export_endpoint(kbid: str):
 
 @api.post("/import/{kbid}")
 async def import_endpoint(request: Request, kbid: str):
-    with tempfile.TemporaryDirectory() as tempfolder:
-        path = await save_tarfile_to_disk(request, kbid, tempfolder)
-        import_from_tarfile(kbid, tempfolder, path)
+    await import_from_stream(request, kbid)
+
 
 
 @api.get("/{kbid}/binaries")

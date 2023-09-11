@@ -15,7 +15,7 @@ def get_resources(kbid: str):
 
 
 def get_binaries(kbid: str):
-    return STORAGE["binaries"].get(kbid, {}).items()
+    return STORAGE["binaries"].get(kbid, {})
 
 
 def store_resource(kbid: str, resource):
