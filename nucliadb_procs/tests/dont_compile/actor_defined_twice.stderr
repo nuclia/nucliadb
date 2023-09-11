@@ -1,0 +1,5 @@
+error: Argument `actor` is expected only once
+  --> tests/dont_compile/actor_defined_twice.rs:23:30
+   |
+23 | #[measure(actor = "vectors", actor = "paragraphs", metric = "my-test")]
+   |                              ^^^^^

@@ -12,6 +12,7 @@ COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
 COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
@@ -51,6 +52,7 @@ COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
 COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry

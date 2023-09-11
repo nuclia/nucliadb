@@ -16,6 +16,7 @@ tantivy-fst = "0.3.0"
 tantivy-common = "0.2.0"
 nucliadb_core = { path = "../nucliadb_core" }
 itertools = "0.10.5"
+nucliadb_procs = { path = "../nucliadb_procs" }
 
 [build-dependencies]
 serde_json = "1.0.86"

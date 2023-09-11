@@ -30,6 +30,7 @@ use nucliadb_core::protos::{
     SuggestRequest,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
@@ -60,22 +61,11 @@ impl Debug for ParagraphReaderService {
 }
 
 impl ParagraphReader for ParagraphReaderService {
+    #[measure(actor = "paragraphs", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
-
-        let id: Option<String> = None;
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at: {v} ms");
-        }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(count)
     }
     #[tracing::instrument(skip_all)]
