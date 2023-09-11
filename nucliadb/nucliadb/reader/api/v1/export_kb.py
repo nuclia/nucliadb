@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import tempfile
-from pathlib import Path
+from typing import Annotated
 
+from fastapi import Depends
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version  # type: ignore
 from starlette.requests import Request
@@ -33,26 +33,9 @@ from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
-CHUNK_SIZE = 1024 * 1024
 
-
-def iter_file_chunks(file: Path):
-    with open(file, mode="rb") as f:
-        while True:
-            chunk = f.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            yield chunk
-
-
-async def stream_export(context: ExporterContext, kbid: str):
-    """
-    Creates an temporary export tarfile from the KB contents and streams it to the client.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        tar_file = await exporter.export_kb(context, kbid, tmp)
-        for chunk in iter_file_chunks(tar_file):
-            yield chunk
+async def contexts(request: Request) -> ExporterContext:
+    return {"exporter": get_exporter_context_from_app(request.app)}
 
 
 @api.get(
@@ -63,10 +46,11 @@ async def stream_export(context: ExporterContext, kbid: str):
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def export_kb_endpoint(request: Request, kbid: str) -> StreamingResponse:
-    context = get_exporter_context_from_app(request.app)
+async def export_kb_endpoint(
+    request: Request, kbid: str, contexts: Annotated[dict, Depends(contexts)]
+) -> StreamingResponse:
     return StreamingResponse(
-        stream_export(context, kbid),
+        exporter.export_kb(contexts["exporter"], kbid),
         status_code=200,
         media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename={kbid}.export"},

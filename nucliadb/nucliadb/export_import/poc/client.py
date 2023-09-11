@@ -40,6 +40,7 @@ def export_kb(client, kbid: str, export_path=None) -> str:
 
 def import_kb(client, kbid: str, export: str) -> None:
     chunk_size = 1024 * 1024
+
     def stream_export():
         with open(export, mode="r") as file:
             for chunk in file.read(chunk_size):

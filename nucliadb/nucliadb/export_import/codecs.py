@@ -27,47 +27,57 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
+BINARY_SEP = "__X__"
+
 
 class CODEX(str, Enum):
-    RESOURCE = "RES:"
-    LABELS = "LAB:"
-    ENTITIES = "ENT:"
+    RESOURCE = "RES"
+    LABELS = "LAB"
+    ENTITIES = "ENT"
+    BINARY = "BIN"
 
 
 def encode_bm(bm: BrokerMessage) -> str:
-    return CODEX.RESOURCE + base64.b64encode(bm.SerializeToString()).decode() + "\n"
+    return CODEX.RESOURCE + base64.b64encode(bm.SerializeToString()).decode()
 
 
 def encode_entities(entities: GetEntitiesResponse) -> str:
-    return (
-        CODEX.ENTITIES + base64.b64encode(entities.SerializeToString()).decode() + "\n"
-    )
+    return CODEX.ENTITIES + base64.b64encode(entities.SerializeToString()).decode()
 
 
 def encode_labels(labels: GetLabelsResponse) -> str:
-    return CODEX.LABELS + base64.b64encode(labels.SerializeToString()).decode() + "\n"
+    return CODEX.LABELS + base64.b64encode(labels.SerializeToString()).decode()
+
+
+def encode_binary(binary: bytes, rid: str) -> str:
+    return CODEX.BINARY + rid + BINARY_SEP + base64.b64encode(binary).decode()
 
 
 def decode_bm(line: str) -> BrokerMessage:
     bm = BrokerMessage()
-    payload = base64.b64decode(line[4:].rstrip("\n"))
+    payload = base64.b64decode(line[3:])
     bm.ParseFromString(payload)
     return bm
 
 
 def decode_entities(line: str) -> GetEntitiesResponse:
     entities = GetEntitiesResponse()
-    payload = base64.b64decode(line[4:].rstrip("\n"))
+    payload = base64.b64decode(line[3:])
     entities.ParseFromString(payload)
     return entities
 
 
 def decode_labels(line: str) -> GetLabelsResponse:
     labels = GetLabelsResponse()
-    payload = base64.b64decode(line[4:].rstrip("\n"))
+    payload = base64.b64decode(line[3:])
     labels.ParseFromString(payload)
     return labels
 
 
+def decode_binary(line: str) -> tuple[str, bytes]:
+    rid, binary = line[3:].split(BINARY_SEP)
+    return rid, base64.b64decode(binary)
+
+
 def get_type(line: str) -> CODEX:
-    return CODEX(line[:4])
+    return CODEX(line[:3])

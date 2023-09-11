@@ -1,13 +1,19 @@
 import storage
 from fastapi import FastAPI
-from shared import SERVER_HOST, SERVER_PORT, encode_resource, encode_binary
+from shared import (
+    SERVER_HOST,
+    SERVER_PORT,
+    Codec,
+    encode_binary,
+    encode_resource,
+    parse_codec,
+)
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
+from nucliadb.export_import.poc.shared import decode_binary, decode_resource
 
 api = FastAPI()
-
-EOL = b"\n"
 
 
 def iter_file_chunks(path):
@@ -19,43 +25,69 @@ def iter_file_chunks(path):
             yield chunk
 
 
+class StreamReader:
+    def __init__(self, stream):
+        self.stream = stream
+        self.gen = None
+        self.buffer = b""
 
-def export_to_stream(kbid: str):
-    bins = storage.get_binaries(kbid)
+    def _read_from_buffer(self, n_bytes: int):
+        value = self.buffer[:n_bytes]
+        self.buffer = self.buffer[n_bytes:]
+        return value
 
-    for resource in storage.get_resources(kbid):
-        enc_res = encode_resource(resource)
-        enc_res_size = len(enc_res).to_bytes(4, byteorder="big")
+    async def read(self, n_bytes: int):
+        if self.gen is None:
+            self.gen = self.stream.__aiter__()
 
-        yield enc_res_size + EOL
-        yield enc_res + EOL
+        while True:
+            try:
+                if self.buffer != b"" and len(self.buffer) >= n_bytes:
+                    return self._read_from_buffer(n_bytes)
 
-        rbin = bins.get(resource.id, None)
-        if rbin is not None:
-            enc_bin = encode_binary(rbin)
-            enc_bin_size = len(enc_bin).to_bytes(4, byteorder="big")
+                self.buffer += await self.gen.__anext__()
+                if len(self.buffer) >= n_bytes:
+                    return self._read_from_buffer(n_bytes)
 
-            yield enc_bin_size + EOL
-            yield enc_bin + EOL
+            except StopAsyncIteration:
+                if self.buffer != b"":
+                    return self._read_from_buffer(n_bytes)
+                else:
+                    raise
 
 
-async def stream_lines(request: Request):
-    async for chunk in request.stream():
-        lines = chunk.split(EOL)
-        for line in lines:
-            yield line
+class ImportStreamReader(StreamReader):
+    async def iter_to_import(self):
+        while True:
+            try:
+                size = await self.read(4)
+                size_int = int.from_bytes(size, byteorder="big")
+                encoded = await self.read(size_int)
+                yield encoded
+            except StopAsyncIteration:
+                break
+
+
+def import_resource(resource, kbid: str):
+    storage.store_resource(kbid, resource)
+
+
+def import_binary(binary, kbid: str, rid):
+    storage.store_binary(kbid, rid, binary)
 
 
 async def import_from_stream(request: Request, kbid: str):
-    gen = stream_lines(request)
-    while True:
-        try:
-            line = await gen.__anext__()
-            if not line:
-                continue
-            print(line)
-        except StopAsyncIteration:
-            break
+    sr = ImportStreamReader(request.stream())
+    async for encoded_item in sr.iter_to_import():
+        codec, item = parse_codec(encoded_item)
+        if codec == Codec.RESOURCE:
+            resource = decode_resource(item)
+            import_resource(resource, kbid)
+        elif codec == Codec.BINARY:
+            rid, binary = decode_binary(item)
+            import_binary(binary, kbid, rid)
+        else:
+            continue
 
 
 @api.get("/export/{kbid}")
@@ -73,7 +105,6 @@ async def export_endpoint(kbid: str):
 @api.post("/import/{kbid}")
 async def import_endpoint(request: Request, kbid: str):
     await import_from_stream(request, kbid)
-
 
 
 @api.get("/{kbid}/binaries")

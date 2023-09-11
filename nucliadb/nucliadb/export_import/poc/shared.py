@@ -1,3 +1,4 @@
+import base64
 from base64 import b64decode, b64encode
 from enum import Enum
 from typing import Tuple, Union
@@ -15,13 +16,17 @@ class Resource(BaseModel):
     id: str
     data: str
 
+
 class Codec(str, Enum):
     BINARY = "BIN:"
     RESOURCE = "RES:"
 
 
-def encode_binary(binary: bytes) -> bytes:
-    return Codec.BINARY.encode("utf-8") + b64encode(binary)
+def encode_binary(rid: str, binary: bytes) -> bytes:
+    codec = Codec.BINARY.encode("utf-8")
+    rid = rid.encode("utf-8")
+    binary = b64encode(binary)
+    return codec + rid + BINARY_SEPARATOR + binary
 
 
 def encode_resource(resource: Resource) -> bytes:
@@ -29,30 +34,22 @@ def encode_resource(resource: Resource) -> bytes:
     return Codec.RESOURCE.encode("utf-8") + b64encode(serialized)
 
 
-
-
-def decode_resource(line: Union[bytes, str]) -> Resource:
-    if isinstance(line, bytes):
-        line_separator = LINE_SEPARATOR
+def parse_codec(encoded: bytes) -> Tuple[Codec, bytes]:
+    if encoded.startswith(Codec.BINARY.encode("utf-8")):
+        return Codec.BINARY, encoded[4:]
+    elif encoded.startswith(Codec.RESOURCE.encode("utf-8")):
+        return Codec.RESOURCE, encoded[4:]
     else:
-        line_separator = LINE_SEPARATOR.decode("utf-8")
-    line = line.rstrip(line_separator)
-    decoded = b64decode(line)
+        raise ValueError(f"Unknown codec: {encoded[:4]}")
+
+
+def decode_resource(encoded: bytes) -> Resource:
+    decoded = b64decode(encoded)
     return Resource.parse_raw(decoded)
 
 
-def decode_binary(line: Union[bytes, str]) -> Tuple[str, bytes]:
-    if isinstance(line, bytes):
-        line_separator = LINE_SEPARATOR
-        binary_separator = BINARY_SEPARATOR
-        line = line.rstrip(line_separator)
-        rid, data = line.split(binary_separator)
-        rid = rid.decode("utf-8")
-        return rid, data
-    else:
-        line_separator = LINE_SEPARATOR.decode("utf-8")
-        binary_separator = BINARY_SEPARATOR.decode("utf-8")
-        line = line.rstrip(line_separator)
-        rid, data = line.split(binary_separator)
-        data = data.encode("utf-8")
-        return rid, data
+def decode_binary(encoded: bytes) -> Tuple[str, bytes]:
+    binary_separator = BINARY_SEPARATOR
+    rid, data = encoded.split(binary_separator)
+    rid = rid.decode("utf-8")
+    return rid, data

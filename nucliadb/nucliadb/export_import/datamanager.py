@@ -19,6 +19,7 @@
 #
 from typing import AsyncIterator
 
+from aiofiles.threadpool import AsyncFileIO
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -44,6 +45,10 @@ class KBExporterDataManager:
                 resource.disable_vectors = False
                 bm = await resource.generate_broker_message()
                 yield bm
+
+    async def import_broker_message(self, kbid: str, bm: BrokerMessage):
+        # TODO: send to the ingest processed queue. Probably we need to send two messages, simulating the normal operation flow.
+        pass
 
     def get_binaries(self, bm: BrokerMessage) -> list[CloudFile]:
         binaries: list[CloudFile] = []
@@ -85,9 +90,18 @@ class KBExporterDataManager:
 
         return binaries
 
-    async def download_cf_to_file(self, cf: CloudFile, destination_file) -> None:
+    async def download_cf_to_file(
+        self, cf: CloudFile, destination_file: AsyncFileIO
+    ) -> int:
+        file_size = 0
         async for data in self.storage.download(cf.bucket_name, cf.uri):
-            destination_file.write(data)
+            file_size += len(data)
+            await destination_file.write(data)
+        return file_size
+
+    async def upload_file_to_cf(self, kbid: str, source_file: AsyncFileIO):
+        # TODO
+        pass
 
     async def get_entities(self, kbid: str) -> GetEntitiesResponse:
         ger = GetEntitiesResponse()
@@ -97,6 +111,14 @@ class KBExporterDataManager:
             await em.get_entities(ger)
             return ger
 
+    async def set_entities(self, kbid: str, ger: GetEntitiesResponse):
+        async with self.driver.transaction() as txn:
+            kb = KnowledgeBoxORM(txn, self.storage, kbid)
+            em = EntitiesManager(kb, txn)
+            for group, entities in ger.groups.items():
+                await em.set_entities_group(group, entities)
+            await txn.commit()
+
     async def get_labels(self, kbid: str) -> GetLabelsResponse:
         glr = GetLabelsResponse()
         async with self.driver.transaction() as txn:
@@ -104,6 +126,13 @@ class KBExporterDataManager:
             labels = await kb.get_labels()
             glr.labels.CopyFrom(labels)
             return glr
+
+    async def set_labels(self, kbid: str, gel: GetLabelsResponse):
+        async with self.driver.transaction() as txn:
+            kb = KnowledgeBoxORM(txn, self.storage, kbid)
+            for labelset, labelset_obj in gel.labels.labelset.items():
+                await kb.set_labelset(labelset, labelset_obj)
+            await txn.commit()
 
 
 def _clone_collect_cf(binaries: list[CloudFile], origin: CloudFile):

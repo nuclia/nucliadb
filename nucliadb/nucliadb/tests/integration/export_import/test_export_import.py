@@ -18,14 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-import os
-import tarfile
-import tempfile
 
 import pytest
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.export_import import codecs
 from nucliadb.export_import.context import ExporterContext
 from nucliadb.export_import.exporter import export_kb
+from nucliadb.export_import.importer import import_kb
 
 pytestmark = pytest.mark.asyncio
 
@@ -68,17 +68,56 @@ async def kbid_to_export(nucliadb_writer, knowledgebox):
 
 
 async def test_export_kb(exporter_context: ExporterContext, kbid_to_export):
-    kbid = kbid_to_export
-    with tempfile.TemporaryDirectory() as temp_dir:
-        export_file = await export_kb(exporter_context, kbid, temp_dir)
+    items_yielded = []
+    async for chunk in export_kb(exporter_context, kbid_to_export):
+        items_yielded.append(chunk)
 
-        # Check that the tar file has been created
-        assert str(export_file) == f"{temp_dir}/{kbid}.export.tar.bz2"
-        assert os.path.exists(export_file)
+    _test_exported_items(items_yielded, kbid=kbid_to_export)
 
-        # Check that it has the expected content
-        with tarfile.open(export_file, mode="r:bz2") as tar:
-            member_names = list([m.name for m in tar.getmembers()])
-            assert "resources" in member_names
-            member_names.pop(member_names.index("resources"))
-            assert member_names[0].endswith("/f/f/file")
+
+def nwise(lst, n=1):
+    while len(lst) >= n:
+        to_yield = lst[:n]
+        yield to_yield
+        lst = lst[n:]
+
+
+async def test_import_kb(
+    exporter_context: ExporterContext, kbid_to_export, kbid_to_import
+):
+    export1 = []
+    async for chunk in export_kb(exporter_context, kbid_to_export):
+        export1.append(chunk)
+
+    async def generator():
+        for codex, _, data in nwise(export1, 3):
+            yield codecs.CODEX(codex), data
+
+    await import_kb(exporter_context, kbid_to_import, generator)
+
+    export2 = []
+    async for chunk in export_kb(exporter_context, kbid_to_import):
+        export2.append(chunk)
+
+    _test_exported_items(export2, kbid=kbid_to_import)
+
+
+def _test_exported_items(items_yielded, kbid=None):
+    assert len(items_yielded) == 12
+
+    items = []
+    for code_type, size, data in nwise(items_yielded, 3):
+        items.append(codecs.CODEX(code_type.decode()))
+        size_int = int.from_bytes(size, byteorder="big")
+        assert len(data) == size_int
+
+    assert items.count(codecs.CODEX.RESOURCE) == 1
+    assert items.count(codecs.CODEX.BINARY) == 1
+    assert items.count(codecs.CODEX.ENTITIES) == 1
+    assert items.count(codecs.CODEX.LABELS) == 1
+
+    bm_serialized = items_yielded[3]
+    bm = BrokerMessage()
+    bm.ParseFromString(bm_serialized)
+    if kbid:
+        assert bm.knowledgebox == kbid
