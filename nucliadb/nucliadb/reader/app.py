@@ -28,7 +28,10 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.export_import.context import ExporterContext, set_exporter_context_in_app
+from nucliadb.export_import.context import (
+    KBExporterContext,
+    set_exporter_context_in_app,
+)
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import finalize, initialize
@@ -107,7 +110,7 @@ def get_application() -> FastAPI:
     application.add_route("/", homepage)
 
     # Inject kb exporter context
-    exporter_context = ExporterContext(service_name="exporter")
+    exporter_context = KBExporterContext(service_name="exporter")
     asyncio.run(exporter_context.initialize())
     set_exporter_context_in_app(application, exporter_context)
     application.add_event_handler("shutdown", exporter_context.finalize)

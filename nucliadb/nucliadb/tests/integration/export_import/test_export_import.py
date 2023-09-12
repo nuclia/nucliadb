@@ -22,7 +22,7 @@ from io import BytesIO
 
 import pytest
 
-from nucliadb.export_import.context import ExporterContext, ImporterContext
+from nucliadb.export_import.context import KBExporterContext, KBImporterContext
 from nucliadb.export_import.exporter import export_kb
 from nucliadb.export_import.importer import ExportStream, import_kb
 
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.asyncio
 
 @pytest.fixture()
 async def exporter_context(knowledgebox, natsd, redis_config):
-    context = ExporterContext()
+    context = KBExporterContext()
     await context.initialize()
     yield context
     await context.finalize()
@@ -39,7 +39,7 @@ async def exporter_context(knowledgebox, natsd, redis_config):
 
 @pytest.fixture()
 async def importer_context(knowledgebox, natsd, redis_config):
-    context = ImporterContext()
+    context = KBImporterContext()
     await context.initialize()
     yield context
     await context.finalize()
@@ -116,7 +116,7 @@ async def kbid_to_import(nucliadb_manager):
     assert resp.status_code == 200
 
 
-async def test_export_kb(exporter_context: ExporterContext, kbid_to_export):
+async def test_export_kb(exporter_context: KBExporterContext, kbid_to_export):
     items_yielded = []
     async for chunk in export_kb(exporter_context, kbid_to_export):
         items_yielded.append(chunk)
@@ -139,8 +139,8 @@ class TestExportStream(ExportStream):
 
 
 async def test_import_kb(
-    exporter_context: ExporterContext,
-    importer_context: ImporterContext,
+    exporter_context: KBExporterContext,
+    importer_context: KBImporterContext,
     kbid_to_export,
     kbid_to_import,
     nucliadb_reader,

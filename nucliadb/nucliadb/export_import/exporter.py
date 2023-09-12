@@ -5,7 +5,7 @@ from uuid import uuid4
 import aiofiles
 
 from nucliadb.export_import import codecs
-from nucliadb.export_import.context import ExporterContext
+from nucliadb.export_import.context import KBExporterContext
 
 BINARY_CHUNK_SIZE = 1024 * 1024
 
@@ -19,7 +19,7 @@ async def iter_file_chunks(filename: str) -> AsyncIterator[bytes]:
             yield chunk
 
 
-async def export_kb(context: ExporterContext, kbid: str) -> AsyncIterator[bytes]:
+async def export_kb(context: KBExporterContext, kbid: str) -> AsyncIterator[bytes]:
     with tempfile.TemporaryDirectory() as dest_dir:
         async for bm in context.data_manager.iter_broker_messages(kbid):
             # Stream the binary files of the broker message

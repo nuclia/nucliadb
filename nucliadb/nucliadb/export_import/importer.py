@@ -9,7 +9,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.export_import.codecs import CODEX
-from nucliadb.export_import.context import ImporterContext
+from nucliadb.export_import.context import KBImporterContext
 from nucliadb.export_import.datamanager import BinaryStream, BinaryStreamGenerator
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,9 @@ class ExportStreamReader:
                 break
 
 
-async def import_kb(context: ImporterContext, kbid: str, stream: ExportStream) -> None:
+async def import_kb(
+    context: KBImporterContext, kbid: str, stream: ExportStream
+) -> None:
     stream_reader = ExportStreamReader(stream)
     async for codex, data in stream_reader.iter_items():
         if codex == CODEX.RESOURCE:

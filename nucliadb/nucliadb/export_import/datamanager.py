@@ -61,7 +61,7 @@ BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
-class ExporterDataManager:
+class KBExporterDataManager:
     def __init__(self, driver: Driver, storage: Storage):
         self.driver = driver
         self.storage = storage
@@ -151,7 +151,7 @@ class ExporterDataManager:
             return glr
 
 
-class ImporterDataManager:
+class KBImporterDataManager:
     def __init__(
         self,
         driver: Driver,

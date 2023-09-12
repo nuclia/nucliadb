@@ -28,26 +28,26 @@ from nucliadb_utils.utilities import (
     stop_transaction_utility,
 )
 
-from .datamanager import ExporterDataManager, ImporterDataManager
+from .datamanager import KBExporterDataManager, KBImporterDataManager
 
 
-class ExporterContext(ApplicationContext):
-    data_manager: ExporterDataManager
+class KBExporterContext(ApplicationContext):
+    data_manager: KBExporterDataManager
 
     async def initialize(self) -> None:
         await super().initialize()
-        self.data_manager = ExporterDataManager(self.kv_driver, self.blob_storage)
+        self.data_manager = KBExporterDataManager(self.kv_driver, self.blob_storage)
 
     async def finalize(self) -> None:
         await super().finalize()
 
 
-class ImporterContext(ApplicationContext):
-    data_manager: ImporterDataManager
+class KBImporterContext(ApplicationContext):
+    data_manager: KBImporterDataManager
 
     async def initialize(self) -> None:
         await super().initialize()
-        self.data_manager = ImporterDataManager(
+        self.data_manager = KBImporterDataManager(
             self.kv_driver,
             self.blob_storage,
             start_partitioning_utility(),
@@ -60,17 +60,17 @@ class ImporterContext(ApplicationContext):
         stop_partitioning_utility()
 
 
-def set_exporter_context_in_app(app: FastAPI, context: ExporterContext):
+def set_exporter_context_in_app(app: FastAPI, context: KBExporterContext):
     app.state.exporter_context = context
 
 
-def get_exporter_context_from_app(app: FastAPI) -> ExporterContext:
+def get_exporter_context_from_app(app: FastAPI) -> KBExporterContext:
     return app.state.exporter_context
 
 
-def set_importer_context_in_app(app: FastAPI, context: ImporterContext):
+def set_importer_context_in_app(app: FastAPI, context: KBImporterContext):
     app.state.importer_context = context
 
 
-def get_importer_context_from_app(app: FastAPI) -> ImporterContext:
+def get_importer_context_from_app(app: FastAPI) -> KBImporterContext:
     return app.state.importer_context
