@@ -20,6 +20,7 @@ use crate::settings::Settings;
 use nucliadb_index::core::SegmentID;
 use std::{
     collections::HashMap,
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 use tokio::io::AsyncWriteExt;
@@ -72,6 +73,10 @@ impl PrimaryReplicator {
             .entry(secondary_id.to_string())
             .or_insert_with(HashMap::new);
 
+        println!(
+            "Secondary {} committed {} at {}",
+            secondary_id, shard_id, position
+        );
         secondary_positions.insert(shard_id.to_string(), position);
     }
 
@@ -218,12 +223,26 @@ async fn sync_shard_segments(
             .expect("Failed to create shard");
     }
 
+    println!("Syncing shard {} {}", commit.shard_id, commit.position);
     for segment in commit.segments.iter() {
         // need to be smarter about not replicating segments that already exist
 
-        let segment_filepath =
-            get_segment_filepath(settings.clone(), commit.shard_id.as_str(), segment.as_str());
-        println!("Downloading segment {} to {}", segment, segment_filepath);
+        let segment_filepath = PathBuf::from(get_segment_filepath(
+            settings.clone(),
+            commit.shard_id.as_str(),
+            segment.as_str(),
+        ));
+        if segment_filepath.exists() {
+            // XXX double check segment is valid, hashes, etc..
+            // ignoring, already have segment
+            continue;
+        }
+
+        println!(
+            "Downloading segment {} to {}",
+            segment,
+            segment_filepath.to_str().unwrap()
+        );
         let mut file = tokio::fs::File::create(segment_filepath).await.unwrap();
 
         let mut stream = primary_client
@@ -259,7 +278,6 @@ pub async fn connect_to_primary_and_replicate(
     // .max_decoding_message_size(256 * 1024 * 1024)
     // .max_encoding_message_size(256 * 1024 * 1024);address);
     loop {
-        println!("Requesting commits from primary");
         let mut stream_data = Vec::new();
         let positions: Vec<unified::ShardReplicationPosition> = replicator
             .lock()
@@ -271,6 +289,7 @@ pub async fn connect_to_primary_and_replicate(
                 position: v,
             })
             .collect();
+
         stream_data.push(unified::SecondaryReplicateRequest {
             secondary_id: secondary_id.clone(),
             positions,
