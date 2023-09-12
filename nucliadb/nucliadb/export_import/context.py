@@ -18,8 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from fastapi import FastAPI
-
 from nucliadb.common.context import ApplicationContext
 from nucliadb_utils.utilities import (
     start_partitioning_utility,
@@ -58,19 +56,3 @@ class KBImporterContext(ApplicationContext):
         await super().finalize()
         await stop_transaction_utility()
         stop_partitioning_utility()
-
-
-def set_exporter_context_in_app(app: FastAPI, context: KBExporterContext):
-    app.state.exporter_context = context
-
-
-def get_exporter_context_from_app(app: FastAPI) -> KBExporterContext:
-    return app.state.exporter_context
-
-
-def set_importer_context_in_app(app: FastAPI, context: KBImporterContext):
-    app.state.importer_context = context
-
-
-def get_importer_context_from_app(app: FastAPI) -> KBImporterContext:
-    return app.state.importer_context
