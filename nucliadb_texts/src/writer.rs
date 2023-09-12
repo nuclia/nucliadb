@@ -22,12 +22,11 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
 use tantivy::schema::*;
@@ -53,6 +52,7 @@ impl Debug for TextWriterService {
 impl FieldWriter for TextWriterService {}
 
 impl WriterChild for TextWriterService {
+    #[measure(actor = "texts", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
@@ -62,18 +62,15 @@ impl WriterChild for TextWriterService {
         let searcher = reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("count".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took}");
 
         Ok(count)
     }
+
+    #[measure(actor = "texts", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
-        let time = SystemTime::now();
-
         let id = Some(&resource.shard_id);
         let resource_id = resource.resource.as_ref().expect("Missing resource ID");
 
@@ -105,14 +102,13 @@ impl WriterChild for TextWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("set_resource".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took}");
 
         Ok(())
     }
+
+    #[measure(actor = "texts", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -136,14 +132,12 @@ impl WriterChild for TextWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("delete_resource".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took}");
 
         Ok(())
     }
+
     fn garbage_collection(&mut self) -> NodeResult<()> {
         Ok(())
     }
@@ -166,6 +160,7 @@ impl TextWriterService {
             Ok(TextWriterService::open(config)?)
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn new(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
@@ -190,6 +185,7 @@ impl TextWriterService {
             schema: field_schema,
         })
     }
+
     #[tracing::instrument(skip_all)]
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
