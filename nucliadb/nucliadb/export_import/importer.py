@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Copyright (C) 2021 Bosutech XXI S.L.
 #
 # nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -37,6 +38,25 @@ logger = logging.getLogger(__name__)
 ExportItem = tuple[ExportedItemType, Any]
 BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
+=======
+import logging
+from io import BytesIO
+from typing import Any, AsyncGenerator, cast
+
+from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    GetEntitiesResponse,
+    GetLabelsResponse,
+)
+
+from nucliadb.export_import.context import KBImporterContext
+from nucliadb.export_import.datamanager import BinaryStream, BinaryStreamGenerator
+from nucliadb.export_import.models import CODEX
+
+logger = logging.getLogger(__name__)
+ExportItem = tuple[CODEX, Any]
+>>>>>>> 11af5824 (Export / Import logic)
 
 
 class ExportStream:
