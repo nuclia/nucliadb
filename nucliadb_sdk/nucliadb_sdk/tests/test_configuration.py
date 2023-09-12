@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import nucliadb_sdk
+from nucliadb_models.configuration import KBConfiguration
 
 
 def test_configuration(sdk: nucliadb_sdk.NucliaDB):
@@ -31,4 +32,7 @@ def test_configuration(sdk: nucliadb_sdk.NucliaDB):
         generative_model="test2",
     )
 
-    config = sdk.get_configuration(kbid=kb.uuid)
+    config: KBConfiguration = sdk.get_configuration(kbid=kb.uuid)
+    assert config.semantic_model == "test1"
+    assert config.generative_model == "test2"
+    assert config.anonymization_model is None

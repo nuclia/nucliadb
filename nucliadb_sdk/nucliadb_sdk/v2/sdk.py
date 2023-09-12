@@ -23,10 +23,10 @@ import io
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import httpx
-from nucliadb_models.configuration import KBConfiguration
 import orjson
 from pydantic import BaseModel
 
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
