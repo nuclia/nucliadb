@@ -117,6 +117,8 @@ async def start_predict_engine():
             nuclia_settings.nuclia_service_account,
             nuclia_settings.nuclia_zone,
             nuclia_settings.onprem,
+            nuclia_settings.local_predict,
+            nuclia_settings.local_predict_headers,
         )
     await predict_util.initialize()
     set_utility(Utility.PREDICT, predict_util)
@@ -208,6 +210,8 @@ class PredictEngine:
         nuclia_service_account: Optional[str] = None,
         zone: Optional[str] = None,
         onprem: bool = False,
+        local_predict: bool = False,
+        local_predict_headers: Optional[Dict[str, str]] = None,
     ):
         self.nuclia_service_account = nuclia_service_account
         self.cluster_url = cluster_url
@@ -217,6 +221,8 @@ class PredictEngine:
             self.public_url = None
         self.zone = zone
         self.onprem = onprem
+        self.local_predict = local_predict
+        self.local_predict_headers = local_predict_headers
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
@@ -241,7 +247,9 @@ class PredictEngine:
         return kb_pb
 
     def check_nua_key_is_configured_for_onprem(self):
-        if self.onprem and self.nuclia_service_account is None:
+        if self.onprem and (
+            self.nuclia_service_account is None and self.local_predict is False
+        ):
             raise NUAKeyMissingError()
 
     def get_predict_url(self, endpoint: str) -> str:
@@ -254,18 +262,20 @@ class PredictEngine:
         if self.onprem:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             config = await self.get_configuration(kbid)
+            if self.local_predict_headers is not None:
+                headers.update(self.local_predict_headers)
             if config is not None:
-                if config.HasField("anonymization_model"):
-                    headers["X-STF-ANONYMIZATION_MODEL"] = config.anonymization_model
-                if config.HasField("semantic_model"):
-                    headers["X-STF-SEMANTIC_MODEL"] = config.semantic_model
-                if config.HasField("ner_model"):
-                    headers["X-STF-NER_MODEL"] = config.ner_model
-                if config.HasField("generative_model"):
-                    headers["X-STF-GENERATIVE_MODEL"] = config.generative_model
-                if config.HasField("visual_labeling"):
-                    headers["X-STF-VISUAL_LABELING"] = config.visual_labeling
-            return
+                if config.anonymization_model:
+                    headers["X-STF-ANONYMIZATION-MODEL"] = config.anonymization_model
+                if config.semantic_model:
+                    headers["X-STF-SEMANTIC-MODEL"] = config.semantic_model
+                if config.ner_model:
+                    headers["X-STF-NER-MODEL"] = config.ner_model
+                if config.generative_model:
+                    headers["X-STF-GENERATIVE-MODEL"] = config.generative_model
+                if config.visual_labeling:
+                    headers["X-STF-VISUAL-LABELING"] = config.visual_labeling
+            return headers
         else:
             return {"X-STF-KBID": kbid}
 
