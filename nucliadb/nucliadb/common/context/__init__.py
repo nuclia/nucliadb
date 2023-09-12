@@ -34,8 +34,11 @@ from nucliadb_utils.utilities import (
     start_indexing_utility,
     start_nats_manager,
     start_partitioning_utility,
+    start_transaction_utility,
     stop_indexing_utility,
     stop_nats_manager,
+    stop_partitioning_utility,
+    stop_transaction_utility,
 )
 
 
@@ -62,6 +65,7 @@ class ApplicationContext:
             indexing_settings.index_jetstream_servers,
             indexing_settings.index_jetstream_auth,
         )
+        self.transaction = await start_transaction_utility(self.service_name)
 
     async def finalize(self) -> None:
         await teardown_driver()
@@ -69,5 +73,6 @@ class ApplicationContext:
         await self.blob_storage.finalize()
         await stop_indexing_utility()
         await stop_nats_manager()
+        stop_partitioning_utility()
         clean_utility(Utility.STORAGE)
-        clean_utility(Utility.PARTITION)
+        await stop_transaction_utility()
