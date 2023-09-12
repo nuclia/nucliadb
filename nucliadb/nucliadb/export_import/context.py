@@ -19,12 +19,6 @@
 #
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb_utils.utilities import (
-    start_partitioning_utility,
-    start_transaction_utility,
-    stop_partitioning_utility,
-    stop_transaction_utility,
-)
 
 from .datamanager import KBExporterDataManager, KBImporterDataManager
 
@@ -36,9 +30,6 @@ class KBExporterContext(ApplicationContext):
         await super().initialize()
         self.data_manager = KBExporterDataManager(self.kv_driver, self.blob_storage)
 
-    async def finalize(self) -> None:
-        await super().finalize()
-
 
 class KBImporterContext(ApplicationContext):
     data_manager: KBImporterDataManager
@@ -48,11 +39,6 @@ class KBImporterContext(ApplicationContext):
         self.data_manager = KBImporterDataManager(
             self.kv_driver,
             self.blob_storage,
-            start_partitioning_utility(),
-            await start_transaction_utility(service_name="importer"),
+            self.partitioning,
+            self.transaction,
         )
-
-    async def finalize(self) -> None:
-        await super().finalize()
-        await stop_transaction_utility()
-        stop_partitioning_utility()
