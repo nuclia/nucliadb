@@ -44,7 +44,7 @@ async def context(request: Request) -> dict:
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def export_kb_endpoint(
-    kbid: str, context: Annotated[dict, Depends(context)]
+    request: Request, kbid: str, context: Annotated[dict, Depends(context)]
 ) -> StreamingResponse:
     return StreamingResponse(
         exporter.export_kb(context["exporter"], kbid),

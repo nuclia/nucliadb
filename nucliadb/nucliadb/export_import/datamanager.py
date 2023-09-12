@@ -185,6 +185,7 @@ class ImporterDataManager:
         return pbm
 
     async def import_broker_message(self, kbid: str, bm: BrokerMessage):
+        bm.kbid = kbid
         partition = self.partitioning.generate_partition(kbid, bm.uuid)
         for import_bm in [self.writer_bm(bm), self.processor_bm(bm)]:
             await self.transaction.commit(
