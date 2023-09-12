@@ -15,16 +15,8 @@ use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
 use vectors_benchmark::json_writer::write_json;
 use vectors_benchmark::random_vectors::RandomVectors;
-use vectors_benchmark::stats::Stats;
 
 const NO_NEIGHBOURS: usize = 5;
-const LABELS: [&str; 5] = [
-    "nucliad_db_has_label_1",
-    "nucliad_db_has_label_2",
-    "nucliad_db_has_label_3",
-    "nucliad_db_has_label_4",
-    "nucliad_db_has_label_5",
-];
 const CYCLES: usize = 25;
 const CHUNK_SIZE: usize = 1024 * 1024;
 
@@ -104,29 +96,9 @@ impl SearchRequest for Request {
     }
 }
 
-fn vector_random_subset<T: Clone>(vector: Vec<T>) -> Vec<T> {
-    let mut rng = rand::thread_rng();
-    let size = vector.len();
-    let subset_size = rng.gen_range(1..=size);
-    let mut random_indices: Vec<usize> = (0..size).collect();
-    random_indices.shuffle(&mut rng);
-    random_indices.truncate(subset_size);
-    random_indices
-        .iter()
-        .map(|&index| vector[index].clone())
-        .collect()
-}
-
-fn create_filtered_request(dimension: usize) -> Request {
-    let random_subset = vector_random_subset(LABELS.to_vec().clone());
-
-    let formula = random_subset
-        .clone()
-        .into_iter()
-        .fold(Formula::new(), |mut acc, i| {
-            acc.extend(AtomClause::label(i.to_string()));
-            acc
-        });
+// TODO: convert the query in vectors with predict
+fn create_request(query: String, dimension: usize) -> Request {
+    let formula = Formula::new();
 
     Request {
         filter: formula,
@@ -139,13 +111,6 @@ fn download_and_decompress_tarball(
     destination_dir: &str,
     dataset_name: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    // Create a progress bar
-    let pb = ProgressBar::new(0);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-        .unwrap()
-        .progress_chars("#>-"));
-
     let download_path = format!("{}/download.tar.gz", destination_dir);
 
     // Check if the partially downloaded file exists
@@ -173,13 +138,25 @@ fn download_and_decompress_tarball(
         .send()?;
 
     if response.status().is_success() {
-        // Append the downloaded data to the file
         let mut file = OpenOptions::new()
             .write(true)
             .append(true)
             .open(&download_path)?;
 
+        let content_length = response
+            .content_length()
+            .clone()
+            .or_else(|| Some(100))
+            .unwrap();
+
         let mut content = response.bytes()?;
+
+        let pb = ProgressBar::new(content_length);
+
+        pb.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .unwrap()
+            .progress_chars("#>-"));
 
         while !content.is_empty() {
             let chunk_size = std::cmp::min(CHUNK_SIZE, content.len());
@@ -217,90 +194,70 @@ fn download_and_decompress_tarball(
     Ok(destination_dir.into_os_string().into_string().unwrap())
 }
 
-fn test_datapoint(db_location: &Path, cycles: usize) -> Stats {
-    println!("Opening Shared located at {:?}", db_location);
+fn get_num_dimensions(vectors_path: &Path) -> usize {
+    let reader = Index::open(vectors_path).unwrap();
+    reader.get_dimension().unwrap() as usize
+}
+
+fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, u128)> {
+    println!("Opening vectors located at {:?}", dataset.vectors_path);
     let _ = Merger::install_global().map(std::thread::spawn);
-    let reader = Index::open(db_location).unwrap();
-    let vector_dims = reader.get_dimension().unwrap() as usize;
-
-    let mut stats = Stats {
-        writing_time: 0,
-        read_time: 0,
-        tagged_time: 0,
-    };
-
-    let mut filtered_requests: Vec<Request> = vec![];
-    for _ in 0..cycles {
-        filtered_requests.push(create_filtered_request(vector_dims));
-    }
+    let reader = Index::open(dataset.vectors_path.as_path()).unwrap();
+    let mut results: Vec<(String, u128)> = vec![];
 
     let lock = reader.get_slock().unwrap();
 
-    let unfiltered_request = Request {
-        filter: Formula::new(),
-        vector: RandomVectors::new(vector_dims).next().unwrap(),
-    };
+    for (i, query) in dataset.queries.iter().enumerate() {
+        for cycle in 0..cycles {
+            print!(
+                "Request {} Search => cycle {} of {}      \r",
+                i,
+                (cycle + 1),
+                cycles
+            );
+            let _ = std::io::stdout().flush();
 
-    for cycle in 0..cycles {
-        print!(
-            "Unfiltered Search => cycle {} of {}      \r",
-            (cycle + 1),
-            cycles
-        );
-        let _ = std::io::stdout().flush();
-
-        let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(&unfiltered_request, &lock).unwrap();
-        });
-        stats.read_time += elapsed_time as u128;
+            let (_, elapsed_time) = measure_time!(microseconds {
+                reader.search(&query.request, &lock).unwrap();
+            });
+            results.push((query.name.clone(), elapsed_time as u128));
+        }
     }
-
-    stats.read_time /= cycles as u128;
-    println!();
-    let mut filtered_requests: Vec<Request> = vec![];
-    for _ in 0..cycles {
-        filtered_requests.push(create_filtered_request(vector_dims));
-    }
-
-    for (cycle, filtered_request) in filtered_requests.iter().enumerate().take(cycles) {
-        print!(
-            "Filtered Search => cycle {} of {}      \r",
-            (cycle + 1),
-            cycles
-        );
-        let _ = std::io::stdout().flush();
-
-        let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(filtered_request, &lock).unwrap();
-        });
-        stats.tagged_time += elapsed_time as u128;
-    }
-
-    println!();
-    stats.tagged_time /= cycles as u128;
     std::mem::drop(lock);
-    stats
+    results
 }
 
-fn main() {
-    let args = Args::new();
+struct Query {
+    name: String,
+    request: Request,
+}
 
+struct Dataset {
+    name: String,
+    shard_id: String,
+    vectors_path: PathBuf,
+    queries: Vec<Query>,
+}
+
+fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset> {
     // open the dataset definition
-    let datasets = fs::read_to_string(args.datasets.clone()).expect("Unable to read file");
+    let datasets = fs::read_to_string(definition_file.clone()).expect("Unable to read file");
     let dataset_definition: serde_json::Value =
         serde_json::from_str(&datasets).expect("Unable to parse");
 
     let defs = dataset_definition["datasets"].as_array().unwrap();
 
+    let queries = vec![];
     let mut found: bool = false;
-    let mut target = PathBuf::from(args.datasets.clone());
+    let mut shard_id = String::new();
+    let mut target = PathBuf::from(definition_file);
     target.pop();
     let root_dir = target.clone();
     target = fs::canonicalize(&target).unwrap();
-    target.push(args.dataset_name.clone());
+    target.push(dataset_name.clone());
 
     for dataset in defs {
-        if dataset["name"] == args.dataset_name {
+        if dataset["name"] == dataset_name {
             let url = dataset["shards"]["url"].as_str().unwrap();
             println!("Shard located at : {}", url);
             println!("Target path is {:?}", target);
@@ -308,51 +265,54 @@ fn main() {
                 println!("Already exists");
             } else {
                 println!("Downloading {:?} to {:?}", url, root_dir);
-                download_and_decompress_tarball(
-                    url,
-                    root_dir.to_str().unwrap(),
-                    &args.dataset_name,
-                )
-                .unwrap();
+                download_and_decompress_tarball(url, root_dir.to_str().unwrap(), &dataset_name)
+                    .unwrap();
             }
             target.push(dataset["shards"]["root_path"].as_str().unwrap());
             // picking the first id for now
-            target.push(dataset["shards"]["ids"][0].as_str().unwrap());
+            shard_id = dataset["shards"]["ids"][0].as_str().unwrap().to_string();
+            target.push(shard_id.clone());
+
+            // TODO: collect queries and convert them into requests using predict
             found = true;
             break;
         }
     }
 
     if !found {
+        println!("{:?} dataset not found", dataset_name);
+        return None;
+    }
+
+    target.push("vectors");
+
+    Some(Dataset {
+        name: dataset_name,
+        shard_id,
+        vectors_path: target,
+        queries,
+    })
+}
+
+fn main() {
+    let args = Args::new();
+
+    let dataset = get_dataset(args.datasets.clone(), args.dataset_name.clone());
+    if dataset.is_none() {
         println!("{:?} dataset not found", args.dataset_name);
         return;
     }
 
     let mut json_results = vec![];
+    let results = test_search(&dataset.unwrap(), args.cycles);
 
-    target.push("vectors");
-
-    let stats = test_datapoint(&target, args.cycles);
-
-    json_results.extend(vec![
-        json!({
-            "name": format!("Writing Time"),
-            "unit": "ms",
-            "value": stats.writing_time,
-        }),
-        json!({
-        "name": format!("Reading Time"),
+    for (name, value) in results {
+        json_results.push(json!({
+        "name": name,
         "unit": "µs",
-        "value": stats.read_time,
-
-        }),
-        json!({
-        "name": format!("Reading Time with Labels"),
-        "unit": "µs",
-        "value": stats.tagged_time,
-
-        }),
-    ]);
+        "value": value,
+        }));
+    }
 
     let pjson = serde_json::to_string_pretty(&json_results).unwrap();
     println!("{}", pjson);
