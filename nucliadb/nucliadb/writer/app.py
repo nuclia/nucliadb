@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -26,6 +28,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
+from nucliadb.export_import.context import ImporterContext, set_importer_context_in_app
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import finalize, initialize
@@ -81,25 +84,33 @@ fastapi_settings = dict(
     },
 )
 
-base_app = FastAPI(title="NucliaDB Writer API", **fastapi_settings)  # type: ignore
 
-base_app.include_router(api_v1)
+def get_application() -> FastAPI:
+    base_app = FastAPI(title="NucliaDB Writer API", **fastapi_settings)  # type: ignore
 
-extend_openapi(base_app)
+    base_app.include_router(api_v1)
 
-application = VersionedFastAPI(
-    base_app,
-    version_format="{major}",
-    prefix_format=f"/{API_PREFIX}/v{{major}}",
-    default_version=(1, 0),
-    enable_latest=False,
-    kwargs=fastapi_settings,
-)
+    extend_openapi(base_app)
 
+    application = VersionedFastAPI(
+        base_app,
+        version_format="{major}",
+        prefix_format=f"/{API_PREFIX}/v{{major}}",
+        default_version=(1, 0),
+        enable_latest=False,
+        kwargs=fastapi_settings,
+    )
 
-async def homepage(request):
-    return HTMLResponse("NucliaDB Writer Service")
+    async def homepage(request):
+        return HTMLResponse("NucliaDB Writer Service")
 
+    # Use raw starlette routes to avoid unnecessary overhead
+    application.add_route("/", homepage)
 
-# Use raw starlette routes to avoid unnecessary overhead
-application.add_route("/", homepage)
+    # Inject kb importer context
+    importer_context = ImporterContext(service_name="exporter")
+    asyncio.run(importer_context.initialize())
+    set_importer_context_in_app(application, importer_context)
+    application.add_event_handler("shutdown", importer_context.finalize)
+
+    return application

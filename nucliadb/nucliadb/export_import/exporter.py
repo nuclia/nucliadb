@@ -22,24 +22,22 @@ async def iter_file_chunks(filename: str) -> AsyncIterator[bytes]:
 async def export_kb(context: ExporterContext, kbid: str) -> AsyncIterator[bytes]:
     with tempfile.TemporaryDirectory() as dest_dir:
         async for bm in context.data_manager.iter_broker_messages(kbid):
-            # Download each binary contained in the resource into a temporary file and then stream it
+            # Stream the binary files of the broker message
             binary_aux_file = f"{dest_dir}/{uuid4().hex}"
             for cloud_file in context.data_manager.get_binaries(bm):
                 async with aiofiles.open(binary_aux_file, "wb") as binary_file:
-                    file_size = await context.data_manager.download_cf_to_file(
+                    file_size = await context.data_manager.download_binary(
                         cloud_file, binary_file
                     )
-
+                serialized_cf = cloud_file.SerializeToString()
                 yield codecs.CODEX.BINARY.encode("utf-8")
+                yield len(serialized_cf).to_bytes(4, byteorder="big")
+                yield serialized_cf
                 yield file_size.to_bytes(4, byteorder="big")
-                # TODO: need to send metadata about the binary too
-                # yield metadata_size
-                # yield metadata_bytes
-
                 async for file_chunk in iter_file_chunks(binary_aux_file):
                     yield file_chunk
 
-            # Serialize the broker message and stream it
+            # Stream the broker message
             bm_bytes = bm.SerializeToString()
             yield codecs.CODEX.RESOURCE.encode("utf-8")
             yield len(bm_bytes).to_bytes(4, byteorder="big")

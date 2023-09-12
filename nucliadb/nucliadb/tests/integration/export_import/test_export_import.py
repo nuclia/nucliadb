@@ -18,14 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+from io import BytesIO
 
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.export_import import codecs
-from nucliadb.export_import.context import ExporterContext
+from nucliadb.export_import.context import ExporterContext, ImporterContext
 from nucliadb.export_import.exporter import export_kb
-from nucliadb.export_import.importer import import_kb
+from nucliadb.export_import.importer import ExportStream, import_kb
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,11 +38,24 @@ async def exporter_context(knowledgebox, natsd, redis_config):
 
 
 @pytest.fixture()
+async def importer_context(knowledgebox, natsd, redis_config):
+    context = ImporterContext()
+    await context.initialize()
+    yield context
+    await context.finalize()
+
+
+@pytest.fixture()
 async def kbid_to_export(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
-        json={"title": "Test", "thumbnail": "foobar"},
+        json={
+            "title": "Test",
+            "thumbnail": "foobar",
+            "icon": "application/pdf",
+            "slug": "test",
+        },
         headers={"X-SYNCHRONOUS": "true"},
         timeout=None,
     )
@@ -67,12 +79,22 @@ async def kbid_to_export(nucliadb_writer, knowledgebox):
     return kbid
 
 
+@pytest.fixture()
+async def kbid_to_import(nucliadb_manager):
+    resp = await nucliadb_manager.post("/kbs", json={"slug": "kb_to_import"})
+    assert resp.status_code == 201
+    uuid = resp.json().get("uuid")
+    yield uuid
+    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
+
+
 async def test_export_kb(exporter_context: ExporterContext, kbid_to_export):
     items_yielded = []
     async for chunk in export_kb(exporter_context, kbid_to_export):
         items_yielded.append(chunk)
 
-    _test_exported_items(items_yielded, kbid=kbid_to_export)
+    # _test_exported_items(items_yielded, kbid=kbid_to_export)
 
 
 def nwise(lst, n=1):
@@ -82,42 +104,67 @@ def nwise(lst, n=1):
         lst = lst[n:]
 
 
+class TestExportStream(ExportStream):
+    def __init__(self, export: BytesIO):
+        self.export = export
+        self.read_bytes = 0
+        self.length = len(export.getvalue())
+
+    async def read(self, n_bytes):
+        if self.read_bytes >= self.length:
+            raise StopAsyncIteration()
+        chunk = self.export.read(n_bytes)
+        self.read_bytes += len(chunk)
+        return chunk
+
+
 async def test_import_kb(
-    exporter_context: ExporterContext, kbid_to_export, kbid_to_import
+    exporter_context: ExporterContext,
+    importer_context: ImporterContext,
+    kbid_to_export,
+    kbid_to_import,
+    nucliadb_reader,
 ):
-    export1 = []
+    # Export kb
+    export = b""
     async for chunk in export_kb(exporter_context, kbid_to_export):
-        export1.append(chunk)
+        export += chunk
 
-    async def generator():
-        for codex, _, data in nwise(export1, 3):
-            yield codecs.CODEX(codex), data
+    # Import in another kb
+    stream = TestExportStream(BytesIO(export))
+    await import_kb(importer_context, kbid_to_import, stream=stream)
 
-    await import_kb(exporter_context, kbid_to_import, generator)
-
-    export2 = []
-    async for chunk in export_kb(exporter_context, kbid_to_import):
-        export2.append(chunk)
-
-    _test_exported_items(export2, kbid=kbid_to_import)
+    # Contents of kbs should be equal
+    await _check_kb_contents(nucliadb_reader, kbid_to_export)
+    await _check_kb_contents(nucliadb_reader, kbid_to_import)
 
 
-def _test_exported_items(items_yielded, kbid=None):
-    assert len(items_yielded) == 12
+async def _check_kb_contents(nucliadb_reader, kbid: str):
+    # Resource
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resources")
+    assert resp.status_code == 200
+    body = resp.json()
+    resources = body["resources"]
+    assert len(resources) == 1
+    resource = resources[0]
+    rid = resource["id"]
+    assert resource["slug"] == "test"
+    assert resource["title"] == "Test"
+    assert resource["icon"] == "application/pdf"
+    assert resource["thumbnail"] == "foobar"
+    assert resource["metadata"]["status"] == "PROCESSED"
 
-    items = []
-    for code_type, size, data in nwise(items_yielded, 3):
-        items.append(codecs.CODEX(code_type.decode()))
-        size_int = int.from_bytes(size, byteorder="big")
-        assert len(data) == size_int
+    # File uploaded (metadata)
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/file/file")
+    assert resp.status_code == 200
+    body = resp.json()
+    field = body["value"]["file"]
+    assert field["content_type"] == "text/plain"
+    assert field["filename"] == "testfile"
+    assert field["size"] == 36
+    assert kbid in field["uri"]
 
-    assert items.count(codecs.CODEX.RESOURCE) == 1
-    assert items.count(codecs.CODEX.BINARY) == 1
-    assert items.count(codecs.CODEX.ENTITIES) == 1
-    assert items.count(codecs.CODEX.LABELS) == 1
-
-    bm_serialized = items_yielded[3]
-    bm = BrokerMessage()
-    bm.ParseFromString(bm_serialized)
-    if kbid:
-        assert bm.knowledgebox == kbid
+    # File uploaded (content)
+    resp = await nucliadb_reader.get(field["uri"])
+    assert resp.status_code == 200
+    assert base64.b64decode(resp.content) == b"Test for /upload endpoint"

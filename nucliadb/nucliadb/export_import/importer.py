@@ -1,96 +1,120 @@
-from typing import AsyncGenerator
+import logging
+from typing import Any, AsyncGenerator, cast
 
-import aiofiles
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
-    GetEntitiesRequest,
-    GetLabelSetRequest,
+    GetEntitiesResponse,
+    GetLabelsResponse,
 )
 
-from nucliadb.export_import import codecs
-from nucliadb.export_import.context import ExporterContext
+from nucliadb.export_import.codecs import CODEX
+from nucliadb.export_import.context import ImporterContext
+from nucliadb.export_import.datamanager import BinaryStream, BinaryStreamGenerator
 
-ItemType = codecs.CODEX
-ItemData = tuple[bytes, str]
-ExportItem = tuple[ItemType, ItemData]
+logger = logging.getLogger(__name__)
+ExportItem = tuple[CODEX, Any]
 
 
-async def import_kb(
-    context: ExporterContext, kbid: str, item_generator: AsyncGenerator[ExportItem]
-) -> None:
-    async for codex, data in item_generator:
-        if codex == codecs.CODEX.RESOURCE:
-            bm = BrokerMessage()
-            bm.ParseFromString(data)
+class ExportStream:
+    async def read(self, n_bytes: int) -> bytes:
+        raise NotImplementedError()
+
+
+class ExportStreamReader:
+    """
+    Async generator that reads a export stream and yields the different items to be imported.
+    """
+
+    def __init__(self, export_stream: ExportStream):
+        self.stream = export_stream
+
+    async def read_codex(self) -> CODEX:
+        codex_bytes = await self.stream.read(3)
+        return CODEX(codex_bytes.decode())
+
+    async def read_item(self) -> bytes:
+        size_bytes = await self.stream.read(4)
+        size = int.from_bytes(size_bytes, byteorder="big")
+        data = await self.stream.read(size)
+        return data
+
+    async def read_binary(self) -> tuple[CloudFile, BinaryStreamGenerator]:
+        data = await self.read_item()
+        cf = CloudFile()
+        cf.ParseFromString(data)
+
+        binary_size_bytes = await self.stream.read(4)
+        binary_size = int.from_bytes(binary_size_bytes, byteorder="big")
+
+        async def file_chunks_generator(chunk_size: int) -> BinaryStream:
+            bytes_read = 0
+            while True:
+                bytes_to_read = min(binary_size - bytes_read, chunk_size)
+                if bytes_to_read == 0:
+                    break
+                chunk = await self.stream.read(bytes_to_read)
+                yield chunk
+                bytes_read += len(chunk)
+
+        return cf, file_chunks_generator
+
+    async def read_bm(self) -> BrokerMessage:
+        data = await self.read_item()
+        bm = BrokerMessage()
+        bm.ParseFromString(data)
+        return bm
+
+    async def read_entities(self) -> GetEntitiesResponse:
+        data = await self.read_item()
+        entities = GetEntitiesResponse()
+        entities.ParseFromString(data)
+        return entities
+
+    async def read_labels(self) -> GetLabelsResponse:
+        data = await self.read_item()
+        labels = GetLabelsResponse()
+        labels.ParseFromString(data)
+        return labels
+
+    async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
+        while True:
+            try:
+                codex = await self.read_codex()
+                if codex == CODEX.RESOURCE:
+                    data = await self.read_bm()  # type: ignore
+                elif codex == CODEX.ENTITIES:
+                    data = await self.read_entities()  # type: ignore
+                elif codex == CODEX.LABELS:
+                    data = await self.read_labels()  # type: ignore
+                elif codex == CODEX.BINARY:
+                    data = await self.read_binary()  # type: ignore
+                else:
+                    raise ValueError(f"Unknown codex: {codex}")
+                yield codex, data
+            except StopAsyncIteration:
+                break
+
+
+async def import_kb(context: ImporterContext, kbid: str, stream: ExportStream) -> None:
+    stream_reader = ExportStreamReader(stream)
+    async for codex, data in stream_reader.iter_items():
+        if codex == CODEX.RESOURCE:
+            bm = cast(BrokerMessage, data)
             await context.data_manager.import_broker_message(kbid, bm)
 
-        elif codex == codecs.CODEX.BINARY:
-            binary_file_name = data
-            async with aiofiles.open(binary_file_name, "rb") as binary_file:
-                await context.data_manager.upload_file_to_cf(kbid, binary_file)
+        elif codex == CODEX.BINARY:
+            cf = cast(CloudFile, data[0])
+            binary_generator = cast(BinaryStreamGenerator, data[1])
+            await context.data_manager.import_binary(kbid, cf, binary_generator)
 
-        elif codex == codecs.CODEX.ENTITIES:
-            ger = GetEntitiesRequest()
-            ger.ParseFromString(data)
+        elif codex == CODEX.ENTITIES:
+            ger = cast(GetEntitiesResponse, data)
             await context.data_manager.set_entities(kbid, ger)
 
-        elif codex == codecs.CODEX.LABELS:
-            glr = GetLabelSetRequest()
-            glr.ParseFromString(data)
+        elif codex == CODEX.LABELS:
+            glr = cast(GetLabelsResponse, data)
             await context.data_manager.set_labels(kbid, glr)
-
         else:
-            # TODO add warning log
+            logger.warning(f"Unknown codex: {codex}")
             continue
-
-
-# Importing a binary
-"""    
-    async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
-        data: UploadBinaryData
-
-        destination: Optional[StorageField] = None
-        cf = CloudFile()
-        data = await request.__anext__()
-        if data.HasField("metadata"):
-            bucket = self.storage.get_bucket_name(data.metadata.kbid)
-            destination = self.storage.field_klass(
-                storage=self.storage, bucket=bucket, fullkey=data.metadata.key
-            )
-            cf.content_type = data.metadata.content_type
-            cf.filename = data.metadata.filename
-            cf.size = data.metadata.size
-        else:
-            raise AttributeError("Metadata not found")
-
-        async def generate_buffer(
-            storage: Storage, request: AsyncIterator[UploadBinaryData]  # type: ignore
-        ):
-            # Storage requires uploading chunks of a specified size, this is
-            # why we need to have an intermediate buffer
-            buf = BytesIO()
-            async for chunk in request:
-                if not chunk.HasField("payload"):
-                    raise AttributeError("Payload not found")
-                buf.write(chunk.payload)
-                while buf.tell() > storage.chunk_size:
-                    buf.seek(0)
-                    data = buf.read(storage.chunk_size)
-                    if len(data):
-                        yield data
-                    old_data = buf.read()
-                    buf = BytesIO()
-                    buf.write(old_data)
-            buf.seek(0)
-            data = buf.read()
-            if len(data):
-                yield data
-
-        if destination is None:
-            raise AttributeError("No destination file")
-        await self.storage.uploaditerator(
-            generate_buffer(self.storage, request), destination, cf
-        )
-        result = FileUploaded()
-        return result
-"""

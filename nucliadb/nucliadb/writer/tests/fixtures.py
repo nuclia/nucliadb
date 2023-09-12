@@ -49,7 +49,9 @@ async def writer_api(
     event_loop,
 ) -> AsyncIterator[Callable[[List[Enum], str, str], AsyncClient]]:
     nucliadb_settings.nucliadb_ingest = grpc_servicer.host
-    from nucliadb.writer.app import application
+    from nucliadb.writer.app import get_application
+
+    application = get_application()
 
     def make_client_fixture(
         roles: Optional[List[Enum]] = None,
@@ -59,7 +61,6 @@ async def writer_api(
         roles = roles or []
         client_base_url = "http://test"
         client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
-
         client = AsyncClient(app=application, base_url=client_base_url)  # type: ignore
         client.headers["X-NUCLIADB-ROLES"] = ";".join(
             map(lambda role: role.value, roles)

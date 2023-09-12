@@ -106,7 +106,7 @@ def get_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    # Inject exporter context
+    # Inject kb exporter context
     exporter_context = ExporterContext(service_name="exporter")
     asyncio.run(exporter_context.initialize())
     set_exporter_context_in_app(application, exporter_context)
