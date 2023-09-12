@@ -20,7 +20,7 @@
 from enum import Enum
 
 
-class CODEX(str, Enum):
+class ExportedItemType(str, Enum):
     RESOURCE = "RES"
     LABELS = "LAB"
     ENTITIES = "ENT"

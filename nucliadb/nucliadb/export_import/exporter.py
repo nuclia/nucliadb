@@ -25,7 +25,7 @@ from uuid import uuid4
 import aiofiles
 
 from nucliadb.export_import.context import KBExporterContext
-from nucliadb.export_import.models import CODEX
+from nucliadb.export_import.models import ExportedItemType
 
 BINARY_CHUNK_SIZE = 1024 * 1024
 
@@ -50,7 +50,7 @@ async def export_kb(context: KBExporterContext, kbid: str) -> AsyncIterator[byte
                         cloud_file, binary_file
                     )
                 serialized_cf = cloud_file.SerializeToString()
-                yield CODEX.BINARY.encode("utf-8")
+                yield ExportedItemType.BINARY.encode("utf-8")
                 yield len(serialized_cf).to_bytes(4, byteorder="big")
                 yield serialized_cf
                 yield file_size.to_bytes(4, byteorder="big")
@@ -59,19 +59,19 @@ async def export_kb(context: KBExporterContext, kbid: str) -> AsyncIterator[byte
 
             # Stream the broker message
             bm_bytes = bm.SerializeToString()
-            yield CODEX.RESOURCE.encode("utf-8")
+            yield ExportedItemType.RESOURCE.encode("utf-8")
             yield len(bm_bytes).to_bytes(4, byteorder="big")
             yield bm_bytes
 
         # Stream the entities and labels of the knowledgebox
         entities = await context.data_manager.get_entities(kbid)
         bytes = entities.SerializeToString()
-        yield CODEX.ENTITIES.encode("utf-8")
+        yield ExportedItemType.ENTITIES.encode("utf-8")
         yield len(bytes).to_bytes(4, byteorder="big")
         yield bytes
 
         labels = await context.data_manager.get_labels(kbid)
         bytes = labels.SerializeToString()
-        yield CODEX.LABELS.encode("utf-8")
+        yield ExportedItemType.LABELS.encode("utf-8")
         yield len(bytes).to_bytes(4, byteorder="big")
         yield bytes

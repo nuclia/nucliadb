@@ -30,10 +30,10 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb.export_import.context import KBImporterContext
 from nucliadb.export_import.datamanager import BinaryStream, BinaryStreamGenerator
-from nucliadb.export_import.models import CODEX
+from nucliadb.export_import.models import ExportedItemType
 
 logger = logging.getLogger(__name__)
-ExportItem = tuple[CODEX, Any]
+ExportItem = tuple[ExportedItemType, Any]
 
 
 class ExportStream:
@@ -60,9 +60,9 @@ class ExportStreamReader:
     def __init__(self, export_stream: ExportStream):
         self.stream = export_stream
 
-    async def read_codex(self) -> CODEX:
-        codex_bytes = await self.stream.read(3)
-        return CODEX(codex_bytes.decode())
+    async def read_type(self) -> ExportedItemType:
+        type_bytes = await self.stream.read(3)
+        return ExportedItemType(type_bytes.decode())
 
     async def read_item(self) -> bytes:
         size_bytes = await self.stream.read(4)
@@ -111,18 +111,18 @@ class ExportStreamReader:
     async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
         while True:
             try:
-                codex = await self.read_codex()
-                if codex == CODEX.RESOURCE:
+                item_type = await self.read_type()
+                if item_type == ExportedItemType.RESOURCE:
                     data = await self.read_bm()  # type: ignore
-                elif codex == CODEX.ENTITIES:
+                elif item_type == ExportedItemType.ENTITIES:
                     data = await self.read_entities()  # type: ignore
-                elif codex == CODEX.LABELS:
+                elif item_type == ExportedItemType.LABELS:
                     data = await self.read_labels()  # type: ignore
-                elif codex == CODEX.BINARY:
+                elif item_type == ExportedItemType.BINARY:
                     data = await self.read_binary()  # type: ignore
                 else:
-                    raise ValueError(f"Unknown codex: {codex}")
-                yield codex, data
+                    raise ValueError(f"Unknown exported item type: {item_type}")
+                yield item_type, data
             except StopAsyncIteration:
                 break
 
@@ -131,23 +131,23 @@ async def import_kb(
     context: KBImporterContext, kbid: str, stream: ExportStream
 ) -> None:
     stream_reader = ExportStreamReader(stream)
-    async for codex, data in stream_reader.iter_items():
-        if codex == CODEX.RESOURCE:
+    async for item_type, data in stream_reader.iter_items():
+        if item_type == ExportedItemType.RESOURCE:
             bm = cast(BrokerMessage, data)
             await context.data_manager.import_broker_message(kbid, bm)
 
-        elif codex == CODEX.BINARY:
+        elif item_type == ExportedItemType.BINARY:
             cf = cast(CloudFile, data[0])
             binary_generator = cast(BinaryStreamGenerator, data[1])
             await context.data_manager.import_binary(kbid, cf, binary_generator)
 
-        elif codex == CODEX.ENTITIES:
+        elif item_type == ExportedItemType.ENTITIES:
             ger = cast(GetEntitiesResponse, data)
             await context.data_manager.set_entities(kbid, ger)
 
-        elif codex == CODEX.LABELS:
+        elif item_type == ExportedItemType.LABELS:
             glr = cast(GetLabelsResponse, data)
             await context.data_manager.set_labels(kbid, glr)
         else:
-            logger.warning(f"Unknown codex: {codex}")
+            logger.warning(f"Unknown exporteed item type: {item_type}")
             continue
