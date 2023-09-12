@@ -96,8 +96,20 @@ impl SearchRequest for Request {
     }
 }
 
-// TODO: convert the query in vectors with predict
 fn create_request(query: String, dimension: usize) -> Request {
+
+    // TODO: convert the query in vectors with predict
+    let client = Client::new();
+
+    text query
+    model multilingual
+
+    let json_response = client
+        .get("https://europe-1.nuclia.cloud/api/v1/predict/sentence")
+        .header("X-STF-NUAKEY", format!("Bearer {key}"))
+        json();
+
+    // formula
     let formula = Formula::new();
 
     Request {
@@ -210,7 +222,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, u128)> {
     for (i, query) in dataset.queries.iter().enumerate() {
         for cycle in 0..cycles {
             print!(
-                "Request {} Search => cycle {} of {}      \r",
+                "Request {} => cycle {} of {}      \r",
                 i,
                 (cycle + 1),
                 cycles
