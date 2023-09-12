@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from . import field  # noqa
+from . import import_kb  # noqa
 from . import knowledgebox  # noqa
 from . import resource  # noqa
 from . import services  # noqa

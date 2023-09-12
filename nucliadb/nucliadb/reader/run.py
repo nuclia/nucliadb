@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from nucliadb.reader import SERVICE_NAME
-from nucliadb.reader.app import application
+from nucliadb.reader.app import get_application
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import get_telemetry
@@ -27,6 +27,7 @@ from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
 
 def run():
     setup_logging()
+    application = get_application()
     instrument_app(
         application,
         tracer_provider=get_telemetry(SERVICE_NAME),
