@@ -18,17 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import base64
+from dataclasses import dataclass
 from time import monotonic as time
 from typing import AsyncIterator, List, Optional
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
-from starlette.responses import StreamingResponse
 
 from nucliadb.search import logger
-from nucliadb.search.predict import AnswerStatusCode, PredictEngine
+from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.prompt import get_chat_prompt_context
+from nucliadb.search.search.exceptions import IncompleteFindResultsError
+from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -37,16 +38,38 @@ from nucliadb_models.search import (
     ChatModel,
     ChatOptions,
     ChatRequest,
+    FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    Relations,
     RephraseModel,
+    SearchOptions,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_utils.utilities import get_audit
 
-END_OF_STREAM = "_END_"
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
 AUDIT_TEXT_RESULT_SEP = " \n\n "
+
+
+class FoundStatusCode:
+    def __init__(self, default: AnswerStatusCode = AnswerStatusCode.SUCCESS):
+        self._value = AnswerStatusCode.SUCCESS
+
+    def set(self, value: AnswerStatusCode) -> None:
+        self._value = value
+
+    @property
+    def value(self) -> AnswerStatusCode:
+        return self._value
+
+
+@dataclass
+class ChatResult:
+    nuclia_learning_id: Optional[str]
+    answer_stream: AsyncIterator[bytes]
+    status_code: FoundStatusCode
+    find_results: KnowledgeboxFindResults
 
 
 async def rephrase_query_from_chat_history(
@@ -64,26 +87,9 @@ async def rephrase_query_from_chat_history(
     return await predict.rephrase_query(kbid, req)
 
 
-async def generate_answer(
-    *,
-    user_query: str,
-    query_context: List[str],
-    chat_history: List[ChatContextMessage],
-    rephrased_query: Optional[str],
-    results: KnowledgeboxFindResults,
-    kbid: str,
-    user_id: str,
-    client_type: NucliaDBClientType,
-    origin: str,
-    predict: PredictEngine,
-    answer_generator: AsyncIterator[bytes],
-    chat_request: ChatRequest,
+async def format_generated_answer(
+    answer_generator: AsyncIterator[bytes], output_status_code: FoundStatusCode
 ):
-    bytes_results = base64.b64encode(results.json().encode())
-    yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
-    yield bytes_results
-
-    start_time = time()
     answer = []
     status_code: Optional[AnswerStatusCode] = None
     is_last_chunk = False
@@ -110,48 +116,61 @@ async def generate_answer(
     if not is_last_chunk:
         logger.warning("BUG: /chat endpoint without last chunk")
 
-    text_answer = b"".join(answer)
+    output_status_code.set(status_code or AnswerStatusCode.SUCCESS)
 
-    await maybe_audit_chat(
-        kbid=kbid,
-        user_id=user_id,
-        client_type=client_type,
-        origin=origin,
-        duration=time() - start_time,
-        user_query=user_query,
-        rephrased_query=rephrased_query,
-        text_answer=text_answer,
-        status_code=status_code,
-        chat_history=chat_history,
-        query_context=query_context,
-    )
 
-    yield END_OF_STREAM
+async def get_find_results(
+    *,
+    kbid: str,
+    query: str,
+    chat_request: ChatRequest,
+    ndb_client: NucliaDBClientType,
+    user: str,
+    origin: str,
+) -> KnowledgeboxFindResults:
+    find_request = FindRequest()
+    find_request.resource_filters = chat_request.resource_filters
+    find_request.features = [SearchOptions.VECTOR]
+    if ChatOptions.PARAGRAPHS in chat_request.features:
+        find_request.features.append(SearchOptions.PARAGRAPH)
+    find_request.query = query
+    find_request.fields = chat_request.fields
+    find_request.filters = chat_request.filters
+    find_request.field_type_filter = chat_request.field_type_filter
+    find_request.min_score = chat_request.min_score
+    find_request.range_creation_start = chat_request.range_creation_start
+    find_request.range_creation_end = chat_request.range_creation_end
+    find_request.range_modification_start = chat_request.range_modification_start
+    find_request.range_modification_end = chat_request.range_modification_end
+    find_request.show = chat_request.show
+    find_request.extracted = chat_request.extracted
+    find_request.shards = chat_request.shards
+    find_request.autofilter = chat_request.autofilter
+    find_request.highlight = chat_request.highlight
 
-    if ChatOptions.RELATIONS in chat_request.features:
-        detected_entities = await predict.detect_entities(kbid, text_answer.decode())
-        relation_request = RelationSearchRequest()
-        relation_request.subgraph.entry_points.extend(detected_entities)
-        relation_request.subgraph.depth = 1
+    find_results, incomplete = await find(kbid, find_request, ndb_client, user, origin)
+    if incomplete:
+        raise IncompleteFindResultsError()
+    return find_results
 
-        relations_results: List[RelationSearchResponse]
-        (
-            relations_results,
-            _,
-            _,
-            _,
-        ) = await node_query(
-            kbid, Method.RELATIONS, relation_request, chat_request.shards
-        )
-        yield base64.b64encode(
-            (
-                await merge_relations_results(
-                    relations_results, relation_request.subgraph
-                )
-            )
-            .json()
-            .encode()
-        )
+
+async def get_relations_results(
+    *, kbid: str, chat_request: ChatRequest, text_answer: bytes
+) -> Relations:
+    predict = get_predict()
+    detected_entities = await predict.detect_entities(kbid, text_answer.decode("utf-8"))
+    relation_request = RelationSearchRequest()
+    relation_request.subgraph.entry_points.extend(detected_entities)
+    relation_request.subgraph.depth = 1
+
+    relations_results: List[RelationSearchResponse]
+    (
+        relations_results,
+        _,
+        _,
+        _,
+    ) = await node_query(kbid, Method.RELATIONS, relation_request, chat_request.shards)
+    return await merge_relations_results(relations_results, relation_request.subgraph)
 
 
 async def not_enough_context_generator():
@@ -162,34 +181,36 @@ async def not_enough_context_generator():
 
 async def chat(
     kbid: str,
-    user_query: str,
-    rephrased_query: Optional[str],
-    find_results: KnowledgeboxFindResults,
     chat_request: ChatRequest,
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-):
+) -> ChatResult:
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []
-    predict = get_predict()
+    start_time = time()
 
-    if len(find_results.resources) == 0:
-        answer_stream = generate_answer(
-            user_query=user_query,
-            rephrased_query=rephrased_query,
-            results=find_results,
-            kbid=kbid,
-            user_id=user_id,
-            client_type=client_type,
-            origin=origin,
-            predict=predict,
-            answer_generator=not_enough_context_generator(),
-            chat_request=chat_request,
-            query_context=[],
-            chat_history=chat_history,
+    user_query = chat_request.query
+    rephrased_query = None
+    if chat_request.context and len(chat_request.context) > 0:
+        rephrased_query = await rephrase_query_from_chat_history(
+            kbid, chat_request.context, chat_request.query, user_id
         )
 
+    find_results: KnowledgeboxFindResults = await get_find_results(
+        kbid=kbid,
+        query=user_query or rephrased_query or "",
+        chat_request=chat_request,
+        ndb_client=client_type,
+        user=user_id,
+        origin=origin,
+    )
+
+    status_code = FoundStatusCode()
+    if len(find_results.resources) == 0:
+        answer_stream = format_generated_answer(
+            not_enough_context_generator(), status_code
+        )
     else:
         query_context = await get_chat_prompt_context(kbid, find_results)
         chat_model = ChatModel(
@@ -199,31 +220,38 @@ async def chat(
             question=chat_request.query,
             truncate=True,
         )
+        predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(
             kbid, chat_model
         )
-        answer_stream = generate_answer(
-            user_query=user_query,
-            rephrased_query=rephrased_query,
-            results=find_results,
+        answer_stream = format_generated_answer(predict_generator, status_code)
+
+    async def _wrapped_stream():
+        # so we can audit after streamed out answer
+        text_answer = b""
+        async for chunk in answer_stream:
+            text_answer += chunk
+            yield chunk
+
+        await maybe_audit_chat(
             kbid=kbid,
             user_id=user_id,
             client_type=client_type,
             origin=origin,
-            predict=predict,
-            answer_generator=predict_generator,
-            chat_request=chat_request,
-            query_context=query_context,
+            duration=time() - start_time,
+            user_query=user_query,
+            rephrased_query=rephrased_query,
+            text_answer=text_answer,
+            status_code=status_code.value,
             chat_history=chat_history,
+            query_context=query_context,
         )
 
-    return StreamingResponse(
-        answer_stream,
-        media_type="plain/text",
-        headers={
-            "NUCLIA-LEARNING-ID": nuclia_learning_id or "unknown",
-            "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
-        },
+    return ChatResult(
+        nuclia_learning_id=nuclia_learning_id,
+        answer_stream=_wrapped_stream(),
+        status_code=status_code,
+        find_results=find_results,
     )
 
 
