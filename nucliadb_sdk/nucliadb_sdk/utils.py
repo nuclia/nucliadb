@@ -25,11 +25,12 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import requests
-
 from nucliadb_models.resource import KnowledgeBoxList, KnowledgeBoxObj
 from nucliadb_models.utils import SlugString
+
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_sdk.v2.exceptions import NotFoundError
 
 
 class InvalidHost(Exception):
@@ -123,8 +124,10 @@ def get_or_create(
 
 def delete_kb(slug: str, nucliadb_base_url: Optional[str] = "http://localhost:8080"):
     kb = get_kb(slug, nucliadb_base_url)
-    if kb is None or kb.client.url is None:
+    if kb.client.url is None:
         raise AttributeError("URL should not be none")
+    if not kb:
+        raise NotFoundError("KB does not exists.")
     response = requests.delete(kb.client.url, headers={"X-NUCLIADB-ROLES": f"MANAGER"})
     assert response.status_code == 200
 

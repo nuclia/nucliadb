@@ -20,10 +20,10 @@
 import base64
 
 import pytest
-
-import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.search import ResourceProperties
+
+import nucliadb_sdk
 
 
 def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
@@ -97,6 +97,9 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     assert resource.data.texts["text"].value.body == "I'm an updated Ramon"
 
     sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
+
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+        sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
 
     with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
         sdk.get_resource_by_slug(kbid=kb.uuid, slug="mykey1")
