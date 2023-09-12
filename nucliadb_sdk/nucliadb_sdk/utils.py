@@ -25,9 +25,9 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import requests
+
 from nucliadb_models.resource import KnowledgeBoxList, KnowledgeBoxObj
 from nucliadb_models.utils import SlugString
-
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.v2.exceptions import NotFoundError
