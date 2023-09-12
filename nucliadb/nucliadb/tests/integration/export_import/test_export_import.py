@@ -175,9 +175,6 @@ async def _check_kb_contents(nucliadb_reader, kbid: str):
     assert resource["icon"] == "application/pdf"
     assert resource["thumbnail"] == "foobar"
 
-    # TODO: make sure status is correcly imported
-    # assert resource["metadata"]["status"] == "PENDING"
-
     # File uploaded (metadata)
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/file/file")
     assert resp.status_code == 200
