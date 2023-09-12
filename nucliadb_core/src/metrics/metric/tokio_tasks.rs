@@ -78,7 +78,7 @@ struct TokioTasksMetrics {
     mean_first_poll_delay: Family<TaskLabels, Histogram>,
     mean_idle_duration: Family<TaskLabels, Histogram>,
     mean_scheduled_duration: Family<TaskLabels, Histogram>,
-    mean_poll_duration: Family<TaskLabels, Histogram>,
+    mean_task_poll_duration: Family<TaskLabels, Histogram>,
     slow_poll_ratio: Family<TaskLabels, Gauge>,
     long_delay_ratio: Family<TaskLabels, Gauge>,
     mean_fast_poll_duration: Family<TaskLabels, Histogram>,
@@ -268,12 +268,12 @@ impl TokioTasksMetrics {
             mean_scheduled_duration.clone(),
         );
 
-        let mean_poll_duration =
+        let mean_task_poll_duration =
             Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
         registry.register(
-            "mean_poll_duration",
+            "mean_task_poll_duration",
             "The mean duration of polls",
-            mean_poll_duration.clone(),
+            mean_task_poll_duration.clone(),
         );
 
         let slow_poll_ratio = Family::default();
@@ -346,7 +346,7 @@ impl TokioTasksMetrics {
             mean_first_poll_delay,
             mean_idle_duration,
             mean_scheduled_duration,
-            mean_poll_duration,
+            mean_task_poll_duration,
             slow_poll_ratio,
             long_delay_ratio,
             mean_fast_poll_duration,
@@ -442,7 +442,7 @@ impl TokioTasksMetrics {
         self.mean_scheduled_duration
             .get_or_create(&labels)
             .observe(metrics.mean_scheduled_duration().as_secs_f64());
-        self.mean_poll_duration
+        self.mean_task_poll_duration
             .get_or_create(&labels)
             .observe(metrics.mean_poll_duration().as_secs_f64());
 
