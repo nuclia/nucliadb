@@ -1,3 +1,5 @@
+use base64::{engine::general_purpose, Engine as _};
+use std::env::var;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Seek, SeekFrom, Write};
@@ -5,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use kv::*;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use reqwest::blocking::Client;
@@ -72,10 +75,12 @@ impl Args {
     }
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 struct Request {
     vector: Vec<f32>,
     filter: Formula,
 }
+
 impl SearchRequest for Request {
     fn with_duplicates(&self) -> bool {
         true
@@ -96,26 +101,63 @@ impl SearchRequest for Request {
     }
 }
 
-fn create_request(query: String, dimension: usize) -> Request {
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PredictResults {
+    data: Vec<f32>,
+}
 
-    // TODO: convert the query in vectors with predict
+fn create_request(
+    dataset_name: String,
+    query_name: String,
+    query: String,
+    dimension: usize,
+) -> Request {
+    // check if we have it on cache already
+    let query_key = format!("{dataset_name}-{query_name}");
+    let mut cfg = Config::new("./requests.cache");
+    let store = Store::new(cfg).unwrap();
+    let bucket = store
+        .bucket::<String, Json<Request>>(Some("requests"))
+        .unwrap();
+
+    let stored_request = bucket.get(&query_key).unwrap();
+    if stored_request.is_some() {
+        println!("Got a cache hit for {:?}", query_key);
+        return stored_request.unwrap().into_inner();
+    } else {
+        println!("No cache hit for {:?}", query_key);
+    }
+
+    // Calling the NUA service to convert the query as a vector
     let client = Client::new();
+    let nua_key = var("NUA_KEY").unwrap();
 
-    text query
-    model multilingual
+    let response = client
+        .get("https://europe-1.stashify.cloud/api/v1/predict/sentence")
+        .query(&[("text", query), ("model", "multilingual".to_string())])
+        .header("X-STF-NUAKEY", format!("Bearer {nua_key}"))
+        .send()
+        .unwrap();
 
-    let json_response = client
-        .get("https://europe-1.nuclia.cloud/api/v1/predict/sentence")
-        .header("X-STF-NUAKEY", format!("Bearer {key}"))
-        json();
+    if response.status().as_u16() > 299 {
+        panic!("Got a {} response from nua", response.status());
+    }
+
+    let json: PredictResults = serde_json::from_str(response.text().unwrap().as_str()).unwrap();
+
+    println!("{:?}", json.data);
 
     // formula
     let formula = Formula::new();
 
-    Request {
+    let res = Request {
         filter: formula,
-        vector: RandomVectors::new(dimension).next().unwrap(),
-    }
+        vector: json.data,
+    };
+    // saving in cache
+    let val: Json<Request> = Json(res.clone());
+    bucket.set(&query_key, &val).unwrap();
+    res
 }
 
 fn download_and_decompress_tarball(
@@ -284,8 +326,21 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
             // picking the first id for now
             shard_id = dataset["shards"]["ids"][0].as_str().unwrap().to_string();
             target.push(shard_id.clone());
+            target.push("vectors");
+
+            let num_dimensions = get_num_dimensions(&target);
+
+            println!("{} dimensions", num_dimensions);
 
             // TODO: collect queries and convert them into requests using predict
+            for query in dataset["queries"].as_array().unwrap() {
+                let request = create_request(
+                    dataset_name.clone(),
+                    query["name"].to_string().trim_matches('"').to_string(),
+                    query["query"].to_string().trim_matches('"').to_string(),
+                    num_dimensions,
+                );
+            }
             found = true;
             break;
         }
@@ -295,8 +350,6 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
         println!("{:?} dataset not found", dataset_name);
         return None;
     }
-
-    target.push("vectors");
 
     Some(Dataset {
         name: dataset_name,

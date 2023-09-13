@@ -30,3 +30,7 @@ samply-vector-bench: samply
 .PHONY: label-bench
 label-bench:
 	cargo run --release --locked --bin labels_benchmark
+
+.PHONY: real-data
+real-data:
+	cargo run --locked --release --bin real_data_benchmark -- --datasets datasets/dataset.json --dataset-name large

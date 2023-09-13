@@ -20,6 +20,8 @@ reqwest = { version = "0.11.20", features = ["blocking"] }
 indicatif = "0.17.6"
 tar = "0.4.40"
 flate2 = "1.0.27"
+base64 = "0.21.4"
+kv = { version = "0.24.0", features = ["json-value"] }
 
 [[bin]]
 name = "vectors_benchmark"
