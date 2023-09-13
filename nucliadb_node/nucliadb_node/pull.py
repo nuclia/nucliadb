@@ -18,9 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-
-# We need to pull from jetstream key partition
-import os
 from typing import List, Optional
 
 import nats
