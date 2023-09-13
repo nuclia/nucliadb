@@ -48,6 +48,13 @@ def get_traced_jetstream(nc: NATSClient, service_name: str) -> JetStreamContext:
 
 
 class message_progress_updater:
+    """
+    Context manager to send progress updates to NATS.
+
+    This should allow lower ack_wait time settings without causing
+    messages to be redelivered.
+    """
+
     _task: asyncio.Task
 
     def __init__(self, msg: Msg, timeout: float):
