@@ -134,6 +134,9 @@ class ExportStreamReader:
 async def import_kb(
     context: KBImporterContext, kbid: str, stream: ExportStream
 ) -> None:
+    """
+    Imports exported data from a stream into a knowledgebox.
+    """
     stream_reader = ExportStreamReader(stream)
     async for item_type, data in stream_reader.iter_items():
         if item_type == ExportedItemType.RESOURCE:

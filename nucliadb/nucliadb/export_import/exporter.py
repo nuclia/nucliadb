@@ -25,6 +25,11 @@ from nucliadb.export_import.models import ExportedItemType
 
 
 async def export_kb(context: KBExporterContext, kbid: str) -> AsyncIterator[bytes]:
+    """Export the data of a knowledgebox to a stream of bytes.
+
+    See https://github.com/nuclia/nucliadb/blob/main/docs/internal/EXPORTS.md
+    for an overview on format of the export file/stream.
+    """
     async for bm in context.data_manager.iter_broker_messages(kbid):
         # Stream the binary files of the broker message
         for cloud_file in context.data_manager.get_binaries(bm):
