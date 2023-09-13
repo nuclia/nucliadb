@@ -110,6 +110,8 @@ fn create_request(
     dataset_name: String,
     query_name: String,
     query: String,
+    tags: Vec<String>,
+    key_filters: Vec<String>,
     dimension: usize,
 ) -> Request {
     // check if we have it on cache already
@@ -149,8 +151,18 @@ fn create_request(
             dimension
         );
     }
-    // building the formula
-    let formula = Formula::new();
+    // building the formula using tags and key filters
+    let mut formula = Formula::new();
+    let key_filters = key_filters.iter().cloned().map(AtomClause::key_prefix);
+
+    tags.iter()
+        .cloned()
+        .map(AtomClause::label)
+        .for_each(|c| formula.extend(c));
+
+    if key_filters.len() > 0 {
+        formula.extend(CompoundClause::new(1, key_filters.collect()));
+    }
 
     let res = Request {
         filter: formula,
@@ -330,10 +342,28 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
             for query in dataset["queries"].as_array().unwrap() {
                 let query_name = query["name"].to_string().trim_matches('"').to_string();
 
+                let tags: Vec<String> = query["tags"]
+                    .as_array()
+                    .unwrap()
+                    .to_vec()
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect();
+
+                let key_filters: Vec<String> = query["key_filters"]
+                    .as_array()
+                    .unwrap()
+                    .to_vec()
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect();
+
                 let request = create_request(
                     dataset_name.clone(),
                     query_name.clone(),
                     query["query"].to_string().trim_matches('"').to_string(),
+                    tags,
+                    key_filters,
                     num_dimensions,
                 );
                 queries.push(Query {

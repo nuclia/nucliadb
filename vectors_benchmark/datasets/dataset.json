@@ -12,7 +12,15 @@
       "queries": [
         {
           "name": "query_one",
-          "query": "blah"
+          "query": "blah",
+          "tags": [
+            "one",
+            "two"
+          ],
+          "key_filters": [
+            "some",
+            "things"
+          ]
         }
       ]
     }
