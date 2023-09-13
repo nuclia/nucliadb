@@ -36,8 +36,7 @@ from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
-from nucliadb_utils.nats import get_traced_jetstream
-from nucliadb_utils.nats import message_progress_updater
+from nucliadb_utils.nats import get_traced_jetstream, message_progress_updater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
