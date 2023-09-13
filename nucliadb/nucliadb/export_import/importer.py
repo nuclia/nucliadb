@@ -30,6 +30,7 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb.export_import.context import KBImporterContext
 from nucliadb.export_import.datamanager import BinaryStream, BinaryStreamGenerator
+from nucliadb.export_import.exceptions import ExportStreamExhausted
 from nucliadb.export_import.models import ExportedItemType
 
 logger = logging.getLogger(__name__)
@@ -43,9 +44,12 @@ class ExportStream:
         self.length = len(export.getvalue())
 
     async def read(self, n_bytes):
+        """
+        Reads n_bytes from the export stream.
+        Raises ExportStreamExhausted if there are no more bytes to read.
+        """
         if self.read_bytes >= self.length:
-            raise StopAsyncIteration()
-
+            raise ExportStreamExhausted()
         chunk = self.export.read(n_bytes)
         self.read_bytes += len(chunk)
         return chunk
@@ -123,7 +127,7 @@ class ExportStreamReader:
                 else:
                     raise ValueError(f"Unknown exported item type: {item_type}")
                 yield item_type, data
-            except StopAsyncIteration:
+            except ExportStreamExhausted:
                 break
 
 
