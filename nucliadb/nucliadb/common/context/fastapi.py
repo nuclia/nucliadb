@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 
 from fastapi import FastAPI
 
@@ -26,8 +25,8 @@ from nucliadb.common.context import ApplicationContext
 
 def set_app_context(application: FastAPI):
     context = ApplicationContext()
-    asyncio.run(context.initialize())
     application.state.context = context
+    application.add_event_handler("startup", context.initialize)
     application.add_event_handler("shutdown", context.finalize)
 
 
