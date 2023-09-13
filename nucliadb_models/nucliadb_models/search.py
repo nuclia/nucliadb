@@ -702,6 +702,9 @@ class ChatRequest(BaseModel):
     ] = SearchParamDefaults.chat_context.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
+    resource_filters: List[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
 
 
 class FindRequest(BaseSearchRequest):

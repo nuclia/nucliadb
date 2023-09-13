@@ -42,28 +42,6 @@ def predict():
         yield predict
 
 
-async def test_chat_does_not_call_predict_if_no_find_results(
-    predict,
-):
-    find_results = KnowledgeboxFindResults(
-        total=0, min_score=0.7, resources={}, facets=[]
-    )
-    chat_request = ChatRequest(query="query")
-
-    await chat(
-        "kbid",
-        "query",
-        None,
-        find_results,
-        chat_request,
-        "user_id",
-        NucliaDBClientType.API,
-        "origin",
-    )
-
-    predict.chat_query.assert_not_called()
-
-
 async def test_async_gen_lookahead():
     async def gen(n):
         for i in range(n):
@@ -86,6 +64,28 @@ async def test_async_gen_lookahead_last_chunk_is_empty():
         (b"empty", False),
         (b"chunk", True),
     ]
+
+
+async def test_chat_does_not_call_predict_if_no_find_results(
+    predict,
+):
+    find_results = KnowledgeboxFindResults(
+        total=0, min_score=0.7, resources={}, facets=[]
+    )
+    chat_request = ChatRequest(query="query")
+
+    with mock.patch(
+        "nucliadb.search.search.chat.query.get_find_results", return_value=find_results
+    ):
+        await chat(
+            "kbid",
+            chat_request,
+            "user_id",
+            NucliaDBClientType.API,
+            "origin",
+        )
+
+    predict.chat_query.assert_not_called()
 
 
 @pytest.mark.parametrize(

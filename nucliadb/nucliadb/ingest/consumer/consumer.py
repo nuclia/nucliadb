@@ -38,6 +38,7 @@ from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 
 consumer_observer = metrics.Observer(
@@ -76,7 +77,6 @@ class IngestConsumer:
         self.driver = driver
         self.partition = partition
         self.nats_connection_manager = nats_connection_manager
-        self.ack_wait = 10 * 60
         self.initialized = False
 
         self.lock = asyncio.Lock()
@@ -102,12 +102,10 @@ class IngestConsumer:
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
                 opt_start_seq=last_seqid,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                # Read about message ordering:
-                #   https://docs.nats.io/nats-concepts/subject_mapping#when-is-deterministic-partitioning-needed
-                max_ack_pending=1,  # required for strict message ordering
-                max_deliver=10000,
-                ack_wait=self.ack_wait,
-                idle_heartbeat=5.0,
+                max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
+                max_deliver=nats_consumer_settings.nats_max_deliver,
+                ack_wait=nats_consumer_settings.nats_ack_wait,
+                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
         logger.info(
@@ -235,10 +233,10 @@ class IngestProcessedConsumer(IngestConsumer):
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_ack_pending=10,
-                max_deliver=10000,
-                ack_wait=self.ack_wait,
-                idle_heartbeat=5.0,
+                max_ack_pending=100,  # custom ack pending here
+                max_deliver=nats_consumer_settings.nats_max_deliver,
+                ack_wait=nats_consumer_settings.nats_ack_wait,
+                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
         logger.info(
