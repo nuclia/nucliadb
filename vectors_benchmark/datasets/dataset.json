@@ -12,7 +12,8 @@
       "queries": [
         {
           "name": "unfiltered-1",
-          "query": "test"
+          "query": "what are the best things in the world?",
+          "min_results": 5
         },
         {
           "name": "filtered-1",
@@ -24,7 +25,8 @@
           "key_filters": [
             "some",
             "things"
-          ]
+          ],
+          "min_results": 0
         }
       ]
     }

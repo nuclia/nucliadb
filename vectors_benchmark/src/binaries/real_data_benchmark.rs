@@ -285,8 +285,13 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
 
             });
 
-            if search_result.is_empty() {
-                panic!("No results found for query {}", query.name);
+            if search_result.len() < query.min_results {
+                panic!(
+                    "Not enough results found for query {}. Found {}, Expected at least {}",
+                    query.name,
+                    search_result.len(),
+                    query.min_results
+                );
             }
             elapsed_times.push(elapsed_time as u128);
         }
@@ -301,6 +306,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
 struct Query {
     name: String,
     request: Request,
+    min_results: usize,
 }
 
 struct Dataset {
@@ -382,6 +388,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
                 queries.push(Query {
                     name: query_name,
                     request,
+                    min_results: query["min_results"].as_u64().unwrap() as usize,
                 });
             }
             found = true;
