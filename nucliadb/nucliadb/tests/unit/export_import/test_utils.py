@@ -45,6 +45,7 @@ def get_cf(uri=None) -> resources_pb2.CloudFile:
     cf = resources_pb2.CloudFile()
     uri = uri or "//foo/bar"
     cf.uri = uri
+    cf.source = resources_pb2.CloudFile.Source.LOCAL
     return cf
 
 
@@ -128,3 +129,9 @@ def test_get_binaries(broker_message):
     # All expected binaries are returned
     binaries = get_binaries(broker_message)
     assert len(binaries) == 12
+    for cf in binaries:
+        assert cf.source == resources_pb2.CloudFile.Source.LOCAL
+
+    # Make sure that the source is set to export on the broker message cfs
+    for cf in get_binaries(broker_message):
+        assert cf.source == resources_pb2.CloudFile.Source.EXPORT
