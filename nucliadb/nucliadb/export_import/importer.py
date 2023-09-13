@@ -22,41 +22,21 @@ from io import BytesIO
 from typing import Any, AsyncGenerator, Callable, cast
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.entities import EntitiesDataManager
-from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.export_import.exceptions import ExportStreamExhausted
 from nucliadb.export_import.models import ExportedItemType
+from nucliadb.export_import.utils import (
+    import_binary,
+    import_broker_message,
+    set_entities_groups,
+    set_labels,
+)
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
-from nucliadb_utils.const import Streams
 
 logger = logging.getLogger(__name__)
 ExportItem = tuple[ExportedItemType, Any]
 BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
-
-
-# Broker message fields that are populated by the processing pipeline
-PROCESSING_BM_FIELDS = [
-    "link_extracted_data",
-    "file_extracted_data",
-    "extracted_text",
-    "field_metadata",
-    "field_vectors",
-    "field_large_metadata",
-    "user_vectors",
-]
-
-# Broker message fields that are populated by the nucliadb writer component
-WRITER_BM_FIELDS = [
-    "links",
-    "files",
-    "texts",
-    "conversations",
-    "layouts",
-    "keywordsets",
-    "datetimes",
-]
 
 
 class ExportStream:
@@ -183,73 +163,3 @@ async def import_kb(
         else:
             logger.warning(f"Unknown exporteed item type: {item_type}")
             continue
-
-
-async def import_broker_message(
-    context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
-) -> None:
-    bm.kbid = kbid
-    partition = context.partitioning.generate_partition(kbid, bm.uuid)
-    for import_bm in [get_writer_bm(bm), get_processor_bm(bm)]:
-        await context.transaction.commit(
-            import_bm,
-            partition,
-            wait=False,
-            target_subject=Streams.INGEST_PROCESSED.subject,
-        )
-
-
-def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
-    wbm = writer_pb2.BrokerMessage()
-    wbm.CopyFrom(bm)
-    for field in PROCESSING_BM_FIELDS:
-        wbm.ClearField(field)  # type: ignore
-    wbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
-    wbm.source = writer_pb2.BrokerMessage.MessageSource.WRITER
-    return wbm
-
-
-def get_processor_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
-    pbm = writer_pb2.BrokerMessage()
-    pbm.CopyFrom(bm)
-    for field in WRITER_BM_FIELDS:
-        pbm.ClearField(field)  # type: ignore
-    pbm.type = writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT
-    pbm.source = writer_pb2.BrokerMessage.MessageSource.PROCESSOR
-    return pbm
-
-
-async def import_binary(
-    context: ApplicationContext,
-    kbid: str,
-    cf: resources_pb2.CloudFile,
-    binary_generator: BinaryStreamGenerator,
-) -> None:
-    new_cf = resources_pb2.CloudFile()
-    new_cf.CopyFrom(cf)
-    bucket_name = context.blob_storage.get_bucket_name(kbid)
-    new_cf.bucket_name = bucket_name
-
-    src_kb = cf.uri.split("/")[1]
-    new_cf.uri = new_cf.uri.replace(src_kb, kbid, 1)
-
-    destination_field = context.blob_storage.field_klass(
-        storage=context.blob_storage, bucket=bucket_name, fullkey=new_cf.uri
-    )
-    await context.blob_storage.uploaditerator(
-        binary_generator(context.blob_storage.chunk_size), destination_field, new_cf
-    )
-
-
-async def set_entities_groups(
-    context: ApplicationContext, kbid: str, entities_groups: kb_pb2.EntitiesGroups
-) -> None:
-    edm = EntitiesDataManager(context.kv_driver)
-    await edm.set_entities_groups(kbid, entities_groups)
-
-
-async def set_labels(
-    context: ApplicationContext, kbid: str, labels: kb_pb2.Labels
-) -> None:
-    ldm = LabelsDataManager(context.kv_driver)
-    await ldm.set_labels(kbid, labels)
