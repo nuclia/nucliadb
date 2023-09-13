@@ -176,6 +176,10 @@ def get_binaries(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
         if field_metadata.metadata.metadata.HasField("thumbnail"):
             _clone_collect_cf(binaries, field_metadata.metadata.metadata.thumbnail)
 
+        for _, split_metadata in field_metadata.metadata.split_metadata.items():
+            if split_metadata.HasField("thumbnail"):
+                _clone_collect_cf(binaries, split_metadata.thumbnail)
+
     return binaries
 
 
