@@ -162,21 +162,9 @@ impl TextWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(config: &TextConfig) -> NodeResult<Self> {
+    pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
-        fs::create_dir(&config.path)?;
-        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
-        let settings = IndexSettings {
-            sort_by_field: Some(IndexSortByField {
-                field: "created".to_string(),
-                order: Order::Desc,
-            }),
-            ..Default::default()
-        };
-
-        index_builder = index_builder.settings(settings);
-        let index = index_builder.create_in_dir(&config.path).unwrap();
-
+        let index = Index::open_in_dir(&config.path)?;
         let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(TextWriterService {
@@ -187,11 +175,20 @@ impl TextWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn open(config: &TextConfig) -> NodeResult<Self> {
+    fn new(config: &TextConfig) -> NodeResult<Self> {
+        fs::create_dir(&config.path)?;
+
+        let settings = IndexSettings {
+            sort_by_field: Some(IndexSortByField {
+                field: "created".to_string(),
+                order: Order::Desc,
+            }),
+            ..Default::default()
+        };
         let field_schema = TextSchema::new();
-
-        let index = Index::open_in_dir(&config.path)?;
-
+        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
+        index_builder = index_builder.settings(settings);
+        let index = index_builder.create_in_dir(&config.path).unwrap();
         let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(TextWriterService {
