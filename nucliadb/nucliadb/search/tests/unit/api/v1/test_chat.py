@@ -86,7 +86,6 @@ async def test_chat_endpoint_handles_errors(
     )
     response = await chat_knowledgebox_endpoint(
         request=request,
-        response=Mock(),
         kbid="kbid",
         item=Mock(),
         x_ndb_client=None,

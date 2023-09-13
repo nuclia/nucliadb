@@ -42,9 +42,9 @@ class TestRequest(Request):
 
 
 @pytest.fixture(scope="function")
-def resource_chat_mock():
+def create_chat_response_mock():
     with mock.patch(
-        "nucliadb.search.api.v1.resource.chat.resource_chat",
+        "nucliadb.search.api.v1.resource.chat.create_chat_response",
     ) as mocked:
         yield mocked
 
@@ -73,9 +73,9 @@ def resource_chat_mock():
     ],
 )
 async def test_resource_chat_endpoint_handles_errors(
-    resource_chat_mock, predict_error, http_error_response
+    create_chat_response_mock, predict_error, http_error_response
 ):
-    resource_chat_mock.side_effect = predict_error
+    create_chat_response_mock.side_effect = predict_error
     request = TestRequest(
         scope={
             "type": "http",
@@ -86,7 +86,6 @@ async def test_resource_chat_endpoint_handles_errors(
     )
     response = await resource_chat_endpoint(
         request=request,
-        response=Mock(),
         kbid="kbid",
         rid="rid",
         item=Mock(),
