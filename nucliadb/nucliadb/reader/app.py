@@ -27,7 +27,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.export_import.fastapi import set_exporter_context
+from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import finalize, initialize
@@ -105,7 +105,7 @@ def get_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    # Inject kb exporter context
-    set_exporter_context(application)
+    # Inject application context into the request state
+    set_app_context(application)
 
     return application

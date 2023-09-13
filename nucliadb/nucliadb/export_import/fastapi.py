@@ -17,12 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 
-from fastapi import FastAPI
 from starlette.requests import Request
 
-from nucliadb.export_import.context import KBExporterContext, KBImporterContext
+from nucliadb.export_import.exceptions import ExportStreamExhausted
 from nucliadb.export_import.importer import ExportStream
 
 
@@ -55,26 +53,4 @@ class FastAPIExportStream(ExportStream):
                 if self.buffer != b"":
                     return self._read_from_buffer(n_bytes)
                 else:
-                    raise
-
-
-def set_exporter_context(app: FastAPI):
-    context = KBExporterContext(service_name="kb_exporter")
-    asyncio.run(context.initialize())
-    app.state.exporter_context = context
-    app.add_event_handler("shutdown", context.finalize)
-
-
-def get_exporter_context(app: FastAPI) -> KBExporterContext:
-    return app.state.exporter_context
-
-
-def set_importer_context(app: FastAPI):
-    context = KBImporterContext(service_name="kb_imorter")
-    asyncio.run(context.initialize())
-    app.state.importer_context = context
-    app.add_event_handler("shutdown", context.finalize)
-
-
-def get_importer_context(app: FastAPI) -> KBImporterContext:
-    return app.state.importer_context
+                    raise ExportStreamExhausted()

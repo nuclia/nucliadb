@@ -17,22 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Annotated
-
-from fastapi import Depends
 from fastapi.responses import StreamingResponse
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from starlette.requests import Request
 
+from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.export_import import exporter
-from nucliadb.export_import.fastapi import get_exporter_context
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
-
-
-async def context(request: Request) -> dict:
-    return {"exporter": get_exporter_context(request.app)}
 
 
 @api.get(
@@ -43,11 +36,10 @@ async def context(request: Request) -> dict:
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def export_kb_endpoint(
-    request: Request, kbid: str, context: Annotated[dict, Depends(context)]
-) -> StreamingResponse:
+async def export_kb_endpoint(request: Request, kbid: str) -> StreamingResponse:
+    context = get_app_context(request.app)
     return StreamingResponse(
-        exporter.export_kb(context["exporter"], kbid),
+        exporter.export_kb(context, kbid),
         status_code=200,
         media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
