@@ -22,7 +22,7 @@ from io import BytesIO
 
 import pytest
 
-from nucliadb.export_import.context import KBExporterContext, KBImporterContext
+from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.exporter import export_kb
 from nucliadb.export_import.importer import ExportStream, import_kb
 
@@ -30,16 +30,8 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-async def exporter_context(nucliadb, natsd):
-    context = KBExporterContext()
-    await context.initialize()
-    yield context
-    await context.finalize()
-
-
-@pytest.fixture()
-async def importer_context(nucliadb, natsd):
-    context = KBImporterContext()
+async def context(nucliadb, natsd):
+    context = ApplicationContext()
     await context.initialize()
     yield context
     await context.finalize()
@@ -117,8 +109,7 @@ async def kbid_to_import(nucliadb_manager):
 
 
 async def test_import_kb(
-    exporter_context: KBExporterContext,
-    importer_context: KBImporterContext,
+    context: ApplicationContext,
     kbid_to_export,
     kbid_to_import,
     nucliadb_reader,
@@ -127,13 +118,13 @@ async def test_import_kb(
 
     # Export kb
     export = BytesIO()
-    async for chunk in export_kb(exporter_context, kbid_to_export):
+    async for chunk in export_kb(context, kbid_to_export):
         export.write(chunk)
     export.seek(0)
 
     # Import in another kb
     stream = ExportStream(export)
-    await import_kb(importer_context, kbid_to_import, stream=stream)
+    await import_kb(context, kbid_to_import, stream=stream)
 
     # Contents of kbs should be equal
     await _check_kb_contents(nucliadb_reader, kbid_to_export)

@@ -39,6 +39,7 @@ from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common.datamanagers.labels import KB_LABELSET, LabelsDataManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -60,8 +61,7 @@ KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
 KB_KEYS = "/kbs/{kbid}/"
 KB_UUID = "/kbs/{kbid}/config"
-KB_LABELSET = "/kbs/{kbid}/labels/{id}"
-KB_LABELS = "/kbs/{kbid}/labels"
+
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
@@ -312,28 +312,17 @@ class KnowledgeBox:
 
     # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):
-        labelset_key = KB_LABELSET.format(kbid=self.kbid, id=id)
-        await self.txn.set(labelset_key, labelset.SerializeToString())
+        await LabelsDataManager.set_labelset(self.kbid, id, labelset, self.txn)
 
     async def get_labels(self) -> Labels:
-        labels_key = KB_LABELS.format(kbid=self.kbid)
-        labels = Labels()
-        async for key in self.txn.keys(labels_key, count=-1):
-            labelset = await self.txn.get(key)
-            id = key.split("/")[-1]
-            if labelset:
-                ls = LabelSet()
-                ls.ParseFromString(labelset)
-                labels.labelset[id].CopyFrom(ls)
-        return labels
+        return await LabelsDataManager.inner_get_labels(self.kbid, self.txn)
 
     async def get_labelset(
         self, labelset: str, labelset_response: writer_pb2.GetLabelSetResponse
     ):
-        labelset_key = KB_LABELSET.format(kbid=self.kbid, id=labelset)
-        payload = await self.txn.get(labelset_key)
-        if payload is not None:
-            labelset_response.labelset.ParseFromString(payload)
+        ls = await LabelsDataManager.inner_get_labelset(self.kbid, labelset, self.txn)
+        if ls is not None:
+            labelset_response.labelset.CopyFrom(ls)
 
     async def del_labelset(self, id: str):
         labelset_key = KB_LABELSET.format(kbid=self.kbid, id=id)
@@ -535,7 +524,8 @@ class KnowledgeBox:
         base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
         config = await self.get_config()
         async for key in self.txn.keys(match=base, count=-1):
-            uuid = await self.get_resource_uuid_by_slug(key.split("/")[-1])
+            slug = key.split("/")[-1]
+            uuid = await self.get_resource_uuid_by_slug(slug)
             if uuid is not None:
                 yield Resource(
                     self.txn,

@@ -152,6 +152,11 @@ message DeletedEntitiesGroups {
     repeated string entities_groups = 1;
 }
 
+message EntitiesGroups {
+    map <string, EntitiesGroup> entities_groups = 1;
+}
+
+
 // Vectorsets
 
 
