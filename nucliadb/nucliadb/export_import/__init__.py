@@ -17,7 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-KB_ENTITIES = "/kbs/{kbid}/entities"
-KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
-KB_DELETED_ENTITIES_GROUPS = "/kbs/{kbid}/deletedentities"

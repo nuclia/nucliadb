@@ -217,6 +217,10 @@ def start_partitioning_utility() -> PartitionUtility:
     return util
 
 
+def stop_partitioning_utility():
+    clean_utility(Utility.PARTITION)
+
+
 def get_partitioning() -> PartitionUtility:
     return get_utility(Utility.PARTITION)  # type: ignore
 

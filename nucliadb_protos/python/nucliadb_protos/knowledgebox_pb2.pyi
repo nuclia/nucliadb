@@ -510,6 +510,40 @@ class DeletedEntitiesGroups(google.protobuf.message.Message):
 global___DeletedEntitiesGroups = DeletedEntitiesGroups
 
 @typing_extensions.final
+class EntitiesGroups(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class EntitiesGroupsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___EntitiesGroup: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___EntitiesGroup | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    ENTITIES_GROUPS_FIELD_NUMBER: builtins.int
+    @property
+    def entities_groups(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___EntitiesGroup]: ...
+    def __init__(
+        self,
+        *,
+        entities_groups: collections.abc.Mapping[builtins.str, global___EntitiesGroup] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entities_groups", b"entities_groups"]) -> None: ...
+
+global___EntitiesGroups = EntitiesGroups
+
+@typing_extensions.final
 class VectorSet(google.protobuf.message.Message):
     """Vectorsets"""
 

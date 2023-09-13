@@ -45,12 +45,13 @@ from nucliadb.common.cluster.exceptions import (
     NodeError,
 )
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.keys import (
+from nucliadb.common.datamanagers.entities import (
     KB_DELETED_ENTITIES_GROUPS,
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
+    EntitiesDataManager,
 )
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
@@ -192,14 +193,7 @@ class EntitiesManager:
         return entities_group
 
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        payload = await self.txn.get(key)
-        if not payload:
-            return None
-
-        eg = EntitiesGroup()
-        eg.ParseFromString(payload)
-        return eg
+        return await EntitiesDataManager.get_entities_group(self.kbid, group, self.txn)
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         shard_manager = get_shard_manager()
@@ -322,8 +316,7 @@ class EntitiesManager:
         return indexed_groups
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
-        key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(key, eg.SerializeToString())
+        await EntitiesDataManager.set_entities_group(self.kbid, group, eg, self.txn)
         # if it was preivously deleted, we must unmark it
         await self.unmark_entities_group_as_deleted(group)
 
