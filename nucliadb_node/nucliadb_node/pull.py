@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # We need to pull from jetstream key partition
-
+import os
 import asyncio
 from typing import List, Optional
 
@@ -378,7 +378,7 @@ class Worker:
                 opt_start_seq=self.last_seqid or 1,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_deliver=10000,
-                max_ack_pending=1,
+                max_ack_pending=int(os.environ.get("NATS_MAX_ACK_PENDING", "1")),
                 ack_wait=self.ack_wait,
                 idle_heartbeat=5,
             ),

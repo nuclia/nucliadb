@@ -19,6 +19,7 @@
 #
 import asyncio
 import logging
+import os
 import time
 from typing import Optional
 
@@ -104,7 +105,9 @@ class IngestConsumer:
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 # Read about message ordering:
                 #   https://docs.nats.io/nats-concepts/subject_mapping#when-is-deterministic-partitioning-needed
-                max_ack_pending=1,  # required for strict message ordering
+                max_ack_pending=int(
+                    os.environ.get("NATS_MAX_ACK_PENDING", "1")
+                ),  # required for strict message ordering
                 max_deliver=10000,
                 ack_wait=self.ack_wait,
                 idle_heartbeat=5.0,
