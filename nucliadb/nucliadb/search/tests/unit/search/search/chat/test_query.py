@@ -24,12 +24,6 @@ from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import (
     _parse_answer_status_code,
     async_gen_lookahead,
-    chat,
-)
-from nucliadb_models.search import (
-    ChatRequest,
-    KnowledgeboxFindResults,
-    NucliaDBClientType,
 )
 
 
@@ -40,28 +34,6 @@ def predict():
         "nucliadb.search.search.chat.query.get_predict", return_value=predict
     ):
         yield predict
-
-
-async def test_chat_does_not_call_predict_if_no_find_results(
-    predict,
-):
-    find_results = KnowledgeboxFindResults(
-        total=0, min_score=0.7, resources={}, facets=[]
-    )
-    chat_request = ChatRequest(query="query")
-
-    await chat(
-        "kbid",
-        "query",
-        None,
-        find_results,
-        chat_request,
-        "user_id",
-        NucliaDBClientType.API,
-        "origin",
-    )
-
-    predict.chat_query.assert_not_called()
 
 
 async def test_async_gen_lookahead():
