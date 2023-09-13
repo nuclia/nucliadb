@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from io import BytesIO
+
 import pytest
 
 
@@ -42,6 +44,7 @@ async def dst_kb(nucliadb_manager):
 
 
 async def test_export_import_kb_api(
+    natsd,
     nucliadb_writer,
     nucliadb_reader,
     src_kb,
@@ -50,8 +53,13 @@ async def test_export_import_kb_api(
     export_response = await nucliadb_reader.get(f"/kb/{src_kb}/export")
     assert export_response.status_code == 200
 
+    export = BytesIO()
+    for chunk in export_response.iter_bytes():
+        export.write(chunk)
+    export.seek(0)
+
     import_response = await nucliadb_writer.post(
-        f"/kb/{dst_kb}/import", files=export_response.content
+        f"/kb/{dst_kb}/import", content=export.getvalue()
     )
     assert import_response.status_code == 200
 

@@ -28,7 +28,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
 
-@api.get(
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/import",
     status_code=200,
     name="Import to a Knowledge Box",
@@ -37,7 +37,7 @@ from nucliadb_utils.authentication import requires_one
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
 async def import_kb_endpoint(request: Request, kbid: str) -> None:
-    context = get_app_context(request.app)
+    context = await get_app_context(request.app)
     await importer.import_kb(
         context=context,
         kbid=kbid,

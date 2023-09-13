@@ -30,5 +30,8 @@ def set_app_context(application: FastAPI):
     application.add_event_handler("shutdown", context.finalize)
 
 
-def get_app_context(application: FastAPI) -> ApplicationContext:
-    return application.state.context
+async def get_app_context(application: FastAPI) -> ApplicationContext:
+    context = application.state.context
+    if not context.initialized:
+        await context.initialize()
+    return context

@@ -52,6 +52,7 @@ class ApplicationContext:
 
     def __init__(self, service_name: str = "service") -> None:
         self.service_name = service_name
+        self.initialized: bool = False
 
     async def initialize(self) -> None:
         self.kv_driver = await setup_driver()
@@ -66,6 +67,7 @@ class ApplicationContext:
             indexing_settings.index_jetstream_auth,
         )
         self.transaction = await start_transaction_utility(self.service_name)
+        self.initialized = True
 
     async def finalize(self) -> None:
         await teardown_driver()
@@ -76,3 +78,4 @@ class ApplicationContext:
         stop_partitioning_utility()
         clean_utility(Utility.STORAGE)
         await stop_transaction_utility()
+        self.initialized = False
