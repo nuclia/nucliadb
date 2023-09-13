@@ -21,8 +21,6 @@
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
@@ -68,6 +66,8 @@ impl ParagraphReader for ParagraphReaderService {
         let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
         Ok(count)
     }
+
+    #[measure(actor = "paragraphs", metric = "suggest")]
     #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -110,10 +110,6 @@ impl ParagraphReader for ParagraphReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Ending at: {v} ms");
         }
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("suggest".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
             total: results.len(),
@@ -128,6 +124,7 @@ impl ParagraphReader for ParagraphReaderService {
             searcher,
         }))
     }
+
     #[tracing::instrument(skip_all)]
     fn iterator(&self, request: &StreamRequest) -> NodeResult<ParagraphIterator> {
         let producer = BatchProducer {
@@ -145,6 +142,8 @@ impl ParagraphReader for ParagraphReaderService {
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
+
+    #[measure(actor = "paragraphs", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -227,17 +226,12 @@ impl ReaderChild for ParagraphReaderService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("search".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(response)
     }
+
+    #[measure(actor = "paragraphs", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
-
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -250,11 +244,6 @@ impl ReaderChild for ParagraphReaderService {
             };
             keys.push(key);
         }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("stored_ids".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(keys)
     }

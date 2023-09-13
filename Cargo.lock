@@ -1991,6 +1991,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "nucliadb_core",
+ "nucliadb_procs",
  "rand",
  "regex",
  "ring",
@@ -2024,6 +2025,7 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "nucliadb_core",
+ "nucliadb_procs",
  "tantivy",
  "tempfile",
 ]
@@ -2039,6 +2041,7 @@ dependencies = [
  "lazy_static",
  "memmap2",
  "nucliadb_core",
+ "nucliadb_procs",
  "rand",
  "serde",
  "serde_json",
