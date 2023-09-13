@@ -19,7 +19,6 @@
 #
 from typing import AsyncGenerator, AsyncIterator, Callable
 
-from aiofiles.threadpool import AsyncFileIO  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -125,14 +124,9 @@ class KBExporterDataManager:
         origin.source = CloudFile.Source.EXPORT
         binaries.append(cf)
 
-    async def download_binary(
-        self, cf: CloudFile, destination_file: AsyncFileIO
-    ) -> int:
-        file_size = 0
+    async def download_binary(self, cf: CloudFile) -> AsyncIterator[bytes]:
         async for data in self.storage.download(cf.bucket_name, cf.uri):
-            file_size += len(data)
-            await destination_file.write(data)
-        return file_size
+            yield data
 
     async def get_entities(self, kbid: str) -> GetEntitiesResponse:
         ger = GetEntitiesResponse()
