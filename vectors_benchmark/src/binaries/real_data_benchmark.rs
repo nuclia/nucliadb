@@ -260,15 +260,17 @@ fn get_num_dimensions(vectors_path: &Path) -> usize {
     reader.get_dimension().unwrap() as usize
 }
 
-fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, u128)> {
+fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
     println!("Opening vectors located at {:?}", dataset.vectors_path);
     let _ = Merger::install_global().map(std::thread::spawn);
     let reader = Index::open(dataset.vectors_path.as_path()).unwrap();
-    let mut results: Vec<(String, u128)> = vec![];
+    let mut results: Vec<(String, Vec<u128>)> = vec![];
 
     let lock = reader.get_slock().unwrap();
 
     for (i, query) in dataset.queries.iter().enumerate() {
+        let mut elapsed_times: Vec<u128> = vec![];
+
         for cycle in 0..cycles {
             print!(
                 "Request {} => cycle {} of {}      \r",
@@ -281,9 +283,12 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, u128)> {
             let (_, elapsed_time) = measure_time!(microseconds {
                 reader.search(&query.request, &lock).unwrap();
             });
-            results.push((query.name.clone(), elapsed_time as u128));
+            elapsed_times.push(elapsed_time as u128);
         }
+
+        results.push((query.name.clone(), elapsed_times));
     }
+    println!();
     std::mem::drop(lock);
     results
 }
@@ -387,16 +392,20 @@ fn main() {
     let dataset = get_dataset(args.datasets.clone(), args.dataset_name.clone())
         .unwrap_or_else(|| panic!("Dataset {} not found", args.dataset_name));
 
-    println!("Using dataset {:?}-{:?}", dataset.name, dataset.shard_id);
+    println!(
+        "Using dataset: {:?} shard: {:?}",
+        dataset.name, dataset.shard_id
+    );
 
     let mut json_results = vec![];
     let results = test_search(&dataset, args.cycles);
 
-    for (name, value) in results {
+    for (name, values) in results {
         json_results.push(json!({
         "name": name,
         "unit": "µs",
-        "value": value,
+        "values": values,
+        "value":  values.iter().sum::<u128>() as u128 / values.len() as u128,
         }));
     }
 

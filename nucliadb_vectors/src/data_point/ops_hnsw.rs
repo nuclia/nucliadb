@@ -149,18 +149,9 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             // HOT POINT similarity
             match best_so_far.map(|n| (n, self.similarity(n, query))) {
                 None => break None,
-                Some((_, score)) if score < self.tracker.min_score() => {
-                    println!("min score not reached");
-
-                    break None;
-                }
-                Some((n, score)) if filter.is_valid(n, score) => {
-                    println!("Filter is valid");
-                    break Some((n, score));
-                }
+                Some((_, score)) if score < self.tracker.min_score() => break None,
+                Some((n, score)) if filter.is_valid(n, score) => break Some((n, score)),
                 Some((down, _)) => {
-                    println!("score down: {:?}", down);
-                    println!("visited nodes {:?}", visited_nodes.len());
                     let mut sorted_out: Vec<_> = layer.get_out_edges(down).collect();
                     sorted_out.sort_by(|a, b| b.1.dist.total_cmp(&a.1.dist));
                     sorted_out.into_iter().for_each(|(new_candidate, _)| {
@@ -296,9 +287,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             vec_counter.add(self.tracker.get_vector(addr));
         });
 
-        println!("\nNumber of results is {:?}", result.len());
-        // here we can remove nodes that are not matching the filter directly
-
         for (addr, _) in result {
             sol_addresses.remove(&addr);
             vec_counter.sub(self.tracker.get_vector(addr));
@@ -308,22 +296,15 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 blocked_addresses: &sol_addresses,
                 vec_counter: &vec_counter,
             };
-            // XXX HOT POINT
             let Some((addr, score)) =
                 self.closest_up_node(addr, query, hnsw.get_layer(0), node_filter)
             else {
                 continue;
             };
-            println!("Got a match");
             filtered_result.push((addr, score));
             sol_addresses.insert(addr);
             vec_counter.add(self.tracker.get_vector(addr));
         }
-        println!(
-            "\nNumber of filtered results is {:?}",
-            filtered_result.len()
-        );
-
         // order may be lost
         filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
         filtered_result

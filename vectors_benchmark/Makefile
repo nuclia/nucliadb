@@ -31,6 +31,6 @@ samply-vector-bench: samply
 label-bench:
 	cargo run --release --locked --bin labels_benchmark
 
-.PHONY: real-data
-real-data:
+.PHONY: real-data-bench
+real-data-bench:
 	cargo run --locked --release --bin real_data_benchmark -- --datasets datasets/dataset.json --dataset-name large

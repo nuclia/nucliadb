@@ -89,15 +89,11 @@ pub fn load_state<S>(path: &Path) -> FsResult<S>
 where
     S: DeserializeOwned,
 {
-    println!("Loading state at {:?}", path.join(names::STATE));
-
     let mut file = BufReader::new(
         OpenOptions::new()
             .read(true)
             .open(path.join(names::STATE))?,
     );
-    println!("OK");
-
     Ok(bincode::deserialize_from(&mut file)?)
 }
 pub fn crnt_version(path: &Path) -> FsResult<Version> {
