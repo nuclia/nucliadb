@@ -122,10 +122,7 @@ fn create_request(
 
     let stored_request = bucket.get(&query_key).unwrap();
     if stored_request.is_some() {
-        println!("Got a cache hit for {:?}", query_key);
         return stored_request.unwrap().into_inner();
-    } else {
-        println!("No cache hit for {:?}", query_key);
     }
 
     // Calling the NUA service to convert the query as a vector
@@ -140,21 +137,27 @@ fn create_request(
         .unwrap();
 
     if response.status().as_u16() > 299 {
-        panic!("Got a {} response from nua", response.status());
+        panic!("[predict] Got a {} response from nua", response.status());
     }
 
     let json: PredictResults = serde_json::from_str(response.text().unwrap().as_str()).unwrap();
 
-    println!("{:?}", json.data);
-
-    // formula
+    if json.data.len() != dimension {
+        panic!(
+            "[predict] Got a vector of length {}, expected {}",
+            json.data.len(),
+            dimension
+        );
+    }
+    // building the formula
     let formula = Formula::new();
 
     let res = Request {
         filter: formula,
         vector: json.data,
     };
-    // saving in cache
+
+    // saving it in cache before we return it
     let val: Json<Request> = Json(res.clone());
     bucket.set(&query_key, &val).unwrap();
     res
@@ -301,7 +304,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
 
     let defs = dataset_definition["datasets"].as_array().unwrap();
 
-    let queries = vec![];
+    let mut queries = vec![];
     let mut found: bool = false;
     let mut shard_id = String::new();
     let mut target = PathBuf::from(definition_file);
@@ -313,11 +316,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
     for dataset in defs {
         if dataset["name"] == dataset_name {
             let url = dataset["shards"]["url"].as_str().unwrap();
-            println!("Shard located at : {}", url);
-            println!("Target path is {:?}", target);
-            if target.exists() {
-                println!("Already exists");
-            } else {
+            if !target.exists() {
                 println!("Downloading {:?} to {:?}", url, root_dir);
                 download_and_decompress_tarball(url, root_dir.to_str().unwrap(), &dataset_name)
                     .unwrap();
@@ -327,19 +326,20 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
             shard_id = dataset["shards"]["ids"][0].as_str().unwrap().to_string();
             target.push(shard_id.clone());
             target.push("vectors");
-
             let num_dimensions = get_num_dimensions(&target);
-
-            println!("{} dimensions", num_dimensions);
-
-            // TODO: collect queries and convert them into requests using predict
             for query in dataset["queries"].as_array().unwrap() {
+                let query_name = query["name"].to_string().trim_matches('"').to_string();
+
                 let request = create_request(
                     dataset_name.clone(),
-                    query["name"].to_string().trim_matches('"').to_string(),
+                    query_name.clone(),
                     query["query"].to_string().trim_matches('"').to_string(),
                     num_dimensions,
                 );
+                queries.push(Query {
+                    name: query_name,
+                    request,
+                });
             }
             found = true;
             break;
