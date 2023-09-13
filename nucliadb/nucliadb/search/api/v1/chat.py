@@ -81,7 +81,9 @@ async def chat_knowledgebox_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
     x_synchronous: bool = Header(
-        False, description="Do not stream the results of the chat request."
+        False,
+        description="Output response as JSON in a non-streaming way. "
+        "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
