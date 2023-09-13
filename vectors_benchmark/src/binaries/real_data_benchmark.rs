@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose, Engine as _};
 use std::env::var;
 use std::fs;
 use std::fs::{File, OpenOptions};
@@ -8,8 +7,6 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use kv::*;
-use rand::seq::SliceRandom;
-use rand::Rng;
 use reqwest::blocking::Client;
 use serde_json::json;
 use tar::Archive;
@@ -17,7 +14,6 @@ use tar::Archive;
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
 use vectors_benchmark::json_writer::write_json;
-use vectors_benchmark::random_vectors::RandomVectors;
 
 const NO_NEIGHBOURS: usize = 5;
 const CYCLES: usize = 25;
@@ -116,15 +112,15 @@ fn create_request(
 ) -> Request {
     // check if we have it on cache already
     let query_key = format!("{dataset_name}-{query_name}");
-    let mut cfg = Config::new("./requests.cache");
+    let cfg = Config::new("./requests.cache");
     let store = Store::new(cfg).unwrap();
     let bucket = store
         .bucket::<String, Json<Request>>(Some("requests"))
         .unwrap();
 
     let stored_request = bucket.get(&query_key).unwrap();
-    if stored_request.is_some() {
-        return stored_request.unwrap().into_inner();
+    if let Some(res) = stored_request {
+        return res.into_inner();
     }
 
     // Calling the NUA service to convert the query as a vector
@@ -212,11 +208,7 @@ fn download_and_decompress_tarball(
             .append(true)
             .open(&download_path)?;
 
-        let content_length = response
-            .content_length()
-            .clone()
-            .or_else(|| Some(100))
-            .unwrap();
+        let content_length = response.content_length().unwrap_or(100);
 
         let mut content = response.bytes()?;
 
@@ -392,14 +384,13 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
 fn main() {
     let args = Args::new();
 
-    let dataset = get_dataset(args.datasets.clone(), args.dataset_name.clone());
-    if dataset.is_none() {
-        println!("{:?} dataset not found", args.dataset_name);
-        return;
-    }
+    let dataset = get_dataset(args.datasets.clone(), args.dataset_name.clone())
+        .unwrap_or_else(|| panic!("Dataset {} not found", args.dataset_name));
+
+    println!("Using dataset {:?}-{:?}", dataset.name, dataset.shard_id);
 
     let mut json_results = vec![];
-    let results = test_search(&dataset.unwrap(), args.cycles);
+    let results = test_search(&dataset, args.cycles);
 
     for (name, value) in results {
         json_results.push(json!({
