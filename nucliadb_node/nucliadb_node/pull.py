@@ -299,7 +299,7 @@ class Worker:
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
         async with message_progress_updater(
-            msg, nats_consumer_settings.nats_ack_wait / 2
+            msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), sm.lock:
             try:
                 if pb.typemessage == TypeMessage.CREATION:

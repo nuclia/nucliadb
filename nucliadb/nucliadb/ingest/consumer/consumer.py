@@ -127,7 +127,7 @@ class IngestConsumer:
         start = time.monotonic()
 
         async with message_progress_updater(
-            msg, nats_consumer_settings.nats_ack_wait / 2
+            msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), self.lock:
             try:
                 pb = BrokerMessage()
