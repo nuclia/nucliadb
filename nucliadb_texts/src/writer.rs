@@ -20,6 +20,7 @@
 
 use std::fmt::Debug;
 use std::fs;
+use std::path::Path;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
@@ -148,16 +149,9 @@ impl TextWriterService {
     pub fn start(config: &TextConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            match TextWriterService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
+            Self::new(config)
         } else {
-            Ok(TextWriterService::open(config)?)
+            Self::open(config)
         }
     }
 
@@ -176,7 +170,7 @@ impl TextWriterService {
 
     #[tracing::instrument(skip_all)]
     fn new(config: &TextConfig) -> NodeResult<Self> {
-        fs::create_dir(&config.path)?;
+        Self::try_create_index_dir(&config.path)?;
 
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
@@ -188,7 +182,9 @@ impl TextWriterService {
         let field_schema = TextSchema::new();
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         index_builder = index_builder.settings(settings);
-        let index = index_builder.create_in_dir(&config.path).unwrap();
+        let index = index_builder
+            .create_in_dir(&config.path)
+            .expect("Index directory should exist");
         let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(TextWriterService {
@@ -196,6 +192,24 @@ impl TextWriterService {
             writer,
             schema: field_schema,
         })
+    }
+
+    fn try_create_index_dir(path: &Path) -> NodeResult<()> {
+        let result = fs::create_dir(path);
+        if let Err(error) = result {
+            if path.exists() {
+                // operation failed but directory exists, we must delete it
+                if let Err(remove_error) = std::fs::remove_dir(path) {
+                    return Err(node_error!(
+                        "Double error creating and removing texts directory: \nFirst: {error} \
+                         \nSecond: {remove_error}"
+                    ));
+                }
+            }
+            return Err(node_error!("Error while creating texts directory: {error}"));
+        }
+
+        Ok(())
     }
 
     fn index_document(&mut self, resource: &Resource) {
