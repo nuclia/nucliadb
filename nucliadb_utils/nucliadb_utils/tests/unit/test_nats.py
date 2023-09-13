@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -100,3 +101,23 @@ class TestNatsConnectionManager:
         manager._nc.is_connected = False
         assert manager.healthy()
         assert manager._last_unhealthy is not None
+
+
+async def test_message_progress_updater():
+    in_progress = AsyncMock()
+    msg = MagicMock(in_progress=in_progress, _ackd=False)
+
+    async with nats.message_progress_updater(msg, 0.05):
+        await asyncio.sleep(0.07)
+
+    in_progress.assert_awaited_once()
+
+
+async def test_message_progress_updater_does_not_update_ack():
+    in_progress = AsyncMock()
+    msg = MagicMock(in_progress=in_progress, _ackd=True)
+
+    async with nats.message_progress_updater(msg, 0.05):
+        await asyncio.sleep(0.07)
+
+    in_progress.assert_not_awaited()

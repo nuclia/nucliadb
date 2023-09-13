@@ -37,6 +37,7 @@ from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.nats import message_progress_updater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
@@ -297,7 +298,9 @@ class Worker:
         pb.ParseFromString(msg.data)
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
-        async with sm.lock:
+        async with message_progress_updater(
+            msg, nats_consumer_settings.nats_ack_wait / 2
+        ), sm.lock:
             try:
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
