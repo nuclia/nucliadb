@@ -80,7 +80,9 @@ async def chat_knowledgebox_endpoint(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-    x_synchronous: bool = Header(False),
+    x_synchronous: bool = Header(
+        False, description="Do not stream the results of the chat request."
+    ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
         return await create_chat_response(
@@ -166,7 +168,7 @@ async def create_chat_response(
 
         return StreamingResponse(
             _streaming_response(),
-            media_type="plain/text",
+            media_type="application/octet-stream",
             headers={
                 "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",

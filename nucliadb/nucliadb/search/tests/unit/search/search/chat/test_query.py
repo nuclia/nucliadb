@@ -24,6 +24,12 @@ from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import (
     _parse_answer_status_code,
     async_gen_lookahead,
+    chat,
+)
+from nucliadb_models.search import (
+    ChatRequest,
+    KnowledgeboxFindResults,
+    NucliaDBClientType,
 )
 
 
@@ -58,6 +64,28 @@ async def test_async_gen_lookahead_last_chunk_is_empty():
         (b"empty", False),
         (b"chunk", True),
     ]
+
+
+async def test_chat_does_not_call_predict_if_no_find_results(
+    predict,
+):
+    find_results = KnowledgeboxFindResults(
+        total=0, min_score=0.7, resources={}, facets=[]
+    )
+    chat_request = ChatRequest(query="query")
+
+    with mock.patch(
+        "nucliadb.search.search.chat.query.get_find_results", return_value=find_results
+    ):
+        await chat(
+            "kbid",
+            chat_request,
+            "user_id",
+            NucliaDBClientType.API,
+            "origin",
+        )
+
+    predict.chat_query.assert_not_called()
 
 
 @pytest.mark.parametrize(

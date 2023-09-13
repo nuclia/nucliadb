@@ -53,7 +53,9 @@ async def resource_chat_endpoint(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-    x_synchronous: bool = Header(False),
+    x_synchronous: bool = Header(
+        False, description="Do not stream the results of the chat request."
+    ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
         item.resource_filters = [rid]
