@@ -11,8 +11,12 @@
       },
       "queries": [
         {
-          "name": "query_one",
-          "query": "blah",
+          "name": "unfiltered-1",
+          "query": "test"
+        },
+        {
+          "name": "filtered-1",
+          "query": "test",
           "tags": [
             "one",
             "two"

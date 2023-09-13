@@ -8,7 +8,7 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use kv::*;
 use reqwest::blocking::Client;
-use serde_json::json;
+use serde_json::{json, Map};
 use tar::Archive;
 
 use nucliadb_vectors::data_point_provider::*;
@@ -209,9 +209,7 @@ fn download_and_decompress_tarball(
             .open(&download_path)?;
 
         let content_length = response.content_length().unwrap_or(100);
-
         let mut content = response.bytes()?;
-
         let pb = ProgressBar::new(content_length);
 
         pb.set_style(ProgressStyle::default_bar()
@@ -280,9 +278,16 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
             );
             let _ = std::io::stdout().flush();
 
+            let search_result;
+
             let (_, elapsed_time) = measure_time!(microseconds {
-                reader.search(&query.request, &lock).unwrap();
+                search_result = reader.search(&query.request, &lock).unwrap();
+
             });
+
+            if search_result.is_empty() {
+                panic!("No results found for query {}", query.name);
+            }
             elapsed_times.push(elapsed_time as u128);
         }
 
@@ -336,24 +341,34 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
             target.push(shard_id.clone());
             target.push("vectors");
             let num_dimensions = get_num_dimensions(&target);
-            for query in dataset["queries"].as_array().unwrap() {
+            for entry in dataset["queries"].as_array().unwrap() {
+                let query: Map<String, _> = entry.as_object().unwrap().to_owned();
+
                 let query_name = query["name"].to_string().trim_matches('"').to_string();
 
-                let tags: Vec<String> = query["tags"]
-                    .as_array()
-                    .unwrap()
-                    .to_vec()
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let tags: Vec<String> = if query.contains_key("tags") {
+                    query["tags"]
+                        .as_array()
+                        .unwrap()
+                        .to_vec()
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect()
+                } else {
+                    vec![]
+                };
 
-                let key_filters: Vec<String> = query["key_filters"]
-                    .as_array()
-                    .unwrap()
-                    .to_vec()
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let key_filters: Vec<String> = if query.contains_key("key_filters") {
+                    query["key_filters"]
+                        .as_array()
+                        .unwrap()
+                        .to_vec()
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect()
+                } else {
+                    vec![]
+                };
 
                 let request = create_request(
                     dataset_name.clone(),
@@ -363,6 +378,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
                     key_filters,
                     num_dimensions,
                 );
+
                 queries.push(Query {
                     name: query_name,
                     request,
@@ -405,7 +421,7 @@ fn main() {
         "name": name,
         "unit": "µs",
         "values": values,
-        "value":  values.iter().sum::<u128>() as u128 / values.len() as u128,
+        "value":  values.iter().sum::<u128>() / values.len() as u128,
         }));
     }
 
