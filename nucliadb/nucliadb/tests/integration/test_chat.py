@@ -25,6 +25,8 @@ from unittest import mock
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.search.api.v1.chat import SyncChatResponse
+from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.utilities import get_predict
 
 
@@ -48,7 +50,7 @@ async def test_chat(
 @pytest.fixture(scope="function")
 def find_incomplete_results():
     with mock.patch(
-        "nucliadb.search.api.v1.chat.find", return_value=(mock.MagicMock(), True)
+        "nucliadb.search.search.chat.query.find", return_value=(mock.MagicMock(), True)
     ):
         yield
 
@@ -167,3 +169,20 @@ async def test_chat_always_returns_relations(
     _, answer, relations_result = parse_chat_response(resp.content)
     assert answer == b"Not enough data to answer this."
     assert "Ferran" in relations_result["entities"]
+
+
+@pytest.mark.asyncio()
+async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resource):
+    predict = get_predict()
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"0"]  # type: ignore
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title"},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+
+    assert resp_data.answer == "some text with status."
+    assert len(resp_data.results.resources) == 1
+    assert resp_data.status == AnswerStatusCode.SUCCESS
