@@ -48,7 +48,7 @@ async def test_chat(
 @pytest.fixture(scope="function")
 def find_incomplete_results():
     with mock.patch(
-        "nucliadb.search.api.v1.chat.find", return_value=(mock.MagicMock(), True)
+        "nucliadb.search.search.chat.query.find", return_value=(mock.MagicMock(), True)
     ):
         yield
 

@@ -224,32 +224,33 @@ async def chat(
         nuclia_learning_id, predict_generator = await predict.chat_query(
             kbid, chat_model
         )
-        answer_stream = format_generated_answer(predict_generator, status_code)
 
-    async def _wrapped_stream():
-        # so we can audit after streamed out answer
-        text_answer = b""
-        async for chunk in answer_stream:
-            text_answer += chunk
-            yield chunk
+        async def _wrapped_stream():
+            # so we can audit after streamed out answer
+            text_answer = b""
+            async for chunk in format_generated_answer(predict_generator, status_code):
+                text_answer += chunk
+                yield chunk
 
-        await maybe_audit_chat(
-            kbid=kbid,
-            user_id=user_id,
-            client_type=client_type,
-            origin=origin,
-            duration=time() - start_time,
-            user_query=user_query,
-            rephrased_query=rephrased_query,
-            text_answer=text_answer,
-            status_code=status_code.value,
-            chat_history=chat_history,
-            query_context=query_context,
-        )
+            await maybe_audit_chat(
+                kbid=kbid,
+                user_id=user_id,
+                client_type=client_type,
+                origin=origin,
+                duration=time() - start_time,
+                user_query=user_query,
+                rephrased_query=rephrased_query,
+                text_answer=text_answer,
+                status_code=status_code.value,
+                chat_history=chat_history,
+                query_context=query_context,
+            )
+
+        answer_stream = _wrapped_stream()
 
     return ChatResult(
         nuclia_learning_id=nuclia_learning_id,
-        answer_stream=_wrapped_stream(),
+        answer_stream=answer_stream,
         status_code=status_code,
         find_results=find_results,
     )

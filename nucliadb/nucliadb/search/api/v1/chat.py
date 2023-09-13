@@ -21,18 +21,15 @@ import base64
 from typing import Optional, Union
 
 import pydantic
-from fastapi import Body, Header, Response
+from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.chat.query import (
-    FoundStatusCode,
-    chat,
-    get_relations_results,
-)
+from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.search.chat.query import chat, get_relations_results
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -52,7 +49,7 @@ class SyncChatResponse(pydantic.BaseModel):
     answer: str
     relations: Optional[Relations]
     results: KnowledgeboxFindResults
-    status: FoundStatusCode
+    status: AnswerStatusCode
 
 
 CHAT_EXAMPLES = {
@@ -77,6 +74,7 @@ CHAT_EXAMPLES = {
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def chat_knowledgebox_endpoint(
+    request: Request,
     kbid: str,
     item: ChatRequest = Body(examples=CHAT_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),

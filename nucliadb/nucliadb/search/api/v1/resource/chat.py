@@ -19,7 +19,7 @@
 #
 from typing import Union
 
-from fastapi import Header, Response
+from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
@@ -46,6 +46,7 @@ from ..chat import create_chat_response
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def resource_chat_endpoint(
+    request: Request,
     kbid: str,
     rid: str,
     item: ChatRequest,
