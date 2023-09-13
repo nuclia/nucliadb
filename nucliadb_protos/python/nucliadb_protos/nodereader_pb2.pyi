@@ -867,7 +867,6 @@ class RelationSearchRequest(google.protobuf.message.Message):
     RELOAD_FIELD_NUMBER: builtins.int
     PREFIX_FIELD_NUMBER: builtins.int
     SUBGRAPH_FIELD_NUMBER: builtins.int
-    ID_FIELD_NUMBER: builtins.int
     shard_id: builtins.str
     reload: builtins.bool
     @property
@@ -877,7 +876,6 @@ class RelationSearchRequest(google.protobuf.message.Message):
         """TODO: uncomment and implement (next iteration)
         RelationPathsSearchRequest paths = 13;
         """
-    id: builtins.str
     def __init__(
         self,
         *,
@@ -885,10 +883,9 @@ class RelationSearchRequest(google.protobuf.message.Message):
         reload: builtins.bool = ...,
         prefix: global___RelationPrefixSearchRequest | None = ...,
         subgraph: global___EntitiesSubgraphRequest | None = ...,
-        id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["prefix", b"prefix", "subgraph", b"subgraph"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "prefix", b"prefix", "reload", b"reload", "shard_id", b"shard_id", "subgraph", b"subgraph"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["prefix", b"prefix", "reload", b"reload", "shard_id", b"shard_id", "subgraph", b"subgraph"]) -> None: ...
 
 global___RelationSearchRequest = RelationSearchRequest
 

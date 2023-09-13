@@ -380,7 +380,6 @@ impl ShardReader {
         let vector_task = move || Some(vector_reader_service.search(&vector_request));
 
         let relation_request = RelationSearchRequest {
-            id: search_id.clone(),
             shard_id: search_request.shard.clone(),
             prefix: search_request.relation_prefix.clone(),
             subgraph: search_request.relation_subgraph,
