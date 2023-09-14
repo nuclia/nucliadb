@@ -30,7 +30,7 @@ async def test_initialize_happens_only_once():
     tasks = []
     for _ in range(10):
         tasks.append(context.initialize())
-    await asyncio.wait(tasks)
+    await asyncio.gather(*tasks)
 
     context._initialize.assert_awaited_once()
     context._initialized is True
