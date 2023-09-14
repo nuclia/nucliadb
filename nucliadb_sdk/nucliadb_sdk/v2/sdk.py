@@ -20,7 +20,18 @@ import asyncio
 import base64
 import enum
 import io
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    AsyncIterable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 import httpx
 import orjson
@@ -59,6 +70,8 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_sdk.v2 import docstrings, exceptions
+
+RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 
 
 class Region(enum.Enum):
@@ -124,6 +137,14 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
         return resp.content
 
 
+def is_raw_request_content(content: Any) -> bool:
+    return (
+        isinstance(content, str)
+        or isinstance(content, bytes)
+        or (isinstance(content, Iterable) and not isinstance(content, (list, tuple)))
+    )
+
+
 def _request_builder(
     *,
     name: str,
@@ -135,7 +156,6 @@ def _request_builder(
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
     docstring: Optional[docstrings.Docstring] = None,
-    file_upload: bool = False,
 ):
     def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
         path_data = {}
@@ -146,6 +166,7 @@ def _request_builder(
 
         path = path_template.format(**path_data)
         data = None
+        raw_content: Optional[RawRequestContent] = None
         if request_type is not None:
             if content is not None:
                 try:
@@ -165,20 +186,15 @@ def _request_builder(
                         content_data[key] = kwargs.pop(key)
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
 
-        files = None
-        if file_upload:
-            try:
-                file = kwargs["file"]
-            except KeyError:
-                raise TypeError("Missing required parameter 'file'")
-            files = {"file": file}
+        elif is_raw_request_content(content):
+            raw_content = content
 
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
         resp = self._request(
-            path, method, data=data, query_params=query_params, files=files
+            path, method, data=data, query_params=query_params, content=raw_content
         )
 
         if asyncio.iscoroutine(resp):
@@ -537,7 +553,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=export_response_parser,
-        extra_args={"file": {"required": True}},
     )
 
     import_knowledge_box = _request_builder(
@@ -547,7 +562,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=None,
-        file_upload=True,
     )
 
 
@@ -609,7 +623,7 @@ class NucliaDB(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
-        files: Optional[Dict[str, Any]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -617,8 +631,8 @@ class NucliaDB(_NucliaDBBase):
             opts["data"] = data
         if query_params is not None:
             opts["params"] = query_params
-        if files is not None:
-            opts["files"] = files
+        if content is not None:
+            opts["content"] = content
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
