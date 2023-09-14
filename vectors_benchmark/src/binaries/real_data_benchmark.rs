@@ -79,7 +79,7 @@ struct Request {
 
 impl SearchRequest for Request {
     fn with_duplicates(&self) -> bool {
-        true
+        false
     }
     fn get_query(&self) -> &[f32] {
         &self.vector
@@ -107,7 +107,7 @@ fn create_request(
     query_name: String,
     query: String,
     tags: Vec<String>,
-    key_filters: Vec<String>,
+    key_prefixes: Vec<String>,
     dimension: usize,
 ) -> Request {
     // check if we have it on cache already
@@ -149,15 +149,15 @@ fn create_request(
     }
     // building the formula using tags and key filters
     let mut formula = Formula::new();
-    let key_filters = key_filters.iter().cloned().map(AtomClause::key_prefix);
+    let key_prefixes = key_prefixes.iter().cloned().map(AtomClause::key_prefix);
 
     tags.iter()
         .cloned()
         .map(AtomClause::label)
         .for_each(|c| formula.extend(c));
 
-    if key_filters.len() > 0 {
-        formula.extend(CompoundClause::new(1, key_filters.collect()));
+    if key_prefixes.len() > 0 {
+        formula.extend(CompoundClause::new(1, key_prefixes.collect()));
     }
 
     let res = Request {
@@ -280,19 +280,34 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
 
             let search_result;
 
+            //println!("{} {:?}", query.name, query.request.filter);
             let (_, elapsed_time) = measure_time!(microseconds {
                 search_result = reader.search(&query.request, &lock).unwrap();
 
             });
 
-            if search_result.len() < query.min_results {
-                panic!(
-                    "Not enough results found for query {}. Found {}, Expected at least {}",
-                    query.name,
-                    search_result.len(),
-                    query.min_results
-                );
-            }
+            if let Some(min_results) = query.min_results {
+                if search_result.len() < min_results {
+                    panic!(
+                        "Not enough results found for query {}. Found {}, Expected at least {}",
+                        query.name,
+                        search_result.len(),
+                        min_results
+                    );
+                }
+            };
+
+            if let Some(num_results) = query.num_results {
+                if search_result.len() != num_results {
+                    panic!(
+                        "Number of results found for query {} unexpected. Found {}, Expected {}",
+                        query.name,
+                        search_result.len(),
+                        num_results
+                    );
+                }
+            };
+
             elapsed_times.push(elapsed_time as u128);
         }
 
@@ -306,7 +321,8 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
 struct Query {
     name: String,
     request: Request,
-    min_results: usize,
+    min_results: Option<usize>,
+    num_results: Option<usize>,
 }
 
 struct Dataset {
@@ -314,6 +330,10 @@ struct Dataset {
     shard_id: String,
     vectors_path: PathBuf,
     queries: Vec<Query>,
+}
+
+fn trim(data: String) -> String {
+    data.trim_matches('"').to_string()
 }
 
 fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset> {
@@ -350,7 +370,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
             for entry in dataset["queries"].as_array().unwrap() {
                 let query: Map<String, _> = entry.as_object().unwrap().to_owned();
 
-                let query_name = query["name"].to_string().trim_matches('"').to_string();
+                let query_name = trim(query["name"].to_string());
 
                 let tags: Vec<String> = if query.contains_key("tags") {
                     query["tags"]
@@ -358,19 +378,19 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
                         .unwrap()
                         .to_vec()
                         .iter()
-                        .map(|v| v.to_string())
+                        .map(|v| trim(v.to_string()))
                         .collect()
                 } else {
                     vec![]
                 };
 
-                let key_filters: Vec<String> = if query.contains_key("key_filters") {
-                    query["key_filters"]
+                let key_prefixes: Vec<String> = if query.contains_key("key_prefixes") {
+                    query["key_prefixes"]
                         .as_array()
                         .unwrap()
                         .to_vec()
                         .iter()
-                        .map(|v| v.to_string())
+                        .map(|v| trim(v.to_string()))
                         .collect()
                 } else {
                     vec![]
@@ -379,16 +399,28 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
                 let request = create_request(
                     dataset_name.clone(),
                     query_name.clone(),
-                    query["query"].to_string().trim_matches('"').to_string(),
+                    trim(query["query"].to_string()),
                     tags,
-                    key_filters,
+                    key_prefixes,
                     num_dimensions,
                 );
+
+                let min_results = if query.contains_key("min_results") {
+                    Some(query["min_results"].as_u64().unwrap() as usize)
+                } else {
+                    None
+                };
+                let num_results = if query.contains_key("num_results") {
+                    Some(query["num_results"].as_u64().unwrap() as usize)
+                } else {
+                    None
+                };
 
                 queries.push(Query {
                     name: query_name,
                     request,
-                    min_results: query["min_results"].as_u64().unwrap() as usize,
+                    min_results,
+                    num_results,
                 });
             }
             found = true;

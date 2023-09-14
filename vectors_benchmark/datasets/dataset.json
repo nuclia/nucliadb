@@ -11,17 +11,20 @@
       },
       "queries": [
         {
-          "name": "unfiltered-1",
+          "name": "unfiltered",
           "query": "la entrada de un ejército en un país",
           "min_results": 5
         },
         {
-          "name": "filtered-1",
+          "name": "single-match-key-prefix",
           "query": "la entrada de un ejército en un país",
           "tags": [
-            "e/indias"
+            "f/ecc8c259cf0d926fcf4e140621f1615b"
           ],
-          "min_results": 0
+          "key_prefixes": [
+            "ecc8c259cf0d926fcf4e140621f1615b/f/ecc8c259cf0d926fcf4e140621f1615b/175/84949"
+          ],
+          "num_results": 1
         }
       ]
     }
