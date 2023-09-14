@@ -197,10 +197,17 @@ fn download_and_decompress_tarball(
 
     // Create a request with the Range header to resume the download
     let client = Client::new();
-    let response = client
+    let mut request = client
         .get(url)
-        .header("Range", format!("bytes={}-", downloaded_bytes))
-        .send()?;
+        .header("Range", format!("bytes={}-", downloaded_bytes));
+
+    if let Ok(dataset_auth) = var("DATASET_AUTH") {
+        let (user_name, password) = dataset_auth.split_once(":").unwrap();
+        println!("Using user {:?} for basic auth", user_name);
+        request = request.basic_auth(user_name, Some(password));
+    }
+
+    let response = request.send()?;
 
     if response.status().is_success() {
         let mut file = OpenOptions::new()
