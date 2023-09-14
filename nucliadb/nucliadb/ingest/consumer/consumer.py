@@ -37,7 +37,7 @@ from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.nats import NatsConnectionManager, MessageProgressUpdater
+from nucliadb_utils.nats import MessageProgressUpdater, NatsConnectionManager
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 
