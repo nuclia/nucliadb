@@ -98,6 +98,10 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     )
 
 
+def export_response_parser(response: httpx.Response) -> bytes:
+    return response.iter_bytes()
+
+
 def _parse_list_of_pydantic(
     data: List[Any],
 ) -> str:
@@ -131,6 +135,7 @@ def _request_builder(
         Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
     ],
     docstring: Optional[docstrings.Docstring] = None,
+    file_upload: bool = False,
 ):
     def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
         path_data = {}
@@ -160,11 +165,21 @@ def _request_builder(
                         content_data[key] = kwargs.pop(key)
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
 
+        files = None
+        if file_upload:
+            try:
+                file = kwargs["file"]
+            except KeyError:
+                raise TypeError("Missing required parameter 'file'")
+            files = {"file": file}
+
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
-        resp = self._request(path, method, data=data, query_params=query_params)
+        resp = self._request(
+            path, method, data=data, query_params=query_params, files=files
+        )
 
         if asyncio.iscoroutine(resp):
 
@@ -514,6 +529,27 @@ class _NucliaDBBase:
         response_type=None,
     )
 
+    # Export / Import
+    export_knowledge_box = _request_builder(
+        name="export_knowledge_box",
+        path_template="/v1/kb/{kbid}/export",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=export_response_parser,
+        extra_args={"file": {"required": True}},
+    )
+
+    import_knowledge_box = _request_builder(
+        name="import_knowledge_box",
+        path_template="/v1/kb/{kbid}/import",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+        file_upload=True,
+    )
+
 
 class NucliaDB(_NucliaDBBase):
     """
@@ -573,6 +609,7 @@ class NucliaDB(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        files: Optional[Dict[str, Any]] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -580,6 +617,8 @@ class NucliaDB(_NucliaDBBase):
             opts["data"] = data
         if query_params is not None:
             opts["params"] = query_params
+        if files is not None:
+            opts["files"] = files
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
