@@ -60,21 +60,25 @@ class ApplicationContext:
     async def initialize(self) -> None:
         if self._initialized:
             return
-
         async with self._lock:
-            self.kv_driver = await setup_driver()
-            self.blob_storage = await get_storage()
-            self.shard_manager = await setup_cluster()
-            self.partitioning = start_partitioning_utility()
-            if not cluster_settings.standalone_mode:
-                self.indexing = await start_indexing_utility()
-            self.nats_manager = await start_nats_manager(
-                self.service_name,
-                indexing_settings.index_jetstream_servers,
-                indexing_settings.index_jetstream_auth,
-            )
-            self.transaction = await start_transaction_utility(self.service_name)
+            if self._initialized:
+                return
+            await self._initialize()
             self._initialized = True
+
+    async def _initialize(self):
+        self.kv_driver = await setup_driver()
+        self.blob_storage = await get_storage()
+        self.shard_manager = await setup_cluster()
+        self.partitioning = start_partitioning_utility()
+        if not cluster_settings.standalone_mode:
+            self.indexing = await start_indexing_utility()
+        self.nats_manager = await start_nats_manager(
+            self.service_name,
+            indexing_settings.index_jetstream_servers,
+            indexing_settings.index_jetstream_auth,
+        )
+        self.transaction = await start_transaction_utility(self.service_name)
 
     async def finalize(self) -> None:
         if not self._initialized:

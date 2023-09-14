@@ -24,6 +24,10 @@ from nucliadb.export_import.exceptions import ExportStreamExhausted
 from nucliadb.export_import.importer import ExportStream
 
 
+class EndOfStream(Exception):
+    ...
+
+
 class FastAPIExportStream(ExportStream):
     """
     Adapts a FastAPI request stream to the ExportStream interface so that we
@@ -45,11 +49,18 @@ class FastAPIExportStream(ExportStream):
                 if self.buffer != b"" and len(self.buffer) >= n_bytes:
                     return self._read_from_buffer(n_bytes)
 
-                self.buffer += await self.stream.__anext__()
+                next_chunk = await self.stream.__anext__()
+                if next_chunk == b"":
+                    raise EndOfStream()
+
+                self.buffer += next_chunk
                 if len(self.buffer) >= n_bytes:
                     return self._read_from_buffer(n_bytes)
+                else:
+                    # Need to read another chunk
+                    continue
 
-            except StopAsyncIteration:
+            except (StopAsyncIteration, EndOfStream):
                 if self.buffer != b"":
                     return self._read_from_buffer(n_bytes)
                 else:
