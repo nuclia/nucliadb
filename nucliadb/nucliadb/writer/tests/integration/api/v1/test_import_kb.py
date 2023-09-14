@@ -17,10 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import field  # noqa
-from . import import_kb  # noqa
-from . import knowledgebox  # noqa
-from . import resource  # noqa
-from . import services  # noqa
-from . import upload  # noqa
-from .router import api  # noqa
+
+from nucliadb_models.resource import NucliaDBRoles
+
+DUMMY_EXPORT = b"ENT\x00\x00\x00\x00LAB\x00\x00\x00\x00"
+
+
+async def test_import_kb(writer_api, knowledgebox_ingest):
+    kbid = knowledgebox_ingest
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(f"/kb/{kbid}/import", content=DUMMY_EXPORT)
+        assert resp.status_code == 200

@@ -17,10 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import field  # noqa
-from . import import_kb  # noqa
-from . import knowledgebox  # noqa
-from . import resource  # noqa
-from . import services  # noqa
-from . import upload  # noqa
-from .router import api  # noqa
+
+from io import BytesIO
+
+from nucliadb_models.resource import NucliaDBRoles
+
+
+async def test_export_kb(reader_api, knowledgebox_ingest):
+    kbid = knowledgebox_ingest
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/kb/{kbid}/export")
+        assert resp.status_code == 200
+
+        export = BytesIO()
+        for chunk in resp.iter_bytes():
+            export.write(chunk)
+        export.seek(0)
+
+        assert len(export.getvalue()) > 0

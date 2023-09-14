@@ -137,7 +137,7 @@ async def iter_broker_messages(
         yield bm
 
 
-def get_binaries(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
+def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
     """Return the list of binaries of a broker message."""
     binaries: list[resources_pb2.CloudFile] = []
     for file_field in bm.files.values():

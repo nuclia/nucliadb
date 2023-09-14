@@ -17,10 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import field  # noqa
-from . import import_kb  # noqa
-from . import knowledgebox  # noqa
-from . import resource  # noqa
-from . import services  # noqa
-from . import upload  # noqa
-from .router import api  # noqa
+import asyncio
+from unittest.mock import AsyncMock
+
+from nucliadb.common.context import ApplicationContext
+
+
+async def test_initialize_happens_only_once():
+    context = ApplicationContext()
+    context._initialize = AsyncMock()  # noqa
+
+    tasks = []
+    for _ in range(10):
+        tasks.append(context.initialize())
+    await asyncio.gather(*tasks)
+
+    context._initialize.assert_awaited_once()
+    context._initialized is True
