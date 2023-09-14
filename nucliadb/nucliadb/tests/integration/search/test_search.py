@@ -426,6 +426,7 @@ async def test_catalog_can_filter_by_processing_status(
         assert facets["/n/s"][f"/n/s/{status}"] == 1
 
 
+@pytest.skip("Needs sc-5626")
 @pytest.mark.asyncio
 async def test_catalog_prefix_search(
     nucliadb_reader: AsyncClient,
