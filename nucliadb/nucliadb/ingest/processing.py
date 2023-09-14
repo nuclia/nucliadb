@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+from collections import defaultdict
 import datetime
 import uuid
 from contextlib import AsyncExitStack
@@ -204,10 +205,10 @@ class ProcessingEngine:
 
         kb_obj = KnowledgeBoxID()
         kb_obj.uuid = kbid
-        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)
-        if pb_response.status.status == OpStatusWriter.Status.OK:
-            return KBConfiguration.from_message(pb_response.config)
-        return None
+        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
+        if pb_response.status.status != OpStatusWriter.Status.OK:
+            return None
+        return KBConfiguration.from_message(pb_response.config)
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
@@ -428,12 +429,7 @@ class ProcessingEngine:
 class DummyProcessingEngine(ProcessingEngine):
     def __init__(self):
         self.calls: List[List[Any]] = []  # type: ignore
-        self.values: Dict[str, List[Any]] = {}
-        self.values["convert_filefield_to_str"] = []
-        self.values["convert_external_filefield_to_str"] = []
-        self.values["convert_internal_filefield_to_str"] = []
-        self.values["convert_internal_cf_to_str"] = []
-        self.values["send_to_process"] = []
+        self.values: Dict[str, List[Any]] = defaultdict(list)
         self.onprem = True
 
     async def initialize(self):

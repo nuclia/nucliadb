@@ -59,7 +59,7 @@ async def test_kb_configuration(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration")
     assert resp.status_code == 200
-    body: Dict[str, str] = resp.json()
+    body = resp.json()
     assert len(body) == 5
 
     resp = await nucliadb_writer.delete(f"/kb/{kbid}/configuration")
@@ -67,5 +67,5 @@ async def test_kb_configuration(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration")
     assert resp.status_code == 200
-    body: Dict[str, str] = resp.json()
+    body = resp.json()
     assert len(body) == 0
