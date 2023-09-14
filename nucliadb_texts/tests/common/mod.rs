@@ -18,12 +18,32 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+// clippy doesn't detect functions are being used in our intergration tests
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_texts::reader::TextReaderService;
+use nucliadb_texts::writer::TextWriterService;
+use tempfile::TempDir;
+
+pub fn test_reader() -> TextReaderService {
+    let dir = TempDir::new().unwrap();
+    let config = TextConfig {
+        path: dir.path().join("texts"),
+    };
+
+    let mut writer = TextWriterService::start(&config).unwrap();
+    let resource = create_resource("shard".to_string());
+    writer.set_resource(&resource).unwrap();
+
+    TextReaderService::start(&config).unwrap()
+}
 
 pub fn create_resource(shard_id: String) -> Resource {
     let resource_id = ResourceId {
@@ -51,12 +71,12 @@ pub fn create_resource(shard_id: String) -> Resource {
 
     let ti_title = protos::TextInformation {
         text: DOC1_TI.to_string(),
-        labels: vec!["/l/mylabel".to_string()],
+        labels: vec!["/l/mylabel".to_string(), "/e/myentity".to_string()],
     };
 
     let ti_body = protos::TextInformation {
         text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
-        labels: vec!["/f/body".to_string()],
+        labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
     };
 
     let mut texts = HashMap::new();
