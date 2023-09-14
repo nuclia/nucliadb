@@ -17,27 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-from fastapi import FastAPI
-from starlette.routing import Mount
-
-from nucliadb.common.context import ApplicationContext
-
-
-def set_app_context(app: FastAPI):
-    context = ApplicationContext()
-
-    app.state.context = context
-    app.add_event_handler("startup", context.initialize)
-    app.add_event_handler("shutdown", context.finalize)
-
-    # Need to add app context in all sub-applications
-    for route in app.router.routes:
-        if isinstance(route, Mount) and isinstance(route.app, FastAPI):
-            route.app.state.context = context
-            route.app.add_event_handler("startup", context.initialize)
-            route.app.add_event_handler("shutdown", context.finalize)
-
-
-def get_app_context(application: FastAPI) -> ApplicationContext:
-    return application.state.context

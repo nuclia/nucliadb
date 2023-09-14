@@ -37,7 +37,7 @@ from nucliadb_utils.authentication import requires_one
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def export_kb_endpoint(request: Request, kbid: str) -> StreamingResponse:
-    context = await get_app_context(request.app)
+    context = get_app_context(request.app)
     return StreamingResponse(
         exporter.export_kb(context, kbid),
         status_code=200,

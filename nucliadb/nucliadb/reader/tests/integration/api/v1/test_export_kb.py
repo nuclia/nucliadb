@@ -17,29 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi_versioning import version
-from starlette.requests import Request
 
-from nucliadb.common.context.fastapi import get_app_context
-from nucliadb.export_import import importer
-from nucliadb.export_import.fastapi import FastAPIExportStream
-from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from io import BytesIO
+
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.authentication import requires_one
 
 
-@api.post(
-    f"/{KB_PREFIX}/{{kbid}}/import",
-    status_code=200,
-    name="Import to a Knowledge Box",
-    tags=["Knowledge Boxes"],
-)
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
-@version(1)
-async def import_kb_endpoint(request: Request, kbid: str) -> None:
-    context = get_app_context(request.app)
-    await importer.import_kb(
-        context=context,
-        kbid=kbid,
-        stream=FastAPIExportStream(request),
-    )
+async def test_export_kb(reader_api, knowledgebox_ingest):
+    kbid = knowledgebox_ingest
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/kb/{kbid}/export")
+        assert resp.status_code == 200
+
+        export = BytesIO()
+        for chunk in resp.iter_bytes():
+            export.write(chunk)
+        export.seek(0)
+
+        assert len(export.getvalue()) > 0

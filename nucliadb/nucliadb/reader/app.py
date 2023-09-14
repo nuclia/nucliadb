@@ -105,7 +105,7 @@ def create_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    # Inject application context into the request state
+    # Inject application context into the fastapi app's state
     set_app_context(application)
 
     return application

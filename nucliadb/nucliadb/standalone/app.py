@@ -113,8 +113,7 @@ def application_factory(settings: Settings) -> FastAPI:
         if isinstance(route, Mount):
             route.app.settings = settings  # type: ignore
 
-            # Set application context on every sub-application
-            if isinstance(route.app, FastAPI):
-                set_app_context(route.app)
+    # Inject application context into the fastapi app's state
+    set_app_context(application)
 
     return application
