@@ -28,7 +28,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 # These should be refactored
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb_protos import noderesources_pb2
+from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
@@ -137,3 +137,16 @@ class ResourcesDataManager:
                 KB_MATERIALIZED_RESOURCES_COUNT.format(kbid=kbid), str(value).encode()
             )
             await txn.commit()
+
+    async def get_broker_message(
+        self, kbid: str, rid: str
+    ) -> Optional[writer_pb2.BrokerMessage]:
+        resource = await self.get_resource(kbid, rid)
+        if resource is None:
+            return None
+
+        async with self.driver.transaction() as txn:
+            resource.disable_vectors = False
+            resource.txn = txn
+            bm = await resource.generate_broker_message()
+            return bm
