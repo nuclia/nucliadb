@@ -73,11 +73,11 @@ class ApplicationContext:
         self.partitioning = start_partitioning_utility()
         if not cluster_settings.standalone_mode:
             self.indexing = await start_indexing_utility()
-        self.nats_manager = await start_nats_manager(
-            self.service_name,
-            indexing_settings.index_jetstream_servers,
-            indexing_settings.index_jetstream_auth,
-        )
+            self.nats_manager = await start_nats_manager(
+                self.service_name,
+                indexing_settings.index_jetstream_servers,
+                indexing_settings.index_jetstream_auth,
+            )
         self.transaction = await start_transaction_utility(self.service_name)
 
     async def finalize(self) -> None:
