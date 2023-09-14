@@ -35,6 +35,8 @@ use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 
 use super::schema::{timestamp_to_datetime_utc, TextSchema};
 
+const TANTIVY_INDEX_ARENA_MEMORY: usize = 6_000_000;
+
 pub struct TextWriterService {
     index: Index,
     pub schema: TextSchema,
@@ -159,7 +161,9 @@ impl TextWriterService {
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(&config.path)?;
-        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
+        let writer = index
+            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
+            .unwrap();
 
         Ok(TextWriterService {
             index,
@@ -185,7 +189,9 @@ impl TextWriterService {
         let index = index_builder
             .create_in_dir(&config.path)
             .expect("Index directory should exist");
-        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
+        let writer = index
+            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
+            .unwrap();
 
         Ok(TextWriterService {
             index,
