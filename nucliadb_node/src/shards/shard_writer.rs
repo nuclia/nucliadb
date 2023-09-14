@@ -150,6 +150,7 @@ impl ShardWriter {
 
         let psc = ParagraphConfig {
             path: path.join(PARAGRAPHS_DIR),
+            num_threads: num_cpus::get(),
         };
 
         let vsc = VectorConfig {
@@ -172,6 +173,7 @@ impl ShardWriter {
 
         let psc = ParagraphConfig {
             path: path.join(PARAGRAPHS_DIR),
+            num_threads: num_cpus::get(),
         };
 
         let vsc = VectorConfig {
@@ -207,6 +209,7 @@ impl ShardWriter {
 
         let psc = ParagraphConfig {
             path: path.join(PARAGRAPHS_DIR),
+            num_threads: num_cpus::get(),
         };
 
         let vsc = VectorConfig {

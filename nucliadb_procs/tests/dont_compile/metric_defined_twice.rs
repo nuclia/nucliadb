@@ -16,31 +16,13 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 
-use std::fmt::Debug;
+use nucliadb_procs::{measure};
 
-use crate::metrics::meters::Meter;
-use crate::metrics::metric::request_time;
-use crate::{tracing, NodeResult};
+#[measure(actor = "vectors", metric = "my-test", metric = "my-other-test")]
+fn test_metric_defined_twice() {}
 
-pub struct ConsoleMeter;
 
-impl ConsoleMeter {
-    fn record<Metric: Debug, Value: Debug>(&self, metric: Metric, value: Value) {
-        tracing::debug!("{metric:?} : {value:?}")
-    }
-}
-
-impl Meter for ConsoleMeter {
-    fn export(&self) -> NodeResult<String> {
-        Ok(Default::default())
-    }
-
-    fn record_request_time(
-        &self,
-        metric: request_time::RequestTimeKey,
-        value: request_time::RequestTimeValue,
-    ) {
-        self.record(metric, value)
-    }
-}
+// Make trybuild happy and avoid errors due to not having a main function
+fn main() {}

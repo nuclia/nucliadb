@@ -20,11 +20,41 @@
 use prometheus_client::encoding::EncodeLabelSet;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
+use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
 use tokio_metrics::TaskMetrics;
 
-pub struct TokioTaskMetrics {
+use crate::metrics::task_monitor::{Monitor, MultiTaskMonitor, TaskId};
+
+pub struct TokioTasksObserver {
+    tasks_monitor: MultiTaskMonitor,
+    metrics: TokioTasksMetrics,
+}
+
+impl TokioTasksObserver {
+    pub fn new(registry: &mut Registry) -> Self {
+        Self {
+            tasks_monitor: MultiTaskMonitor::new(),
+            metrics: TokioTasksMetrics::new(registry),
+        }
+    }
+
+    pub fn observe(&self) {
+        self.tasks_monitor
+            .export_all()
+            .for_each(|(task_id, metrics)| {
+                let labels = TaskLabels { request: task_id };
+                self.metrics.update(labels, metrics);
+            });
+    }
+
+    pub fn get_monitor(&self, task_id: TaskId) -> Monitor {
+        self.tasks_monitor.task_monitor(task_id)
+    }
+}
+
+struct TokioTasksMetrics {
     instrumented_count: Family<TaskLabels, Counter>,
     dropped_count: Family<TaskLabels, Counter>,
     first_poll_count: Family<TaskLabels, Counter>,
@@ -43,6 +73,18 @@ pub struct TokioTaskMetrics {
     total_long_delay_count: Family<TaskLabels, Counter>,
     total_short_delay_duration: Family<TaskLabels, Histogram>,
     total_long_delay_duration: Family<TaskLabels, Histogram>,
+
+    // Derived metrics
+    mean_first_poll_delay: Family<TaskLabels, Histogram>,
+    mean_idle_duration: Family<TaskLabels, Histogram>,
+    mean_scheduled_duration: Family<TaskLabels, Histogram>,
+    mean_task_poll_duration: Family<TaskLabels, Histogram>,
+    slow_poll_ratio: Family<TaskLabels, Gauge>,
+    long_delay_ratio: Family<TaskLabels, Gauge>,
+    mean_fast_poll_duration: Family<TaskLabels, Histogram>,
+    mean_short_delay_duration: Family<TaskLabels, Histogram>,
+    mean_slow_poll_duration: Family<TaskLabels, Histogram>,
+    mean_long_delay_duration: Family<TaskLabels, Histogram>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
@@ -60,7 +102,7 @@ const BUCKETS: [f64; 15] = [
     0.250, 0.500, 1.0, 5.0,
 ];
 
-impl TokioTaskMetrics {
+impl TokioTasksMetrics {
     fn new(registry: &mut Registry) -> Self {
         let histogram_constructor = || Histogram::new(BUCKETS.iter().copied());
 
@@ -200,6 +242,88 @@ impl TokioTaskMetrics {
             total_long_delay_duration.clone(),
         );
 
+        let mean_first_poll_delay =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_first_poll_delay",
+            "The mean duration elapsed between the instant tasks are instrumented, and the \
+             instant they are first polled",
+            mean_first_poll_delay.clone(),
+        );
+
+        let mean_idle_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_idle_duration",
+            "The mean duration of idles (duration spanning the instant a task completes a poll, \
+             and the instant that is next awoken)",
+            mean_idle_duration.clone(),
+        );
+
+        let mean_scheduled_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_scheduled_duration",
+            "The mean duration that tasks spent waiting to be executed after awakening",
+            mean_scheduled_duration.clone(),
+        );
+
+        let mean_task_poll_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_task_poll_duration",
+            "The mean duration of polls",
+            mean_task_poll_duration.clone(),
+        );
+
+        let slow_poll_ratio = Family::default();
+        registry.register(
+            "slow_poll_ratio",
+            "The ratio between the number polls categorized as slow and fast",
+            slow_poll_ratio.clone(),
+        );
+
+        let long_delay_ratio = Family::default();
+        registry.register(
+            "long_delay_ratio",
+            "The ratio of tasks exceeding long_delay_threshold",
+            long_delay_ratio.clone(),
+        );
+
+        let mean_fast_poll_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_fast_poll_duration",
+            "The eman duration of fast polls",
+            mean_fast_poll_duration.clone(),
+        );
+
+        let mean_short_delay_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_short_delay_duration",
+            "The average time taken for a task witha  short scheduling delay to be executed after \
+             being scheduled",
+            mean_short_delay_duration.clone(),
+        );
+
+        let mean_slow_poll_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_slow_poll_duration",
+            "The mean duration of slow polls",
+            mean_slow_poll_duration.clone(),
+        );
+
+        let mean_long_delay_duration =
+            Family::<TaskLabels, Histogram>::new_with_constructor(histogram_constructor);
+        registry.register(
+            "mean_long_delay_duration",
+            "The average scheduling delay for a task which takes a long time to start executing \
+             after being scheduled",
+            mean_long_delay_duration.clone(),
+        );
+
         Self {
             instrumented_count,
             dropped_count,
@@ -219,12 +343,22 @@ impl TokioTaskMetrics {
             total_long_delay_count,
             total_short_delay_duration,
             total_long_delay_duration,
+            mean_first_poll_delay,
+            mean_idle_duration,
+            mean_scheduled_duration,
+            mean_task_poll_duration,
+            slow_poll_ratio,
+            long_delay_ratio,
+            mean_fast_poll_duration,
+            mean_short_delay_duration,
+            mean_slow_poll_duration,
+            mean_long_delay_duration,
         }
     }
 
     /// Collected metrics must belong to the interval from last `collect` call
     /// until the current call.
-    pub fn collect(&self, labels: TaskLabels, metrics: TaskMetrics) {
+    fn update(&self, labels: TaskLabels, metrics: TaskMetrics) {
         // TODO? Should we add a declarative macro to improve this?
 
         self.instrumented_count
@@ -298,9 +432,41 @@ impl TokioTaskMetrics {
         self.total_long_delay_duration
             .get_or_create(&labels)
             .observe(metrics.total_long_delay_duration.as_secs_f64());
-    }
-}
 
-pub fn register_tokio_task_metrics(registry: &mut Registry) -> TokioTaskMetrics {
-    TokioTaskMetrics::new(registry)
+        self.mean_first_poll_delay
+            .get_or_create(&labels)
+            .observe(metrics.mean_first_poll_delay().as_secs_f64());
+        self.mean_idle_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_idle_duration().as_secs_f64());
+        self.mean_scheduled_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_scheduled_duration().as_secs_f64());
+        self.mean_task_poll_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_poll_duration().as_secs_f64());
+
+        // Gauges are signed integers but our ratio is a float. We multiply by
+        // 10^3 to get 3 decimals and lose less precision (it should be divided
+        // by 1000 on its dashboard)
+        self.slow_poll_ratio
+            .get_or_create(&labels)
+            .set((metrics.slow_poll_ratio() * 1000.0) as i64);
+        self.long_delay_ratio
+            .get_or_create(&labels)
+            .set((metrics.long_delay_ratio() * 1000.0) as i64);
+
+        self.mean_fast_poll_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_fast_poll_duration().as_secs_f64());
+        self.mean_short_delay_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_short_delay_duration().as_secs_f64());
+        self.mean_slow_poll_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_slow_poll_duration().as_secs_f64());
+        self.mean_long_delay_duration
+            .get_or_create(&labels)
+            .observe(metrics.mean_long_delay_duration().as_secs_f64());
+    }
 }

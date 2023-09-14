@@ -27,6 +27,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _LABELS_LABELSETENTRY._serialized_options = b'8\001'
   _ENTITIESGROUP_ENTITIESENTRY._options = None
   _ENTITIESGROUP_ENTITIESENTRY._serialized_options = b'8\001'
+  _ENTITIESGROUPS_ENTITIESGROUPSENTRY._options = None
+  _ENTITIESGROUPS_ENTITIESGROUPSENTRY._serialized_options = b'8\001'
   _VECTORSETS_VECTORSETSENTRY._options = None
   _VECTORSETS_VECTORSETSENTRY._serialized_options = b'8\001'
   _SYNONYMS_TERMSENTRY._options = None

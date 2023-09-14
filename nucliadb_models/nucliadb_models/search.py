@@ -521,8 +521,8 @@ class SearchParamDefaults:
     )
     chat_context = ParamDefault(
         default=None,
-        title="Chat context",
-        description="Use to control the context that is passed as input to the Generative AI model. If not specified, it is generated automatically.",  # noqa
+        title="Chat history",
+        description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
     )
 
     chat_features = ParamDefault(
@@ -645,10 +645,10 @@ class ChatModel(BaseModel):
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    context: List[ChatContextMessage] = Field(
-        [], description="The information retrieval context for the current question"
+    query_context: List[str] = Field(
+        [], description="The information retrieval context for the current query"
     )
-    conversation: List[ChatContextMessage] = Field(
+    chat_history: List[ChatContextMessage] = Field(
         [], description="The chat conversation history"
     )
     truncate: bool = Field(
@@ -659,7 +659,7 @@ class ChatModel(BaseModel):
 
 class RephraseModel(BaseModel):
     question: str
-    context: List[ChatContextMessage] = []
+    chat_history: List[ChatContextMessage] = []
     user_id: str
 
 
@@ -702,6 +702,9 @@ class ChatRequest(BaseModel):
     ] = SearchParamDefaults.chat_context.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
+    resource_filters: List[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
 
 
 class FindRequest(BaseSearchRequest):

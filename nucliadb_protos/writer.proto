@@ -226,6 +226,7 @@ message GetEntitiesRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
 }
 
+
 message GetEntitiesResponse {
     knowledgebox.KnowledgeBoxID kb = 1;
     map <string, knowledgebox.EntitiesGroup> groups = 2;

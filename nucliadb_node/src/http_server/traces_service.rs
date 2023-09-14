@@ -17,6 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::process::Command;
+use std::{env, process};
+
 use axum::response::{IntoResponse, Json, Response};
 use serde::Serialize;
 
@@ -25,35 +28,33 @@ struct Traces {
     trace: String,
 }
 
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use std::env;
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use std::process::Command;
-
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
-use rstack_self;
-
-#[cfg(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl")))]
 pub async fn thread_dump_service() -> Response {
-    let exe = env::current_exe().unwrap();
-    let trace = rstack_self::trace(Command::new(exe).arg("child"));
+    let pid = process::id();
+    let mut node_trace = env::current_exe().unwrap();
+    node_trace.pop();
+    node_trace.push("rust-spy");
+    let mut cmd = Command::new(node_trace);
+    let args = [format!("{}", pid)];
 
-    match trace {
-        Ok(res) => Json(Traces {
-            trace: format!("{:#?}", res),
-        })
-        .into_response(),
-        Err(err) => Json(Traces {
-            trace: format!("Could not retrieve thread dump {:?}", err),
-        })
-        .into_response(),
-    }
-}
+    cmd.args(&args);
 
-#[cfg(not(all(target_arch = "x86_64", target_os = "linux", not(target_env = "musl"))))]
-pub async fn thread_dump_service() -> Response {
-    Json(Traces {
-        trace: String::from("Not supported on this platform"),
-    })
-    .into_response()
+    let output = match cmd.output() {
+        Ok(output) => output,
+        Err(e) => {
+            return Json(Traces {
+                trace: format!("Failed to execute {:?} command: {}", cmd, e),
+            })
+            .into_response();
+        }
+    };
+
+    let result = if output.status.success() {
+        // Convert the stdout bytes into a String
+        String::from_utf8_lossy(&output.stdout).to_string()
+    } else {
+        // Print the error message
+        format!("Command failed with error: {:?}", output.status)
+    };
+
+    Json(Traces { trace: result }).into_response()
 }

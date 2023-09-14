@@ -19,6 +19,7 @@
 use std::path::Path;
 use std::time::SystemTime;
 
+use crossbeam_utils::thread as crossbeam_thread;
 use nucliadb_core::metrics::{self, request_time};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -35,6 +36,7 @@ use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
 
 use crate::disk_structure::*;
+use crate::env;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
@@ -108,11 +110,12 @@ impl ShardReader {
         let mut text_result = Ok(0);
         let mut paragraph_result = Ok(0);
         let mut vector_result = Ok(0);
-        thread::scope(|s| {
+        crossbeam_thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
-        });
+        })
+        .expect("Failed to join threads");
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
@@ -164,8 +167,9 @@ impl ShardReader {
             path: shard_path.join(TEXTS_DIR),
         };
 
-        let psc = ParagraphConfig {
+        let psc: ParagraphConfig = ParagraphConfig {
             path: shard_path.join(PARAGRAPHS_DIR),
+            num_threads: env::num_paragraph_search_threads(),
         };
 
         let vsc = VectorConfig {
@@ -195,12 +199,13 @@ impl ShardReader {
         let mut paragraph_result = None;
         let mut vector_result = None;
         let mut relation_result = None;
-        thread::scope(|s| {
+        crossbeam_thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
             s.spawn(|_| relation_result = relation_task());
-        });
+        })
+        .expect("Failed to join threads");
         let fields = text_result.transpose()?;
         let paragraphs = paragraph_result.transpose()?;
         let vectors = vector_result.transpose()?;
@@ -396,7 +401,7 @@ impl ShardReader {
         let mut rvector = None;
         let mut rrelation = None;
 
-        thread::scope(|s| {
+        crossbeam_thread::scope(|s| {
             if !skip_fields {
                 s.spawn(|_| rtext = text_task());
             }
@@ -409,7 +414,8 @@ impl ShardReader {
             if !skip_relations {
                 s.spawn(|_| rrelation = relation_task());
             }
-        });
+        })
+        .expect("Failed to join threads");
 
         let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);

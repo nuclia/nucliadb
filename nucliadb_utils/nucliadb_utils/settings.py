@@ -178,3 +178,15 @@ class AuditSettings(BaseSettings):
 
 
 audit_settings = AuditSettings()
+
+
+class NATSConsumerSettings(BaseSettings):
+    # Read about message ordering:
+    #   https://docs.nats.io/nats-concepts/subject_mapping#when-is-deterministic-partitioning-needed
+    nats_max_ack_pending: int = 1  # required for strict message ordering
+    nats_max_deliver: int = 10000
+    nats_ack_wait: int = 10 * 60
+    nats_idle_heartbeat: float = 5.0
+
+
+nats_consumer_settings = NATSConsumerSettings()

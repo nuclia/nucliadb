@@ -22,8 +22,6 @@ use std::fmt::Debug;
 use std::time::*;
 
 use itertools::Itertools;
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
@@ -31,6 +29,7 @@ use nucliadb_core::protos::{
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::schema::*;
@@ -117,23 +116,16 @@ impl FieldReader for TextReaderService {
 impl ReaderChild for TextReaderService {
     type Request = DocumentSearchRequest;
     type Response = DocumentSearchResponse;
+
+    #[measure(actor = "texts", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        let time = SystemTime::now();
-
-        let result = self.do_search(request)?;
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("search".to_string());
-        metrics.record_request_time(metric, took);
-
-        Ok(result)
+        self.do_search(request)
     }
+
+    #[measure(actor = "texts", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
-
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -146,11 +138,6 @@ impl ReaderChild for TextReaderService {
             };
             keys.push(key);
         }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("stored_ids".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(keys)
     }
@@ -441,6 +428,7 @@ impl TextReaderService {
             }
         }
     }
+
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()
     }

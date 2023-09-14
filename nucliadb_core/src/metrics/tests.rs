@@ -29,6 +29,7 @@ async fn test_export_metric_name() {
     assert!(export.contains("\n# TYPE nucliadb_node_instrumented_count counter\n"))
 }
 
+#[tokio::test(flavor = "current_thread")]
 async fn test_export_tasks_instrumented_count() {
     let meter = PrometheusMeter::new();
     let task_id = "my-task".to_string();
@@ -36,7 +37,7 @@ async fn test_export_tasks_instrumented_count() {
     meter
         .task_monitor(task_id.clone())
         .unwrap()
-        .instrument(async {  })
+        .instrument(async {})
         .await;
 
     let export = meter.export().unwrap();
@@ -98,6 +99,19 @@ async fn test_export_runtime_metrics_with_prometheus_meter_polls_count() {
     assert!(export.contains("nucliadb_node_total_polls_count_total 200"));
     assert!(export.contains("nucliadb_node_min_polls_count 100"));
     assert!(export.contains("nucliadb_node_max_polls_count 100"));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn test_export_runtime_metrics_blocking_threads_count() {
+    let meter = PrometheusMeter::new();
+
+    let export = meter.export().unwrap();
+    assert!(export.contains("nucliadb_node_blocking_threads_count 0"));
+
+    tokio::task::spawn_blocking(|| std::thread::sleep(std::time::Duration::from_millis(10)));
+
+    let export = meter.export().unwrap();
+    assert!(export.contains("nucliadb_node_blocking_threads_count 1"));
 }
 
 async fn flush_metrics() {

@@ -27,6 +27,7 @@ use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
 use crate::data_point_provider::*;
@@ -50,6 +51,7 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
+    #[measure(actor = "vectors", metric = "list_vectorsets")]
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
         let time = SystemTime::now();
@@ -59,14 +61,13 @@ impl VectorWriter for VectorWriterService {
         let indexset_slock = self.indexset.get_slock()?;
         self.indexset.index_keys(&mut collector, &indexset_slock);
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("list_vectorsets".to_string());
-        metrics.record_request_time(metric, took);
-
         debug!("{id:?} - Ending at {took} ms");
+
         Ok(collector)
     }
+
+    #[measure(actor = "vectors", metric = "add_vectorset")]
     #[tracing::instrument(skip_all)]
     fn add_vectorset(
         &mut self,
@@ -84,14 +85,13 @@ impl VectorWriter for VectorWriterService {
             .get_or_create(indexid, similarity, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("add_vectorset".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
 
         Ok(())
     }
+
+    #[measure(actor = "vectors", metric = "remove_vectorset")]
     #[tracing::instrument(skip_all)]
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -103,16 +103,15 @@ impl VectorWriter for VectorWriterService {
         self.indexset.remove_index(indexid, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("remove_vectorset".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
 
         Ok(())
     }
 }
+
 impl WriterChild for VectorWriterService {
+    #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
@@ -122,14 +121,13 @@ impl WriterChild for VectorWriterService {
         let no_nodes = self.index.no_nodes(&lock);
         std::mem::drop(lock);
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("count".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(no_nodes)
     }
+
+    #[measure(actor = "vectors", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -140,14 +138,13 @@ impl WriterChild for VectorWriterService {
         self.index.delete(&resource_id.uuid, temporal_mark, &lock);
         self.index.commit(&lock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("delete_resource".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(())
     }
+
+    #[measure(actor = "vectors", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -312,6 +309,8 @@ impl WriterChild for VectorWriterService {
 
         Ok(())
     }
+
+    #[measure(actor = "vectors", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -319,10 +318,7 @@ impl WriterChild for VectorWriterService {
         let lock = self.index.get_elock()?;
         self.index.collect_garbage(&lock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("garbage_collection".to_string());
-        metrics.record_request_time(metric, took);
         debug!("Garbage collection {took} ms");
 
         Ok(())
@@ -356,6 +352,7 @@ impl VectorWriterService {
             VectorWriterService::open(config)
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
@@ -372,6 +369,7 @@ impl VectorWriterService {
             })
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);

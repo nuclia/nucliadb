@@ -183,6 +183,11 @@ pub struct DeletedEntitiesGroups {
     #[prost(string, repeated, tag="1")]
     pub entities_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EntitiesGroups {
+    #[prost(map="string, message", tag="1")]
+    pub entities_groups: ::std::collections::HashMap<::prost::alloc::string::String, EntitiesGroup>,
+}
 // Vectorsets
 
 #[derive(Clone, PartialEq, ::prost::Message)]

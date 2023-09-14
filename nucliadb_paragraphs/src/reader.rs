@@ -21,8 +21,6 @@
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
@@ -30,6 +28,7 @@ use nucliadb_core::protos::{
     SuggestRequest,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
@@ -60,24 +59,15 @@ impl Debug for ParagraphReaderService {
 }
 
 impl ParagraphReader for ParagraphReaderService {
+    #[measure(actor = "paragraphs", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
-
-        let id: Option<String> = None;
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("{id:?} - Ending at: {v} ms");
-        }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(count)
     }
+
+    #[measure(actor = "paragraphs", metric = "suggest")]
     #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -120,10 +110,6 @@ impl ParagraphReader for ParagraphReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Ending at: {v} ms");
         }
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("suggest".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
             total: results.len(),
@@ -135,8 +121,10 @@ impl ParagraphReader for ParagraphReaderService {
             query: &text,
             page_number: 1,
             results_per_page: 10,
+            searcher,
         }))
     }
+
     #[tracing::instrument(skip_all)]
     fn iterator(&self, request: &StreamRequest) -> NodeResult<ParagraphIterator> {
         let producer = BatchProducer {
@@ -154,6 +142,8 @@ impl ParagraphReader for ParagraphReaderService {
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
+
+    #[measure(actor = "paragraphs", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -236,17 +226,12 @@ impl ReaderChild for ParagraphReaderService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("search".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(response)
     }
+
+    #[measure(actor = "paragraphs", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
-
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -260,11 +245,6 @@ impl ReaderChild for ParagraphReaderService {
             keys.push(key);
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("stored_ids".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(keys)
     }
 }
@@ -276,7 +256,8 @@ impl ParagraphReaderService {
             return Err(node_error!("Invalid path {:?}", config.path));
         }
         let paragraph_schema = ParagraphSchema::default();
-        let index = Index::open_in_dir(&config.path)?;
+        let mut index = Index::open_in_dir(&config.path)?;
+        index.set_multithread_executor(config.num_threads)?;
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
@@ -427,6 +408,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
+                        searcher,
                     }))
                 }
                 None => {
@@ -444,6 +426,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
+                        searcher,
                     }))
                 }
             }
@@ -466,6 +449,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
+                        searcher,
                     }))
                 }
                 None => {
@@ -483,6 +467,7 @@ impl<'a> Searcher<'a> {
                         query: self.text,
                         page_number: self.request.page_number,
                         results_per_page: self.results as i32,
+                        searcher,
                     }))
                 }
             }
@@ -656,6 +641,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
+            num_threads: 4,
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
@@ -709,6 +695,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
+            num_threads: 4,
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());

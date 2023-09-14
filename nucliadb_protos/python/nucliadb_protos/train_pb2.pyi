@@ -24,6 +24,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     ERROR as ERROR,
     EntitiesGroup as EntitiesGroup,
     EntitiesGroupSummary as EntitiesGroupSummary,
+    EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,

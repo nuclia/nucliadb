@@ -109,13 +109,13 @@ class NatsConnectionManager:
                 except nats.errors.ConnectionClosedError:  # pragma: no cover
                     pass
             try:
-                await asyncio.wait_for(self.nc.drain(), timeout=1)
+                await asyncio.wait_for(self._nc.drain(), timeout=1)
             except (
                 nats.errors.ConnectionClosedError,
                 asyncio.TimeoutError,
             ):  # pragma: no cover
                 pass
-            await self.nc.close()
+            await self._nc.close()
             self._subscriptions = []
 
     async def disconnected_cb(self) -> None:
