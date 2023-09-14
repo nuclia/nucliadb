@@ -36,7 +36,7 @@ from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
-from nucliadb_utils.nats import get_traced_jetstream, message_progress_updater
+from nucliadb_utils.nats import get_traced_jetstream, MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
@@ -297,7 +297,7 @@ class Worker:
         pb.ParseFromString(msg.data)
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
-        async with message_progress_updater(
+        async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), sm.lock:
             try:

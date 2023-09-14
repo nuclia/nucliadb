@@ -37,7 +37,7 @@ from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.nats import NatsConnectionManager, message_progress_updater
+from nucliadb_utils.nats import NatsConnectionManager, MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 
@@ -126,7 +126,7 @@ class IngestConsumer:
         message_source = "<msg source not set>"
         start = time.monotonic()
 
-        async with message_progress_updater(
+        async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), self.lock:
             try:

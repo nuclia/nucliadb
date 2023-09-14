@@ -47,7 +47,7 @@ def get_traced_jetstream(nc: NATSClient, service_name: str) -> JetStreamContext:
     return jetstream
 
 
-class message_progress_updater:
+class MessageProgressUpdater:
     """
     Context manager to send progress updates to NATS.
 
