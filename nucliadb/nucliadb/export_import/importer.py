@@ -122,7 +122,7 @@ class ExportStreamReader:
                 item_type = await self.read_type()
                 read_data_func = {
                     ExportedItemType.RESOURCE: self.read_bm,
-                    ExportedItemType.BINARY: self.read_bm,
+                    ExportedItemType.BINARY: self.read_binary,
                     ExportedItemType.ENTITIES: self.read_entities,
                     ExportedItemType.LABELS: self.read_labels,
                 }[item_type]
