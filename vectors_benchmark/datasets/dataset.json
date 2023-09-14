@@ -3,7 +3,7 @@
     {
       "name": "large",
       "shards": {
-        "url": "http://ziade.org/cov.tgz",
+        "url": "https://storage.googleapis.com/nucliadb_indexer/4508ea2f-b3e2-41ca-89b6-224172f5bb3e.tar.gz",
         "root_path": "shards",
         "ids": [
           "4508ea2f-b3e2-41ca-89b6-224172f5bb3e"
