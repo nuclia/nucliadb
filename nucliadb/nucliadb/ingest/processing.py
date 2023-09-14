@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from collections import defaultdict
 import datetime
 import uuid
+from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar
