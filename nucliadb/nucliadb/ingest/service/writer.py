@@ -25,7 +25,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse,
     GCKnowledgeBoxResponse,
-    KBConfiguration,
     KnowledgeBox,
     KnowledgeBoxID,
     KnowledgeBoxNew,
@@ -555,7 +554,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.OK
             return response
 
-    async def SetConfiguration(
+    async def SetConfiguration(  # type: ignore
         self, request: SetKBConfigurationRequest, context=None
     ) -> OpStatusWriter:
         response = OpStatusWriter()
@@ -576,9 +575,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.ERROR
                 return response
 
-    async def GetConfiguration(
+    async def GetConfiguration(  # type: ignore
         self, request: KnowledgeBoxID, context=None
-    ) -> KBConfiguration:
+    ) -> GetConfigurationResponse:
         response = GetConfigurationResponse()
         txn: Transaction
         async with self.driver.transaction() as txn:
@@ -596,7 +595,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status.status = OpStatusWriter.Status.ERROR
                 return response
 
-    async def DelConfiguration(
+    async def DelConfiguration(  # type: ignore
         self, request: KnowledgeBoxID, context=None
     ) -> OpStatusWriter:
         response = OpStatusWriter()

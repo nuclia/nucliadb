@@ -155,8 +155,8 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
-        self.NewConfiguration = channel.unary_unary(
-                '/fdbwriter.Writer/NewConfiguration',
+        self.SetConfiguration = channel.unary_unary(
+                '/fdbwriter.Writer/SetConfiguration',
                 request_serializer=nucliadb__protos_dot_writer__pb2.SetKBConfigurationRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
@@ -382,7 +382,7 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def NewConfiguration(self, request, context):
+    def SetConfiguration(self, request, context):
         """Configuration
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -586,8 +586,8 @@ def add_WriterServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
-            'NewConfiguration': grpc.unary_unary_rpc_method_handler(
-                    servicer.NewConfiguration,
+            'SetConfiguration': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetConfiguration,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.SetKBConfigurationRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
@@ -1123,7 +1123,7 @@ class Writer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def NewConfiguration(request,
+    def SetConfiguration(request,
             target,
             options=(),
             channel_credentials=None,
@@ -1133,7 +1133,7 @@ class Writer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/NewConfiguration',
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetConfiguration',
             nucliadb__protos_dot_writer__pb2.SetKBConfigurationRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
             options, channel_credentials,

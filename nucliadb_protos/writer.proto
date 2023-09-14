@@ -545,7 +545,7 @@ service Writer {
     rpc DelSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
 
     // Configuration
-    rpc NewConfiguration(SetKBConfigurationRequest) returns (OpStatusWriter) {}
+    rpc SetConfiguration(SetKBConfigurationRequest) returns (OpStatusWriter) {}
     rpc DelConfiguration(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
     rpc GetConfiguration(knowledgebox.KnowledgeBoxID) returns (GetConfigurationResponse) {}
     

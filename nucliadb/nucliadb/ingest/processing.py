@@ -429,7 +429,7 @@ class ProcessingEngine:
 class DummyProcessingEngine(ProcessingEngine):
     def __init__(self):
         self.calls: List[List[Any]] = []  # type: ignore
-        self.values: Dict[str, List[Any]] = defaultdict(list)
+        self.values = defaultdict(list)
         self.onprem = True
 
     async def initialize(self):

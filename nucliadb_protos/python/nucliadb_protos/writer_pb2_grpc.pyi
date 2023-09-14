@@ -246,7 +246,7 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
-    NewConfiguration: grpc.UnaryUnaryMultiCallable[
+    SetConfiguration: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetKBConfigurationRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
@@ -462,7 +462,7 @@ class WriterServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
     @abc.abstractmethod
-    def NewConfiguration(
+    def SetConfiguration(
         self,
         request: nucliadb_protos.writer_pb2.SetKBConfigurationRequest,
         context: grpc.ServicerContext,
