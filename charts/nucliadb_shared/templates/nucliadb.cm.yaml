@@ -59,6 +59,8 @@ data:
   CACHE_PUBSUB_NATS_AUTH: {{ .Values.cache.cache_pubsub_nats_auth }}
   TRANSACTION_JETSTREAM_AUTH: {{ .Values.transaction.transaction_jetstream_auth }}
   TRANSACTION_JETSTREAM_SERVERS: {{ toJson .Values.transaction.transaction_jetstream_servers | quote }}
+  INDEX_JETSTREAM_AUTH: {{ .Values.indexing.index_jetstream_auth }}
+  INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   DRIVER: {{ .Values.maindb.driver }}
 {{- if eq .Values.maindb.driver "redis" }}
   DRIVER_REDIS_URL: {{ .Values.maindb.driver_redis_url }}
