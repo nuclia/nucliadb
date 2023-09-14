@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.export_import.utils import get_binaries, import_broker_message
+from nucliadb.export_import.utils import get_cloud_files, import_broker_message
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.const import Streams
 
@@ -125,13 +125,13 @@ async def test_import_broker_message(broker_message, transaction, partitioning):
         assert call[1]["target_subject"] == Streams.INGEST_PROCESSED.subject
 
 
-def test_get_binaries(broker_message):
+def test_get_cloud_files(broker_message):
     # All expected binaries are returned
-    binaries = get_binaries(broker_message)
+    binaries = get_cloud_files(broker_message)
     assert len(binaries) == 12
     for cf in binaries:
         assert cf.source == resources_pb2.CloudFile.Source.LOCAL
 
     # Make sure that the source is set to export on the broker message cfs
-    for cf in get_binaries(broker_message):
+    for cf in get_cloud_files(broker_message):
         assert cf.source == resources_pb2.CloudFile.Source.EXPORT

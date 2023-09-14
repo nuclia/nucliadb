@@ -29,6 +29,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
+from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -111,5 +112,8 @@ def application_factory(settings: Settings) -> FastAPI:
     for route in application.router.routes:
         if isinstance(route, Mount):
             route.app.settings = settings  # type: ignore
+
+    # Inject application context into the fastapi app's state
+    set_app_context(application)
 
     return application

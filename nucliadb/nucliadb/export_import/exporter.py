@@ -24,7 +24,7 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.models import ExportedItemType
 from nucliadb.export_import.utils import (
     download_binary,
-    get_binaries,
+    get_cloud_files,
     get_entities,
     get_labels,
     iter_broker_messages,
@@ -41,7 +41,7 @@ async def export_kb(
     """
     async for bm in iter_broker_messages(context, kbid):
         # Stream the binary files of the broker message
-        for cloud_file in get_binaries(bm):
+        for cloud_file in get_cloud_files(bm):
             binary_size = cloud_file.size
             serialized_cf = cloud_file.SerializeToString()
 
@@ -59,15 +59,15 @@ async def export_kb(
         yield len(bm_bytes).to_bytes(4, byteorder="big")
         yield bm_bytes
 
-        # Stream the entities and labels of the knowledgebox
-        entities = await get_entities(context, kbid)
-        bytes = entities.SerializeToString()
-        yield ExportedItemType.ENTITIES.encode("utf-8")
-        yield len(bytes).to_bytes(4, byteorder="big")
-        yield bytes
+    # Stream the entities and labels of the knowledgebox
+    entities = await get_entities(context, kbid)
+    data = entities.SerializeToString()
+    yield ExportedItemType.ENTITIES.encode("utf-8")
+    yield len(data).to_bytes(4, byteorder="big")
+    yield data
 
-        labels = await get_labels(context, kbid)
-        bytes = labels.SerializeToString()
-        yield ExportedItemType.LABELS.encode("utf-8")
-        yield len(bytes).to_bytes(4, byteorder="big")
-        yield bytes
+    labels = await get_labels(context, kbid)
+    data = labels.SerializeToString()
+    yield ExportedItemType.LABELS.encode("utf-8")
+    yield len(data).to_bytes(4, byteorder="big")
+    yield data

@@ -129,15 +129,13 @@ async def iter_broker_messages(
 ) -> AsyncGenerator[writer_pb2.BrokerMessage, None]:
     rdm = ResourcesDataManager(context.kv_driver, context.blob_storage)
     async for rid in rdm.iterate_resource_ids(kbid):
-        resource = await rdm.get_resource(kbid, rid)
-        if resource is None:
+        bm = await rdm.get_broker_message(kbid, rid)
+        if bm is None:
             continue
-        resource.disable_vectors = False
-        bm = await resource.generate_broker_message()
         yield bm
 
 
-def get_binaries(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
+def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
     """Return the list of binaries of a broker message."""
     binaries: list[resources_pb2.CloudFile] = []
     for file_field in bm.files.values():

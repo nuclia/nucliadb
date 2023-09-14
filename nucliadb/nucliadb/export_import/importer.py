@@ -120,16 +120,13 @@ class ExportStreamReader:
         while True:
             try:
                 item_type = await self.read_type()
-                if item_type == ExportedItemType.RESOURCE:
-                    data = await self.read_bm()  # type: ignore
-                elif item_type == ExportedItemType.ENTITIES:
-                    data = await self.read_entities()  # type: ignore
-                elif item_type == ExportedItemType.LABELS:
-                    data = await self.read_labels()  # type: ignore
-                elif item_type == ExportedItemType.BINARY:
-                    data = await self.read_binary()  # type: ignore
-                else:
-                    raise ValueError(f"Unknown exported item type: {item_type}")
+                read_data_func = {
+                    ExportedItemType.RESOURCE: self.read_bm,
+                    ExportedItemType.BINARY: self.read_binary,
+                    ExportedItemType.ENTITIES: self.read_entities,
+                    ExportedItemType.LABELS: self.read_labels,
+                }[item_type]
+                data = await read_data_func()  # type: ignore
                 yield item_type, data
             except ExportStreamExhausted:
                 break
