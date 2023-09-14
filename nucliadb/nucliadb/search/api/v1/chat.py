@@ -147,6 +147,7 @@ async def create_chat_response(
             headers={
                 "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
+                "Content-Type": "application/json",
             },
         )
     else:
