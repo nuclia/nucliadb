@@ -41,16 +41,30 @@ fn test_start_new_writer() {
 }
 
 #[test]
-fn test_open_existent_writer() {
+fn test_open_writer_for_existent_index() {
+    let dir = TempDir::new().unwrap();
+    let config = TextConfig {
+        path: dir.path().join("texts"),
+    };
+
+    let writer = TextWriterService::start(&config).unwrap();
+    std::mem::drop(writer);
+
+    let another_writer = TextWriterService::open(&config);
+
+    assert!(another_writer.is_ok());
+}
+
+#[test]
+#[should_panic]
+fn test_two_simultaneous_writers() {
     let dir = TempDir::new().unwrap();
     let config = TextConfig {
         path: dir.path().join("texts"),
     };
 
     let _writer = TextWriterService::start(&config).unwrap();
-    let another_writer = TextWriterService::open(&config);
-
-    assert!(another_writer.is_ok());
+    let _another_writer = TextWriterService::open(&config);
 }
 
 #[test]
