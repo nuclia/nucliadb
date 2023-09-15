@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from io import BytesIO
 from uuid import uuid4
 
 import pytest
@@ -42,21 +41,8 @@ def dst_kbid(sdk: nucliadb_sdk.NucliaDB):
 
 def test_export_import_kb(src_kbid, dst_kbid, sdk: nucliadb_sdk.NucliaDB):
     export_generator = sdk.export_knowledge_box(kbid=src_kbid)
-    export = BytesIO()
-    for chunk in export_generator:
-        export.write(chunk)
-    export.seek(0)
-    assert len(export.getvalue()) > 0
 
-    def export_stream():
-        export.seek(0)
-        while True:
-            chunk = export.read(1024)
-            if not chunk:
-                break
-            yield chunk
-
-    sdk.import_knowledge_box(kbid=dst_kbid, content=export_stream())
+    sdk.import_knowledge_box(kbid=dst_kbid, content=export_generator)
 
     _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
 
