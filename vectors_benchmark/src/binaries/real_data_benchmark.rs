@@ -3,6 +3,7 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str::FromStr;
 
 use byte_unit::Byte;
@@ -211,14 +212,27 @@ impl Iterator for PartialRangeIter {
     }
 }
 
+fn get_gcp_token() -> String {
+    let output = Command::new("gcloud")
+        .args(["auth", "application-default", "print-access-token"])
+        .output()
+        .expect("Failed to execute gcloud command.");
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        panic!("gcloud error:\n{}", stderr);
+    }
+
+    let res = String::from_utf8_lossy(&output.stdout);
+    res.trim_end_matches(|c| c == '\n' || c == '\r').to_string()
+}
+
 fn get_content_length(url: &str) -> u64 {
     let client = reqwest::blocking::Client::new();
     let mut request = client.head(url);
 
     if url.starts_with("https://storage.googleapis.com") {
-        if let Ok(token) = var("GCLOUD_TOKEN") {
-            request = request.bearer_auth(token);
-        }
+        request = request.bearer_auth(get_gcp_token());
     } else if let Ok(dataset_auth) = var("DATASET_AUTH") {
         let (user_name, password) = dataset_auth.split_once(':').unwrap();
         request = request.basic_auth(user_name, Some(password));
@@ -246,9 +260,7 @@ fn range_request(url: &str, range: &HeaderValue) -> Response {
     let mut request = client.get(url).header(RANGE, range);
 
     if url.starts_with("https://storage.googleapis.com") {
-        if let Ok(token) = var("GCLOUD_TOKEN") {
-            request = request.bearer_auth(token);
-        }
+        request = request.bearer_auth(get_gcp_token());
     } else if let Ok(dataset_auth) = var("DATASET_AUTH") {
         let (user_name, password) = dataset_auth.split_once(':').unwrap();
         request = request.basic_auth(user_name, Some(password));
@@ -281,45 +293,47 @@ fn download_and_decompress_tarball(
         file.set_len(0)?;
     }
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open(&download_path)?;
-
     let content_length = get_content_length(url);
 
-    println!(
-        "Downloading {}",
-        Byte::from_bytes(content_length as u128).get_appropriate_unit(true),
-    );
+    if downloaded_bytes < content_length {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&download_path)?;
 
-    let pb = ProgressBar::new(content_length);
+        println!(
+            "Downloading {}",
+            Byte::from_bytes(content_length as u128).get_appropriate_unit(true),
+        );
 
-    for range in PartialRangeIter::new(0, content_length - 1, CHUNK_SIZE)? {
-        let mut response = range_request(url, &range);
-        let status = response.status();
+        let pb = ProgressBar::new(content_length);
 
-        if !(status == StatusCode::OK || status == StatusCode::PARTIAL_CONTENT) {
-            panic!("Unexpected server response: {}", status)
+        for range in PartialRangeIter::new(0, content_length - 1, CHUNK_SIZE)? {
+            let mut response = range_request(url, &range);
+            let status = response.status();
+
+            if !(status == StatusCode::OK || status == StatusCode::PARTIAL_CONTENT) {
+                panic!("Unexpected server response: {}", status)
+            }
+            std::io::copy(&mut response, &mut file).unwrap();
+
+            // really???
+            let length = u64::from_str(
+                response
+                    .headers()
+                    .get("Content-Length")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            downloaded_bytes += length;
+            pb.set_position(downloaded_bytes);
+            pb.tick();
         }
-        std::io::copy(&mut response, &mut file).unwrap();
 
-        // really???
-        let length = u64::from_str(
-            response
-                .headers()
-                .get("Content-Length")
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        )
-        .unwrap();
-        downloaded_bytes += length;
-        pb.set_position(downloaded_bytes);
-        pb.tick();
+        pb.finish_and_clear();
     }
-
-    pb.finish_and_clear();
     let tarball_file = File::open(&download_path)?;
     let tar = flate2::read::GzDecoder::new(tarball_file);
     let mut archive = Archive::new(tar);
