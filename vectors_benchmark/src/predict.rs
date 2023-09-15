@@ -17,31 +17,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod cli;
-pub mod downloader;
-pub mod engines;
-pub mod file_vectors;
-pub mod json_writer;
-pub mod plot_writer;
-pub mod predict;
-pub mod random_vectors;
-pub mod reader;
-pub mod stats;
-pub mod writer;
+use reqwest::blocking::Client;
+use std::env::var;
 
-pub mod cli_interface {
-    pub use super::cli::Args;
-    pub use super::file_vectors::*;
-    pub use super::plot_writer::*;
-    pub use super::random_vectors::*;
-    pub use super::{engines, reader, writer};
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct PredictResults {
+    pub data: Vec<f32>,
 }
 
-pub trait VectorEngine {
-    fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>);
-    fn search(&self, no_results: usize, query: &[f32]);
-}
+/// Calls the predict service to convert the query as a vector set
+pub fn get_vectorset(query: &str, model: &str) -> PredictResults {
+    let client = Client::new();
+    let nua_key = var("NUA_KEY").unwrap();
 
-pub trait Logger {
-    fn report(&mut self) -> cli::BenchR<()>;
+    let response = client
+        .get("https://europe-1.stashify.cloud/api/v1/predict/sentence")
+        .query(&[("text", query), ("model", model)])
+        .header("X-STF-NUAKEY", format!("Bearer {nua_key}"))
+        .send()
+        .unwrap();
+
+    if response.status().as_u16() > 299 {
+        panic!("[predict] Got a {} response from nua", response.status());
+    }
+
+    serde_json::from_str(response.text().unwrap().as_str()).unwrap()
 }
