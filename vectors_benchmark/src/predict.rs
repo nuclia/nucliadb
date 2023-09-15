@@ -28,10 +28,11 @@ pub struct PredictResults {
 /// Calls the predict service to convert the query as a vector set
 pub fn get_vectorset(query: &str, model: &str) -> PredictResults {
     let client = Client::new();
-    let nua_key = env!(
-        "NUA_KEY",
-        "You need to set your NUA_KEY environment variable to call the predict service"
-    );
+
+    let nua_key = env::var("NUA_KEY").unwrap_or_else(|_| {
+        panic!("You need to set your NUA_KEY environment variable to call the predict service");
+    });
+
     let response = client
         .get("https://europe-1.stashify.cloud/api/v1/predict/sentence")
         .query(&[("text", query), ("model", model)])
