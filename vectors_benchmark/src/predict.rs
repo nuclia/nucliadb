@@ -26,7 +26,7 @@ pub struct PredictResults {
 }
 
 /// Calls the predict service to convert the query as a vector set
-pub fn get_vectorset(query: &str, model: &str) -> PredictResults {
+pub fn get_vector(query: &str, model: &str) -> PredictResults {
     let client = Client::new();
 
     let nua_key = env::var("NUA_KEY").unwrap_or_else(|_| {

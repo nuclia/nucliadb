@@ -29,7 +29,7 @@ use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
 use vectors_benchmark::downloader::download_shard;
 use vectors_benchmark::json_writer::write_json;
-use vectors_benchmark::predict::{get_vectorset, PredictResults};
+use vectors_benchmark::predict::{get_vector, PredictResults};
 
 const NO_NEIGHBOURS: usize = 5;
 const CYCLES: usize = 25;
