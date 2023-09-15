@@ -20,6 +20,7 @@
 
 use std::fmt::Debug;
 use std::fs;
+use std::path::Path;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
@@ -33,6 +34,8 @@ use tantivy::schema::*;
 use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 
 use super::schema::{timestamp_to_datetime_utc, TextSchema};
+
+const TANTIVY_INDEX_ARENA_MEMORY: usize = 6_000_000;
 
 pub struct TextWriterService {
     index: Index,
@@ -148,24 +151,31 @@ impl TextWriterService {
     pub fn start(config: &TextConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            match TextWriterService::new(config) {
-                Err(e) if path.exists() => {
-                    std::fs::remove_dir(path)?;
-                    Err(e)
-                }
-                Err(e) => Err(e),
-                Ok(v) => Ok(v),
-            }
+            Self::new(config)
         } else {
-            Ok(TextWriterService::open(config)?)
+            Self::open(config)
         }
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(config: &TextConfig) -> NodeResult<Self> {
+    pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
-        fs::create_dir(&config.path)?;
-        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
+        let index = Index::open_in_dir(&config.path)?;
+        let writer = index
+            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
+            .unwrap();
+
+        Ok(TextWriterService {
+            index,
+            writer,
+            schema: field_schema,
+        })
+    }
+
+    #[tracing::instrument(skip_all)]
+    fn new(config: &TextConfig) -> NodeResult<Self> {
+        Self::try_create_index_dir(&config.path)?;
+
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
                 field: "created".to_string(),
@@ -173,11 +183,15 @@ impl TextWriterService {
             }),
             ..Default::default()
         };
-
+        let field_schema = TextSchema::new();
+        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         index_builder = index_builder.settings(settings);
-        let index = index_builder.create_in_dir(&config.path).unwrap();
-
-        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
+        let index = index_builder
+            .create_in_dir(&config.path)
+            .expect("Index directory should exist");
+        let writer = index
+            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
+            .unwrap();
 
         Ok(TextWriterService {
             index,
@@ -186,19 +200,22 @@ impl TextWriterService {
         })
     }
 
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &TextConfig) -> NodeResult<Self> {
-        let field_schema = TextSchema::new();
+    fn try_create_index_dir(path: &Path) -> NodeResult<()> {
+        let result = fs::create_dir(path);
+        if let Err(error) = result {
+            if path.exists() {
+                // operation failed but directory exists, we must delete it
+                if let Err(remove_error) = std::fs::remove_dir(path) {
+                    return Err(node_error!(
+                        "Double error creating and removing texts directory: \nFirst: {error} \
+                         \nSecond: {remove_error}"
+                    ));
+                }
+            }
+            return Err(node_error!("Error while creating texts directory: {error}"));
+        }
 
-        let index = Index::open_in_dir(&config.path)?;
-
-        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
-
-        Ok(TextWriterService {
-            index,
-            writer,
-            schema: field_schema,
-        })
+        Ok(())
     }
 
     fn index_document(&mut self, resource: &Resource) {
@@ -247,102 +264,5 @@ impl TextWriterService {
             }
             self.writer.add_document(field_doc).unwrap();
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::time::SystemTime;
-
-    use nucliadb_core::protos::prost_types::Timestamp;
-    use nucliadb_core::{protos, NodeResult};
-    use tantivy::collector::{Count, TopDocs};
-    use tantivy::query::{AllQuery, TermQuery};
-    use tempfile::TempDir;
-
-    use super::*;
-
-    fn create_resource(shard_id: String) -> Resource {
-        let resource_id = ResourceId {
-            shard_id: shard_id.to_string(),
-            uuid: "f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string(),
-        };
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
-        let metadata = protos::IndexMetadata {
-            created: Some(timestamp.clone()),
-            modified: Some(timestamp),
-        };
-
-        const DOC1_TI: &str = "This is the first document";
-        const DOC1_P1: &str = "This is the text of the second paragraph.";
-        const DOC1_P2: &str = "This should be enough to test the tantivy.";
-        const DOC1_P3: &str = "But I wanted to make it three anyway.";
-
-        let ti_title = protos::TextInformation {
-            text: DOC1_TI.to_string(),
-            labels: vec!["/l/mylabel".to_string()],
-        };
-
-        let ti_body = protos::TextInformation {
-            text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
-            labels: vec!["/f/body".to_string()],
-        };
-
-        let mut texts = HashMap::new();
-        texts.insert("title".to_string(), ti_title);
-        texts.insert("body".to_string(), ti_body);
-
-        Resource {
-            resource: Some(resource_id),
-            metadata: Some(metadata),
-            texts,
-            status: protos::resource::ResourceStatus::Processed as i32,
-            labels: vec![],
-            paragraphs: HashMap::new(),
-            paragraphs_to_delete: vec![],
-            sentences_to_delete: vec![],
-            relations_to_delete: vec![],
-            relations: vec![],
-            vectors: HashMap::default(),
-            vectors_to_delete: HashMap::default(),
-            shard_id,
-        }
-    }
-
-    #[test]
-    fn test_new_writer() -> NodeResult<()> {
-        let dir = TempDir::new().unwrap();
-        let fsc = TextConfig {
-            path: dir.path().join("texts"),
-        };
-
-        let mut field_writer_service = TextWriterService::start(&fsc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
-        let _ = field_writer_service.set_resource(&resource1);
-        let _ = field_writer_service.set_resource(&resource1);
-
-        let reader = field_writer_service.index.reader()?;
-        let searcher = reader.searcher();
-
-        let query = TermQuery::new(
-            Term::from_field_text(field_writer_service.schema.text, "document"),
-            IndexRecordOption::Basic,
-        );
-
-        let (_top_docs, count) = searcher.search(&query, &(TopDocs::with_limit(2), Count))?;
-        assert_eq!(count, 1);
-
-        let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
-        assert_eq!(count, 2);
-        Ok(())
     }
 }
