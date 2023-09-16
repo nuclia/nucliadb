@@ -134,7 +134,7 @@ fn create_request(
     }
 
     // Calling the NUA service to convert the query as a vector
-    let json: PredictResults = get_vectorset(&query, "multilingual");
+    let json: PredictResults = get_vector(&query, "multilingual");
 
     if json.data.len() != dimension {
         panic!(
