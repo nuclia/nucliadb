@@ -26,7 +26,7 @@ import pydantic
 try:
     from pydantic import BaseSettings
 except ImportError:  # pragma: no cover
-    from pydantic_settings import BaseSettings
+    from pydantic_settings import BaseSettings  # type: ignore
 
 try:
     import sentry_sdk

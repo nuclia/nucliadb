@@ -23,7 +23,7 @@ from typing import Optional
 try:
     from pydantic import BaseSettings
 except ImportError:  # pragma: no cover
-    from pydantic_settings import BaseSettings
+    from pydantic_settings import BaseSettings  # type: ignore
 
 
 class TelemetrySettings(BaseSettings):
