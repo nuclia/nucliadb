@@ -28,7 +28,6 @@ from async_lru import alru_cache
 from nucliadb_protos.knowledgebox_pb2 import KBConfiguration
 from nucliadb_protos.utils_pb2 import RelationNode
 
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KB_CONFIGURATION
 from nucliadb.ingest.tests.vectors import Q, Qm2023
 from nucliadb.ingest.txn_utils import get_transaction
@@ -226,16 +225,17 @@ class PredictEngine:
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
-        self.driver = get_driver()
 
     async def finalize(self):
         await self.session.close()
 
-    @alru_cache(maxsize=None)
     async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
         if self.onprem is False:
             return None
+        return await self._get_configuration(kbid)
 
+    @alru_cache(maxsize=None)
+    async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
         txn = await get_transaction()
         config_key = KB_CONFIGURATION.format(kbid=kbid)
         payload = await txn.get(config_key)
