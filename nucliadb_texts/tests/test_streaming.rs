@@ -17,31 +17,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod cli;
-pub mod downloader;
-pub mod engines;
-pub mod file_vectors;
-pub mod json_writer;
-pub mod plot_writer;
-pub mod predict;
-pub mod random_vectors;
-pub mod reader;
-pub mod stats;
-pub mod writer;
 
-pub mod cli_interface {
-    pub use super::cli::Args;
-    pub use super::file_vectors::*;
-    pub use super::plot_writer::*;
-    pub use super::random_vectors::*;
-    pub use super::{engines, reader, writer};
-}
+mod common;
 
-pub trait VectorEngine {
-    fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>);
-    fn search(&self, no_results: usize, query: &[f32]);
-}
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::StreamRequest;
 
-pub trait Logger {
-    fn report(&mut self) -> cli::BenchR<()>;
+#[test]
+fn test_stream_request_iterator() {
+    let reader = common::test_reader();
+    let request = StreamRequest {
+        shard_id: None,
+        filter: None,
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 2);
 }

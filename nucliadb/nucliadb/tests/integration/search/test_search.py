@@ -426,6 +426,54 @@ async def test_catalog_can_filter_by_processing_status(
         assert facets["/n/s"][f"/n/s/{status}"] == 1
 
 
+@pytest.mark.skip(reason="Needs sc-5626")
+@pytest.mark.asyncio
+async def test_catalog_prefix_search(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "Rust for dummies",
+        },
+    )
+    assert resp.status_code == 201
+    rust_for_dummies = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "Introduction to Python",
+        },
+    )
+    assert resp.status_code == 201
+    intro_to_python = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "Rust",
+        },
+    )
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 1
+    assert rust_for_dummies in resources
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "Intro",
+        },
+    )
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 1
+    assert intro_to_python in resources
+
+
 @pytest.mark.asyncio
 async def test_search_returns_sentence_positions(
     nucliadb_reader: AsyncClient,

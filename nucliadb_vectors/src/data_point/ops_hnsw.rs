@@ -145,6 +145,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let mut candidates = VecDeque::from([x]);
         loop {
             let best_so_far = candidates.pop_front();
+
             match best_so_far.map(|n| (n, self.similarity(n, query))) {
                 None => break None,
                 Some((_, score)) if score < self.tracker.min_score() => break None,
