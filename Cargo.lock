@@ -1951,6 +1951,7 @@ dependencies = [
  "log",
  "nucliadb_core",
  "nucliadb_paragraphs",
+ "nucliadb_procs",
  "nucliadb_relations",
  "nucliadb_telemetry",
  "nucliadb_texts",

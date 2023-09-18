@@ -69,6 +69,7 @@ rand = "0.8.4"
 # nucliadb dependencies
 nucliadb_telemetry = { path = "../nucliadb_telemetry" }
 nucliadb_core = { path = "../nucliadb_core" }
+nucliadb_procs = { path = "../nucliadb_procs" }
 nucliadb_texts = { path = "../nucliadb_texts" }
 nucliadb_paragraphs = { path = "../nucliadb_paragraphs" }
 nucliadb_vectors = { path = "../nucliadb_vectors" }
