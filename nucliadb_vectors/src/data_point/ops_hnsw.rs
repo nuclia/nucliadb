@@ -146,7 +146,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         loop {
             let best_so_far = candidates.pop_front();
 
-            // HOT POINT similarity
             match best_so_far.map(|n| (n, self.similarity(n, query))) {
                 None => break None,
                 Some((_, score)) if score < self.tracker.min_score() => break None,
@@ -286,7 +285,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             sol_addresses.insert(addr);
             vec_counter.add(self.tracker.get_vector(addr));
         });
-
         for (addr, _) in result {
             sol_addresses.remove(&addr);
             vec_counter.sub(self.tracker.get_vector(addr));
