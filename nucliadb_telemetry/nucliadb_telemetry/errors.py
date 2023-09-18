@@ -24,11 +24,6 @@ from typing import Any, ContextManager, Optional
 import pydantic
 
 try:
-    from pydantic import BaseSettings
-except ImportError:  # pragma: no cover
-    from pydantic_settings import BaseSettings  # type: ignore
-
-try:
     import sentry_sdk
     from sentry_sdk import Scope
 
@@ -73,7 +68,7 @@ def push_scope(**kwargs: Any) -> ContextManager[Scope]:
         return NoopScope()  # type: ignore
 
 
-class ErrorHandlingSettings(BaseSettings):
+class ErrorHandlingSettings(pydantic.BaseSettings):
     sentry_url: Optional[str] = None
     environment: str = pydantic.Field(
         "local", env=["environment", "running_environment"]
