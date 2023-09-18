@@ -60,6 +60,9 @@ COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
+
+ENV TMPDIR=/dev/root
+
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && cargo build \
     --locked \
