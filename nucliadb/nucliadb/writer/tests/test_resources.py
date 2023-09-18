@@ -344,23 +344,26 @@ async def test_reprocess_resource(
         assert payload.kbid == kbid
 
         assert isinstance(payload.filefield.get("file1"), str)
-        assert payload.filefield["file1"] == "DUMMYJWT"
+        assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"
         assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
         assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
         assert isinstance(
             payload.layoutfield.get("layout1"), nucliadb_models.LayoutDiff
         )
-        assert payload.layoutfield["layout1"].blocks["field1"].file == "DUMMYJWT"
+        assert (
+            payload.layoutfield["layout1"].blocks["field1"].file
+            == "convert_internal_cf_to_str,2"
+        )
         assert isinstance(
             payload.conversationfield.get("conv1"), nucliadb_models.PushConversation
         )
         assert (
             payload.conversationfield["conv1"].messages[33].content.attachments[0]
-            == "DUMMYJWT"
+            == "convert_internal_cf_to_str,0"
         )
         assert (
             payload.conversationfield["conv1"].messages[33].content.attachments[1]
-            == "DUMMYJWT"
+            == "convert_internal_cf_to_str,1"
         )
 
 
