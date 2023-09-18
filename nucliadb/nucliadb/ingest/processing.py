@@ -20,25 +20,32 @@
 import base64
 import datetime
 import uuid
+from collections import defaultdict
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar
 
 import aiohttp
 import backoff
-import jwt  # type: ignore
+import jwt
+from async_lru import alru_cache
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
+from nucliadb_protos.writer_pb2 import GetConfigurationResponse, OpStatusWriter
 from pydantic import BaseModel, Field
 
 import nucliadb_models as models
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.resource import QueueType
 from nucliadb_telemetry import metrics
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, get_ingest, set_utility
+
+_T = TypeVar("_T")
 
 if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
@@ -103,12 +110,11 @@ class PushPayload(BaseModel):
         default_factory=models.PushProcessingOptions
     )
 
+    learning_config: Optional[KBConfiguration] = None
+
 
 class PushResponse(BaseModel):
     seqid: Optional[int] = None
-
-
-DUMMY_JWT = "DUMMYJWT"
 
 
 async def start_processing_engine():
@@ -127,43 +133,6 @@ async def start_processing_engine():
         )
     await processing_engine.initialize()
     set_utility(Utility.PROCESSING, processing_engine)
-
-
-class DummyProcessingEngine:
-    def __init__(self):
-        self.calls: list[list[Any]] = []  # type: ignore
-
-    async def initialize(self):
-        pass
-
-    async def finalize(self):
-        pass
-
-    async def convert_filefield_to_str(self, file: models.FileField) -> str:
-        self.calls.append([file])
-        return DUMMY_JWT
-
-    def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
-        self.calls.append([file_field])
-        return DUMMY_JWT
-
-    async def convert_internal_filefield_to_str(
-        self, file: FieldFilePB, storage: Storage
-    ) -> str:
-        self.calls.append([file, storage])
-        return DUMMY_JWT
-
-    async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
-        self.calls.append([cf, storage])
-        return DUMMY_JWT
-
-    async def send_to_process(
-        self, item: PushPayload, partition: int
-    ) -> ProcessingInfo:
-        self.calls.append([item, partition])
-        return ProcessingInfo(
-            seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
-        )
 
 
 class ProcessingEngine:
@@ -226,6 +195,19 @@ class ProcessingEngine:
 
     async def finalize(self):
         await self.session.close()
+
+    @alru_cache(maxsize=None)
+    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
+        if self.onprem is False:
+            return None
+
+        ingest = get_ingest()
+        kb_obj = KnowledgeBoxID()
+        kb_obj.uuid = kbid
+        pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
+        if pb_response.status.status != OpStatusWriter.Status.OK:
+            return None
+        return KBConfiguration.from_message(pb_response.config)
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
@@ -408,6 +390,7 @@ class ProcessingEngine:
                     headers=headers,
                 )
             else:
+                item.learning_config = await self.get_configuration(item.kbid)
                 headers.update(
                     {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
                 )
@@ -439,4 +422,54 @@ class ProcessingEngine:
 
         return ProcessingInfo(
             seqid=seqid, account_seq=account_seq, queue=QueueType(queue_type)
+        )
+
+
+class DummyProcessingEngine(ProcessingEngine):
+    def __init__(self):
+        self.calls: List[List[Any]] = []  # type: ignore
+        self.values = defaultdict(list)
+        self.onprem = True
+
+    async def initialize(self):
+        pass
+
+    async def finalize(self):
+        pass
+
+    async def convert_filefield_to_str(self, file: models.FileField) -> str:
+        self.calls.append([file])
+        index = len(self.values["convert_filefield_to_str"])
+        self.values["convert_filefield_to_str"].append(file)
+        return f"convert_filefield_to_str,{index}"
+
+    def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
+        self.calls.append([file_field])
+        index = len(self.values["convert_external_filefield_to_str"])
+        self.values["convert_external_filefield_to_str"].append(file_field)
+        return f"convert_external_filefield_to_str,{index}"
+
+    async def convert_internal_filefield_to_str(
+        self, file: FieldFilePB, storage: Storage
+    ) -> str:
+        self.calls.append([file, storage])
+        index = len(self.values["convert_internal_filefield_to_str"])
+        self.values["convert_internal_filefield_to_str"].append([file, storage])
+        return f"convert_internal_filefield_to_str,{index}"
+
+    async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
+        self.calls.append([cf, storage])
+        index = len(self.values["convert_internal_cf_to_str"])
+        self.values["convert_internal_cf_to_str"].append([cf, storage])
+        return f"convert_internal_cf_to_str,{index}"
+
+    async def send_to_process(
+        self, item: PushPayload, partition: int
+    ) -> ProcessingInfo:
+        self.calls.append([item, partition])
+        item.learning_config = await self.get_configuration(item.kbid)
+
+        self.values["send_to_process"].append([item, partition])
+        return ProcessingInfo(
+            seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
         )

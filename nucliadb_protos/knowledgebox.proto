@@ -188,3 +188,14 @@ message SemanticModelMetadata {
     optional int32 vector_dimension = 2;
     optional float default_min_score = 3;
 }
+
+// Do not update this model without confirmation of internal Learning Config API
+
+
+message KBConfiguration {
+    string semantic_model = 2;
+    string generative_model = 3;
+    string ner_model = 4;
+    string anonymization_model = 5;
+    string visual_labeling = 6;
+}

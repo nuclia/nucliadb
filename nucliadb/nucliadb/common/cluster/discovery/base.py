@@ -119,7 +119,10 @@ async def _get_index_node_metadata(
 async def _get_standalone_index_node_metadata(
     settings: Settings, address: str
 ) -> IndexNodeMetadata:
-    grpc_address = f"{address}:{settings.standalone_node_port}"
+    if ":" not in address:
+        grpc_address = f"{address}:{settings.standalone_node_port}"
+    else:
+        grpc_address = address
     channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
     stub = standalone_pb2_grpc.StandaloneClusterServiceStub(channel)
     resp: standalone_pb2.NodeInfoResponse = await stub.NodeInfo(standalone_pb2.NodeInfoRequest())  # type: ignore

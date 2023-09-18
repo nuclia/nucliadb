@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -72,6 +73,14 @@ async def test_dummy_predict_engine():
     assert await pe.chat_query("kbid", Mock())
     assert await pe.convert_sentence_to_vector("kbid", "some sentence")
     assert await pe.detect_entities("kbid", "some sentence")
+
+
+@pytest.fixture(scope="function", autouse=True)
+def get_configuration():
+    with mock.patch(
+        "nucliadb.search.predict.PredictEngine.get_configuration", return_value=None
+    ):
+        yield
 
 
 @pytest.mark.asyncio

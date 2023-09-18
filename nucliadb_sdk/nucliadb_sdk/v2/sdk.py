@@ -26,6 +26,7 @@ import httpx
 import orjson
 from pydantic import BaseModel
 
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
@@ -362,6 +363,32 @@ class _NucliaDBBase:
         path_params=("kbid", "rid", "field_id"),
         request_type=List[InputMessage],  # type: ignore
         response_type=ResourceFieldAdded,
+    )
+
+    # Configuration
+    set_configuration = _request_builder(
+        name="set_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="POST",
+        path_params=("kbid",),
+        request_type=KBConfiguration,
+        response_type=None,
+    )
+    delete_configuration = _request_builder(
+        name="delete_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="DELETE",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+    get_configuration = _request_builder(
+        name="get_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KBConfiguration,
     )
 
     # Labels

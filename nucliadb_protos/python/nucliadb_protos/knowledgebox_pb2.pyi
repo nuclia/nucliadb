@@ -676,3 +676,32 @@ class SemanticModelMetadata(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_vector_dimension", b"_vector_dimension"]) -> typing_extensions.Literal["vector_dimension"] | None: ...
 
 global___SemanticModelMetadata = SemanticModelMetadata
+
+@typing_extensions.final
+class KBConfiguration(google.protobuf.message.Message):
+    """Do not update this model without confirmation of internal Learning Config API"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEMANTIC_MODEL_FIELD_NUMBER: builtins.int
+    GENERATIVE_MODEL_FIELD_NUMBER: builtins.int
+    NER_MODEL_FIELD_NUMBER: builtins.int
+    ANONYMIZATION_MODEL_FIELD_NUMBER: builtins.int
+    VISUAL_LABELING_FIELD_NUMBER: builtins.int
+    semantic_model: builtins.str
+    generative_model: builtins.str
+    ner_model: builtins.str
+    anonymization_model: builtins.str
+    visual_labeling: builtins.str
+    def __init__(
+        self,
+        *,
+        semantic_model: builtins.str = ...,
+        generative_model: builtins.str = ...,
+        ner_model: builtins.str = ...,
+        anonymization_model: builtins.str = ...,
+        visual_labeling: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["anonymization_model", b"anonymization_model", "generative_model", b"generative_model", "ner_model", b"ner_model", "semantic_model", b"semantic_model", "visual_labeling", b"visual_labeling"]) -> None: ...
+
+global___KBConfiguration = KBConfiguration

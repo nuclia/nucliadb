@@ -129,6 +129,8 @@ class NucliaSettings(BaseSettings):
 
     dummy_processing: bool = False
     dummy_predict: bool = False
+    local_predict: bool = False
+    local_predict_headers: Dict[str, str] = {}
 
     @root_validator(pre=True)
     def check_onprem_does_not_use_jwt_key(cls, values):

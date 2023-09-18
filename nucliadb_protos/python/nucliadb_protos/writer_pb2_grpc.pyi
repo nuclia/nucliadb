@@ -18,6 +18,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
+    KBConfiguration as KBConfiguration,
     KnowledgeBox as KnowledgeBox,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -245,6 +246,19 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
+    SetConfiguration: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.SetKBConfigurationRequest,
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
+    """Configuration"""
+    DelConfiguration: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
+    GetConfiguration: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+        nucliadb_protos.writer_pb2.GetConfigurationResponse,
+    ]
     Status: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.WriterStatusRequest,
         nucliadb_protos.writer_pb2.WriterStatusResponse,
@@ -447,6 +461,25 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
+    @abc.abstractmethod
+    def SetConfiguration(
+        self,
+        request: nucliadb_protos.writer_pb2.SetKBConfigurationRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.OpStatusWriter:
+        """Configuration"""
+    @abc.abstractmethod
+    def DelConfiguration(
+        self,
+        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
+    @abc.abstractmethod
+    def GetConfiguration(
+        self,
+        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.GetConfigurationResponse: ...
     @abc.abstractmethod
     def Status(
         self,
