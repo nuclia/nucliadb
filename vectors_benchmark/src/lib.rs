@@ -18,10 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 pub mod cli;
+pub mod downloader;
 pub mod engines;
 pub mod file_vectors;
 pub mod json_writer;
 pub mod plot_writer;
+pub mod predict;
 pub mod random_vectors;
 pub mod reader;
 pub mod stats;

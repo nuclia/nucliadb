@@ -91,7 +91,7 @@ pub struct Index {
     dimension: RwLock<Option<u64>>,
 }
 impl Index {
-    fn get_dimension(&self) -> Option<u64> {
+    pub fn get_dimension(&self) -> Option<u64> {
         *self.dimension.read().unwrap_or_else(|e| e.into_inner())
     }
     fn set_dimension(&self, dimension: Option<u64>) {
