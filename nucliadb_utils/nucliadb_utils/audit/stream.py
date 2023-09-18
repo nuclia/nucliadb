@@ -111,15 +111,18 @@ class StreamAuditStorage(AuditStorage):
 
     async def run(self):
         while True:
+            item_dequeued = False
             try:
                 audit = await self.queue.get()
+                item_dequeued = True
                 await self._send(audit)
             except (asyncio.CancelledError, KeyboardInterrupt, RuntimeError):
                 return
             except Exception:  # pragma: no cover
                 logger.exception("Could not send audit", stack_info=True)
             finally:
-                self.queue.task_done()
+                if item_dequeued:
+                    self.queue.task_done()
 
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)

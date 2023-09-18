@@ -61,7 +61,7 @@ async def fake_nodes():
 
 
 @pytest.fixture(scope="function")
-async def shards(fake_nodes, fake_kbid: str, redis_driver: Driver):
+async def shards(fake_nodes, fake_kbid: str, maindb_driver: Driver):
     """
     Shards:
     - shard-a
@@ -73,7 +73,7 @@ async def shards(fake_nodes, fake_kbid: str, redis_driver: Driver):
     - shard-b.1 -> node-1
     - shard-b.2 -> node-2
     """
-    driver = redis_driver
+    driver = maindb_driver
     kbid = fake_kbid
 
     shards = Shards()
@@ -172,7 +172,7 @@ async def test_choose_node_raises_if_no_nodes(shards):
 
 
 @pytest.mark.asyncio
-async def test_apply_for_all_shards(fake_kbid: str, shards, redis_driver: Driver):
+async def test_apply_for_all_shards(fake_kbid: str, shards, maindb_driver: Driver):
     kbid = fake_kbid
 
     shard_manager = manager.KBShardManager()
@@ -200,10 +200,10 @@ def node_new_shard():
 
 
 async def test_create_shard_by_kbid_attempts_on_all_nodes(
-    shards, redis_driver, fake_kbid, node_new_shard
+    shards, maindb_driver, fake_kbid, node_new_shard
 ):
     shard_manager = manager.KBShardManager()
-    async with redis_driver.transaction() as txn:
+    async with maindb_driver.transaction() as txn:
         with pytest.raises(ExhaustedNodesError):
             await shard_manager.create_shard_by_kbid(
                 txn, fake_kbid, semantic_model=mock.MagicMock()
