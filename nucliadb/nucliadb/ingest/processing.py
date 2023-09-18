@@ -202,7 +202,6 @@ class ProcessingEngine:
             return None
 
         ingest = get_ingest()
-
         kb_obj = KnowledgeBoxID()
         kb_obj.uuid = kbid
         pb_response: GetConfigurationResponse = await ingest.GetConfiguration(kb_obj)  # type: ignore
