@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -55,16 +56,18 @@ async def test_dummy_processing_engine():
     engine.convert_external_filefield_to_str(None)
     await engine.convert_internal_filefield_to_str(None, None)
     await engine.convert_internal_cf_to_str(None, None)
-    await engine.send_to_process(None, 1)
+    await engine.send_to_process(Mock(kbid="foo"), 1)
 
 
 @pytest.fixture(scope="function")
 def engine():
-    return ProcessingEngine(
+    pe = ProcessingEngine(
         onprem=True,
         nuclia_cluster_url="cluster_url",
         nuclia_public_url="public_url",
     )
+    with mock.patch.object(pe, "get_configuration", return_value=None):
+        yield pe
 
 
 def get_mocked_session(
