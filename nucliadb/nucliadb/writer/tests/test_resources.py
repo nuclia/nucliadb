@@ -327,6 +327,7 @@ async def test_reprocess_resource(
     from nucliadb.writer.utilities import get_processing
 
     processing = get_processing()
+    processing.values.clear()
 
     original = processing.send_to_process
     mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
