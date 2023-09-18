@@ -47,6 +47,15 @@ TEST_CLOUD_FILE = CloudFile(
 TEST_ITEM = PushPayload(uuid="foo", kbid="bar", userid="baz", partition=1)
 
 
+@pytest.fixture(scope="function", autouse=True)
+def get_configuration():
+    with mock.patch(
+        "nucliadb.ingest.processing.ProcessingEngine.get_configuration",
+        return_value=None,
+    ):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_dummy_processing_engine():
     engine = DummyProcessingEngine()

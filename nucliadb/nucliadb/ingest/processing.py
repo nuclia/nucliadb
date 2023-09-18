@@ -437,9 +437,6 @@ class DummyProcessingEngine(ProcessingEngine):
     async def finalize(self):
         pass
 
-    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:  # type: ignore
-        return None
-
     async def convert_filefield_to_str(self, file: models.FileField) -> str:
         self.calls.append([file])
         index = len(self.values["convert_filefield_to_str"])
