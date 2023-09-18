@@ -20,7 +20,10 @@
 import enum
 from typing import Optional
 
-from pydantic import BaseSettings
+try:
+    from pydantic import BaseSettings
+except ImportError:  # pragma: no cover
+    from pydantic_settings import BaseSettings
 
 
 class TelemetrySettings(BaseSettings):
