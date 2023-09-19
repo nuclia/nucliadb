@@ -306,7 +306,7 @@ async def get_resource_field(
         await txn.abort()
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-    resource_field = ResourceField(field_id=field_id, field_type=field_type)
+    resource_field = ResourceField(field_id=field_id, field_type=field_type)  # type: ignore
 
     if ResourceFieldProperties.VALUE in show:
         value = await field.get_value()

@@ -28,7 +28,7 @@ class RunningSettings(BaseSettings):
     debug: bool = True
     sentry_url: Optional[str] = None
     running_environment: str = Field(
-        "local", env=["environment", "running_environment"]
+        default="local", env=["environment", "running_environment"]
     )
     metrics_port: int = 3030
     metrics_host: str = "0.0.0.0"
@@ -65,27 +65,27 @@ class FileBackendConfig(str, Enum):
 
 class StorageSettings(BaseSettings):
     file_backend: FileBackendConfig = Field(
-        FileBackendConfig.NOT_SET, description="File backend storage type"
+        default=FileBackendConfig.NOT_SET, description="File backend storage type"
     )
 
     gcs_base64_creds: Optional[str] = Field(
-        None,
+        default=None,
         description="GCS JSON credentials of a service account encoded in Base64: https://cloud.google.com/iam/docs/service-account-overview",  # noqa
     )
     gcs_bucket: Optional[str] = Field(
-        None,
+        default=None,
         description="GCS Bucket name where files are stored: https://cloud.google.com/storage/docs/buckets",
     )
     gcs_location: Optional[str] = Field(
-        None,
+        default=None,
         description="GCS Bucket location: https://cloud.google.com/storage/docs/locations",
     )
     gcs_project: Optional[str] = Field(
-        None,
+        default=None,
         description="Google Cloud Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects",  # noqa
     )
     gcs_bucket_labels: Dict[str, str] = Field(
-        {},
+        default={},
         description="Map of labels with which GCS buckets will be labeled with: https://cloud.google.com/storage/docs/tags-and-labels",  # noqa
     )
     gcs_endpoint_url: str = "https://www.googleapis.com"
@@ -100,11 +100,11 @@ class StorageSettings(BaseSettings):
     s3_bucket: Optional[str] = None
 
     local_files: Optional[str] = Field(
-        None,
+        default=None,
         description="If using LOCAL `file_backend` storage, directory where files should be stored",
     )
     upload_token_expiration: int = Field(
-        3,
+        default=3,
         description="Number of days that uploaded files are kept in Nulia's processing engine",
     )
 

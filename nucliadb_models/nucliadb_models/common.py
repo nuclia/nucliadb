@@ -89,9 +89,9 @@ class File(BaseModel):
     filename: Optional[str]
     content_type: str = "application/octet-stream"
     payload: Optional[str] = Field(description="Base64 encoded file content")
-    md5: Optional[str]
+    md5: Optional[str] = None
     # These are to be used for external files
-    uri: Optional[str]
+    uri: Optional[str] = None
     extra_headers: Dict[str, str] = {}
 
     @root_validator(pre=False)

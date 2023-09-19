@@ -33,8 +33,8 @@ _T = TypeVar("_T")
 
 class ExtractedText(BaseModel):
     text: Optional[str]
-    split_text: Optional[Dict[str, str]]
-    deleted_splits: Optional[List[str]]
+    split_text: Optional[Dict[str, str]] = None
+    deleted_splits: Optional[List[str]] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.ExtractedText) -> _T:

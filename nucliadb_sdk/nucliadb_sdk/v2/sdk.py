@@ -93,7 +93,7 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
 
     return ChatResponse(
         result=find_result,
-        answer=answer,
+        answer=answer.decode("utf-8"),
         relations=relations_result,
         learning_id=learning_id,
     )
