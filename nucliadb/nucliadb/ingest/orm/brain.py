@@ -323,6 +323,8 @@ class ResourceBrain:
             self.brain.metadata.created.CopyFrom(basic.created)
         if basic.HasField("modified"):
             self.brain.metadata.modified.CopyFrom(basic.modified)
+        else:
+            self.brain.metadata.modified.CopyFrom(basic.created)
 
         relationnodedocument = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
