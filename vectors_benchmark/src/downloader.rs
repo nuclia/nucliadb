@@ -28,8 +28,7 @@ use std::str::FromStr;
 
 use byte_unit::Byte;
 use indicatif::ProgressBar;
-use reqwest::blocking::Client;
-use reqwest::blocking::Response;
+use reqwest::blocking::{Client, Response};
 use reqwest::header::{HeaderValue, CONTENT_LENGTH, RANGE};
 use reqwest::StatusCode;
 use tar::Archive;

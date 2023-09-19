@@ -124,9 +124,7 @@ impl Formula {
         Formula::default()
     }
     pub fn extend<C>(&mut self, clause: C)
-    where
-        Clause: From<C>,
-    {
+    where Clause: From<C> {
         self.clauses.push(clause.into())
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
