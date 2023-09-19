@@ -114,12 +114,12 @@ jobs:
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         run: |
-          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+          make build-node-debug
 
       - name: Build local Sidecar for testing
         if: steps.filter.outputs.sidecar_modified == 'true'
         run: |
-          docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
+          make build-sidecar
 
       - name: Run tests
         run: |

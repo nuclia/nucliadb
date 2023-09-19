@@ -98,16 +98,19 @@ base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
 
-build-search-images: build-local-node build-local-sidecar
+build-search-images: build-local-node build-sidecar
 
 build-node:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
+build-node-debug:
+	docker build -t eu.gcr.io/stashify-218417/node:main --build-arg CARGO_PROFILE=debug -f Dockerfile.node .
 
 # Not use the base image
 build-base-node-image-scratch:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_local .
 
-build-local-sidecar:
+build-sidecar:
 	docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
 
 
