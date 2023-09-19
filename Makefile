@@ -98,8 +98,6 @@ base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
 
-build-search-images: build-local-node build-sidecar
-
 build-node:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
