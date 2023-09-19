@@ -24,10 +24,38 @@ pub mod paragraphs;
 pub mod relations;
 pub mod texts;
 pub mod vectors;
+
+pub mod protos {
+    pub use nucliadb_protos::prelude::*;
+    pub use {prost, prost_types};
+}
+
+pub mod tracing {
+    pub use tracing::*;
+}
+
+pub mod thread {
+    pub use rayon::prelude::*;
+    pub use rayon::*;
+}
+
+pub mod prelude {
+    pub use crate::paragraphs::{self, *};
+    pub use crate::relations::{self, *};
+    pub use crate::texts::{self, *};
+    pub use crate::vectors::{self, *};
+    pub use crate::{
+        encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write,
+        relation_read, relation_write, text_read, text_write, vector_read, vector_write, Context,
+        NodeResult, ReaderChild, WriterChild,
+    };
+}
+
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::noderesources::{Resource, ResourceId};
+
 pub type NodeResult<O> = anyhow::Result<O>;
 
 pub fn paragraph_write(
@@ -76,32 +104,6 @@ pub fn relation_read(
     x: &relations::RelationsWriterPointer,
 ) -> RwLockReadGuard<'_, dyn relations::RelationWriter + 'static> {
     x.read().unwrap_or_else(|l| l.into_inner())
-}
-
-pub mod protos {
-    pub use nucliadb_protos::prelude::*;
-    pub use {prost, prost_types};
-}
-
-pub mod tracing {
-    pub use tracing::*;
-}
-
-pub mod thread {
-    pub use rayon::prelude::*;
-    pub use rayon::*;
-}
-
-pub mod prelude {
-    pub use crate::paragraphs::{self, *};
-    pub use crate::relations::{self, *};
-    pub use crate::texts::{self, *};
-    pub use crate::vectors::{self, *};
-    pub use crate::{
-        encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write,
-        relation_read, relation_write, text_read, text_write, vector_read, vector_write, Context,
-        NodeResult, ReaderChild, WriterChild,
-    };
 }
 
 pub fn encapsulate_reader<T>(reader: T) -> Arc<T> {
