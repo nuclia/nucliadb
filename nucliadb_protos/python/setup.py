@@ -34,5 +34,10 @@ setup(
     include_package_data=True,
     package_data={"": ["*.txt", "*.rst"], "nucliadb_protos": ["py.typed"]},
     packages=find_packages(),
-    install_requires=requirements,
+    install_requires=[
+        "protobuf >= 4.22.3, < 5",
+        "grpcio >= 1.44.0",
+        "grpcio-tools >= 1.44.0",
+        "mypy-protobuf >= 3.4.0",
+    ],
 )
