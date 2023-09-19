@@ -160,7 +160,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.rid = rid or ""
         auditrequest.origin = origin or ""
         auditrequest.type = audit_type
-        if when is None:
+        if when is None or when.SerializeToString() == b"":
             auditrequest.time.FromDatetime(datetime.now())
         else:
             auditrequest.time.CopyFrom(when)
