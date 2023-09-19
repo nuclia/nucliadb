@@ -316,9 +316,9 @@ def parse_link_field(
 
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
-        headers=link_field.headers,
-        cookies=link_field.cookies,
-        localstorage=link_field.localstorage,
+        headers=link_field.headers or {},
+        cookies=link_field.cookies or {},
+        localstorage=link_field.localstorage or {},
     )
 
 
@@ -390,7 +390,7 @@ async def parse_layout_field(
         )
 
     toprocess.layoutfield[key] = models.LayoutDiff(
-        format=lc.format, blocks=toprocess_blocks
+        format=lc.format, blocks=toprocess_blocks  # type: ignore
     )
 
 

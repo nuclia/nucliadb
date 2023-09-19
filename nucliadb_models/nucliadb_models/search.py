@@ -105,7 +105,7 @@ FacetsResult = Dict[str, Any]
 
 
 class TextPosition(BaseModel):
-    page_number: Optional[int]
+    page_number: Optional[int] = None
     index: int
     start: int
     end: int
@@ -158,6 +158,7 @@ class ResourceResult(BaseModel):
     rid: str
     field_type: str
     field: str
+    labels: Optional[list[str]] = None
 
 
 class Resources(BaseModel):
@@ -226,8 +227,8 @@ class ResourceSearchResults(BaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Tuple[str, str, str]]]
-    shards: Optional[List[str]]
+    nodes: Optional[List[Tuple[str, str, str]]] = None
+    shards: Optional[List[str]] = None
 
 
 class KnowledgeboxSearchResults(BaseModel):
@@ -238,8 +239,8 @@ class KnowledgeboxSearchResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     fulltext: Optional[Resources] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Tuple[str, str, str]]]
-    shards: Optional[List[str]]
+    nodes: Optional[List[Tuple[str, str, str]]] = None
+    shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
@@ -248,7 +249,7 @@ class KnowledgeboxSuggestResults(BaseModel):
 
     paragraphs: Optional[Paragraphs] = None
     entities: Optional[RelatedEntities] = None
-    shards: Optional[List[str]]
+    shards: Optional[List[str]] = None
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -256,7 +257,7 @@ class KnowledgeboxCounters(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
-    shards: Optional[List[str]]
+    shards: Optional[List[str]] = None
 
 
 class SortField(str, Enum):
@@ -742,7 +743,7 @@ class FindTextPosition(BaseModel):
 class FindParagraph(BaseModel):
     score: float
     score_type: SCORE_TYPE
-    order: int = Field(0, ge=0)
+    order: int = Field(default=0, ge=0)
     text: str
     id: str
     labels: Optional[List[str]] = []
@@ -786,8 +787,8 @@ class KnowledgeboxFindResults(BaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
-    nodes: Optional[List[Tuple[str, str, str]]]
-    shards: Optional[List[str]]
+    nodes: Optional[List[Tuple[str, str, str]]] = None
+    shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
 

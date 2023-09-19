@@ -76,7 +76,7 @@ def push_scope(**kwargs: Any) -> ContextManager[Scope]:
 class ErrorHandlingSettings(BaseSettings):
     sentry_url: Optional[str] = None
     environment: str = pydantic.Field(
-        "local", env=["environment", "running_environment"]
+        default="local", env=["environment", "running_environment"]
     )
 
 

@@ -57,7 +57,7 @@ class ResourceField(BaseModel):
     field_id: str
     value: ValueType
     extracted: ExtractedDataType
-    error: Optional[Error]
+    error: Optional[Error] = None
 
 
 FIELD_NAMES_TO_PB_TYPE_MAP = {v: k for k, v in FIELD_TYPES_MAP.items()}

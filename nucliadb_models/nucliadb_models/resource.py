@@ -140,11 +140,11 @@ class KnowledgeBoxList(BaseModel):
 
 
 class ExtractedData(BaseModel):
-    text: Optional[ExtractedText]
-    metadata: Optional[FieldComputedMetadata]
-    large_metadata: Optional[LargeComputedMetadata]
-    vectors: Optional[VectorObject]
-    uservectors: Optional[UserVectorSet]
+    text: Optional[ExtractedText] = None
+    metadata: Optional[FieldComputedMetadata] = None
+    large_metadata: Optional[LargeComputedMetadata] = None
+    vectors: Optional[VectorObject] = None
+    uservectors: Optional[UserVectorSet] = None
 
 
 class TextFieldExtractedData(ExtractedData):
@@ -152,11 +152,11 @@ class TextFieldExtractedData(ExtractedData):
 
 
 class FileFieldExtractedData(ExtractedData):
-    file: Optional[FileExtractedData]
+    file: Optional[FileExtractedData] = None
 
 
 class LinkFieldExtractedData(ExtractedData):
-    link: Optional[LinkExtractedData]
+    link: Optional[LinkExtractedData] = None
 
 
 class LayoutFieldExtractedData(ExtractedData):
@@ -198,62 +198,62 @@ class FieldData(BaseModel):
 
 
 class TextFieldData(BaseModel):
-    value: Optional[FieldText]
-    extracted: Optional[TextFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldText] = None
+    extracted: Optional[TextFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class FileFieldData(BaseModel):
-    value: Optional[FieldFile]
-    extracted: Optional[FileFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldFile] = None
+    extracted: Optional[FileFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class LinkFieldData(BaseModel):
-    value: Optional[FieldLink]
-    extracted: Optional[LinkFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldLink] = None
+    extracted: Optional[LinkFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class LayoutFieldData(BaseModel):
-    value: Optional[FieldLayout]
-    extracted: Optional[LayoutFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldLayout] = None
+    extracted: Optional[LayoutFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class ConversationFieldData(BaseModel):
-    value: Optional[FieldConversation]
-    extracted: Optional[ConversationFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldConversation] = None
+    extracted: Optional[ConversationFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class KeywordsetFieldData(BaseModel):
-    value: Optional[FieldKeywordset]
-    extracted: Optional[KeywordsetFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldKeywordset] = None
+    extracted: Optional[KeywordsetFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class DatetimeFieldData(BaseModel):
-    value: Optional[FieldDatetime]
-    extracted: Optional[DatetimeFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[FieldDatetime] = None
+    extracted: Optional[DatetimeFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class GenericFieldData(BaseModel):
-    value: Optional[str]
-    extracted: Optional[TextFieldExtractedData]
-    error: Optional[Error]
+    value: Optional[str] = None
+    extracted: Optional[TextFieldExtractedData] = None
+    error: Optional[Error] = None
 
 
 class ResourceData(BaseModel):
-    texts: Optional[Dict[str, TextFieldData]]
-    files: Optional[Dict[str, FileFieldData]]
-    links: Optional[Dict[str, LinkFieldData]]
-    layouts: Optional[Dict[str, LayoutFieldData]]
-    conversations: Optional[Dict[str, ConversationFieldData]]
-    keywordsets: Optional[Dict[str, KeywordsetFieldData]]
-    datetimes: Optional[Dict[str, DatetimeFieldData]]
-    generics: Optional[Dict[str, GenericFieldData]]
+    texts: Optional[Dict[str, TextFieldData]] = None
+    files: Optional[Dict[str, FileFieldData]] = None
+    links: Optional[Dict[str, LinkFieldData]] = None
+    layouts: Optional[Dict[str, LayoutFieldData]] = None
+    conversations: Optional[Dict[str, ConversationFieldData]] = None
+    keywordsets: Optional[Dict[str, KeywordsetFieldData]] = None
+    datetimes: Optional[Dict[str, DatetimeFieldData]] = None
+    generics: Optional[Dict[str, GenericFieldData]] = None
 
 
 class QueueType(str, Enum):  # type: ignore
@@ -265,27 +265,27 @@ class Resource(BaseModel):
     id: str
 
     # This first block of attributes correspond to Basic fields
-    slug: Optional[str]
-    title: Optional[str]
-    summary: Optional[str]
-    icon: Optional[str]
-    layout: Optional[str]
-    thumbnail: Optional[str]
-    metadata: Optional[Metadata]
-    usermetadata: Optional[UserMetadata]
-    fieldmetadata: Optional[List[UserFieldMetadata]]
-    computedmetadata: Optional[ComputedMetadata]
-    created: Optional[datetime]
-    modified: Optional[datetime]
-    last_seqid: Optional[int]
-    last_account_seq: Optional[int]
-    queue: Optional[QueueType]
+    slug: Optional[str] = None
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    icon: Optional[str] = None
+    layout: Optional[str] = None
+    thumbnail: Optional[str] = None
+    metadata: Optional[Metadata] = None
+    usermetadata: Optional[UserMetadata] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    computedmetadata: Optional[ComputedMetadata] = None
+    created: Optional[datetime] = None
+    modified: Optional[datetime] = None
+    last_seqid: Optional[int] = None
+    last_account_seq: Optional[int] = None
+    queue: Optional[QueueType] = None
 
-    origin: Optional[Origin]
-    extra: Optional[Extra]
-    relations: Optional[List[Relation]]
+    origin: Optional[Origin] = None
+    extra: Optional[Extra] = None
+    relations: Optional[List[Relation]] = None
 
-    data: Optional[ResourceData]
+    data: Optional[ResourceData] = None
 
 
 class ResourcePagination(BaseModel):
