@@ -50,8 +50,5 @@ setup(
     include_package_data=True,
     package_data={"": ["*.txt", "*.md"], "nucliadb_models": ["py.typed"]},
     packages=find_packages(),
-    install_requires=[
-        "pydantic>=1.8.2,<2.0",
-        "nucliadb-protos >= 4",
-    ],
+    install_requires=requirements,
 )
