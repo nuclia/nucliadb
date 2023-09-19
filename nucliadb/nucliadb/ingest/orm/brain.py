@@ -321,9 +321,10 @@ class ResourceBrain:
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
         if basic.HasField("created"):
             self.brain.metadata.created.CopyFrom(basic.created)
+
         if basic.HasField("modified"):
             self.brain.metadata.modified.CopyFrom(basic.modified)
-        else:
+        elif basic.HasField("created"):
             self.brain.metadata.modified.CopyFrom(basic.created)
 
         relationnodedocument = RelationNode(
