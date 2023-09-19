@@ -224,12 +224,14 @@ jobs:
         with:
           filters: |
             node_modified:
-              - 'nucliadb_node/src/**'
               - 'nucliadb_core/**'
+              - 'nucliadb_node/src/**'
               - 'nucliadb_paragraphs/**'
+              - 'nucliadb_procs/**'
+              - 'nucliadb_relations/**'
+              - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'
-              - 'nucliadb_relations/**'
 
       # We need to setup buildx to be able to cache with gha
       - name: Set up Docker Buildx

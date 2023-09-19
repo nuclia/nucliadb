@@ -107,12 +107,14 @@ jobs:
         with:
           filters: |
             node_modified:
-              - 'nucliadb_node/**'
               - 'nucliadb_core/**'
+              - 'nucliadb_node/src/**'
               - 'nucliadb_paragraphs/**'
+              - 'nucliadb_procs/**'
+              - 'nucliadb_relations/**'
+              - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'
-              - 'nucliadb_relations/**'
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
