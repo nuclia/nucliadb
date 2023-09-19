@@ -23,10 +23,9 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use kv::*;
-use serde_json::{json, Map};
-
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
+use serde_json::{json, Map};
 use vectors_benchmark::downloader::download_shard;
 use vectors_benchmark::json_writer::write_json;
 use vectors_benchmark::predict::{get_vector, PredictResults};

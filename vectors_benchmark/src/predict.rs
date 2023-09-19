@@ -17,8 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use reqwest::blocking::Client;
 use std::env;
+
+use reqwest::blocking::Client;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct PredictResults {

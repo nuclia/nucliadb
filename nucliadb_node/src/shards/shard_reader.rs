@@ -17,10 +17,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::time::SystemTime;
 
 use crossbeam_utils::thread as crossbeam_thread;
-use nucliadb_core::metrics::{self, request_time};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -34,6 +32,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
 use crate::env;
@@ -67,6 +66,7 @@ impl ShardReader {
             i => panic!("Unknown document version {i}"),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
         match self.paragraph_service_version {
@@ -75,6 +75,7 @@ impl ShardReader {
             i => panic!("Unknown paragraph version {i}"),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
         match self.vector_service_version {
@@ -83,6 +84,7 @@ impl ShardReader {
             i => panic!("Unknown vector version {i}"),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
         match self.relation_service_version {
@@ -91,10 +93,11 @@ impl ShardReader {
             i => panic!("Unknown relation version {i}"),
         }
     }
+
+    #[measure(actor = "shard", metric = "reader/get_info")]
     #[tracing::instrument(skip_all)]
     pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let paragraphs = self.paragraph_reader.clone();
         let vectors = self.vector_reader.clone();
@@ -117,11 +120,6 @@ impl ShardReader {
         })
         .expect("Failed to join threads");
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/get_info".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(Shard {
             metadata: Some(self.metadata.clone().into()),
             shard_id: self.id.clone(),
@@ -132,35 +130,41 @@ impl ShardReader {
             sentences: vector_result? as u64,
         })
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_text_keys(&self) -> NodeResult<Vec<String>> {
         self.text_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_paragraphs_keys(&self) -> NodeResult<Vec<String>> {
         self.paragraph_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
         self.vector_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_relations_keys(&self) -> NodeResult<Vec<String>> {
         self.relation_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_relations_edges(&self) -> NodeResult<EdgeList> {
         self.relation_reader.get_edges()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_relations_types(&self) -> NodeResult<TypeList> {
         self.relation_reader.get_node_types()
     }
 
+    #[measure(actor = "shard", metric = "reader/new")]
     #[tracing::instrument(skip_all)]
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReader> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let metadata = ShardMetadata::open(&shard_path.join(METADATA_FILE))?;
         let tsc = TextConfig {
@@ -211,10 +215,6 @@ impl ShardReader {
         let vectors = vector_result.transpose()?;
         let relations = relation_result.transpose()?;
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/new".to_string());
-        metrics.record_request_time(metric, took);
         Ok(ShardReader {
             id,
             metadata,
@@ -250,10 +250,10 @@ impl ShardReader {
         prefixes
     }
 
+    #[measure(actor = "shard", metric = "reader/suggest")]
     #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let relations_reader_service = self.relation_reader.clone();
         let paragraph_reader_service = self.paragraph_reader.clone();
@@ -292,11 +292,6 @@ impl ShardReader {
             .map(|node| node.value)
             .collect::<Vec<_>>();
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/suggest".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(SuggestResponse {
             query: rparagraph.query,
             total: rparagraph.total,
@@ -309,11 +304,11 @@ impl ShardReader {
         })
     }
 
+    #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
@@ -417,11 +412,6 @@ impl ShardReader {
             }
         })
         .expect("Failed to join threads");
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/search".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(SearchResponse {
             document: rtext.transpose()?,

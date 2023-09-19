@@ -66,7 +66,7 @@ def storage_mock():
     [
         FileField(password="mypassword", file=File(filename="myfile.pdf", payload="")),
         FileField(
-            password="mypassword", file=File(uri="http://external.foo/myfile.pdf")
+            password="mypassword", file=File(uri="http://external.foo/myfile.pdf")  # type: ignore
         ),
     ],
 )

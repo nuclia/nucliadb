@@ -1,5 +1,5 @@
 nats-py[nkeys]>=2.2.0
-httpx==0.23.0
+httpx>=0.23.0
 grpcio>=1.44.0
 grpcio-health-checking>=1.44.0
 grpcio-channelz>=1.44.0
@@ -15,9 +15,9 @@ opentelemetry-propagator-b3==1.11.1
 opentelemetry-instrumentation-fastapi==0.30b1
 opentelemetry-instrumentation-aiohttp-client==0.30b1
 opentelemetry-semantic-conventions==0.30b1
-pydantic<2.0
+pydantic
 requests
-fastapi>=0.75.0,<0.89.0
+fastapi
 tikv-client>=0.0.3
 types-protobuf>=3.19.5
 types-requests

@@ -17,9 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -27,8 +25,9 @@ use nucliadb_core::protos::shard_created::{
 use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity,
 };
+use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::{metrics, thread};
+use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
@@ -164,9 +163,8 @@ impl ShardWriter {
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
+    #[measure(actor = "shard", metric = "writer/new")]
     pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
-        let time = SystemTime::now();
-
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -188,19 +186,12 @@ impl ShardWriter {
         std::fs::create_dir(path)?;
         let metadata_path = path.join(METADATA_FILE);
         metadata.serialize(&metadata_path)?;
-        let result = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc);
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("writer/new".to_string());
-        metrics.record_request_time(metric, took);
-
-        result
+        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
+    #[measure(actor = "shard", metric = "writer/open")]
     pub fn open(id: String, path: &Path) -> NodeResult<ShardWriter> {
-        let time = SystemTime::now();
-
         let metadata_path = path.join(METADATA_FILE);
         let metadata = ShardMetadata::open(&metadata_path)?;
         let tsc = TextConfig {
@@ -220,19 +211,14 @@ impl ShardWriter {
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
         };
-        let result = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc);
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("writer/open".to_string());
-        metrics.record_request_time(metric, took);
 
-        result
+        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
+    #[measure(actor = "shard", metric = "writer/set_resource")]
     #[tracing::instrument(skip_all)]
     pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
@@ -294,21 +280,17 @@ impl ShardWriter {
             s.spawn(|_| relation_result = relation_task());
         });
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("writer/set_resource".to_string());
-        metrics.record_request_time(metric, took);
-
         text_result?;
         paragraph_result?;
         vector_result?;
         relation_result?;
         Ok(())
     }
+
+    #[measure(actor = "shard", metric = "writer/remove_resource")]
     #[tracing::instrument(skip_all)]
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
@@ -355,11 +337,6 @@ impl ShardWriter {
             s.spawn(|_| relation_result = relation_task());
         });
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("writer/remove_resource".to_string());
-        metrics.record_request_time(metric, took);
-
         text_result?;
         paragraph_result?;
         vector_result?;
@@ -367,10 +344,10 @@ impl ShardWriter {
         Ok(())
     }
 
+    #[measure(actor = "shard", metric = "writer/get_opstatus")]
     #[tracing::instrument(skip_all)]
     pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let paragraphs = self.paragraph_writer.clone();
         let vectors = self.vector_writer.clone();
@@ -401,11 +378,6 @@ impl ShardWriter {
             s.spawn(|_| vector_count = count_vectors());
         });
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("writer/get_opstatus".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(OpStatus {
             shard_id: self.id.clone(),
             field_count: field_count? as u64,
@@ -421,6 +393,7 @@ impl ShardWriter {
         let keys = reader.list_vectorsets()?;
         Ok(keys)
     }
+
     #[tracing::instrument(skip_all)]
     pub fn add_vectorset(
         &self,
@@ -431,36 +404,43 @@ impl ShardWriter {
         writer.add_vectorset(setid, similarity)?;
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     pub fn remove_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
         let mut writer = vector_write(&self.vector_writer);
         writer.remove_vectorset(setid)?;
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> NodeResult<()> {
         let mut writer = relation_write(&self.relation_writer);
         writer.delete_nodes(nodes)?;
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     pub fn join_relations_graph(&self, graph: &JoinGraph) -> NodeResult<()> {
         let mut writer = relation_write(&self.relation_writer);
         writer.join_graph(graph)?;
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     pub fn paragraph_count(&self) -> NodeResult<usize> {
         paragraph_read(&self.paragraph_writer).count()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn vector_count(&self) -> NodeResult<usize> {
         vector_read(&self.vector_writer).count()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn text_count(&self) -> NodeResult<usize> {
         text_read(&self.text_writer).count()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
         vector_write(&self.vector_writer).garbage_collection()
