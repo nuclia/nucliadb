@@ -127,7 +127,7 @@ jobs:
         env:
           DRIVER: PG
           FILE_BACKEND: PG
-          DRIVER_PG_URL: postgresql://postgres:postgres@postgres:5432/postgres
+          DRIVER_PG_URL: postgresql://postgres:postgres@localhost:5432/postgres
           NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
           cluster_discovery_mode: manual
           cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
