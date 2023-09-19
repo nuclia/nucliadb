@@ -8,22 +8,6 @@ VERSION = _dir.parent.parent.joinpath("VERSION").open().read().strip()
 README = _dir.joinpath("README.rst").open().read()
 
 
-def load_reqs(filename):
-    with open(filename) as reqs_file:
-        return [
-            # pin nucliadb-xxx to the same version as nucliadb
-            line.strip() + f"=={VERSION}"
-            if line.startswith("nucliadb-")
-            else line.strip()
-            for line in reqs_file.readlines()
-            if not (
-                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
-            )
-        ]
-
-
-requirements = load_reqs("requirements.txt")
-
 setup(
     name="nucliadb_protos",
     version=VERSION,
