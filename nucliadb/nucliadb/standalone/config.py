@@ -98,6 +98,8 @@ def config_nucliadb(nucliadb_args: Settings):
     if nucliadb_args.cluster_discovery_mode == StandaloneDiscoveryMode.DEFAULT:
         # default for standalone is single node
         cluster_settings.cluster_discovery_mode = ClusterDiscoveryMode.SINGLE_NODE
+
+    if nucliadb_args.cluster_discovery_mode == StandaloneDiscoveryMode.SINGLE_NODE:
         cluster_settings.node_replicas = 1
 
     ingest_settings.nuclia_partitions = 1

@@ -119,11 +119,13 @@ jobs:
         uses: actions/checkout@v2
       
       - name: Install NucliaDB
+        # tests that installation script works
         run: |
           ./scripts/install-vm.sh
-      
-      - name: Run Cluster
+
+      - name: Run Cluster and tests
         run: |
+          pip install -r e2e/requirements.txt
           source ./nucliadb/bin/activate
           export NUA_API_KEY=${{ secrets.NUA_API_KEY }}
           export standalone_node_port=10009
