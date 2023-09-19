@@ -65,12 +65,14 @@ jobs:
             nucliadb_modified:
               - 'nucliadb/**'
             nucliadb_node_modified:
-              - 'nucliadb_node/**'
               - 'nucliadb_core/**'
+              - 'nucliadb_node/src/**'
               - 'nucliadb_paragraphs/**'
+              - 'nucliadb_procs/**'
+              - 'nucliadb_relations/**'
+              - 'nucliadb_telemetry/**'
               - 'nucliadb_texts/**'
               - 'nucliadb_vectors/**'
-              - 'nucliadb_relations/**'
 
       - name: Build local NucliaDB for testing
         if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'false'
