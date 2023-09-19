@@ -9,7 +9,13 @@ on:
       - main
 
 jobs:
-  e2e:
+  e2e-k8s-cluster:
+    #
+    # E2E tests run against a Kubernetes cluster.
+    # These tests setup microk8s and run NucliaDB with PostgreSQL.
+    # Chart configuration: e2e/conf/chart.values.yaml
+    #
+    name: E2E Kubernetes Cluster Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -57,7 +63,7 @@ jobs:
           helm install nucliadb charts/nucliadb \
             --timeout 5m \
             --namespace nucliadb \
-            --values e2e/chart.values.yaml \
+            --values e2e/conf/chart.values.yaml \
             --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.envs.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
           sleep 10
@@ -88,3 +94,42 @@ jobs:
               kubectl logs -n nucliadb pod/nucliadb-0 &&
               kubectl logs -n nucliadb pod/nucliadb-1 &&
               exit 1)
+
+  e2e-vm-cluster:
+    name: E2E VM Cluster Tests
+    runs-on: ubuntu-latest
+
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Install NucliaDB
+        run: |
+          ./scripts/install-vm.sh
+      
+      - name: Run Cluster
+        run: |
+          source ./nucliadb/bin/activate
+          export NUA_API_KEY=${{ secrets.NUA_API_KEY }}
+          export standalone_node_port=10009
+          export DATA_PATH=data1
+          env $(cat e2e/conf/vm.env | xargs) nucliadb --http-port=8080 &
+          export standalone_node_port=10010
+          export DATA_PATH=data2
+          env $(cat e2e/conf/vm.env | xargs) nucliadb --http-port=8081 &
+          pytest -s --tb=native e2e/test_e2e.py
