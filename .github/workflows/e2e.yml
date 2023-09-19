@@ -124,10 +124,18 @@ jobs:
           ./scripts/install-vm.sh
 
       - name: Run Cluster and tests
+        env:
+          DRIVER: PG
+          FILE_BACKEND: PG
+          DRIVER_PG_URL: postgresql://postgres:postgres@postgres:5432/postgres
+          NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
+          cluster_discovery_mode: manual
+          cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
+          DEBUG: "1"
+          NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
         run: |
           pip install -r e2e/requirements.txt
           source ./nucliadb/bin/activate
-          export NUA_API_KEY=${{ secrets.NUA_API_KEY }}
           export standalone_node_port=10009
           export DATA_PATH=data1
           env $(cat e2e/conf/vm.env | xargs) nucliadb --http-port=8080 &
