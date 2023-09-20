@@ -25,3 +25,7 @@ class ExportStreamExhausted(Exception):
     """
 
     pass
+
+
+class MetadataNotFound(Exception):
+    pass

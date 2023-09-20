@@ -19,9 +19,19 @@
 #
 from enum import Enum
 
+from pydantic import BaseModel
+
 
 class ExportedItemType(str, Enum):
     RESOURCE = "RES"
     LABELS = "LAB"
     ENTITIES = "ENT"
     BINARY = "BIN"
+
+
+class ExportMetadata(BaseModel):
+    id: str
+
+
+class ImportMetadata(BaseModel):
+    id: str
