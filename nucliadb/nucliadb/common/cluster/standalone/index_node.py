@@ -98,10 +98,10 @@ class ProxyCallerWrapper:
         self._address = address
         self._type = type
         self._original_type = original_type
-        if ":" not in address:
-            grpc_address = f"{address}:{cluster_settings.standalone_node_port}"
-        else:
+        if ":" in address:
             grpc_address = address
+        else:
+            grpc_address = f"{address}:{cluster_settings.standalone_node_port}"
         self._channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
         self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)
 
