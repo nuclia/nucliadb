@@ -107,6 +107,9 @@ jobs:
         # Provide the password for postgres
         env:
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -135,6 +138,9 @@ jobs:
           NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
         run: |
           pip install -r e2e/requirements.txt
+          while ! pg_isready -h localhost -p 5432 -U postgres -d postgres; do
+            sleep 1
+          done
           source ./nucliadb/bin/activate
           export standalone_node_port=10009
           export DATA_PATH=data1
