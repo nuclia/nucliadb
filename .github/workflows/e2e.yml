@@ -134,7 +134,7 @@ jobs:
         # the current branch.
         run: |
           source ./nucliadb/bin/activate
-          make -c nucliadb install-dev
+          make -C nucliadb install-dev
 
       - name: Run Cluster and tests
         env:
