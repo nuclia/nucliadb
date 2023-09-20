@@ -159,8 +159,11 @@ class PGDriver(Driver):
                 self.pool = await asyncpg.create_pool(self.url)
 
                 # check if table exists
-                async with self.pool.acquire() as conn:
-                    await conn.execute(CREATE_TABLE)
+                try:
+                    async with self.pool.acquire() as conn:
+                        await conn.execute(CREATE_TABLE)
+                except asyncpg.exceptions.UniqueViolationError:  # pragma: no cover
+                    pass
 
             self.initialized = True
 
