@@ -158,9 +158,9 @@ mod tests {
             let detected_language = detect_language(query);
             let elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(expected_language, detected_language);
-            // make sure we never spend more than ~1 ms
-            // setting it to 4ms for slow CI boxes
-            assert_eq!(elapsed < 4000.0, true, "{}", elapsed);
+            // the call in is general less than ~1 ms
+            // however, setting it to 10ms for slow CI boxes
+            assert_eq!(elapsed < 10000.0, true, "{}", elapsed);
         }
     }
 
