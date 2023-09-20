@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 def get_standalone_node_id() -> str:
     if not os.path.exists(cluster_settings.host_key_path):
         os.makedirs(
-            os.path.sep.join(os.path.sep.split(cluster_settings.host_key_path)[:-1]),
+            os.path.sep.join(cluster_settings.host_key_path.split(os.path.sep)[:-1]),
             exist_ok=True,
         )
     if not os.path.exists(cluster_settings.host_key_path):

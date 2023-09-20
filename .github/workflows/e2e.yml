@@ -129,6 +129,9 @@ jobs:
       - name: Install local nucliadb
         # Now, let's install the current version of nucliadb to
         # run the tests against.
+        # Unfortunately, we're not testing against the released version
+        # of NucliaDB; however, it seems more important to test against
+        # the current branch.
         run: |
           source ./nucliadb/bin/activate
           make -c nucliadb install-dev
