@@ -23,5 +23,5 @@ pub mod reader;
 pub mod schema;
 pub mod search_query;
 pub mod search_response;
-pub(crate) mod stop_words;
+pub mod stop_words;
 pub mod writer;

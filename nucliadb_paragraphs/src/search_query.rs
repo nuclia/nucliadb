@@ -29,7 +29,7 @@ use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
-use crate::stop_words::is_stop_word;
+use crate::stop_words::{detect_language, is_stop_word};
 
 type QueryP = (Occur, Box<dyn Query>);
 
@@ -213,10 +213,13 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
 ///
 /// The last term of the query is a prefix fuzzy term and must be preserved.
 fn remove_stop_words(query: &str) -> Cow<'_, str> {
+    // Negligible overhead (<1ms)
+    let lang = detect_language(query);
+
     match query.rsplit_once(' ') {
         Some((query, last_term)) => query
             .split(' ')
-            .filter(|term| !is_stop_word(&term.to_lowercase()))
+            .filter(|term| !is_stop_word(&term.to_lowercase(), Some(lang)))
             .chain([last_term])
             .join(" ")
             .into(),
@@ -451,6 +454,7 @@ pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box
 
 #[cfg(test)]
 mod tests {
+    use lingua::Language;
     use tantivy::schema::Field;
 
     use super::*;
@@ -506,19 +510,60 @@ mod tests {
             (
                 "nuclia is a database for unstructured data",
                 "nuclia database unstructured data",
+                Language::English,
             ),
             (
-                "nuclia is a",
+                "nuclia is a database for the",
                 // keeps last term even if is a stop word
-                "nuclia a",
+                "nuclia database the",
+                Language::English,
             ),
-            ("is a for and", "and"),
+            ("is a for and", "and", Language::English),
+            ("what does stop is?", "stop is?", Language::English),
+            // by default, fallback to english
+            ("", "", Language::English),
+            (
+                "comment s'appelle le train à grande vitesse",
+                "comment s'appelle train grande vitesse",
+                Language::French,
+            ),
+            (
+                "¿Qué significa la palabra sentence en español?",
+                "¿Qué significa palabra sentence español?",
+                Language::Spanish,
+            ),
+            (
+                "Per què les vaques no són de color rosa?",
+                "vaques color rosa?",
+                Language::Catalan,
+            ),
+            (
+                "How can I learn to make a flat white?",
+                "learn make flat white?",
+                Language::English,
+            ),
+            (
+                "Qué es escalada en bloque?",
+                "escalada bloque?",
+                Language::Spanish,
+            ),
+            (
+                "Wer hat gesagt: 'Kaffeetrinken ist integraler Bestandteil des Kletterns'?",
+                "Wer gesagt: 'Kaffeetrinken integraler Bestandteil Kletterns'?",
+                Language::German,
+            ),
+            (
+                "i pistacchi siciliani sono i migliori al mondo?",
+                "pistacchi siciliani migliori mondo?",
+                Language::Italian,
+            ),
         ];
 
-        for (query, expected_fuzzy_query) in tests {
+        for (query, expected_fuzzy_query, expected_language) in tests {
             let fuzzy_query = remove_stop_words(query);
-
+            let detected_language = detect_language(query);
             assert_eq!(fuzzy_query, expected_fuzzy_query);
+            assert_eq!(expected_language, detected_language);
         }
     }
 }

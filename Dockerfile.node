@@ -60,7 +60,12 @@ COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
+RUN mkdir -p /nucliadb/tmp
+ENV TMPDIR=/nucliadb/tmp
+
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
+    && rm -rf /nucliadb/tmp/* \
+    && rm -rf target \
     && cargo build \
     --locked \
     --features $CARGO_FEATURES \
@@ -69,6 +74,8 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
     && echo "Moving binaries to /nucliadb/bin" \
     && mkdir -p /nucliadb/bin \
     && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /nucliadb/bin \; \
+    && rm -rf target \
+    && rm -rf /nucliadb/tmp/* \
     && cargo install rust-spy \
     && cargo clean
 
