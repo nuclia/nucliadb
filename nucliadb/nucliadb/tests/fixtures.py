@@ -117,7 +117,6 @@ async def nucliadb(dummy_processing, telemetry_disabled):
             local_files=f"{tmpdir}/blob",
             driver_local_url=f"{tmpdir}/main",
             data_path=f"{tmpdir}/node",
-            host_key_path=f"{tmpdir}/node/host.key",
             http_port=free_port(),
             ingest_grpc_port=free_port(),
             train_grpc_port=free_port(),
