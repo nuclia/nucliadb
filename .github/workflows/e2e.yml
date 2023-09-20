@@ -125,6 +125,13 @@ jobs:
         # tests that installation script works
         run: |
           ./scripts/install-vm.sh
+        
+      - name: Install local nucliadb
+        # Now, let's install the current version of nucliadb to
+        # run the tests against.
+        run: |
+          source ./nucliadb/bin/activate
+          make -c nucliadb install-dev
 
       - name: Run Cluster and tests
         env:
