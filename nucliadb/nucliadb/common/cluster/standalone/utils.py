@@ -29,17 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_standalone_node_id() -> str:
-    if not os.path.exists(cluster_settings.host_key_path):
-        os.makedirs(
-            os.path.sep.join(cluster_settings.host_key_path.split(os.path.sep)[:-1]),
-            exist_ok=True,
-        )
-    if not os.path.exists(cluster_settings.host_key_path):
+    if not os.path.exists(cluster_settings.data_path):
+        os.makedirs(cluster_settings.data_path, exist_ok=True)
+    host_key_path = f"{cluster_settings.data_path}/node.key"
+    if not os.path.exists(host_key_path):
         logger.info("Generating new node key")
-        with open(cluster_settings.host_key_path, "wb") as f:
+        with open(host_key_path, "wb") as f:
             f.write(uuid.uuid4().bytes)
 
-    with open(cluster_settings.host_key_path, "rb") as f:
+    with open(host_key_path, "rb") as f:
         return str(uuid.UUID(bytes=f.read()))
 
 
