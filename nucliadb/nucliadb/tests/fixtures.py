@@ -105,8 +105,13 @@ def reset_config():
 
 @pytest.fixture(scope="function")
 def tmpdir():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield tmpdir
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield tmpdir
+    except OSError:
+        # Python error on tempfile when tearing down the fixture.
+        # Solved in version 3.11
+        pass
 
 
 @pytest.fixture(scope="function")
