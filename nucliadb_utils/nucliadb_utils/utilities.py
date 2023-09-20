@@ -246,6 +246,13 @@ async def start_transaction_utility(
 ) -> TransactionUtility:
     from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 
+    current = get_transaction_utility()
+    if current is not None:
+        logger.warning(
+            "Warning, transaction utility was already set, cleaning existing one"
+        )
+        await current.finalize()
+
     if transaction_settings.transaction_local:
         transaction_utility: Union[
             LocalTransactionUtility, TransactionUtility
