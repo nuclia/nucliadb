@@ -65,6 +65,9 @@ RUN mkdir -p /nucliadb/tmp
 ENV TMPDIR=/nucliadb/tmp
 
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
+    && rm -rf /nucliadb/tmp/* \
+    && df -h \
+    && du -ch /nucliadb \
     && cargo build \
     --locked \
     --features $CARGO_FEATURES \
