@@ -66,6 +66,7 @@ ENV TMPDIR=/nucliadb/tmp
 
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && rm -rf /nucliadb/tmp/* \
+    && rm -rf /nucliadb/target/debug \
     && df -h \
     && du -ch /nucliadb \
     && cargo build \
@@ -76,6 +77,7 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
     && echo "Moving binaries to /nucliadb/bin" \
     && mkdir -p /nucliadb/bin \
     && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /nucliadb/bin \; \
+    && rm -rf /nucliadb/target/debug \
     && rm -rf /nucliadb/tmp/* \
     && df -h \
     && du -ch /nucliadb \
