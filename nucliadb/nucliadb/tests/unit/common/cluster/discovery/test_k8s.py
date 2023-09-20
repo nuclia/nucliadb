@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import kubernetes_asyncio.client.models.v1_container_status  # type: ignore
 import kubernetes_asyncio.client.models.v1_object_meta  # type: ignore
@@ -37,9 +37,9 @@ pytestmark = pytest.mark.asyncio
 
 @pytest.fixture()
 def writer_stub():
-    writer_stub = AsyncMock()
-    writer_stub.GetMetadata.return_value = nodewriter_pb2.NodeMetadata(
-        node_id="node_id", shard_count=1
+    writer_stub = MagicMock()
+    writer_stub.GetMetadata = AsyncMock(
+        return_value=nodewriter_pb2.NodeMetadata(node_id="node_id", shard_count=1)
     )
     with patch(
         "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",
@@ -75,7 +75,8 @@ def create_k8s_event(
                         image_id="image_id",
                         restart_count=0,
                     )
-                ]
+                ],
+                pod_ip="1.2.3.4",
             ),
             metadata=kubernetes_asyncio.client.models.v1_object_meta.V1ObjectMeta(
                 name=name,
@@ -94,7 +95,7 @@ async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub
         address="1.1.1.1",
     )
 
-    writer_stub.GetMetadata.assert_called_once()
+    writer_stub.GetMetadata.assert_awaited_once()
 
     # should be cached now
     await k8s_discovery.get_node_metadata("node-0", "1.1.1.1")
