@@ -138,8 +138,8 @@ jobs:
           source ./nucliadb/bin/activate
           export standalone_node_port=10009
           export DATA_PATH=data1
-          env $(cat e2e/conf/vm.env | xargs) nucliadb --http-port=8080 &
+          nucliadb --http-port=8080 &
           export standalone_node_port=10010
           export DATA_PATH=data2
-          env $(cat e2e/conf/vm.env | xargs) nucliadb --http-port=8081 &
+          nucliadb --http-port=8081 &
           pytest -s --tb=native e2e/test_e2e.py
