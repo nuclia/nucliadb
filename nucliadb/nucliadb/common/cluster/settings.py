@@ -30,6 +30,7 @@ class ClusterDiscoveryMode(str, enum.Enum):
 
 class Settings(BaseSettings):
     data_path: str = "./data/node"
+    host_key_path: str = "./data/node/node.key"
     standalone_mode: bool = False
     standalone_node_port: int = Field(
         default=10009,

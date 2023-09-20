@@ -52,6 +52,9 @@ class Settings(DriverSettings, StorageSettings):
     data_path: str = pydantic.Field(
         "./data/node", description="Path to node index files"
     )
+    host_key_path: str = pydantic.Field(
+        "./data/node/node.key", description="Path to node key file"
+    )
 
     # all settings here are mapped in to other env var settings used
     # in the app. These are helper settings to make things easier to

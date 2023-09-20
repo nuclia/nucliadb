@@ -71,6 +71,9 @@ def config_standalone_driver(nucliadb_args: Settings):
     if "DATA_PATH" not in os.environ:
         os.environ["DATA_PATH"] = nucliadb_args.data_path
 
+    if "HOST_KEY_PATH" not in os.environ:
+        os.environ["HOST_KEY_PATH"] = nucliadb_args.host_key_path
+
 
 def config_nucliadb(nucliadb_args: Settings):
     """
@@ -93,6 +96,7 @@ def config_nucliadb(nucliadb_args: Settings):
 
     cluster_settings.standalone_mode = True
     cluster_settings.data_path = nucliadb_args.data_path
+    cluster_settings.host_key_path = nucliadb_args.host_key_path
     cluster_settings.standalone_node_port = nucliadb_args.standalone_node_port
 
     if nucliadb_args.cluster_discovery_mode == StandaloneDiscoveryMode.DEFAULT:

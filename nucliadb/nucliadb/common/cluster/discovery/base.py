@@ -129,7 +129,7 @@ async def _get_standalone_index_node_metadata(
     return IndexNodeMetadata(
         node_id=resp.id,
         name=resp.id,
-        address=grpc_address,
+        address=address,
         shard_count=resp.shard_count,
     )
 
