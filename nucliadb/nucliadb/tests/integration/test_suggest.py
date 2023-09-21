@@ -276,6 +276,38 @@ async def test_suggestion_on_link_computed_titles_sc6088(
 
 
 @pytest.mark.asyncio
+async def test_suggest_features(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    texts: dict[str, str],
+    entities,
+):
+    """Test description:
+
+    Validate how responses are returned depending on requested features
+
+    """
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/suggest",
+        params={"query": "Nietzche", "features": ["paragraph"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["entities"]) == 0
+    assert len(body["paragraphs"]["results"]) == 1
+    assert body["paragraphs"]["results"][0]["rid"] == texts["zarathrustra"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/suggest", params={"query": "ann", "features": ["entities"]}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]) == 0
+    assert set(body["entities"]["entities"]) == {"Anna"}
+
+
+@pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def texts(
     nucliadb_writer: AsyncClient,
