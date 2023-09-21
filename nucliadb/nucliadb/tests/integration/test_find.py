@@ -190,3 +190,65 @@ async def test_find_min_score(
     )
     assert resp.status_code == 200
     assert resp.json()["min_score"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_story_7286(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await asyncio.sleep(1)
+    resp = await nucliadb_writer.patch(
+        f"/kb/{knowledgebox}/resource/{rid}",
+        json={
+            "fieldmetadata": [
+                {
+                    "field": {
+                        "field": "text1",
+                        "field_type": "text",
+                    },
+                    "paragraphs": [
+                        {
+                            "key": f"{rid}/t/text1/0-7",
+                            "classifications": [{"labelset": "ls1", "label": "label"}],
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    assert resp.status_code == 200
+
+    # should get 1 result
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "title",
+            "features": ["paragraph", "vector", "relations"],
+            "shards": [],
+            "highlight": True,
+            "autofilter": False,
+            "page_number": 0,
+            "show": ["basic", "values", "origin"],
+            "filters": [],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    resource_id = list(body["resources"].values())[0]["id"]
+    assert resource_id == rid
+    assert "/" not in resource_id
