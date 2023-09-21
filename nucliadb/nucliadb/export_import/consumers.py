@@ -13,7 +13,13 @@ from nucliadb.export_import.exporter import (
     export_labels,
     export_resource,
 )
-from nucliadb.export_import.models import ExportMessage, ExportMetadata, Status
+from nucliadb.export_import.models import (
+    ExportMessage,
+    ExportMetadata,
+    ImportMessage,
+    ImportMetadata,
+    Status,
+)
 from nucliadb.export_import.utils import get_broker_message, iter_kb_resource_uuids
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
@@ -110,19 +116,10 @@ class ExportsConsumer(BaseConsumer):
     stream = const.Streams.EXPORTS.name
 
     async def do_work(self, msg: Msg):
-        """
-        TODO:
-        - Start/resume the export
-        - Stream the export to gcs to the specified uri
-        - Update export metadata with progress
-        - At the end, update export metadata with finished status
-        """
         export_msg = ExportMessage.parse_raw(msg.data)
-        metadata: ExportMetadata = await self.data_manager.get_export_metadata(
-            export_msg.kbid, export_msg.export_id
-        )
         export_id = export_msg.export_id
         kbid = export_msg.kbid
+        metadata = await self.data_manager.get_export_metadata(kbid, export_id)
 
         if metadata.status in (Status.FINISHED, Status.ERRORED):
             logger.info(f"Export {export_id} for {kbid} is {metadata.status.value}.")
@@ -219,15 +216,44 @@ class ImportsConsumer(BaseConsumer):
     stream = const.Streams.IMPORTS.name
 
     async def do_work(self, msg: Msg):
-        """
-        TODO:
-        - Get kbid and import id from message
-        - Get the import metadata
-        - Start/resume the import
-        - Download the import from gcs and import resources from it
-        - Update import metadata with progress
-        - At the end, update import metadata with finished status
-        """
+        import_msg = ImportMessage.parse_raw(msg.data)
+        import_id = import_msg.import_id
+        kbid = import_msg.kbid
+        metadata = await self.data_manager.get_import_metadata(kbid, import_id)
+
+        if metadata.status in (Status.FINISHED, Status.ERRORED):
+            logger.info(f"Import {import_id} for {kbid} is {metadata.status.value}.")
+            return
+
+        if metadata.tries >= EXPORT_MAX_RETRIES:
+            logger.info(
+                f"Import {import_id} for kbid {kbid} failed too many times. Skipping"
+            )
+            metadata.status = Status.ERRORED
+            await self.data_manager.set_import_metadata(kbid, import_id, metadata)
+            return
+
+        if metadata.status == Status.FAILED:
+            logger.info(f"Import {import_id} for kbid {kbid} failed, retrying")
+            metadata.status = Status.RUNNING
+        else:  # metadata.status == Status.SCHEDULED:
+            logger.info(f"Starting import {import_id} for kbid {kbid}")
+            metadata.status = Status.RUNNING
+        metadata.tries += 1
+        try:
+            await self.import_from_blob_storage_stream(metadata)
+        except Exception as e:
+            # Error during import. Mark as failed. It will be retried
+            metadata.status = Status.FAILED
+            raise e
+        else:
+            # Successful import
+            metadata.status = Status.FINISHED
+        finally:
+            await self.data_manager.set_import_metadata(kbid, import_id, metadata)
+
+    async def import_from_blob_storage_stream(self, metadata: ImportMetadata):
+        # TODO
         pass
 
 
