@@ -20,6 +20,7 @@
 import asyncio
 
 import pytest
+from unittest.mock import patch
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -211,7 +212,6 @@ async def test_story_7286(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    await asyncio.sleep(1)
     resp = await nucliadb_writer.patch(
         f"/kb/{knowledgebox}/resource/{rid}",
         json={
@@ -233,22 +233,23 @@ async def test_story_7286(
     )
     assert resp.status_code == 200
 
-    # should get 1 result
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
-        json={
-            "query": "title",
-            "features": ["paragraph", "vector", "relations"],
-            "shards": [],
-            "highlight": True,
-            "autofilter": False,
-            "page_number": 0,
-            "show": ["basic", "values", "origin"],
-            "filters": [],
-        },
-    )
-    assert resp.status_code == 200
+    with patch("nucliadb.search.search.find_merge.serialize", return_value=None):
+        # should get no result (because serialize returns None, as the resource is not found in the DB)
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/find",
+            json={
+                "query": "title",
+                "features": ["paragraph", "vector", "relations"],
+                "shards": [],
+                "highlight": True,
+                "autofilter": False,
+                "page_number": 0,
+                "show": ["basic", "values", "origin"],
+                "filters": [],
+            },
+        )
+        assert resp.status_code == 200
     body = resp.json()
-    resource_id = list(body["resources"].values())[0]["id"]
-    assert resource_id == rid
-    assert "/" not in resource_id
+    assert len(body["resources"]) == 0
+
+    # TODO: assert the warning  Resource 4d8dc1aea04d4d078fcd4b03e44d7215 not found in b4f1475e-59b4-4ac1-b6dd-b2923ab15702

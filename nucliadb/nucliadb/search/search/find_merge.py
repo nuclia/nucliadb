@@ -106,6 +106,10 @@ async def set_resource_metadata_value(
         )
         if serialized_resource is not None:
             find_resources[resource].updated_from(serialized_resource)
+        else:
+            logger.warning(f"Resource {resource} not found in {kbid}")
+            find_resources.pop(resource, None)
+
     finally:
         max_operations.release()
 
