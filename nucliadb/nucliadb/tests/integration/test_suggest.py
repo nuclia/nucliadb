@@ -29,56 +29,15 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 async def test_suggest_paragraphs(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
+    knowledgebox: str,
+    texts: dict[str, str],
 ):
+    """Test description:
+
+    Query a knowledgebox with some texts with /suggest endpoint to obtain
+    paragraph suggestions
+
     """
-    Test description:
-
-    Create some resource on a knowledgebox and use the /suggest endpoint
-    to search them.
-    """
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json={
-            "title": "My resource",
-            "slug": "myresource",
-            "summary": "Some summary",
-        },
-    )
-    assert resp.status_code == 201
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json={
-            "title": "The little prince",
-            "slug": "the-little-prince",
-            "summary": (
-                "The story follows a young prince who visits various planets in space, "
-                "including Earth, and addresses themes of loneliness, friendship, love, "
-                "and loss."
-            ),
-            "metadata": {
-                "language": "en",
-            },
-        },
-    )
-    assert resp.status_code == 201
-    rid2 = resp.json()["uuid"]
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json={
-            "title": "Thus Spoke Zarathustra",
-            "slug": "thus-spoke-zarathustra",
-            "summary": "Philosophical written by Frederich Nietzche",
-            "metadata": {
-                "language": "de",
-            },
-        },
-    )
-    assert resp.status_code == 201
-    rid3 = resp.json()["uuid"]
-
     # exact match
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",
@@ -87,7 +46,7 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
-    assert body["paragraphs"]["results"][0]["rid"] == rid3
+    assert body["paragraphs"]["results"][0]["rid"] == texts["zarathrustra"]
 
     # typo tolerant search
     resp = await nucliadb_reader.get(
@@ -97,8 +56,8 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 2
-    assert body["paragraphs"]["results"][0]["rid"] == rid2
-    assert body["paragraphs"]["results"][1]["rid"] == rid2
+    assert body["paragraphs"]["results"][0]["rid"] == texts["little_prince"]
+    assert body["paragraphs"]["results"][1]["rid"] == texts["little_prince"]
     assert {"summary", "title"} == {
         result["field"] for result in body["paragraphs"]["results"]
     }
@@ -110,7 +69,7 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
-    assert body["paragraphs"]["results"][0]["rid"] == rid2
+    assert body["paragraphs"]["results"][0]["rid"] == texts["little_prince"]
     assert body["paragraphs"]["results"][0]["field"] == "summary"
 
     # nonexistent term
@@ -168,60 +127,16 @@ async def test_suggest_paragraphs(
 
 @pytest.mark.asyncio
 async def test_suggest_related_entities(
-    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    entities,
 ):
-    """
-    Test description:
+    """Test description:
 
-    Create a new resoure with some entities and relations and use
-    /suggest endpoint to make autocomplete suggestions.
-    """
-    collaborators = ["Irene", "Anastasia"]
-    entities = [
-        ("Anna", "person"),
-        ("Anthony", "person"),
-        ("Bárcenas", "person"),
-        ("Ben", "person"),
-        ("John", "person"),
-        ("Barcelona", "city"),
-        ("New York", "city"),
-        ("York", "city"),
-        ("Israel", "country"),
-        ("Netherlands", "country"),
-        ("Solomon Islands", "country"),
-    ]
-    relations = [
-        {
-            "relation": "ENTITY",
-            "to": {
-                "type": "entity",
-                "value": entity,
-                "group": type,
-            },
-        }
-        for entity, type in entities
-    ]
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        headers={"X-Synchronous": "True"},
-        json={
-            "title": "People and places",
-            "slug": "pap",
-            "summary": "Test entities to validate suggest on relations index",
-            "origin": {
-                "collaborators": collaborators,
-            },
-            "usermetadata": {
-                "classifications": [
-                    {"labelset": "labelset-1", "label": "label-1"},
-                    {"labelset": "labelset-2", "label": "label-2"},
-                ],
-                "relations": relations,
-            },
-        },
-    )
-    assert resp.status_code == 201
+    Query a knowledgebox with some entities adn relations with /suggest endpoint
+    to make autocomplete suggestions
 
+    """
     # Test simple suggestions
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest", params={"query": "An", "features": ["entities"]}
@@ -358,3 +273,108 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     assert suggested["field_type"] == "a"
     assert suggested["rid"] == rid
     assert suggested["text"] == extracted_title
+
+
+@pytest.mark.asyncio
+@pytest.fixture(scope="function")
+async def texts(
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+) -> dict[str, str]:
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My resource",
+            "slug": "myresource",
+            "summary": "Some summary",
+        },
+    )
+    assert resp.status_code == 201
+    rid1 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "The little prince",
+            "slug": "the-little-prince",
+            "summary": (
+                "The story follows a young prince who visits various planets in space, "
+                "including Earth, and addresses themes of loneliness, friendship, love, "
+                "and loss."
+            ),
+            "metadata": {
+                "language": "en",
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid2 = resp.json()["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "Thus Spoke Zarathustra",
+            "slug": "thus-spoke-zarathustra",
+            "summary": "Philosophical written by Frederich Nietzche",
+            "metadata": {
+                "language": "de",
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid3 = resp.json()["uuid"]
+
+    return {
+        "myresource": rid1,
+        "little_prince": rid2,
+        "zarathrustra": rid3,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.fixture(scope="function")
+async def entities(nucliadb_writer: AsyncClient, knowledgebox: str):
+    collaborators = ["Irene", "Anastasia"]
+    entities = [
+        ("Anna", "person"),
+        ("Anthony", "person"),
+        ("Bárcenas", "person"),
+        ("Ben", "person"),
+        ("John", "person"),
+        ("Barcelona", "city"),
+        ("New York", "city"),
+        ("York", "city"),
+        ("Israel", "country"),
+        ("Netherlands", "country"),
+        ("Solomon Islands", "country"),
+    ]
+    relations = [
+        {
+            "relation": "ENTITY",
+            "to": {
+                "type": "entity",
+                "value": entity,
+                "group": type,
+            },
+        }
+        for entity, type in entities
+    ]
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        headers={"X-Synchronous": "True"},
+        json={
+            "title": "People and places",
+            "slug": "pap",
+            "summary": "Test entities to validate suggest on relations index",
+            "origin": {
+                "collaborators": collaborators,
+            },
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "labelset-1", "label": "label-1"},
+                    {"labelset": "labelset-2", "label": "label-2"},
+                ],
+                "relations": relations,
+            },
+        },
+    )
+    assert resp.status_code == 201
