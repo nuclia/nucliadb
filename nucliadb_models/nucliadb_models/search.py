@@ -77,7 +77,6 @@ class ChatOptions(str, Enum):
 class SuggestOptions(str, Enum):
     PARAGRAPH = "paragraph"
     ENTITIES = "entities"
-    INTENT = "intent"
 
 
 class NucliaDBClientType(str, Enum):
@@ -535,7 +534,6 @@ class SearchParamDefaults:
         default=[
             SuggestOptions.PARAGRAPH,
             SuggestOptions.ENTITIES,
-            SuggestOptions.INTENT,
         ],
         title="Suggest features",
         description="Features enabled for the suggest endpoint.",
