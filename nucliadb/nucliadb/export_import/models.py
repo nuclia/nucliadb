@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -44,6 +45,7 @@ class ExportMetadata(BaseModel):
     tries: int = 0
     resources_to_export: list[str] = []
     exported_resources: list[str] = []
+    serialized_cloud_file: Optional[bytes] = None
 
 
 class ImportMetadata(BaseModel):

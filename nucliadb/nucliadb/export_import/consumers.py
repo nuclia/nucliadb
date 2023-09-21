@@ -7,12 +7,12 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
-from nucliadb.export_import.exceptions import (
-    ExportNotResumableError,
-    ExportResumableError,
-    MetadataNotFound,
+from nucliadb.export_import.exceptions import MetadataNotFound
+from nucliadb.export_import.exporter import (
+    export_entities,
+    export_labels,
+    export_resource,
 )
-from nucliadb.export_import.exporter import export_resource
 from nucliadb.export_import.models import ExportMessage, ExportMetadata, Status
 from nucliadb.export_import.utils import get_broker_message, iter_kb_resource_uuids
 from nucliadb_telemetry import errors
@@ -21,12 +21,12 @@ from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import StorageField
 
-UNRECOVERABLE_ERRORS = (
-    MetadataNotFound,
-    ExportNotResumableError,
-)
+UNRECOVERABLE_ERRORS = (MetadataNotFound,)
 
 EXPORT_MAX_RETRIES = 5
+
+KB_EXPORTS = "exports/{export_id}"
+
 
 """
 TODO:
@@ -142,63 +142,77 @@ class ExportsConsumer(BaseConsumer):
         else:  # metadata.status == Status.SCHEDULED:
             logger.info(f"Starting export {export_id} for kbid {kbid}")
             metadata.status = Status.RUNNING
-
         metadata.tries += 1
         try:
-            await self.export(metadata)
+            await self.stream_export_to_blob_storage(metadata)
         except Exception as e:
+            # Error during export. Mark as failed. It will be retried
             metadata.status = Status.FAILED
-            raise ExportNotResumableError from e
+            raise e
         else:
+            # Successful export
             metadata.status = Status.FINISHED
         finally:
             await self.data_manager.set_export_metadata(kbid, export_id, metadata)
 
     async def export(self, metadata: ExportMetadata):
+        async for chunk in self.export_resources(metadata):
+            yield chunk
+
+        async for chunk in export_entities(self.context, metadata.kbid):
+            yield chunk
+
+        async for chunk in export_labels(self.context, metadata.kbid):
+            yield chunk
+
+    async def export_resources(self, metadata):
+        metadata.exported_resources = []
         if len(metadata.resources_to_export) == 0:
             # Starting an export from scratch
-            metadata.exported_resources = []
             async for rid in iter_kb_resource_uuids(self.context, metadata.kbid):
                 metadata.resources_to_export.append(rid)
             await self.data_manager.set_export_metadata(metadata)
 
         for rid in metadata.resources_to_export:
-            if rid in metadata.exported_resources:
-                logger.info(f"Skipping resource {rid} as it was already exported")
-                continue
-
             bm = await get_broker_message(self.context, metadata.kbid, rid)
             if bm is None:
                 logger.warning(f"Skipping resource {rid} as it was deleted")
                 continue
 
-            iterator = export_resource(self.context, metadata.kbid, bm)
-            destination: StorageField = self.get_export_field_destination(
-                metadata.kbid,
-                metadata.id,
-            )
-            # TODO: Set
-            cf = CloudFile()
-            cf.bucket_name = "test"
-            cf.uri = "uri"
-            cf.content_type = "binary/octet-stream"
-            cf.size = 0
-            cf.source = CloudFile.Source.EXPORT
-            cf.filename = "foo"
-            await self.context.blob_storage.uploaditerator(iterator, destination, cf)
+            async for chunk in export_resource(self.context, metadata.kbid, bm):
+                yield chunk
 
             metadata.exported_resources.append(rid)
             await self.data_manager.set_export_metadata(metadata)
 
+    async def stream_export_to_blob_storage(self, metadata: ExportMetadata):
+        iterator = self.export(metadata)
+        destination: StorageField = self.get_export_field_destination(
+            metadata.kbid,
+            metadata.id,
+        )
+        cf = self.get_export_cloud_file()
+        await self.context.blob_storage.uploaditerator(iterator, destination, cf)
+
     def get_export_field_destination(self, kbid: str, export_id: str) -> StorageField:
         bucket = self.context.blob_storage.get_bucket_name(kbid)
-        # TODO use a proper key
-        key = f"exports/{export_id}"
+        key = KB_EXPORTS.format(export_id=export_id)
         return self.context.blob_storage.field_klass(
             storage=self.context.blob_storage,
             bucket=bucket,
             fullkey=key,
         )
+
+    def get_export_cloud_file(self) -> CloudFile:
+        # TODO: Set
+        cf = CloudFile()
+        cf.bucket_name = "test"
+        cf.uri = "uri"
+        cf.content_type = "binary/octet-stream"
+        cf.size = 0
+        cf.source = CloudFile.Source.EXPORT
+        cf.filename = "foo"
+        return cf
 
 
 class ImportsConsumer(BaseConsumer):
