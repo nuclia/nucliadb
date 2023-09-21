@@ -215,8 +215,9 @@ async def suggest_query_to_pb(
     range_modification_end: Optional[datetime] = None,
 ) -> SuggestRequest:
     request = SuggestRequest()
+
+    request.body = query
     if SuggestOptions.PARAGRAPH in features:
-        request.body = query
         request.filter.tags.extend(filters)
         request.fields.extend(fields)
 
