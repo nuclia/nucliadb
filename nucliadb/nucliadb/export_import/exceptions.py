@@ -29,3 +29,11 @@ class ExportStreamExhausted(Exception):
 
 class MetadataNotFound(Exception):
     pass
+
+
+class ExportResumableError(Exception):
+    pass
+
+
+class ExportNotResumableError(Exception):
+    pass

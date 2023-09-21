@@ -29,9 +29,35 @@ class ExportedItemType(str, Enum):
     BINARY = "BIN"
 
 
+class Status(str, Enum):
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    FINISHED = "finished"
+    FAILED = "failed"
+    ERRORED = "errored"
+
+
 class ExportMetadata(BaseModel):
+    kbid: str
     id: str
+    status: Status
+    tries: int = 0
+    resources_to_export: list[str] = []
+    exported_resources: list[str] = []
 
 
 class ImportMetadata(BaseModel):
     id: str
+    status: Status
+    imported_resources: list[str] = []
+    bytes_read: int = 0
+
+
+class ExportMessage(BaseModel):
+    kbid: str
+    export_id: str
+
+
+class ImportMessage(BaseModel):
+    kbid: str
+    import_id: str

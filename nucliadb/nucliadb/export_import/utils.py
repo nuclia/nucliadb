@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator, Callable, Optional
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.entities import EntitiesDataManager
@@ -124,15 +124,19 @@ async def set_labels(
     await ldm.set_labels(kbid, labels)
 
 
-async def iter_broker_messages(
+async def iter_kb_resource_uuids(
     context: ApplicationContext, kbid: str
-) -> AsyncGenerator[writer_pb2.BrokerMessage, None]:
+) -> AsyncGenerator[str, None]:
     rdm = ResourcesDataManager(context.kv_driver, context.blob_storage)
     async for rid in rdm.iterate_resource_ids(kbid):
-        bm = await rdm.get_broker_message(kbid, rid)
-        if bm is None:
-            continue
-        yield bm
+        yield rid
+
+
+async def get_broker_message(
+    context: ApplicationContext, kbid: str, rid: str
+) -> Optional[writer_pb2.BrokerMessage]:
+    rdm = ResourcesDataManager(context.kv_driver, context.blob_storage)
+    return await rdm.get_broker_message(kbid, rid)
 
 
 def get_cloud_files(bm: writer_pb2.BrokerMessage) -> list[resources_pb2.CloudFile]:
