@@ -18,58 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import datetime
-import json
-import sys
 
-from fastapi.openapi.utils import get_openapi
-from starlette.routing import Mount
-
-from nucliadb.writer import API_PREFIX
-
-
-def is_versioned_route(route):
-    return isinstance(route, Mount) and route.path.startswith(f"/{API_PREFIX}/v")
-
-
-def extract_openapi(application, version, commit_id):
-    app = [
-        route.app
-        for route in application.routes
-        if is_versioned_route(route) and route.app.version == version
-    ][0]
-    document = get_openapi(
-        title=app.title,
-        version=app.version,
-        openapi_version=app.openapi_version,
-        description=app.description,
-        terms_of_service=app.terms_of_service,
-        contact=app.contact,
-        license_info=app.license_info,
-        routes=app.routes,
-        tags=app.openapi_tags,
-        servers=app.servers,
-    )
-
-    document["x-metadata"] = {
-        "nucliadb_writer": {
-            "commit": commit_id,
-            "last_updated": datetime.datetime.utcnow().isoformat(),
-        }
-    }
-    return document
+from nucliadb import openapi
 
 
 def command_extract_openapi():
-    from nucliadb.writer.app import create_application
+    from nucliadb.reader.app import create_application
 
-    openapi_json_path = sys.argv[1]
-    api_version = sys.argv[2]
-    commit_id = sys.argv[3]
-
-    application = create_application()
-
-    json.dump(
-        extract_openapi(application, api_version, commit_id),
-        open(openapi_json_path, "w"),
-    )
+    openapi.command_extract_openapi(create_application(), "nucliadb_writer")

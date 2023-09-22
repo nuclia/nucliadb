@@ -13,28 +13,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job to run pre-checks
   pre-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install package
-        run: make -C nucliadb_dataset/ install-dev
-
-      - name: Run pre-checks
-        run: make -C nucliadb_dataset/ lint
+    uses: ./.github/workflows/_component_prechecks.yml
+    with:
+      component: "nucliadb_dataset"
 
   # Job to run tests
   tests:

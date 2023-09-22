@@ -1,0 +1,28 @@
+name: NucliaDB Client
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  pre-checks:
+    name: Pre-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+            filters: |
+              VERSION:
+                - 'nucliadb_protos/python/VERSION'
+      
+      - name: Check if VERSION file was not updated
+        if: steps.changes.outputs.VERSION != 'true'
+        run: |
+            echo "VERSION file was not updated"
+            exit 1
