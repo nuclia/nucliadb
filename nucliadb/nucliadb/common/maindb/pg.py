@@ -37,34 +37,39 @@ CREATE TABLE IF NOT EXISTS resources (
 class DataLayer:
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
+        self.lock = asyncio.Lock()
 
     async def get(self, key: str) -> Optional[bytes]:
-        return await self.connection.fetchval(
-            "SELECT value FROM resources WHERE key = $1", key
-        )
+        async with self.lock:
+            return await self.connection.fetchval(
+                "SELECT value FROM resources WHERE key = $1", key
+            )
 
     async def set(self, key: str, value: bytes) -> None:
-        await self.connection.execute(
-            """
+        async with self.lock:
+            await self.connection.execute(
+                """
 INSERT INTO resources (key, value)
 VALUES ($1, $2)
 ON CONFLICT (key)
 DO UPDATE SET value = EXCLUDED.value
 """,
-            key,
-            value,
-        )
+                key,
+                value,
+            )
 
     async def delete(self, key: str) -> None:
-        await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
+        async with self.lock:
+            await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
 
     async def batch_get(self, keys: List[str]) -> List[bytes]:
-        records = {
-            record["key"]: record["value"]
-            for record in await self.connection.fetch(
-                "SELECT key, value FROM resources WHERE key = ANY($1)", keys
-            )
-        }
+        async with self.lock:
+            records = {
+                record["key"]: record["value"]
+                for record in await self.connection.fetch(
+                    "SELECT key, value FROM resources WHERE key = ANY($1)", keys
+                )
+            }
         # get sorted by keys
         return [records[key] for key in keys]
 
@@ -79,15 +84,17 @@ DO UPDATE SET value = EXCLUDED.value
         if limit > 0:
             query += " LIMIT $2"
             args.append(limit)
-        async for record in self.connection.cursor(query, *args):
-            if not include_start and record["key"] == prefix:
-                continue
-            yield record["key"]
+        async with self.lock:
+            async for record in self.connection.cursor(query, *args):
+                if not include_start and record["key"] == prefix:
+                    continue
+                yield record["key"]
 
     async def count(self, match: str) -> int:
-        results = await self.connection.fetch(
-            "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
-        )
+        async with self.lock:
+            results = await self.connection.fetch(
+                "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
+            )
         return results[0]["count"]
 
 
