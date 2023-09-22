@@ -65,3 +65,9 @@ async def storage_field_test(storage: Storage):
     assert metadata["CONTENT_TYPE"] == "text/plain"
     assert str(metadata["SIZE"]) == str(len(binary_data))
     assert metadata["FILENAME"] == "myfile.txt"
+
+    # Download the file and check that it's the same
+    downloaded_data = b""
+    async for data in sfield.iter_data():
+        downloaded_data += data
+    assert downloaded_data == binary_data
