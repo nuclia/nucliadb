@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS resources (
 class DataLayer:
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
+        self.lock = asyncio.Lock()
 
     async def get(self, key: str) -> Optional[bytes]:
         async with self.lock:
