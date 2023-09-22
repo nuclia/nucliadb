@@ -26,12 +26,14 @@ use lingua::{Language, LanguageDetector, LanguageDetectorBuilder};
 use serde_json;
 
 lazy_static! {
-    static ref LANGUAGE_DETECTOR: LanguageDetector = {
-        let detector = LanguageDetectorBuilder::from_all_spoken_languages()
-            .with_preloaded_language_models()
-            .build();
-        detector
-    };
+    static ref LANGUAGE_DETECTOR: LanguageDetector = build_language_detector();
+}
+
+/// Builds a language detector
+fn build_language_detector() -> LanguageDetector {
+    LanguageDetectorBuilder::from_all_spoken_languages()
+        .with_preloaded_language_models()
+        .build()
 }
 
 struct StopWords {
@@ -121,15 +123,16 @@ mod tests {
 
     #[test]
     fn it_detects_language() {
-        // cache warm up
-        let start_time = std::time::Instant::now();
-        let _ = detect_language("I am just here to lazy-build the detector");
-        let elapsed = start_time.elapsed().as_millis() as f64;
-
-        // make sure we never spend more than 500 ms for the cache warmup
-        // TODO: is this ok? should we preload at startup so the first call is not slow?
         if cfg!(not(debug_assertions)) {
+            // Make sure we never spend more than 500 ms for creating.
+            // This is only done if the tests are run in --release mode, otherwise the check is
+            // pointless. Is important to use `build_language_detector` and not `LANGUAGE_DETECTOR`
+            // since tests are ran in parallel.
+            let start_time = std::time::Instant::now();
+            let detector_from_scratch = build_language_detector();
+            let elapsed = start_time.elapsed().as_millis() as f64;
             assert_eq!(elapsed < 500.0, true, "{}", elapsed);
+            std::mem::drop(detector_from_scratch);
         }
 
         let tests = [
