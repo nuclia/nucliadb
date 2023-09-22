@@ -62,7 +62,7 @@ async def export_resources(
         if bm is None:
             logger.warning(f"No resource found for rid {rid}")
             continue
-        async for chunk in export_resource(context, kbid, bm):
+        async for chunk in export_resource(context, bm):
             yield chunk
 
 

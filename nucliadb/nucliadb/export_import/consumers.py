@@ -13,6 +13,7 @@ from nucliadb.export_import.exporter import (
     export_labels,
     export_resource,
 )
+from nucliadb.export_import.importer import IteratorExportStream, import_kb
 from nucliadb.export_import.models import (
     ExportMessage,
     ExportMetadata,
@@ -32,12 +33,7 @@ UNRECOVERABLE_ERRORS = (MetadataNotFound,)
 EXPORT_MAX_RETRIES = 5
 
 KB_EXPORTS = "exports/{export_id}"
-
-
-"""
-TODO:
- - Figure out partitioning strategy
-"""
+KB_IMPORTS = "imports/{import_id}"
 
 
 class BaseConsumer:
@@ -57,10 +53,6 @@ class BaseConsumer:
         await self.setup_nats_subscription()
 
     async def setup_nats_subscription(self):
-        """
-        TODO:
-        - Figure out nats subscription settings
-        """
         subject = self.stream.subject.format(partition=self.partition)
         group = self.stream.group.format(partition=self.partition)
         stream = self.stream.name
@@ -73,6 +65,7 @@ class BaseConsumer:
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
+                opt_start_seq=1,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
@@ -113,7 +106,7 @@ class BaseConsumer:
 
 
 class ExportsConsumer(BaseConsumer):
-    stream = const.Streams.EXPORTS.name
+    stream = const.Streams.EXPORTS
 
     async def do_work(self, msg: Msg):
         export_msg = ExportMessage.parse_raw(msg.data)
@@ -130,7 +123,7 @@ class ExportsConsumer(BaseConsumer):
                 f"Export {export_id} for kbid {kbid} failed too many times. Skipping"
             )
             metadata.status = Status.ERRORED
-            await self.data_manager.set_export_metadata(kbid, export_id, metadata)
+            await self.set_metadata(metadata)
             return
 
         if metadata.status == Status.FAILED:
@@ -150,7 +143,7 @@ class ExportsConsumer(BaseConsumer):
             # Successful export
             metadata.status = Status.FINISHED
         finally:
-            await self.data_manager.set_export_metadata(kbid, export_id, metadata)
+            await self.set_metadata(metadata)
 
     async def export(self, metadata: ExportMetadata):
         async for chunk in self.export_resources(metadata):
@@ -168,7 +161,7 @@ class ExportsConsumer(BaseConsumer):
             # Starting an export from scratch
             async for rid in iter_kb_resource_uuids(self.context, metadata.kbid):
                 metadata.resources_to_export.append(rid)
-            await self.data_manager.set_export_metadata(metadata)
+            await self.set_metadata(metadata)
 
         for rid in metadata.resources_to_export:
             bm = await get_broker_message(self.context, metadata.kbid, rid)
@@ -176,11 +169,16 @@ class ExportsConsumer(BaseConsumer):
                 logger.warning(f"Skipping resource {rid} as it was deleted")
                 continue
 
-            async for chunk in export_resource(self.context, metadata.kbid, bm):
+            async for chunk in export_resource(self.context, bm):
                 yield chunk
 
             metadata.exported_resources.append(rid)
-            await self.data_manager.set_export_metadata(metadata)
+            await self.set_metadata(metadata)
+
+    async def set_metadata(self, metadata: ExportMetadata):
+        await self.data_manager.set_export_metadata(
+            metadata.kbid, metadata.id, metadata
+        )
 
     async def stream_export_to_blob_storage(self, metadata: ExportMetadata):
         iterator = self.export(metadata)
@@ -188,7 +186,7 @@ class ExportsConsumer(BaseConsumer):
             metadata.kbid,
             metadata.id,
         )
-        cf = self.get_export_cloud_file()
+        cf = self.get_export_cloud_file(metadata.kbid, metadata.id)
         await self.context.blob_storage.uploaditerator(iterator, destination, cf)
 
     def get_export_field_destination(self, kbid: str, export_id: str) -> StorageField:
@@ -200,20 +198,17 @@ class ExportsConsumer(BaseConsumer):
             fullkey=key,
         )
 
-    def get_export_cloud_file(self) -> CloudFile:
-        # TODO: Set
+    def get_export_cloud_file(self, kbid: str, export_id: str) -> CloudFile:
         cf = CloudFile()
-        cf.bucket_name = "test"
-        cf.uri = "uri"
+        cf.bucket_name = self.context.blob_storage.get_bucket_name(kbid)
         cf.content_type = "binary/octet-stream"
-        cf.size = 0
         cf.source = CloudFile.Source.EXPORT
-        cf.filename = "foo"
+        cf.filename = f"{kbid}-{export_id}.export"
         return cf
 
 
 class ImportsConsumer(BaseConsumer):
-    stream = const.Streams.IMPORTS.name
+    stream = const.Streams.IMPORTS
 
     async def do_work(self, msg: Msg):
         import_msg = ImportMessage.parse_raw(msg.data)
@@ -253,23 +248,23 @@ class ImportsConsumer(BaseConsumer):
             await self.data_manager.set_import_metadata(kbid, import_id, metadata)
 
     async def import_from_blob_storage_stream(self, metadata: ImportMetadata):
-        # TODO
-        pass
+        bucket = self.context.blob_storage.get_bucket_name(metadata.kbid)
+        key = KB_IMPORTS.format(import_id=metadata.id)
+        field = self.context.blob_storage.field_klass(
+            storage=self.context.blob_storage,
+            bucket=bucket,
+            fullkey=key,
+        )
+        iterator = field.iter_data()
+        stream = IteratorExportStream(iterator)
+        await import_kb(context=self.context, kbid=metadata.kbid, stream=stream)
 
 
-async def start_exports_consumer():
-    context = ApplicationContext(service_name="exports_consumer")
-    await context.initialize()
-    for partition in nats_consumer_settings.nats_partitions:
-        consumer = ExportsConsumer(context, partition)
-        await consumer.initialize()
-    return context.finalize
+async def start_exports_consumer(context: ApplicationContext):
+    consumer = ExportsConsumer(context, 1)
+    await consumer.initialize()
 
 
-async def start_imports_consumer():
-    context = ApplicationContext(service_name="imports_consumer")
-    await context.initialize()
-    for partition in nats_consumer_settings.nats_partitions:
-        consumer = ImportsConsumer(context, partition)
-        await consumer.initialize()
-    return context.finalize
+async def start_imports_consumer(context: ApplicationContext):
+    consumer = ImportsConsumer(context, 1)
+    await consumer.initialize()

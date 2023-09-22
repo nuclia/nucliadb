@@ -73,7 +73,7 @@ class LocalStorageField(StorageField):
         shutil.copy(origin_path, destination_path)
 
     def get_file_path(self, bucket: str, key: str):
-        return f"{self.storage.get_bucket_name(bucket)}/{key}"
+        return f"{self.storage.get_bucket_path(bucket)}/{key}"
 
     async def iter_data(self, headers=None):
         key = self.field.uri if self.field else self.key
@@ -82,13 +82,14 @@ class LocalStorageField(StorageField):
         else:
             bucket = self.field.bucket_name
 
-        path = self.storage.get_bucket_path(bucket)
-
-        async with aiofiles.open(self.get_file_path(path, key)) as resp:
+        path = self.get_file_path(bucket, key)
+        async with aiofiles.open(path, mode="rb") as resp:
             data = await resp.read(CHUNK_SIZE)
-            while data is not None:
+            while True:
                 yield data
                 data = await resp.read(CHUNK_SIZE)
+                if data is None or data == b"":
+                    break
 
     async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
         """

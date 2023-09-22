@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -38,21 +38,22 @@ class Status(str, Enum):
     ERRORED = "errored"
 
 
-class ExportMetadata(BaseModel):
-    kbid: str
+class TaskMetadata(BaseModel):
     id: str
     status: Status
+    result: dict[str, Any] = {}
     tries: int = 0
+
+
+class ExportMetadata(TaskMetadata):
+    kbid: str
     resources_to_export: list[str] = []
     exported_resources: list[str] = []
     serialized_cloud_file: Optional[bytes] = None
 
 
-class ImportMetadata(BaseModel):
-    id: str
-    status: Status
-    imported_resources: list[str] = []
-    bytes_read: int = 0
+class ImportMetadata(TaskMetadata):
+    kbid: str
 
 
 class ExportMessage(BaseModel):

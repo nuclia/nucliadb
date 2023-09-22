@@ -57,7 +57,7 @@ class Streams:
         """
 
         name = "nucliadb"
-        subject = "ndb.exports.{partition}"
+        subject = "ndb.consumer.exports.{partition}"
         group = "nucliadb-exports-{partition}"
 
     class IMPORTS:
@@ -66,7 +66,7 @@ class Streams:
         """
 
         name = "nucliadb"
-        subject = "ndb.imports.{partition}"
+        subject = "ndb.consumer.imports.{partition}"
         group = "nucliadb-imports-{partition}"
 
 

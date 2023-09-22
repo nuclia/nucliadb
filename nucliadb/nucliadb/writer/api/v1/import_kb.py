@@ -22,7 +22,7 @@ from starlette.requests import Request
 
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.export_import import importer
-from nucliadb.export_import.fastapi import FastAPIExportStream
+from nucliadb.export_import.importer import IteratorExportStream
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
@@ -38,8 +38,9 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def import_kb_endpoint(request: Request, kbid: str) -> None:
     context = get_app_context(request.app)
+    iterator = request.stream().__aiter__()
     await importer.import_kb(
         context=context,
         kbid=kbid,
-        stream=FastAPIExportStream(request),
+        stream=IteratorExportStream(iterator),
     )

@@ -19,7 +19,7 @@
 #
 import logging
 from io import BytesIO
-from typing import Any, AsyncGenerator, Callable, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Callable, cast
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.exceptions import ExportStreamExhausted
@@ -39,6 +39,10 @@ BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
+class EndOfStream(Exception):
+    ...
+
+
 class ExportStream:
     def __init__(self, export: BytesIO):
         self.export = export
@@ -55,6 +59,40 @@ class ExportStream:
         chunk = self.export.read(n_bytes)
         self.read_bytes += len(chunk)
         return chunk
+
+
+class IteratorExportStream(ExportStream):
+    def __init__(self, iterator: AsyncIterator[bytes]):
+        self.iterator = iterator
+        self.buffer = b""
+
+    def _read_from_buffer(self, n_bytes: int) -> bytes:
+        value = self.buffer[:n_bytes]
+        self.buffer = self.buffer[n_bytes:]
+        return value
+
+    async def read(self, n_bytes: int) -> bytes:
+        while True:
+            try:
+                if self.buffer != b"" and len(self.buffer) >= n_bytes:
+                    return self._read_from_buffer(n_bytes)
+
+                next_chunk = await self.iterator.__anext__()
+                if next_chunk == b"":
+                    raise EndOfStream()
+
+                self.buffer += next_chunk
+                if len(self.buffer) >= n_bytes:
+                    return self._read_from_buffer(n_bytes)
+                else:
+                    # Need to read another chunk
+                    continue
+
+            except (StopAsyncIteration, EndOfStream):
+                if self.buffer != b"":
+                    return self._read_from_buffer(n_bytes)
+                else:
+                    raise ExportStreamExhausted()
 
 
 class ExportStreamReader:
