@@ -20,6 +20,7 @@
 from typing import Union
 
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -39,13 +40,13 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_storage
 
 ASK_EXAMPLES = {
-    "Ask a Resource": {
-        "summary": "Ask a question to the document",
-        "description": "Ask a question to the document. The whole document is sent as context to the generative AI",
-        "value": {
+    "Ask a Resource": Example(
+        summary="Ask a question to the document",
+        description="Ask a question to the document. The whole document is sent as context to the generative AI",
+        value={
             "question": "Does this document contain personal information?",
         },
-    }
+    )
 }
 
 
@@ -66,7 +67,7 @@ async def resource_ask_endpoint(
     kbid: str,
     rid: str,
     item: AskRequest = Body(
-        examples=ASK_EXAMPLES, description="Ask a question payload"
+        openapi_examples=ASK_EXAMPLES, description="Ask a question payload"
     ),
     x_nucliadb_user: str = Header("", description="User Id", include_in_schema=False),
 ) -> Union[AskResponse, HTTPClientError]:

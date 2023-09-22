@@ -23,6 +23,7 @@ from time import time
 from typing import List, Optional, Tuple, Union
 
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
@@ -57,24 +58,24 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_audit
 
 SEARCH_EXAMPLES = {
-    "filtering_by_icon": {
-        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
-        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
-        "value": {
+    "filtering_by_icon": Example(
+        summary="Search for pdf documents where the text 'Noam Chomsky' appears",
+        description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        value={
             "query": "Noam Chomsky",
             "filters": ["/n/i/application/pdf"],
             "features": [SearchOptions.DOCUMENT],
         },
-    },
-    "get_language_counts": {
-        "summary": "Get the number of documents for each language",
-        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
-        "value": {
+    ),
+    "get_language_counts": Example(
+        summary="Get the number of documents for each language",
+        description="For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        value={
             "page_size": 0,
             "faceted": ["/s/p"],
             "features": [SearchOptions.DOCUMENT],
         },
-    },
+    ),
 }
 
 
@@ -254,7 +255,7 @@ async def search_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: SearchRequest = Body(examples=SEARCH_EXAMPLES),
+    item: SearchRequest = Body(openapi_examples=SEARCH_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
