@@ -25,7 +25,6 @@ from typing import List, Optional
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from starlette.routing import Mount
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.reader import API_PREFIX
@@ -55,14 +54,6 @@ async def reader_api(test_settings_reader: None, local_files, event_loop):  # ty
     from nucliadb.reader.app import create_application
 
     application = create_application()
-
-    async def handler(req, exc):  # type: ignore
-        raise exc
-
-    # Little hack to raise exeptions from VersionedFastApi
-    for route in application.routes:
-        if isinstance(route, Mount):
-            route.app.middleware_stack.handler = handler  # type: ignore
 
     def make_client_fixture(
         roles: Optional[List[Enum]] = None,

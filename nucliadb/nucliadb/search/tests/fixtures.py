@@ -27,7 +27,6 @@ from httpx import AsyncClient
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
 from redis import asyncio as aioredis
-from starlette.routing import Mount
 
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
 from nucliadb.common.maindb.utils import get_driver
@@ -82,16 +81,8 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
     from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
 
-    async def handler(req, exc):  # type: ignore
-        raise exc
-
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
-
-    # Little hack to raise exeptions from VersionedFastApi
-    for route in application.routes:
-        if isinstance(route, Mount):
-            route.app.middleware_stack.handler = handler  # type: ignore
 
     await application.router.startup()
 
