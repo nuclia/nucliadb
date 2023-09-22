@@ -79,7 +79,10 @@ DO UPDATE SET value = EXCLUDED.value
         limit: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ) -> AsyncGenerator[str, None]:
-        query = "SELECT key FROM resources WHERE key LIKE $1"
+        query = """SELECT key FROM resources
+WHERE key LIKE $1
+ORDER BY key
+"""
         args: list[Any] = [prefix + "%"]
         if limit > 0:
             query += " LIMIT $2"

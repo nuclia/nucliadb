@@ -614,6 +614,8 @@ async def maybe_cleanup_maindb():
 
 
 async def cleanup_maindb(driver: Driver):
+    if not driver.initialized:
+        return
     async with driver.transaction() as txn:
         all_keys = [k async for k in txn.keys("", count=-1)]
         for key in all_keys:
