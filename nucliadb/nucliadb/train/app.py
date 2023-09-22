@@ -28,7 +28,7 @@ from starlette.responses import HTMLResponse
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import api
-from nucliadb.train.lifecycle import finalize, initialize
+from nucliadb.train.lifecycle import lifespan
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
@@ -52,10 +52,6 @@ middleware = [
 errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
 
-on_startup = [initialize]
-on_shutdown = [finalize]
-
-
 async def global_exception_handler(request: Request, exc: Exception):
     errors.capture_exception(exc)
     return JSONResponse(
@@ -74,8 +70,7 @@ async def client_disconnect_handler(request: Request, exc: ClientDisconnect):
 fastapi_settings = dict(
     debug=running_settings.debug,
     middleware=middleware,
-    on_startup=on_startup,
-    on_shutdown=on_shutdown,
+    lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
         ClientDisconnect: client_disconnect_handler,

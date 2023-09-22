@@ -18,48 +18,46 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.ingest.app import initialize_grpc as initialize_ingest_grpc
 from nucliadb.ingest.app import initialize_pull_workers
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.reader.lifecycle import finalize as finalize_reader
-from nucliadb.reader.lifecycle import initialize as initialize_reader
-from nucliadb.search.lifecycle import finalize as finalize_search
-from nucliadb.search.lifecycle import initialize as initialize_search
-from nucliadb.train.lifecycle import finalize as finalize_train
-from nucliadb.train.lifecycle import initialize as initialize_train
-from nucliadb.writer.lifecycle import finalize as finalize_writer
-from nucliadb.writer.lifecycle import initialize as initialize_writer
+from nucliadb.reader.lifecycle import lifespan as reader_lifespan
+from nucliadb.search.lifecycle import lifespan as search_lifespan
+from nucliadb.train.lifecycle import lifespan as train_lifespan
+from nucliadb.writer.lifecycle import lifespan as writer_lifespan
 from nucliadb_utils.utilities import finalize_utilities
 
-SYNC_FINALIZERS = []
 
-
-async def initialize():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SYNC_FINALIZERS = []
     if ingest_settings.disable_pull_worker:
         finalizers = await initialize_ingest_grpc()
     else:
         finalizers = await initialize_pull_workers()
     SYNC_FINALIZERS.extend(finalizers)
-    await initialize_writer()
-    await initialize_reader()
-    await initialize_search()
-    await initialize_train()
-    await setup_cluster()
 
+    async with (
+        writer_lifespan(app),
+        reader_lifespan(app),
+        search_lifespan(app),
+        train_lifespan(app),
+    ):
+        await setup_cluster()
 
-async def finalize():
-    for finalizer in SYNC_FINALIZERS:
-        if asyncio.iscoroutinefunction(finalizer):
-            await finalizer()
-        else:
-            finalizer()
-    SYNC_FINALIZERS.clear()
+        yield
 
-    await finalize_writer()
-    await finalize_reader()
-    await finalize_search()
-    await finalize_train()
+        for finalizer in SYNC_FINALIZERS:
+            if asyncio.iscoroutinefunction(finalizer):
+                await finalizer()
+            else:
+                finalizer()
+        SYNC_FINALIZERS.clear()
+
     await finalize_utilities()
     await teardown_cluster()
