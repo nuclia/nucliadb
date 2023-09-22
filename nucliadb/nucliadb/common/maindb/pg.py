@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS resources (
 class DataLayer:
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
-        self.lock = asyncio.Lock()
 
     async def get(self, key: str) -> Optional[bytes]:
         async with self.lock:
@@ -101,7 +100,14 @@ DO UPDATE SET value = EXCLUDED.value
 class PGTransaction(Transaction):
     driver: PGDriver
 
-    def __init__(self, connection: asyncpg.Connection, txn: Any, driver: PGDriver):
+    def __init__(
+        self,
+        pool: asyncpg.Pool,
+        connection: asyncpg.Connection,
+        txn: Any,
+        driver: PGDriver,
+    ):
+        self.pool = pool
         self.connection = connection
         self.data_layer = DataLayer(connection)
         self.txn = txn
@@ -141,13 +147,17 @@ class PGTransaction(Transaction):
     async def delete(self, key: str):
         await self.data_layer.delete(key)
 
-    def keys(
+    async def keys(
         self,
         match: str,
         count: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ):
-        return self.data_layer.scan_keys(match, count, include_start=include_start)
+        async with self.pool.acquire() as conn:
+            # all txn implementations implement this API outside of the current txn
+            dl = DataLayer(conn)
+            async for key in dl.scan_keys(match, count, include_start=include_start):
+                yield key
 
     async def count(self, match: str) -> int:
         return await self.data_layer.count(match)
@@ -183,4 +193,4 @@ class PGDriver(Driver):
         conn = await self.pool.acquire()
         txn = conn.transaction()
         await txn.start()
-        return PGTransaction(conn, txn, driver=self)
+        return PGTransaction(self.pool, conn, txn, driver=self)
