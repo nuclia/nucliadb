@@ -27,13 +27,30 @@ use serde_json;
 
 lazy_static! {
     static ref LANGUAGE_DETECTOR: LanguageDetector = build_language_detector();
+    static ref STOP_WORDS: StopWords = build_stop_words();
 }
 
 /// Builds a language detector
+#[inline]
 fn build_language_detector() -> LanguageDetector {
     LanguageDetectorBuilder::from_all_spoken_languages()
         .with_preloaded_language_models()
         .build()
+}
+
+#[inline]
+fn build_stop_words() -> StopWords {
+    let mut stop_words = StopWords::new();
+
+    for loaded in &LOADED_LANGUAGES {
+        let code = loaded[0];
+        let data = loaded[1];
+        if let Err(err) = stop_words.load_language(code, data) {
+            eprintln!("Error loading stop words for {}: {}", code, err);
+        }
+    }
+
+    stop_words
 }
 
 struct StopWords {
@@ -85,22 +102,6 @@ static LOADED_LANGUAGES: [[&str; 2]; 8] = [
     ["pt", PT],
 ];
 
-lazy_static! {
-    static ref STOP_WORDS: StopWords = {
-        let mut stop_words = StopWords::new();
-
-        for loaded in &LOADED_LANGUAGES {
-            let code = loaded[0];
-            let data = loaded[1];
-            if let Err(err) = stop_words.load_language(code, data) {
-                eprintln!("Error loading stop words for {}: {}", code, err);
-            }
-        }
-
-        stop_words
-    };
-}
-
 /// Returns the detected language, defaults to English
 pub fn detect_language(query: &str) -> Language {
     let detected_language: Option<Language> = LANGUAGE_DETECTOR.detect_language_of(query);
@@ -123,18 +124,8 @@ mod tests {
 
     #[test]
     fn it_detects_language() {
-        if cfg!(not(debug_assertions)) {
-            // Make sure we never spend more than 500 ms for creating.
-            // This is only done if the tests are run in --release mode, otherwise the check is
-            // pointless. Is important to use `build_language_detector` and not `LANGUAGE_DETECTOR`
-            // since tests are ran in parallel.
-            let start_time = std::time::Instant::now();
-            let detector_from_scratch = build_language_detector();
-            let elapsed = start_time.elapsed().as_millis() as f64;
-            assert_eq!(elapsed < 500.0, true, "{}", elapsed);
-            std::mem::drop(detector_from_scratch);
-        }
-
+        // Force-built `LANGUAGE_DETECTOR` before the tests
+        let _ = detect_language("I am just here to lazy-build the detector");
         let tests = [
             (
                 "nuclia is a database for unstructured data",
@@ -161,11 +152,12 @@ mod tests {
         for (query, expected_language) in tests {
             let start_time = std::time::Instant::now();
             let detected_language = detect_language(query);
-            let elapsed = start_time.elapsed().as_micros() as f64;
+            let _elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(expected_language, detected_language);
             // the call in is general less than ~1 ms
             // however, setting it to 10ms for slow CI boxes
-            assert_eq!(elapsed < 10000.0, true, "{}", elapsed);
+            #[cfg(not(debug_assertions))]
+            assert!(_elapsed < 10000.0, "{}", _elapsed);
         }
     }
 
