@@ -185,7 +185,8 @@ async def knowledgebox(nucliadb_manager: AsyncClient):
 
     yield uuid
 
-    await nucliadb_manager.delete(f"/kb/{uuid}")
+    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
 
 
 @pytest.fixture(scope="function")
