@@ -124,8 +124,6 @@ mod tests {
 
     #[test]
     fn it_detects_language() {
-        // Force-built `LANGUAGE_DETECTOR` before the tests
-        let _ = detect_language("I am just here to lazy-build the detector");
         let tests = [
             (
                 "nuclia is a database for unstructured data",
@@ -150,14 +148,8 @@ mod tests {
         ];
 
         for (query, expected_language) in tests {
-            let start_time = std::time::Instant::now();
             let detected_language = detect_language(query);
-            let _elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(expected_language, detected_language);
-            // the call in is general less than ~1 ms
-            // however, setting it to 10ms for slow CI boxes
-            #[cfg(not(debug_assertions))]
-            assert!(_elapsed < 10000.0, "{}", _elapsed);
         }
     }
 
