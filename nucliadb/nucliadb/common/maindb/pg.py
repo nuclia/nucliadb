@@ -153,7 +153,7 @@ class PGTransaction(Transaction):
         count: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ):
-        async with self.pool.acquire() as conn:
+        async with self.pool.acquire() as conn, conn.transaction():
             # all txn implementations implement this API outside of the current txn
             dl = DataLayer(conn)
             async for key in dl.scan_keys(match, count, include_start=include_start):
@@ -190,7 +190,7 @@ class PGDriver(Driver):
             self.initialized = False
 
     async def begin(self) -> PGTransaction:
-        conn = await self.pool.acquire()
+        conn: asyncpg.Connection = await self.pool.acquire()
         txn = conn.transaction()
         await txn.start()
         return PGTransaction(self.pool, conn, txn, driver=self)
