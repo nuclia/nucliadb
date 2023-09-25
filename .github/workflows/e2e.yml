@@ -100,7 +100,7 @@ jobs:
     name: E2E VM Cluster Tests
     strategy:
       matrix:
-        ostypes: ["debian:bookworm-slim", "fedora:38"]
+        ostypes: ["debian:bullseye-slim", "debian:bookworm-slim", "fedora:38"]
 
     container:
       image: ${{ matrix.ostypes }}
