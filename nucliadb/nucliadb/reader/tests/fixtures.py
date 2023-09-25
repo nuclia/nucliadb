@@ -25,7 +25,6 @@ from typing import List, Optional
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from starlette.routing import Mount
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.reader import API_PREFIX

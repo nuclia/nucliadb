@@ -27,7 +27,6 @@ from httpx import AsyncClient
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
 from redis import asyncio as aioredis
-from starlette.routing import Mount
 
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
 from nucliadb.common.maindb.utils import get_driver
