@@ -70,10 +70,14 @@ class NatsTaskProducer:
             await self.context.nats_manager.js.publish(  # type: ignore
                 self.stream.subject, task_msg.json().encode("utf-8")  # type: ignore
             )
+            logger.info(
+                "Task sent to NATS",
+                extra={"kbid": kbid, "producer_name": self.name},
+            )
         except Exception as e:
             errors.capture_exception(e)
             logger.error(
-                f"Error sending task for {kbid} to NATS",
+                "Error sending task to NATS",
                 extra={"kbid": kbid, "producer_name": self.name},
             )
             await self.dm.delete_task(task)
