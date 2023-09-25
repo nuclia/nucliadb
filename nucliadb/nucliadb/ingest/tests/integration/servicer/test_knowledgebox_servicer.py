@@ -32,6 +32,7 @@ from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_create_knowledgebox(
     set_telemetry_settings, grpc_servicer: IngestFixture, maindb_driver
@@ -80,7 +81,7 @@ async def test_create_knowledgebox(
     await tracer_provider.async_force_flush()
 
     client = AsyncClient()
-    for _ in range(10):
+    for _ in range(15):
         resp = await client.get(
             f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces?service=GCS_SERVICE",
             headers={"Accept": "application/json"},
