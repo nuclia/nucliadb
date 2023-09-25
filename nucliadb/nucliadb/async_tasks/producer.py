@@ -38,6 +38,7 @@ class NatsTaskProducer:
         self.stream = stream
         self.context: Optional[ApplicationContext] = None
         self.initialized = False
+        self._dm = None
 
     @property
     def dm(self):
