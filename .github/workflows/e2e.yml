@@ -96,8 +96,16 @@ jobs:
               exit 1)
 
   e2e-vm-cluster:
-    name: E2E VM Cluster Tests
     runs-on: ubuntu-latest
+    name: E2E VM Cluster Tests
+    strategy:
+      matrix:
+        ostypes: ["debian:bookworm-slim", "fedora:38"]
+
+    container:
+      image: ${{ matrix.ostypes }}
+      volumes:
+        - /opt/
 
     services:
       # Label used to access the service container
@@ -133,8 +141,7 @@ jobs:
         # of NucliaDB; however, it seems more important to test against
         # the current branch.
         run: |
-          source ./nucliadb/bin/activate
-          make -C nucliadb install-dev
+          bash -c 'source /opt/nucliadb/bin/activate && make -C nucliadb install-dev'
 
       - name: Run Cluster and tests
         env:
@@ -146,16 +153,4 @@ jobs:
           cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
           DEBUG: "1"
           NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
-        run: |
-          pip install -r e2e/requirements.txt
-          while ! pg_isready -h localhost -p 5432 -U postgres -d postgres; do
-            sleep 1
-          done
-          source ./nucliadb/bin/activate
-          export standalone_node_port=10009
-          export DATA_PATH=data1
-          nucliadb --http-port=8080 &
-          export standalone_node_port=10010
-          export DATA_PATH=data2
-          nucliadb --http-port=8081 &
-          pytest -s --tb=native e2e/test_e2e.py
+        run: bash e2e/run-e2e-tests.sh
