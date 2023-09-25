@@ -32,7 +32,7 @@ from nucliadb.async_tasks.exceptions import (
     TaskShouldNotBeHandled,
 )
 from nucliadb.async_tasks.logger import logger
-from nucliadb.async_tasks.models import Status, Task, TaskNatsMessage
+from nucliadb.async_tasks.models import Task, TaskNatsMessage, TaskStatus
 from nucliadb.async_tasks.utils import TaskCallback
 from nucliadb.common.context import ApplicationContext
 from nucliadb_telemetry import errors
@@ -135,7 +135,7 @@ class NatsTaskConsumer:
                 await self.check_task_state(task)
             except TaskShouldNotBeHandled:
                 logger.info(
-                    f"Task will not be handled. Status: {task.status.value}",
+                    f"Task will not be handled. TaskStatus: {task.status.value}",
                     extra={
                         "consumer_name": self.name,
                         "kbid": kbid,
@@ -153,7 +153,7 @@ class NatsTaskConsumer:
                         "task_id": task_id,
                     },
                 )
-                task.status = Status.ERRORED
+                task.status = TaskStatus.ERRORED
                 await self.dm.set_task(task)
                 await msg.ack()
                 return
@@ -162,7 +162,7 @@ class NatsTaskConsumer:
                 f"Starting task",
                 extra={"consumer_name": self.name, "kbid": kbid, "task_id": task_id},
             )
-            task.status = Status.RUNNING
+            task.status = TaskStatus.RUNNING
             task.tries += 1
             try:
                 await self.callback(
@@ -171,7 +171,7 @@ class NatsTaskConsumer:
             except UNRECOVERABLE_ERRORS as e:
                 errors.capture_exception(e)
                 # Unrecoverable errors are not retried
-                task.status = Status.ERRORED
+                task.status = TaskStatus.ERRORED
                 await msg.ack()
                 return
             except Exception as e:
@@ -186,7 +186,7 @@ class NatsTaskConsumer:
                 )
                 await asyncio.sleep(2)
                 # Set status to failed so that the task is retried
-                task.status = Status.FAILED
+                task.status = TaskStatus.FAILED
                 await msg.nak()
             else:
                 logger.info(
@@ -197,18 +197,22 @@ class NatsTaskConsumer:
                         "task_id": task_id,
                     },
                 )
-                task.status = Status.FINISHED
+                task.status = TaskStatus.FINISHED
                 await msg.ack()
             finally:
                 await self.dm.set_task(task)
                 return
 
     async def check_task_state(self, task: Task):
-        if task.status in (Status.FINISHED, Status.ERRORED, Status.CANCELLED):
+        if task.status in (
+            TaskStatus.FINISHED,
+            TaskStatus.ERRORED,
+            TaskStatus.CANCELLED,
+        ):
             raise TaskShouldNotBeHandled()
         if self.max_retries and task.tries >= self.max_retries:
             raise TaskMaxTriesReached()
-        if task.status == Status.FAILED:
+        if task.status == TaskStatus.FAILED:
             logger.info(
                 f"Retrying {task.task_id} for kbid {task.kbid} for the {task.tries + 1} time",
                 extra={"consumer_name": self.name},

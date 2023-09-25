@@ -24,6 +24,7 @@ from nucliadb.common.context import ApplicationContext
 
 from .consumer import NatsTaskConsumer, create_consumer
 from .datamanager import AsyncTasksDataManager
+from .models import Task, TaskStatus  # noqa
 from .producer import NatsTaskProducer, create_producer
 from .registry import register_task  # noqa
 from .registry import get_registered_task

@@ -22,7 +22,7 @@ from typing import Any, Optional
 
 from nucliadb.async_tasks.datamanager import AsyncTasksDataManager
 from nucliadb.async_tasks.logger import logger
-from nucliadb.async_tasks.models import Status, Task, TaskNatsMessage
+from nucliadb.async_tasks.models import Task, TaskNatsMessage, TaskStatus
 from nucliadb.common.context import ApplicationContext
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
@@ -59,7 +59,7 @@ class NatsTaskProducer:
         task_id = uuid.uuid4().hex
 
         # Store task state
-        task = Task(kbid=kbid, task_id=task_id, status=Status.SCHEDULED)
+        task = Task(kbid=kbid, task_id=task_id, status=TaskStatus.SCHEDULED)
         await self.dm.set_task(task)
 
         try:
