@@ -21,6 +21,7 @@ fi
 # Check if /etc/redhat-release exists (Red Hat/Fedora)
 if [ -f /etc/redhat-release ]; then
     echo "Detected Red Hat or Fedora"
+    $SUDO dnf update -y
     $SUDO dnf install -y gcc make zlib-devel \
       ncurses-devel gdbm-devel nss-devel openssl-devel \
       readline-devel libffi-devel sqlite-devel wget \
@@ -47,17 +48,10 @@ $SUDO ./configure --enable-optimizations
 $SUDO make -j 2
 $SUDO make install
 
-$SUDO useradd --create-home --shell /bin/bash nucliadb
-
-AS_NDB_USER=''
-if (($EUID != 0)); then
-  AS_NDB_USER='sudo -u nucliadb'
-fi
-
 $SUDO /opt/python/Python-$PYTHON_VERSION/python -m venv $INSTALL_DIR
 $SUDO chown -R nucliadb:nucliadb $INSTALL_DIR
 cd $INSTALL_DIR
-$AS_NDB_USER $INSTALL_DIR/bin/python -m pip install --upgrade pip
-$AS_NDB_USER $INSTALL_DIR/bin/pip install nucliadb
+$SUDO $INSTALL_DIR/bin/python -m pip install --upgrade pip
+$SUDO $INSTALL_DIR/bin/pip install nucliadb
 
 $SUDO ln -s $INSTALL_DIR/bin/nucliadb /bin/nucliadb
