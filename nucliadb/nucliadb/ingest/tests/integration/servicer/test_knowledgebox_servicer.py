@@ -24,8 +24,6 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
-from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
 
 
