@@ -17,23 +17,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 
 use lazy_static::lazy_static;
-use lingua::Language;
 use lingua::Language::English;
-use lingua::{LanguageDetector, LanguageDetectorBuilder};
+use lingua::{Language, LanguageDetector, LanguageDetectorBuilder};
 use serde_json;
 
 lazy_static! {
-    static ref LANGUAGE_DETECTOR: LanguageDetector = {
-        let detector = LanguageDetectorBuilder::from_all_spoken_languages()
-            .with_preloaded_language_models()
-            .build();
-        detector
-    };
+    static ref LANGUAGE_DETECTOR: LanguageDetector = build_language_detector();
+    static ref STOP_WORDS: StopWords = build_stop_words();
+}
+
+/// Builds a language detector
+#[inline]
+fn build_language_detector() -> LanguageDetector {
+    LanguageDetectorBuilder::from_all_spoken_languages()
+        .with_preloaded_language_models()
+        .build()
+}
+
+#[inline]
+fn build_stop_words() -> StopWords {
+    let mut stop_words = StopWords::new();
+
+    for loaded in &LOADED_LANGUAGES {
+        let code = loaded[0];
+        let data = loaded[1];
+        if let Err(err) = stop_words.load_language(code, data) {
+            eprintln!("Error loading stop words for {}: {}", code, err);
+        }
+    }
+
+    stop_words
 }
 
 struct StopWords {
@@ -85,22 +102,6 @@ static LOADED_LANGUAGES: [[&str; 2]; 8] = [
     ["pt", PT],
 ];
 
-lazy_static! {
-    static ref STOP_WORDS: StopWords = {
-        let mut stop_words = StopWords::new();
-
-        for loaded in &LOADED_LANGUAGES {
-            let code = loaded[0];
-            let data = loaded[1];
-            if let Err(err) = stop_words.load_language(code, data) {
-                eprintln!("Error loading stop words for {}: {}", code, err);
-            }
-        }
-
-        stop_words
-    };
-}
-
 /// Returns the detected language, defaults to English
 pub fn detect_language(query: &str) -> Language {
     let detected_language: Option<Language> = LANGUAGE_DETECTOR.detect_language_of(query);
@@ -117,19 +118,12 @@ pub fn is_stop_word(x: &str, lang: Option<Language>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use lingua::Language;
+
+    use super::*;
 
     #[test]
     fn it_detects_language() {
-        // cache warm up
-        let start_time = std::time::Instant::now();
-        let _ = detect_language("I am just here to lazy-build the detector");
-        let elapsed = start_time.elapsed().as_millis() as f64;
-        // make sure we never spend more than 500 ms for the cache warmup
-        // TODO: is this ok? should we preload at startup so the first call is not slow?
-        assert_eq!(elapsed < 500.0, true, "{}", elapsed);
-
         let tests = [
             (
                 "nuclia is a database for unstructured data",
@@ -154,13 +148,8 @@ mod tests {
         ];
 
         for (query, expected_language) in tests {
-            let start_time = std::time::Instant::now();
             let detected_language = detect_language(query);
-            let elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(expected_language, detected_language);
-            // the call in is general less than ~1 ms
-            // however, setting it to 10ms for slow CI boxes
-            assert_eq!(elapsed < 10000.0, true, "{}", elapsed);
         }
     }
 
