@@ -17,23 +17,34 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import functools
+from typing import Optional
+
+from nucliadb_utils import const
+
+REGISTRY = dict()
 
 
-class TaskNotFound(Exception):
-    pass
+def register_task(name: str, stream: const.Streams, max_retries: Optional[int] = None):
+    """
+    Decorator to register a task in the registry.
+    """
+
+    def decorator_register(func):
+        REGISTRY[name] = {
+            "func": func,
+            "stream": stream,
+            "max_retries": max_retries,
+        }
+
+        @functools.wraps(func)
+        async def wrapper_register(*args, **kwargs):
+            return await func(*args, **kwargs)
+
+        return wrapper_register
+
+    return decorator_register
 
 
-class TaskShouldNotBeHandled(Exception):
-    pass
-
-
-class TaskMaxTriesReached(Exception):
-    pass
-
-
-class TaskCancelled(Exception):
-    pass
-
-
-class TaskErrored(Exception):
-    pass
+def get_registered_task(name: str):
+    return REGISTRY[name]

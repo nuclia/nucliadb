@@ -18,9 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
+from typing import Any, Optional
 
-from nucliadb.async_tasks import logger
 from nucliadb.async_tasks.datamanager import AsyncTasksDataManager
+from nucliadb.async_tasks.logger import logger
 from nucliadb.async_tasks.models import Status, Task, TaskNatsMessage
 from nucliadb.common.context import ApplicationContext
 from nucliadb_telemetry import errors
@@ -31,28 +32,43 @@ class NatsTaskProducer:
     def __init__(
         self,
         name: str,
-        context: ApplicationContext,
         stream: const.Streams,
     ):
         self.name = name
-        self.context = context
         self.stream = stream
-        self.data_manager = AsyncTasksDataManager(context.kv_driver)
+        self.context: Optional[ApplicationContext] = None
+        self.initialized = False
 
-    async def send(self, kbid: str, *args, **kwargs) -> str:
+    @property
+    def dm(self):
+        if self._dm is None:
+            self._dm = AsyncTasksDataManager(self.context.kv_driver)
+        return self._dm
+
+    async def initialize(self, context: ApplicationContext):
+        self.context = context
+        await self.context.nats_manager.js.add_stream(
+            name=self.stream.name, subjects=[self.stream.subject]  # type: ignore
+        )
+        self.initialized = True
+
+    async def __call__(self, kbid: str, *args: tuple[Any, ...], **kwargs) -> str:
+        if not self.initialized:
+            raise RuntimeError("NatsTaskProducer not initialized")
+
         task_id = uuid.uuid4().hex
 
         # Store task state
         task = Task(kbid=kbid, task_id=task_id, status=Status.SCHEDULED)
-        await self.data_manager.set_task(task)
+        await self.dm.set_task(task)
 
         try:
             # Send task to NATS
             task_msg = TaskNatsMessage(
                 kbid=kbid, task_id=task_id, args=args, kwargs=kwargs
             )
-            await self.context.nats_manager.js.publish(
-                self.stream.subject, task_msg.json().encode("utf-8")
+            await self.context.nats_manager.js.publish(  # type: ignore
+                self.stream.subject, task_msg.json().encode("utf-8")  # type: ignore
             )
         except Exception as e:
             errors.capture_exception(e)
@@ -60,5 +76,13 @@ class NatsTaskProducer:
                 f"Error sending task for {kbid} to NATS",
                 extra={"kbid": kbid, "producer_name": self.name},
             )
-            await self.data_manager.delete_task(task)
+            await self.dm.delete_task(task)
+            raise
         return task_id
+
+
+def create_producer(
+    name: str,
+    stream: const.Streams,
+) -> NatsTaskProducer:
+    return NatsTaskProducer(name=name, stream=stream)

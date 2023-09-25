@@ -19,19 +19,20 @@
 #
 
 import asyncio
+from typing import Optional
 
 import nats
 import pydantic
 from nats.aio.client import Msg
 
-from nucliadb.async_tasks import logger
 from nucliadb.async_tasks.datamanager import AsyncTasksDataManager
 from nucliadb.async_tasks.exceptions import (
     TaskMaxTriesReached,
     TaskNotFound,
     TaskShouldNotBeHandled,
 )
-from nucliadb.async_tasks.models import Status, Task, TaskCallbackState, TaskNatsMessage
+from nucliadb.async_tasks.logger import logger
+from nucliadb.async_tasks.models import Status, Task, TaskNatsMessage
 from nucliadb.async_tasks.utils import TaskCallback
 from nucliadb.common.context import ApplicationContext
 from nucliadb_telemetry import errors
@@ -42,33 +43,32 @@ from nucliadb_utils.settings import nats_consumer_settings
 UNRECOVERABLE_ERRORS = (TaskNotFound,)
 
 
-class TaskLogger:
-    def __init__(self, logger):
-        self.logger = logger
-
-    # TODO: put all logger task logic here
-    pass
-
-
 class NatsTaskConsumer:
-    max_tries = 5
-
     def __init__(
         self,
         name: str,
-        context: ApplicationContext,
         stream: const.Streams,
         callback: TaskCallback,
+        max_retries: Optional[int] = None,
     ):
         self.name = name
-        self.context = context
         self.stream = stream
         self.callback = callback
+        self.max_retries = max_retries
         self.initialized = False
-        self.data_manager = AsyncTasksDataManager(context.kv_driver)
+        self.context: Optional[ApplicationContext] = None
+        self._dm = None
 
-    async def initialize(self):
+    @property
+    def dm(self):
+        if self._dm is None:
+            self._dm = AsyncTasksDataManager(self.context.kv_driver)
+        return self._dm
+
+    async def initialize(self, context: ApplicationContext):
+        self.context = context
         await self.setup_nats_subscription()
+        self.initialized = True
 
     async def setup_nats_subscription(self):
         subject = self.stream.subject
@@ -106,75 +106,107 @@ class NatsTaskConsumer:
             try:
                 task_msg = TaskNatsMessage.parse_raw(msg.data)
                 kbid, task_id = task_msg.kbid, task_msg.task_id
-                task: Task = await self.data_manager.get_task(kbid, task_id)
+                task: Task = await self.dm.get_task(kbid, task_id)
             except pydantic.ValidationError as e:
                 errors.capture_exception(e)
                 logger.error(
-                    "Invalid task message received", extra={"consumer_name": self.name}
+                    "Invalid task message received",
+                    extra={
+                        "consumer_name": self.name,
+                        "kbid": kbid,
+                        "task_id": task_id,
+                    },
                 )
                 await msg.ack()
                 return
             except TaskNotFound:
                 logger.error(
-                    f"Task {task_id} not found for kbid {kbid}",
-                    extra={"consumer_name": self.name},
+                    f"Task not found",
+                    extra={
+                        "consumer_name": self.name,
+                        "kbid": kbid,
+                        "task_id": task_id,
+                    },
                 )
                 await msg.ack()
                 return
+
             try:
                 await self.check_task_state(task)
             except TaskShouldNotBeHandled:
                 logger.info(
-                    f"Task {task.task_id} for {task.kbid} is {task.status.value}.",
-                    extra={"consumer_name": self.name},
+                    f"Task will not be handled. Status: {task.status.value}",
+                    extra={
+                        "consumer_name": self.name,
+                        "kbid": kbid,
+                        "task_id": task_id,
+                    },
                 )
                 await msg.ack()
                 return
             except TaskMaxTriesReached:
                 logger.info(
-                    f"Task {task.task_id} for kbid {task.kbid} failed too many times. Skipping",
-                    extra={"consumer_name": self.name},
+                    f"Task failed too many times. Skipping",
+                    extra={
+                        "consumer_name": self.name,
+                        "kbid": kbid,
+                        "task_id": task_id,
+                    },
                 )
                 task.status = Status.ERRORED
-                await self.data_manager.set_task(task)
+                await self.dm.set_task(task)
                 await msg.ack()
                 return
 
             logger.info(
-                f"Starting task {task_id} for kbid {kbid}",
-                extra={"consumer_name": self.name},
+                f"Starting task",
+                extra={"consumer_name": self.name, "kbid": kbid, "task_id": task_id},
             )
             task.status = Status.RUNNING
             task.tries += 1
             try:
-                await self.callback(self.context, *task_msg.args, **task_msg.kwargs)
+                await self.callback(
+                    self.context, kbid, *task_msg.args, **task_msg.kwargs  # type: ignore
+                )
             except UNRECOVERABLE_ERRORS as e:
-                # Unrecoverable errors are not retried
                 errors.capture_exception(e)
+                # Unrecoverable errors are not retried
                 task.status = Status.ERRORED
                 await msg.ack()
                 return
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error(
-                    f"Error while handling task {task_id} for kbid {kbid}",
-                    extra={"consumer_name": self.name},
+                    f"Unexpected error while handling task",
+                    extra={
+                        "consumer_name": self.name,
+                        "kbid": kbid,
+                        "task_id": task_id,
+                    },
                 )
                 await asyncio.sleep(2)
+                # Set status to failed so that the task is retried
                 task.status = Status.FAILED
                 await msg.nak()
             else:
-                # Successful task handling
+                logger.info(
+                    f"Successful task",
+                    extra={
+                        "consumer_name": self.name,
+                        "kbid": kbid,
+                        "task_id": task_id,
+                    },
+                )
                 task.status = Status.FINISHED
                 await msg.ack()
             finally:
-                await self.data_manager.set_task(task)
+                await self.dm.set_task(task)
                 return
 
     async def check_task_state(self, task: Task):
         if task.status in (Status.FINISHED, Status.ERRORED, Status.CANCELLED):
             raise TaskShouldNotBeHandled()
-        if task.tries >= self.max_tries:
+        if self.max_retries and task.tries >= self.max_retries:
             raise TaskMaxTriesReached()
         if task.status == Status.FAILED:
             logger.info(
@@ -183,27 +215,16 @@ class NatsTaskConsumer:
             )
 
 
-async def export_kb(
-    context: ApplicationContext,
-    callback_state: TaskCallbackState,
-    kbid: str,
-    export_id: str,
-):
-    pass
-
-
-async def main():
-    context = ApplicationContext()
-    await context.initialize()
-
-    exporter_consumer = NatsTaskConsumer(
-        name="export_consumer",
-        context=context,
-        stream=const.Streams.EXPORTS,
-        callback=export_kb,
+def create_consumer(
+    name: str,
+    stream: const.Streams,
+    callback: TaskCallback,
+    max_retries: Optional[int] = None,
+) -> NatsTaskConsumer:
+    consumer = NatsTaskConsumer(
+        name=name,
+        stream=stream,
+        callback=callback,
+        max_retries=max_retries,
     )
-    await exporter_consumer.initialize()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    return consumer

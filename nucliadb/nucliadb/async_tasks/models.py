@@ -49,5 +49,5 @@ class Task(BaseModel):
 class TaskNatsMessage(BaseModel):
     kbid: str
     task_id: str
-    args: list[Any] = []
-    kwargs: dict[str, Any] = {}
+    args: tuple[Any, ...] = tuple()
+    kwargs: dict[str, Any] = dict()

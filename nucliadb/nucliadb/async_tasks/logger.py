@@ -17,23 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 
-
-class TaskNotFound(Exception):
-    pass
-
-
-class TaskShouldNotBeHandled(Exception):
-    pass
-
-
-class TaskMaxTriesReached(Exception):
-    pass
-
-
-class TaskCancelled(Exception):
-    pass
-
-
-class TaskErrored(Exception):
-    pass
+SERVICE_NAME = "nucliadb.async_tasks"
+logger = logging.getLogger(SERVICE_NAME)
