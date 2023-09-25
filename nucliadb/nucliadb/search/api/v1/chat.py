@@ -70,6 +70,7 @@ CHAT_EXAMPLES = {
     summary="Chat on a Knowledge Box",
     description="Chat on a Knowledge Box",
     tags=["Search"],
+    response_model=None,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
