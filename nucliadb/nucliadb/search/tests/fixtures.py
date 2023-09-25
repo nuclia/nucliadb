@@ -82,16 +82,8 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
     from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
 
-    async def handler(req, exc):  # type: ignore
-        raise exc
-
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
-
-    # Little hack to raise exeptions from VersionedFastApi
-    for route in application.routes:
-        if isinstance(route, Mount):
-            route.app.middleware_stack.handler = handler  # type: ignore
 
     await application.router.startup()
 

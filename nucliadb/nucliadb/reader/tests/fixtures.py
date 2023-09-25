@@ -56,14 +56,6 @@ async def reader_api(test_settings_reader: None, local_files, event_loop):  # ty
 
     application = create_application()
 
-    async def handler(req, exc):  # type: ignore
-        raise exc
-
-    # Little hack to raise exeptions from VersionedFastApi
-    for route in application.routes:
-        if isinstance(route, Mount):
-            route.app.middleware_stack.handler = handler  # type: ignore
-
     def make_client_fixture(
         roles: Optional[List[Enum]] = None,
         user: str = "",
