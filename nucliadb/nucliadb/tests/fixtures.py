@@ -172,13 +172,13 @@ async def knowledgebox(nucliadb_manager: AsyncClient):
 
 @pytest.fixture(scope="function")
 async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
+    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))  # type: ignore
     return stub
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_train(nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
+    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))  # type: ignore
     return stub
 
 

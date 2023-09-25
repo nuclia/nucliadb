@@ -52,7 +52,7 @@ from nucliadb_utils.utilities import get_storage
 
 @pytest.mark.asyncio
 async def test_export_resources(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title"
@@ -142,7 +142,7 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
 @pytest.mark.asyncio
 async def test_upload_download(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     # Create a KB
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
@@ -182,7 +182,7 @@ async def test_upload_download(grpc_servicer: IngestFixture):
 
 @pytest.mark.asyncio
 async def test_export_file(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title"

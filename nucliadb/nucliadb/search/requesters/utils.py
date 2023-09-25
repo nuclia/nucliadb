@@ -214,11 +214,12 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
             if isinstance(result, AioRpcError):
                 if result.code() is GrpcStatusCode.INTERNAL:
                     # handle node response errors
-                    if "AllButQueryForbidden" in result.details():
+                    details = result.details() or "gRPC error without details"
+                    if "AllButQueryForbidden" in details:
                         status_code = 412
-                        reason = result.details().split(":")[-1].strip().strip("'")
+                        reason = details.split(":")[-1].strip().strip("'")
                     else:
-                        reason = result.details()
+                        reason = details
                         logger.exception(f"Unhandled node error", exc_info=result)
                 else:
                     logger.error(

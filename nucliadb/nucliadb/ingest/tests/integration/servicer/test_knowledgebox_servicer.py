@@ -38,7 +38,7 @@ async def test_create_knowledgebox(
     tracer_provider = get_telemetry("GCS_SERVICE")
     assert tracer_provider is not None
 
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
     pb_prefix = knowledgebox_pb2.KnowledgeBoxPrefix(prefix="")
 
     count = 0
@@ -102,7 +102,7 @@ async def get_kb_similarity(txn, kbid) -> utils_pb2.VectorSimilarity.ValueType:
 
 @pytest.mark.asyncio
 async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture, txn):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-dot")
     pb.config.title = "My Title"
@@ -118,7 +118,7 @@ async def test_create_knowledgebox_defaults_to_cosine_similarity(
     grpc_servicer: IngestFixture,
     txn,
 ):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default")
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
@@ -131,7 +131,7 @@ async def test_create_knowledgebox_defaults_to_cosine_similarity(
 
 @pytest.mark.asyncio
 async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title"
@@ -146,7 +146,7 @@ async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
 async def test_delete_knowledgebox_handles_unexisting_kb(
     grpc_servicer: IngestFixture,
 ) -> None:
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     pbid = knowledgebox_pb2.KnowledgeBoxID(slug="idonotexist")
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore

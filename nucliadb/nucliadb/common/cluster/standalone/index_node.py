@@ -103,7 +103,7 @@ class ProxyCallerWrapper:
         else:
             grpc_address = address
         self._channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
-        self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)
+        self._stub = standalone_pb2_grpc.StandaloneClusterServiceStub(self._channel)  # type: ignore
 
     def __getattr__(self, name):
         async def call(request):

@@ -105,7 +105,7 @@ async def _get_index_node_metadata(
     else:
         grpc_address = f"{address}:{settings.node_writer_port}"
     channel = get_traced_grpc_channel(grpc_address, "discovery", variant="_writer")
-    stub = nodewriter_pb2_grpc.NodeWriterStub(channel)
+    stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
     metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
     return IndexNodeMetadata(
         node_id=metadata.node_id,
@@ -124,7 +124,7 @@ async def _get_standalone_index_node_metadata(
     else:
         grpc_address = address
     channel = get_traced_grpc_channel(grpc_address, "standalone_proxy")
-    stub = standalone_pb2_grpc.StandaloneClusterServiceStub(channel)
+    stub = standalone_pb2_grpc.StandaloneClusterServiceStub(channel)  # type: ignore
     resp: standalone_pb2.NodeInfoResponse = await stub.NodeInfo(standalone_pb2.NodeInfoRequest())  # type: ignore
     return IndexNodeMetadata(
         node_id=resp.id,
