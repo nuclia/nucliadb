@@ -42,6 +42,7 @@ from ..chat import create_chat_response
     summary="Chat with a resource",
     description="Chat with a resource",
     tags=["Search"],
+    response_model=None,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)

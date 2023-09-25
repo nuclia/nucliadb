@@ -56,6 +56,7 @@ ASK_EXAMPLES = {
     summary="Ask a question to a resource",
     description="Ask to the complete content of the resource",
     tags=["Search"],
+    response_model=None,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
