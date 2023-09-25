@@ -34,7 +34,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -116,7 +115,7 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(redis_config, ingest_consumers, ingest_processed_consumer):
+async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consumer):
     servicer = WriterServicer()
     await servicer.initialize()
 
@@ -181,17 +180,19 @@ async def fake_node(_natsd_reset, indexing_utility_ingest, shard_manager):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(gcs_storage, redis_driver: RedisDriver, shard_manager):
+async def knowledgebox_ingest(gcs_storage, maindb_driver: Driver, shard_manager):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
-    txn = await redis_driver.begin()
-    model = SemanticModelMetadata(similarity_function=upb.VectorSimilarity.COSINE)
-    await KnowledgeBox.create(txn, kbslug, model, uuid=kbid)
-    await txn.commit()
+    async with maindb_driver.transaction() as txn:
+        model = SemanticModelMetadata(similarity_function=upb.VectorSimilarity.COSINE)
+        await KnowledgeBox.create(txn, kbslug, model, uuid=kbid)
+        await txn.commit()
+
     yield kbid
-    txn = await redis_driver.begin()
-    await KnowledgeBox.delete_kb(txn, kbslug, kbid)
-    await txn.commit()
+
+    async with maindb_driver.transaction() as txn:
+        await KnowledgeBox.delete_kb(txn, kbslug, kbid)
+        await txn.commit()
 
 
 @pytest.fixture(scope="function")
@@ -362,13 +363,13 @@ def make_extracted_vectors(field_id):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(gcs_storage, redis_driver, knowledgebox_ingest, fake_node):
+async def test_resource(gcs_storage, maindb_driver, knowledgebox_ingest, fake_node):
     """
     Create a resource that has every possible bit of information
     """
     resource = await create_resource(
         storage=gcs_storage,
-        driver=redis_driver,
+        driver=maindb_driver,
         knowledgebox_ingest=knowledgebox_ingest,
     )
     yield resource
