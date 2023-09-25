@@ -69,6 +69,8 @@ class MessageProgressUpdater:
         self._task.cancel()
         try:
             await self._task
+        except asyncio.CancelledError:  # pragma: no cover
+            pass
         except Exception:  # pragma: no cover
             pass
 

@@ -21,7 +21,7 @@
 from datetime import datetime
 from typing import Optional
 
-from nucliadb.async_tasks.exceptions import TaskNotFound
+from nucliadb.async_tasks.exceptions import TaskNotFoundError
 from nucliadb.async_tasks.models import Task
 from nucliadb.common.maindb.driver import Driver
 
@@ -36,7 +36,7 @@ class AsyncTasksDataManager:
         key = KB_TASKS.format(kbid=kbid, task_id=task_id)
         data = await self._get(key)
         if data is None or data == b"":
-            raise TaskNotFound()
+            raise TaskNotFoundError()
         decoded = data.decode("utf-8")
         return Task.parse_raw(decoded)
 

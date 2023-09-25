@@ -22,7 +22,7 @@ from typing import Union
 from fastapi_versioning import version
 from starlette.requests import Request
 
-from nucliadb.async_tasks import AsyncTasksDataManager, Task, TaskNotFound
+from nucliadb.async_tasks import AsyncTasksDataManager, Task, TaskNotFoundError
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
@@ -46,7 +46,7 @@ async def get_task_status_endpoint(
     dm = AsyncTasksDataManager(context.kv_driver)
     try:
         return await dm.get_task(kbid, task_id)
-    except TaskNotFound:
+    except TaskNotFoundError:
         return HTTPClientError(
             status_code=404,
             detail="Task not found",

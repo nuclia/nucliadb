@@ -19,7 +19,11 @@
 #
 import asyncio
 
-from nucliadb.async_tasks.exceptions import TaskCancelled, TaskErrored, TaskNotFound
+from nucliadb.async_tasks.exceptions import (
+    TaskCancelled,
+    TaskErrored,
+    TaskNotFoundError,
+)
 from nucliadb.common.context import ApplicationContext
 
 from .consumer import NatsTaskConsumer, create_consumer
@@ -77,7 +81,7 @@ async def wait_for_task(
     for _ in range(max_wait):
         try:
             task = await dm.get_task(kbid, task_id)
-        except TaskNotFound:
+        except TaskNotFoundError:
             await asyncio.sleep(1)
             continue
         if task.status == "cancelled":

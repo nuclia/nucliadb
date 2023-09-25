@@ -28,7 +28,7 @@ from nats.aio.client import Msg
 from nucliadb.async_tasks.datamanager import AsyncTasksDataManager
 from nucliadb.async_tasks.exceptions import (
     TaskMaxTriesReached,
-    TaskNotFound,
+    TaskNotFoundError,
     TaskShouldNotBeHandled,
 )
 from nucliadb.async_tasks.logger import logger
@@ -40,7 +40,7 @@ from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
-UNRECOVERABLE_ERRORS = (TaskNotFound,)
+UNRECOVERABLE_ERRORS = (TaskNotFoundError,)
 
 
 class NatsTaskConsumer:
@@ -113,13 +113,11 @@ class NatsTaskConsumer:
                     "Invalid task message received",
                     extra={
                         "consumer_name": self.name,
-                        "kbid": kbid,
-                        "task_id": task_id,
                     },
                 )
                 await msg.ack()
                 return
-            except TaskNotFound:
+            except TaskNotFoundError:
                 logger.error(
                     f"Task not found",
                     extra={
@@ -165,6 +163,7 @@ class NatsTaskConsumer:
             task.status = TaskStatus.RUNNING
             task.tries += 1
             try:
+                await self.dm.set_task(task)
                 await self.callback(
                     self.context, kbid, *task_msg.args, **task_msg.kwargs  # type: ignore
                 )
@@ -210,7 +209,7 @@ class NatsTaskConsumer:
             TaskStatus.CANCELLED,
         ):
             raise TaskShouldNotBeHandled()
-        if self.max_retries and task.tries >= self.max_retries:
+        if self.max_retries is not None and task.tries > self.max_retries:
             raise TaskMaxTriesReached()
         if task.status == TaskStatus.FAILED:
             logger.info(

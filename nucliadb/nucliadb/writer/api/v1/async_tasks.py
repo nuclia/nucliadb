@@ -22,7 +22,12 @@ from typing import Union
 from fastapi_versioning import version
 from starlette.requests import Request
 
-from nucliadb.async_tasks import AsyncTasksDataManager, Task, TaskNotFound, TaskStatus
+from nucliadb.async_tasks import (
+    AsyncTasksDataManager,
+    Task,
+    TaskNotFoundError,
+    TaskStatus,
+)
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
@@ -49,7 +54,7 @@ async def cancel_task_endpoint(
         task.status = TaskStatus.CANCELLED
         await dm.set_task(task)
         return None
-    except TaskNotFound:
+    except TaskNotFoundError:
         return HTTPClientError(
             status_code=404,
             detail="Task not found",
