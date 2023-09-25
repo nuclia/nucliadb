@@ -18,6 +18,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug|resources|entitiesgroup|labelset|vectorset|upload|custom-synonyms|export|import).*'
           method:
             regex: "POST|PATCH|PUT|DELETE|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/task/.*'
+          method:
+            regex: "DELETE|OPTIONS"
       route:
         - destination:
             port:

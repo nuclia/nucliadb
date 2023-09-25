@@ -19,6 +19,10 @@ spec:
           uri:
             regex: '^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|vectorset|custom-synonyms|export|import)s?.*'
         - method:
+            regex: "GET|OPTIONS"
+          uri:
+            regex: '^/api/v\d+/kb/[^/]+/task/.*'
+        - method:
             regex: OPTIONS
           uri:
             regex: ^/api/v\d+/kb/[^/]+/(upload)?.*
