@@ -37,7 +37,7 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_extracted(
-    gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+    gcs_storage: Storage, txn, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
@@ -64,7 +64,6 @@ async def test_create_resource_orm_extracted_file(
     local_files,
     gcs_storage: Storage,
     txn,
-    cache,
     fake_node,
     knowledgebox_ingest: str,
 ):

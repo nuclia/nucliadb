@@ -77,7 +77,7 @@ jobs:
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           ref: main
-          check-name: NucliaDBTests (3.11)
+          check-name: NucliaDBTests (3.11, pg)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 

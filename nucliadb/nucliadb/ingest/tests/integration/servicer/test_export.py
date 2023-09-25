@@ -19,6 +19,7 @@
 #
 import base64
 from datetime import datetime
+from uuid import uuid4
 
 import pytest
 from nucliadb_protos.resources_pb2 import (
@@ -54,7 +55,7 @@ from nucliadb_utils.utilities import get_storage
 async def test_export_resources(grpc_servicer: IngestFixture):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug=f"test-{uuid4()}")
     pb.config.title = "My Title"
     result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
@@ -145,7 +146,7 @@ async def test_upload_download(grpc_servicer: IngestFixture):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     # Create a KB
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug=f"test-{uuid4()}")
     pb.config.title = "My Title"
     result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
@@ -184,7 +185,7 @@ async def test_upload_download(grpc_servicer: IngestFixture):
 async def test_export_file(grpc_servicer: IngestFixture):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug=f"test-{uuid4()}")
     pb.config.title = "My Title"
     result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
