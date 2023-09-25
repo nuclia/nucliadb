@@ -49,7 +49,6 @@ $SUDO make -j 2
 $SUDO make install
 
 $SUDO /opt/python/Python-$PYTHON_VERSION/python -m venv $INSTALL_DIR
-$SUDO chown -R nucliadb:nucliadb $INSTALL_DIR
 cd $INSTALL_DIR
 $SUDO $INSTALL_DIR/bin/python -m pip install --upgrade pip
 $SUDO $INSTALL_DIR/bin/pip install nucliadb
