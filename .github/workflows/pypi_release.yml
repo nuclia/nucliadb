@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - main
-      - semver-is-back
-      # only for testing
-  pull_request:
-    branches:
-      # only for testing
-      - semver-is-back
 
 jobs:
   build_wheels:
