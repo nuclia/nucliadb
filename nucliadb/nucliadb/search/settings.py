@@ -25,8 +25,5 @@ from nucliadb.ingest.settings import DriverSettings
 class Settings(DriverSettings):
     search_timeout: float = 10.0
 
-    search_cache_redis_host: Optional[str] = None
-    search_cache_redis_port: Optional[int] = None
-
 
 settings = Settings()
