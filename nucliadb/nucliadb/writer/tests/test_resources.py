@@ -20,13 +20,14 @@
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 from unittest.mock import AsyncMock  # type: ignore
-from nucliadb.common.maindb.local import LocalDriver
-from nucliadb.common.maindb.redis import RedisDriver
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import ResourceFieldId
 
 import nucliadb_models
+from nucliadb.common.maindb.local import LocalDriver
+from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer.api.v1.router import (
