@@ -33,7 +33,7 @@ from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
-from nucliadb.standalone.lifecycle import lifespan
+from nucliadb.standalone.lifecycle import finalize, initialize
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry.fastapi import metrics_endpoint
@@ -63,7 +63,8 @@ def application_factory(settings: Settings) -> FastAPI:
                 backend=get_auth_backend(settings),
             ),
         ],
-        lifespan=lifespan,
+        on_startup=[initialize],
+        on_shutdown=[finalize],
     )
 
     base_app = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
