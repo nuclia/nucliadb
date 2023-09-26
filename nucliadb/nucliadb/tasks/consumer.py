@@ -26,7 +26,7 @@ import pydantic
 from nats.aio.client import Msg
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb.tasks.datamanager import AsyncTasksDataManager
+from nucliadb.tasks.datamanager import TasksDataManager
 from nucliadb.tasks.exceptions import (
     TaskMaxTriesReached,
     TaskNotFoundError,
@@ -62,7 +62,7 @@ class NatsTaskConsumer:
     @property
     def dm(self):
         if self._dm is None:
-            self._dm = AsyncTasksDataManager(self.context.kv_driver)
+            self._dm = TasksDataManager(self.context.kv_driver)
         return self._dm
 
     async def initialize(self, context: ApplicationContext):

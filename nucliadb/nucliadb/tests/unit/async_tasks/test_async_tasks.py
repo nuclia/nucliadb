@@ -56,7 +56,7 @@ async def test_get_producer(context):
     assert producer.initialized
 
 
-@patch("nucliadb.tasks.AsyncTasksDataManager.get_task")
+@patch("nucliadb.tasks.TasksDataManager.get_task")
 async def test_wait_for_task(get_task_mock, context):
     get_task_mock.return_value = Task(
         kbid="kbid", task_id="task_id", status=TaskStatus.CANCELLED

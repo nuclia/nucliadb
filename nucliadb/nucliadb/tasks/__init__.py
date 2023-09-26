@@ -23,7 +23,7 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.exceptions import TaskCancelled, TaskErrored, TaskNotFoundError
 
 from .consumer import NatsTaskConsumer, create_consumer
-from .datamanager import AsyncTasksDataManager
+from .datamanager import TasksDataManager
 from .models import Task, TaskStatus  # noqa
 from .producer import NatsTaskProducer, create_producer
 from .registry import register_task  # noqa
@@ -73,7 +73,7 @@ async def wait_for_task(
     Waits for the given task to finish, or raises an exception if it fails.
     """
     finished = False
-    dm = AsyncTasksDataManager(context.kv_driver)
+    dm = TasksDataManager(context.kv_driver)
     for _ in range(max_wait):
         try:
             task = await dm.get_task(kbid, task_id)

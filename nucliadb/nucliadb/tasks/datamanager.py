@@ -28,7 +28,7 @@ from nucliadb.tasks.models import Task
 KB_TASKS = "/kbs/{kbid}/tasks/{task_id}"
 
 
-class AsyncTasksDataManager:
+class TasksDataManager:
     def __init__(self, driver: Driver):
         self.driver = driver
 
