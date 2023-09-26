@@ -240,8 +240,8 @@ jobs:
       - name: Calc git info
         id: git
         run: |-
-          HASH=`git rev-parse --short HEAD`
-          BRANCH=${GITHUB_REF##*/}
+          HASH=$(git rev-parse --short HEAD)
+          BRANCH=${GITHUB_REF#refs/heads/}
           echo "short_sha=$HASH" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
