@@ -443,6 +443,8 @@ pub struct SuggestRequest {
     pub shard: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub body: ::prost::alloc::string::String,
+    #[prost(enumeration="SuggestFeatures", repeated, tag="6")]
+    pub features: ::prost::alloc::vec::Vec<i32>,
     #[prost(message, optional, tag="3")]
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="4")]
@@ -547,6 +549,12 @@ pub struct StreamRequest {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
     #[prost(message, optional, tag="4")]
     pub filter: ::core::option::Option<StreamFilter>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum SuggestFeatures {
+    Entities = 0,
+    Paragraph = 1,
 }
 /// Generated client implementations.
 pub mod node_reader_client {

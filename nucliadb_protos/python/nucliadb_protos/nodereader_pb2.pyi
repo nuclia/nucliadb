@@ -62,6 +62,21 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _SuggestFeatures:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _SuggestFeaturesEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_SuggestFeatures.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    ENTITIES: _SuggestFeatures.ValueType  # 0
+    PARAGRAPH: _SuggestFeatures.ValueType  # 1
+
+class SuggestFeatures(_SuggestFeatures, metaclass=_SuggestFeaturesEnumTypeWrapper): ...
+
+ENTITIES: SuggestFeatures.ValueType  # 0
+PARAGRAPH: SuggestFeatures.ValueType  # 1
+global___SuggestFeatures = SuggestFeatures
+
 @typing_extensions.final
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1021,11 +1036,14 @@ class SuggestRequest(google.protobuf.message.Message):
 
     SHARD_FIELD_NUMBER: builtins.int
     BODY_FIELD_NUMBER: builtins.int
+    FEATURES_FIELD_NUMBER: builtins.int
     FILTER_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
+    @property
+    def features(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[global___SuggestFeatures.ValueType]: ...
     @property
     def filter(self) -> global___Filter: ...
     @property
@@ -1037,12 +1055,13 @@ class SuggestRequest(google.protobuf.message.Message):
         *,
         shard: builtins.str = ...,
         body: builtins.str = ...,
+        features: collections.abc.Iterable[global___SuggestFeatures.ValueType] | None = ...,
         filter: global___Filter | None = ...,
         timestamps: global___Timestamps | None = ...,
         fields: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
 
 global___SuggestRequest = SuggestRequest
 
