@@ -57,7 +57,10 @@ class TestProducer:
 
     @pytest.fixture(scope="function")
     async def producer(self, context, datamanager, stream, nats_manager):
-        producer = create_producer("foo", stream=stream)
+        async def callback(context, kbid, foo=1, bar=2):
+            pass
+
+        producer = create_producer("foo", stream=stream, callback=callback)
         await producer.initialize(context)
         producer._dm = datamanager
         producer.context.nats_manager = nats_manager
@@ -98,3 +101,7 @@ class TestProducer:
             await producer("kbid", "foo", bar="baz")
 
         producer.dm.delete_task.assert_called_once()
+
+    async def test_raises_error_on_invalid_callback_arguments(self, producer):
+        with pytest.raises(TypeError):
+            await producer("kbid", "foo", not_a_valid_arg="baz")
