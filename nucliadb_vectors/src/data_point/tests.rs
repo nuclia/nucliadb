@@ -328,7 +328,7 @@ fn prefiltering_test() {
             acc.extend(i.clone());
             acc
         });
-        let mut result_0 = reader
+        let result_0 = reader
             .search(
                 &HashSet::new(),
                 &query,
@@ -339,6 +339,23 @@ fn prefiltering_test() {
                 -1.0,
             )
             .collect::<Vec<_>>();
-        result_0.sort_by(|i, j| i.id().cmp(j.id()));
+        assert_eq!(result_0.len(), 1);
+
+        let delete_log: HashSet<_> = result_0
+            .into_iter()
+            .map(|n| String::from_utf8_lossy(n.id()).to_string())
+            .collect();
+        let result_with_deleted = reader
+            .search(
+                &delete_log,
+                &query,
+                &formula,
+                true,
+                no_results,
+                Similarity::Cosine,
+                -1.0,
+            )
+            .collect::<Vec<_>>();
+        assert_eq!(result_with_deleted.len(), 0);
     }
 }

@@ -127,9 +127,7 @@ impl LabelIndex {
     /// `path` is the directory to store the FST and index file.
     /// `labels` is an iterator of Label objects.
     pub fn new<I>(path: &Path, labels: I) -> VectorR<Self>
-    where
-        I: Iterator<Item = Label>,
-    {
+    where I: Iterator<Item = Label> {
         let records_file_path = path.join(Self::LABELS_IDX);
         let fst_file_path = path.join(Self::LABELS_FST);
 
@@ -228,9 +226,7 @@ impl KeyIndex {
     /// `path` is the directory to store the FST and index file.
     /// `labels` is an iterator of Label objects.
     pub fn new<I>(path: &Path, keys: I) -> VectorR<Self>
-    where
-        I: Iterator<Item = (String, u64)>,
-    {
+    where I: Iterator<Item = (String, u64)> {
         let fst_file_path = path.join(Self::KEYS_FST);
 
         // create the fst file
