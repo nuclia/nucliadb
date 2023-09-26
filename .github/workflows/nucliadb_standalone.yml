@@ -115,13 +115,8 @@ jobs:
       - name: Calc git info
         id: git
         run: |-
-          HASH=$(git rev-parse --short HEAD)
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BRANCH="${{ github.event.pull_request.head.ref }}"
-          else
-            BRANCH="${{ github.ref }}"
-            BRANCH="${branch_name#refs/heads/}"
-          fi
+          BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          HASH=`git rev-parse $BRANCH`
           echo "short_sha=$HASH" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
