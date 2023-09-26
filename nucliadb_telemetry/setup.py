@@ -9,10 +9,7 @@ README = open("README.md").read()
 def load_reqs(filename):
     with open(filename) as reqs_file:
         return [
-            # pin nucliadb-xxx to the same version as nucliadb
-            line.strip() + f"=={VERSION}"
-            if line.startswith("nucliadb-") and "=" not in line
-            else line.strip()
+            line.strip()
             for line in reqs_file.readlines()
             if not (
                 re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)

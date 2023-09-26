@@ -13,7 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  API_VERSION: 1
   COMPONENT: nucliadb-train
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: nucliadb_train
