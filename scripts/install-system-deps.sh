@@ -24,7 +24,7 @@ if [ "$machine" == "linux" ]; then
 		;;
 
 	fedora | rhel | centos)
-		$SUDO yum update
+		$SUDO yum update -y
 		$SUDO yum -y install elfutils-devel pkgconfig
 		;;
 

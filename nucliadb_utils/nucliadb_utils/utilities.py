@@ -248,10 +248,8 @@ async def start_transaction_utility(
 
     current = get_transaction_utility()
     if current is not None:
-        logger.warning(
-            "Warning, transaction utility was already set, cleaning existing one"
-        )
-        await current.finalize()
+        logger.debug("Warning, transaction utility was already set, ignoring")
+        return current
 
     if transaction_settings.transaction_local:
         transaction_utility: Union[
