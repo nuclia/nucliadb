@@ -21,9 +21,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.async_tasks import TaskNotFoundError
-from nucliadb.async_tasks.consumer import create_consumer
-from nucliadb.async_tasks.models import Task, TaskNatsMessage, TaskStatus
+from nucliadb.tasks import TaskNotFoundError
+from nucliadb.tasks.consumer import create_consumer
+from nucliadb.tasks.models import Task, TaskNatsMessage, TaskStatus
 
 
 def test_create_consumer():

@@ -21,8 +21,8 @@ from unittest.mock import patch
 
 import pytest
 
-from nucliadb import async_tasks
-from nucliadb.async_tasks.models import Task, TaskStatus
+from nucliadb import tasks
+from nucliadb.tasks.models import Task, TaskStatus
 from nucliadb_utils import const
 
 
@@ -34,43 +34,43 @@ class StreamTest(const.Streams):
 
 async def test_start_consumer(context):
     with pytest.raises(ValueError):
-        await async_tasks.start_consumer("foo", context)
+        await tasks.start_consumer("foo", context)
 
-    @async_tasks.register_task("foo", StreamTest)
+    @tasks.register_task("foo", StreamTest)
     async def some_test_work(context, kbid):
         ...
 
-    consumer = await async_tasks.start_consumer("foo", context)
+    consumer = await tasks.start_consumer("foo", context)
     assert consumer.initialized
 
 
 async def test_get_producer(context):
     with pytest.raises(ValueError):
-        await async_tasks.get_producer("bar", context)
+        await tasks.get_producer("bar", context)
 
-    @async_tasks.register_task("bar", StreamTest)
+    @tasks.register_task("bar", StreamTest)
     async def some_test_work(context, kbid):
         ...
 
-    producer = await async_tasks.get_producer("bar", context)
+    producer = await tasks.get_producer("bar", context)
     assert producer.initialized
 
 
-@patch("nucliadb.async_tasks.AsyncTasksDataManager.get_task")
+@patch("nucliadb.tasks.AsyncTasksDataManager.get_task")
 async def test_wait_for_task(get_task_mock, context):
     get_task_mock.return_value = Task(
         kbid="kbid", task_id="task_id", status=TaskStatus.CANCELLED
     )
-    with pytest.raises(async_tasks.TaskCancelled):
-        await async_tasks.wait_for_task("kbid", "task_id", context)
+    with pytest.raises(tasks.TaskCancelled):
+        await tasks.wait_for_task("kbid", "task_id", context)
 
     get_task_mock.return_value = Task(
         kbid="kbid", task_id="task_id", status=TaskStatus.ERRORED
     )
-    with pytest.raises(async_tasks.TaskErrored):
-        await async_tasks.wait_for_task("kbid", "task_id", context)
+    with pytest.raises(tasks.TaskErrored):
+        await tasks.wait_for_task("kbid", "task_id", context)
 
     get_task_mock.return_value = Task(
         kbid="kbid", task_id="task_id", status=TaskStatus.FINISHED
     )
-    await async_tasks.wait_for_task("kbid", "task_id", context)
+    await tasks.wait_for_task("kbid", "task_id", context)

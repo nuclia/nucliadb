@@ -22,8 +22,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.async_tasks.models import TaskNatsMessage, TaskStatus
-from nucliadb.async_tasks.producer import create_producer
+from nucliadb.tasks.models import TaskNatsMessage, TaskStatus
+from nucliadb.tasks.producer import create_producer
 
 
 def test_create_producer():

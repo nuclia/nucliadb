@@ -25,16 +25,16 @@ import nats
 import pydantic
 from nats.aio.client import Msg
 
-from nucliadb.async_tasks.datamanager import AsyncTasksDataManager
-from nucliadb.async_tasks.exceptions import (
+from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.datamanager import AsyncTasksDataManager
+from nucliadb.tasks.exceptions import (
     TaskMaxTriesReached,
     TaskNotFoundError,
     TaskShouldNotBeHandled,
 )
-from nucliadb.async_tasks.logger import logger
-from nucliadb.async_tasks.models import Task, TaskNatsMessage, TaskStatus
-from nucliadb.async_tasks.utils import TaskCallback
-from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.logger import logger
+from nucliadb.tasks.models import Task, TaskNatsMessage, TaskStatus
+from nucliadb.tasks.utils import TaskCallback
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater

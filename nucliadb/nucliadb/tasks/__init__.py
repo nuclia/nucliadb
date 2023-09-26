@@ -19,12 +19,8 @@
 #
 import asyncio
 
-from nucliadb.async_tasks.exceptions import (
-    TaskCancelled,
-    TaskErrored,
-    TaskNotFoundError,
-)
 from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.exceptions import TaskCancelled, TaskErrored, TaskNotFoundError
 
 from .consumer import NatsTaskConsumer, create_consumer
 from .datamanager import AsyncTasksDataManager

@@ -20,10 +20,10 @@
 import uuid
 from typing import Any, Optional
 
-from nucliadb.async_tasks.datamanager import AsyncTasksDataManager
-from nucliadb.async_tasks.logger import logger
-from nucliadb.async_tasks.models import Task, TaskNatsMessage, TaskStatus
 from nucliadb.common.context import ApplicationContext
+from nucliadb.tasks.datamanager import AsyncTasksDataManager
+from nucliadb.tasks.logger import logger
+from nucliadb.tasks.models import Task, TaskNatsMessage, TaskStatus
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 

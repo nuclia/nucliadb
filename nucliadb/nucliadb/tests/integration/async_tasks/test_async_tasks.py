@@ -22,7 +22,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from nucliadb import async_tasks
+from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb_utils import const
@@ -47,7 +47,7 @@ async def context(nucliadb, natsd):
     await context.finalize()
 
 
-async def test_async_tasks_registry_api(context):
+async def test_tasks_registry_api(context):
     work_done = {}
 
     class MyStreams(const.Streams):
@@ -56,20 +56,20 @@ async def test_async_tasks_registry_api(context):
             subject = "work"
             group = "work"
 
-    @async_tasks.register_task(name="some_work", stream=MyStreams.SOME_WORK)
+    @tasks.register_task(name="some_work", stream=MyStreams.SOME_WORK)
     async def some_work(context: ApplicationContext, kbid: str, amount: int):
         nonlocal work_done
         work_done.setdefault(kbid, 0)
         work_done[kbid] += amount
 
-    producer = await async_tasks.get_producer("some_work", context=context)
+    producer = await tasks.get_producer("some_work", context=context)
     task_id = await producer("kbid1", 1)
-    await async_tasks.start_consumer("some_work", context=context)
-    await async_tasks.wait_for_task("kbid1", task_id, context=context)
+    await tasks.start_consumer("some_work", context=context)
+    await tasks.wait_for_task("kbid1", task_id, context=context)
     assert work_done["kbid1"] == 1
 
 
-async def test_async_tasks_factory_api(context):
+async def test_tasks_factory_api(context):
     work_done = {}
 
     class MyStreams(const.Streams):
@@ -83,13 +83,13 @@ async def test_async_tasks_factory_api(context):
         work_done.setdefault(kbid, 0)
         work_done[kbid] += amount
 
-    producer = async_tasks.create_producer(
+    producer = tasks.create_producer(
         name="some_work",
         stream=MyStreams.SOME_WORK,
     )
     await producer.initialize(context=context)
 
-    consumer = async_tasks.create_consumer(
+    consumer = tasks.create_consumer(
         name="some_work",
         stream=MyStreams.SOME_WORK,
         max_retries=10,
@@ -98,5 +98,5 @@ async def test_async_tasks_factory_api(context):
     await consumer.initialize(context=context)
 
     task_id = await producer("kbid1", 1)
-    await async_tasks.wait_for_task("kbid1", task_id, context=context)
+    await tasks.wait_for_task("kbid1", task_id, context=context)
     assert work_done["kbid1"] == 1

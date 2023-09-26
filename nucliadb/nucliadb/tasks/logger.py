@@ -19,5 +19,5 @@
 #
 import logging
 
-SERVICE_NAME = "nucliadb.async_tasks"
+SERVICE_NAME = "nucliadb.tasks"
 logger = logging.getLogger(SERVICE_NAME)

@@ -21,11 +21,11 @@
 from datetime import datetime
 from typing import Optional
 
-from nucliadb.async_tasks.exceptions import TaskNotFoundError
-from nucliadb.async_tasks.models import Task
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.tasks.exceptions import TaskNotFoundError
+from nucliadb.tasks.models import Task
 
-KB_TASKS = "/kbs/{kbid}/async_tasks/{task_id}"
+KB_TASKS = "/kbs/{kbid}/tasks/{task_id}"
 
 
 class AsyncTasksDataManager:
