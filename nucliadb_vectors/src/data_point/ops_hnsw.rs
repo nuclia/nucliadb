@@ -268,7 +268,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             let addr = Address(addr as usize);
             let score = self.tracker.similarity(addr, query);
 
-            if score <= self.tracker.min_score() {
+            if score <= self.tracker.min_score() || self.tracker.is_deleted(addr) {
                 continue;
             } else if result.len() < k_neighbours {
                 result.push(Reverse(Cnx(addr, score)));

@@ -55,7 +55,6 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::noderesources::{Resource, ResourceId};
-
 use serde::{Deserialize, Serialize};
 pub type NodeResult<O> = anyhow::Result<O>;
 
