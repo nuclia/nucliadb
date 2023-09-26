@@ -34,6 +34,7 @@ use io::{BufWriter, Write};
 use key_value::Slot;
 use memmap2::Mmap;
 use node::Node;
+use nucliadb_core::tracing::debug;
 use nucliadb_core::Channel;
 pub use ops_hnsw::DataRetriever;
 use ops_hnsw::HnswOps;
@@ -123,6 +124,7 @@ impl FormulaFilter<'_> {
         total_nodes: usize,
     ) -> FormulaFilter<'a> {
         let (Some(key_index), Some(label_index)) = (key_index, label_index) else {
+            debug!("No FST index files found, using regular filtering");
             return FormulaFilter {
                 filter,
                 total_nodes,
@@ -132,6 +134,7 @@ impl FormulaFilter<'_> {
             };
         };
 
+        debug!("Using FST index files");
         let collector = filter.get_atoms();
         let empty_formula = collector.labels.is_empty() && collector.key_prefixes.is_empty();
 
@@ -522,6 +525,7 @@ impl DataPoint {
 
         // Creating the FSTs with the new nodes
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
+            debug!("Indexing with experimental FSTs");
             Self::create_fsts(&id, &nodes)?
         } else {
             (None, None)
@@ -596,6 +600,7 @@ impl DataPoint {
 
         let (label_index, key_index) = if LabelIndex::exists(&fst_dir) && KeyIndex::exists(&fst_dir)
         {
+            debug!("Found FSTs on disk");
             (
                 Some(LabelIndex::open(&fst_dir)?),
                 Some(KeyIndex::open(&fst_dir)?),
@@ -714,6 +719,7 @@ impl DataPoint {
 
         // Creating the FSTs
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
+            debug!("Indexing with experimental FSTs");
             Self::create_fsts(&id, &nodes)?
         } else {
             (None, None)
