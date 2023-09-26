@@ -50,7 +50,6 @@ env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
-  API_VERSION: 1
   COMPONENT: nucliadb-node
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME_BASE_NODE: basenode

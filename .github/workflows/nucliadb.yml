@@ -1,6 +1,5 @@
 name: nucliadb (py)
 env:
-  API_VERSION: 1
   COMPONENT: nucliadb
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   TESTING_TIKV_LOCAL: "true"
@@ -19,28 +18,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job to run pre-checks
   pre-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install package
-        run: make -C nucliadb/ install-dev
-
-      - name: Run pre-checks
-        run: make -C nucliadb/ lint
+    uses: ./.github/workflows/_component_prechecks.yml
+    with:
+      component: "nucliadb"
 
   # Job to run Python tests
   tests:
