@@ -4,12 +4,13 @@ ENV DATA_PATH=data
 ENV RUST_LOG=nucliadb_node=DEBUG
 ENV RUST_BACKTRACE=1
 
+COPY scripts/install-system-deps.sh /tmp/
 RUN apt-get -y update \
     && apt-get -y install ca-certificates curl \
     libssl1.1 \
     lmdb-utils \
     libdw-dev \
-    && rm -rf /var/lib/apt/lists/*
+    /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh && rm -rf /var/lib/apt/lists/*
 
 COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
 
