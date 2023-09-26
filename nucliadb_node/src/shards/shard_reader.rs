@@ -32,7 +32,6 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::Channel;
 use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
