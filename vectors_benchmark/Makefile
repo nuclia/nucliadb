@@ -9,14 +9,12 @@ build:
 nightly:
 	cargo run --release --locked --bin vectors_benchmark
 	cargo run --release --locked --bin 1m_stats -- --merge
-	cargo run --release --locked --bin labels_benchmark -- --merge
 
 
 .PHONY: fast-bench
 fast-bench:
 	cargo run --release --locked --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
 	cargo run --release --locked --bin 1m_stats -- -b $(BATCH_SIZE) -i $(INDEX_SIZE) --merge
-	cargo run --release --locked --bin labels_benchmark -- --merge
 
 .PHONY: 1m-bench
 1m-bench:
