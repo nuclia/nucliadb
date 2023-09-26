@@ -56,7 +56,24 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::noderesources::{Resource, ResourceId};
 
+use serde::{Deserialize, Serialize};
 pub type NodeResult<O> = anyhow::Result<O>;
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+pub enum Channel {
+    #[default]
+    STABLE,
+    EXPERIMENTAL,
+}
+
+impl From<i32> for Channel {
+    fn from(value: i32) -> Self {
+        match value {
+            1 => Channel::EXPERIMENTAL,
+            _ => Channel::STABLE,
+        }
+    }
+}
 
 pub fn paragraph_write(
     x: &paragraphs::ParagraphsWriterPointer,

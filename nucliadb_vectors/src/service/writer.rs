@@ -20,13 +20,13 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::{metrics, Channel};
 use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
@@ -42,6 +42,7 @@ impl IndexKeyCollector for Vec<String> {
 pub struct VectorWriterService {
     index: Index,
     indexset: IndexSet,
+    channel: Channel,
 }
 
 impl Debug for VectorWriterService {
@@ -201,6 +202,7 @@ impl WriterChild for VectorWriterService {
                 elems,
                 Some(temporal_mark),
                 self.index.metadata().similarity,
+                self.channel,
             )?)
         } else {
             None
@@ -289,7 +291,13 @@ impl WriterChild for VectorWriterService {
             } else if !elems.is_empty() {
                 let similarity = index.metadata().similarity;
                 let location = index.location();
-                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
+                let new_dp = DataPoint::new(
+                    location,
+                    elems,
+                    Some(temporal_mark),
+                    similarity,
+                    self.channel,
+                )?;
                 let lock = index.get_slock()?;
                 match index.add(new_dp, &lock) {
                     Ok(_) => index.commit(&lock)?,
@@ -364,8 +372,15 @@ impl VectorWriterService {
                 return Err(node_error!("A similarity must be specified"));
             };
             Ok(VectorWriterService {
-                index: Index::new(path, IndexMetadata { similarity })?,
+                index: Index::new(
+                    path,
+                    IndexMetadata {
+                        similarity,
+                        channel: config.channel,
+                    },
+                )?,
                 indexset: IndexSet::new(indexset)?,
+                channel: config.channel,
             })
         }
     }
@@ -380,6 +395,7 @@ impl VectorWriterService {
             Ok(VectorWriterService {
                 index: Index::open(path)?,
                 indexset: IndexSet::new(indexset)?,
+                channel: config.channel,
             })
         }
     }
@@ -427,9 +443,12 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
+            channel: Channel::EXPERIMENTAL,
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
+        assert_eq!(writer.channel, Channel::EXPERIMENTAL);
+
         let indexes: HashMap<_, _> = (0..10)
             .map(|i| create_vector_set(&mut writer, i.to_string()))
             .collect();
@@ -494,6 +513,7 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),

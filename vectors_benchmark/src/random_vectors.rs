@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy)]
 pub struct RandomVectors(usize);
 
 impl RandomVectors {

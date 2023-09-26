@@ -33,6 +33,7 @@ use crossbeam::channel::{self, Receiver};
 pub use merger::Merger;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use nucliadb_core::tracing::*;
+use nucliadb_core::Channel;
 use serde::{Deserialize, Serialize};
 use state::*;
 
@@ -58,6 +59,8 @@ pub trait SearchRequest {
 pub struct IndexMetadata {
     #[serde(default)]
     pub similarity: Similarity,
+    #[serde(default)]
+    pub channel: Channel,
 }
 impl IndexMetadata {
     pub fn write(&self, path: &Path) -> VectorR<()> {
@@ -270,7 +273,7 @@ impl Index {
             let location = self.location.clone();
             let similarity = self.metadata.similarity;
             let (sender, receiver) = channel::unbounded();
-            let worker = Worker::request(location, sender, similarity);
+            let worker = Worker::request(location, sender, similarity, self.metadata.channel);
             self.merger_status = MergerStatus::WorkScheduled(receiver);
             merger::send_merge_request(worker);
         }
@@ -309,7 +312,14 @@ mod test {
 
         let empty_no_entries = std::fs::read_dir(&vectors_path)?.count();
         for _ in 0..10 {
-            DataPoint::new(&vectors_path, vec![], None, Similarity::Cosine).unwrap();
+            DataPoint::new(
+                &vectors_path,
+                vec![],
+                None,
+                Similarity::Cosine,
+                Channel::EXPERIMENTAL,
+            )
+            .unwrap();
         }
 
         index.collect_garbage(&lock)?;

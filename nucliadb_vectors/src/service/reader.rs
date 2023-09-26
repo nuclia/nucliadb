@@ -229,6 +229,7 @@ mod tests {
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
     };
+    use nucliadb_core::Channel;
     use tempfile::TempDir;
 
     use super::*;
@@ -241,6 +242,7 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -360,6 +362,7 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]),

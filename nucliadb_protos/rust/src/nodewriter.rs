@@ -65,6 +65,8 @@ pub struct NewShardRequest {
     pub similarity: i32,
     #[prost(string, tag="2")]
     pub kbid: ::prost::alloc::string::String,
+    #[prost(enumeration="ReleaseChannel", tag="3")]
+    pub release_channel: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewVectorSetRequest {
@@ -80,6 +82,12 @@ pub struct NewVectorSetRequest {
 pub enum TypeMessage {
     Creation = 0,
     Deletion = 1,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum ReleaseChannel {
+    Stable = 0,
+    Experimental = 1,
 }
 /// Generated client implementations.
 pub mod node_writer_client {

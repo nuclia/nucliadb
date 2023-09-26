@@ -5,7 +5,6 @@ INDEX_SIZE:=10000
 build:
 	cargo build --release --locked
 
-
 .PHONY: nightly
 nightly:
 	cargo run --release --locked --bin vectors_benchmark
@@ -19,6 +18,15 @@ fast-bench:
 	cargo run --release --locked --bin 1m_stats -- -b $(BATCH_SIZE) -i $(INDEX_SIZE) --merge
 	cargo run --release --locked --bin labels_benchmark -- --merge
 
+.PHONY: 1m-bench
+1m-bench:
+	cargo run --locked --release --bin 1m_stats
+
+
+.PHONY: vector-bench
+vector-bench:
+	cargo run --locked --release --bin vectors_benchmark -- -b $(BATCH_SIZE) -i $(INDEX_SIZE)
+
 .PHONY: samply
 samply:
 	samply --help > /dev/null || cargo install samply
@@ -26,10 +34,6 @@ samply:
 .PHONY: samply-vector-bench
 samply-vector-bench: samply
 	samply record ../target/release/vectors_benchmark -b $(BATCH_SIZE) -i $(INDEX_SIZE)
-
-.PHONY: label-bench
-label-bench:
-	cargo run --release --locked --bin labels_benchmark
 
 .PHONY: real-data-bench
 real-data-bench:

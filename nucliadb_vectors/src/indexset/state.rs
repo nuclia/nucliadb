@@ -68,7 +68,15 @@ impl State {
             let index = index.to_string();
             let location = self.location.join(&index);
             self.indexes.insert(index);
-            Index::new(&location, IndexMetadata { similarity })
+            // TODO: for now we set the channel to STABLE here
+            let channel = nucliadb_core::Channel::STABLE;
+            Index::new(
+                &location,
+                IndexMetadata {
+                    similarity,
+                    channel,
+                },
+            )
         }
     }
 }

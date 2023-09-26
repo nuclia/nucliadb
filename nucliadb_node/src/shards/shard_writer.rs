@@ -152,10 +152,13 @@ impl ShardWriter {
             num_threads: num_cpus::get(),
         };
 
+        let channel = metadata.channel.unwrap_or_default();
+
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
+            channel,
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -174,10 +177,13 @@ impl ShardWriter {
             num_threads: num_cpus::get(),
         };
 
+        let channel = metadata.channel.unwrap_or_default();
+
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
+            channel,
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
@@ -203,10 +209,13 @@ impl ShardWriter {
             num_threads: num_cpus::get(),
         };
 
+        let channel = metadata.channel.unwrap_or_default();
+
         let vsc = VectorConfig {
             similarity: None,
             path: path.join(VECTORS_DIR),
             vectorset: path.join(VECTORSET_DIR),
+            channel,
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),

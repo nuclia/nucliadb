@@ -20,8 +20,8 @@
 use std::path::PathBuf;
 
 use crossbeam::channel::Sender;
-use nucliadb_core::fs_state;
 use nucliadb_core::tracing::*;
+use nucliadb_core::{fs_state, Channel};
 
 use super::merger::{MergeQuery, MergeRequest};
 use super::State;
@@ -32,6 +32,7 @@ pub(crate) struct Worker {
     location: PathBuf,
     sender: Sender<Journal>,
     similarity: Similarity,
+    channel: Channel,
 }
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
@@ -43,11 +44,13 @@ impl Worker {
         location: PathBuf,
         sender: Sender<Journal>,
         similarity: Similarity,
+        channel: Channel,
     ) -> MergeRequest {
         Box::new(Worker {
             similarity,
             location,
             sender,
+            channel,
         })
     }
     fn work(&self) -> VectorR<()> {
@@ -63,7 +66,7 @@ impl Worker {
         }) else {
             return Ok(());
         };
-        let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
+        let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
         let new_dp_id = new_dp.get_id();
         if self.sender.send(new_dp.meta()).is_err() {
             // If the sender has been deallocated this data point becomes garbage,

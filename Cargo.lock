@@ -4501,6 +4501,7 @@ dependencies = [
  "kv",
  "lazy_static",
  "memory-stats",
+ "nucliadb_core",
  "nucliadb_vectors",
  "rand",
  "reqwest",

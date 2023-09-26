@@ -2,6 +2,7 @@ use std::io::Write;
 use std::path::Path;
 
 use clap::Parser;
+use nucliadb_core::Channel;
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
@@ -146,7 +147,14 @@ fn add_batch(
         })
         .collect();
 
-    let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity).unwrap();
+    let new_dp = DataPoint::new(
+        writer.location(),
+        elems,
+        Some(temporal_mark),
+        similarity,
+        Channel::EXPERIMENTAL,
+    )
+    .unwrap();
     let lock = writer.get_slock().unwrap();
     writer.add(new_dp, &lock).unwrap();
     writer.commit(&lock).unwrap();
