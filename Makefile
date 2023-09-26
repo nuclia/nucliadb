@@ -102,7 +102,7 @@ build-node:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
 build-node-debug:
-	./scripts/download-build.sh && docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_prebuilt . || ( \
+	./scripts/download-build.sh && echo "Using build server build" && docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_prebuilt . || ( \
 		echo "Failed to download build from build server. Manually running build." && \
 		docker build -t eu.gcr.io/stashify-218417/node:main --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
 	)

@@ -24,6 +24,7 @@ echo "Building: $BRANCH $COMMIT_HASH -- test: $TEST"
 
 # JSON data
 json_data=$(curl -f "$BUILD_SERVER_URL/build" \
+    --retry 1 \
     -H "X-Secret-Key:$secret_key" \
     -H 'content-type: application/json' \
     --data "{\"git_url\": \"https://github.com/nuclia/nucliadb.git\",\"branch\": \"$BRANCH\",\"commit_hash\": \"$COMMIT_HASH\",\"release\": false, \"test\": $TEST}")
@@ -41,13 +42,13 @@ mkdir -p http-builds/tests
 for binary in $binaries; do
     url="${base_url}/${binary}"
     echo "Downloading $binary from $url"
-    curl -f -o "http-builds/$binary" "$url" -H "X-Secret-Key:$secret_key"
+    curl -f --retry 1 -o "http-builds/$binary" "$url" -H "X-Secret-Key:$secret_key"
 done
 
 if [ "$TEST" = "true" ]; then
     for binary in $test_binaries; do
         url="${base_url}/${binary}"
         echo "Downloading $binary from $url"
-        curl -f -o "http-builds/tests/$binary" "$url" -H "X-Secret-Key:$secret_key"
+        curl -f --retry 1 -o "http-builds/tests/$binary" "$url" -H "X-Secret-Key:$secret_key"
     done
 fi
