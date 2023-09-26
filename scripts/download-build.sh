@@ -4,19 +4,10 @@ set -e
 
 BUILD_SERVER_URL="https://ci.stashify.tech/rust-build-server"
 # BUILD_SERVER_URL="http://localhost:8000"
+COMMIT_HASH=$(git rev-parse --short HEAD)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-if [ -z "$BRANCH" ]; then
-    echo "BRANCH is not set"
-    exit 1
-fi
-if [ -z "$COMMIT_HASH" ]; then
-    echo "COMMIT_HASH is not set"
-    exit 1
-fi
-if [ -z "$secret_key" ]; then
-    echo "secret_key is not set"
-    exit 1
-fi
+echo "Building: $BRANCH $COMMIT_HASH"
 
 # JSON data
 json_data=$(curl -f "$BUILD_SERVER_URL/build" \

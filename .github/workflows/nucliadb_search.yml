@@ -118,14 +118,6 @@ jobs:
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
-      - name: Calc git info
-        id: git
-        run: |-
-          HASH=`git rev-parse --short HEAD`
-          BRANCH=${GITHUB_REF##*/}
-          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
       - name: Install jq
         run: |
           sudo apt-get update -y
@@ -135,16 +127,12 @@ jobs:
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ steps.git.outputs.short_sha }}
-          BRANCH: ${{ steps.git.outputs.branch }}
         run: ./scripts/download-build.sh
 
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ steps.git.outputs.short_sha }}
-          BRANCH: ${{ steps.git.outputs.branch }}
         run: |
           make build-node-debug
 
@@ -234,13 +222,8 @@ jobs:
       - name: Calculate short sha
         id: env-vars
         run: |-
-          HASH=$(git rev-parse --short HEAD)
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BRANCH="${{ github.event.pull_request.head.ref }}"
-          else
-            BRANCH="${{ github.ref }}"
-            BRANCH="${branch_name#refs/heads/}"
-          fi
+          HASH=`git rev-parse --short HEAD`
+          BRANCH=${GITHUB_REF##*/}
           echo "short_sha=$HASH" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
