@@ -24,11 +24,13 @@ jobs:
         id: changes
         with:
           filters: |
+            COMPONENT_CHANGED:
+              - '${{ inputs.component }}'
             VERSION:
               - '${{ inputs.component }}/VERSION'
       
       - name: Check if VERSION file was not updated
-        if: steps.changes.outputs.VERSION != 'true'
+        if: steps.changes.outputs.VERSION != 'true' && steps.changes.outputs.COMPONENT_CHANGED == 'true'
         run: |
           echo "VERSION file was not updated"
           exit 1
