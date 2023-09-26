@@ -1,6 +1,5 @@
 name: nucliadb Standalone (py)
 env:
-  API_VERSION: 1
   COMPONENT: nucliadb-standalone
 on:
   pull_request:
