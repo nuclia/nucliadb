@@ -30,16 +30,27 @@ use tantivy::Document;
 pub struct ParagraphSchema {
     pub schema: Schema,
 
+    /// resource id
     pub uuid: Field,
+    /// field id
+    pub field: Field,
+    /// paragraph id
     pub paragraph: Field,
+
     pub text: Field,
+
     pub start_pos: Field,
     pub end_pos: Field,
+
     pub created: Field,
     pub modified: Field,
+
+    /// resource status
     pub status: Field,
+
+    /// labels
     pub facets: Field,
-    pub field: Field,
+
     pub split: Field,
     pub index: Field,
     pub repeated_in_field: Field,
