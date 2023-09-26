@@ -26,6 +26,8 @@ from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import ResourceFieldId
 
 import nucliadb_models
+from nucliadb.common.maindb.local import LocalDriver
+from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer.api.v1.router import (
@@ -318,8 +320,14 @@ async def test_resource_crud_sync(
 
 @pytest.mark.asyncio
 async def test_reprocess_resource(
-    writer_api: Callable[..., AsyncClient], test_resource: Resource, mocker
+    writer_api: Callable[..., AsyncClient],
+    test_resource: Resource,
+    mocker,
+    maindb_driver,
 ) -> None:
+    if isinstance(maindb_driver, (LocalDriver, RedisDriver)):
+        pytest.skip("Keys might not be ordered correctly in this driver")
+
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
