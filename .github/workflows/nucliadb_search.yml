@@ -118,12 +118,17 @@ jobs:
             sidecar_modified:
               - 'nucliadb_node/nucliadb_node/**'
 
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
           COMMIT_HASH: ${{ github.sha }}
-          BRANCH: ${{ github.ref }}
+          BRANCH: ${{ steps.extract_branch.outputs.branch }}
         run: |
           make build-node-debug
 
