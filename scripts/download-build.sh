@@ -24,7 +24,7 @@ echo "Building: $BRANCH $COMMIT_HASH -- test: $TEST"
 
 # JSON data
 json_data=$(curl -f "$BUILD_SERVER_URL/build" \
-    --retry 1 \
+    --retry 2 \
     -H "X-Secret-Key:$secret_key" \
     -H 'content-type: application/json' \
     --data "{\"git_url\": \"https://github.com/nuclia/nucliadb.git\",\"branch\": \"$BRANCH\",\"commit_hash\": \"$COMMIT_HASH\",\"release\": false, \"test\": $TEST}")
