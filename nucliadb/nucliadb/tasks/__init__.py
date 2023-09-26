@@ -61,6 +61,7 @@ async def get_producer(task_name: str, context: ApplicationContext) -> NatsTaskP
     producer = create_producer(
         name=f"{task_name}_producer",
         stream=registry_data["stream"],
+        callback=registry_data["func"],
     )
     await producer.initialize(context)
     return producer

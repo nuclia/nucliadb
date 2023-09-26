@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import inspect
 import uuid
-from typing import Any, Optional
+from typing import Any, Coroutine, Optional
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.datamanager import TasksDataManager
@@ -33,12 +34,14 @@ class NatsTaskProducer:
         self,
         name: str,
         stream: const.Streams,
+        callback=None,
     ):
         self.name = name
         self.stream = stream
         self.context: Optional[ApplicationContext] = None
         self.initialized = False
         self._dm = None
+        self.callback = callback
 
     @property
     def dm(self):
@@ -56,6 +59,10 @@ class NatsTaskProducer:
     async def __call__(self, kbid: str, *args: tuple[Any, ...], **kwargs) -> str:
         if not self.initialized:
             raise RuntimeError("NatsTaskProducer not initialized")
+
+        if self.callback is not None:
+            callback_args = (self.context, kbid, *args)
+            check_is_callable_with(self.callback, *callback_args, **kwargs)
 
         task_id = uuid.uuid4().hex
 
@@ -86,8 +93,16 @@ class NatsTaskProducer:
         return task_id
 
 
+def check_is_callable_with(f, *args, **kwargs) -> None:
+    """
+    Will raise a TypeError if f is not callable with the given arguments.
+    """
+    inspect.getcallargs(f, *args, **kwargs)
+
+
 def create_producer(
     name: str,
     stream: const.Streams,
+    callback: Optional[Coroutine[Any, Any, Any]] = None,
 ) -> NatsTaskProducer:
-    return NatsTaskProducer(name=name, stream=stream)
+    return NatsTaskProducer(name=name, stream=stream, callback=callback)
