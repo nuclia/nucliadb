@@ -122,8 +122,6 @@ jobs:
         id: git
         run: |-
           BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          HASH=`git rev-parse $BRANCH`
-          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Install jq
@@ -135,7 +133,7 @@ jobs:
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ steps.git.outputs.short_sha }}
+          COMMIT_HASH: ${{ github.sha }}
           BRANCH: ${{ steps.git.outputs.branch }}
         run: ./scripts/download-build.sh
 
@@ -143,7 +141,7 @@ jobs:
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ steps.git.outputs.short_sha }}
+          COMMIT_HASH: ${{ github.sha }}
           BRANCH: ${{ steps.git.outputs.branch }}
         run: |
           make build-node-debug
