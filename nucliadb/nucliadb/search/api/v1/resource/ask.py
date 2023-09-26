@@ -34,9 +34,10 @@ from nucliadb.search.search.exceptions import ResourceNotFoundError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, AskResponse, TextBlocks
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 ASK_EXAMPLES = {
     "Ask a Resource": {
@@ -57,6 +58,8 @@ ASK_EXAMPLES = {
     description="Ask to the complete content of the resource",
     tags=["Search"],
     response_model=None,
+    # TODO: set to True once feature is fully enabled
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -70,6 +73,9 @@ async def resource_ask_endpoint(
     ),
     x_nucliadb_user: str = Header("", description="User Id", include_in_schema=False),
 ) -> Union[AskResponse, HTTPClientError]:
+    if not has_feature(const.Features.ASK_YOUR_DOCUMENTS):
+        return HTTPClientError(status_code=404, detail="Feature not yet available")
+
     try:
         return await resource_ask(kbid, rid, item, user_id=x_nucliadb_user)
     except ResourceNotFoundError:
