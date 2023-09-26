@@ -112,6 +112,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Install jq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
       - name: Extract branch name
         shell: bash
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT

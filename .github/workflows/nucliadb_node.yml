@@ -242,6 +242,11 @@ jobs:
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
         id: extract_branch
 
+      - name: Install jq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         env:
