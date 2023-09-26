@@ -470,7 +470,7 @@ def tikv_driver_settings(tikvd):
     if os.environ.get("TESTING_TIKV_LOCAL", None):
         url = "localhost:2379"
     else:
-        url = f"{tikvd[0]}:{tikvd[2]}"
+        url = f"{tikvd.host}:{tikvd.pd_port}"
     return DriverSettings(driver=DriverConfig.TIKV, driver_tikv_url=[url])
 
 

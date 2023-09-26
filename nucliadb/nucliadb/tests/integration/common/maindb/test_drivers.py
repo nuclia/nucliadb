@@ -46,9 +46,25 @@ async def test_redis_driver(redis):
     "tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS"
 )
 async def test_tikv_driver(tikvd):
-    url = [f"{tikvd[0]}:{tikvd[2]}"]
+    url = [f"{tikvd.host}:{tikvd.pd_port}"]
     driver = TiKVDriver(url=url)
     await driver_basic(driver)
+
+
+@pytest.mark.flaky(reruns=5)
+@pytest.mark.skipif(
+    "tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS"
+)
+async def test_tikv_driver_against_restarts(tikvd):
+    url = [f"{tikvd.host}:{tikvd.pd_port}"]
+    driver = TiKVDriver(url=url)
+    tikvd.stop()
+
+    tikvd.start()
+
+    async with driver.transaction() as txn:
+        await txn.set("/test", b"test")
+        await txn.get("/test") == b"test"
 
 
 @pytest.mark.skipif(

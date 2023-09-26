@@ -56,6 +56,23 @@ class TiKVd(object):
         self.proc2 = None
 
     def start(self):
+        self._start()
+
+        endpoint = "127.0.0.1:{port}".format(port=self.port)
+        retries = 0
+        while True:
+            if retries > 100:
+                break
+
+            try:
+                connection = TransactionClient.connect(endpoint)
+                txn = connection.begin(pessimistic=True)
+                txn.rollback()
+            except:  # noqa
+                retries += 1
+                time.sleep(0.1)
+
+    def _start(self):
         self.tmpfolder = tempfile.TemporaryDirectory()
 
         cmd = [
@@ -161,24 +178,6 @@ class TiKVd(object):
             self.tmpfolder = None
 
 
-def start_tikvd(tikvd: TiKVd):
-    tikvd.start()
-
-    endpoint = "127.0.0.1:{port}".format(port=tikvd.port)
-    retries = 0
-    while True:
-        if retries > 100:
-            break
-
-        try:
-            connection = TransactionClient.connect(endpoint)
-            txn = connection.begin(pessimistic=True)
-            txn.rollback()
-        except:  # noqa
-            retries += 1
-            time.sleep(0.1)
-
-
 @pytest.fixture(scope="session")
 def tikvd():
     if os.environ.get("TESTING_TIKV_LOCAL", None):
@@ -222,7 +221,7 @@ def tikvd():
     server.pd_bin_name = "pd-server"
     server.path = os.getcwd()
 
-    start_tikvd(server)
+    server.start()
     print("Started TiKVd")
 
     for i in range(100):
@@ -236,5 +235,5 @@ def tikvd():
         print(resp.json())
         time.sleep(1)
 
-    yield server.host, server.port, server.pd_port
+    yield server
     server.stop()
