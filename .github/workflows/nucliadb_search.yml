@@ -133,7 +133,7 @@ jobs:
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ github.sha }}
+          COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
           BRANCH: ${{ steps.git.outputs.branch }}
         run: ./scripts/download-build.sh
 
@@ -141,7 +141,7 @@ jobs:
         if: steps.filter.outputs.node_modified == 'true'
         env:
           secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ github.sha }}
+          COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
           BRANCH: ${{ steps.git.outputs.branch }}
         run: |
           make build-node-debug
