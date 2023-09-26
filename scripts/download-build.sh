@@ -18,13 +18,15 @@ if [ -z "$secret_key" ]; then
     exit 1
 fi
 
-echo "Building: $BRANCH $COMMIT_HASH"
+TEST=${TEST:-false}
+
+echo "Building: $BRANCH $COMMIT_HASH -- test: $TEST"
 
 # JSON data
 json_data=$(curl -f "$BUILD_SERVER_URL/build" \
     -H "X-Secret-Key:$secret_key" \
     -H 'content-type: application/json' \
-    --data "{\"git_url\": \"https://github.com/nuclia/nucliadb.git\",\"branch\": \"$BRANCH\",\"commit_hash\": \"$COMMIT_HASH\",\"release\": false}")
+    --data "{\"git_url\": \"https://github.com/nuclia/nucliadb.git\",\"branch\": \"$BRANCH\",\"commit_hash\": \"$COMMIT_HASH\",\"release\": false, \"test\": $TEST}")
 
 echo "JSON data:"
 echo $json_data
@@ -42,8 +44,10 @@ for binary in $binaries; do
     curl -f -o "http-builds/$binary" "$url" -H "X-Secret-Key:$secret_key"
 done
 
-for binary in $test_binaries; do
-    url="${base_url}/${binary}"
-    echo "Downloading $binary from $url"
-    curl -f -o "http-builds/tests/$binary" "$url" -H "X-Secret-Key:$secret_key"
-done
+if [ "$TEST" = "true" ]; then
+    for binary in $test_binaries; do
+        url="${base_url}/${binary}"
+        echo "Downloading $binary from $url"
+        curl -f -o "http-builds/tests/$binary" "$url" -H "X-Secret-Key:$secret_key"
+    done
+fi
