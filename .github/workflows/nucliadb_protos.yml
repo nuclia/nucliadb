@@ -19,7 +19,7 @@ jobs:
         with:
             filters: |
               COMPONENT_CHANGED:
-              - '${{ inputs.component }}'
+                - nucliadb_protos/
               VERSION:
                 - 'nucliadb_protos/python/VERSION'
       
