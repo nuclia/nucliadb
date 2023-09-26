@@ -1,0 +1,20 @@
+FROM debian:bullseye-slim
+
+ENV DATA_PATH=data
+ENV RUST_LOG=nucliadb_node=DEBUG
+ENV RUST_BACKTRACE=1
+
+RUN apt-get -y update \
+    && apt-get -y install ca-certificates curl \
+    libssl1.1 \
+    lmdb-utils \
+    libdw-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
+
+COPY ./http-builds/node_reader /usr/local/bin/node_reader
+COPY ./http-builds/node_writer /usr/local/bin/node_writer
+
+
+EXPOSE 4444/udp
