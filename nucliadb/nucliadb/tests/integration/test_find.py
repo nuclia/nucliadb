@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -199,6 +199,7 @@ async def test_story_7286(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
+    caplog,
 ):
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
@@ -251,5 +252,4 @@ async def test_story_7286(
         assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 0
-
-    # TODO: assert the warning  Resource 4d8dc1aea04d4d078fcd4b03e44d7215 not found in b4f1475e-59b4-4ac1-b6dd-b2923ab15702
+    assert caplog.record_tuples[0][2] == f"Resource {rid} not found in {knowledgebox}"
