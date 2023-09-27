@@ -240,7 +240,7 @@ class TiKVDriver(Driver):
             self.connect_in_progress = True
             try:
                 async with self.connect_lock:
-                    print("XXX: reinitializing tikv")
+                    logger.warning("Reconnecting to TiKV")
                     self.tikv = await TransactionClient.connect(self.url)
             finally:
                 self.connect_in_progress = False
