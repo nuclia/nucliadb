@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import os
 
 import asyncpg
@@ -51,20 +52,27 @@ async def test_tikv_driver(tikvd):
     await driver_basic(driver)
 
 
-@pytest.mark.flaky(reruns=5)
 @pytest.mark.skipif(
     "tikv" not in TESTING_MAINDB_DRIVERS, reason="tikv not in TESTING_MAINDB_DRIVERS"
 )
 async def test_tikv_driver_against_restarts(tikvd):
     url = [f"{tikvd.host}:{tikvd.pd_port}"]
     driver = TiKVDriver(url=url)
-    tikvd.stop()
+    await driver.initialize()
 
+    async def _runtest(i):
+        async with driver.transaction() as txn:
+            await txn.set(f"/test{i}", b"test")
+            await txn.get(f"/test{i}") == b"test"
+
+    await asyncio.gather(*[_runtest(i) for i in range(10)])
+
+    tikvd.stop()
     tikvd.start()
 
-    async with driver.transaction() as txn:
-        await txn.set("/test", b"test")
-        await txn.get("/test") == b"test"
+    # after server is restarted, old connection is bad and connection needs
+    # to be re-established but having many simultaneous requests should not stomp on each other
+    await asyncio.gather(*[_runtest(i) for i in range(10)])
 
 
 @pytest.mark.skipif(

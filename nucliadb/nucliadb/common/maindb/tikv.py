@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, List, Optional
 
@@ -221,11 +222,28 @@ class TiKVDriver(Driver):
         if TiKV is False:
             raise ImportError("TiKV is not installed")
         self.url = url
+        self.connect_lock = asyncio.Lock()
+        self.connect_in_progress = False
 
     async def initialize(self):
-        if self.initialized is False and self.tikv is None:
-            self.tikv = await TransactionClient.connect(self.url)
-        self.initialized = True
+        async with self.connect_lock:
+            if self.initialized is False and self.tikv is None:
+                self.tikv = await TransactionClient.connect(self.url)
+            self.initialized = True
+
+    async def reinitialize(self) -> None:
+        if self.connect_in_progress:
+            async with self.connect_lock:
+                # wait for lock and then just continue because someone else is establishing the connection
+                return
+        else:
+            self.connect_in_progress = True
+            try:
+                async with self.connect_lock:
+                    print("XXX: reinitializing tikv")
+                    self.tikv = await TransactionClient.connect(self.url)
+            finally:
+                self.connect_in_progress = False
 
     async def finalize(self):
         pass
@@ -234,5 +252,21 @@ class TiKVDriver(Driver):
         if self.tikv is None:
             raise AttributeError()
         with tikv_observer({"type": "begin"}):
-            txn = await self.tikv.begin(pessimistic=False)
+            try:
+                txn = await self.tikv.begin(pessimistic=False)
+            except Exception as exc:
+                if "failed to connect to" not in str(exc):
+                    # NO exception handling in client, this is ugly but the best
+                    # we have right now
+                    # Exception looks like this:
+                    # Exception: [//client-rust-5a1ccd35a54db20f/eb1d2da/tikv-client-pd/src/cluster.rs:264]:
+                    #   failed to connect to
+                    #   [Member { name: "pd", member_id: 3474484975246189105, peer_urls: ["http://127.0.0.1:2380"],
+                    #             client_urls: ["http://127.0.0.1:2379"], leader_priority: 0, deploy_path: "",
+                    #             binary_version: "", git_hash: "", dc_location: "" }]
+                    raise
+                # attempt to reconnect once per driver so we need to deal with locks
+                await self.reinitialize()
+                txn = await self.tikv.begin(pessimistic=False)
+
         return TiKVTransaction(txn, driver=self)
