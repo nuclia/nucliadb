@@ -203,7 +203,7 @@ def parse_entities_to_filters(
     return added_filters
 
 
-async def suggest_query_to_pb(
+def suggest_query_to_pb(
     features: List[SuggestOptions],
     query: str,
     fields: List[str],

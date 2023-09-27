@@ -91,7 +91,7 @@ async def suggest_knowledgebox(
     start_time = time()
 
     # We need to query all nodes
-    pb_query = await suggest_query_to_pb(
+    pb_query = suggest_query_to_pb(
         features,
         query,
         fields,
@@ -102,7 +102,7 @@ async def suggest_knowledgebox(
         range_modification_start,
         range_modification_end,
     )
-    results, incomplete_results, queried_nodes, queried_shards = await node_query(
+    results, incomplete_results, _, queried_shards = await node_query(
         kbid, Method.SUGGEST, pb_query, []
     )
 
