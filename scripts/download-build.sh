@@ -2,8 +2,8 @@
 
 set -e
 
-# BUILD_SERVER_URL="https://ci.stashify.tech/rust-build-server"
-BUILD_SERVER_URL="http://localhost:8000"
+BUILD_SERVER_URL="https://ci.stashify.tech/rust-build-server"
+# BUILD_SERVER_URL="http://localhost:8000"
 
 if [ -z "$BRANCH" ]; then
     echo "BRANCH is not set"
