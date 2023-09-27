@@ -13,7 +13,7 @@ Types of Dockerfiles:
 - Dockerfile: primary python component build that includes rust bindings that allow standalone serving
 - Dockerfile.withbinding: build python component along with rust bindings, all in one dockerfile
 - Dockerfile.node: rust build for our Index Nodes
-- Dockerfile.node_local: allows building the node locally
+- Dockerfile.node_local: allows building the node locally without usage of a remote base image
 - Dockerfile.node_prebuilt: allows building the node with prebuilt rust binaries
 - Dockerfile.basenode: used as a base in other containers
 
