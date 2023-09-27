@@ -42,7 +42,7 @@ class TiKVd(object):
         peer_port=2380,
         tikv_bin_name="tikv-server",
         pd_bin_name="pd-server",
-        host="127.0.0.1",
+        host="localhost",
         path=None,
         debug=False,
     ):
@@ -61,7 +61,7 @@ class TiKVd(object):
     def start(self):
         self._start()
 
-        endpoint = "127.0.0.1:{port}".format(port=self.port)
+        endpoint = "localhost:{port}".format(port=self.port)
         retries = 0
         while True:
             if retries > 100:
@@ -111,7 +111,7 @@ class TiKVd(object):
         cmd = [
             f"{self.path}/{self.tikv_bin_name}",
             f"--pd-endpoints={self.host}:{self.pd_port}",
-            f"--addr={self.host}:{self.port}",
+            f"--addr=0.0.0.0:{self.port}",
             f"--data-dir={self.tmpfolder.name}/tikv1",
             f"--log-file={self.tmpfolder.name}/tikv1.log",
         ]
