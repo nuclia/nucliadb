@@ -44,6 +44,7 @@ env:
   COMPONENT: nucliadb-search
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: search
+  PYTHONUNBUFFERED: "1"
 
 jobs:
   # Job to run pre-checks

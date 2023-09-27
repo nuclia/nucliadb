@@ -71,6 +71,7 @@ class TiKVd(object):
                 connection = TransactionClient.connect(endpoint)
                 txn = connection.begin(pessimistic=True)
                 txn.rollback()
+                return  # connected, we're good
             except:  # noqa
                 retries += 1
                 time.sleep(0.1)

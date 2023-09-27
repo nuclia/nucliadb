@@ -2,6 +2,7 @@ name: nucliadb (py)
 env:
   COMPONENT: nucliadb
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  PYTHONUNBUFFERED: "1"
 permissions:
   contents: write
 on:
