@@ -7,7 +7,6 @@ ENV RUST_BACKTRACE=1
 COPY scripts/install-system-deps.sh /tmp/
 RUN apt-get -y update \
     && apt-get -y install ca-certificates curl \
-    libssl1.1 \
     lmdb-utils \
     libdw-dev \
     libssl-dev \
