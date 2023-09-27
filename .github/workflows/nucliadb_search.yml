@@ -132,7 +132,7 @@ jobs:
       - name: Build local Node for testing
         if: steps.filter.outputs.node_modified == 'true'
         env:
-          secret_key: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
+          SECRET_KEY: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
           COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
           BRANCH: ${{ steps.git.outputs.branch }}
         run: |

@@ -17,8 +17,8 @@ RUN apt-get -y update \
 COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
 
 
-COPY ./http-builds/node_reader /usr/local/bin/node_reader
-COPY ./http-builds/node_writer /usr/local/bin/node_writer
+COPY ./builds/node_reader /usr/local/bin/node_reader
+COPY ./builds/node_writer /usr/local/bin/node_writer
 
 RUN chmod +x /usr/local/bin/node_reader
 RUN chmod +x /usr/local/bin/node_writer
