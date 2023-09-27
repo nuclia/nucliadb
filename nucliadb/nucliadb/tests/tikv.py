@@ -107,6 +107,7 @@ class TiKVd(object):
                     % self.pd_port
                 )
 
+        self.wait_for_health()
         cmd = [
             f"{self.path}/{self.tikv_bin_name}",
             f"--pd-endpoints={self.host}:{self.pd_port}",
@@ -157,14 +158,14 @@ class TiKVd(object):
                     % self.port
                 )
 
-        if self.proc.returncode is not None:
+        if self.proc is not None and self.proc.returncode is not None:
             if self.debug:
                 print(
                     "[\033[0;31mDEBUG\033[0;0m] Server listening on port {port} finished running already with exit {ret}".format(  # noqa
                         port=self.pd_port, ret=self.proc.returncode
                     )
                 )
-        elif self.proc2.returncode is not None:
+        elif self.proc2 is not None and self.proc2.returncode is not None:
             if self.debug:
                 print(
                     "[\033[0;31mDEBUG\033[0;0m] Server listening on port {port} finished running already with exit {ret}".format(  # noqa
@@ -172,10 +173,14 @@ class TiKVd(object):
                     )
                 )
         else:
-            os.kill(self.proc.pid, signal.SIGKILL)
-            self.proc.wait()
-            os.kill(self.proc2.pid, signal.SIGKILL)
-            self.proc2.wait()
+            if self.proc is not None:
+                os.kill(self.proc.pid, signal.SIGKILL)
+                self.proc.wait()
+                self.proc = None
+            if self.proc2 is not None:
+                os.kill(self.proc2.pid, signal.SIGKILL)
+                self.proc2.wait()
+                self.proc2 = None
             if self.debug:
                 print(
                     "[\033[0;33mDEBUG\033[0;0m] Server listening on %d was stopped."
@@ -186,21 +191,31 @@ class TiKVd(object):
             self.tmpfolder = None
 
     def wait_for_health(self):
-        for i in range(100):
-            resp = requests.get(f"http://{self.host}:{self.pd_port}/pd/api/v1/stores")
-            if (
-                resp.status_code == 200
-                and resp.json()["stores"][0]["store"]["state_name"] == "Up"
-            ):
-                break
-            logger.info(
-                f"Waiting for tikv to startup({resp.status_code}): {resp.json()}"
-            )
-            time.sleep(1)
-        assert self.proc.returncode is None, "TiKV server is not running but should be"
-        assert (
-            self.proc.returncode is None
-        ), "TiKV pd server is not running but should be"
+        for _ in range(100):
+            try:
+                resp = requests.get(
+                    f"http://{self.host}:{self.pd_port}/pd/api/v1/stores"
+                )
+                if (
+                    resp.status_code == 200
+                    and resp.json()["stores"][0]["store"]["state_name"] == "Up"
+                ):
+                    break
+                if resp.status_code == 503 and resp.text.strip() == "no leader":
+                    break
+                logger.info(
+                    f"Waiting for tikv to startup({resp.status_code}): {resp.text}"
+                )
+            except requests.exceptions.ConnectionError:  # noqa
+                ...
+            finally:
+                time.sleep(1)
+        if self.proc is not None:
+            assert self.proc.returncode is None, "TiKV pd is not running but should be"
+        if self.proc2 is not None:
+            assert (
+                self.proc2.returncode is None
+            ), "TiKV server is not running but should be"
 
 
 TIKV_VERSION = "v5.3.1"
@@ -241,7 +256,11 @@ def tikvd():
         os.chmod("pd-server", 755)
 
     server = TiKVd(debug=True)
-    server.start()
+    try:
+        server.start()
+    except Exception:
+        server.stop()
+        raise
     server.wait_for_health()
 
     print("Started TiKVd")
