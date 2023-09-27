@@ -63,6 +63,9 @@ jobs:
       - name: Install the package
         run: make -C nucliadb/ install-dev
 
+      - name: Increase File Descriptors for tikv
+        run: ulimit -n 100000
+
       - name: Run tests
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
