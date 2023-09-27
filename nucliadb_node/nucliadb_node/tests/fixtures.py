@@ -237,7 +237,7 @@ async def sidecar_stub(worker):
 async def shard(writer_stub: NodeWriterStub) -> AsyncIterable[str]:
     channel = (
         ReleaseChannel.EXPERIMENTAL
-        if os.environ.get("RELEASE_CHANNEL", "STABLE")
+        if os.environ.get("RELEASE_CHANNEL", "STABLE") == "EXPERIMENTAL"
         else ReleaseChannel.STABLE
     )
     request = NewShardRequest(kbid="test", release_channel=channel)
