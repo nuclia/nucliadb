@@ -79,34 +79,6 @@ class TiKVd(object):
         self.tmpfolder = tempfile.TemporaryDirectory()
 
         cmd = [
-            f"{self.path}/{self.tikv_bin_name}",
-            f"--pd-endpoints={self.host}:{self.pd_port}",
-            f"--addr={self.host}:{self.port}",
-            f"--data-dir={self.tmpfolder.name}/tikv1",
-            f"--log-file={self.tmpfolder.name}/tikv1.log",
-        ]
-
-        logger.warning(f'Running command {" ".join(cmd)}')
-
-        if self.debug:
-            self.proc2 = subprocess.Popen(cmd)
-        else:
-            self.proc2 = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-
-        if self.debug:
-            if self.proc2 is None:
-                print(
-                    "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
-                    % self.port
-                )
-            else:
-                print(
-                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
-                    % self.port
-                )
-        cmd = [
             f"{self.path}/{self.pd_bin_name}",
             "--name=pd",
             f"--data-dir={self.tmpfolder.name}",
@@ -134,6 +106,36 @@ class TiKVd(object):
                     "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
                     % self.pd_port
                 )
+
+        cmd = [
+            f"{self.path}/{self.tikv_bin_name}",
+            f"--pd-endpoints={self.host}:{self.pd_port}",
+            f"--addr={self.host}:{self.port}",
+            f"--data-dir={self.tmpfolder.name}/tikv1",
+            f"--log-file={self.tmpfolder.name}/tikv1.log",
+        ]
+
+        logger.warning(f'Running command {" ".join(cmd)}')
+
+        if self.debug:
+            self.proc2 = subprocess.Popen(cmd)
+        else:
+            self.proc2 = subprocess.Popen(
+                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+        if self.debug:
+            if self.proc2 is None:
+                print(
+                    "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
+                    % self.port
+                )
+            else:
+                print(
+                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
+                    % self.port
+                )
+
         return self.proc
 
     def stop(self):
@@ -183,6 +185,23 @@ class TiKVd(object):
             self.tmpfolder.cleanup()
             self.tmpfolder = None
 
+    def wait_for_health(self):
+        for i in range(100):
+            resp = requests.get(f"http://{self.host}:{self.pd_port}/pd/api/v1/stores")
+            if (
+                resp.status_code == 200
+                and resp.json()["stores"][0]["store"]["state_name"] == "Up"
+            ):
+                break
+            logger.info(
+                f"Waiting for tikv to startup({resp.status_code}): {resp.json()}"
+            )
+            time.sleep(1)
+        assert self.proc.returncode is None, "TiKV server is not running but should be"
+        assert (
+            self.proc.returncode is None
+        ), "TiKV pd server is not running but should be"
+
 
 TIKV_VERSION = "v5.3.1"
 
@@ -223,16 +242,7 @@ def tikvd():
 
     server = TiKVd(debug=True)
     server.start()
-
-    for i in range(100):
-        resp = requests.get(f"http://{server.host}:{server.pd_port}/pd/api/v1/stores")
-        if (
-            resp.status_code == 200
-            and resp.json()["stores"][0]["store"]["state_name"] == "Up"
-        ):
-            break
-        logger.info(f"Waiting for tikv to startup({resp.status_code}): {resp.json()}")
-        time.sleep(1)
+    server.wait_for_health()
 
     print("Started TiKVd")
 
