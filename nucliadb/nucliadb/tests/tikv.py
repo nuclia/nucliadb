@@ -201,7 +201,7 @@ class TiKVd(object):
                     resp.status_code == 200
                     and resp.json()["stores"][0]["store"]["state_name"] == "Up"
                 ):
-                    break
+                    return
                 print(f"Waiting for tikv to startup({resp.status_code}): {resp.text}")
             except requests.exceptions.ConnectionError:  # noqa
                 ...
