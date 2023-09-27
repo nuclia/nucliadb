@@ -21,7 +21,6 @@
 mod common;
 
 use std::collections::HashMap;
-use std::time::SystemTime;
 
 use common::{node_reader, node_writer, resources, TestNodeReader, TestNodeWriter};
 use itertools::Itertools;
@@ -31,21 +30,11 @@ use nucliadb_core::protos::{
 use tonic::Request;
 
 #[tokio::test]
-async fn test_suggest_paragraphs_and_entities() -> Result<(), Box<dyn std::error::Error>> {
-    let start = SystemTime::now();
-
+async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = node_writer().await;
     let mut reader = node_reader().await;
 
-    println!("Node clients: {:?}", start.elapsed().unwrap());
-
     let shard = create_suggest_shard(&mut writer).await;
-
-    println!("Create shard and resources: {:?}", start.elapsed().unwrap());
-
-    // --------------------------------------------------------------
-    // Test: suggest paragraphs
-    // --------------------------------------------------------------
 
     // exact match
     expect_paragraphs(
@@ -96,11 +85,15 @@ async fn test_suggest_paragraphs_and_entities() -> Result<(), Box<dyn std::error
 
     // TODO: add metadata language and filter by it
 
-    println!("After paragraph suggests: {:?}", start.elapsed().unwrap());
+    Ok(())
+}
 
-    // --------------------------------------------------------------
-    // Test: suggest entities
-    // --------------------------------------------------------------
+#[tokio::test]
+async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = node_writer().await;
+    let mut reader = node_reader().await;
+
+    let shard = create_suggest_shard(&mut writer).await;
 
     // basic suggests
     expect_entities(
@@ -147,8 +140,6 @@ async fn test_suggest_paragraphs_and_entities() -> Result<(), Box<dyn std::error
     assert_eq!(response.entities.as_ref().unwrap().total, 2);
     assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
     assert!(response.entities.as_ref().unwrap().entities[1] == *"Israel");
-
-    println!("Last suggest: {:?}", start.elapsed().unwrap());
 
     Ok(())
 }
