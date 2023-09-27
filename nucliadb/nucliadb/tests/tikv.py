@@ -61,7 +61,7 @@ class TiKVd(object):
     def start(self):
         self._start()
 
-        endpoint = "localhost:{port}".format(port=self.port)
+        endpoint = f"{self.host}:{self.port}"
         retries = 0
         while True:
             if retries > 100:
@@ -82,13 +82,15 @@ class TiKVd(object):
             f"{self.path}/{self.pd_bin_name}",
             "--name=pd",
             f"--data-dir={self.tmpfolder.name}",
-            f"--client-urls=http://{self.host}:{self.pd_port}",
-            f"--peer-urls=http://{self.host}:{self.peer_port}",
+            f"--client-urls=http://0.0.0.0:{self.pd_port}",
+            f"--advertise-client-urls=http://{self.host}:{self.pd_port}",
+            f"--peer-urls=http://0.0.0.0:{self.peer_port}",
+            f"--advertise-peer-urls=http://{self.host}:{self.peer_port}",
             f"--initial-cluster=pd=http://{self.host}:{self.peer_port}",
         ]
-        logger.warning(f'Running command {" ".join(cmd)}')
 
         if self.debug:
+            print(f'Running command {" ".join(cmd)}')
             self.proc = subprocess.Popen(cmd)
         else:
             self.proc = subprocess.Popen(
@@ -107,18 +109,18 @@ class TiKVd(object):
                     % self.pd_port
                 )
 
-        self.wait_for_health()
+        time.sleep(1)
         cmd = [
             f"{self.path}/{self.tikv_bin_name}",
             f"--pd-endpoints={self.host}:{self.pd_port}",
             f"--addr=0.0.0.0:{self.port}",
+            f"--advertise-addr={self.host}:{self.port}",
             f"--data-dir={self.tmpfolder.name}/tikv1",
             f"--log-file={self.tmpfolder.name}/tikv1.log",
         ]
 
-        logger.warning(f'Running command {" ".join(cmd)}')
-
         if self.debug:
+            print(f'Running command {" ".join(cmd)}')
             self.proc2 = subprocess.Popen(cmd)
         else:
             self.proc2 = subprocess.Popen(
@@ -128,13 +130,11 @@ class TiKVd(object):
         if self.debug:
             if self.proc2 is None:
                 print(
-                    "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
-                    % self.port
+                    f"[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port {self.port} started."
                 )
             else:
                 print(
-                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
-                    % self.port
+                    f"[\033[0;33mDEBUG\033[0;0m] Server listening on port {self.port} started in {self.tmpfolder.name}"
                 )
 
         return self.proc
@@ -201,11 +201,7 @@ class TiKVd(object):
                     and resp.json()["stores"][0]["store"]["state_name"] == "Up"
                 ):
                     break
-                if resp.status_code == 503 and resp.text.strip() == "no leader":
-                    break
-                logger.info(
-                    f"Waiting for tikv to startup({resp.status_code}): {resp.text}"
-                )
+                print(f"Waiting for tikv to startup({resp.status_code}): {resp.text}")
             except requests.exceptions.ConnectionError:  # noqa
                 ...
             finally:
