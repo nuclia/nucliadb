@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 import os
 import platform
 import signal
@@ -30,6 +31,8 @@ import pytest
 import requests
 from tikv_client import TransactionClient  # type: ignore
 
+logger = logging.getLogger(__name__)
+
 
 class TiKVd(object):
     def __init__(
@@ -40,7 +43,7 @@ class TiKVd(object):
         tikv_bin_name="tikv-server",
         pd_bin_name="pd-server",
         host="127.0.0.1",
-        path="",
+        path=None,
         debug=False,
     ):
         self.port = port
@@ -48,7 +51,7 @@ class TiKVd(object):
         self.peer_port = peer_port
         self.tikv_bin_name = tikv_bin_name
         self.pd_bin_name = pd_bin_name
-        self.path = path
+        self.path = path or os.getcwd()
         self.host = host
         self.tmpfolder = None
         self.debug = debug
@@ -83,6 +86,8 @@ class TiKVd(object):
             f"--log-file={self.tmpfolder.name}/tikv1.log",
         ]
 
+        logger.warning(f'Running command {" ".join(cmd)}')
+
         if self.debug:
             self.proc2 = subprocess.Popen(cmd)
         else:
@@ -109,6 +114,7 @@ class TiKVd(object):
             f"--peer-urls=http://{self.host}:{self.peer_port}",
             f"--initial-cluster=pd=http://{self.host}:{self.peer_port}",
         ]
+        logger.warning(f'Running command {" ".join(cmd)}')
 
         if self.debug:
             self.proc = subprocess.Popen(cmd)
@@ -178,47 +184,45 @@ class TiKVd(object):
             self.tmpfolder = None
 
 
+TIKV_VERSION = "v5.3.1"
+
+
 @pytest.fixture(scope="session")
 def tikvd():
     if not os.path.isfile("tikv-server"):
-        version = "v5.3.1"
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"
         system = platform.system().lower()
 
+        logger.warning("Downloading tikv-server")
         resp = requests.get(
-            f"https://tiup-mirrors.pingcap.com/tikv-{version}-{system}-{arch}.tar.gz"
+            f"https://tiup-mirrors.pingcap.com/tikv-{TIKV_VERSION}-{system}-{arch}.tar.gz"
         )
 
         zipfile = tarfile.open(fileobj=BytesIO(resp.content), mode="r:gz")
 
-        zipfile.extract(f"tikv-server")
+        zipfile.extract("tikv-server")
         os.chmod("tikv-server", 755)
 
     if not os.path.isfile("pd-server"):
-        version = "v5.3.1"
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"
         system = platform.system().lower()
 
+        logger.warning("Downloading pd-server")
         resp = requests.get(
-            f"https://tiup-mirrors.pingcap.com/pd-{version}-{system}-{arch}.tar.gz"
+            f"https://tiup-mirrors.pingcap.com/pd-{TIKV_VERSION}-{system}-{arch}.tar.gz"
         )
 
         zipfile = tarfile.open(fileobj=BytesIO(resp.content), mode="r:gz")
 
-        zipfile.extract(f"pd-server")
+        zipfile.extract("pd-server")
         os.chmod("pd-server", 755)
 
     server = TiKVd(debug=True)
-    server.tikv_bin_name = "tikv-server"
-    server.pd_bin_name = "pd-server"
-    server.path = os.getcwd()
-
     server.start()
-    print("Started TiKVd")
 
     for i in range(100):
         resp = requests.get(f"http://{server.host}:{server.pd_port}/pd/api/v1/stores")
@@ -227,9 +231,10 @@ def tikvd():
             and resp.json()["stores"][0]["store"]["state_name"] == "Up"
         ):
             break
-        print(resp.status_code)
-        print(resp.json())
+        logger.info(f"Waiting for tikv to startup({resp.status_code}): {resp.json()}")
         time.sleep(1)
+
+    print("Started TiKVd")
 
     yield server
     server.stop()
