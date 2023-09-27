@@ -42,7 +42,7 @@ async def start_train_grpc(service_name: Optional[str] = None):
     if actual_service is not None:
         return
 
-    aio.init_grpc_aio()
+    aio.init_grpc_aio()  # type: ignore
 
     await setup_telemetry(service_name or "train")
     server = get_traced_grpc_server(service_name or "train")

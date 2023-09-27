@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import List, Optional, Union
 
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
@@ -44,14 +45,14 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
 FIND_EXAMPLES = {
-    "find_hybrid_search": {
-        "summary": "Do a hybrid search on a Knowledge Box",
-        "description": "Perform a hybrid search that will return text and semantic results matching the query",
-        "value": {
+    "find_hybrid_search": Example(
+        summary="Do a hybrid search on a Knowledge Box",
+        description="Perform a hybrid search that will return text and semantic results matching the query",
+        value={
             "query": "How can I be an effective product manager?",
             "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
         },
-    }
+    )
 }
 
 
@@ -166,7 +167,7 @@ async def find_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: FindRequest = Body(examples=FIND_EXAMPLES),
+    item: FindRequest = Body(openapi_examples=FIND_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),

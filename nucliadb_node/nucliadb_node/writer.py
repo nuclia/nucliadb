@@ -45,7 +45,7 @@ class Writer:
         self.channel = get_traced_grpc_channel(
             grpc_writer_address, SERVICE_NAME, max_send_message=250
         )
-        self.stub = NodeWriterStub(self.channel)
+        self.stub = NodeWriterStub(self.channel)  # type: ignore
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb)  # type: ignore

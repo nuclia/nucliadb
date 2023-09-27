@@ -67,7 +67,7 @@ class IndexNode(AbstractIndexNode):
                 channel = get_traced_grpc_channel(
                     grpc_address, SERVICE_NAME, variant="_sidecar"
                 )
-                SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)
+                SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)  # type: ignore
             else:
                 SIDECAR_CONNECTIONS[self.address] = DummySidecarStub()
             self._sidecar = SIDECAR_CONNECTIONS[self.address]
@@ -83,7 +83,7 @@ class IndexNode(AbstractIndexNode):
                 channel = get_traced_grpc_channel(
                     grpc_address, SERVICE_NAME, variant="_writer"
                 )
-                WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
+                WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)  # type: ignore
             else:
                 WRITE_CONNECTIONS[self.address] = DummyWriterStub()
             self._writer = WRITE_CONNECTIONS[self.address]
@@ -99,7 +99,7 @@ class IndexNode(AbstractIndexNode):
                 channel = get_traced_grpc_channel(
                     grpc_address, SERVICE_NAME, variant="_reader"
                 )
-                READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
+                READ_CONNECTIONS[self.address] = NodeReaderStub(channel)  # type: ignore
             else:
                 READ_CONNECTIONS[self.address] = DummyReaderStub()
             self._reader = READ_CONNECTIONS[self.address]

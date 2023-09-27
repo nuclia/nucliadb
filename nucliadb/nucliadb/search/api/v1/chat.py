@@ -22,6 +22,7 @@ from typing import Optional, Union
 
 import pydantic
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
@@ -53,13 +54,13 @@ class SyncChatResponse(pydantic.BaseModel):
 
 
 CHAT_EXAMPLES = {
-    "search_and_chat": {
-        "summary": "Ask who won the league final",
-        "description": "You can ask a question to your knowledge box",  # noqa
-        "value": {
+    "search_and_chat": Example(
+        summary="Ask who won the league final",
+        description="You can ask a question to your knowledge box",  # noqa
+        value={
             "query": "Who won the league final?",
         },
-    },
+    ),
 }
 
 
@@ -77,7 +78,7 @@ CHAT_EXAMPLES = {
 async def chat_knowledgebox_endpoint(
     request: Request,
     kbid: str,
-    item: ChatRequest = Body(examples=CHAT_EXAMPLES),
+    item: ChatRequest = Body(openapi_examples=CHAT_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
