@@ -2,7 +2,6 @@ name: nucliadb (py)
 env:
   COMPONENT: nucliadb
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
-  TESTING_TIKV_LOCAL: "true"
 permissions:
   contents: write
 on:
@@ -45,14 +44,6 @@ jobs:
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
-
-      - name: Install tikv
-        if: matrix.maindb_driver == 'tikv'
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
-          source /home/runner/.profile
-          tiup playground 5.3.1 --mode tikv-slim --without-monitor &
-          ./scripts/wait-for-service.sh 2379
 
       - uses: dorny/paths-filter@v2
         id: filter

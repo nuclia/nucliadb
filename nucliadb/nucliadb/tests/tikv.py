@@ -180,10 +180,6 @@ class TiKVd(object):
 
 @pytest.fixture(scope="session")
 def tikvd():
-    if os.environ.get("TESTING_TIKV_LOCAL", None):
-        yield "localhost", "XX", "2379"
-        return
-
     if not os.path.isfile("tikv-server"):
         version = "v5.3.1"
         arch = platform.machine()

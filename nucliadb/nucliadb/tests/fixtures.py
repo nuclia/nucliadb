@@ -433,7 +433,7 @@ async def redis_config(redis):
     ingest_settings.driver_redis_url = None
     ingest_settings.driver = default_driver
     await driver.flushall()
-    await driver.close(close_connection_pool=True)
+    await driver.aclose(close_connection_pool=True)
 
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is not None:
@@ -467,10 +467,7 @@ async def local_driver(local_driver_settings) -> AsyncIterator[Driver]:
 
 @pytest.fixture(scope="function")
 def tikv_driver_settings(tikvd):
-    if os.environ.get("TESTING_TIKV_LOCAL", None):
-        url = "localhost:2379"
-    else:
-        url = f"{tikvd.host}:{tikvd.pd_port}"
+    url = f"{tikvd.host}:{tikvd.pd_port}"
     return DriverSettings(driver=DriverConfig.TIKV, driver_tikv_url=[url])
 
 
