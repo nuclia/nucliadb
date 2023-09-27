@@ -20,121 +20,205 @@
 
 mod common;
 
-use common::resources::minimal_resource;
-use common::{node_reader, node_writer, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::relation::RelationType;
-use nucliadb_core::protos::relation_node::NodeType;
+use std::collections::HashMap;
+use std::time::SystemTime;
+
+use common::{node_reader, node_writer, resources, TestNodeReader, TestNodeWriter};
+use itertools::Itertools;
 use nucliadb_core::protos::{
-    op_status, NewShardRequest, Relation, RelationNode, Resource, SuggestFeatures, SuggestRequest,
-    SuggestResponse, TextInformation,
+    op_status, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
 };
 use tonic::Request;
 
 #[tokio::test]
-async fn test_suggest() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_suggest_paragraphs_and_entities() -> Result<(), Box<dyn std::error::Error>> {
+    let start = SystemTime::now();
+
     let mut writer = node_writer().await;
     let mut reader = node_reader().await;
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest::default()))
-        .await?;
-    let shard_id = &new_shard_response.get_ref().id;
+    println!("Node clients: {:?}", start.elapsed().unwrap());
 
-    create_test_resources(&mut writer, shard_id.clone()).await;
+    let shard = create_suggest_shard(&mut writer).await;
+
+    println!("Create shard and resources: {:?}", start.elapsed().unwrap());
 
     // --------------------------------------------------------------
     // Test: suggest paragraphs
     // --------------------------------------------------------------
 
-    // let response = suggest_paragraphs(&mut reader, shard_id, "Nietzche").await;
-    // println!("Response: {:#?}", response);
+    // exact match
+    expect_paragraphs(
+        &suggest_paragraphs(&mut reader, &shard.id, "Nietzche").await,
+        &[(&shard.resources["zarathustra"], "/a/summary")],
+    );
+    expect_paragraphs(
+        &suggest_paragraphs(&mut reader, &shard.id, "story").await,
+        &[(&shard.resources["little prince"], "/a/summary")],
+    );
+
+    // typo tolerant search
+    expect_paragraphs(
+        &suggest_paragraphs(&mut reader, &shard.id, "princes").await,
+        &[
+            (&shard.resources["little prince"], "/a/title"),
+            (&shard.resources["little prince"], "/a/summary"),
+        ],
+    );
+
+    // fuzzy search with distance 1 will only match 'a' from resource 2
+    expect_paragraphs(
+        &suggest_paragraphs(&mut reader, &shard.id, "z").await,
+        &[(&shard.resources["little prince"], "/a/summary")],
+    );
+
+    // nonexistent term
+    expect_paragraphs(
+        &suggest_paragraphs(&mut reader, &shard.id, "Hanna Adrent").await,
+        &[],
+    );
+
+    // filter by field
+    let response = reader
+        .suggest(Request::new(SuggestRequest {
+            shard: shard.id.clone(),
+            body: "prince".to_string(),
+            fields: vec!["a/title".to_string()],
+            features: vec![SuggestFeatures::Paragraph as i32],
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(response.total, 1);
+    assert_eq!(response.results[0].uuid, shard.resources["little prince"]);
+    assert!(&response.results[0].field == "/a/title");
+
+    // TODO: add metadata language and filter by it
+
+    println!("After paragraph suggests: {:?}", start.elapsed().unwrap());
 
     // --------------------------------------------------------------
-    // Test: suggest entities - basic suggests
+    // Test: suggest entities
     // --------------------------------------------------------------
 
+    // basic suggests
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "An").await,
+        &suggest_entities(&mut reader, &shard.id, "An").await,
         &["Anastasia", "Anna", "Anthony"],
     );
 
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "ann").await,
+        &suggest_entities(&mut reader, &shard.id, "ann").await,
         &["Anna"],
     );
 
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "jo").await,
+        &suggest_entities(&mut reader, &shard.id, "jo").await,
         &["John"],
     );
 
-    expect_entities(suggest_entities(&mut reader, shard_id, "any").await, &[]);
+    expect_entities(&suggest_entities(&mut reader, &shard.id, "any").await, &[]);
 
-    // --------------------------------------------------------------
-    // Test: suggest entities - validate tokenization
-    // --------------------------------------------------------------
+    // validate tokenization
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "bar").await,
+        &suggest_entities(&mut reader, &shard.id, "bar").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "BAR").await,
+        &suggest_entities(&mut reader, &shard.id, "BAR").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "BÄR").await,
+        &suggest_entities(&mut reader, &shard.id, "BÄR").await,
         &["Barcelona", "Bárcenas"],
     );
 
     expect_entities(
-        suggest_entities(&mut reader, shard_id, "BáR").await,
+        &suggest_entities(&mut reader, &shard.id, "BáR").await,
         &["Barcelona", "Bárcenas"],
     );
 
-    // --------------------------------------------------------------
-    // Test: suggest entities - multiple words and result ordering
-    // --------------------------------------------------------------
-
-    let response = suggest_entities(&mut reader, shard_id, "Solomon Is").await;
+    // multiple words and result ordering
+    let response = suggest_entities(&mut reader, &shard.id, "Solomon Is").await;
     assert!(response.entities.is_some());
     assert_eq!(response.entities.as_ref().unwrap().total, 2);
     assert!(response.entities.as_ref().unwrap().entities[0] == *"Solomon Islands");
     assert!(response.entities.as_ref().unwrap().entities[1] == *"Israel");
 
+    println!("Last suggest: {:?}", start.elapsed().unwrap());
+
     Ok(())
 }
 
-async fn suggest_entities(
-    reader: &mut TestNodeReader,
-    shard_id: impl Into<String>,
-    query: impl Into<String>,
-) -> SuggestResponse {
-    let request = Request::new(SuggestRequest {
-        shard: shard_id.into(),
-        body: query.into(),
-        features: vec![SuggestFeatures::Entities as i32],
-        ..Default::default()
-    });
-    let response = reader.suggest(request).await.unwrap();
-    response.into_inner()
+#[tokio::test]
+async fn test_suggest_features() -> Result<(), Box<dyn std::error::Error>> {
+    // Test: search for "an" with paragraph and entities features and validate
+    // we search only for what we request.
+    //
+    // "an" should match entities starting with this prefix and the "and" word
+    // from the little prince text
+
+    let mut writer = node_writer().await;
+    let mut reader = node_reader().await;
+
+    let shard = create_suggest_shard(&mut writer).await;
+
+    let response = suggest_paragraphs(&mut reader, &shard.id, "an").await;
+    assert!(response.entities.is_none());
+    expect_paragraphs(
+        &response,
+        &[(&shard.resources["little prince"], "/a/summary")],
+    );
+
+    let response = suggest_entities(&mut reader, &shard.id, "an").await;
+    assert_eq!(response.total, 0);
+    assert!(response.results.is_empty());
+    expect_entities(&response, &["Anastasia", "Anna", "Anthony"]);
+
+    Ok(())
 }
 
-fn expect_entities(response: SuggestResponse, expected: &[&str]) {
-    assert!(response.entities.is_some());
-    assert_eq!(
-        response.entities.as_ref().unwrap().total as usize,
-        expected.len()
-    );
-    for entity in expected {
-        assert!(response
-            .entities
-            .as_ref()
-            .unwrap()
-            .entities
-            .contains(&entity.to_string()));
+struct ShardDetails<'a> {
+    id: String,
+    resources: HashMap<&'a str, String>,
+}
+
+async fn create_suggest_shard(writer: &mut TestNodeWriter) -> ShardDetails {
+    let request = Request::new(NewShardRequest::default());
+    let new_shard_response = writer
+        .new_shard(request)
+        .await
+        .expect("Unable to create new shard");
+    let shard_id = &new_shard_response.get_ref().id;
+    let resource_uuids = create_test_resources(writer, shard_id.clone()).await;
+    ShardDetails {
+        id: shard_id.to_owned(),
+        resources: resource_uuids,
     }
+}
+
+async fn create_test_resources(
+    writer: &mut TestNodeWriter,
+    shard_id: String,
+) -> HashMap<&str, String> {
+    let resources = [
+        ("little prince", resources::little_prince(&shard_id)),
+        ("zarathustra", resources::thus_spoke_zarathustra(&shard_id)),
+        ("pap", resources::people_and_places(&shard_id)),
+    ];
+    let mut resource_uuids = HashMap::new();
+
+    for (name, resource) in resources.into_iter() {
+        resource_uuids.insert(name, resource.resource.as_ref().unwrap().uuid.clone());
+        let request = Request::new(resource);
+        let response = writer.set_resource(request).await.unwrap();
+        assert_eq!(response.get_ref().status, op_status::Status::Ok as i32);
+    }
+
+    resource_uuids
 }
 
 async fn suggest_paragraphs(
@@ -152,149 +236,48 @@ async fn suggest_paragraphs(
     response.into_inner()
 }
 
-async fn create_test_resources(writer: &mut TestNodeWriter, shard_id: String) {
-    let resources = [
-        resource_with_little_prince(shard_id.clone()),
-        resource_with_zarathustra(shard_id.clone()),
-        resource_with_entities(shard_id.clone()),
-    ];
+fn expect_paragraphs(response: &SuggestResponse, expected: &[(&str, &str)]) {
+    assert_eq!(response.total as usize, expected.len());
 
-    for resource in resources.into_iter() {
-        let request = Request::new(resource);
-        let response = writer.set_resource(request).await.unwrap();
-        assert_eq!(response.get_ref().status, op_status::Status::Ok as i32);
-    }
+    let results = response
+        .results
+        .iter()
+        .map(|result| (result.uuid.as_str(), result.field.as_str()))
+        .sorted();
+    results
+        .zip(expected.iter().sorted())
+        .for_each(|(item, expected)| {
+            assert_eq!(item, *expected, "\nfailed assert for \n'{:#?}'", response)
+        });
 }
 
-fn resource_with_little_prince(shard_id: String) -> Resource {
-    let mut resource = minimal_resource(shard_id);
-
-    resource.texts.insert(
-        format!("{}/title", resource.resource.as_ref().unwrap().uuid),
-        TextInformation {
-            text: "The little prince".to_string(),
-            ..Default::default()
-        },
-    );
-
-    resource.texts.insert(
-        format!("{}/summary", resource.resource.as_ref().unwrap().uuid),
-        TextInformation {
-            text: "The story follows a young prince who visits various planets in space, \
-                   including Earth, and addresses themes of loneliness, friendship, love, and \
-                   loss."
-                .to_string(),
-            ..Default::default()
-        },
-    );
-
-    resource
+async fn suggest_entities(
+    reader: &mut TestNodeReader,
+    shard_id: impl Into<String>,
+    query: impl Into<String>,
+) -> SuggestResponse {
+    let request = Request::new(SuggestRequest {
+        shard: shard_id.into(),
+        body: query.into(),
+        features: vec![SuggestFeatures::Entities as i32],
+        ..Default::default()
+    });
+    let response = reader.suggest(request).await.unwrap();
+    response.into_inner()
 }
 
-fn resource_with_zarathustra(shard_id: String) -> Resource {
-    let mut resource = minimal_resource(shard_id);
-
-    resource.texts.insert(
-        format!("{}/title", resource.resource.as_ref().unwrap().uuid),
-        TextInformation {
-            text: "Thus Spoke Zarathustra".to_string(),
-            ..Default::default()
-        },
+fn expect_entities(response: &SuggestResponse, expected: &[&str]) {
+    assert!(response.entities.is_some());
+    assert_eq!(
+        response.entities.as_ref().unwrap().total as usize,
+        expected.len()
     );
-
-    resource.texts.insert(
-        format!("{}/summary", resource.resource.as_ref().unwrap().uuid),
-        TextInformation {
-            text: "Philosophical book written by Frederich Nietzche".to_string(),
-            ..Default::default()
-        },
-    );
-
-    resource
-}
-
-fn resource_with_entities(shard_id: String) -> Resource {
-    let mut resource = minimal_resource(shard_id);
-
-    resource.texts.insert(
-        format!("{}/title", resource.resource.as_ref().unwrap().uuid),
-        TextInformation {
-            text: "People and places".to_string(),
-            ..Default::default()
-        },
-    );
-    resource.texts.insert(
-        format!("{}/summary", resource.resource.as_ref().unwrap().uuid),
-        TextInformation {
-            text: "Test entities to validate suggest on relations index".to_string(),
-            ..Default::default()
-        },
-    );
-
-    add_entities(&mut resource);
-
-    resource
-}
-
-fn add_entities(resource: &mut Resource) {
-    let resource_node = RelationNode {
-        value: resource
-            .resource
+    for entity in expected {
+        assert!(response
+            .entities
             .as_ref()
-            .expect("Minimal resource")
-            .uuid
-            .clone(),
-        ntype: NodeType::Resource as i32,
-        subtype: String::new(),
-    };
-
-    let collaborators = ["Anastasia", "Irene"]
-        .into_iter()
-        .map(|collaborator| RelationNode {
-            value: collaborator.to_string(),
-            ntype: NodeType::User as i32,
-            subtype: "".to_string(),
-        });
-
-    let people = ["Anna", "Anthony", "Bárcenas", "Ben", "John"]
-        .into_iter()
-        .map(|person| RelationNode {
-            value: person.to_string(),
-            ntype: NodeType::Entity as i32,
-            subtype: "person".to_string(),
-        });
-
-    let cities = ["Barcelona", "New York", "York"]
-        .into_iter()
-        .map(|city| RelationNode {
-            value: city.to_string(),
-            ntype: NodeType::Entity as i32,
-            subtype: "city".to_string(),
-        });
-
-    let countries = ["Israel", "Netherlands", "Solomon Islands"]
-        .into_iter()
-        .map(|country| RelationNode {
-            value: country.to_string(),
-            ntype: NodeType::Entity as i32,
-            subtype: "country".to_string(),
-        });
-
-    let entities = people.chain(cities).chain(countries);
-
-    let mut relations = vec![];
-    relations.extend(collaborators.map(|node| Relation {
-        relation: RelationType::Colab as i32,
-        source: Some(resource_node.clone()),
-        to: Some(node),
-        ..Default::default()
-    }));
-    relations.extend(entities.map(|node| Relation {
-        relation: RelationType::Entity as i32,
-        source: Some(resource_node.clone()),
-        to: Some(node),
-        ..Default::default()
-    }));
-
-    resource.relations.extend(relations);
+            .unwrap()
+            .entities
+            .contains(&entity.to_string()));
+    }
 }
