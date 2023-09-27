@@ -191,7 +191,7 @@ class TiKVd(object):
             self.tmpfolder = None
 
     def wait_for_health(self):
-        for _ in range(100):
+        for _ in range(30):
             try:
                 resp = requests.get(
                     f"http://{self.host}:{self.pd_port}/pd/api/v1/stores"
@@ -206,12 +206,11 @@ class TiKVd(object):
                 ...
             finally:
                 time.sleep(1)
-        if self.proc is not None:
-            assert self.proc.returncode is None, "TiKV pd is not running but should be"
-        if self.proc2 is not None:
-            assert (
-                self.proc2.returncode is None
-            ), "TiKV server is not running but should be"
+
+        with open(f"{self.tmpfolder.name}/tikv1.log", 'r') as fi:
+            log_file = fi.read()
+
+        raise Exception(f"TiKV did not start. Logs:\n{log_file}"
 
 
 TIKV_VERSION = "v5.3.1"
