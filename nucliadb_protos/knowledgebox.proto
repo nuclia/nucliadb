@@ -50,6 +50,7 @@ message KnowledgeBoxNew {
     utils.VectorSimilarity similarity = 4;
     optional int32 vector_dimension = 5;
     optional float default_min_score = 6;
+    utils.ReleaseChannel release_channel = 7;
 }
 
 

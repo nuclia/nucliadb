@@ -533,6 +533,7 @@ class Processor:
         config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
         semantic_model: knowledgebox_pb2.SemanticModelMetadata,
         forceuuid: Optional[str] = None,
+        release_channel: Optional[knowledgebox_pb2.ReleaseChannel] = None,
     ) -> str:
         async with self.driver.transaction() as txn:
             try:
@@ -542,6 +543,7 @@ class Processor:
                     semantic_model,
                     uuid=forceuuid,
                     config=config,
+                    release_channel=release_channel,
                 )
                 if failed:
                     raise Exception("Failed to create KB")

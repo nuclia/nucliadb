@@ -59,21 +59,6 @@ CREATION: TypeMessage.ValueType  # 0
 DELETION: TypeMessage.ValueType  # 1
 global___TypeMessage = TypeMessage
 
-class _ReleaseChannel:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
-
-class _ReleaseChannelEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ReleaseChannel.ValueType], builtins.type):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    STABLE: _ReleaseChannel.ValueType  # 0
-    EXPERIMENTAL: _ReleaseChannel.ValueType  # 1
-
-class ReleaseChannel(_ReleaseChannel, metaclass=_ReleaseChannelEnumTypeWrapper): ...
-
-STABLE: ReleaseChannel.ValueType  # 0
-EXPERIMENTAL: ReleaseChannel.ValueType  # 1
-global___ReleaseChannel = ReleaseChannel
-
 @typing_extensions.final
 class OpStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -212,13 +197,13 @@ class NewShardRequest(google.protobuf.message.Message):
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     kbid: builtins.str
-    release_channel: global___ReleaseChannel.ValueType
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         kbid: builtins.str = ...,
-        release_channel: global___ReleaseChannel.ValueType = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "release_channel", b"release_channel", "similarity", b"similarity"]) -> None: ...
 

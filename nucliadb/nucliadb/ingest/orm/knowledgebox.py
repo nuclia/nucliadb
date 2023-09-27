@@ -28,6 +28,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     Labels,
     LabelSet,
+    ReleaseChannel,
     SemanticModelMetadata,
 )
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
@@ -177,6 +178,7 @@ class KnowledgeBox:
         semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
+        release_channel: Optional[ReleaseChannel] = None,
     ) -> Tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
