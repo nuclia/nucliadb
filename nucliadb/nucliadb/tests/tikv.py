@@ -211,7 +211,12 @@ class TiKVd(object):
         with open(f"{self.tmpfolder.name}/tikv1.log", "r") as fi:
             log_file = fi.read()
 
-        raise Exception(f"TiKV did not start. Logs:\n{log_file}")
+        try:
+            self.stop()
+        except Exception:
+            ...
+        print(f"TiKV did not start in time. Logs:\n{log_file}")
+        raise Exception("TiKV did not start in time.")
 
 
 TIKV_VERSION = "v5.3.1"
