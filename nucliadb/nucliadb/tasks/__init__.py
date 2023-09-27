@@ -20,7 +20,11 @@
 import asyncio
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb.tasks.exceptions import TaskCancelled, TaskErrored, TaskNotFoundError
+from nucliadb.tasks.exceptions import (  # noqa
+    TaskCancelled,
+    TaskErrored,
+    TaskNotFoundError,
+)
 
 from .consumer import NatsTaskConsumer, create_consumer
 from .datamanager import TasksDataManager
@@ -68,7 +72,11 @@ async def get_producer(task_name: str, context: ApplicationContext) -> NatsTaskP
 
 
 async def wait_for_task(
-    kbid: str, task_id: str, context: ApplicationContext, max_wait: int = 100
+    kbid: str,
+    task_id: str,
+    context: ApplicationContext,
+    max_wait: int = 30,
+    wait_interval: int = 1,
 ):
     """
     Waits for the given task to finish, or raises an exception if it fails.
@@ -76,17 +84,13 @@ async def wait_for_task(
     finished = False
     dm = TasksDataManager(context.kv_driver)
     for _ in range(max_wait):
-        try:
-            task = await dm.get_task(kbid, task_id)
-        except TaskNotFoundError:
-            await asyncio.sleep(1)
-            continue
+        task = await dm.get_task(kbid, task_id)
         if task.status == "cancelled":
             raise TaskCancelled()
         if task.status == "errored":
             raise TaskErrored()
         if task.status != "finished":
-            await asyncio.sleep(1)
+            await asyncio.sleep(wait_interval)
             continue
         finished = True
         break
