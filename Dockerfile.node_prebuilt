@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 ENV DATA_PATH=data
 ENV RUST_LOG=nucliadb_node=DEBUG
@@ -11,6 +11,7 @@ RUN apt-get -y update \
     lmdb-utils \
     libdw-dev \
     libssl-dev \
+    libc6  \
     build-essential && \
     /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh && rm -rf /var/lib/apt/lists/*
 
