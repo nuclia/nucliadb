@@ -94,10 +94,6 @@ class ChatResponse(BaseModel):
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 
 
-def export_response_parser(response: httpx.Response) -> Iterator[bytes]:
-    return response.iter_bytes()
-
-
 def chat_response_parser(response: httpx.Response) -> ChatResponse:
     raw = io.BytesIO(response.content)
     header = raw.read(4)
@@ -167,6 +163,7 @@ def _request_builder(
             Callable[[httpx.Response], Iterator[bytes]],
         ]
     ],
+    stream_response: bool = False,
     docstring: Optional[docstrings.Docstring] = None,
 ):
     def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
@@ -203,19 +200,24 @@ def _request_builder(
         if len(kwargs) > 0:
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
-        resp = self._request(
-            path, method, data=data, query_params=query_params, content=raw_content
-        )
+        if not stream_response:
+            resp = self._request(
+                path, method, data=data, query_params=query_params, content=raw_content
+            )
+            if asyncio.iscoroutine(resp):
 
-        if asyncio.iscoroutine(resp):
+                async def _wrapped_resp():
+                    real_resp = await resp
+                    return _parse_response(response_type, real_resp)
 
-            async def _wrapped_resp():
-                real_resp = await resp
-                return _parse_response(response_type, real_resp)
-
-            return _wrapped_resp()
+                return _wrapped_resp()
+            else:
+                return _parse_response(response_type, resp)
         else:
-            return _parse_response(response_type, resp)
+            resp = self._stream_request(
+                path, method, data=data, query_params=query_params
+            )
+            return resp
 
     docstrings.inject_documentation(
         _func,
@@ -263,6 +265,15 @@ class _NucliaDBBase:
         self.headers = headers
 
     def _request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[Dict[str, str]] = None,
+    ):
+        raise NotImplementedError
+
+    def _stream_request(
         self,
         path,
         method: str,
@@ -605,7 +616,8 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "export_id"),
         request_type=None,
-        response_type=export_response_parser,
+        response_type=None,
+        stream_response=True,
     )
 
     start_import = _request_builder(
@@ -698,6 +710,28 @@ class NucliaDB(_NucliaDBBase):
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
+    def _stream_request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[Dict[str, str]] = None,
+    ):
+        url = f"{self.base_url}{path}"
+        opts: Dict[str, Any] = {}
+        if data is not None:
+            opts["data"] = data
+        if query_params is not None:
+            opts["params"] = query_params
+
+        def iter_bytes(chunk_size=None):
+            with self.session.stream(method.lower(), url=url, **opts) as response:
+                self._check_response(response)
+                for chunk in response.iter_raw(chunk_size=chunk_size):
+                    yield chunk
+
+        return iter_bytes
+
 
 class NucliaDBAsync(_NucliaDBBase):
     """
@@ -767,3 +801,25 @@ class NucliaDBAsync(_NucliaDBBase):
         )
         self._check_response(response)
         return response
+
+    def _stream_request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[Dict[str, str]] = None,
+    ):
+        url = f"{self.base_url}{path}"
+        opts: Dict[str, Any] = {}
+        if data is not None:
+            opts["data"] = data
+        if query_params is not None:
+            opts["params"] = query_params
+
+        async def iter_bytes(chunk_size=None):
+            with self.session.stream(method.lower(), url=url, **opts) as response:
+                self._check_response(response)
+                async for chunk in response.aiter_raw(chunk_size=chunk_size):
+                    yield chunk
+
+        return iter_bytes

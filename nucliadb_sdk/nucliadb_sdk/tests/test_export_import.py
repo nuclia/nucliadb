@@ -47,7 +47,7 @@ def test_export_import_kb(src_kbid, dst_kbid, sdk: nucliadb_sdk.NucliaDB):
     export_generator = sdk.download_export(kbid=src_kbid, export_id=export_id)
 
     # Import to dst kb
-    resp = sdk.start_import(kbid=dst_kbid, content=export_generator)
+    resp = sdk.start_import(kbid=dst_kbid, content=export_generator(chunk_size=1024))
     import_id = resp.import_id
     assert sdk.import_status(kbid=dst_kbid, import_id=import_id).status == "finished"
 
