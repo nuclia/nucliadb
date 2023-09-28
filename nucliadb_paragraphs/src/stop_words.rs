@@ -17,25 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::env;
 
 use lazy_static::lazy_static;
-use lingua::Language::English;
-use lingua::{Language, LanguageDetector, LanguageDetectorBuilder};
 use serde_json;
 
 lazy_static! {
-    static ref LANGUAGE_DETECTOR: LanguageDetector = build_language_detector();
     static ref STOP_WORDS: StopWords = build_stop_words();
-}
-
-/// Builds a language detector
-#[inline]
-fn build_language_detector() -> LanguageDetector {
-    LanguageDetectorBuilder::from_all_spoken_languages()
-        .with_preloaded_language_models()
-        .build()
 }
 
 #[inline]
@@ -54,14 +43,14 @@ fn build_stop_words() -> StopWords {
 }
 
 struct StopWords {
-    map: HashMap<String, HashSet<String>>,
+    words: HashSet<String>,
 }
 
 /// HashMap with the stop words for each language
 impl StopWords {
     fn new() -> StopWords {
         StopWords {
-            map: HashMap::new(),
+            words: HashSet::new(),
         }
     }
 
@@ -69,16 +58,13 @@ impl StopWords {
     fn load_language(&mut self, language_code: &str, json_data: &str) -> Result<(), String> {
         let stop_words: HashSet<String> = serde_json::from_str(json_data)
             .map_err(|err| format!("Error parsing stop words for {}: {}", language_code, err))?;
-        self.map.insert(language_code.to_string(), stop_words);
+        self.words.extend(stop_words);
         Ok(())
     }
 
     /// Returns true if `word` is a stop word in `language_code`
-    fn is_stop_word(&self, word: &str, language_code: &str) -> bool {
-        if let Some(stop_words) = self.map.get(language_code) {
-            return stop_words.contains(word);
-        }
-        false // Language not found
+    fn is_stop_word(&self, word: &str) -> bool {
+        self.words.contains(word)
     }
 }
 
@@ -102,78 +88,37 @@ static LOADED_LANGUAGES: [[&str; 2]; 8] = [
     ["pt", PT],
 ];
 
-/// Returns the detected language, defaults to English
-pub fn detect_language(query: &str) -> Language {
-    let detected_language: Option<Language> = LANGUAGE_DETECTOR.detect_language_of(query);
-
-    detected_language.unwrap_or(English)
-}
-
 /// Returns `true` if the word is a stop word
-pub fn is_stop_word(x: &str, lang: Option<Language>) -> bool {
-    let lang = lang.unwrap_or(English);
-
-    STOP_WORDS.is_stop_word(x, lang.iso_code_639_1().to_string().as_str())
+pub fn is_stop_word(word: &str) -> bool {
+    STOP_WORDS.is_stop_word(word)
 }
 
 #[cfg(test)]
 mod tests {
-    use lingua::Language;
 
     use super::*;
-
-    #[test]
-    fn it_detects_language() {
-        let tests = [
-            (
-                "nuclia is a database for unstructured data",
-                Language::English,
-            ),
-            ("nuclia is a database for the", Language::English),
-            ("is a for and", Language::English),
-            ("what does stop is?", Language::English),
-            ("", Language::English),
-            (
-                "comment s'appelle le train à grande vitesse",
-                Language::French,
-            ),
-            (
-                "¿Qué significa la palabra sentence en español?",
-                Language::Spanish,
-            ),
-            (
-                "Per què les vaques no són de color rosa?",
-                Language::Catalan,
-            ),
-        ];
-
-        for (query, expected_language) in tests {
-            let detected_language = detect_language(query);
-            assert_eq!(expected_language, detected_language);
-        }
-    }
 
     #[test]
     fn it_finds_stop_words() {
         // cache warm up
         let start_time = std::time::Instant::now();
-        let _ = is_stop_word("detector", Some(Language::English));
+        let _ = is_stop_word("detector");
         let elapsed = start_time.elapsed().as_millis() as f64;
         // make sure we never spend more than 100 ms for the cache warmup
         assert_eq!(elapsed < 100.0, true, "{}", elapsed);
 
         let tests = [
-            ("nuclia", Language::English, false),
-            ("is", Language::English, true),
-            ("le", Language::French, true),
-            ("el", Language::Spanish, true),
-            ("stop", Language::French, false),
-            ("stop", Language::English, false),
+            ("nuclia", false),
+            ("is", true),
+            ("le", true),
+            ("el", true),
+            ("stop", false),
+            ("stop", false),
         ];
 
-        for (word, lang, expected) in tests {
+        for (word, expected) in tests {
             let start_time = std::time::Instant::now();
-            let matches = is_stop_word(word, Some(lang));
+            let matches = is_stop_word(word);
             let elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(matches, expected);
             // make sure we never spend more than 1 ms
