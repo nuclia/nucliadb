@@ -20,7 +20,7 @@
 import asyncio
 
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
@@ -42,10 +42,6 @@ from nucliadb_utils.utilities import (
     stop_partitioning_utility,
     stop_transaction_utility,
 )
-
-
-def in_standalone_mode():
-    return cluster_settings.standalone_mode
 
 
 class ApplicationContext:

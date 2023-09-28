@@ -41,8 +41,9 @@ async def download_export_kb_endpoint(
     request: Request, kbid: str, export_id: str
 ) -> StreamingResponse:
     context = get_app_context(request.app)
+    stream = exporter.export_kb(context, kbid)
     return StreamingResponse(
-        exporter.export_kb(context, kbid),
+        stream,
         status_code=200,
         media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename={kbid}.export"},

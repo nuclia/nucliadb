@@ -41,7 +41,8 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str) -> CreateExportResponse:
     export_id = uuid4().hex
-    return CreateExportResponse(export_id=export_id)
+    response = CreateExportResponse(export_id=export_id)
+    return response
 
 
 @api.post(
