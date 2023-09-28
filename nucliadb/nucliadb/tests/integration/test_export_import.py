@@ -116,6 +116,7 @@ async def dst_kb(nucliadb_manager):
         pass
 
 
+<<<<<<< HEAD
 @contextmanager
 def set_standalone_mode_settings(standalone: bool):
     prev = cluster_settings.standalone_mode
@@ -130,8 +131,10 @@ def standalone_nucliadb():
         yield
 
 
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_on_standalone_nucliadb(
     standalone_nucliadb,
+    natsd,
     nucliadb_writer,
     nucliadb_reader,
     src_kb,

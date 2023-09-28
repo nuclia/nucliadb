@@ -178,7 +178,7 @@ class KnowledgeBox:
         semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
-        release_channel: Optional[ReleaseChannel] = None,
+        release_channel: Optional[str] = None,
     ) -> Tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
@@ -215,11 +215,17 @@ class KnowledgeBox:
             logger.error(f"{uuid} KB could not be created")
             failed = True
 
+        if release_channel is None:
+            release_channel = "STABLE"
+
         if failed is False:
             shard_manager = get_shard_manager()
             try:
                 await shard_manager.create_shard_by_kbid(
-                    txn, uuid, semantic_model=semantic_model
+                    txn,
+                    uuid,
+                    semantic_model=semantic_model,
+                    release_channel=release_channel,
                 )
             except Exception as e:
                 await storage.delete_kb(uuid)

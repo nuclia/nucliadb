@@ -533,7 +533,7 @@ class Processor:
         config: Optional[knowledgebox_pb2.KnowledgeBoxConfig],
         semantic_model: knowledgebox_pb2.SemanticModelMetadata,
         forceuuid: Optional[str] = None,
-        release_channel: Optional[knowledgebox_pb2.ReleaseChannel] = None,
+        release_channel: Optional[str] = None,
     ) -> str:
         async with self.driver.transaction() as txn:
             try:

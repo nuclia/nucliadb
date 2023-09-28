@@ -38,6 +38,7 @@ TEST_PARTITION = "111"
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_indexing(worker, shard: str, reader):
     node = settings.force_host_id
 
@@ -88,6 +89,7 @@ async def test_indexing_not_found(worker, reader):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
     node_id = settings.force_host_id
     assert node_id

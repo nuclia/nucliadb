@@ -38,6 +38,7 @@ async def execution_context(natsd, gcs_storage, redis_config, nucliadb):
         await context.finalize()
 
 
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     # this will test run all avilable migrations
     await execution_context.data_manager.update_kb_info(

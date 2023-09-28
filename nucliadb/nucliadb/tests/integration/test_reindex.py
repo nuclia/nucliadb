@@ -148,6 +148,7 @@ async def create_resource(knowledgebox, writer: WriterStub):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

@@ -175,10 +175,9 @@ async def nucliadb_manager(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox(nucliadb_manager: AsyncClient):
-    release_channel = os.environ.get("RELEASE_CHANNEL", "STABLE")
+async def knowledgebox(nucliadb_manager: AsyncClient, request):
     resp = await nucliadb_manager.post(
-        "/kbs", json={"slug": "knowledgebox", "release_channel": release_channel}
+        "/kbs", json={"slug": "knowledgebox", "release_channel": request.param}
     )
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")

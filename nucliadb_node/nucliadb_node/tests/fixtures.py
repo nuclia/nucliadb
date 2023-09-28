@@ -234,18 +234,19 @@ async def sidecar_stub(worker):
 
 
 @pytest.fixture(scope="function")
-async def shard(writer_stub: NodeWriterStub) -> AsyncIterable[str]:
+async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
     channel = (
         ReleaseChannel.EXPERIMENTAL
-        if os.environ.get("RELEASE_CHANNEL", "STABLE") == "EXPERIMENTAL"
+        if request.param == "EXPERIMENTAL"
         else ReleaseChannel.STABLE
     )
     request = NewShardRequest(kbid="test", release_channel=channel)
     shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
 
-    yield shard.id
-
-    await writer_stub.DeleteShard(ShardId(id=shard.id))  # type: ignore
+    try:
+        yield shard.id
+    finally:
+        await writer_stub.DeleteShard(ShardId(id=shard.id))  # type: ignore
 
 
 @pytest.fixture(scope="function")

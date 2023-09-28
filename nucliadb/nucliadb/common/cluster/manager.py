@@ -157,6 +157,7 @@ class KBShardManager:
         txn: Transaction,
         kbid: str,
         semantic_model: SemanticModelMetadata,
+        release_channel: str,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -206,7 +207,9 @@ class KBShardManager:
                     continue
                 try:
                     shard_created = await node.new_shard(
-                        kbid, similarity=kb_shards.similarity
+                        kbid,
+                        similarity=kb_shards.similarity,
+                        release_channel=release_channel,
                     )
                 except Exception as e:
                     errors.capture_exception(e)
@@ -324,7 +327,7 @@ class KBShardManager:
         )
 
     async def maybe_create_new_shard(
-        self, kbid: str, shard_info: noderesources_pb2.Shard
+        self, kbid: str, shard_info: noderesources_pb2.Shard, release_channel: str
     ):
         if self.should_create_new_shard(shard_info):
             logger.warning({"message": "Adding shard", "kbid": kbid})
@@ -332,7 +335,9 @@ class KBShardManager:
             model = await kbdm.get_model_metadata(kbid)
             driver = get_driver()
             async with driver.transaction() as txn:
-                await self.create_shard_by_kbid(txn, kbid, semantic_model=model)
+                await self.create_shard_by_kbid(
+                    txn, kbid, semantic_model=model, release_channel=release_channel
+                )
                 await txn.commit()
 
 

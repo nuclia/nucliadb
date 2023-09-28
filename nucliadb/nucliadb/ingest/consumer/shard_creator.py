@@ -99,4 +99,7 @@ class ShardCreatorHandler:
         shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
-        await self.shard_manager.maybe_create_new_shard(kbid, shard_counter)  # type: ignore
+        # TODO: how do I pass the release_channel here?
+        release_channel = "STABLE"
+
+        await self.shard_manager.maybe_create_new_shard(kbid, shard_counter, release_channel=release_channel)  # type: ignore
