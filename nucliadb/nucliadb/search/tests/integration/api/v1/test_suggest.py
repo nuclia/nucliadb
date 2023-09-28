@@ -79,5 +79,5 @@ async def test_suggest_resource_all(
                 prequest.body = "Ramon"
 
                 suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
-                assert suggest.total == 1
+                assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"
     await txn.abort()
