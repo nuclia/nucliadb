@@ -22,6 +22,7 @@ import enum
 import io
 from typing import (
     Any,
+    AsyncGenerator,
     AsyncIterable,
     Callable,
     Dict,
@@ -599,6 +600,7 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=CreateExportResponse,
+        docstring=docstrings.START_EXPORT,
     )
 
     export_status = _request_builder(
@@ -608,6 +610,7 @@ class _NucliaDBBase:
         path_params=("kbid", "export_id"),
         request_type=None,
         response_type=StatusResponse,
+        docstring=docstrings.EXPORT_STATUS,
     )
 
     download_export = _request_builder(
@@ -618,6 +621,7 @@ class _NucliaDBBase:
         request_type=None,
         response_type=None,
         stream_response=True,
+        docstring=docstrings.DOWNLOAD_EXPORT,
     )
 
     start_import = _request_builder(
@@ -627,6 +631,7 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=CreateImportResponse,
+        docstring=docstrings.START_IMPORT,
     )
 
     import_status = _request_builder(
@@ -636,6 +641,7 @@ class _NucliaDBBase:
         path_params=("kbid", "import_id"),
         request_type=None,
         response_type=StatusResponse,
+        docstring=docstrings.IMPORT_STATUS,
     )
 
 
@@ -716,7 +722,7 @@ class NucliaDB(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
-    ):
+    ) -> Callable[[Optional[int]], Iterator[bytes]]:
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
         if data is not None:
@@ -724,7 +730,7 @@ class NucliaDB(_NucliaDBBase):
         if query_params is not None:
             opts["params"] = query_params
 
-        def iter_bytes(chunk_size=None):
+        def iter_bytes(chunk_size=None) -> Iterator[bytes]:
             with self.session.stream(method.lower(), url=url, **opts) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
@@ -808,7 +814,7 @@ class NucliaDBAsync(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
-    ):
+    ) -> Callable[[Optional[int]], AsyncGenerator[bytes, None]]:
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
         if data is not None:
@@ -816,7 +822,7 @@ class NucliaDBAsync(_NucliaDBBase):
         if query_params is not None:
             opts["params"] = query_params
 
-        async def iter_bytes(chunk_size=None):
+        async def iter_bytes(chunk_size=None) -> AsyncGenerator[bytes, None]:
             async with self.session.stream(method.lower(), url=url, **opts) as response:
                 self._check_response(response)
                 async for chunk in response.aiter_raw(chunk_size=chunk_size):
