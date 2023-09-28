@@ -24,23 +24,57 @@ from starlette.requests import Request
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.export_import import exporter
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.export_import import Status, StatusResponse
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/export",
+    f"/{KB_PREFIX}/{{kbid}}/export/{{export_id}}",
     status_code=200,
-    name="Export a Knowledge Box",
+    name="Download a Knowledge Box export",
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def export_kb_endpoint(request: Request, kbid: str) -> StreamingResponse:
+async def download_export_kb_endpoint(
+    request: Request, kbid: str, export_id: str
+) -> StreamingResponse:
     context = get_app_context(request.app)
+    stream = exporter.export_kb(context, kbid)
     return StreamingResponse(
-        exporter.export_kb(context, kbid),
+        stream,
         status_code=200,
         media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
     )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/export/{{export_id}}/status",
+    status_code=200,
+    name="Get the status of a Knowledge Box Export",
+    response_model=StatusResponse,
+    tags=["Knowledge Boxes"],
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
+@version(1)
+async def get_export_status_endpoint(
+    request: Request, kbid: str, export_id: str
+) -> StatusResponse:
+    return StatusResponse(status=Status.FINISHED)
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/import/{{import_id}}/status",
+    status_code=200,
+    name="Get the status of a Knowledge Box Import",
+    response_model=StatusResponse,
+    tags=["Knowledge Boxes"],
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
+@version(1)
+async def get_import_status_endpoint(
+    request: Request, kbid: str, import_id: str
+) -> StatusResponse:
+    return StatusResponse(status=Status.FINISHED)
