@@ -219,7 +219,7 @@ fn remove_stop_words(query: &str) -> Cow<'_, str> {
     let time = SystemTime::now();
     tracing::debug!("Detecting query language for: {query}");
     let lang = detect_language(query);
-    let elapsed = time.elapsed().map(|t| t.as_secs()).unwrap_or_default();
+    let elapsed = time.elapsed().map(|t| t.as_millis()).unwrap_or_default();
     tracing::debug!("Took {elapsed:?} to know that {query} language is {lang:?}");
 
     match query.rsplit_once(' ') {
