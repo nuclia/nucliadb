@@ -27,10 +27,10 @@ use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
-    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
     VectorSearchResponse,
 };
-use nucliadb_core::thread::{self, *};
+use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 
@@ -258,53 +258,89 @@ impl ShardReader {
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
         let span = tracing::Span::current();
 
+        let suggest_paragraphs = request
+            .features
+            .contains(&(SuggestFeatures::Paragraphs as i32));
+        let suggest_entities = request
+            .features
+            .contains(&(SuggestFeatures::Entities as i32));
+
+        let paragraphs_reader_service = self.paragraph_reader.clone();
         let relations_reader_service = self.relation_reader.clone();
-        let paragraph_reader_service = self.paragraph_reader.clone();
-
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
-        let relations = prefixes
-            .par_iter()
-            .filter(|p| p.len() >= MIN_VIABLE_PREFIX_SUGGEST)
-            .cloned()
-            .map(|prefix| RelationPrefixSearchRequest {
-                prefix,
-                ..Default::default()
-            })
-            .map(|prefix| RelationSearchRequest {
-                shard_id: String::default(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .map(|request| relations_reader_service.search(&request));
 
-        let relation_task = move || relations.collect::<Vec<_>>();
-        let paragraph_task = move || paragraph_reader_service.suggest(&request);
+        let suggest_paragraphs_task = suggest_paragraphs.then(|| {
+            let paragraph_task = move || paragraphs_reader_service.suggest(&request);
+            let info = info_span!(parent: &span, "paragraph suggest");
+            || run_with_telemetry(info, paragraph_task)
+        });
 
-        let info = info_span!(parent: &span, "relations suggest");
-        let relation_task = || run_with_telemetry(info, relation_task);
-        let info = info_span!(parent: &span, "paragraph suggest");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let relation_task = suggest_entities.then(|| {
+            let relation_task = move || {
+                let requests = prefixes
+                    .par_iter()
+                    .filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST)
+                    .cloned()
+                    .map(|prefix| RelationSearchRequest {
+                        shard_id: String::default(), // REVIEW: really?
+                        prefix: Some(RelationPrefixSearchRequest {
+                            prefix,
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    });
 
-        let (paragraph, relation) = thread::join(paragraph_task, relation_task);
-        let rparagraph = paragraph?;
-        let entities = relation
-            .into_iter()
-            .flatten()
-            .flat_map(|r| r.prefix)
-            .flat_map(|prefix| prefix.nodes.into_iter())
-            .map(|node| node.value)
-            .collect::<Vec<_>>();
+                let responses = requests
+                    .map(|request| relations_reader_service.search(&request))
+                    .collect::<Vec<_>>();
 
-        Ok(SuggestResponse {
-            query: rparagraph.query,
-            total: rparagraph.total,
-            results: rparagraph.results,
-            ematches: rparagraph.ematches,
-            entities: Some(RelatedEntities {
+                let entities = responses
+                    .into_iter()
+                    .flatten() // unwrap errors and continue with successful results
+                    .flat_map(|response| response.prefix)
+                    .flat_map(|prefix_response| prefix_response.nodes.into_iter())
+                    .map(|node| node.value);
+
+                entities.collect::<Vec<_>>()
+            };
+
+            let info = info_span!(parent: &span, "relations suggest");
+            || run_with_telemetry(info, relation_task)
+        });
+
+        let mut paragraphs_response = None;
+        let mut entities = None;
+
+        crossbeam_thread::scope(|s| {
+            if let Some(task) = suggest_paragraphs_task {
+                s.spawn(|_| {
+                    paragraphs_response = Some(task());
+                });
+            }
+            if let Some(task) = relation_task {
+                s.spawn(|_| entities = Some(task()));
+            }
+        })
+        .expect("Failed to join threads");
+
+        let mut response = SuggestResponse::default();
+
+        if let Some(paragraphs_response) = paragraphs_response {
+            let paragraphs_response = paragraphs_response?;
+            response.query = paragraphs_response.query;
+            response.total = paragraphs_response.total;
+            response.results = paragraphs_response.results;
+            response.ematches = paragraphs_response.ematches;
+        };
+
+        if let Some(entities) = entities {
+            response.entities = Some(RelatedEntities {
                 total: entities.len() as u32,
                 entities,
-            }),
-        })
+            })
+        }
+
+        Ok(response)
     }
 
     #[measure(actor = "shard", metric = "request/search")]
