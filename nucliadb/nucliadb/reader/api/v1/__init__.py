@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from . import download  # noqa
-from . import export_kb  # noqa
+from . import export_import  # noqa
 from . import knowledgebox  # noqa
 from . import resource  # noqa
 from . import services  # noqa

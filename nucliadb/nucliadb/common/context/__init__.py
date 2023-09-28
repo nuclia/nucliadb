@@ -44,6 +44,10 @@ from nucliadb_utils.utilities import (
 )
 
 
+def in_standalone_mode():
+    return cluster_settings.standalone_mode
+
+
 class ApplicationContext:
     kv_driver: Driver
     shard_manager: KBShardManager
@@ -71,7 +75,7 @@ class ApplicationContext:
         self.blob_storage = await get_storage()
         self.shard_manager = await setup_cluster()
         self.partitioning = start_partitioning_utility()
-        if not cluster_settings.standalone_mode:
+        if not in_standalone_mode():
             self.indexing = await start_indexing_utility()
             self.nats_manager = await start_nats_manager(
                 self.service_name,

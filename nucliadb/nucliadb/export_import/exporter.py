@@ -21,14 +21,17 @@
 from typing import AsyncGenerator
 
 from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import import logger
 from nucliadb.export_import.models import ExportedItemType
 from nucliadb.export_import.utils import (
     download_binary,
+    get_broker_message,
     get_cloud_files,
     get_entities,
     get_labels,
-    iter_broker_messages,
+    iter_kb_resource_uuids,
 )
+from nucliadb_protos import writer_pb2
 
 
 async def export_kb(
@@ -39,35 +42,72 @@ async def export_kb(
     See https://github.com/nuclia/nucliadb/blob/main/docs/internal/EXPORTS.md
     for an overview on format of the export file/stream.
     """
-    async for bm in iter_broker_messages(context, kbid):
-        # Stream the binary files of the broker message
-        for cloud_file in get_cloud_files(bm):
-            binary_size = cloud_file.size
-            serialized_cf = cloud_file.SerializeToString()
+    async for chunk in export_resources(context, kbid):
+        yield chunk
 
-            yield ExportedItemType.BINARY.encode("utf-8")
-            yield len(serialized_cf).to_bytes(4, byteorder="big")
-            yield serialized_cf
+    async for chunk in export_entities(context, kbid):
+        yield chunk
 
-            yield binary_size.to_bytes(4, byteorder="big")
-            async for chunk in download_binary(context, cloud_file):
-                yield chunk
+    async for chunk in export_labels(context, kbid):
+        yield chunk
 
-        # Stream the broker message
-        bm_bytes = bm.SerializeToString()
-        yield ExportedItemType.RESOURCE.encode("utf-8")
-        yield len(bm_bytes).to_bytes(4, byteorder="big")
-        yield bm_bytes
 
-    # Stream the entities and labels of the knowledgebox
+async def export_resources(
+    context: ApplicationContext,
+    kbid: str,
+) -> AsyncGenerator[bytes, None]:
+    async for rid in iter_kb_resource_uuids(context, kbid):
+        bm = await get_broker_message(context, kbid, rid)
+        if bm is None:
+            logger.warning(f"No resource found for rid {rid}")
+            continue
+        async for chunk in export_resource(context, bm):
+            yield chunk
+
+
+async def export_resource(
+    context,
+    bm: writer_pb2.BrokerMessage,
+) -> AsyncGenerator[bytes, None]:
+    # Stream the binary files of the broker message
+    for cloud_file in get_cloud_files(bm):
+        binary_size = cloud_file.size
+        serialized_cf = cloud_file.SerializeToString()
+
+        yield ExportedItemType.BINARY.encode("utf-8")
+        yield len(serialized_cf).to_bytes(4, byteorder="big")
+        yield serialized_cf
+
+        yield binary_size.to_bytes(4, byteorder="big")
+        async for chunk in download_binary(context, cloud_file):
+            yield chunk
+
+    # Stream the broker message
+    bm_bytes = bm.SerializeToString()
+    yield ExportedItemType.RESOURCE.encode("utf-8")
+    yield len(bm_bytes).to_bytes(4, byteorder="big")
+    yield bm_bytes
+
+
+async def export_entities(
+    context: ApplicationContext,
+    kbid: str,
+) -> AsyncGenerator[bytes, None]:
     entities = await get_entities(context, kbid)
-    data = entities.SerializeToString()
-    yield ExportedItemType.ENTITIES.encode("utf-8")
-    yield len(data).to_bytes(4, byteorder="big")
-    yield data
+    if len(entities.entities_groups) > 0:
+        data = entities.SerializeToString()
+        yield ExportedItemType.ENTITIES.encode("utf-8")
+        yield len(data).to_bytes(4, byteorder="big")
+        yield data
 
+
+async def export_labels(
+    context: ApplicationContext,
+    kbid: str,
+) -> AsyncGenerator[bytes, None]:
     labels = await get_labels(context, kbid)
-    data = labels.SerializeToString()
-    yield ExportedItemType.LABELS.encode("utf-8")
-    yield len(data).to_bytes(4, byteorder="big")
-    yield data
+    if len(labels.labelset) > 0:
+        data = labels.SerializeToString()
+        yield ExportedItemType.LABELS.encode("utf-8")
+        yield len(data).to_bytes(4, byteorder="big")
+        yield data

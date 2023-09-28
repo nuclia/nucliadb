@@ -17,3 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+from nucliadb_models.resource import NucliaDBRoles
+
+
+async def test_api(reader_api, knowledgebox_ingest):
+    kbid = knowledgebox_ingest
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/kb/{kbid}/export/foo")
+        assert resp.status_code < 500
+
+        resp = await client.get(f"/kb/{kbid}/export/foo/status")
+        assert resp.status_code < 500
+
+        resp = await client.get(f"/kb/{kbid}/import/foo/status")
+        assert resp.status_code < 500

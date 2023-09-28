@@ -30,8 +30,8 @@ from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.nodewriter_pb2 import (
     NewShardRequest,
     OpStatus,
-    ShardCreated,
     ReleaseChannel,
+    ShardCreated,
 )
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
+from typing import Any
 
 
 class ExportedItemType(str, Enum):
@@ -25,3 +26,6 @@ class ExportedItemType(str, Enum):
     LABELS = "LAB"
     ENTITIES = "ENT"
     BINARY = "BIN"
+
+
+ExportItem = tuple[ExportedItemType, Any]

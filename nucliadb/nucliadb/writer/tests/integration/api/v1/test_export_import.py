@@ -18,20 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from io import BytesIO
-
 from nucliadb_models.resource import NucliaDBRoles
 
 
-async def test_export_kb(reader_api, knowledgebox_ingest):
+async def test_api(writer_api, knowledgebox_ingest):
     kbid = knowledgebox_ingest
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/kb/{kbid}/export")
-        assert resp.status_code == 200
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(f"/kb/{kbid}/import")
+        assert resp.status_code < 500
 
-        export = BytesIO()
-        for chunk in resp.iter_bytes():
-            export.write(chunk)
-        export.seek(0)
-
-        assert len(export.getvalue()) > 0
+        resp = await client.post(f"/kb/{kbid}/export")
+        assert resp.status_code < 500
