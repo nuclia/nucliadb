@@ -103,6 +103,7 @@ async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
 
     expect_entities(
         &suggest_entities(&mut reader, &shard.id, "ann").await,
+        // TODO: add "Anastasia" when typo correction is implemented
         &["Anna"],
     );
 
@@ -116,6 +117,11 @@ async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
     // validate tokenization
     expect_entities(
         &suggest_entities(&mut reader, &shard.id, "bar").await,
+        &["Barcelona", "Bárcenas"],
+    );
+
+    expect_entities(
+        &suggest_entities(&mut reader, &shard.id, "Bar").await,
         &["Barcelona", "Bárcenas"],
     );
 

@@ -38,63 +38,6 @@ async def test_suggest_paragraphs(
     paragraph suggestions
 
     """
-    # exact match
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={"query": "Nietzche", "features": ["paragraph"]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 1
-    assert body["paragraphs"]["results"][0]["rid"] == texts["zarathrustra"]
-
-    # typo tolerant search
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={"query": "princes", "features": ["paragraph"]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 2
-    assert body["paragraphs"]["results"][0]["rid"] == texts["little_prince"]
-    assert body["paragraphs"]["results"][1]["rid"] == texts["little_prince"]
-    assert {"summary", "title"} == {
-        result["field"] for result in body["paragraphs"]["results"]
-    }
-
-    # fuzzy search with distance 1 will only match 'a' from resource 2
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "z", "features": ["paragraph"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 1
-    assert body["paragraphs"]["results"][0]["rid"] == texts["little_prince"]
-    assert body["paragraphs"]["results"][0]["field"] == "summary"
-
-    # nonexistent term
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={"query": "Hanna Adrent", "features": ["paragraph"]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 0
-
-    # by field
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={
-            "query": "prince",
-            "fields": "a/title",
-            "features": ["paragraph"],
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 1
-    assert body["paragraphs"]["results"][0]["field"] == "title"
-
     # filter by language
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",
@@ -123,97 +66,6 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 0
-
-
-@pytest.mark.asyncio
-async def test_suggest_related_entities(
-    nucliadb_reader: AsyncClient,
-    knowledgebox: str,
-    entities,
-):
-    """Test description:
-
-    Query a knowledgebox with some entities adn relations with /suggest endpoint
-    to make autocomplete suggestions
-
-    """
-    # Test simple suggestions
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "An", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Anastasia", "Anna", "Anthony"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "ann", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Anna"}
-    # XXX: add "Anastasia" when typo correction is implemented
-    # assert set(body["entities"]["entities"]) == {"Anna", "Anastasia"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "jo", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"John"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "any", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert not body["entities"]["entities"]
-
-    # Test correct query tokenization
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "bar", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "Bar", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "BAR", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "BÄR", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest", params={"query": "BáR", "features": ["entities"]}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
-
-    # Test multiple word suggest and ordering
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={"query": "Solomon Is", "features": ["entities"]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]
 
 
 @pytest.mark.asyncio
@@ -288,23 +140,47 @@ async def test_suggest_features(
     Validate how responses are returned depending on requested features
 
     """
+
+    def assert_expected_paragraphs(response):
+        assert len(response["paragraphs"]["results"]) == 2
+        assert "People and places" in {
+            response["paragraphs"]["results"][0]["text"],
+            response["paragraphs"]["results"][1]["text"],
+        }
+        assert texts["little_prince"] in {
+            response["paragraphs"]["results"][0]["rid"],
+            response["paragraphs"]["results"][1]["rid"],
+        }
+
+    def assert_expected_entities(response):
+        assert response["entities"]["total"] == 1
+        assert set(response["entities"]["entities"]) == {"Anna"}
+
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",
-        params={"query": "Nietzche", "features": ["paragraph"]},
+        params={"query": "ann", "features": ["paragraph", "entities"]},
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["entities"]) == 0
-    assert len(body["paragraphs"]["results"]) == 1
-    assert body["paragraphs"]["results"][0]["rid"] == texts["zarathrustra"]
+    assert_expected_entities(body)
+    assert_expected_paragraphs(body)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/suggest",
+        params={"query": "ann", "features": ["paragraph"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["entities"]["total"] == 0
+    assert_expected_paragraphs(body)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest", params={"query": "ann", "features": ["entities"]}
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["paragraphs"]) == 0
-    assert set(body["entities"]["entities"]) == {"Anna"}
+    assert_expected_entities(body)
+    assert len(body["paragraphs"]["results"]) == 0
 
 
 @pytest.mark.asyncio
