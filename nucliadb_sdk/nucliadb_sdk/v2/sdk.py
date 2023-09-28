@@ -20,7 +20,19 @@ import asyncio
 import base64
 import enum
 import io
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    AsyncIterable,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 import httpx
 import orjson
@@ -33,6 +45,11 @@ from nucliadb_models.entities import (
     EntitiesGroup,
     KnowledgeBoxEntities,
     UpdateEntitiesGroupPayload,
+)
+from nucliadb_models.export_import import (
+    CreateExportResponse,
+    CreateImportResponse,
+    StatusResponse,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import (
@@ -72,6 +89,13 @@ class ChatResponse(BaseModel):
     answer: str
     relations: Optional[Relations]
     learning_id: Optional[str]
+
+
+RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
+
+
+def export_response_parser(response: httpx.Response) -> Iterator[bytes]:
+    return response.iter_bytes()
 
 
 def chat_response_parser(response: httpx.Response) -> ChatResponse:
@@ -121,6 +145,14 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
         return resp.content
 
 
+def is_raw_request_content(content: Any) -> bool:
+    return (
+        isinstance(content, str)
+        or isinstance(content, bytes)
+        or (isinstance(content, Iterable) and not isinstance(content, (list, tuple)))
+    )
+
+
 def _request_builder(
     *,
     name: str,
@@ -129,7 +161,11 @@ def _request_builder(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
     docstring: Optional[docstrings.Docstring] = None,
 ):
@@ -142,6 +178,7 @@ def _request_builder(
 
         path = path_template.format(**path_data)
         data = None
+        raw_content: Optional[RawRequestContent] = None
         if request_type is not None:
             if content is not None:
                 try:
@@ -160,12 +197,15 @@ def _request_builder(
                     if key in request_type.__fields__:  # type: ignore
                         content_data[key] = kwargs.pop(key)
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
-
+        elif is_raw_request_content(content):
+            raw_content = content
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
-        resp = self._request(path, method, data=data, query_params=query_params)
+        resp = self._request(
+            path, method, data=data, query_params=query_params, content=raw_content
+        )
 
         if asyncio.iscoroutine(resp):
 
@@ -541,6 +581,51 @@ class _NucliaDBBase:
         response_type=None,
     )
 
+    start_export = _request_builder(
+        name="start_export",
+        path_template="/v1/kb/{kbid}/export",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=CreateExportResponse,
+    )
+
+    export_status = _request_builder(
+        name="export_status",
+        path_template="/v1/kb/{kbid}/export/{export_id}/status",
+        method="GET",
+        path_params=("kbid", "export_id"),
+        request_type=None,
+        response_type=StatusResponse,
+    )
+
+    download_export = _request_builder(
+        name="download_export",
+        path_template="/v1/kb/{kbid}/export/{export_id}",
+        method="GET",
+        path_params=("kbid", "export_id"),
+        request_type=None,
+        response_type=export_response_parser,
+    )
+
+    start_import = _request_builder(
+        name="start_import",
+        path_template="/v1/kb/{kbid}/import",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=CreateImportResponse,
+    )
+
+    import_status = _request_builder(
+        name="import_status",
+        path_template="/v1/kb/{kbid}/import/{import_id}/status",
+        method="GET",
+        path_params=("kbid", "import_id"),
+        request_type=None,
+        response_type=StatusResponse,
+    )
+
 
 class NucliaDB(_NucliaDBBase):
     """
@@ -600,6 +685,7 @@ class NucliaDB(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -607,6 +693,8 @@ class NucliaDB(_NucliaDBBase):
             opts["data"] = data
         if query_params is not None:
             opts["params"] = query_params
+        if content is not None:
+            opts["content"] = content
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 

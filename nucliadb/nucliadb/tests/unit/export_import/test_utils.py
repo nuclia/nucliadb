@@ -17,12 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from io import BytesIO
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from starlette.requests import Request
 
-from nucliadb.export_import.utils import get_cloud_files, import_broker_message
+from nucliadb.export_import.exceptions import ExportStreamExhausted
+from nucliadb.export_import.utils import (
+    IteratorExportStream,
+    get_cloud_files,
+    import_broker_message,
+)
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.const import Streams
 
@@ -135,3 +142,51 @@ def test_get_cloud_files(broker_message):
     # Make sure that the source is set to export on the broker message cfs
     for cf in get_cloud_files(broker_message):
         assert cf.source == resources_pb2.CloudFile.Source.EXPORT
+
+
+class TestRequest(Request):
+    def __init__(self, data: bytes, receive_chunk_size: int = 10):
+        super().__init__(
+            scope={
+                "type": "http",
+                "http_version": "1.1",
+                "method": "GET",
+                "headers": [],
+            },
+            receive=self.receive,
+        )
+        self.receive_chunk_size = receive_chunk_size
+        self.bytes = BytesIO(data)
+
+    async def receive(self):
+        chunk = self.bytes.read(self.receive_chunk_size)
+        more_data = True
+        if chunk == b"":
+            more_data = False
+        return {"type": "http.request", "body": chunk, "more_body": more_data}
+
+
+async def test_export_stream():
+    request = TestRequest(data=b"01234XYZ", receive_chunk_size=2)
+
+    iterator = request.stream().__aiter__()
+    export_stream = IteratorExportStream(iterator)
+    assert await export_stream.read(0) == b""
+
+    for i in range(5):
+        assert await export_stream.read(1) == f"{i}".encode()
+
+    assert await export_stream.read(3) == b"XYZ"
+
+    with pytest.raises(ExportStreamExhausted):
+        await export_stream.read(1)
+
+    with pytest.raises(ExportStreamExhausted):
+        await export_stream.read(0)
+
+    request = TestRequest(data=b"foobar", receive_chunk_size=2)
+    iterator = request.stream().__aiter__()
+    export_stream = IteratorExportStream(iterator)
+    assert await export_stream.read(50) == b"foobar"
+    with pytest.raises(ExportStreamExhausted):
+        await export_stream.read(0)

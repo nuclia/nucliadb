@@ -20,7 +20,7 @@
 import asyncio
 
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
@@ -71,7 +71,7 @@ class ApplicationContext:
         self.blob_storage = await get_storage()
         self.shard_manager = await setup_cluster()
         self.partitioning = start_partitioning_utility()
-        if not cluster_settings.standalone_mode:
+        if not in_standalone_mode():
             self.indexing = await start_indexing_utility()
             self.nats_manager = await start_nats_manager(
                 self.service_name,

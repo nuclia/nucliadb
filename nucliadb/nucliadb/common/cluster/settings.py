@@ -76,3 +76,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def in_standalone_mode() -> bool:
+    return settings.standalone_mode

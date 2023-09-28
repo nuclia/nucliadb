@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import inspect
 import typing
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import httpx
 from pydantic import BaseModel
@@ -223,7 +223,11 @@ def inject_documentation(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
     docstring: Optional[Docstring] = None,
 ):
@@ -239,7 +243,11 @@ def _inject_signature_and_annotations(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
 ) -> None:
     """Dynamically generate and inject the function signature and its annotations"""
@@ -303,7 +311,11 @@ def _inject_docstring(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
     docstring: Optional[Docstring] = None,
 ):

@@ -90,7 +90,7 @@ pub fn num_paragraph_search_threads() -> usize {
             if let Ok(threads) = threadstr.parse() {
                 threads
             } else {
-                error!("NUM_PARAGRAPH_SEARCH_THREADS defined incorrectly. Defaulting to num cpus");
+                error!("NUM_PARAGRAPH_SEARCH_THREADS defined incorrectly. Defaulting to num cpus.");
                 num_cpus::get()
             }
         }
@@ -104,7 +104,7 @@ pub fn num_global_rayon_threads() -> usize {
             if let Ok(threads) = threadstr.parse() {
                 threads
             } else {
-                error!("NUM_GLOBAL_RAYON_THREADS defined incorrectly. Defaulting to num cpus");
+                error!("NUM_GLOBAL_RAYON_THREADS defined incorrectly. Defaulting to num cpus.");
                 10
             }
         }
