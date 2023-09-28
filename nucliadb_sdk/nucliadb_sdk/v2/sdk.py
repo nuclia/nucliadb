@@ -817,7 +817,7 @@ class NucliaDBAsync(_NucliaDBBase):
             opts["params"] = query_params
 
         async def iter_bytes(chunk_size=None):
-            with self.session.stream(method.lower(), url=url, **opts) as response:
+            async with self.session.stream(method.lower(), url=url, **opts) as response:
                 self._check_response(response)
                 async for chunk in response.aiter_raw(chunk_size=chunk_size):
                     yield chunk
