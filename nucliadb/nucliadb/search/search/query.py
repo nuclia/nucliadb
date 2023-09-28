@@ -235,8 +235,6 @@ def suggest_query_to_pb(
     if range_modification_end is not None:
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
-    print("Py Suggest Request:")
-    print(request)
     return request
 
 
