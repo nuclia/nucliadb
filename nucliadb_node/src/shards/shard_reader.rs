@@ -277,7 +277,7 @@ impl ShardReader {
 
         let relation_task = suggest_entities.then(|| {
             let relation_task = move || {
-                let entities = prefixes
+                let requests = prefixes
                     .par_iter()
                     .filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST)
                     .cloned()
@@ -288,16 +288,20 @@ impl ShardReader {
                             ..Default::default()
                         }),
                         ..Default::default()
-                    })
+                    });
+
+                let responses = requests
                     .map(|request| relations_reader_service.search(&request))
                     .collect::<Vec<_>>();
-                entities
+
+                let entities = responses
                     .into_iter()
-                    .flatten()
-                    .flat_map(|r| r.prefix)
-                    .flat_map(|prefix| prefix.nodes.into_iter())
-                    .map(|node| node.value)
-                    .collect::<Vec<_>>()
+                    .flatten() // unwrap errors and continue with successful results
+                    .flat_map(|response| response.prefix)
+                    .flat_map(|prefix_response| prefix_response.nodes.into_iter())
+                    .map(|node| node.value);
+
+                entities.collect::<Vec<_>>()
             };
 
             let info = info_span!(parent: &span, "relations suggest");
