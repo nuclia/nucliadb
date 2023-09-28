@@ -205,8 +205,9 @@ jobs:
           BRANCH: ${{ steps.git.outputs.branch }}
           MATURIN: "true"
         run: |
-          ./scripts/download-build.sh
-          pip install builds/wheels/*_x86_64.whl
+          ./scripts/download-build.sh && pip install builds/wheels/*_x86_64.whl || (
+            maturin build -m nucliadb_node_binding/Cargo.toml && pip install target/wheels/*_x86_64.whl
+          )
 
       - uses: dorny/paths-filter@v2
         id: filter
