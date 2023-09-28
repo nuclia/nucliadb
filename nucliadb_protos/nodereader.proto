@@ -348,7 +348,7 @@ message SearchRequest {
 
 enum SuggestFeatures {
     ENTITIES = 0;
-    PARAGRAPH = 1;
+    PARAGRAPHS = 1;
 }
 
 message SuggestRequest {

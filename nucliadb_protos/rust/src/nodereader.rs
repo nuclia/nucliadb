@@ -554,7 +554,7 @@ pub struct StreamRequest {
 #[repr(i32)]
 pub enum SuggestFeatures {
     Entities = 0,
-    Paragraph = 1,
+    Paragraphs = 1,
 }
 /// Generated client implementations.
 pub mod node_reader_client {

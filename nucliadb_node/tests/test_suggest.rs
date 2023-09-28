@@ -73,7 +73,7 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
             shard: shard.id.clone(),
             body: "prince".to_string(),
             fields: vec!["a/title".to_string()],
-            features: vec![SuggestFeatures::Paragraph as i32],
+            features: vec![SuggestFeatures::Paragraphs as i32],
             ..Default::default()
         }))
         .await
@@ -220,7 +220,7 @@ async fn suggest_paragraphs(
     let request = Request::new(SuggestRequest {
         shard: shard_id.into(),
         body: query.into(),
-        features: vec![SuggestFeatures::Paragraph as i32],
+        features: vec![SuggestFeatures::Paragraphs as i32],
         ..Default::default()
     });
     let response = reader.suggest(request).await.unwrap();

@@ -260,7 +260,7 @@ impl ShardReader {
 
         let suggest_paragraphs = request
             .features
-            .contains(&(SuggestFeatures::Paragraph as i32));
+            .contains(&(SuggestFeatures::Paragraphs as i32));
         let suggest_entities = request
             .features
             .contains(&(SuggestFeatures::Entities as i32));

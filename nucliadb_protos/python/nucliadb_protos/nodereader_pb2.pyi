@@ -69,12 +69,12 @@ class _SuggestFeatures:
 class _SuggestFeaturesEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_SuggestFeatures.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ENTITIES: _SuggestFeatures.ValueType  # 0
-    PARAGRAPH: _SuggestFeatures.ValueType  # 1
+    PARAGRAPHS: _SuggestFeatures.ValueType  # 1
 
 class SuggestFeatures(_SuggestFeatures, metaclass=_SuggestFeaturesEnumTypeWrapper): ...
 
 ENTITIES: SuggestFeatures.ValueType  # 0
-PARAGRAPH: SuggestFeatures.ValueType  # 1
+PARAGRAPHS: SuggestFeatures.ValueType  # 1
 global___SuggestFeatures = SuggestFeatures
 
 @typing_extensions.final
