@@ -26,7 +26,9 @@ echo "Building: $BRANCH $COMMIT_HASH -- test: $TEST"
 
 # JSON data
 json_data=$(curl -f "$BUILD_SERVER_URL/build" \
-    --retry 3 \
+    --retry 5 \
+    --retry-all-errors \
+    --retry-delay 1 \
     -H "X-Secret-Key:$SECRET_KEY" \
     -H 'content-type: application/json' \
     --data "{\"git_url\": \"https://github.com/nuclia/nucliadb.git\",\"branch\": \"$BRANCH\",\"commit_hash\": \"$COMMIT_HASH\",\"release\": $RELEASE, \"test\": $TEST, \"maturin\": $MATURIN, \"cargo_file\": \"nucliadb_node_binding/Cargo.toml\"}")
@@ -47,20 +49,20 @@ if [ "$MATURIN" = "true" ]; then
     for wheel in $wheels; do
         url="${base_url}/${wheel}"
         echo "Downloading $wheel from $url"
-        curl -f --retry 1 -o "builds/wheels/$wheel" "$url" -H "X-Secret-Key:$SECRET_KEY"
+        curl -f --retry 3 --retry-delay 2 -o "builds/wheels/$wheel" "$url" -H "X-Secret-Key:$SECRET_KEY"
     done
 fi
 
 for binary in $binaries; do
     url="${base_url}/${binary}"
     echo "Downloading $binary from $url"
-    curl -f --retry 1 -o "builds/$binary" "$url" -H "X-Secret-Key:$SECRET_KEY"
+    curl -f --retry 3 --retry-delay 2 -o "builds/$binary" "$url" -H "X-Secret-Key:$SECRET_KEY"
 done
 
 if [ "$TEST" = "true" ]; then
     for binary in $test_binaries; do
         url="${base_url}/${binary}"
         echo "Downloading $binary from $url"
-        curl -f --retry 1 -o "builds/tests/$binary" "$url" -H "X-Secret-Key:$SECRET_KEY"
+        curl -f --retry 3 --retry-delay 2 -o "builds/tests/$binary" "$url" -H "X-Secret-Key:$SECRET_KEY"
     done
 fi
