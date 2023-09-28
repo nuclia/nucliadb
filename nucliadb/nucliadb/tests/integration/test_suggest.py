@@ -26,49 +26,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
-async def test_suggest_paragraphs(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    knowledgebox: str,
-    texts: dict[str, str],
-):
-    """Test description:
-
-    Query a knowledgebox with some texts with /suggest endpoint to obtain
-    paragraph suggestions
-
-    """
-    # filter by language
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={
-            "query": "prince",
-            "filters": "/s/p/en",
-            "features": ["paragraph"],
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 2
-    assert {"summary", "title"} == {
-        result["field"] for result in body["paragraphs"]["results"]
-    }
-
-    # No "prince" appear in any german resource
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/suggest",
-        params={
-            "query": "prince",
-            "filters": "/s/p/de",
-            "features": ["paragraph"],
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 0
-
-
-@pytest.mark.asyncio
 async def test_suggestion_on_link_computed_titles_sc6088(
     nucliadb_writer,
     nucliadb_grpc,

@@ -64,6 +64,8 @@ pub fn little_prince(shard_id: impl Into<String>) -> Resource {
     let mut resource = minimal_resource(shard_id);
     let rid = &resource.resource.as_ref().unwrap().uuid;
 
+    resource.labels.push("/s/p/en".to_string()); // language=en
+
     resource.texts.insert(
         "a/title".to_string(),
         TextInformation {
@@ -122,6 +124,8 @@ pub fn thus_spoke_zarathustra(shard_id: impl Into<String>) -> Resource {
     let shard_id = shard_id.into();
     let mut resource = minimal_resource(shard_id);
     let rid = &resource.resource.as_ref().unwrap().uuid;
+
+    resource.labels.push("/s/p/de".to_string()); // language=de
 
     resource.texts.insert(
         "a/title".to_string(),

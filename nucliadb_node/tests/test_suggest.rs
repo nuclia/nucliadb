@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use common::{node_reader, node_writer, resources, TestNodeReader, TestNodeWriter};
 use itertools::Itertools;
 use nucliadb_core::protos::{
-    op_status, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
+    op_status, Filter, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
 };
 use tonic::Request;
 
@@ -79,11 +79,51 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap()
         .into_inner();
-    assert_eq!(response.total, 1);
-    assert_eq!(response.results[0].uuid, shard.resources["little prince"]);
-    assert!(&response.results[0].field == "/a/title");
+    expect_paragraphs(
+        &response,
+        &[(&shard.resources["little prince"], "/a/title")],
+    );
 
-    // TODO: add metadata language and filter by it
+    // filter by language (set as a label) - "prince" appears in english sources
+    // but not in german ones
+    let request = SuggestRequest {
+        shard: shard.id.clone(),
+        body: "prince".to_string(),
+        features: vec![SuggestFeatures::Paragraphs as i32],
+        ..Default::default()
+    };
+
+    let response = reader
+        .suggest(Request::new(SuggestRequest {
+            filter: Some(Filter {
+                tags: vec!["/s/p/en".to_string()],
+            }),
+            ..request.clone()
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+
+    expect_paragraphs(
+        &response,
+        &[
+            (&shard.resources["little prince"], "/a/title"),
+            (&shard.resources["little prince"], "/a/summary"),
+        ],
+    );
+
+    let response = reader
+        .suggest(Request::new(SuggestRequest {
+            filter: Some(Filter {
+                tags: vec!["/s/p/de".to_string()],
+            }),
+            ..request
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+
+    expect_paragraphs(&response, &[]);
 
     Ok(())
 }
@@ -234,7 +274,12 @@ async fn suggest_paragraphs(
 }
 
 fn expect_paragraphs(response: &SuggestResponse, expected: &[(&str, &str)]) {
-    assert_eq!(response.total as usize, expected.len());
+    assert_eq!(
+        response.total as usize,
+        expected.len(),
+        "\nfailed assert for \n'{:#?}'",
+        response
+    );
 
     let results = response
         .results
