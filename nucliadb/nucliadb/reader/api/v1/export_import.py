@@ -32,7 +32,7 @@ from nucliadb_utils.authentication import requires_one
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/export/{{export_id}}",
     status_code=200,
-    name="Export a Knowledge Box",
+    name="Download a Knowledge Box export",
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])

@@ -47,12 +47,12 @@ async def start_kb_export_endpoint(request: Request, kbid: str) -> CreateExportR
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/import",
     status_code=200,
-    name="Import to a Knowledge Box",
+    name="Start an import to a Knowledge Box",
     tags=["Knowledge Boxes"],
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def import_kb_endpoint(request: Request, kbid: str) -> CreateImportResponse:
+async def start_kb_import_endpoint(request: Request, kbid: str) -> CreateImportResponse:
     context = get_app_context(request.app)
     import_id = uuid4().hex
     stream = FastAPIExportStream(request)

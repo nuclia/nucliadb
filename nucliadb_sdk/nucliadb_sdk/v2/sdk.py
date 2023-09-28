@@ -161,7 +161,11 @@ def _request_builder(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
     docstring: Optional[docstrings.Docstring] = None,
 ):
