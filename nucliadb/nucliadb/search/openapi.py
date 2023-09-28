@@ -23,6 +23,6 @@ from nucliadb import openapi
 
 
 def command_extract_openapi():
-    from nucliadb.reader.app import create_application
+    from nucliadb.search.app import create_application
 
     openapi.command_extract_openapi(create_application(), "nucliadb_search")

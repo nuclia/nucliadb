@@ -38,6 +38,7 @@ def extract_openapi(application, version, commit_id, app_name):
         for route in application.routes
         if is_versioned_route(route) and route.app.version == version
     ][0]
+    print(f"Routes {app.routes}")
     document = get_openapi(
         title=app.title,
         version=app.version,
