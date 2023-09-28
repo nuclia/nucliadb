@@ -20,9 +20,11 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use itertools::Itertools;
 use nucliadb_core::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
+use nucliadb_core::tracing;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
@@ -214,7 +216,11 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
 /// The last term of the query is a prefix fuzzy term and must be preserved.
 fn remove_stop_words(query: &str) -> Cow<'_, str> {
     // Negligible overhead (<1ms)
+    let time = SystemTime::now();
+    tracing::debug!("Detecting query language for: {query}");
     let lang = detect_language(query);
+    let elapsed = time.elapsed().map(|t| t.as_secs()).unwrap_or_default();
+    tracing::debug!("Took {elapsed:?} to know that {query} language is {lang:?}");
 
     match query.rsplit_once(' ') {
         Some((query, last_term)) => query
