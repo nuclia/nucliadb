@@ -23,6 +23,7 @@ import argparse
 import asyncio
 
 from nucliadb_client.client import NucliaDBClient
+from nucliadb_client.utils import warn_deprecated
 
 
 def parse_arguments():
@@ -86,4 +87,7 @@ def run():
 
 
 if __name__ == "__main__":
+    warn_deprecated(
+        "nucliadb_client has been deprecated and is no longer maintained. Please export/import your data using nucliadb_sdk instead"  # noqa
+    )
     run()
