@@ -106,7 +106,7 @@ class Conversation(Field):
         await self.db_set_metadata(metadata)
 
     async def get_value(self, page: Optional[int] = None) -> Optional[PBConversation]:
-        # If now page was requested, force fetch of metadata
+        # If no page was requested, force fetch of metadata
         # and set the page to the last page
         if page is None and self.metadata is None:
             await self.get_metadata()

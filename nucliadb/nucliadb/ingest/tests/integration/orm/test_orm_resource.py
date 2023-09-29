@@ -215,3 +215,12 @@ async def test_vector_duplicate_fields(
                 ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
 
     assert count == 1
+
+
+async def test_generate_field_conversation(
+    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+):
+    # Create a resource with a conversation field (with multiple pages of messages)
+
+    # Check that generate field copies over the right data from the conversation
+    pass
