@@ -25,12 +25,13 @@ use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use tracing_subscriber::filter::{FilterFn, LevelFilter, Targets};
+use tracing_subscriber::filter::{FilterFn, LevelFilter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
 use crate::settings::Settings;
+use crate::utils::ALL_TARGETS;
 
 const TRACE_ID: &str = "trace-id";
 
@@ -70,15 +71,39 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
         .with_level(true)
         .with_target(true);
 
+    let filter = FilterFn::new(move |metadata| {
+        let metadata_target = String::from(metadata.target());
+
+        for (target, log_level) in log_levels.iter() {
+            let mut target = String::from(target);
+
+            if metadata.level() <= log_level {
+                // exact match or match all `*`
+                if target == metadata_target || target == ALL_TARGETS {
+                    return true;
+                }
+                // starts with
+                if target.len() > 1 && target.ends_with('*') {
+                    target.truncate(target.len() - 1);
+                    if metadata_target.starts_with(&target) {
+                        println!("true");
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    });
+
     if settings.plain_logs() {
         layer
             .event_format(tracing_subscriber::fmt::format().compact())
-            .with_filter(Targets::new().with_targets(log_levels))
+            .with_filter(filter)
             .boxed()
-    else {
+    } else {
         layer
             .event_format(tracing_subscriber::fmt::format().json())
-            .with_filter(Targets::new().with_targets(log_levels))
+            .with_filter(filter)
             .boxed()
     }
 }

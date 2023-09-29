@@ -29,6 +29,8 @@ use nucliadb_core::{Context, NodeResult};
 use tonic::transport::Endpoint;
 use uuid::Uuid;
 
+pub static ALL_TARGETS: &str = "*";
+
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> NodeResult<Endpoint> {
     let uri = Uri::builder()
@@ -111,5 +113,29 @@ mod tests {
             let lookup = reliable_lookup_host(host).ip().to_string();
             assert!(lookup == "127.0.0.1" || lookup == "::1");
         }
+    }
+
+    #[test]
+    fn test_parse_log_levels() {
+        let levels = "nucliadb=INFO,node_reader=DEBUG,node_writer=TRACE";
+        let res = parse_log_levels(levels);
+        assert_eq!(
+            vec![
+                ("nucliadb".to_string(), Level::from_str("INFO").unwrap()),
+                ("node_reader".to_string(), Level::from_str("DEBUG").unwrap()),
+                ("node_writer".to_string(), Level::from_str("TRACE").unwrap())
+            ],
+            res
+        );
+    }
+
+    #[test]
+    fn test_parse_log_levels_with_catchall() {
+        let levels = "nucliadb=INFO,*=DEBUG,node_writer=TRACE";
+        let res = parse_log_levels(levels);
+        assert_eq!(
+            vec![("*".to_string(), Level::from_str("DEBUG").unwrap()),],
+            res
+        );
     }
 }
