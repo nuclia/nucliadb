@@ -84,6 +84,7 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     assert suggested["text"] == extracted_title
 
 
+@pytest.mark.skip(reason="Bindings not released")
 @pytest.mark.asyncio
 async def test_suggest_features(
     nucliadb_grpc: WriterStub,
