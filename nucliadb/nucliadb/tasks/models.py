@@ -18,18 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Type
 
-from pydantic import BaseModel
+import pydantic
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb_utils import const
 
-Callback = Callable[[ApplicationContext, BaseModel], Coroutine[Any, Any, Any]]
+MsgType = Type[pydantic.BaseModel]
+
+# async def callback(context: ApplicationContext, msg: MyPydanticModel):
+Callback = Callable[[ApplicationContext, MsgType], Coroutine[Any, Any, Any]]
 
 
 @dataclass
 class RegisteredTask:
     stream: const.Streams
     callback: Callback
-    msg_type: BaseModel
+    msg_type: MsgType

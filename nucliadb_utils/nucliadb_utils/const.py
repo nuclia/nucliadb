@@ -51,6 +51,24 @@ class Streams:
         subject = "node.{node}"
         group = "node-{node}"
 
+    class KB_EXPORTS:
+        """
+        Exporting kbs
+        """
+
+        name = "nucliadb-exports"
+        subject = "ndb.exports"
+        group = "nucliadb-exports"
+
+    class KB_IMPORTS:
+        """
+        Importing kbs
+        """
+
+        name = "nucliadb-imports"
+        subject = "ndb.imports"
+        group = "nucliadb-imports"
+
 
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"

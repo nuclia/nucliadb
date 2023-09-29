@@ -19,9 +19,56 @@
 #
 
 
+from nucliadb_models.export_import import Status
+
+
 class ExportStreamExhausted(Exception):
     """
     Raised when there are no more bytes to read from the export stream.
     """
 
     pass
+
+
+class MetadataNotFound(Exception):
+    """
+    Raised when the metadata for an export/import is not found.
+    """
+
+    pass
+
+
+class TaskNotFinishedError(Exception):
+    """
+    Raised when trying to get the status of a task that is not finished.
+    """
+
+    pass
+
+
+class TaskErrored(Exception):
+    """
+    Raised when a task has errored.
+    """
+
+    pass
+
+
+class TaskCancelledError(Exception):
+    """
+    Raised when a task has been cancelled.
+    """
+
+    pass
+
+
+def raise_for_task_status(status: Status):
+    if status == Status.FINISHED:
+        return
+    raise {
+        Status.FAILED: TaskNotFinishedError,
+        Status.ERRORED: TaskErrored,
+        Status.CANCELLED: TaskCancelledError,
+        Status.SCHEDULED: TaskNotFinishedError,
+        Status.RUNNING: TaskNotFinishedError,
+    }[status]

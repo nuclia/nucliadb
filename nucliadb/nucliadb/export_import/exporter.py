@@ -18,12 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
-from nucliadb.export_import.models import ExportedItemType
+from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.models import ExportedItemType, ExportMetadata
 from nucliadb.export_import.utils import (
+    TaskRetryHandler,
     download_binary,
     get_broker_message,
     get_cloud_files,
@@ -32,17 +34,25 @@ from nucliadb.export_import.utils import (
     iter_kb_resource_uuids,
 )
 from nucliadb_protos import writer_pb2
+from nucliadb_telemetry import errors
 
 
 async def export_kb(
-    context: ApplicationContext, kbid: str
+    context: ApplicationContext, kbid: str, metadata: Optional[ExportMetadata] = None
 ) -> AsyncGenerator[bytes, None]:
     """Export the data of a knowledgebox to a stream of bytes.
 
     See https://github.com/nuclia/nucliadb/blob/main/docs/internal/EXPORTS.md
     for an overview on format of the export file/stream.
+
+    If a metadata object is provided, uses it to resume the export if it was interrupted.
     """
-    async for chunk in export_resources(context, kbid):
+    resources_iterator = export_resources(context, kbid)
+    if metadata is not None:
+        assert metadata.kbid == kbid
+        resources_iterator = export_resources_resumable(context, metadata)
+
+    async for chunk in resources_iterator:
         yield chunk
 
     async for chunk in export_entities(context, kbid):
@@ -50,6 +60,23 @@ async def export_kb(
 
     async for chunk in export_labels(context, kbid):
         yield chunk
+
+
+async def export_kb_to_blob_storage(
+    context: ApplicationContext,
+    kbid: str,
+    export_id: str,
+) -> None:
+    """
+    Exports the data of a knowledgebox to the blob storage service.
+    """
+    dm = ExportImportDataManager(context.kv_driver)
+    metadata = await dm.get_metadata(type="export", kbid=kbid, id=export_id)
+    iterator = export_kb(context, kbid, metadata)  # type: ignore
+    upload_export_retried = TaskRetryHandler("export", dm, metadata).wrap(
+        dm.upload_export
+    )
+    await upload_export_retried(context, iterator, kbid, export_id)
 
 
 async def export_resources(
@@ -63,6 +90,41 @@ async def export_resources(
             continue
         async for chunk in export_resource(context, bm):
             yield chunk
+
+
+async def export_resources_resumable(
+    context, metadata: ExportMetadata
+) -> AsyncGenerator[bytes, None]:
+    dm = ExportImportDataManager(context.kv_driver)
+    kbid = metadata.kbid
+    if len(metadata.resources_to_export) == 0:
+        # Starting an export from scratch
+        metadata.exported_resources = []
+        async for rid in iter_kb_resource_uuids(context, kbid):
+            metadata.resources_to_export.append(rid)
+        await dm.set_metadata("export", metadata)
+
+    try:
+        for rid in metadata.resources_to_export:
+            bm = await get_broker_message(context, kbid, rid)
+            if bm is None:
+                logger.warning(f"Skipping resource {rid} as it was deleted")
+                continue
+
+            async for chunk in export_resource(context, bm):
+                yield chunk
+
+            metadata.exported_resources.append(rid)
+            await dm.set_metadata("export", metadata)
+
+    except Exception as e:
+        errors.capture_exception(e)
+        logger.error(f"Error exporting resource {rid}: {e}")
+        # Start from scracth next time.
+        # TODO: try to resume from the last resource
+        metadata.exported_resources = []
+        await dm.set_metadata("export", metadata)
+        raise
 
 
 async def export_resource(

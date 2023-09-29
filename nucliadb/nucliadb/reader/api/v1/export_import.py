@@ -17,12 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import AsyncIterable, Union
+
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
 from starlette.requests import Request
 
+from nucliadb.common.cluster.settings import in_standalone_mode
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.export_import import exceptions as export_exceptions
 from nucliadb.export_import import exporter
+from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.exceptions import MetadataNotFound
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.export_import import Status, StatusResponse
 from nucliadb_models.resource import NucliaDBRoles
@@ -39,15 +47,44 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def download_export_kb_endpoint(
     request: Request, kbid: str, export_id: str
-) -> StreamingResponse:
+) -> Union[StreamingResponse, HTTPClientError]:
     context = get_app_context(request.app)
-    stream = exporter.export_kb(context, kbid)
-    return StreamingResponse(
-        stream,
-        status_code=200,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
-    )
+    if in_standalone_mode():
+        # In standalone mode, we stream the export as we generate it.
+        return StreamingResponse(
+            exporter.export_kb(context, kbid),
+            status_code=200,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
+        )
+    try:
+        download_stream = await get_export_download_stream(context, kbid, export_id)
+        return StreamingResponse(
+            download_stream,
+            status_code=200,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
+        )
+    except export_exceptions.MetadataNotFound:
+        return HTTPClientError(status_code=404, detail="Export not found")
+    except export_exceptions.TaskNotFinishedError:
+        return HTTPClientError(
+            status_code=412,
+            detail=f"Export not yet finished",
+        )
+    except export_exceptions.TaskCancelledError:
+        return HTTPClientError(status_code=412, detail="Export cancelled")
+    except export_exceptions.TaskErrored:
+        return HTTPClientError(status_code=500, detail=f"Export errored")
+
+
+async def get_export_download_stream(
+    context: ApplicationContext, kbid: str, export_id: str
+) -> AsyncIterable[bytes]:
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+    metadata = await dm.get_metadata("export", kbid, export_id)
+    export_exceptions.raise_for_task_status(metadata.status)
+    return dm.download_export(kbid, export_id)
 
 
 @api.get(
@@ -61,8 +98,9 @@ async def download_export_kb_endpoint(
 @version(1)
 async def get_export_status_endpoint(
     request: Request, kbid: str, export_id: str
-) -> StatusResponse:
-    return StatusResponse(status=Status.FINISHED)
+) -> Union[StatusResponse, HTTPClientError]:
+    context = get_app_context(request.app)
+    return await _get_status(context, "export", kbid, export_id)
 
 
 @api.get(
@@ -76,5 +114,29 @@ async def get_export_status_endpoint(
 @version(1)
 async def get_import_status_endpoint(
     request: Request, kbid: str, import_id: str
-) -> StatusResponse:
-    return StatusResponse(status=Status.FINISHED)
+) -> Union[StatusResponse, HTTPClientError]:
+    context = get_app_context(request.app)
+    return await _get_status(context, "import", kbid, import_id)
+
+
+async def _get_status(
+    context: ApplicationContext, type: str, kbid: str, id: str
+) -> Union[StatusResponse, HTTPClientError]:
+    if type not in ("export", "import"):
+        raise ValueError(f"Incorrect type: {type}")
+
+    if in_standalone_mode():
+        # In standalone mode exports/imports are not actually run in a background task.
+        # We return always FINISHED status to keep the API compatible with the hosted mode.
+        return StatusResponse(status=Status.FINISHED)
+
+    try:
+        dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+        metadata = await dm.get_metadata(type, kbid, id)
+        return StatusResponse(
+            status=metadata.status,
+            total=metadata.total,
+            processed=metadata.processed,
+        )
+    except MetadataNotFound:
+        return HTTPClientError(status_code=404, detail=f"{type.capitalize()} not found")
