@@ -18,13 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 import nats
+from pydantic import BaseModel
 
 from nucliadb.common.context import ApplicationContext
 
-TaskCallback = Callable[[ApplicationContext, Any], Awaitable[None]]
+TaskCallback = Callable[[ApplicationContext, BaseModel], Awaitable[None]]
 
 
 async def create_nats_stream_if_not_exists(
