@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import inspect
-import uuid
-from typing import Any, Coroutine, Optional
+from typing import Optional
+
+import pydantic
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb.tasks.datamanager import TasksDataManager
 from nucliadb.tasks.logger import logger
-from nucliadb.tasks.models import Task, TaskNatsMessage, TaskStatus
+from nucliadb.tasks.registry import get_registered_task
+from nucliadb.tasks.utils import create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 
@@ -34,75 +34,68 @@ class NatsTaskProducer:
         self,
         name: str,
         stream: const.Streams,
-        callback=None,
+        msg_type: pydantic.BaseModel,
     ):
         self.name = name
         self.stream = stream
+        self.msg_type = msg_type
         self.context: Optional[ApplicationContext] = None
         self.initialized = False
-        self._dm = None
-        self.callback = callback
-
-    @property
-    def dm(self):
-        if self._dm is None:
-            self._dm = TasksDataManager(self.context.kv_driver)
-        return self._dm
 
     async def initialize(self, context: ApplicationContext):
         self.context = context
-        await self.context.nats_manager.js.add_stream(
-            name=self.stream.name, subjects=[self.stream.subject]  # type: ignore
+        await create_nats_stream_if_not_exists(
+            self.context, self.stream.name, subjects=[self.stream.subject]  # type: ignore
         )
         self.initialized = True
 
-    async def __call__(self, kbid: str, *args: tuple[Any, ...], **kwargs) -> str:
+    async def __call__(self, msg: pydantic.BaseModel) -> int:
+        """
+        Publish message to the producer's nats stream.
+        Returns the sequence number of the published message.
+        """
         if not self.initialized:
             raise RuntimeError("NatsTaskProducer not initialized")
-
-        if self.callback is not None:
-            callback_args = (self.context, kbid, *args)
-            check_is_callable_with(self.callback, *callback_args, **kwargs)
-
-        task_id = uuid.uuid4().hex
-
-        # Store task state
-        task = Task(kbid=kbid, task_id=task_id, status=TaskStatus.SCHEDULED)
-        await self.dm.set_task(task)
-
         try:
-            # Send task to NATS
-            task_msg = TaskNatsMessage(
-                kbid=kbid, task_id=task_id, args=args, kwargs=kwargs
-            )
-            await self.context.nats_manager.js.publish(  # type: ignore
-                self.stream.subject, task_msg.json().encode("utf-8")  # type: ignore
+            pub_ack = await self.context.nats_manager.js.publish(  # type: ignore
+                self.stream.subject, msg.json().encode("utf-8")  # type: ignore
             )
             logger.info(
-                "Task sent to NATS",
-                extra={"kbid": kbid, "producer_name": self.name},
+                "Message sent to Nats",
+                extra={"producer_name": self.name},
             )
         except Exception as e:
             errors.capture_exception(e)
             logger.error(
-                "Error sending task to NATS",
-                extra={"kbid": kbid, "producer_name": self.name},
+                "Error sending message to Nats",
+                extra={"producer_name": self.name},
             )
-            await self.dm.delete_task(task)
             raise
-        return task_id
-
-
-def check_is_callable_with(f, *args, **kwargs) -> None:
-    """
-    Will raise a TypeError if f is not callable with the given arguments.
-    """
-    inspect.getcallargs(f, *args, **kwargs)
+        else:
+            return pub_ack.seq
 
 
 def create_producer(
     name: str,
     stream: const.Streams,
-    callback: Optional[Coroutine[Any, Any, Any]] = None,
+    msg_type: pydantic.BaseModel,
 ) -> NatsTaskProducer:
-    return NatsTaskProducer(name=name, stream=stream, callback=callback)
+    """
+    Returns a non-initialized producer.
+    """
+    return NatsTaskProducer(name=name, stream=stream, msg_type=msg_type)
+
+
+async def get_producer(task_name: str, context: ApplicationContext) -> NatsTaskProducer:
+    """
+    Returns a producer for the given task name, ready to be used to send messages to the task stream.
+    """
+    try:
+        task = get_registered_task(task_name)
+    except KeyError:
+        raise ValueError(f"Task {task_name} not registered")
+    producer = create_producer(
+        name=f"{task_name}_producer", stream=task.stream, msg_type=task.msg_type
+    )
+    await producer.initialize(context)
+    return producer

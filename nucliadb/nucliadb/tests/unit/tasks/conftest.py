@@ -19,21 +19,23 @@
 #
 from unittest.mock import AsyncMock, Mock
 
+import nats
 import pytest
 
 
 @pytest.fixture(scope="function")
-async def nats_manager():
+def nats_manager():
     nats_manager = Mock()
     nats_manager.subscribe = AsyncMock()
     js = Mock()
+    js.stream_info = AsyncMock(side_effect=nats.js.errors.NotFoundError)
     js.add_stream = AsyncMock()
     nats_manager.js = js
     yield nats_manager
 
 
 @pytest.fixture(scope="function")
-async def context(nats_manager):
+def context(nats_manager):
     context = Mock()
     context.initialize = AsyncMock()
     context.nats_manager = nats_manager

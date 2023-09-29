@@ -26,21 +26,13 @@ import pydantic
 from nats.aio.client import Msg
 
 from nucliadb.common.context import ApplicationContext
-from nucliadb.tasks.datamanager import TasksDataManager
-from nucliadb.tasks.exceptions import (
-    TaskMaxTriesReached,
-    TaskNotFoundError,
-    TaskShouldNotBeHandled,
-)
 from nucliadb.tasks.logger import logger
-from nucliadb.tasks.models import Task, TaskNatsMessage, TaskStatus
-from nucliadb.tasks.utils import TaskCallback
+from nucliadb.tasks.registry import get_registered_task
+from nucliadb.tasks.utils import TaskCallback, create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
-
-UNRECOVERABLE_ERRORS = (TaskNotFoundError,)
 
 
 class NatsTaskConsumer:
@@ -49,28 +41,25 @@ class NatsTaskConsumer:
         name: str,
         stream: const.Streams,
         callback: TaskCallback,
-        max_retries: Optional[int] = None,
+        msg_type: pydantic.BaseModel,
     ):
         self.name = name
         self.stream = stream
         self.callback = callback
-        self.max_retries = max_retries
+        self.msg_type = msg_type
         self.initialized = False
         self.context: Optional[ApplicationContext] = None
-        self._dm = None
-
-    @property
-    def dm(self):
-        if self._dm is None:
-            self._dm = TasksDataManager(self.context.kv_driver)
-        return self._dm
 
     async def initialize(self, context: ApplicationContext):
         self.context = context
-        await self.setup_nats_subscription()
+        await create_nats_stream_if_not_exists(
+            self.context, self.stream.name, subjects=[self.stream.subject]  # type: ignore
+        )
+        await self._setup_nats_subscription()
         self.initialized = True
 
-    async def setup_nats_subscription(self):
+    async def _setup_nats_subscription(self):
+        # Nats push consumer
         subject = self.stream.subject
         group = self.stream.group
         stream = self.stream.name
@@ -79,7 +68,7 @@ class NatsTaskConsumer:
             queue=group,
             stream=stream,
             cb=self.subscription_worker,
-            subscription_lost_cb=self.setup_nats_subscription,
+            subscription_lost_cb=self._setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
                 deliver_policy=nats.js.api.DeliverPolicy.ALL,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
@@ -104,9 +93,7 @@ class NatsTaskConsumer:
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ):
             try:
-                task_msg = TaskNatsMessage.parse_raw(msg.data)
-                kbid, task_id = task_msg.kbid, task_msg.task_id
-                task: Task = await self.dm.get_task(kbid, task_id)
+                task_msg = self.msg_type.parse_raw(msg.data)
             except pydantic.ValidationError as e:
                 errors.capture_exception(e)
                 logger.error(
@@ -117,117 +104,68 @@ class NatsTaskConsumer:
                 )
                 await msg.ack()
                 return
-            except TaskNotFoundError:
-                logger.error(
-                    f"Task not found",
-                    extra={
-                        "consumer_name": self.name,
-                        "kbid": kbid,
-                        "task_id": task_id,
-                    },
-                )
-                await msg.ack()
-                return
-
-            try:
-                await self.check_task_state(task)
-            except TaskShouldNotBeHandled:
-                logger.info(
-                    f"Task will not be handled. TaskStatus: {task.status.value}",
-                    extra={
-                        "consumer_name": self.name,
-                        "kbid": kbid,
-                        "task_id": task_id,
-                    },
-                )
-                await msg.ack()
-                return
-            except TaskMaxTriesReached:
-                logger.info(
-                    f"Task failed too many times. Skipping",
-                    extra={
-                        "consumer_name": self.name,
-                        "kbid": kbid,
-                        "task_id": task_id,
-                    },
-                )
-                task.status = TaskStatus.ERRORED
-                await self.dm.set_task(task)
-                await msg.ack()
-                return
 
             logger.info(
-                f"Starting task",
-                extra={"consumer_name": self.name, "kbid": kbid, "task_id": task_id},
+                f"Starting task consumption", extra={"consumer_name": self.name}
             )
-            task.status = TaskStatus.RUNNING
-            task.tries += 1
             try:
-                await self.dm.set_task(task)
-                await self.callback(
-                    self.context, kbid, *task_msg.args, **task_msg.kwargs  # type: ignore
-                )
-            except UNRECOVERABLE_ERRORS as e:
-                errors.capture_exception(e)
-                # Unrecoverable errors are not retried
-                task.status = TaskStatus.ERRORED
-                await msg.ack()
-                return
+                await self.callback(self.context, task_msg)  # type: ignore
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error(
                     f"Unexpected error while handling task",
                     extra={
                         "consumer_name": self.name,
-                        "kbid": kbid,
-                        "task_id": task_id,
                     },
                 )
+                # Nak the message to retry
                 await asyncio.sleep(2)
-                # Set status to failed so that the task is retried
-                task.status = TaskStatus.FAILED
                 await msg.nak()
             else:
                 logger.info(
                     f"Successful task",
                     extra={
                         "consumer_name": self.name,
-                        "kbid": kbid,
-                        "task_id": task_id,
                     },
                 )
-                task.status = TaskStatus.FINISHED
                 await msg.ack()
             finally:
-                await self.dm.set_task(task)
                 return
-
-    async def check_task_state(self, task: Task):
-        if task.status in (
-            TaskStatus.FINISHED,
-            TaskStatus.ERRORED,
-            TaskStatus.CANCELLED,
-        ):
-            raise TaskShouldNotBeHandled()
-        if self.max_retries is not None and task.tries > self.max_retries:
-            raise TaskMaxTriesReached()
-        if task.status == TaskStatus.FAILED:
-            logger.info(
-                f"Retrying {task.task_id} for kbid {task.kbid} for the {task.tries + 1} time",
-                extra={"consumer_name": self.name},
-            )
 
 
 def create_consumer(
     name: str,
     stream: const.Streams,
     callback: TaskCallback,
-    max_retries: Optional[int] = None,
+    msg_type: pydantic.BaseModel,
 ) -> NatsTaskConsumer:
+    """
+    Returns a non-initialized consumer
+    """
     consumer = NatsTaskConsumer(
         name=name,
         stream=stream,
         callback=callback,
-        max_retries=max_retries,
+        msg_type=msg_type,
     )
+    return consumer
+
+
+async def start_consumer(
+    task_name: str, context: ApplicationContext
+) -> NatsTaskConsumer:
+    """
+    Returns an initialized consumer for the given task name, ready to consume messages from the task stream.
+    """
+    try:
+        task = get_registered_task(task_name)
+    except KeyError:
+        raise ValueError(f"Task {task_name} not registered")
+    consumer = create_consumer(
+        name=f"{task_name}_consumer",
+        stream=task.stream,
+        callback=task.callback,
+        msg_type=task.msg_type,
+    )
+    await consumer.initialize(context)
     return consumer

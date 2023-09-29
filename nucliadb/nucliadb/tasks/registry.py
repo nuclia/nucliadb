@@ -18,24 +18,26 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import functools
-from typing import Optional
 
+import pydantic
+
+from nucliadb.tasks.models import RegisteredTask
 from nucliadb_utils import const
 
-REGISTRY = dict()
+REGISTRY: dict[str, RegisteredTask] = dict()
 
 
-def register_task(name: str, stream: const.Streams, max_retries: Optional[int] = None):
+def register_task(name: str, stream: const.Streams, msg_type: pydantic.BaseModel):
     """
     Decorator to register a task in the registry.
     """
 
     def decorator_register(func):
-        REGISTRY[name] = {
-            "func": func,
-            "stream": stream,
-            "max_retries": max_retries,
-        }
+        REGISTRY[name] = RegisteredTask(
+            callback=func,
+            stream=stream,
+            msg_type=msg_type,
+        )
 
         @functools.wraps(func)
         async def wrapper_register(*args, **kwargs):
@@ -46,5 +48,5 @@ def register_task(name: str, stream: const.Streams, max_retries: Optional[int] =
     return decorator_register
 
 
-def get_registered_task(name: str):
+def get_registered_task(name: str) -> RegisteredTask:
     return REGISTRY[name]

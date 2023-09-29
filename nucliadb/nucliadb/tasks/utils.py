@@ -20,6 +20,18 @@
 
 from typing import Any, Awaitable, Callable
 
+import nats
+
 from nucliadb.common.context import ApplicationContext
 
 TaskCallback = Callable[[ApplicationContext, Any], Awaitable[None]]
+
+
+async def create_nats_stream_if_not_exists(
+    context: ApplicationContext, stream_name: str, subjects: list[str]
+):
+    js = context.nats_manager.js
+    try:
+        await js.stream_info(stream_name)
+    except nats.js.errors.NotFoundError:
+        await js.add_stream(name=stream_name, subjects=subjects)

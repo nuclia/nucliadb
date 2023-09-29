@@ -17,12 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import patch
-
+import pydantic
 import pytest
 
 from nucliadb import tasks
-from nucliadb.tasks.models import Task, TaskStatus
 from nucliadb_utils import const
 
 
@@ -32,12 +30,16 @@ class StreamTest(const.Streams):
     subject = "test"
 
 
+class Message(pydantic.BaseModel):
+    kbid: str
+
+
 async def test_start_consumer(context):
     with pytest.raises(ValueError):
         await tasks.start_consumer("foo", context)
 
-    @tasks.register_task("foo", StreamTest)
-    async def some_test_work(context, kbid):
+    @tasks.register_task("foo", StreamTest, msg_type=Message)
+    async def some_test_work(context, msg: Message):
         ...
 
     consumer = await tasks.start_consumer("foo", context)
@@ -48,29 +50,11 @@ async def test_get_producer(context):
     with pytest.raises(ValueError):
         await tasks.get_producer("bar", context)
 
-    @tasks.register_task("bar", StreamTest)
-    async def some_test_work(context, kbid):
+    @tasks.register_task("bar", StreamTest, msg_type=Message)
+    async def some_test_work(context, msg: Message):
         ...
 
     producer = await tasks.get_producer("bar", context)
     assert producer.initialized
-
-
-@patch("nucliadb.tasks.TasksDataManager.get_task")
-async def test_wait_for_task(get_task_mock, context):
-    get_task_mock.return_value = Task(
-        kbid="kbid", task_id="task_id", status=TaskStatus.CANCELLED
-    )
-    with pytest.raises(tasks.TaskCancelled):
-        await tasks.wait_for_task("kbid", "task_id", context)
-
-    get_task_mock.return_value = Task(
-        kbid="kbid", task_id="task_id", status=TaskStatus.ERRORED
-    )
-    with pytest.raises(tasks.TaskErrored):
-        await tasks.wait_for_task("kbid", "task_id", context)
-
-    get_task_mock.return_value = Task(
-        kbid="kbid", task_id="task_id", status=TaskStatus.FINISHED
-    )
-    await tasks.wait_for_task("kbid", "task_id", context)
+    assert producer.msg_type == Message
+    assert producer.name == "bar_producer"

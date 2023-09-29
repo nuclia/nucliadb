@@ -17,37 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
-from enum import Enum
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable, Coroutine
 
 from pydantic import BaseModel
 
+from nucliadb.common.context import ApplicationContext
+from nucliadb_utils import const
 
-class TaskStatus(str, Enum):
-    SCHEDULED = "scheduled"
-    RUNNING = "running"
-    FINISHED = "finished"
-    FAILED = "failed"
-    ERRORED = "errored"
-    CANCELLED = "cancelled"
+Callback = Callable[[ApplicationContext, BaseModel], Coroutine[Any, Any, Any]]
 
 
-class Task(BaseModel):
-    """
-    Basic metadata for the async tasks
-    """
-
-    kbid: str
-    task_id: str
-    status: TaskStatus
-    tries: int = 0
-    created_at: datetime = datetime.utcnow()
-    updated_at: datetime = datetime.utcnow()
-
-
-class TaskNatsMessage(BaseModel):
-    kbid: str
-    task_id: str
-    args: tuple[Any, ...] = tuple()
-    kwargs: dict[str, Any] = dict()
+@dataclass
+class RegisteredTask:
+    stream: const.Streams
+    callback: Callback
+    msg_type: BaseModel

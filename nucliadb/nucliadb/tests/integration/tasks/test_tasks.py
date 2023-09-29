@@ -18,8 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 from contextlib import contextmanager
 
+import pydantic
 import pytest
 
 from nucliadb import tasks
@@ -48,7 +50,10 @@ async def context(nucliadb, natsd):
 
 
 async def test_tasks_registry_api(context):
-    work_done = {}
+    work_done = asyncio.Event()
+
+    class Message(pydantic.BaseModel):
+        kbid: str
 
     class MyStreams(const.Streams):
         class SOME_WORK:
@@ -56,21 +61,27 @@ async def test_tasks_registry_api(context):
             subject = "work"
             group = "work"
 
-    @tasks.register_task(name="some_work", stream=MyStreams.SOME_WORK)
-    async def some_work(context: ApplicationContext, kbid: str, amount: int):
+    @tasks.register_task(name="some_work", stream=MyStreams.SOME_WORK, msg_type=Message)
+    async def some_work(context: ApplicationContext, msg: Message):
         nonlocal work_done
-        work_done.setdefault(kbid, 0)
-        work_done[kbid] += amount
+        work_done.set()
 
     producer = await tasks.get_producer("some_work", context=context)
-    task_id = await producer("kbid1", 1)
+
+    msg = Message(kbid="kbid1")
+    await producer(msg)
+
     await tasks.start_consumer("some_work", context=context)
-    await tasks.wait_for_task("kbid1", task_id, context=context)
-    assert work_done["kbid1"] == 1
+
+    await work_done.wait()
+    work_done.clear()
 
 
 async def test_tasks_factory_api(context):
-    work_done = {}
+    work_done = asyncio.Event()
+
+    class Message(pydantic.BaseModel):
+        kbid: str
 
     class MyStreams(const.Streams):
         class SOME_WORK:
@@ -78,25 +89,27 @@ async def test_tasks_factory_api(context):
             subject = "work"
             group = "work"
 
-    async def some_work(context: ApplicationContext, kbid: str, amount: int):
+    async def some_work(context: ApplicationContext, msg: Message):
         nonlocal work_done
-        work_done.setdefault(kbid, 0)
-        work_done[kbid] += amount
+        work_done.set()
 
     producer = tasks.create_producer(
         name="some_work",
         stream=MyStreams.SOME_WORK,
+        msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
         stream=MyStreams.SOME_WORK,
-        max_retries=10,
         callback=some_work,
+        msg_type=Message,
     )
     await consumer.initialize(context=context)
 
-    task_id = await producer("kbid1", 1)
-    await tasks.wait_for_task("kbid1", task_id, context=context)
-    assert work_done["kbid1"] == 1
+    msg = Message(kbid="kbid1")
+    await producer(msg)
+
+    await work_done.wait()
+    work_done.clear()

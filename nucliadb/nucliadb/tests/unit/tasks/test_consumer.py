@@ -19,11 +19,14 @@
 #
 from unittest.mock import AsyncMock, MagicMock
 
+import pydantic
 import pytest
 
-from nucliadb.tasks import TaskNotFoundError
 from nucliadb.tasks.consumer import create_consumer
-from nucliadb.tasks.models import Task, TaskNatsMessage, TaskStatus
+
+
+class Message(pydantic.BaseModel):
+    kbid: str
 
 
 def test_create_consumer():
@@ -32,13 +35,15 @@ def test_create_consumer():
     async def callback():
         ...
 
-    consumer = create_consumer("foo", stream=stream, callback=callback, max_retries=3)
+    consumer = create_consumer(
+        "foo", stream=stream, msg_type=Message, callback=callback
+    )
     assert not consumer.initialized
 
     assert consumer.name == "foo"
     assert consumer.stream == stream
     assert consumer.callback == callback
-    assert consumer.max_retries == 3
+    assert consumer.msg_type == Message
 
 
 class TestSubscriptionWorker:
@@ -47,43 +52,38 @@ class TestSubscriptionWorker:
         yield AsyncMock()
 
     @pytest.fixture(scope="function")
-    def task(self):
-        task = Task(kbid="kbid", task_id="task_id", status=TaskStatus.SCHEDULED)
-        yield task
-
-    @pytest.fixture(scope="function")
-    async def datamanager(self, task):
-        dm = MagicMock()
-        dm.get_task = AsyncMock(return_value=task)
-        dm.set_task = AsyncMock()
-        yield dm
-
-    @pytest.fixture(scope="function")
-    async def consumer(self, context, callback, datamanager):
+    async def consumer(self, context, callback):
         consumer = create_consumer(
-            "foo", stream=MagicMock(), callback=callback, max_retries=1
+            "foo", stream=MagicMock(), callback=callback, msg_type=Message
         )
         await consumer.initialize(context)
-        consumer._dm = datamanager
         yield consumer
 
     @pytest.fixture(scope="function")
-    def task_nats_message(self):
-        yield TaskNatsMessage(kbid="kbid", task_id="task_id")
+    def task_message(self):
+        yield Message(kbid="kbid")
 
     @pytest.fixture(scope="function")
-    def msg(self, task_nats_message):
-        data = task_nats_message.json().encode("utf-8")
+    def msg(self, task_message):
+        data = task_message.json().encode("utf-8")
         msg = MagicMock()
         msg.data = data
         msg.ack = AsyncMock()
         msg.nak = AsyncMock()
         yield msg
 
-    async def test_success(self, consumer, msg):
+    async def test_callback_ok(self, consumer, msg, callback):
         await consumer.subscription_worker(msg)
 
-        assert consumer.dm.set_task.call_args[0][0].status == TaskStatus.FINISHED
+        callback.assert_called_once()
+
+    async def test_callback_error(self, consumer, msg, callback):
+        callback.side_effect = Exception("foo")
+
+        await consumer.subscription_worker(msg)
+
+        callback.assert_called_once()
+        msg.nak.assert_called_once()
 
     async def test_validation_error(self, consumer, msg):
         msg.data = b"foo"
@@ -91,71 +91,3 @@ class TestSubscriptionWorker:
         await consumer.subscription_worker(msg)
 
         msg.ack.assert_called_once()
-
-    async def test_task_not_found(self, consumer, msg):
-        consumer.dm.get_task.side_effect = TaskNotFoundError
-
-        await consumer.subscription_worker(msg)
-
-        msg.ack.assert_called_once()
-
-    async def test_task_finished_are_not_scheduled(self, consumer, msg):
-        consumer.dm.get_task.return_value.status = TaskStatus.FINISHED
-
-        await consumer.subscription_worker(msg)
-
-        msg.ack.assert_called_once()
-
-    async def test_task_errored_are_not_scheduled(self, consumer, msg):
-        consumer.dm.get_task.return_value.status = TaskStatus.ERRORED
-
-        await consumer.subscription_worker(msg)
-
-        msg.ack.assert_called_once()
-
-    async def test_task_cancelled_are_not_scheduled(self, consumer, msg):
-        consumer.dm.get_task.return_value.status = TaskStatus.CANCELLED
-
-        await consumer.subscription_worker(msg)
-
-        msg.ack.assert_called_once()
-
-    async def test_task_max_tries_are_not_scheduled(self, consumer, msg):
-        consumer.dm.get_task.return_value.tries = 30
-
-        await consumer.subscription_worker(msg)
-
-        msg.ack.assert_called_once()
-
-    async def test_task_failed_are_scheduled(self, consumer, msg):
-        consumer.dm.get_task.return_value.status = TaskStatus.FAILED
-        consumer.dm.get_task.return_value.tries = 1
-
-        await consumer.subscription_worker(msg)
-
-        assert consumer.dm.set_task.call_args[0][0].status == TaskStatus.FINISHED
-
-    async def test_task_callback_retriable_errors(self, consumer, msg, callback):
-        callback.side_effect = [Exception("foo"), None]
-
-        await consumer.subscription_worker(msg)
-
-        # First call is the one that fails
-        msg.nak.assert_called_once()
-        end_status = consumer.dm.set_task.call_args_list[-1][0][0].status
-        assert end_status == TaskStatus.FAILED
-
-        await consumer.subscription_worker(msg)
-
-        # Second call is the one that succeeds
-        end_status = consumer.dm.set_task.call_args_list[-1][0][0].status
-        assert end_status == TaskStatus.FINISHED
-
-    async def test_task_callback_unrecoverable_errors(self, consumer, msg, callback):
-        callback.side_effect = TaskNotFoundError
-
-        await consumer.subscription_worker(msg)
-
-        msg.ack.assert_called_once()
-        end_status = consumer.dm.set_task.call_args_list[-1][0][0].status
-        assert end_status == TaskStatus.ERRORED
