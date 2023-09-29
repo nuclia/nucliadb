@@ -21,6 +21,9 @@
 requires = ["maturin>=0.12,<0.13"]
 build-backend = "maturin"
 
+[tool.maturin]
+profile = "release-wheel"
+
 [project]
 name = "nucliadb_node_binding"
 requires-python = ">=3.6"
