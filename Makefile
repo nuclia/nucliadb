@@ -128,7 +128,7 @@ debug-run-nucliadb-redis:
 
 build-node-binding:
 	rm -rf target/wheels/*
-	maturin build -m nucliadb_node_binding/Cargo.toml --release
+	maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-node-binding-debug:
