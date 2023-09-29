@@ -102,7 +102,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --profile release-wheel --out dist --interpreter ${{ matrix.interpreter || '3.8 3.9 3.10 3.11 pypy3.8 pypy3.9' }}
+          args: -m nucliadb_node_binding/Cargo.toml --out dist --interpreter ${{matrix.interpreter || '3.8 3.9 3.10 3.11 pypy3.8 pypy3.9' }} --profile release-wheel
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
