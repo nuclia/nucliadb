@@ -42,11 +42,5 @@ setup(
     zip_safe=True,
     include_package_data=True,
     packages=find_packages(),
-    install_requires=requirements,
-    entry_points={
-        "console_scripts": [
-            "nucliadb_export = nucliadb_client.export:run",
-            "nucliadb_import = nucliadb_client.importing:run",
-        ]
-    },
+    install_requires=["nucliadb_sdk"],
 )
