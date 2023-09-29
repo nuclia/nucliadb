@@ -66,19 +66,18 @@ pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitG
 
 fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sync> {
     let log_levels = settings.log_levels().to_vec();
-
     let layer = tracing_subscriber::fmt::layer()
         .with_level(true)
         .with_target(true);
 
-    if settings.json_logs() {
-        layer
-            .event_format(tracing_subscriber::fmt::format().json())
-            .with_filter(Targets::new().with_targets(log_levels))
-            .boxed()
-    } else {
+    if settings.plain_logs() {
         layer
             .event_format(tracing_subscriber::fmt::format().compact())
+            .with_filter(Targets::new().with_targets(log_levels))
+            .boxed()
+    else {
+        layer
+            .event_format(tracing_subscriber::fmt::format().json())
             .with_filter(Targets::new().with_targets(log_levels))
             .boxed()
     }

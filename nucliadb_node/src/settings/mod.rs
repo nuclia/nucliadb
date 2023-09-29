@@ -82,7 +82,7 @@ pub struct Settings {
     span_levels: Vec<(String, Level)>,
 
     #[builder(default = "true", setter(custom))]
-    json_logs: bool,
+    plain_logs: bool,
 
     // Telemetry
     #[builder(default = "false", setter(custom))]
@@ -162,9 +162,9 @@ impl Settings {
         &self.log_levels
     }
 
-    /// When enabled, stdout logs are formatted as JSON
-    pub fn json_logs(&self) -> bool {
-        self.json_logs
+    /// When enabled, stdout logs are formatted as plain compact
+    pub fn plain_logs(&self) -> bool {
+        self.plain_logs
     }
 
     /// Span levels. Every element is a crate-level pair
