@@ -81,7 +81,7 @@ pub struct Settings {
     )]
     span_levels: Vec<(String, Level)>,
 
-    #[builder(default = "true", setter(custom))]
+    #[builder(default = "false", setter(custom))]
     plain_logs: bool,
 
     // Telemetry

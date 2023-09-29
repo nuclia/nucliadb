@@ -117,24 +117,14 @@ mod tests {
 
     #[test]
     fn test_parse_log_levels() {
-        let levels = "nucliadb=INFO,node_reader=DEBUG,node_writer=TRACE";
+        let levels = "nucliadb=INFO,node_*=DEBUG,*=TRACE";
         let res = parse_log_levels(levels);
         assert_eq!(
             vec![
                 ("nucliadb".to_string(), Level::from_str("INFO").unwrap()),
-                ("node_reader".to_string(), Level::from_str("DEBUG").unwrap()),
-                ("node_writer".to_string(), Level::from_str("TRACE").unwrap())
+                ("node_*".to_string(), Level::from_str("DEBUG").unwrap()),
+                ("*".to_string(), Level::from_str("TRACE").unwrap())
             ],
-            res
-        );
-    }
-
-    #[test]
-    fn test_parse_log_levels_with_catchall() {
-        let levels = "nucliadb=INFO,*=DEBUG,node_writer=TRACE";
-        let res = parse_log_levels(levels);
-        assert_eq!(
-            vec![("*".to_string(), Level::from_str("DEBUG").unwrap()),],
             res
         );
     }

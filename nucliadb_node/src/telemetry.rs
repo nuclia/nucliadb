@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use nucliadb_core::tracing::{Level, Span};
@@ -71,25 +72,39 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
         .with_level(true)
         .with_target(true);
 
+    let mut logs_map = HashMap::new();
+    let mut all_target_level = LevelFilter::OFF;
+    let mut prefixes = vec![];
+
+    for (target, log_level) in log_levels.iter() {
+        if target == ALL_TARGETS {
+            all_target_level = LevelFilter::from_level(*log_level);
+            println!("{:?}", all_target_level);
+        } else if target.ends_with('*') {
+            prefixes.push((target[..target.len() - 1].to_owned(), *log_level));
+        } else {
+            logs_map.insert(target.clone(), *log_level);
+        }
+    }
+
     let filter = FilterFn::new(move |metadata| {
-        let metadata_target = String::from(metadata.target());
+        // match all
+        println!("is {:?} <= {:?}", all_target_level, metadata.level());
 
-        for (target, log_level) in log_levels.iter() {
-            let mut target = String::from(target);
-
-            if metadata.level() <= log_level {
-                // exact match or match all `*`
-                if target == metadata_target || target == ALL_TARGETS {
-                    return true;
-                }
-                // starts with
-                if target.len() > 1 && target.ends_with('*') {
-                    target.truncate(target.len() - 1);
-                    if metadata_target.starts_with(&target) {
-                        println!("true");
-                        return true;
-                    }
-                }
+        if all_target_level != LevelFilter::OFF && all_target_level >= *metadata.level() {
+            return true;
+        }
+        let metadata_target = metadata.target();
+        // exact match
+        if let Some(log_level) = logs_map.get(metadata_target) {
+            if log_level >= metadata.level() {
+                return true;
+            }
+        }
+        // prefixes match
+        for (prefix, log_level) in prefixes.iter() {
+            if log_level >= metadata.level() && metadata_target.starts_with(prefix) {
+                return true;
             }
         }
         false
