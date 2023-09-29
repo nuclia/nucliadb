@@ -68,3 +68,9 @@ def collect_cfs(bm: BrokerMessage, binaries: List[CloudFile]):
     for field_metadata in bm.field_metadata:
         if field_metadata.metadata.metadata.HasField("thumbnail"):
             clone_collect_cf(binaries, field_metadata.metadata.metadata.thumbnail)
+
+
+def warn_deprecated(reason):
+    import warnings
+
+    warnings.warn(reason, category=DeprecationWarning, stacklevel=2)
