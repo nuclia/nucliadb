@@ -42,7 +42,6 @@ type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 #[tokio::main]
 async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
-
     let start_bootstrap = Instant::now();
 
     let settings = Arc::new(EnvSettingsProvider::generate_settings()?);
@@ -72,7 +71,6 @@ async fn main() -> NodeResult<()> {
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    warn!("NucliaDB Reader Node starting...");
     wait_for_sigkill().await?;
     info!("Shutting down NucliaDB Reader Node...");
     metrics_task.abort();
