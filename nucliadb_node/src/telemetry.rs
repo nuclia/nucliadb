@@ -19,7 +19,6 @@
 
 use std::sync::Arc;
 
-use nucliadb_core::tracing::*;
 use nucliadb_core::tracing::{Level, Span};
 use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;
@@ -27,7 +26,6 @@ use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, LevelFilter, Targets};
-use tracing_subscriber::fmt::format::Format;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
@@ -68,18 +66,19 @@ pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitG
 
 fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sync> {
     let log_levels = settings.log_levels().to_vec();
-    if settings.json_logs() {
-        let json_layer =
-            tracing_subscriber::fmt::layer().event_format(tracing_subscriber::fmt::format().json());
 
-        json_layer
+    let layer = tracing_subscriber::fmt::layer()
+        .with_level(true)
+        .with_target(true);
+
+    if settings.json_logs() {
+        layer
+            .event_format(tracing_subscriber::fmt::format().json())
             .with_filter(Targets::new().with_targets(log_levels))
             .boxed()
     } else {
-        let compact_layer = tracing_subscriber::fmt::layer()
-            .event_format(tracing_subscriber::fmt::format().compact().with_level(true));
-
-        compact_layer
+        layer
+            .event_format(tracing_subscriber::fmt::format().compact())
             .with_filter(Targets::new().with_targets(log_levels))
             .boxed()
     }
