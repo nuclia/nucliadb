@@ -84,20 +84,6 @@ pub fn host_key_path() -> PathBuf {
     }
 }
 
-pub fn num_paragraph_search_threads() -> usize {
-    match env::var("NUM_PARAGRAPH_SEARCH_THREADS") {
-        Ok(threadstr) => {
-            if let Ok(threads) = threadstr.parse() {
-                threads
-            } else {
-                error!("NUM_PARAGRAPH_SEARCH_THREADS defined incorrectly. Defaulting to num cpus.");
-                num_cpus::get()
-            }
-        }
-        Err(_) => num_cpus::get(),
-    }
-}
-
 pub fn num_global_rayon_threads() -> usize {
     match env::var("NUM_GLOBAL_RAYON_THREADS") {
         Ok(threadstr) => {

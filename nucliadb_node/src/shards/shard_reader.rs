@@ -173,7 +173,6 @@ impl ShardReader {
 
         let psc: ParagraphConfig = ParagraphConfig {
             path: shard_path.join(PARAGRAPHS_DIR),
-            num_threads: env::num_paragraph_search_threads(),
         };
 
         let channel = metadata.channel.unwrap_or_default();

@@ -257,7 +257,6 @@ impl ParagraphReaderService {
         }
         let paragraph_schema = ParagraphSchema::default();
         let mut index = Index::open_in_dir(&config.path)?;
-        index.set_multithread_executor(config.num_threads)?;
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
@@ -641,7 +640,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
-            num_threads: 4,
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
@@ -695,7 +693,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
-            num_threads: 4,
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
