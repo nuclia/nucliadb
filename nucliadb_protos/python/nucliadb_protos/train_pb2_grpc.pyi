@@ -109,6 +109,7 @@ from nucliadb_protos.writer_pb2 import (
     BinaryData as BinaryData,
     BinaryMetadata as BinaryMetadata,
     BrokerMessage as BrokerMessage,
+    BrokerMessageBlobReference as BrokerMessageBlobReference,
     DelEntitiesRequest as DelEntitiesRequest,
     DelLabelsRequest as DelLabelsRequest,
     DelVectorSetRequest as DelVectorSetRequest,

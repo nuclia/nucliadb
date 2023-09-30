@@ -21,12 +21,17 @@ import asyncio
 import uuid
 from asyncio import Event
 from functools import partial
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, OpStatusWriter
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    BrokerMessageBlobReference,
+    Notification,
+    OpStatusWriter,
+)
 
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_utils import const, logger
@@ -78,7 +83,7 @@ class TransactionUtility:
 
     def __init__(
         self,
-        nats_servers: List[str],
+        nats_servers: list[str],
         nats_creds: Optional[str] = None,
     ):
         self.nats_creds = nats_creds
@@ -142,7 +147,7 @@ class TransactionUtility:
     async def initialize(self, service_name: Optional[str] = None):
         self.pubsub = await get_pubsub()  # type: ignore
 
-        options: Dict[str, Any] = {
+        options: dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
             "reconnected_cb": self.reconnected_cb,
@@ -166,13 +171,15 @@ class TransactionUtility:
 
     async def commit(
         self,
-        writer: BrokerMessage,
+        writer: Union[BrokerMessage, BrokerMessageBlobReference],
         partition: int,
         wait: bool = False,
         target_subject: Optional[
             str
         ] = None,  # allow customizing where to send the message
+        headers: Optional[dict[str, str]] = None,
     ) -> int:
+        headers = headers or {}
         waiting_event: Optional[Event] = None
 
         waiting_for = WaitFor(uuid=writer.uuid)
@@ -186,7 +193,9 @@ class TransactionUtility:
         if target_subject is None:
             target_subject = const.Streams.INGEST.subject.format(partition=partition)
 
-        res = await self.js.publish(target_subject, writer.SerializeToString())
+        res = await self.js.publish(
+            target_subject, writer.SerializeToString(), headers=headers
+        )
 
         waiting_for.seq = res.seq
 
