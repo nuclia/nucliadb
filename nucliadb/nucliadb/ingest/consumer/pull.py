@@ -75,7 +75,8 @@ class PullWorker:
 
     async def handle_message(self, payload: str) -> None:
         pb = BrokerMessage()
-        pb.ParseFromString(base64.b64decode(payload))
+        data = base64.b64decode(payload)
+        pb.ParseFromString(data)
 
         logger.debug(
             f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}"
@@ -94,9 +95,7 @@ class PullWorker:
                 )
             except nats.errors.MaxPayloadError:
                 storage = await get_storage()
-                stored_key = await storage.set_stream_message(
-                    kbid=pb.kbid, data=payload
-                )
+                stored_key = await storage.set_stream_message(kbid=pb.kbid, data=data)
                 referenced_pb = BrokerMessageBlobReference(
                     uuid=pb.uuid, kbid=pb.kbid, storage_key=stored_key
                 )
