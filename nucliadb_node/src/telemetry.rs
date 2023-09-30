@@ -31,7 +31,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
-use crate::env::debug;
+use crate::env::is_debug;
 use crate::settings::Settings;
 use crate::utils::ALL_TARGETS;
 
@@ -113,7 +113,7 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
         false
     });
 
-    if settings.plain_logs() || debug {
+    if settings.plain_logs() || is_debug() {
         layer
             .event_format(tracing_subscriber::fmt::format().compact())
             .with_filter(filter)

@@ -37,12 +37,8 @@ pub fn shards_path() -> PathBuf {
     data_path().join("shards")
 }
 
-pub fn debug() -> bool {
-    let default = false;
-    match env::var("DEBUG") {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+pub fn is_debug() -> bool {
+    env::var("DEBUG").is_ok()
 }
 
 pub fn log_level() -> Vec<(String, Level)> {
