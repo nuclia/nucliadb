@@ -79,7 +79,6 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
     for (target, log_level) in log_levels.iter() {
         if target == ALL_TARGETS {
             all_target_level = LevelFilter::from_level(*log_level);
-            println!("{:?}", all_target_level);
         } else if target.ends_with('*') {
             prefixes.push((target[..target.len() - 1].to_owned(), *log_level));
         } else {
@@ -89,8 +88,6 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
 
     let filter = FilterFn::new(move |metadata| {
         // match all
-        println!("is {:?} <= {:?}", all_target_level, metadata.level());
-
         if all_target_level != LevelFilter::OFF && all_target_level >= *metadata.level() {
             return true;
         }
