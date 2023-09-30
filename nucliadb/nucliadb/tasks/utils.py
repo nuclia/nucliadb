@@ -18,6 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-KB_ENTITIES = "/kbs/{kbid}/entities"
-KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
-KB_DELETED_ENTITIES_GROUPS = "/kbs/{kbid}/deletedentities"
+from typing import Awaitable, Callable
+
+import nats
+from pydantic import BaseModel
+
+from nucliadb.common.context import ApplicationContext
+
+TaskCallback = Callable[[ApplicationContext, BaseModel], Awaitable[None]]
+
+
+async def create_nats_stream_if_not_exists(
+    context: ApplicationContext, stream_name: str, subjects: list[str]
+):
+    js = context.nats_manager.js
+    try:
+        await js.stream_info(stream_name)
+    except nats.js.errors.NotFoundError:
+        await js.add_stream(name=stream_name, subjects=subjects)

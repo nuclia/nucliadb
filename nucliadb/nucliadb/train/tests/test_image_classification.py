@@ -142,7 +142,7 @@ async def image_classification_resource(
         ) as _,
     ):
         resp = await nucliadb_grpc.ProcessMessage(  # type: ignore
-            [broker_message], timeout=10, wait_for_ready=True
+            iter([broker_message]), timeout=10, wait_for_ready=True
         )
         assert resp.status == OpStatusWriter.Status.OK
         yield

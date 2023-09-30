@@ -152,7 +152,7 @@ class KnowledgeBox:
 
     def new_vectorset(self, key: str, dimension: int, similarity: Optional[str] = None):
         self.client.set_vectorset(
-            key, VectorSet(dimension=dimension, similarity=similarity)
+            key, VectorSet(dimension=dimension, similarity=similarity)  # type: ignore
         )
 
     async def async_list_vectorset(self) -> VectorSets:
@@ -336,7 +336,7 @@ class KnowledgeBox:
         for labelset, labelset_obj in response.items():
             base_label = f"/l/{labelset}"
             search_result = self.client.search(
-                SearchRequest(features=["document"], faceted=[base_label], page_size=0)
+                SearchRequest(features=["document"], faceted=[base_label], page_size=0)  # type: ignore
             )
             if search_result.fulltext is None or search_result.fulltext.facets is None:
                 raise Exception("Search error")
@@ -349,7 +349,7 @@ class KnowledgeBox:
     def get_uploaded_labels(self) -> Dict[str, LabelSet]:
         # Search for fulltext with faceted for labelsets
         search_result = self.client.search(
-            SearchRequest(features=["document"], faceted=["/l"], page_size=0)
+            SearchRequest(features=["document"], faceted=["/l"], page_size=0)  # type: ignore
         )
 
         return self.process_uploaded_labels_from_search(search_result)
@@ -357,7 +357,7 @@ class KnowledgeBox:
     async def async_get_uploaded_labels(self) -> Dict[str, LabelSet]:
         # Search for fulltext with faceted for labelsets
         search_result = await self.client.async_search(
-            SearchRequest(features=["document"], faceted=["/l"], page_size=0)
+            SearchRequest(features=["document"], faceted=["/l"], page_size=0)  # type: ignore
         )
 
         return self.process_uploaded_labels_from_search(search_result)
@@ -389,7 +389,7 @@ class KnowledgeBox:
             payload = CreateEntitiesGroupPayload(
                 group=entity_group,
                 title=entity_group,
-                entities={entity: {"value": entity} for entity in entities},
+                entities={entity: {"value": entity} for entity in entities},  # type: ignore
             )
             resp = self.client.writer_session.post(
                 "/entitiesgroups",

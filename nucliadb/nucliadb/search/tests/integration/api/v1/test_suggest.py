@@ -21,7 +21,7 @@ from typing import Callable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.nodereader_pb2 import SuggestRequest
+from nucliadb_protos.nodereader_pb2 import SuggestFeatures, SuggestRequest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.common.cluster.manager import INDEX_NODES
@@ -74,10 +74,12 @@ async def test_suggest_resource_all(
                 assert shard.paragraphs == 2
                 assert shard.sentences == 3
 
-                prequest = SuggestRequest()
+                prequest = SuggestRequest(
+                    features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
+                )
                 prequest.shard = replica.shard.id
                 prequest.body = "Ramon"
 
                 suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
-                assert suggest.total == 1
+                assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"
     await txn.abort()

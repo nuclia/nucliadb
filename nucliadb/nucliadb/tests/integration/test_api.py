@@ -722,3 +722,36 @@ async def test_language_metadata(
     res = resp.json()
     assert res["metadata"]["language"] == "de"
     assert res["metadata"]["languages"] == []
+
+
+@pytest.mark.asyncio
+async def test_story_7081(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+        },
+    )
+
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{knowledgebox}/resource/{rid}",
+        json={"origin": {"metadata": {"some": "data"}}},
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=origin",
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["origin"]["metadata"]["some"] == "data"

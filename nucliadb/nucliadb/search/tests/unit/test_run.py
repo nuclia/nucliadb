@@ -27,7 +27,9 @@ from nucliadb.search.run import run
 
 @pytest.fixture(scope="function")
 def run_fastapi_with_metrics():
-    with patch("nucliadb.search.run.run_fastapi_with_metrics") as mocked:
+    with patch("nucliadb.search.run.run_fastapi_with_metrics") as mocked, patch(
+        "nucliadb.search.run.instrument_app"
+    ):
         yield mocked
 
 

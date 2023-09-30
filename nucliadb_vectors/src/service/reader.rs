@@ -20,8 +20,6 @@
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
@@ -29,6 +27,7 @@ use nucliadb_core::protos::{
     VectorSearchResponse,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 
 use crate::data_point_provider::*;
 use crate::formula::{AtomClause, CompoundClause, Formula};
@@ -65,44 +64,25 @@ impl Debug for VectorReaderService {
 impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
-        let time = SystemTime::now();
-
         let indexet_slock = self.indexset.get_slock()?;
         if vectorset.is_empty() {
             debug!("Id for the vectorset is empty");
-            let index_slock = self.index.get_slock()?;
-            let no_nodes = self.index.no_nodes(&index_slock);
-            std::mem::drop(index_slock);
-
-            let metrics = metrics::get_metrics();
-            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors("count".to_string());
-            metrics.record_request_time(metric, took);
-            debug!("Ending at {took} ms");
-
-            Ok(no_nodes)
+            self.index_count(&self.index)
         } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
             debug!("Counting nodes for {vectorset}");
-            let lock = index.get_slock()?;
-            let no_nodes = index.no_nodes(&lock);
-            std::mem::drop(lock);
-
-            let metrics = metrics::get_metrics();
-            let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-            let metric = request_time::RequestTimeKey::vectors("count".to_string());
-            metrics.record_request_time(metric, took);
-            debug!("Ending at {took} ms");
-
-            Ok(no_nodes)
+            self.index_count(&index)
         } else {
             debug!("There was not a set called {vectorset}");
             Ok(0)
         }
     }
 }
+
 impl ReaderChild for VectorReaderService {
     type Request = VectorSearchRequest;
     type Response = VectorSearchResponse;
+
+    #[measure(actor = "vectors", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
         let time = SystemTime::now();
@@ -173,10 +153,7 @@ impl ReaderChild for VectorReaderService {
             debug!("{id:?} - Creating results: ends at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("search".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(VectorSearchResponse {
@@ -185,6 +162,8 @@ impl ReaderChild for VectorReaderService {
             result_per_page: request.result_per_page,
         })
     }
+
+    #[measure(actor = "vectors", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
         let time = SystemTime::now();
@@ -217,6 +196,7 @@ impl TryFrom<Neighbour> for DocumentScored {
         })
     }
 }
+
 impl VectorReaderService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
@@ -231,6 +211,14 @@ impl VectorReaderService {
             indexset: IndexSet::new(&config.vectorset)?,
         })
     }
+
+    #[measure(actor = "vectors", metric = "count")]
+    fn index_count(&self, index: &Index) -> NodeResult<usize> {
+        let lock = index.get_slock()?;
+        let no_nodes = index.no_nodes(&lock);
+        std::mem::drop(lock);
+        Ok(no_nodes)
+    }
 }
 
 #[cfg(test)]
@@ -241,6 +229,7 @@ mod tests {
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
     };
+    use nucliadb_core::Channel;
     use tempfile::TempDir;
 
     use super::*;
@@ -253,6 +242,7 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -372,6 +362,7 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]),

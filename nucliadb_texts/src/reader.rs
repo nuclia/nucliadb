@@ -22,8 +22,6 @@ use std::fmt::Debug;
 use std::time::*;
 
 use itertools::Itertools;
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
@@ -31,6 +29,7 @@ use nucliadb_core::protos::{
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::schema::*;
@@ -117,23 +116,16 @@ impl FieldReader for TextReaderService {
 impl ReaderChild for TextReaderService {
     type Request = DocumentSearchRequest;
     type Response = DocumentSearchResponse;
+
+    #[measure(actor = "texts", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        let time = SystemTime::now();
-
-        let result = self.do_search(request)?;
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("search".to_string());
-        metrics.record_request_time(metric, took);
-
-        Ok(result)
+        self.do_search(request)
     }
+
+    #[measure(actor = "texts", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
-
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -146,11 +138,6 @@ impl ReaderChild for TextReaderService {
             };
             keys.push(key);
         }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::texts("stored_ids".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(keys)
     }
@@ -441,6 +428,7 @@ impl TextReaderService {
             }
         }
     }
+
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()
     }
@@ -502,236 +490,5 @@ impl Iterator for BatchProducer {
             debug!("New batch created, took {v} ms");
         }
         Some(items)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::time::SystemTime;
-
-    use nucliadb_core::protos::prost_types::Timestamp;
-    use nucliadb_core::protos::resource::ResourceStatus;
-    use nucliadb_core::protos::{
-        Faceted, Filter, IndexMetadata, OrderBy, Resource, ResourceId, TextInformation, Timestamps,
-    };
-    use nucliadb_core::NodeResult;
-    use tempfile::TempDir;
-
-    use super::*;
-    use crate::writer::TextWriterService;
-
-    fn create_resource(shard_id: String) -> Resource {
-        let resource_id = ResourceId {
-            shard_id: shard_id.to_string(),
-            uuid: "f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string(),
-        };
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
-        let metadata = IndexMetadata {
-            created: Some(timestamp.clone()),
-            modified: Some(timestamp),
-        };
-
-        const DOC1_TI: &str = "This is the first document";
-        const DOC1_P1: &str = "This is the text of the second paragraph.";
-        const DOC1_P2: &str = "This should be enough to test the tantivy.";
-        const DOC1_P3: &str = "But I wanted to make it three anyway.";
-
-        let ti_title = TextInformation {
-            text: DOC1_TI.to_string(),
-            labels: vec!["/l/mylabel".to_string(), "/e/myentity".to_string()],
-        };
-
-        let ti_body = TextInformation {
-            text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
-            labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
-        };
-
-        let mut texts = HashMap::new();
-        texts.insert("title".to_string(), ti_title);
-        texts.insert("body".to_string(), ti_body);
-
-        Resource {
-            resource: Some(resource_id),
-            metadata: Some(metadata),
-            texts,
-            status: ResourceStatus::Processed as i32,
-            labels: vec![],
-            paragraphs: HashMap::new(),
-            paragraphs_to_delete: vec![],
-            sentences_to_delete: vec![],
-            relations_to_delete: vec![],
-            relations: vec![],
-            vectors: HashMap::default(),
-            vectors_to_delete: HashMap::default(),
-            shard_id,
-        }
-    }
-
-    #[test]
-    fn test_new_reader() -> NodeResult<()> {
-        let dir = TempDir::new().unwrap();
-        let fsc = TextConfig {
-            path: dir.path().join("texts"),
-        };
-
-        let mut field_writer_service = TextWriterService::start(&fsc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
-        let _ = field_writer_service.set_resource(&resource1);
-
-        let field_reader_service = TextReaderService::start(&fsc).unwrap();
-
-        let filter = Filter {
-            tags: vec!["/l/mylabel2".to_string()],
-        };
-
-        let faceted = Faceted {
-            tags: vec!["/".to_string(), "/l".to_string(), "/t".to_string()],
-        };
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
-        let old_timestamp = Timestamp {
-            seconds: 0_i64,
-            nanos: 0,
-        };
-
-        let timestamps = Timestamps {
-            from_modified: Some(old_timestamp.clone()),
-            to_modified: Some(timestamp.clone()),
-            from_created: Some(old_timestamp),
-            to_created: Some(timestamp),
-        };
-
-        let order = OrderBy {
-            sort_by: OrderField::Created as i32,
-            r#type: 0,
-            ..Default::default()
-        };
-        let search = DocumentSearchRequest {
-            id: "shard1".to_string(),
-            body: "\"enough test\"".to_string(),
-            fields: vec!["body".to_string()],
-            filter: Some(filter.clone()),
-            faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
-
-        let search = DocumentSearchRequest {
-            id: "shard1".to_string(),
-            body: "enough test".to_string(),
-            fields: vec!["body".to_string()],
-            filter: Some(filter.clone()),
-            faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 1);
-
-        let search = DocumentSearchRequest {
-            id: "shard1".to_string(),
-            body: "enough - test".to_string(),
-            fields: vec!["body".to_string()],
-            filter: Some(filter.clone()),
-            faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.query, "\"enough - test\"");
-        assert_eq!(result.total, 0);
-
-        let search = DocumentSearchRequest {
-            id: "shard1".to_string(),
-            body: "enough - test\"".to_string(),
-            fields: vec!["body".to_string()],
-            filter: Some(filter.clone()),
-            faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.query, "\"enough - test\"");
-        assert_eq!(result.total, 0);
-
-        let search = DocumentSearchRequest {
-            id: "shard1".to_string(),
-            body: "".to_string(),
-            fields: vec!["body".to_string()],
-            filter: None,
-            faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
-            only_faceted: false,
-            ..Default::default()
-        };
-
-        let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 1);
-
-        let search = DocumentSearchRequest {
-            id: "shard1".to_string(),
-            body: "".to_string(),
-            fields: vec!["body".to_string()],
-            filter: Some(filter),
-            faceted: Some(faceted),
-            order: Some(order),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps),
-            only_faceted: false,
-            ..Default::default()
-        };
-
-        let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 1);
-
-        let request = StreamRequest {
-            shard_id: None,
-            filter: None,
-            ..Default::default()
-        };
-        let iter = field_reader_service.iterator(&request).unwrap();
-        let count = iter.count();
-        assert_eq!(count, 2);
-
-        Ok(())
     }
 }

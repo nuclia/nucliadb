@@ -56,3 +56,4 @@ class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
     DEFAULT_MIN_SCORE = "nucliadb_default_min_score"
     ROLLOVER_SHARDS = "nuclaidb_rollover_shards"
+    ASK_YOUR_DOCUMENTS = "nucliadb_ask_your_documents"

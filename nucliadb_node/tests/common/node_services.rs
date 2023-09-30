@@ -131,6 +131,8 @@ async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::
 
     backoff::future::retry(
         backoff::ExponentialBackoffBuilder::new()
+            .with_initial_interval(Duration::from_millis(10))
+            .with_max_interval(Duration::from_millis(100))
             .with_max_elapsed_time(Some(timeout))
             .build(),
         || async {

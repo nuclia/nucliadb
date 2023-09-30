@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import inspect
 import typing
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import httpx
 from pydantic import BaseModel
@@ -214,6 +214,83 @@ DELETE_LABELSET = Docstring(
     path_param_doc={"labelset": "Id of the labelset to delete"},
 )
 
+START_EXPORT = Docstring(
+    doc="Start a new export for a Knowledge Box",
+    examples=[
+        Example(
+            description="Start an export on a KB",
+            code=""">>> from nucliadb_sdk import *
+export_id = sdk.start_export(kbid="mykbid").export_id
+print(export_id)
+'925796f7-3820-44c9-b306-6e69148d02c3'
+""",
+        )
+    ],
+)
+
+EXPORT_STATUS = Docstring(
+    doc="Check the status of an export",
+    path_param_doc={"export_id": "Id of the export to check"},
+    examples=[
+        Example(
+            description="Check the status of an export",
+            code=""">>> from nucliadb_sdk import *
+resp = sdk.export_status(kbid="mykbid", export_id=export_id)
+print(resp.status.value)
+'finished'
+""",
+        )
+    ],
+)
+
+DOWNLOAD_EXPORT = Docstring(
+    doc="Download the export of the Knowledge Box",
+    path_param_doc={"export_id": "Id of the export to check"},
+    examples=[
+        Example(
+            description="Download the export content once it has finished",
+            code=""">>> from nucliadb_sdk import *
+resp = sdk.export_status(kbid="mykbid", export_id=export_id)
+assert resp.status.value == 'finished'
+resp_bytes_gen = sdk.download_export(kbid="mykbid", export_id=export_id)
+with open("my-kb.export", "wb") as f:
+    for chunk in resp_bytes_gen(chunk_size=1024):
+        f.write(chunk)
+""",
+        )
+    ],
+)
+
+START_IMPORT = Docstring(
+    doc="Start a new import for a Knowledge Box",
+    examples=[
+        Example(
+            description="Import to a KB from an export file",
+            code=""">>> from nucliadb_sdk import *
+resp =  sdk.start_import(kbid="mykbid", content=open("my-kb.export", "rb"))
+import_id = resp.import_id
+print(import_id)
+'b17337ca-5b1b-431b-b9b7-5ecb2241c78a'
+""",
+        )
+    ],
+)
+
+IMPORT_STATUS = Docstring(
+    doc="Check the status of an import",
+    path_param_doc={"import_id": "Id of the import to check"},
+    examples=[
+        Example(
+            description="Check the status of an import",
+            code=""">>> from nucliadb_sdk import *
+resp = sdk.import_status(kbid="mykbid", import_id=import_id)
+print(resp.status.value)
+'finished'
+""",
+        )
+    ],
+)
+
 
 def inject_documentation(
     func,
@@ -223,7 +300,11 @@ def inject_documentation(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
     docstring: Optional[Docstring] = None,
 ):
@@ -239,7 +320,11 @@ def _inject_signature_and_annotations(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
 ) -> None:
     """Dynamically generate and inject the function signature and its annotations"""
@@ -303,7 +388,11 @@ def _inject_docstring(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
     docstring: Optional[Docstring] = None,
 ):

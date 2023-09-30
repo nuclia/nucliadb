@@ -89,9 +89,9 @@ async def pull_processor_api():
 
 
 @pytest.fixture()
-async def pull_worker(redis_driver, pull_processor_api: PullProcessorAPI):
+async def pull_worker(maindb_driver, pull_processor_api: PullProcessorAPI):
     worker = PullWorker(
-        driver=redis_driver,
+        driver=maindb_driver,
         partition="1",
         storage=None,  # type: ignore
         pull_time_error_backoff=5,

@@ -57,6 +57,11 @@ transaction:
   transaction_jetstream_servers:
     - nats1
 
+indexing:
+  index_jetstream_auth:
+  index_jetstream_servers:
+    - nats1
+
 cache:
   cache_pubsub_nats_url:
     - nats1

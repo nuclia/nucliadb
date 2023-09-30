@@ -20,14 +20,14 @@
 
 use crate::data_point::{Address, DataRetriever};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum AtomKind {
     KeyPrefix,
     Label,
 }
 
 /// Is a singleton clause.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct AtomClause {
     kind: AtomKind,
     value: String,
@@ -53,7 +53,7 @@ impl AtomClause {
 /// Is a clause formed by the conjuction of several LabelClauses. Additionally this
 /// clause has a threshold that specifies the minimum number of AtomClauses that have to
 /// succeed in order for the overall conjuction to be satisfied.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CompoundClause {
     threshold: usize,
     labels: Vec<AtomClause>,
@@ -84,7 +84,7 @@ impl CompoundClause {
 }
 
 /// Wrapper that unifies the different types of clauses a formula may have.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum Clause {
     Atom(AtomClause),
     Compound(CompoundClause),
@@ -111,11 +111,25 @@ impl From<CompoundClause> for Clause {
     }
 }
 
+#[derive(Default)]
+pub struct AtomCollector {
+    pub labels: Vec<String>,
+    pub key_prefixes: Vec<String>,
+}
+impl AtomCollector {
+    fn add(&mut self, atom: AtomClause) {
+        match atom.kind {
+            AtomKind::KeyPrefix => self.key_prefixes.push(atom.value),
+            AtomKind::Label => self.labels.push(atom.value),
+        }
+    }
+}
+
 /// Formulas are boolean expressions in conjuctive normal form, but for labels.
 /// The clauses in a formula are connected by intersections, and they are formed
 /// by strings. Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Formula {
     clauses: Vec<Clause>,
 }
@@ -129,6 +143,21 @@ impl Formula {
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         self.clauses.iter().all(|q| q.run(x, retriever))
+    }
+    /// Returns the atoms that form a formula
+    pub fn get_atoms(&self) -> AtomCollector {
+        let mut collector = AtomCollector::default();
+        for clause in self.clauses.iter() {
+            match clause {
+                Clause::Compound(q) => {
+                    for label in q.labels.iter() {
+                        collector.add(label.clone());
+                    }
+                }
+                Clause::Atom(q) => collector.add(q.clone()),
+            }
+        }
+        collector
     }
 }
 

@@ -30,7 +30,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
 async def test_create_entities_group(
     grpc_servicer: IngestFixture, entities_manager_mock
 ):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)  # type: ignore
 
     kb_id = str(uuid4())
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kb_id)

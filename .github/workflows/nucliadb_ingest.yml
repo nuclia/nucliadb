@@ -46,8 +46,10 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      max-parallel: 4
       matrix:
         python-version: ["3.11"]
+        maindb_driver: ["tikv", "pg"]
 
     steps:
       - name: Checkout the repository
@@ -63,6 +65,7 @@ jobs:
         run: make -C nucliadb/ install-dev
 
       - name: Install tikv
+        if: matrix.maindb_driver == 'tikv'
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
           source /home/runner/.profile
@@ -70,6 +73,8 @@ jobs:
           ./scripts/wait-for-service.sh 2379
 
       - name: Run tests
+        env:
+          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         run: |
           make -C nucliadb/ test-cov-ingest
 

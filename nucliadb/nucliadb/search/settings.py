@@ -17,16 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
 from nucliadb.ingest.settings import DriverSettings
 
 
 class Settings(DriverSettings):
     search_timeout: float = 10.0
-
-    search_cache_redis_host: Optional[str] = None
-    search_cache_redis_port: Optional[int] = None
 
 
 settings = Settings()

@@ -302,10 +302,10 @@ class ResourceWritesAuditHandler:
         with metrics.handler_histo({"type": "audit_fields"}):
             audit_fields = await self.collect_audit_fields(message)
             field_metadata = [fi.field for fi in message.field_metadata]
-
+            when = message.audit.when if message.audit.HasField("when") else None
             await self.audit.report(
                 kbid=message.kbid,
-                when=message.audit.when,
+                when=when,
                 user=message.audit.user,
                 rid=message.uuid,
                 origin=message.audit.origin,

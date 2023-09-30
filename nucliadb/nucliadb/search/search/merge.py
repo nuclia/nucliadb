@@ -430,7 +430,7 @@ async def merge_relations_results(
     relations_responses: List[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
 ) -> Relations:
-    relations = Relations(entities={}, graph=[])
+    relations = Relations(entities={})
 
     for entry_point in query.entry_points:
         relations.entities[entry_point.value] = EntitySubgraph(related_to=[])

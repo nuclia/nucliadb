@@ -30,16 +30,27 @@ use tantivy::Document;
 pub struct ParagraphSchema {
     pub schema: Schema,
 
+    /// resource id
     pub uuid: Field,
+    /// field id
+    pub field: Field,
+    /// paragraph id
     pub paragraph: Field,
+
     pub text: Field,
+
     pub start_pos: Field,
     pub end_pos: Field,
+
     pub created: Field,
     pub modified: Field,
+
+    /// resource status
     pub status: Field,
+
+    /// labels
     pub facets: Field,
-    pub field: Field,
+
     pub split: Field,
     pub index: Field,
     pub repeated_in_field: Field,
@@ -49,7 +60,7 @@ pub struct ParagraphSchema {
 pub fn timestamp_to_datetime_utc(timestamp: &Timestamp) -> DateTime<Utc> {
     let naive =
         NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
-    DateTime::from_utc(naive, tantivy::chrono::Utc)
+    DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
 }
 
 impl ParagraphSchema {

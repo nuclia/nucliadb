@@ -17,22 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import Mock
+import logging
 
-from starlette.routing import Mount
-
-from nucliadb.search.app import application
-from nucliadb.search.openapi import extract_openapi, is_versioned_route
-
-
-def get_route(path):
-    return Mount(path=path, app=Mock())
-
-
-def test_is_versioned_route():
-    assert is_versioned_route(get_route(path="/api/v1/search"))
-    assert not is_versioned_route(get_route(path="/metrics"))
-
-
-def test_extract_openapi():
-    assert extract_openapi(application, "1", "commitid")
+SERVICE_NAME = "nucliadb.tasks"
+logger = logging.getLogger(SERVICE_NAME)

@@ -25,6 +25,7 @@ from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
     SearchRequest,
+    SuggestFeatures,
     SuggestRequest,
 )
 from nucliadb_protos.noderesources_pb2 import Resource
@@ -203,7 +204,7 @@ def parse_entities_to_filters(
     return added_filters
 
 
-async def suggest_query_to_pb(
+def suggest_query_to_pb(
     features: List[SuggestOptions],
     query: str,
     fields: List[str],
@@ -215,8 +216,13 @@ async def suggest_query_to_pb(
     range_modification_end: Optional[datetime] = None,
 ) -> SuggestRequest:
     request = SuggestRequest()
+
+    request.body = query
+    if SuggestOptions.ENTITIES in features:
+        request.features.append(SuggestFeatures.ENTITIES)
+
     if SuggestOptions.PARAGRAPH in features:
-        request.body = query
+        request.features.append(SuggestFeatures.PARAGRAPHS)
         request.filter.tags.extend(filters)
         request.fields.extend(fields)
 

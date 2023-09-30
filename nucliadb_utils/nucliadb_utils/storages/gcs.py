@@ -211,9 +211,6 @@ class GCSStorageField(StorageField):
                 else:
                     break
 
-    async def range_supported(self) -> bool:
-        return True
-
     @storage_ops_observer.wrap({"type": "read_range"})
     async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
         """

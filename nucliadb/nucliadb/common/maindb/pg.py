@@ -37,34 +37,39 @@ CREATE TABLE IF NOT EXISTS resources (
 class DataLayer:
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
+        self.lock = asyncio.Lock()
 
     async def get(self, key: str) -> Optional[bytes]:
-        return await self.connection.fetchval(
-            "SELECT value FROM resources WHERE key = $1", key
-        )
+        async with self.lock:
+            return await self.connection.fetchval(
+                "SELECT value FROM resources WHERE key = $1", key
+            )
 
     async def set(self, key: str, value: bytes) -> None:
-        await self.connection.execute(
-            """
+        async with self.lock:
+            await self.connection.execute(
+                """
 INSERT INTO resources (key, value)
 VALUES ($1, $2)
 ON CONFLICT (key)
 DO UPDATE SET value = EXCLUDED.value
 """,
-            key,
-            value,
-        )
+                key,
+                value,
+            )
 
     async def delete(self, key: str) -> None:
-        await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
+        async with self.lock:
+            await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
 
     async def batch_get(self, keys: List[str]) -> List[bytes]:
-        records = {
-            record["key"]: record["value"]
-            for record in await self.connection.fetch(
-                "SELECT key, value FROM resources WHERE key = ANY($1)", keys
-            )
-        }
+        async with self.lock:
+            records = {
+                record["key"]: record["value"]
+                for record in await self.connection.fetch(
+                    "SELECT key, value FROM resources WHERE key = ANY($1)", keys
+                )
+            }
         # get sorted by keys
         return [records[key] for key in keys]
 
@@ -74,27 +79,39 @@ DO UPDATE SET value = EXCLUDED.value
         limit: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ) -> AsyncGenerator[str, None]:
-        query = "SELECT key FROM resources WHERE key LIKE $1"
+        query = """SELECT key FROM resources
+WHERE key LIKE $1
+ORDER BY key
+"""
         args: list[Any] = [prefix + "%"]
         if limit > 0:
             query += " LIMIT $2"
             args.append(limit)
-        async for record in self.connection.cursor(query, *args):
-            if not include_start and record["key"] == prefix:
-                continue
-            yield record["key"]
+        async with self.lock:
+            async for record in self.connection.cursor(query, *args):
+                if not include_start and record["key"] == prefix:
+                    continue
+                yield record["key"]
 
     async def count(self, match: str) -> int:
-        results = await self.connection.fetch(
-            "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
-        )
+        async with self.lock:
+            results = await self.connection.fetch(
+                "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
+            )
         return results[0]["count"]
 
 
 class PGTransaction(Transaction):
     driver: PGDriver
 
-    def __init__(self, connection: asyncpg.Connection, txn: Any, driver: PGDriver):
+    def __init__(
+        self,
+        pool: asyncpg.Pool,
+        connection: asyncpg.Connection,
+        txn: Any,
+        driver: PGDriver,
+    ):
+        self.pool = pool
         self.connection = connection
         self.data_layer = DataLayer(connection)
         self.txn = txn
@@ -134,13 +151,17 @@ class PGTransaction(Transaction):
     async def delete(self, key: str):
         await self.data_layer.delete(key)
 
-    def keys(
+    async def keys(
         self,
         match: str,
         count: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ):
-        return self.data_layer.scan_keys(match, count, include_start=include_start)
+        async with self.pool.acquire() as conn, conn.transaction():
+            # all txn implementations implement this API outside of the current txn
+            dl = DataLayer(conn)
+            async for key in dl.scan_keys(match, count, include_start=include_start):
+                yield key
 
     async def count(self, match: str) -> int:
         return await self.data_layer.count(match)
@@ -159,8 +180,11 @@ class PGDriver(Driver):
                 self.pool = await asyncpg.create_pool(self.url)
 
                 # check if table exists
-                async with self.pool.acquire() as conn:
-                    await conn.execute(CREATE_TABLE)
+                try:
+                    async with self.pool.acquire() as conn:
+                        await conn.execute(CREATE_TABLE)
+                except asyncpg.exceptions.UniqueViolationError:  # pragma: no cover
+                    pass
 
             self.initialized = True
 
@@ -170,7 +194,7 @@ class PGDriver(Driver):
             self.initialized = False
 
     async def begin(self) -> PGTransaction:
-        conn = await self.pool.acquire()
+        conn: asyncpg.Connection = await self.pool.acquire()
         txn = conn.transaction()
         await txn.start()
-        return PGTransaction(conn, txn, driver=self)
+        return PGTransaction(self.pool, conn, txn, driver=self)

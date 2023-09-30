@@ -13,9 +13,16 @@ serde_json = "1.0.82"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.1.18", features = ["derive"] }
 nucliadb_vectors = {path= "../nucliadb_vectors"}
+nucliadb_core = {path= "../nucliadb_core"}
 lazy_static = "1.4.0"
 memory-stats = "1.0.0"
 byte-unit = "4.0.19"
+reqwest = { version = "0.11.20", features = ["blocking"] }
+indicatif = "0.17.6"
+tar = "0.4.40"
+flate2 = "1.0.27"
+base64 = "0.21.4"
+kv = { version = "0.24.0", features = ["json-value"] }
 
 [[bin]]
 name = "vectors_benchmark"
@@ -26,5 +33,5 @@ name = "1m_stats"
 path = "src/binaries/1m_stats.rs"
 
 [[bin]]
-name = "labels_benchmark"
-path = "src/binaries/labels_benchmark.rs"
+name = "real_data_benchmark"
+path = "src/binaries/real_data_benchmark.rs"

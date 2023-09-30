@@ -25,9 +25,9 @@ from nucliadb.ingest.tests.fixtures import broker_resource
 
 @pytest.mark.asyncio
 async def test_knowledgebox_purge_handles_unexisting_shard_payload(
-    gcs_storage, redis_driver
+    gcs_storage, maindb_driver
 ):
-    await KnowledgeBox.purge(redis_driver, "idonotexist")
+    await KnowledgeBox.purge(maindb_driver, "idonotexist")
 
 
 def test_chunker():
@@ -54,10 +54,10 @@ async def test_knowledgebox_delete_all_kb_keys(
     gcs_storage,
     cache,
     fake_node,
-    tikv_driver,
+    maindb_driver,
     knowledgebox_ingest: str,
 ):
-    txn = await tikv_driver.begin()
+    txn = await maindb_driver.begin()
     kbid = knowledgebox_ingest
     kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
 
@@ -73,17 +73,17 @@ async def test_knowledgebox_delete_all_kb_keys(
     await txn.commit()
 
     # Check that all of them are there
-    txn = await tikv_driver.begin()
+    txn = await maindb_driver.begin()
     kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
     await txn.abort()
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(tikv_driver, kbid, chunk_size=10)
+    await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
-    txn = await tikv_driver.begin()
+    txn = await maindb_driver.begin()
     kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) is None

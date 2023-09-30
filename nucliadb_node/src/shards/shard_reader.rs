@@ -17,10 +17,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::time::SystemTime;
 
 use crossbeam_utils::thread as crossbeam_thread;
-use nucliadb_core::metrics::{self, request_time};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -29,11 +27,12 @@ use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
-    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
     VectorSearchResponse,
 };
-use nucliadb_core::thread::{self, *};
+use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
 use crate::env;
@@ -67,6 +66,7 @@ impl ShardReader {
             i => panic!("Unknown document version {i}"),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
         match self.paragraph_service_version {
@@ -75,6 +75,7 @@ impl ShardReader {
             i => panic!("Unknown paragraph version {i}"),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
         match self.vector_service_version {
@@ -83,6 +84,7 @@ impl ShardReader {
             i => panic!("Unknown vector version {i}"),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
         match self.relation_service_version {
@@ -91,10 +93,11 @@ impl ShardReader {
             i => panic!("Unknown relation version {i}"),
         }
     }
+
+    #[measure(actor = "shard", metric = "reader/get_info")]
     #[tracing::instrument(skip_all)]
     pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let paragraphs = self.paragraph_reader.clone();
         let vectors = self.vector_reader.clone();
@@ -117,11 +120,6 @@ impl ShardReader {
         })
         .expect("Failed to join threads");
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/get_info".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(Shard {
             metadata: Some(self.metadata.clone().into()),
             shard_id: self.id.clone(),
@@ -132,35 +130,41 @@ impl ShardReader {
             sentences: vector_result? as u64,
         })
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_text_keys(&self) -> NodeResult<Vec<String>> {
         self.text_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_paragraphs_keys(&self) -> NodeResult<Vec<String>> {
         self.paragraph_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
         self.vector_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_relations_keys(&self) -> NodeResult<Vec<String>> {
         self.relation_reader.stored_ids()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_relations_edges(&self) -> NodeResult<EdgeList> {
         self.relation_reader.get_edges()
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_relations_types(&self) -> NodeResult<TypeList> {
         self.relation_reader.get_node_types()
     }
 
+    #[measure(actor = "shard", metric = "reader/new")]
     #[tracing::instrument(skip_all)]
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReader> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let metadata = ShardMetadata::open(&shard_path.join(METADATA_FILE))?;
         let tsc = TextConfig {
@@ -172,10 +176,13 @@ impl ShardReader {
             num_threads: env::num_paragraph_search_threads(),
         };
 
+        let channel = metadata.channel.unwrap_or_default();
+
         let vsc = VectorConfig {
             similarity: None,
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),
+            channel,
         };
         let rsc = RelationConfig {
             path: shard_path.join(RELATIONS_DIR),
@@ -211,10 +218,6 @@ impl ShardReader {
         let vectors = vector_result.transpose()?;
         let relations = relation_result.transpose()?;
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/new".to_string());
-        metrics.record_request_time(metric, took);
         Ok(ShardReader {
             id,
             metadata,
@@ -250,69 +253,101 @@ impl ShardReader {
         prefixes
     }
 
+    #[measure(actor = "shard", metric = "reader/suggest")]
     #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
+        let suggest_paragraphs = request
+            .features
+            .contains(&(SuggestFeatures::Paragraphs as i32));
+        let suggest_entities = request
+            .features
+            .contains(&(SuggestFeatures::Entities as i32));
+
+        let paragraphs_reader_service = self.paragraph_reader.clone();
         let relations_reader_service = self.relation_reader.clone();
-        let paragraph_reader_service = self.paragraph_reader.clone();
-
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
-        let relations = prefixes
-            .par_iter()
-            .filter(|p| p.len() >= MIN_VIABLE_PREFIX_SUGGEST)
-            .cloned()
-            .map(|prefix| RelationPrefixSearchRequest {
-                prefix,
-                ..Default::default()
-            })
-            .map(|prefix| RelationSearchRequest {
-                shard_id: String::default(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .map(|request| relations_reader_service.search(&request));
 
-        let relation_task = move || relations.collect::<Vec<_>>();
-        let paragraph_task = move || paragraph_reader_service.suggest(&request);
+        let suggest_paragraphs_task = suggest_paragraphs.then(|| {
+            let paragraph_task = move || paragraphs_reader_service.suggest(&request);
+            let info = info_span!(parent: &span, "paragraph suggest");
+            || run_with_telemetry(info, paragraph_task)
+        });
 
-        let info = info_span!(parent: &span, "relations suggest");
-        let relation_task = || run_with_telemetry(info, relation_task);
-        let info = info_span!(parent: &span, "paragraph suggest");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let relation_task = suggest_entities.then(|| {
+            let relation_task = move || {
+                let requests = prefixes
+                    .par_iter()
+                    .filter(|prefix| prefix.len() >= MIN_VIABLE_PREFIX_SUGGEST)
+                    .cloned()
+                    .map(|prefix| RelationSearchRequest {
+                        shard_id: String::default(), // REVIEW: really?
+                        prefix: Some(RelationPrefixSearchRequest {
+                            prefix,
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    });
 
-        let (paragraph, relation) = thread::join(paragraph_task, relation_task);
-        let rparagraph = paragraph?;
-        let entities = relation
-            .into_iter()
-            .flatten()
-            .flat_map(|r| r.prefix)
-            .flat_map(|prefix| prefix.nodes.into_iter())
-            .map(|node| node.value)
-            .collect::<Vec<_>>();
+                let responses = requests
+                    .map(|request| relations_reader_service.search(&request))
+                    .collect::<Vec<_>>();
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/suggest".to_string());
-        metrics.record_request_time(metric, took);
+                let entities = responses
+                    .into_iter()
+                    .flatten() // unwrap errors and continue with successful results
+                    .flat_map(|response| response.prefix)
+                    .flat_map(|prefix_response| prefix_response.nodes.into_iter())
+                    .map(|node| node.value);
 
-        Ok(SuggestResponse {
-            query: rparagraph.query,
-            total: rparagraph.total,
-            results: rparagraph.results,
-            ematches: rparagraph.ematches,
-            entities: Some(RelatedEntities {
+                entities.collect::<Vec<_>>()
+            };
+
+            let info = info_span!(parent: &span, "relations suggest");
+            || run_with_telemetry(info, relation_task)
+        });
+
+        let mut paragraphs_response = None;
+        let mut entities = None;
+
+        crossbeam_thread::scope(|s| {
+            if let Some(task) = suggest_paragraphs_task {
+                s.spawn(|_| {
+                    paragraphs_response = Some(task());
+                });
+            }
+            if let Some(task) = relation_task {
+                s.spawn(|_| entities = Some(task()));
+            }
+        })
+        .expect("Failed to join threads");
+
+        let mut response = SuggestResponse::default();
+
+        if let Some(paragraphs_response) = paragraphs_response {
+            let paragraphs_response = paragraphs_response?;
+            response.query = paragraphs_response.query;
+            response.total = paragraphs_response.total;
+            response.results = paragraphs_response.results;
+            response.ematches = paragraphs_response.ematches;
+        };
+
+        if let Some(entities) = entities {
+            response.entities = Some(RelatedEntities {
                 total: entities.len() as u32,
                 entities,
-            }),
-        })
+            })
+        }
+
+        Ok(response)
     }
 
+    #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+        let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
-        let time = SystemTime::now();
 
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
@@ -321,7 +356,7 @@ impl ShardReader {
             search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
 
         let field_request = DocumentSearchRequest {
-            id: "".to_string(),
+            id: search_id.clone(),
             body: search_request.body.clone(),
             fields: search_request.fields.clone(),
             filter: search_request.filter.clone(),
@@ -339,7 +374,7 @@ impl ShardReader {
         let text_task = move || Some(text_reader_service.search(&field_request));
 
         let paragraph_request = ParagraphSearchRequest {
-            id: "".to_string(),
+            id: search_id.clone(),
             uuid: "".to_string(),
             with_duplicates: search_request.with_duplicates,
             body: search_request.body.clone(),
@@ -359,7 +394,7 @@ impl ShardReader {
         let paragraph_task = move || Some(paragraph_reader_service.search(&paragraph_request));
 
         let vector_request = VectorSearchRequest {
-            id: "".to_string(),
+            id: search_id.clone(),
             vector_set: search_request.vectorset.clone(),
             vector: search_request.vector.clone(),
             page_number: search_request.page_number,
@@ -416,11 +451,6 @@ impl ShardReader {
             }
         })
         .expect("Failed to join threads");
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::shard("reader/search".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(SearchResponse {
             document: rtext.transpose()?,

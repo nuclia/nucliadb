@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nucliadb_core::Channel;
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::Formula;
@@ -57,8 +58,14 @@ impl VectorEngine for Index {
             let elem = Elem::new(key, vector, LabelDictionary::new(vec![]), None);
             elems.push(elem);
         }
-        let new_dp =
-            DataPoint::new(self.location(), elems, Some(temporal_mark), similarity).unwrap();
+        let new_dp = DataPoint::new(
+            self.location(),
+            elems,
+            Some(temporal_mark),
+            similarity,
+            Channel::EXPERIMENTAL,
+        )
+        .unwrap();
         let lock = self.get_slock().unwrap();
         self.add(new_dp, &lock).unwrap();
         self.delete(batch_id, temporal_mark, &lock);

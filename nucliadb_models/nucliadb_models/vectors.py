@@ -82,7 +82,7 @@ class SemanticModelMetadata(BaseModel):
 
 class VectorSet(BaseModel):
     dimension: int
-    similarity: Optional[VectorSimilarity]
+    similarity: Optional[VectorSimilarity] = None
 
     @classmethod
     def from_message(cls, message: PBVectorSet):

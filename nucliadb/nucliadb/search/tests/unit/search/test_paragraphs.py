@@ -87,14 +87,7 @@ class TestGetParagraphText:
         ):
             yield mock
 
-    @pytest.fixture()
-    def pcache(self):
-        mock = AsyncMock()
-        mock.get.return_value = None
-        with patch("nucliadb.search.search.paragraphs.get_utility", return_value=mock):
-            yield mock
-
-    async def test_get_paragraph_text(self, orm_resource, pcache):
+    async def test_get_paragraph_text(self, orm_resource):
         assert (
             await paragraphs.get_paragraph_text(
                 kbid="kbid",
@@ -111,24 +104,6 @@ class TestGetParagraphText:
         )
 
         orm_resource.get_field.assert_called_once_with("text", 4, load=False)
-        pcache.get.assert_called_once()
-
-    async def test_get_paragraph_text_with_pcache(self, orm_resource, pcache):
-        pcache.get.return_value = "Cached Value!"
-        assert (
-            await paragraphs.get_paragraph_text(
-                kbid="kbid",
-                rid="rid",
-                field="/t/text",
-                start=0,
-                end=12,
-                split=None,
-                highlight=True,
-                ematches=None,
-                matches=None,
-            )
-            == "Cached Value!"
-        )
 
 
 async def fake_get_extracted_text_from_gcloud(*args, **kwargs):

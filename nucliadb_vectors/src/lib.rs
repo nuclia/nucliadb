@@ -22,8 +22,8 @@ pub mod data_point;
 pub mod data_point_provider;
 mod data_types;
 pub mod formula;
+pub mod fst_index;
 pub mod indexset;
-pub mod labels;
 pub mod service;
 
 use thiserror::Error;
@@ -49,6 +49,8 @@ pub enum VectorErr {
     EmptyMerge,
     #[error("Inconsistent dimensions")]
     InconsistentDimensions,
+    #[error("UTF8 decoding error: {0}")]
+    FromUtf8Error(#[from] std::string::FromUtf8Error),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

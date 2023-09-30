@@ -58,6 +58,9 @@ class LocalFileStorageManager(FileStorageManager):
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(json.dumps(metadata))
 
+        async with aiofiles.open(init_url, "wb+") as aio_fi:
+            await aio_fi.write(b"")
+
         await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
 
     async def iter_data(self, uri, kbid: str, headers=None):
@@ -92,22 +95,19 @@ class LocalFileStorageManager(FileStorageManager):
         except FileNotFoundError:
             raise CloudFileNotFound()
 
-    async def _append(self, data, offset, aiofi):
-        await aiofi.seek(offset)
-        await aiofi.write(data)
-        await aiofi.flush()
-
     async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
         count = 0
         bucket = dm.get("bucket")
         upload_file_id = dm.get("upload_file_id")
         init_url = self.get_file_path(bucket, upload_file_id)
-        async with aiofiles.open(init_url, "wb") as aiofi:
+        async with aiofiles.open(init_url, "rb+") as aio_fi:
+            await aio_fi.seek(offset)
             async for chunk in iterable:
-                await self._append(chunk, offset, aiofi)
+                await aio_fi.write(chunk)
                 size = len(chunk)
                 count += size
                 offset += size
+            await aio_fi.flush()
         return count
 
     async def finish(self, dm: FileDataMangaer):

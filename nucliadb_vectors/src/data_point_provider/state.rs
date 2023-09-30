@@ -30,6 +30,7 @@ use super::{SearchRequest, VectorR};
 use crate::data_point::{DataPoint, DpId, Journal, Neighbour, Similarity};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
+
 const BUFFER_CAP: usize = 5;
 
 #[derive(Serialize, Deserialize)]
@@ -283,11 +284,13 @@ impl State {
 mod test {
     use std::path::Path;
 
+    use nucliadb_core::Channel;
     use rand::random;
     use uuid::Uuid;
 
     use super::*;
     use crate::data_point::{Elem, LabelDictionary, Similarity};
+
     #[test]
     fn fssv_test() {
         let values: &[Neighbour] = &[
@@ -332,7 +335,16 @@ mod test {
                     .collect::<Vec<_>>();
                 elems.push(Elem::new(key, vector, labels, None));
             }
-            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine).unwrap())
+            Some(
+                DataPoint::new(
+                    self.path,
+                    elems,
+                    None,
+                    Similarity::Cosine,
+                    Channel::EXPERIMENTAL,
+                )
+                .unwrap(),
+            )
         }
     }
 
@@ -357,7 +369,8 @@ mod test {
             .iter()
             .map(|j| (state.delete_log(*j), j.id()))
             .collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
+        let new =
+            DataPoint::merge(dir.path(), &work, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         std::mem::drop(work);
         state.replace_work_unit(new.meta());
         assert!(state.current_work_unit().is_none());

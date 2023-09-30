@@ -319,8 +319,13 @@ class ResourceBrain:
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
-        self.brain.metadata.created.CopyFrom(basic.created)
-        self.brain.metadata.modified.CopyFrom(basic.modified)
+        if basic.HasField("created"):
+            self.brain.metadata.created.CopyFrom(basic.created)
+
+        if basic.HasField("modified"):
+            self.brain.metadata.modified.CopyFrom(basic.modified)
+        elif basic.HasField("created"):
+            self.brain.metadata.modified.CopyFrom(basic.created)
 
         relationnodedocument = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE

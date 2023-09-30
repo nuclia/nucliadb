@@ -22,11 +22,10 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 
 use super::bfs::GrpcGuide;
 use super::utils::*;
@@ -148,6 +147,7 @@ impl RelationsReaderService {
             relations: subgraph,
         }))
     }
+
     #[tracing::instrument(skip_all)]
     fn prefix_search(
         &self,
@@ -217,6 +217,7 @@ impl RelationsReaderService {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
         }))
     }
+
     #[tracing::instrument(skip_all)]
     pub fn reload(&self) {
         let _v = self
@@ -226,24 +227,19 @@ impl RelationsReaderService {
             .map_err(|err| error!("Reload error {err:?}"));
     }
 }
+
 impl RelationReader for RelationsReaderService {
+    #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
-        let time = SystemTime::now();
-
-        let result = Ok(self
+        Ok(self
             .index
             .start_reading()
             .and_then(|reader| reader.no_nodes())
-            .map(|v| v as usize)?);
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("count".to_string());
-        metrics.record_request_time(metric, took);
-
-        result
+            .map(|v| v as usize)?)
     }
+
+    #[measure(actor = "relations", metric = "get_edges")]
     #[tracing::instrument(skip_all)]
     fn get_edges(&self) -> NodeResult<EdgeList> {
         let time = SystemTime::now();
@@ -272,13 +268,10 @@ impl RelationReader for RelationsReaderService {
             debug!("{id:?} - Ending at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("get_edges".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(EdgeList { list: edges })
     }
+
+    #[measure(actor = "relations", metric = "get_node_types")]
     #[tracing::instrument(skip_all)]
     fn get_node_types(&self) -> NodeResult<TypeList> {
         let time = SystemTime::now();
@@ -307,11 +300,6 @@ impl RelationReader for RelationsReaderService {
             debug!("{id:?} - Ending at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("get_node_types".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(TypeList { list: types })
     }
 }
@@ -319,26 +307,19 @@ impl RelationReader for RelationsReaderService {
 impl ReaderChild for RelationsReaderService {
     type Request = RelationSearchRequest;
     type Response = RelationSearchResponse;
+
+    #[measure(actor = "relations", metric = "search")]
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
-        let time = SystemTime::now();
-
-        let result = Ok(RelationSearchResponse {
+        Ok(RelationSearchResponse {
             subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,
-        });
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("search".to_string());
-        metrics.record_request_time(metric, took);
-
-        result
+        })
     }
+
+    #[measure(actor = "relations", metric = "stored_ids")]
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> NodeResult<Vec<String>> {
-        let time = SystemTime::now();
-
         let reader = self.index.start_reading()?;
         let ids = reader
             .iter_node_ids()?
@@ -346,11 +327,6 @@ impl ReaderChild for RelationsReaderService {
             .filter_map(|id| reader.get_node(id).ok())
             .map(|s| format!("{s:?}"))
             .collect();
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("stored_ids".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(ids)
     }

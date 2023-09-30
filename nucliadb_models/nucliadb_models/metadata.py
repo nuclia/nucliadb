@@ -234,7 +234,7 @@ class ComputedMetadata(BaseModel):
                 FieldClassification(
                     field=FieldID(
                         field=fc.field.field,
-                        field_type=FIELD_TYPES_MAP[fc.field.field_type],
+                        field_type=FIELD_TYPES_MAP[fc.field.field_type],  # type: ignore
                     ),
                     classifications=[
                         Classification(label=c.label, labelset=c.labelset)

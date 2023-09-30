@@ -21,11 +21,10 @@ import logging
 import os
 import tempfile
 from os.path import dirname
-from shutil import rmtree
-from tempfile import mkdtemp
-from typing import AsyncIterator, List
+from typing import AsyncIterator
 from unittest.mock import Mock
 
+import asyncpg
 import pytest
 from grpc import aio  # type: ignore
 from httpx import AsyncClient
@@ -33,14 +32,17 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.local import LocalDriver
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.common.maindb.tikv import TiKVDriver
-from nucliadb.ingest.settings import DriverConfig
+from nucliadb.common.maindb.utils import _DRIVER_UTIL_NAME, get_driver
+from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
@@ -102,35 +104,50 @@ def reset_config():
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(dummy_processing, telemetry_disabled):
+def tmpdir():
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield tmpdir
+    except OSError:
+        # Python error on tempfile when tearing down the fixture.
+        # Solved in version 3.11
+        pass
+
+
+@pytest.fixture(scope="function")
+async def nucliadb(dummy_processing, telemetry_disabled, driver_settings, tmpdir):
     from nucliadb.common.cluster import manager
 
     manager.INDEX_NODES.clear()
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # we need to force DATA_PATH updates to run every test on the proper
-        # temporary directory
-        os.environ["DATA_PATH"] = f"{tmpdir}/node"
-        settings = Settings(
-            driver="local",
-            file_backend="local",
-            local_files=f"{tmpdir}/blob",
-            driver_local_url=f"{tmpdir}/main",
-            data_path=f"{tmpdir}/node",
-            http_port=free_port(),
-            ingest_grpc_port=free_port(),
-            train_grpc_port=free_port(),
-            standalone_node_port=free_port(),
-        )
+    # we need to force DATA_PATH updates to run every test on the proper
+    # temporary directory
+    os.environ["DATA_PATH"] = f"{tmpdir}/node"
+    settings = Settings(
+        driver=driver_settings.driver,
+        driver_local_url=driver_settings.driver_local_url,
+        driver_pg_url=driver_settings.driver_pg_url,
+        driver_redis_url=driver_settings.driver_redis_url,
+        driver_tikv_url=driver_settings.driver_tikv_url,
+        file_backend="local",
+        local_files=f"{tmpdir}/blob",
+        data_path=f"{tmpdir}/node",
+        http_port=free_port(),
+        ingest_grpc_port=free_port(),
+        train_grpc_port=free_port(),
+        standalone_node_port=free_port(),
+    )
 
-        config_nucliadb(settings)
-        server = await run_async_nucliadb(settings)
+    config_nucliadb(settings)
+    server = await run_async_nucliadb(settings)
 
-        yield settings
+    yield settings
 
-        reset_config()
-        clear_global_cache()
-        await server.shutdown()
+    await maybe_cleanup_maindb()
+
+    reset_config()
+    clear_global_cache()
+    await server.shutdown()
 
 
 @pytest.fixture(scope="function")
@@ -165,20 +182,22 @@ async def knowledgebox(nucliadb_manager: AsyncClient):
     resp = await nucliadb_manager.post("/kbs", json={"slug": "knowledgebox"})
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
+
     yield uuid
+
     resp = await nucliadb_manager.delete(f"/kb/{uuid}")
     assert resp.status_code == 200
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
+    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))  # type: ignore
     return stub
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_train(nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
+    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))  # type: ignore
     return stub
 
 
@@ -422,29 +441,46 @@ async def redis_config(redis):
 
 
 @pytest.fixture(scope="function")
-async def local_driver() -> AsyncIterator[Driver]:
-    path = mkdtemp()
+def local_driver_settings(tmpdir):
+    return DriverSettings(
+        driver=DriverConfig.LOCAL,
+        driver_local_url=f"{tmpdir}/main",
+    )
+
+
+@pytest.fixture(scope="function")
+async def local_driver(local_driver_settings) -> AsyncIterator[Driver]:
+    path = local_driver_settings.driver_local_url
     ingest_settings.driver = DriverConfig.LOCAL
     ingest_settings.driver_local_url = path
+
     driver: Driver = LocalDriver(url=path)
     await driver.initialize()
+
     yield driver
+
     await driver.finalize()
-    rmtree(path)
+
     ingest_settings.driver_local_url = None
     MAIN.pop("driver", None)
 
 
 @pytest.fixture(scope="function")
-async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
+def tikv_driver_settings(tikvd):
     if os.environ.get("TESTING_TIKV_LOCAL", None):
         url = "localhost:2379"
     else:
         url = f"{tikvd[0]}:{tikvd[2]}"
-    ingest_settings.driver = DriverConfig.TIKV
-    ingest_settings.driver_tikv_url = [url]
+    return DriverSettings(driver=DriverConfig.TIKV, driver_tikv_url=[url])
 
-    driver: Driver = TiKVDriver(url=[url])
+
+@pytest.fixture(scope="function")
+async def tikv_driver(tikv_driver_settings) -> AsyncIterator[Driver]:
+    url = tikv_driver_settings.driver_tikv_url
+    ingest_settings.driver = DriverConfig.TIKV
+    ingest_settings.driver_tikv_url = url
+
+    driver: Driver = TiKVDriver(url=url)
     await driver.initialize()
 
     yield driver
@@ -454,15 +490,23 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
         await txn.delete(key)
     await txn.commit()
     await driver.finalize()
-    ingest_settings.driver_tikv_url = []
+    ingest_settings.driver_tikv_url = None
     MAIN.pop("driver", None)
 
 
 @pytest.fixture(scope="function")
-async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
-    url = f"redis://{redis[0]}:{redis[1]}"
+def redis_driver_settings(redis):
+    return DriverSettings(
+        driver=DriverConfig.REDIS,
+        driver_redis_url=f"redis://{redis[0]}:{redis[1]}",
+    )
+
+
+@pytest.fixture(scope="function")
+async def redis_driver(redis_driver_settings) -> AsyncIterator[RedisDriver]:
+    url = redis_driver_settings.driver_redis_url
     ingest_settings.driver = DriverConfig.REDIS
-    ingest_settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
+    ingest_settings.driver_redis_url = url
 
     driver = RedisDriver(url=url)
     await driver.initialize()
@@ -481,8 +525,102 @@ async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
 
 
 @pytest.fixture(scope="function")
-async def maindb_driver(redis_driver):
-    yield redis_driver
+def pg_driver_settings(pg):
+    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    return DriverSettings(
+        driver=DriverConfig.PG,
+        driver_pg_url=url,
+    )
+
+
+@pytest.fixture(scope="function")
+async def pg_driver(pg_driver_settings):
+    url = pg_driver_settings.driver_pg_url
+    ingest_settings.driver = DriverConfig.PG
+    ingest_settings.driver_pg_url = url
+
+    conn = await asyncpg.connect(url)
+    await conn.execute(
+        """
+DROP table IF EXISTS resources;
+"""
+    )
+    await conn.close()
+    driver = PGDriver(url=url)
+    await driver.initialize()
+
+    yield driver
+
+    await driver.finalize()
+    ingest_settings.driver_pg_url = None
+
+
+def driver_settings_lazy_fixtures(default_drivers="local"):
+    driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
+    return [
+        lazy_fixture.lf(f"{driver_type}_driver_settings")
+        for driver_type in driver_types.split(",")
+    ]
+
+
+@pytest.fixture(scope="function", params=driver_settings_lazy_fixtures())
+def driver_settings(request):
+    """
+    Allows dynamically loading the driver fixtures via env vars.
+
+    MAINDB_DRIVER=redis,local pytest nucliadb/nucliadb/tests/
+
+    Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
+    """
+    yield request.param
+
+
+def driver_lazy_fixtures(default_drivers: str = "redis"):
+    """
+    Allows running tests using maindb_driver for each supported driver type via env vars.
+
+    MAINDB_DRIVER=redis,local pytest nucliadb/nucliadb/ingest/tests/
+
+    Any test using the maindb_driver fixture will be run twice, once with redis_driver and once with local_driver.
+    """
+    driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
+    return [
+        lazy_fixture.lf(f"{driver_type}_driver")
+        for driver_type in driver_types.split(",")
+    ]
+
+
+@pytest.fixture(
+    scope="function",
+    params=driver_lazy_fixtures(),
+)
+async def maindb_driver(request):
+    driver = request.param
+    MAIN[_DRIVER_UTIL_NAME] = driver
+
+    yield driver
+
+    await cleanup_maindb(driver)
+    MAIN.pop(_DRIVER_UTIL_NAME, None)
+
+
+async def maybe_cleanup_maindb():
+    try:
+        driver = get_driver()
+    except KeyError:
+        pass
+    else:
+        await cleanup_maindb(driver)
+
+
+async def cleanup_maindb(driver: Driver):
+    if not driver.initialized:
+        return
+    async with driver.transaction() as txn:
+        all_keys = [k async for k in txn.keys("", count=-1)]
+        for key in all_keys:
+            await txn.delete(key)
+        await txn.commit()
 
 
 @pytest.fixture(scope="function")

@@ -17,37 +17,50 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Union
+import base64
+from typing import Optional, Union
 
+import pydantic
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
-from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.chat.query import chat, rephrase_query_from_chat_history
+from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.search.chat.query import chat, get_relations_results
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     ChatOptions,
     ChatRequest,
-    FindRequest,
+    KnowledgeboxFindResults,
     NucliaDBClientType,
-    SearchOptions,
+    Relations,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
+END_OF_STREAM = "_END_"
+
+
+class SyncChatResponse(pydantic.BaseModel):
+    answer: str
+    relations: Optional[Relations]
+    results: KnowledgeboxFindResults
+    status: AnswerStatusCode
+
+
 CHAT_EXAMPLES = {
-    "search_and_chat": {
-        "summary": "Ask who won the league final",
-        "description": "You can ask a question to your knowledge box",  # noqa
-        "value": {
+    "search_and_chat": Example(
+        summary="Ask who won the league final",
+        description="You can ask a question to your knowledge box",  # noqa
+        value={
             "query": "Who won the league final?",
         },
-    },
+    ),
 }
 
 
@@ -58,21 +71,26 @@ CHAT_EXAMPLES = {
     summary="Chat on a Knowledge Box",
     description="Chat on a Knowledge Box",
     tags=["Search"],
+    response_model=None,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def chat_knowledgebox_endpoint(
     request: Request,
-    response: Response,
     kbid: str,
-    item: ChatRequest = Body(examples=CHAT_EXAMPLES),
+    item: ChatRequest = Body(openapi_examples=CHAT_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> Union[StreamingResponse, HTTPClientError]:
+    x_synchronous: bool = Header(
+        False,
+        description="Output response as JSON in a non-streaming way. "
+        "This is slower and requires waiting for entire answer to be ready.",
+    ),
+) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
-        return await chat_knowledgebox(
-            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        return await create_chat_response(
+            kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
@@ -95,60 +113,69 @@ async def chat_knowledgebox_endpoint(
         )
 
 
-async def chat_knowledgebox(
-    response: Response,
+async def create_chat_response(
     kbid: str,
-    item: ChatRequest,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-):
-    user_query = item.query
-    rephrased_query = None
-    if item.context is not None and len(item.context) > 0:
-        rephrased_query = await rephrase_query_from_chat_history(
-            kbid, item.context, item.query, x_nucliadb_user
+    chat_request: ChatRequest,
+    user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
+    x_synchronous: bool,
+) -> Response:
+    chat_result = await chat(
+        kbid,
+        chat_request,
+        user_id,
+        client_type,
+        origin,
+    )
+    if x_synchronous:
+        text_answer = b""
+        async for chunk in chat_result.answer_stream:
+            text_answer += chunk
+
+        relations_results = None
+        if ChatOptions.RELATIONS in chat_request.features:
+            relations_results = await get_relations_results(
+                kbid=kbid, chat_request=chat_request, text_answer=text_answer
+            )
+
+        return Response(
+            content=SyncChatResponse(
+                answer=text_answer.decode(),
+                relations=relations_results,
+                results=chat_result.find_results,
+                status=chat_result.status_code.value,
+            ).json(),
+            headers={
+                "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
+                "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
+                "Content-Type": "application/json",
+            },
         )
+    else:
 
-    find_request = FindRequest()
-    find_request.features = [SearchOptions.VECTOR]
-    if ChatOptions.PARAGRAPHS in item.features:
-        find_request.features.append(SearchOptions.PARAGRAPH)
-    find_request.query = rephrased_query or user_query
-    find_request.fields = item.fields
-    find_request.filters = item.filters
-    find_request.field_type_filter = item.field_type_filter
-    find_request.min_score = item.min_score
-    find_request.range_creation_start = item.range_creation_start
-    find_request.range_creation_end = item.range_creation_end
-    find_request.range_modification_start = item.range_modification_start
-    find_request.range_modification_end = item.range_modification_end
-    find_request.show = item.show
-    find_request.extracted = item.extracted
-    find_request.shards = item.shards
-    find_request.autofilter = item.autofilter
-    find_request.highlight = item.highlight
-    find_request.with_duplicates = False
+        async def _streaming_response():
+            bytes_results = base64.b64encode(chat_result.find_results.json().encode())
+            yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+            yield bytes_results
 
-    find_results, incomplete = await find(
-        response,
-        kbid,
-        find_request,
-        x_ndb_client,
-        x_nucliadb_user,
-        x_forwarded_for,
-        do_audit=True,
-    )
-    if incomplete:
-        raise IncompleteFindResultsError()
+            text_answer = b""
+            async for chunk in chat_result.answer_stream:
+                text_answer += chunk
+                yield chunk
 
-    return await chat(
-        kbid,
-        user_query,
-        rephrased_query,
-        find_results,
-        item,
-        x_nucliadb_user,
-        x_ndb_client,
-        x_forwarded_for,
-    )
+            yield END_OF_STREAM.encode()
+            if ChatOptions.RELATIONS in chat_request.features:
+                relations_results = await get_relations_results(
+                    kbid=kbid, chat_request=chat_request, text_answer=text_answer
+                )
+                yield base64.b64encode(relations_results.json().encode())
+
+        return StreamingResponse(
+            _streaming_response(),
+            media_type="application/octet-stream",
+            headers={
+                "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
+                "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
+            },
+        )

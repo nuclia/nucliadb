@@ -28,8 +28,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
     ERROR as ERROR,
     EntitiesGroup as EntitiesGroup,
     EntitiesGroupSummary as EntitiesGroupSummary,
+    EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
+    KBConfiguration as KBConfiguration,
     KnowledgeBox as KnowledgeBox,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -1861,3 +1863,45 @@ class GetSynonymsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["status", b"status", "synonyms", b"synonyms"]) -> None: ...
 
 global___GetSynonymsResponse = GetSynonymsResponse
+
+@typing_extensions.final
+class SetKBConfigurationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    @property
+    def config(self) -> nucliadb_protos.knowledgebox_pb2.KBConfiguration: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+        config: nucliadb_protos.knowledgebox_pb2.KBConfiguration | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["config", b"config", "kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "kb", b"kb"]) -> None: ...
+
+global___SetKBConfigurationRequest = SetKBConfigurationRequest
+
+@typing_extensions.final
+class GetConfigurationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATUS_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    @property
+    def status(self) -> global___OpStatusWriter: ...
+    @property
+    def config(self) -> nucliadb_protos.knowledgebox_pb2.KBConfiguration: ...
+    def __init__(
+        self,
+        *,
+        status: global___OpStatusWriter | None = ...,
+        config: nucliadb_protos.knowledgebox_pb2.KBConfiguration | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["config", b"config", "status", b"status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "status", b"status"]) -> None: ...
+
+global___GetConfigurationResponse = GetConfigurationResponse

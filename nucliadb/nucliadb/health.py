@@ -108,7 +108,7 @@ def setup_grpc_servicer(server) -> Callable[[], Awaitable[None]]:
 
 
 async def start_grpc_health_service(port: int) -> Callable[[], Awaitable[None]]:
-    aio.init_grpc_aio()
+    aio.init_grpc_aio()  # type: ignore
 
     server = aio.server()
     server.add_insecure_port(f"0.0.0.0:{port}")

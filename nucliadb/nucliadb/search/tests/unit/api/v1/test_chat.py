@@ -42,9 +42,9 @@ class TestRequest(Request):
 
 
 @pytest.fixture(scope="function")
-def chat_knowledgebox_mock():
+def create_chat_response_mock():
     with mock.patch(
-        "nucliadb.search.api.v1.chat.chat_knowledgebox",
+        "nucliadb.search.api.v1.chat.create_chat_response",
     ) as mocked:
         yield mocked
 
@@ -73,9 +73,9 @@ def chat_knowledgebox_mock():
     ],
 )
 async def test_chat_endpoint_handles_errors(
-    chat_knowledgebox_mock, predict_error, http_error_response
+    create_chat_response_mock, predict_error, http_error_response
 ):
-    chat_knowledgebox_mock.side_effect = predict_error
+    create_chat_response_mock.side_effect = predict_error
     request = TestRequest(
         scope={
             "type": "http",
@@ -86,7 +86,6 @@ async def test_chat_endpoint_handles_errors(
     )
     response = await chat_knowledgebox_endpoint(
         request=request,
-        response=Mock(),
         kbid="kbid",
         item=Mock(),
         x_ndb_client=None,

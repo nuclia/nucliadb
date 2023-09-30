@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -26,6 +27,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
+from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import finalize, initialize
@@ -81,25 +83,29 @@ fastapi_settings = dict(
 )
 
 
-base_app = FastAPI(title="NucliaDB Reader API", **fastapi_settings)  # type: ignore
+def create_application() -> FastAPI:
+    base_app = FastAPI(title="NucliaDB Reader API", **fastapi_settings)  # type: ignore
 
-base_app.include_router(api_v1)
+    base_app.include_router(api_v1)
 
-extend_openapi(base_app)
+    extend_openapi(base_app)
 
-application = VersionedFastAPI(
-    base_app,
-    version_format="{major}",
-    prefix_format=f"/{API_PREFIX}/v{{major}}",
-    default_version=(1, 0),
-    enable_latest=False,
-    kwargs=fastapi_settings,
-)
+    application = VersionedFastAPI(
+        base_app,
+        version_format="{major}",
+        prefix_format=f"/{API_PREFIX}/v{{major}}",
+        default_version=(1, 0),
+        enable_latest=False,
+        kwargs=fastapi_settings,
+    )
 
+    async def homepage(request: Request) -> HTMLResponse:
+        return HTMLResponse("NucliaDB Reader Service")
 
-async def homepage(request: Request) -> HTMLResponse:
-    return HTMLResponse("NucliaDB Reader Service")
+    # Use raw starlette routes to avoid unnecessary overhead
+    application.add_route("/", homepage)
 
+    # Inject application context into the fastapi app's state
+    set_app_context(application)
 
-# Use raw starlette routes to avoid unnecessary overhead
-application.add_route("/", homepage)
+    return application

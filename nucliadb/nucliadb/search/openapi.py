@@ -18,56 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import datetime
-import json
-import sys
 
-from fastapi.openapi.utils import get_openapi
-from starlette.routing import Mount
-
-from nucliadb.search import API_PREFIX
+from nucliadb import openapi
 
 
-def is_versioned_route(route):
-    return isinstance(route, Mount) and route.path.startswith(f"/{API_PREFIX}/v")
-
-
-def extract_openapi(application, version, commit_id):
-    app = [
-        route.app
-        for route in application.routes
-        if is_versioned_route(route) and route.app.version == version
-    ][0]
-    document = get_openapi(
-        title=app.title,
-        version=app.version,
-        openapi_version=app.openapi_version,
-        description=app.description,
-        terms_of_service=app.terms_of_service,
-        contact=app.contact,
-        license_info=app.license_info,
-        routes=app.routes,
-        tags=app.openapi_tags,
-        servers=app.servers,
-    )
-
-    document["x-metadata"] = {
-        "nucliadb_search": {
-            "commit": commit_id,
-            "last_updated": datetime.datetime.utcnow().isoformat(),
-        }
-    }
-    return document
-
-
-def command_extract_openapi():  # pragma: no cover
+def command_extract_openapi():
     from nucliadb.search.app import application
 
-    openapi_json_path = sys.argv[1]
-    api_version = sys.argv[2]
-    commit_id = sys.argv[3]
-
-    json.dump(
-        extract_openapi(application, api_version, commit_id),
-        open(openapi_json_path, "w"),
-    )
+    openapi.command_extract_openapi(application, "nucliadb_search")

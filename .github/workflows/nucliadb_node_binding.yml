@@ -10,7 +10,6 @@ env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
-  API_VERSION: 1
 
 jobs:
   tests:

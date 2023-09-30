@@ -22,13 +22,12 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 use regex::Regex;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -60,6 +59,7 @@ impl Debug for ParagraphWriterService {
 impl ParagraphWriter for ParagraphWriterService {}
 
 impl WriterChild for ParagraphWriterService {
+    #[measure(actor = "paragraphs", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
@@ -75,13 +75,10 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Ending at: {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("count".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(count)
     }
+
+    #[measure(actor = "paragraphs", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -115,13 +112,10 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("set_resource".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(())
     }
+
+    #[measure(actor = "paragraphs", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -144,13 +138,9 @@ impl WriterChild for ParagraphWriterService {
             debug!("{id:?} - Commit: ends at {v} ms");
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::paragraphs("delete_resource".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
         Ok(())
