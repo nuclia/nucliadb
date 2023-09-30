@@ -31,6 +31,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
+use crate::env::debug;
 use crate::settings::Settings;
 use crate::utils::ALL_TARGETS;
 
@@ -66,6 +67,11 @@ pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitG
     Ok(sentry_guard)
 }
 
+/// Sets up the stdout output using the log levels (target, level)
+/// Log levels can be defined with 3 different flavors to match targets (crate names)
+/// - exact match. e.g. `node_reader`
+/// - partial match. e.g. `node*` will match all targets starting with `node`
+/// - catch-all using `*`
 fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sync> {
     let log_levels = settings.log_levels().to_vec();
     let layer = tracing_subscriber::fmt::layer()
@@ -107,7 +113,7 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
         false
     });
 
-    if settings.plain_logs() {
+    if settings.plain_logs() || debug {
         layer
             .event_format(tracing_subscriber::fmt::format().compact())
             .with_filter(filter)
@@ -166,7 +172,9 @@ fn sentry_layer() -> Box<dyn Layer<Registry> + Send + Sync> {
 }
 
 pub fn run_with_telemetry<F, R>(current: Span, f: F) -> R
-where F: FnOnce() -> R {
+where
+    F: FnOnce() -> R,
+{
     let tid = current.context().span().span_context().trace_id();
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
