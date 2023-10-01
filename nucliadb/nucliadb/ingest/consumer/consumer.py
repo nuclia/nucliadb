@@ -133,7 +133,10 @@ class IngestConsumer:
         ), self.lock:
             try:
                 pb_data = msg.data
-                if msg.headers and msg.headers.get("X-MESSAGE-TYPE") == "PROXY":
+                if (
+                    msg.headers is not None
+                    and msg.headers.get("X-MESSAGE-TYPE") == "PROXY"
+                ):
                     # this is a message that is referencing a blob because
                     # it was too big to be sent through NATS
                     ref_pb = BrokerMessageBlobReference()
