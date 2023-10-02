@@ -55,7 +55,7 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--grpc_host", dest="grpc_host", default="ingest.nucliadb.svc.cluster.local"
+        "--grpc_host", dest="grpc_host", default="ingest-orm-grpc.nucliadb.svc.cluster.local"
     )
 
     return parser.parse_args()
@@ -71,6 +71,7 @@ def run():
         reader_host=args.reader_host,
         grpc_host=args.grpc_host,
     )
+
     kb = client.get_kb(kbid=args.kbid)
     if kb is None:
         raise KeyError(f"KB could not be found")
