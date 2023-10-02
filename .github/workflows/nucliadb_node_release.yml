@@ -56,7 +56,7 @@ jobs:
             platform: linux
           - os: macos
             target: aarch64
-            interpreter: 3.11
+            interpreter: 3.9 3.10 3.11
           # - os: ubuntu
           #   platform: linux
           #   target: i686
@@ -112,7 +112,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.11' }}
+          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11' }}
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
