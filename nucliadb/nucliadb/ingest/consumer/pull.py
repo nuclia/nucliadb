@@ -95,7 +95,9 @@ class PullWorker:
                 )
             except nats.errors.MaxPayloadError:
                 storage = await get_storage()
-                stored_key = await storage.set_stream_message(kbid=pb.kbid, data=data)
+                stored_key = await storage.set_stream_message(
+                    kbid=pb.kbid, rid=pb.uuid, data=data
+                )
                 referenced_pb = BrokerMessageBlobReference(
                     uuid=pb.uuid, kbid=pb.kbid, storage_key=stored_key
                 )

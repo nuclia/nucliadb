@@ -33,6 +33,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
@@ -55,7 +56,7 @@ DEADLETTER = "deadletter/{partition}/{seqid}/{seq}"
 OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
 # temporary storage for large stream data
-MESSAGE_KEY = "message/{kbid}/{mid}"
+MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
 
 
 class StorageField:
@@ -537,16 +538,16 @@ class Storage:
     async def schedule_delete_kb(self, kbid: str) -> bool:
         raise NotImplementedError()
 
-    async def set_stream_message(self, kbid: str, data: bytes) -> str:
-        key = MESSAGE_KEY.format(kbid=kbid, mid=uuid.uuid4())
-        await self.uploadbytes(self.indexing_bucket, key, data)
+    async def set_stream_message(self, kbid: str, rid: str, data: bytes) -> str:
+        key = MESSAGE_KEY.format(kbid=kbid, rid=rid, mid=uuid.uuid4())
+        await self.uploadbytes(cast(str, self.indexing_bucket), key, data)
         return key
 
     async def get_stream_message(self, key: str) -> bytes:
-        bytes_buffer = await self.downloadbytes(self.indexing_bucket, key)
+        bytes_buffer = await self.downloadbytes(cast(str, self.indexing_bucket), key)
         if bytes_buffer.getbuffer().nbytes == 0:
             raise KeyError(f'Stream message data not found for key "{key}"')
         return bytes_buffer.read()
 
     async def del_stream_message(self, key: str) -> bytes:
-        await self.delete_upload(key, self.indexing_bucket)
+        await self.delete_upload(key, cast(str, self.indexing_bucket))
