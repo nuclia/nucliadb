@@ -549,5 +549,5 @@ class Storage:
             raise KeyError(f'Stream message data not found for key "{key}"')
         return bytes_buffer.read()
 
-    async def del_stream_message(self, key: str) -> bytes:
+    async def del_stream_message(self, key: str) -> None:
         await self.delete_upload(key, cast(str, self.indexing_bucket))
