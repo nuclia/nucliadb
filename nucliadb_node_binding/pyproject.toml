@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 [build-system]
+requires = ["maturin>=0.12"]
 build-backend = "maturin"
 
 [tool.maturin]
@@ -25,11 +26,10 @@ profile = "release-wheel"
 
 [project]
 name = "nucliadb_node_binding"
-requires-python = ">=3.6"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: Implementation :: CPython"
 ]
 
 [tool.pytest.ini_options]
