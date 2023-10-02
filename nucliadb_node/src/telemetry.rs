@@ -216,3 +216,86 @@ where
     let tid = current.context().span().span_context().trace_id();
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tracing_core::metadata::Kind;
+    use tracing_core::{callsite, metadata};
+
+    pub struct MyCallsite {}
+
+    impl callsite::Callsite for MyCallsite {
+        fn set_interest(&self, _: Interest) {
+            unimplemented!()
+        }
+        fn metadata(&self) -> &Metadata {
+            unimplemented!()
+        }
+    }
+
+    static FOO_CALLSITE: MyCallsite = MyCallsite {
+            // ...
+    };
+
+    #[test]
+    fn test_logs_filtering_catchall() {
+        // we catch all logs at the INFO level
+        let log_levels = vec![("*".to_string(), Level::INFO)];
+        let filter = LogLevelsFilter::new(log_levels);
+
+        for (target, level, should_log) in vec![
+            ("some_node", Level::DEBUG, false),
+            ("some_node", Level::INFO, true),
+            ("unknown", Level::DEBUG, false),
+            ("nucliadb_node", Level::INFO, true),
+            ("nucliadb_node", Level::DEBUG, false),
+        ] {
+            let metadata = metadata!(
+                name:"metadata",
+                target:target,
+                level: level,
+                fields: &["bar", "baz"],
+                callsite: &FOO_CALLSITE,
+                kind: Kind::SPAN,
+            );
+            if should_log {
+                assert!(filter.is_enabled(&metadata));
+            } else {
+                assert!(!filter.is_enabled(&metadata));
+            }
+        }
+    }
+    #[test]
+    fn test_logs_filtering_partial_and_exact() {
+        // defined logs
+        let log_levels = vec![
+            ("nucliadb_node".to_string(), Level::INFO),
+            ("some*".to_string(), Level::DEBUG),
+        ];
+
+        let filter = LogLevelsFilter::new(log_levels);
+
+        for (target, level, should_log) in vec![
+            ("some_node", Level::DEBUG, true),
+            ("some_node", Level::INFO, true),
+            ("unknown", Level::DEBUG, false),
+            ("nucliadb_node", Level::INFO, true),
+            ("nucliadb_node", Level::DEBUG, false),
+        ] {
+            let metadata = metadata!(
+                name:"metadata",
+                target:target,
+                level: level,
+                fields: &["bar", "baz"],
+                callsite: &FOO_CALLSITE,
+                kind: Kind::SPAN,
+            );
+            if should_log {
+                assert!(filter.is_enabled(&metadata));
+            } else {
+                assert!(!filter.is_enabled(&metadata));
+            }
+        }
+    }
+}
