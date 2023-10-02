@@ -111,3 +111,5 @@ Examples:
     )
 
     cluster_discovery_mode: StandaloneDiscoveryMode = StandaloneDiscoveryMode.DEFAULT
+
+    fork: bool = pydantic.Field(default=False, description="Fork process on startup")
