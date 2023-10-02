@@ -46,4 +46,10 @@ setup(
     package_data={"": ["*.txt", "*.md"], "nucliadb_sdk": ["py.typed"]},
     packages=find_packages(),
     install_requires=requirements,
+    entry_points={
+        "console_scripts": [
+            "nucliadb_export = nucliadb_sdk.exp_imp:run export",
+            "nucliadb_export = nucliadb_sdk.exp_imp:run import",
+        ]
+    },
 )
