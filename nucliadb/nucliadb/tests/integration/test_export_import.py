@@ -27,6 +27,7 @@ import pytest
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 
 
 @pytest.fixture(scope="function")
@@ -126,8 +127,16 @@ async def test_on_standalone_nucliadb(
 @pytest.fixture(scope="function")
 def hosted_nucliadb(natsd):
     with patch("nucliadb.common.context.in_standalone_mode", return_value=False):
-        with set_standalone_mode_settings(False):
-            yield
+        with patch(
+            "nucliadb.reader.api.v1.export_import.in_standalone_mode",
+            return_value=False,
+        ):
+            with patch(
+                "nucliadb.writer.api.v1.export_import.in_standalone_mode",
+                return_value=False,
+            ):
+                with set_standalone_mode_settings(False):
+                    yield
 
 
 @pytest.fixture(scope="function")
@@ -138,12 +147,26 @@ async def context(hosted_nucliadb):
     await context.finalize()
 
 
+@pytest.fixture(scope="function")
+async def exports_consumer(context):
+    consumer = get_exports_consumer()
+    await consumer.initialize(context)
+
+
+@pytest.fixture(scope="function")
+async def imports_consumer(context):
+    consumer = get_imports_consumer()
+    await consumer.initialize(context)
+
+
 async def test_on_hosted_nucliadb(
     hosted_nucliadb,
     nucliadb_writer,
     nucliadb_reader,
     src_kb,
     dst_kb,
+    imports_consumer,
+    exports_consumer,
 ):
     await _test_export_import_kb_api(nucliadb_writer, nucliadb_reader, src_kb, dst_kb)
 

@@ -58,9 +58,9 @@ async def download_export_kb_endpoint(
             headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
         )
     try:
-        download_stream = await get_export_download_stream(context, kbid, export_id)
+        # TODO: Support range downloads to better support big export downloads.
         return StreamingResponse(
-            download_stream,
+            await download_export_from_blob_storage(context, kbid, export_id),
             status_code=200,
             media_type="application/octet-stream",
             headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
@@ -78,7 +78,7 @@ async def download_export_kb_endpoint(
         return HTTPClientError(status_code=500, detail=f"Export errored")
 
 
-async def get_export_download_stream(
+async def download_export_from_blob_storage(
     context: ApplicationContext, kbid: str, export_id: str
 ) -> AsyncIterable[bytes]:
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)

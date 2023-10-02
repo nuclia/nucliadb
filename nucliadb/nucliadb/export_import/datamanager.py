@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, AsyncIterator, Union
+from typing import AsyncGenerator, Union
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import.exceptions import MetadataNotFound
@@ -80,7 +80,7 @@ class ExportImportDataManager:
 
     async def upload_export(
         self,
-        export_bytes: AsyncIterator[bytes],
+        export_bytes: AsyncGenerator[bytes, None],
         kbid: str,
         export_id: str,
     ):
@@ -93,7 +93,9 @@ class ExportImportDataManager:
         iterator = _iter_and_add_size_to_cf(export_bytes, cf)
         await self.storage.uploaditerator(iterator, field, cf)
 
-    async def download_export(self, kbid: str, export_id: str) -> AsyncIterator[bytes]:
+    async def download_export(
+        self, kbid: str, export_id: str
+    ) -> AsyncGenerator[bytes, None]:
         key = STORAGE_EXPORT_KEY.format(export_id=export_id)
         bucket = self.storage.get_bucket_name(kbid)
         async for chunk in self.storage.download(bucket, key):
@@ -130,7 +132,7 @@ class ExportImportDataManager:
 
 async def _iter_and_add_size_to_cf(
     stream: AsyncGenerator[bytes, None], cf: resources_pb2.CloudFile
-) -> AsyncIterator[bytes]:
+) -> AsyncGenerator[bytes, None]:
     # This is needed to upload exports to GCS because it requires the size of
     # the file at least at the request for the last chunk.
     total_size = 0
@@ -143,7 +145,7 @@ async def _iter_and_add_size_to_cf(
 
 async def async_gen_lookahead(
     stream: AsyncGenerator[bytes, None]
-) -> AsyncIterator[bytes, bool]:
+) -> AsyncGenerator[tuple[bytes, bool], None]:
     """Async generator that yields the next chunk and whether it's the last one.
     Empty chunks are ignored.
     """

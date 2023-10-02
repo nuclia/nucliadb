@@ -29,6 +29,8 @@ from nucliadb.common.cluster.discovery.utils import (
 )
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
+from nucliadb.common.context import ApplicationContext
+from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
@@ -148,11 +150,19 @@ async def main_ingest_processed_consumer():  # pragma: no cover
 async def main_subscriber_workers():  # pragma: no cover
     finalizers = await initialize()
 
+    context = ApplicationContext("subscriber-workers")
+    await context.initialize()
+
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     auditor_closer = await consumer_service.start_auditor()
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
+
+    export_consumer = get_exports_consumer()
+    await export_consumer.initialize(context)
+    imports_consumer = get_imports_consumer()
+    await imports_consumer.initialize(context)
 
     await run_until_exit(
         [
@@ -161,6 +171,7 @@ async def main_subscriber_workers():  # pragma: no cover
             materializer_closer,
             metrics_server.shutdown,
             grpc_health_finalizer,
+            context.finalize,
         ]
         + finalizers
     )

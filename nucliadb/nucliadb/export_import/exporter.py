@@ -23,7 +23,11 @@ from typing import AsyncGenerator, Optional
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
-from nucliadb.export_import.models import ExportedItemType, ExportMetadata
+from nucliadb.export_import.models import (
+    ExportedItemType,
+    ExportMetadata,
+    NatsTaskMessage,
+)
 from nucliadb.export_import.utils import (
     TaskRetryHandler,
     download_binary,
@@ -63,20 +67,19 @@ async def export_kb(
 
 
 async def export_kb_to_blob_storage(
-    context: ApplicationContext,
-    kbid: str,
-    export_id: str,
+    context: ApplicationContext, msg: NatsTaskMessage
 ) -> None:
     """
     Exports the data of a knowledgebox to the blob storage service.
     """
-    dm = ExportImportDataManager(context.kv_driver)
+    kbid, export_id = msg.kbid, msg.id
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata(type="export", kbid=kbid, id=export_id)
     iterator = export_kb(context, kbid, metadata)  # type: ignore
     upload_export_retried = TaskRetryHandler("export", dm, metadata).wrap(
         dm.upload_export
     )
-    await upload_export_retried(context, iterator, kbid, export_id)
+    await upload_export_retried(iterator, kbid, export_id)
 
 
 async def export_resources(
@@ -88,20 +91,22 @@ async def export_resources(
         if bm is None:
             logger.warning(f"No resource found for rid {rid}")
             continue
-        async for chunk in export_resource(context, bm):
+        async for chunk in export_resource_with_binaries(context, bm):
             yield chunk
 
 
 async def export_resources_resumable(
     context, metadata: ExportMetadata
 ) -> AsyncGenerator[bytes, None]:
-    dm = ExportImportDataManager(context.kv_driver)
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     kbid = metadata.kbid
     if len(metadata.resources_to_export) == 0:
         # Starting an export from scratch
         metadata.exported_resources = []
         async for rid in iter_kb_resource_uuids(context, kbid):
             metadata.resources_to_export.append(rid)
+        metadata.resources_to_export.sort()
+        metadata.total = len(metadata.resources_to_export)
         await dm.set_metadata("export", metadata)
 
     try:
@@ -111,10 +116,11 @@ async def export_resources_resumable(
                 logger.warning(f"Skipping resource {rid} as it was deleted")
                 continue
 
-            async for chunk in export_resource(context, bm):
+            async for chunk in export_resource_with_binaries(context, bm):
                 yield chunk
 
             metadata.exported_resources.append(rid)
+            metadata.total += 1
             await dm.set_metadata("export", metadata)
 
     except Exception as e:
@@ -123,11 +129,12 @@ async def export_resources_resumable(
         # Start from scracth next time.
         # TODO: try to resume from the last resource
         metadata.exported_resources = []
+        metadata.processed = 0
         await dm.set_metadata("export", metadata)
         raise
 
 
-async def export_resource(
+async def export_resource_with_binaries(
     context,
     bm: writer_pb2.BrokerMessage,
 ) -> AsyncGenerator[bytes, None]:

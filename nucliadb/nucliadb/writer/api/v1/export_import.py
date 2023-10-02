@@ -88,7 +88,8 @@ async def start_kb_import_endpoint(request: Request, kbid: str) -> CreateImportR
         )
         return CreateImportResponse(import_id=import_id)
     else:
-        await upload_import_from_request(
+        # TODO: Implement range/resumable uploads to better suppor big exports.
+        await upload_import_to_blob_storage(
             context=context,
             request=request,
             kbid=kbid,
@@ -98,7 +99,7 @@ async def start_kb_import_endpoint(request: Request, kbid: str) -> CreateImportR
         return CreateImportResponse(import_id=import_id)
 
 
-async def upload_import_from_request(
+async def upload_import_to_blob_storage(
     context: ApplicationContext, request: Request, kbid: str, import_id: str
 ):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)

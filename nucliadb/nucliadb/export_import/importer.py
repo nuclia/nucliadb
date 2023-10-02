@@ -22,8 +22,11 @@ from typing import AsyncGenerator, Callable, Optional, cast
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
-from nucliadb.export_import.exceptions import MetadataNotFound
-from nucliadb.export_import.models import ExportedItemType, ImportMetadata
+from nucliadb.export_import.models import (
+    ExportedItemType,
+    ImportMetadata,
+    NatsTaskMessage,
+)
 from nucliadb.export_import.utils import (
     ExportStream,
     ExportStreamReader,
@@ -51,7 +54,7 @@ async def import_kb(
     Imports exported data from a stream into a knowledgebox.
     If metadata is provided, the import will be resumable as it will store checkpoints.
     """
-    dm = ExportImportDataManager(context.kv_driver)
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     stream_reader = ExportStreamReader(stream)
 
     if metadata and metadata.read_bytes > 0:
@@ -88,17 +91,15 @@ async def import_kb(
 
 
 async def import_kb_from_blob_storage(
-    context: ApplicationContext, kbid: str, import_id: str
+    context: ApplicationContext, msg: NatsTaskMessage
 ):
     """
     Imports to a knowledgebox from an export stored in the blob storage service.
     """
-    dm = ExportImportDataManager(context.kv_driver)
-    try:
-        metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
-    except MetadataNotFound:
-        metadata = ImportMetadata(kbid=kbid, id=import_id)
-    iterator = dm.download_import(context, kbid, import_id)
+    kbid, import_id = msg.kbid, msg.id
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+    metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
+    iterator = dm.download_import(kbid, import_id)
     stream = IteratorExportStream(iterator)
     import_kb_with_retries = TaskRetryHandler("import", dm, metadata).wrap(import_kb)
     await import_kb_with_retries(context, kbid, stream, metadata)  # type: ignore
