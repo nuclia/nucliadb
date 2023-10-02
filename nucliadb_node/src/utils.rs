@@ -121,9 +121,9 @@ mod tests {
         let res = parse_log_levels(levels);
         assert_eq!(
             vec![
-                ("nucliadb".to_string(), Level::from_str("INFO").unwrap()),
-                ("node_*".to_string(), Level::from_str("DEBUG").unwrap()),
-                ("*".to_string(), Level::from_str("TRACE").unwrap())
+                ("nucliadb".to_string(), Level::INFO),
+                ("node_*".to_string(), Level::DEBUG),
+                ("*".to_string(), Level::TRACE)
             ],
             res
         );
