@@ -75,10 +75,6 @@ jobs:
             platform: linux
             target: aarch64
             manylinux: musllinux_1_1
-        exclude:
-          # Windows on arm64 only supports Python 3.11+
-          - os: windows
-            target: aarch64
 
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -97,7 +93,6 @@ jobs:
       - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
       - name: Check system deps
-        if: ${{ matrix.os != 'windows' }}
         run: make -C nucliadb check-system
 
       - name: build sdist
@@ -105,7 +100,7 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           command: sdist
-          args: -m nucliadb_node_binding/Cargo.toml --out dist
+          args: -m nucliadb_node_binding/Cargo.toml --out dist --profile release-wheel --release
           rust-toolchain: stable
 
       - name: build wheels
@@ -117,7 +112,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.11' }}
+          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.11' }}
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
