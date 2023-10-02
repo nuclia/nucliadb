@@ -97,13 +97,13 @@ async def test_create_resource_orm_with_basic(
     o2 = PBOrigin()
     assert o2 is not None
     o2.source = PBOrigin.Source.API
-    o2.source_id = "My Suorce"
+    o2.source_id = "My Source"
     o2.created.FromDatetime(datetime.now())
 
     await r.set_origin(o2)
     o2 = await r.get_origin()
     assert o2 is not None
-    assert o2.source_id == "My Suorce"
+    assert o2.source_id == "My Source"
 
 
 @pytest.mark.asyncio
