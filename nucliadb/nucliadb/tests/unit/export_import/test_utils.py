@@ -223,7 +223,7 @@ class TestTaskRetryHandler:
     async def test_errors_are_retried(self, callback, dm, metadata):
         callback.side_effect = ValueError("foo")
 
-        trh = TaskRetryHandler("foo", dm, metadata, max_tries=1)
+        trh = TaskRetryHandler("foo", dm, metadata, max_tries=2)
         callback_retried = trh.wrap(callback)
 
         with pytest.raises(ValueError):
@@ -241,7 +241,7 @@ class TestTaskRetryHandler:
         assert metadata.task.retries == 2
 
     async def test_ignored_statuses(self, callback, dm, metadata):
-        trh = TaskRetryHandler("foo", dm, metadata, max_tries=1)
+        trh = TaskRetryHandler("foo", dm, metadata)
         callback_retried = trh.wrap(callback)
 
         for status in (Status.ERRORED, Status.FINISHED, Status.CANCELLED):

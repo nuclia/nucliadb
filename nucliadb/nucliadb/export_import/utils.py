@@ -402,7 +402,7 @@ class TaskRetryHandler:
                 )
                 return
 
-            if task.retries > self.max_tries:
+            if task.retries >= self.max_tries:
                 task.status = Status.ERRORED
                 logger.info(
                     f"{self.type} task reached max retries. Setting to ERRORED state",
