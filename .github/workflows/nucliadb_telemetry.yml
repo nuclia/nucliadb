@@ -20,8 +20,12 @@ concurrency:
 
 jobs:
   pre-checks:
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
     uses: ./.github/workflows/_component_prechecks.yml
     with:
+      python-version: "${{ matrix.python-version }}"
       component: "nucliadb_telemetry"
 
   # Job to run tests
