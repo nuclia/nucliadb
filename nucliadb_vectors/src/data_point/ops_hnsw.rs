@@ -31,15 +31,10 @@ use crate::data_point::params;
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
-    /// Returns the key of the embedding pointed by x.
     fn get_key(&self, x: Address) -> &[u8];
-    /// Checks if x is a deleted embedding.
     fn is_deleted(&self, x: Address) -> bool;
-    /// During filtering this function will be called to know if x has the necessary labels.
     fn has_label(&self, x: Address, label: &[u8]) -> bool;
-    /// Computes the similarity between the embeddings pointed by x and y.
     fn similarity(&self, x: Address, y: Address) -> f32;
-    /// Returns the serialized embedding of x, is meant to be used by [`crate::data_types::vector`].
     fn get_vector(&self, x: Address) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
@@ -58,9 +53,11 @@ pub trait Hnsw {
     fn get_layer(&self, i: usize) -> Self::L;
 }
 
-/// Util for storing embedding pointers and their similarity in a [`BinaryHeap`].
+///  Tuples ([`Address`], [`f32`]) can not be stored in a [`BinaryHeap`] because [`f32`] does not
+/// implement [`Ord`]. [`Cnx`] is an application of the new-type pattern that lets us bypass the
+/// orphan rules and store such tuples in a [`BinaryHeap`].  
 #[derive(Clone, Copy)]
-struct Cnx(pub Address, pub f32);
+struct Cnx(Address, f32);
 impl Eq for Cnx {}
 impl Ord for Cnx {
     fn cmp(&self, other: &Self) -> Ordering {
