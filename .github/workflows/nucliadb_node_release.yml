@@ -48,15 +48,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos, windows]
+        os: [ubuntu, macos]
         target: [x86_64, aarch64]
         manylinux: [auto]
         include:
           - os: ubuntu
             platform: linux
-          - os: windows
-            ls: dir
-            interpreter: 3.11
           - os: macos
             target: aarch64
             interpreter: 3.11
