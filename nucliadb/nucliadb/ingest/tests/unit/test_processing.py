@@ -182,7 +182,7 @@ async def test_send_to_process_limits_exceeded(status, engine):
     assert exc.value.status_code == status
 
 
-async def test_send_to_process_limits_exceeded(engine):
+async def test_send_to_process_limits_exceeded_429(engine):
     engine.session = get_mocked_session(
         "POST", 429, json={"detail": "limits exceeded"}, context_manager=False
     )
