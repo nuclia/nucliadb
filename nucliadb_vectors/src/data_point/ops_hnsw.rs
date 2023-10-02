@@ -27,41 +27,38 @@ use rand::prelude::*;
 use rand::rngs::SmallRng;
 
 use super::*;
+use crate::data_point::params;
 
-pub mod params {
-    pub fn level_factor() -> f64 {
-        1.0 / (m() as f64).ln()
-    }
-    pub const fn m_max() -> usize {
-        30
-    }
-    pub const fn m() -> usize {
-        30
-    }
-    pub const fn ef_construction() -> usize {
-        100
-    }
-}
+/// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
-    fn get_key(&self, _: Address) -> &[u8];
-    fn is_deleted(&self, _: Address) -> bool;
-    fn has_label(&self, _: Address, _: &[u8]) -> bool;
-    fn similarity(&self, _: Address, _: Address) -> f32;
-    fn get_vector(&self, _: Address) -> &[u8];
+    /// Returns the key of the embedding pointed by x.
+    fn get_key(&self, x: Address) -> &[u8];
+    /// Checks if x is a deleted embedding.
+    fn is_deleted(&self, x: Address) -> bool;
+    /// During filtering this function will be called to know if x has the necessary labels.
+    fn has_label(&self, x: Address, label: &[u8]) -> bool;
+    /// Computes the similarity between the embeddings pointed by x and y.
+    fn similarity(&self, x: Address, y: Address) -> f32;
+    /// Returns the serialized embedding of x, is meant to be used by [`crate::data_types::vector`].
+    fn get_vector(&self, x: Address) -> &[u8];
+    /// Embeddings with smaller similarity should not be considered.
     fn min_score(&self) -> f32;
 }
 
+/// Implementors of this trait are layers of an HNSW where a nearest neighbour search can be ran.
 pub trait Layer {
     type EdgeIt: Iterator<Item = (Address, Edge)>;
     fn get_out_edges(&self, node: Address) -> Self::EdgeIt;
 }
 
+/// Implementors of this trait are an HNSW where search can be ran.
 pub trait Hnsw {
     type L: Layer;
     fn get_entry_point(&self) -> Option<EntryPoint>;
     fn get_layer(&self, i: usize) -> Self::L;
 }
 
+/// Util for storing embedding pointers and their similarity in a [`BinaryHeap`].
 #[derive(Clone, Copy)]
 struct Cnx(pub Address, pub f32);
 impl Eq for Cnx {}
@@ -81,8 +78,10 @@ impl PartialOrd for Cnx {
     }
 }
 
+/// A list of neighbours containing a pointer to the embedding and their similarity.
 pub type Neighbours = Vec<(Address, f32)>;
 
+/// Guides an algorithm to the valid nodes.
 #[derive(Clone, Copy)]
 struct NodeFilter<'a, DR> {
     tracker: &'a DR,
@@ -377,6 +376,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
 }
 
+/// Useful datatype for counting how many times a embedding appears a solution.
+/// If it not enabled the count will always be 0.
 #[derive(Default)]
 struct RepCounter<'a> {
     enabled: bool,
@@ -390,16 +391,20 @@ impl<'a> RepCounter<'a> {
         }
     }
     fn add(&mut self, x: &'a [u8]) {
-        *self.counter.entry(x).or_insert(0) += 1;
+        if self.enabled {
+            *self.counter.entry(x).or_insert(0) += 1;
+        }
     }
     fn sub(&mut self, x: &'a [u8]) {
-        *self.counter.entry(x).or_insert(1) -= 1;
+        if self.enabled {
+            *self.counter.entry(x).or_insert(1) -= 1;
+        }
     }
     fn get(&self, x: &[u8]) -> usize {
-        self.counter
-            .get(&x)
-            .copied()
-            .filter(|_| self.enabled)
-            .unwrap_or_default()
+        if self.enabled {
+            self.counter.get(&x).copied().unwrap_or_default()
+        } else {
+            0
+        }
     }
 }
