@@ -19,6 +19,7 @@
 #
 import asyncio
 import os
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 from uuid import uuid4
@@ -29,7 +30,6 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 import nucliadb_sdk
-from nucliadb_client.client import NucliaDBClient as GRPCNucliaDBClient
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
@@ -49,9 +49,11 @@ images.settings["nucliadb"] = {
     },
 }
 
-NUCLIA_DOCS_dataset = (
-    "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia.export"
-)
+NUCLIA_DOCS_dataset = "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia-datasets.export"
+
+
+MB = 1024 * 1024
+CHUNK_SIZE = 5 * MB
 
 
 class NucliaDB(BaseImage):
@@ -142,12 +144,18 @@ async def init_fixture(
     dataset_slug: str,
     dataset_location: str,
 ):
-    client = GRPCNucliaDBClient(
-        host=nucliadb.host, grpc=nucliadb.grpc, http=nucliadb.port, train=0
-    )
-    client.init_async_grpc()
-    kbid = await client.import_kb(slug=dataset_slug, location=dataset_location)
-    await client.finish_async_grpc()
+    sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    slug = uuid.uuid4().hex
+    kb_obj = sdk.create_knowledge_box(slug=slug)
+    kbid = kb_obj.uuid
+
+    def dataset_generator():
+        with requests.get(dataset_location, stream=True) as resp:
+            for chunk in resp.iter_content(chunk_size=CHUNK_SIZE):
+                yield chunk
+
+    import_id = sdk.start_import(kbid=kbid, content=dataset_generator()).import_id
+    assert sdk.import_status(kbid=kbid, import_id=import_id).status.value == "finished"
     return kbid
 
 

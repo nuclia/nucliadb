@@ -72,3 +72,12 @@ def raise_for_task_status(status: Status):
         Status.SCHEDULED: TaskNotFinishedError,
         Status.RUNNING: TaskNotFinishedError,
     }[status]
+
+
+class WrongExportStreamFormat(Exception):
+    """
+    Raised then data being imported does not follow the expected format
+    """
+
+    pass
+

@@ -6,13 +6,37 @@ on:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/Cargo.toml"
+      - "nucliadb_node_binding/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_core/**"
+      - "nucliadb_node/src/**"
+      - "nucliadb_node/Cargo.toml"
+      - "nucliadb_vectors/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_core/**"
+      - "nucliadb_relations/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/Cargo.toml"
+      - "nucliadb_node_binding/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_core/**"
+      - "nucliadb_node/src/**"
+      - "nucliadb_node/Cargo.toml"
+      - "nucliadb_vectors/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_core/**"
+      - "nucliadb_relations/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -78,6 +102,10 @@ jobs:
         with:
           python-version: "3.11"
           architecture: ${{ matrix.python-architecture || 'x64' }}
+      
+      - name: Setup env
+        run: |
+          python bump.py --build=${{github.run_number}}
 
       - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
@@ -110,12 +138,14 @@ jobs:
       - run: twine check dist/*
 
       - uses: actions/upload-artifact@v3
+        if: github.event_name == 'push'
         with:
           name: pypi_files
           path: dist
 
   list-pypi-files:
     needs: [build]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
