@@ -20,16 +20,17 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use nucliadb_core::tracing::{Level, Span};
+use nucliadb_core::tracing::{Level, Metadata, Span};
 use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
+use tracing_core::subscriber::Interest;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, LevelFilter};
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::layer::{Context as LayerContext, Filter, Layer, SubscriberExt};
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{Layer, Registry};
+use tracing_subscriber::Registry;
 
 use crate::env::is_debug;
 use crate::settings::Settings;
@@ -67,6 +68,76 @@ pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitG
     Ok(sentry_guard)
 }
 
+pub struct LogLevelsFilter {
+    prefixes: Vec<(String, Level)>,
+    all_target_level: LevelFilter,
+    logs_map: HashMap<String, Level>,
+}
+
+impl LogLevelsFilter {
+    fn new(log_levels: Vec<(String, Level)>) -> Self {
+        let mut logs_map = HashMap::new();
+        let mut all_target_level = LevelFilter::OFF;
+        let mut prefixes = vec![];
+
+        for (target, log_level) in log_levels.iter() {
+            if target == ALL_TARGETS {
+                all_target_level = LevelFilter::from_level(*log_level);
+            } else if target.ends_with('*') {
+                prefixes.push((target[..target.len() - 1].to_owned(), *log_level));
+            } else {
+                logs_map.insert(target.clone(), *log_level);
+            }
+        }
+
+        LogLevelsFilter {
+            prefixes,
+            all_target_level,
+            logs_map,
+        }
+    }
+
+    fn is_enabled(&self, metadata: &Metadata<'_>) -> bool {
+        let level = metadata.level();
+
+        // match all
+        if self.all_target_level != LevelFilter::OFF && self.all_target_level >= *level {
+            return true;
+        }
+
+        let metadata_target = metadata.target();
+        // exact match
+        if let Some(log_level) = self.logs_map.get(metadata_target) {
+            if log_level >= level {
+                return true;
+            }
+        }
+        // prefixes match
+        for (prefix, log_level) in self.prefixes.iter() {
+            if log_level >= level && metadata_target.starts_with(prefix) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl<S> Filter<S> for LogLevelsFilter {
+    fn enabled(&self, metadata: &Metadata<'_>, _: &LayerContext<'_, S>) -> bool {
+        self.is_enabled(metadata)
+    }
+    fn callsite_enabled(&self, metadata: &'static Metadata<'static>) -> Interest {
+        // The result of `self.enabled(metadata, ...)` will always be
+        // the same for any given `Metadata`, so we can convert it into
+        // an `Interest`:
+        if self.is_enabled(metadata) {
+            Interest::always()
+        } else {
+            Interest::never()
+        }
+    }
+}
+
 /// Sets up the stdout output using the log levels (target, level)
 /// Log levels can be defined with 3 different flavors to match targets (crate names)
 /// - exact match. e.g. `node_reader`
@@ -78,40 +149,7 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
         .with_level(true)
         .with_target(true);
 
-    let mut logs_map = HashMap::new();
-    let mut all_target_level = LevelFilter::OFF;
-    let mut prefixes = vec![];
-
-    for (target, log_level) in log_levels.iter() {
-        if target == ALL_TARGETS {
-            all_target_level = LevelFilter::from_level(*log_level);
-        } else if target.ends_with('*') {
-            prefixes.push((target[..target.len() - 1].to_owned(), *log_level));
-        } else {
-            logs_map.insert(target.clone(), *log_level);
-        }
-    }
-
-    let filter = FilterFn::new(move |metadata| {
-        // match all
-        if all_target_level != LevelFilter::OFF && all_target_level >= *metadata.level() {
-            return true;
-        }
-        let metadata_target = metadata.target();
-        // exact match
-        if let Some(log_level) = logs_map.get(metadata_target) {
-            if log_level >= metadata.level() {
-                return true;
-            }
-        }
-        // prefixes match
-        for (prefix, log_level) in prefixes.iter() {
-            if log_level >= metadata.level() && metadata_target.starts_with(prefix) {
-                return true;
-            }
-        }
-        false
-    });
+    let filter = LogLevelsFilter::new(log_levels);
 
     if settings.plain_logs() || is_debug() {
         layer
@@ -172,7 +210,9 @@ fn sentry_layer() -> Box<dyn Layer<Registry> + Send + Sync> {
 }
 
 pub fn run_with_telemetry<F, R>(current: Span, f: F) -> R
-where F: FnOnce() -> R {
+where
+    F: FnOnce() -> R,
+{
     let tid = current.context().span().span_context().trace_id();
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
