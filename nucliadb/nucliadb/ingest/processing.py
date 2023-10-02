@@ -280,6 +280,8 @@ class ProcessingEngine:
             elif resp.status == 402:
                 data = await resp.json()
                 raise LimitsExceededError(resp.status, data["detail"])
+            elif resp.status == 429:
+                raise LimitsExceededError(resp.status, "Rate limited")
             else:
                 text = await resp.text()
                 raise Exception(f"STATUS: {resp.status} - {text}")
@@ -339,6 +341,8 @@ class ProcessingEngine:
                 elif resp.status == 402:
                     data = await resp.json()
                     raise LimitsExceededError(resp.status, data["detail"])
+                elif resp.status == 429:
+                    raise LimitsExceededError(resp.status, "Rate limited")
                 else:
                     text = await resp.text()
                     raise Exception(f"STATUS: {resp.status} - {text}")
@@ -368,6 +372,8 @@ class ProcessingEngine:
                 elif resp.status == 402:
                     data = await resp.json()
                     raise LimitsExceededError(resp.status, data["detail"])
+                elif resp.status == 429:
+                    raise LimitsExceededError(resp.status, "Rate limited")
                 else:
                     text = await resp.text()
                     raise Exception(f"STATUS: {resp.status} - {text}")
@@ -410,6 +416,8 @@ class ProcessingEngine:
                 # 413 -> payload size exceeded
                 data = await resp.json()
                 raise LimitsExceededError(resp.status, data["detail"])
+            elif resp.status == 429:
+                raise LimitsExceededError(resp.status, "Rate limited")
             else:
                 error_text = await resp.text()
                 logger.warning(f"Error sending to process: {resp.status} {error_text}")
