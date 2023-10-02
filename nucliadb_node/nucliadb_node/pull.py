@@ -130,7 +130,9 @@ class ShardManager:
             try:
                 with gc_observer():
                     await self._writer.garbage_collector(self._shard_id)
-                    logger.info("Garbage collection finished", extra={"shard": self._shard_id})
+                    logger.info(
+                        "Garbage collection finished", extra={"shard": self._shard_id}
+                    )
             except Exception:
                 logger.exception(
                     "Could not garbage collect", extra={"shard": self._shard_id}
@@ -295,7 +297,13 @@ class Worker:
         pb.ParseFromString(msg.data)
         logger.info(
             "Message received",
-            extra={"shard": pb.shard, "subject": subject, "reply": reply, "seqid": seqid, "storage_key": pb.storage_key},
+            extra={
+                "shard": pb.shard,
+                "subject": subject,
+                "reply": reply,
+                "seqid": seqid,
+                "storage_key": pb.storage_key,
+            },
         )
 
         status: Optional[OpStatus] = None
