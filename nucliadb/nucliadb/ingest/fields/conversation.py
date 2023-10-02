@@ -58,7 +58,7 @@ class Conversation(Field):
     async def set_value(self, payload: PBConversation):
         last_page: Optional[PBConversation] = None
         metadata = await self.get_metadata()
-        if self._created is False:
+        if self._created is False and metadata.pages > 0:
             try:
                 last_page = await self.db_get_value(page=metadata.pages)
             except PageNotFound:
@@ -138,6 +138,9 @@ class Conversation(Field):
         return self.metadata
 
     async def db_get_value(self, page: int = 1):
+        if page == 0:
+            raise ValueError(f"Conversation pages start at index 1")
+
         if self.value.get(page) is None:
             field_key = KB_RESOURCE_FIELD.format(
                 kbid=self.kbid,
