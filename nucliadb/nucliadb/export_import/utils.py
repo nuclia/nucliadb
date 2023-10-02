@@ -29,12 +29,12 @@ from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.export_import import logger
 from nucliadb.export_import.datamanager import ExportImportDataManager
-from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
-from nucliadb_models.export_import import Status
 from nucliadb.export_import.exceptions import (
     ExportStreamExhausted,
     WrongExportStreamFormat,
 )
+from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
+from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.const import Streams
