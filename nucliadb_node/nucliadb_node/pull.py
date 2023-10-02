@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import time
 from typing import List, Optional
 
 import nats
@@ -308,6 +309,7 @@ class Worker:
 
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
+        start = time.time()
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), sm.lock:
@@ -362,6 +364,15 @@ class Worker:
                 f"An error on subscription_worker. Check sentry for more details."
             )
             raise e
+        else:
+            logger.info(
+                "Message finished",
+                extra={
+                    "shard": pb.shard,
+                    "storage_key": pb.storage_key,
+                    "time": time.time() - start,
+                },
+            )
 
     async def subscribe(self):
         logger.info(f"Last seqid {self.last_seqid}")
