@@ -256,10 +256,15 @@ async def serialize(
                     resource.data.files = {}
                 if field.id not in resource.data.files:
                     resource.data.files[field.id] = FileFieldData()
-                if include_value and value is not None:
-                    resource.data.files[field.id].value = models.FieldFile.from_message(
-                        value  # type: ignore
-                    )
+                if include_value:
+                    if value is not None:
+                        resource.data.files[
+                            field.id
+                        ].value = models.FieldFile.from_message(
+                            value  # type: ignore
+                        )
+                    else:
+                        resource.data.files[field.id].value = None
 
                 if include_errors:
                     error = await field.get_error()
