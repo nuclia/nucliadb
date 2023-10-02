@@ -21,7 +21,7 @@ import functools
 from io import BytesIO
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
-from google import protobuf
+from google.protobuf.message import DecodeError as ProtobufDecodeError
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.entities import EntitiesDataManager
@@ -369,7 +369,7 @@ class ExportStreamReader:
                 yield item_type, data
             except ExportStreamExhausted:
                 break
-            except protobuf.message.DecodeError as e:
+            except ProtobufDecodeError as e:
                 raise WrongExportStreamFormat() from e
 
 
