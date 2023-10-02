@@ -81,7 +81,7 @@ gc_observer = metrics.Observer(
 
 
 class ShardManager:
-    schedule_delay_seconds = 5.0
+    schedule_delay_seconds = 30.0
 
     def __init__(self, shard_id: str, writer: Writer, gc_lock: asyncio.Semaphore):
         self.lock = asyncio.Lock()  # write lock for this shard
