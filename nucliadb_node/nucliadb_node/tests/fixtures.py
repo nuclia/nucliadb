@@ -52,7 +52,7 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
         "DEBUG": "1",
     },
     "options": {
@@ -73,7 +73,7 @@ images.settings["nucliadb_node_writer"] = {
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
         "DEBUG": "1",
     },
     "options": {

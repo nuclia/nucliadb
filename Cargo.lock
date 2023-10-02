@@ -1980,6 +1980,7 @@ dependencies = [
  "tonic-health",
  "tower",
  "tracing",
+ "tracing-core",
  "tracing-log",
  "tracing-opentelemetry",
  "tracing-subscriber",
