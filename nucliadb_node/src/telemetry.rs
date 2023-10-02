@@ -244,7 +244,7 @@ mod tests {
         let log_levels = vec![("*".to_string(), Level::INFO)];
         let filter = LogLevelsFilter::new(log_levels);
 
-        for (target, level, should_log) in vec![
+        for (target, level, should_log) in [
             ("some_node", Level::DEBUG, false),
             ("some_node", Level::INFO, true),
             ("unknown", Level::DEBUG, false),
@@ -276,7 +276,7 @@ mod tests {
 
         let filter = LogLevelsFilter::new(log_levels);
 
-        for (target, level, should_log) in vec![
+        for (target, level, should_log) in [
             ("some_node", Level::DEBUG, true),
             ("some_node", Level::INFO, true),
             ("unknown", Level::DEBUG, false),
