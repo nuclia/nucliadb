@@ -112,7 +112,8 @@ async def upload_import_to_blob_storage(
 
 async def start_export_task(context: ApplicationContext, kbid: str, export_id: str):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    metadata = ExportMetadata(kbid=kbid, id=export_id, status=Status.SCHEDULED)
+    metadata = ExportMetadata(kbid=kbid, id=export_id)
+    metadata.task.status = Status.SCHEDULED
     await dm.set_metadata("export", metadata)
     try:
         producer = await get_exports_producer(context)
@@ -129,7 +130,8 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
 
 async def start_import_task(context: ApplicationContext, kbid: str, import_id: str):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    metadata = ImportMetadata(kbid=kbid, id=import_id, status=Status.SCHEDULED)
+    metadata = ImportMetadata(kbid=kbid, id=import_id)
+    metadata.task.status = Status.SCHEDULED
     await dm.set_metadata("import", metadata)
     try:
         producer = await get_imports_producer(context)

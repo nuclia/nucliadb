@@ -40,6 +40,11 @@ class ExportedItemType(str, Enum):
 ExportItem = tuple[ExportedItemType, Any]
 
 
+class TaskMetadata(BaseModel):
+    status: Status
+    retries: int = 0
+
+
 class Metadata(BaseModel):
     """
     Model for the state metadata of the exports and imports that is stored on maindb
@@ -47,8 +52,7 @@ class Metadata(BaseModel):
 
     kbid: str
     id: str
-    status: Status
-    retries = 0
+    task: TaskMetadata = TaskMetadata(status=Status.SCHEDULED)
     total: int = 0
     processed: int = 0
 

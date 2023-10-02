@@ -83,7 +83,7 @@ async def download_export_from_blob_storage(
 ) -> AsyncIterable[bytes]:
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata("export", kbid, export_id)
-    export_exceptions.raise_for_task_status(metadata.status)
+    export_exceptions.raise_for_task_status(metadata.task.status)
     return dm.download_export(kbid, export_id)
 
 
@@ -134,7 +134,7 @@ async def _get_status(
         dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
         metadata = await dm.get_metadata(type, kbid, id)
         return StatusResponse(
-            status=metadata.status,
+            status=metadata.task.status,
             total=metadata.total,
             processed=metadata.processed,
         )

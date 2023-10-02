@@ -387,15 +387,16 @@ class TaskRetryHandler:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             metadata = self.metadata
-            if metadata.status in (Status.FINISHED, Status.ERRORED, Status.CANCELLED):
+            task = metadata.task
+            if task.status in (Status.FINISHED, Status.ERRORED, Status.CANCELLED):
                 logger.info(
-                    f"{self.type} task is {metadata.status.value}. Skipping",
+                    f"{self.type} task is {task.status.value}. Skipping",
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
                 )
                 return
 
-            if metadata.retries > self.max_tries:
-                metadata.status = Status.ERRORED
+            if task.retries > self.max_tries:
+                task.status = Status.ERRORED
                 logger.info(
                     f"{self.type} task reached max retries. Setting to ERRORED state",
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
@@ -405,8 +406,8 @@ class TaskRetryHandler:
             try:
                 await func(*args, **kwargs)
             except Exception:
-                metadata.retries += 1
-                metadata.status = Status.FAILED
+                task.retries += 1
+                task.status = Status.FAILED
                 logger.info(
                     f"{self.type} failed. Will be retried",
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
@@ -417,7 +418,7 @@ class TaskRetryHandler:
                     f"{self.type} finished successfully",
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
                 )
-                metadata.status = Status.FINISHED
+                task.status = Status.FINISHED
             finally:
                 await self.dm.set_metadata(self.type, metadata)
 

@@ -101,5 +101,11 @@ async def import_kb_from_blob_storage(
     metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
     iterator = dm.download_import(kbid, import_id)
     stream = IteratorExportStream(iterator)
-    import_kb_with_retries = TaskRetryHandler("import", dm, metadata).wrap(import_kb)
-    await import_kb_with_retries(context, kbid, stream, metadata)  # type: ignore
+
+    retry_handler = TaskRetryHandler("import", dm, metadata)
+
+    @retry_handler.wrap
+    async def import_kb_retried(context, kbid, stream, metadata):
+        await import_kb(context, kbid, stream, metadata)
+
+    await import_kb_retried(context, kbid, stream, metadata)  # type: ignore

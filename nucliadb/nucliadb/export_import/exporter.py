@@ -75,10 +75,15 @@ async def export_kb_to_blob_storage(
     kbid, export_id = msg.kbid, msg.id
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata(type="export", kbid=kbid, id=export_id)
+
     iterator = export_kb(context, kbid, metadata)  # type: ignore
-    upload_export_retried = TaskRetryHandler("export", dm, metadata).wrap(
-        dm.upload_export
-    )
+
+    retry_handler = TaskRetryHandler("export", dm, metadata)
+
+    @retry_handler.wrap
+    async def upload_export_retried(iterator, kbid, export_id):
+        await dm.upload_export(iterator, kbid, export_id)
+
     await upload_export_retried(iterator, kbid, export_id)
 
 
