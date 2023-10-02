@@ -29,7 +29,7 @@ from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
 from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
-from nucliadb_protos.nodewriter_pb2 import NewShardRequest
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest, ReleaseChannel
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
@@ -52,7 +52,7 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
         "DEBUG": "1",
     },
     "options": {
@@ -73,7 +73,7 @@ images.settings["nucliadb_node_writer"] = {
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "RUST_LOG": "nucliadb_*=DEBUG",  # noqa
         "DEBUG": "1",
     },
     "options": {
@@ -236,6 +236,16 @@ async def sidecar_stub(worker):
 @pytest.fixture(scope="function")
 async def shard(writer_stub: NodeWriterStub) -> AsyncIterable[str]:
     request = NewShardRequest(kbid="test")
+    shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
+
+    yield shard.id
+
+    await writer_stub.DeleteShard(ShardId(id=shard.id))  # type: ignore
+
+
+@pytest.fixture(scope="function")
+async def experimental_shard(writer_stub: NodeWriterStub) -> AsyncIterable[str]:
+    request = NewShardRequest(kbid="test", release_channel=ReleaseChannel.EXPERIMENTAL)
     shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
 
     yield shard.id

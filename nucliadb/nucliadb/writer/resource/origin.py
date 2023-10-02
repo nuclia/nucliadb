@@ -39,6 +39,8 @@ def parse_origin(origin: Origin, origin_payload: InputOrigin):
         origin.filename = origin_payload.filename
     if origin_payload.related:
         origin.related.extend(origin_payload.related)
+    if origin_payload.metadata:
+        origin.metadata.update(origin_payload.metadata)
     origin.source = Origin.Source.API
 
 

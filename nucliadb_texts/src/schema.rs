@@ -43,7 +43,7 @@ pub struct TextSchema {
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
     let naive =
         NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
-    DateTime::from_utc(naive, tantivy::chrono::Utc)
+    DateTime::from_naive_utc_and_offset(naive, tantivy::chrono::Utc)
 }
 
 impl TextSchema {

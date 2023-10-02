@@ -18,7 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#[derive(Clone, Copy)]
 pub struct RandomVectors(usize);
+
 impl RandomVectors {
     pub fn new(dim: usize) -> RandomVectors {
         RandomVectors(dim)

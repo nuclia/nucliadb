@@ -25,6 +25,10 @@ from unittest import mock
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.search.api.v1.chat import SyncChatResponse
+from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.utilities import get_predict
+
 
 @pytest.mark.asyncio()
 async def test_chat(
@@ -46,7 +50,7 @@ async def test_chat(
 @pytest.fixture(scope="function")
 def find_incomplete_results():
     with mock.patch(
-        "nucliadb.search.api.v1.chat.find", return_value=(mock.MagicMock(), True)
+        "nucliadb.search.search.chat.query.find", return_value=(mock.MagicMock(), True)
     ):
         yield
 
@@ -90,44 +94,50 @@ async def resource(nucliadb_writer, knowledgebox):
 
 @pytest.mark.asyncio
 async def test_chat_handles_status_codes_in_a_different_chunk(
-    nucliadb_reader: AsyncClient,
-    knowledgebox,
-    resource,
+    nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
-    async def fake_generator():
-        for chunk in [b"some ", b"text ", b"with ", b"status.", b"-2"]:
-            yield chunk
+    predict = get_predict()
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]  # type: ignore
 
-    m = mock.AsyncMock(return_value=("00", fake_generator()))
-    with mock.patch("nucliadb.search.predict.DummyPredictEngine.chat_query", new=m):
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/chat", json={"query": "title"}
-        )
-        assert resp.status_code == 200
-        find_result, answer, relations_result = parse_chat_response(resp.content)
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat", json={"query": "title"}
+    )
+    assert resp.status_code == 200
+    _, answer, _ = parse_chat_response(resp.content)
 
-        assert answer == b"some text with status."
+    assert answer == b"some text with status."
 
 
 @pytest.mark.asyncio
 async def test_chat_handles_status_codes_in_the_same_chunk(
-    nucliadb_reader: AsyncClient,
-    knowledgebox,
-    resource,
+    nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
-    async def fake_generator():
-        for chunk in [b"some ", b"text ", b"with ", b"status.-2"]:
-            yield chunk
+    predict = get_predict()
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.-2"]  # type: ignore
 
-    m = mock.AsyncMock(return_value=("00", fake_generator()))
-    with mock.patch("nucliadb.search.predict.DummyPredictEngine.chat_query", new=m):
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/chat", json={"query": "title"}
-        )
-        assert resp.status_code == 200
-        find_result, answer, relations_result = parse_chat_response(resp.content)
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat", json={"query": "title"}
+    )
+    assert resp.status_code == 200
+    _, answer, _ = parse_chat_response(resp.content)
 
-        assert answer == b"some text with status."
+    assert answer == b"some text with status."
+
+
+@pytest.mark.asyncio
+async def test_chat_handles_status_codes_with_last_chunk_empty(
+    nucliadb_reader: AsyncClient, knowledgebox, resource
+):
+    predict = get_predict()
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2", b""]  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat", json={"query": "title"}
+    )
+    assert resp.status_code == 200
+    _, answer, _ = parse_chat_response(resp.content)
+
+    assert answer == b"some text with status."
 
 
 def parse_chat_response(content: bytes):
@@ -146,3 +156,33 @@ def parse_chat_response(content: bytes):
     if len(relations_payload) > 0:
         relations_result = json.loads(base64.b64decode(relations_payload))
     return find_result, answer, relations_result
+
+
+@pytest.mark.asyncio()
+async def test_chat_always_returns_relations(
+    nucliadb_reader: AsyncClient, knowledgebox
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat", json={"query": "summary", "features": ["relations"]}
+    )
+    assert resp.status_code == 200
+    _, answer, relations_result = parse_chat_response(resp.content)
+    assert answer == b"Not enough data to answer this."
+    assert "Ferran" in relations_result["entities"]
+
+
+@pytest.mark.asyncio()
+async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resource):
+    predict = get_predict()
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"0"]  # type: ignore
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "title"},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    resp_data = SyncChatResponse.parse_raw(resp.content)
+
+    assert resp_data.answer == "some text with status."
+    assert len(resp_data.results.resources) == 1
+    assert resp_data.status == AnswerStatusCode.SUCCESS

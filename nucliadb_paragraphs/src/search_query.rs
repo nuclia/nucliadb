@@ -508,16 +508,42 @@ mod tests {
                 "nuclia database unstructured data",
             ),
             (
-                "nuclia is a",
+                "nuclia is a database for the",
                 // keeps last term even if is a stop word
-                "nuclia a",
+                "nuclia database the",
             ),
             ("is a for and", "and"),
+            ("what does stop is?", "stop is?"),
+            ("", ""),
+            (
+                "comment s'appelle le train à grande vitesse",
+                "comment s'appelle train grande vitesse",
+            ),
+            (
+                "¿Qué significa la palabra sentence en español?",
+                "¿Qué significa palabra sentence español?",
+            ),
+            (
+                "Per què les vaques no són de color rosa?",
+                "vaques color rosa?",
+            ),
+            (
+                "How can I learn to make a flat white?",
+                "learn make flat white?",
+            ),
+            ("Qué es escalada en bloque?", "escalada bloque?"),
+            (
+                "Wer hat gesagt: 'Kaffeetrinken ist integraler Bestandteil des Kletterns'?",
+                "Wer gesagt: 'Kaffeetrinken integraler Bestandteil Kletterns'?",
+            ),
+            (
+                "i pistacchi siciliani sono i migliori al mondo?",
+                "pistacchi siciliani migliori mondo?",
+            ),
         ];
 
         for (query, expected_fuzzy_query) in tests {
             let fuzzy_query = remove_stop_words(query);
-
             assert_eq!(fuzzy_query, expected_fuzzy_query);
         }
     }

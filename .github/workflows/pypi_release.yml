@@ -16,9 +16,32 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: 3.11
+      
+      - uses: dorny/paths-filter@v2
+        id: component_changes
+        with:
+          filters: |
+            nucliadb_protos:
+              - 'nucliadb_protos/**'
+            nucliadb_utils:
+              - 'nucliadb_utils/**'
+            nucliadb_models:
+              - 'nucliadb_models/**'
+            nucliadb_sdk:
+              - 'nucliadb_sdk/**'
+            nucliadb_dataset:
+              - 'nucliadb_dataset/**'
+            nucliadb_telemetry:
+              - 'nucliadb_telemetry/**'
 
       - name: Setup env
         run: |
+          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_protos/python/VERSION
+          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_utils/VERSION
+          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_models/VERSION
+          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_sdk/VERSION
+          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_dataset/VERSION
+          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_telemetry/VERSION
           python bump.py --build=${{github.run_number}}
           pip install wheel
           pip install -U twine
@@ -29,38 +52,26 @@ jobs:
           pip install -e ./nucliadb_protos/python/
           pip install -e ./nucliadb_utils/
           pip install -e ./nucliadb_models/
-          pip install -e ./nucliadb_client/
           pip install -e ./nucliadb_sdk/
           pip install -e ./nucliadb_dataset/
+          pip install -e ./nucliadb_telemetry/
           pip install -e ./nucliadb/
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_client/ ./nucliadb_dataset/ ./nucliadb/
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_dataset/ ./nucliadb_telemetry/ ./nucliadb/
 
       # XXX wait for tests to run successfully in all dependencies before we actually release
       - name: Wait for utils
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_utils == 'true'
         with:
           ref: main
           check-name: NucliaDBUtilsTests (3.11)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
-      - name: Wait for models
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          ref: main
-          check-name: NucliaDBModelsTests (3.11)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-      - name: Wait for client tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          ref: main
-          check-name: NucliaDBClientTests (3.11)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
       - name: Wait for sdk tests
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_sdk == 'true'
         with:
           ref: main
           check-name: NucliaDBSDKTests (3.11)
@@ -68,16 +79,25 @@ jobs:
           wait-interval: 10
       - name: Wait for dataset tests
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_dataset == 'true'
         with:
           ref: main
           check-name: NucliaDBDatasetTests (3.11)
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for telemetry tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_telemetry == 'true'
+        with:
+          ref: main
+          check-name: NucliaDBTelemetryTests (3.11)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
       - name: Wait for nucliadb tests
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           ref: main
-          check-name: NucliaDBTests (3.11)
+          check-name: NucliaDBTests (3.11, pg)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 

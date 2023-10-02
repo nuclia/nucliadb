@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -25,7 +26,10 @@ from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
     PredictVectorMissing,
+    RephraseError,
+    RephraseMissingContextError,
     SendToPredictError,
+    _parse_rephrase_response,
 )
 from nucliadb_models.search import (
     AskDocumentModel,
@@ -69,6 +73,14 @@ async def test_dummy_predict_engine():
     assert await pe.chat_query("kbid", Mock())
     assert await pe.convert_sentence_to_vector("kbid", "some sentence")
     assert await pe.detect_entities("kbid", "some sentence")
+
+
+@pytest.fixture(scope="function", autouse=True)
+def get_configuration():
+    with mock.patch(
+        "nucliadb.search.predict.PredictEngine.get_configuration", return_value=None
+    ):
+        yield
 
 
 @pytest.mark.asyncio
@@ -351,7 +363,7 @@ async def test_rephrase():
         "POST", 200, json="rephrased", context_manager=False
     )
 
-    item = RephraseModel(question="question", context=[], user_id="foo")
+    item = RephraseModel(question="question", chat_history=[], user_id="foo")
     rephrased_query = await pe.rephrase_query("kbid", item)
     # The rephrase query should not be wrapped in quotes, otherwise it will trigger an exact match query to the index
     assert rephrased_query.strip('"') == rephrased_query
@@ -362,3 +374,22 @@ async def test_rephrase():
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
     )
+
+
+@pytest.mark.parametrize(
+    "content,exception",
+    [
+        ("foobar", None),
+        ("foobar0", None),
+        ("foobar-1", RephraseError),
+        ("foobar-2", RephraseMissingContextError),
+    ],
+)
+async def test_parse_rephrase_response(content, exception):
+    resp = Mock()
+    resp.json = AsyncMock(return_value=content)
+    if exception:
+        with pytest.raises(exception):
+            await _parse_rephrase_response(resp)
+    else:
+        assert await _parse_rephrase_response(resp) == content.rstrip("0")

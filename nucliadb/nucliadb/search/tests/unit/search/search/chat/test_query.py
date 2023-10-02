@@ -42,6 +42,30 @@ def predict():
         yield predict
 
 
+async def test_async_gen_lookahead():
+    async def gen(n):
+        for i in range(n):
+            yield f"{i}".encode()
+
+    assert [item async for item in async_gen_lookahead(gen(0))] == []
+    assert [item async for item in async_gen_lookahead(gen(1))] == [(b"0", True)]
+    assert [item async for item in async_gen_lookahead(gen(2))] == [
+        (b"0", False),
+        (b"1", True),
+    ]
+
+
+async def test_async_gen_lookahead_last_chunk_is_empty():
+    async def gen():
+        for chunk in [b"empty", b"chunk", b""]:
+            yield chunk
+
+    assert [item async for item in async_gen_lookahead(gen())] == [
+        (b"empty", False),
+        (b"chunk", True),
+    ]
+
+
 async def test_chat_does_not_call_predict_if_no_find_results(
     predict,
 ):
@@ -50,31 +74,18 @@ async def test_chat_does_not_call_predict_if_no_find_results(
     )
     chat_request = ChatRequest(query="query")
 
-    await chat(
-        "kbid",
-        "query",
-        None,
-        find_results,
-        chat_request,
-        "user_id",
-        NucliaDBClientType.API,
-        "origin",
-    )
+    with mock.patch(
+        "nucliadb.search.search.chat.query.get_find_results", return_value=find_results
+    ):
+        await chat(
+            "kbid",
+            chat_request,
+            "user_id",
+            NucliaDBClientType.API,
+            "origin",
+        )
 
     predict.chat_query.assert_not_called()
-
-
-async def test_async_gen_lookahead():
-    async def gen(n):
-        for i in range(n):
-            yield i
-
-    assert [item async for item in async_gen_lookahead(gen(0))] == []
-    assert [item async for item in async_gen_lookahead(gen(1))] == [(0, True)]
-    assert [item async for item in async_gen_lookahead(gen(2))] == [
-        (0, False),
-        (1, True),
-    ]
 
 
 @pytest.mark.parametrize(

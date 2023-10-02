@@ -24,7 +24,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
 use nucliadb_core::protos::{NewShardRequest, ShardMetadata as GrpcMetadata, VectorSimilarity};
-use nucliadb_core::{node_error, NodeResult};
+use nucliadb_core::{node_error, Channel, NodeResult};
 use serde::*;
 
 #[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -55,6 +55,8 @@ impl From<Similarity> for VectorSimilarity {
 pub struct ShardMetadata {
     kbid: Option<String>,
     similarity: Option<Similarity>,
+    #[serde(default)]
+    pub channel: Option<Channel>,
 }
 
 impl From<ShardMetadata> for GrpcMetadata {
@@ -69,6 +71,7 @@ impl From<NewShardRequest> for ShardMetadata {
         ShardMetadata {
             similarity: Some(value.similarity().into()),
             kbid: Some(value.kbid).filter(|s| !s.is_empty()),
+            channel: Some(Channel::from(value.release_channel)),
         }
     }
 }
@@ -111,6 +114,7 @@ mod test {
         let meta = ShardMetadata {
             kbid: Some("KB".to_string()),
             similarity: Some(Similarity::Cosine),
+            channel: Some(Channel::EXPERIMENTAL),
         };
         meta.serialize(&metadata_path).unwrap();
         let meta_disk = ShardMetadata::open(&metadata_path).unwrap();

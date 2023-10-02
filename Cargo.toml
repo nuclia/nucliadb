@@ -5,6 +5,7 @@ members = [
   "nucliadb_node",
   "nucliadb_node_binding",
   "nucliadb_paragraphs",
+  "nucliadb_procs",
   "nucliadb_protos/rust",
   "nucliadb_relations",
   "nucliadb_telemetry",

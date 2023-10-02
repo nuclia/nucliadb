@@ -18,7 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import unittest
+
 import pytest
+
+
+@pytest.fixture(scope="function")
+def feature_disabled():
+    with unittest.mock.patch(
+        "nucliadb.search.api.v1.resource.ask.has_feature", return_value=False
+    ):
+        yield
 
 
 @pytest.mark.asyncio()
@@ -41,9 +51,24 @@ async def test_ask_document(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/resource/{rid}/ask",
+        f"/kb/{kbid}/resource/{rid}/ask",
         json={"question": "Some question?"},
-        timeout=None,
     )
     assert resp.status_code == 200
     assert resp.json()["answer"] == "Answer to your question"
+
+
+@pytest.mark.asyncio()
+async def test_ask_document_disabled(
+    nucliadb_writer,
+    nucliadb_reader,
+    knowledgebox,
+    feature_disabled,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/resource/someresource/ask",
+        json={"question": "Some question?"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Feature not yet available"

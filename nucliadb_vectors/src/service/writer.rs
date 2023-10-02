@@ -20,13 +20,14 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
 use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::{metrics, Channel};
+use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
 use crate::data_point_provider::*;
@@ -41,6 +42,7 @@ impl IndexKeyCollector for Vec<String> {
 pub struct VectorWriterService {
     index: Index,
     indexset: IndexSet,
+    channel: Channel,
 }
 
 impl Debug for VectorWriterService {
@@ -50,6 +52,7 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
+    #[measure(actor = "vectors", metric = "list_vectorsets")]
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
         let time = SystemTime::now();
@@ -59,14 +62,13 @@ impl VectorWriter for VectorWriterService {
         let indexset_slock = self.indexset.get_slock()?;
         self.indexset.index_keys(&mut collector, &indexset_slock);
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("list_vectorsets".to_string());
-        metrics.record_request_time(metric, took);
-
         debug!("{id:?} - Ending at {took} ms");
+
         Ok(collector)
     }
+
+    #[measure(actor = "vectors", metric = "add_vectorset")]
     #[tracing::instrument(skip_all)]
     fn add_vectorset(
         &mut self,
@@ -84,14 +86,13 @@ impl VectorWriter for VectorWriterService {
             .get_or_create(indexid, similarity, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("add_vectorset".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
 
         Ok(())
     }
+
+    #[measure(actor = "vectors", metric = "remove_vectorset")]
     #[tracing::instrument(skip_all)]
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -103,16 +104,15 @@ impl VectorWriter for VectorWriterService {
         self.indexset.remove_index(indexid, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("remove_vectorset".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?}/{set} - Ending at {took} ms");
 
         Ok(())
     }
 }
+
 impl WriterChild for VectorWriterService {
+    #[measure(actor = "vectors", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
@@ -122,14 +122,13 @@ impl WriterChild for VectorWriterService {
         let no_nodes = self.index.no_nodes(&lock);
         std::mem::drop(lock);
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("count".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(no_nodes)
     }
+
+    #[measure(actor = "vectors", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -140,14 +139,13 @@ impl WriterChild for VectorWriterService {
         self.index.delete(&resource_id.uuid, temporal_mark, &lock);
         self.index.commit(&lock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("delete_resource".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
         Ok(())
     }
+
+    #[measure(actor = "vectors", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -204,6 +202,7 @@ impl WriterChild for VectorWriterService {
                 elems,
                 Some(temporal_mark),
                 self.index.metadata().similarity,
+                self.channel,
             )?)
         } else {
             None
@@ -292,7 +291,13 @@ impl WriterChild for VectorWriterService {
             } else if !elems.is_empty() {
                 let similarity = index.metadata().similarity;
                 let location = index.location();
-                let new_dp = DataPoint::new(location, elems, Some(temporal_mark), similarity)?;
+                let new_dp = DataPoint::new(
+                    location,
+                    elems,
+                    Some(temporal_mark),
+                    similarity,
+                    self.channel,
+                )?;
                 let lock = index.get_slock()?;
                 match index.add(new_dp, &lock) {
                     Ok(_) => index.commit(&lock)?,
@@ -312,6 +317,8 @@ impl WriterChild for VectorWriterService {
 
         Ok(())
     }
+
+    #[measure(actor = "vectors", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -319,10 +326,7 @@ impl WriterChild for VectorWriterService {
         let lock = self.index.get_elock()?;
         self.index.collect_garbage(&lock)?;
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::vectors("garbage_collection".to_string());
-        metrics.record_request_time(metric, took);
         debug!("Garbage collection {took} ms");
 
         Ok(())
@@ -356,6 +360,7 @@ impl VectorWriterService {
             VectorWriterService::open(config)
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
@@ -367,11 +372,19 @@ impl VectorWriterService {
                 return Err(node_error!("A similarity must be specified"));
             };
             Ok(VectorWriterService {
-                index: Index::new(path, IndexMetadata { similarity })?,
+                index: Index::new(
+                    path,
+                    IndexMetadata {
+                        similarity,
+                        channel: config.channel,
+                    },
+                )?,
                 indexset: IndexSet::new(indexset)?,
+                channel: config.channel,
             })
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
@@ -382,6 +395,7 @@ impl VectorWriterService {
             Ok(VectorWriterService {
                 index: Index::open(path)?,
                 indexset: IndexSet::new(indexset)?,
+                channel: config.channel,
             })
         }
     }
@@ -429,9 +443,12 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
+            channel: Channel::EXPERIMENTAL,
         };
 
         let mut writer = VectorWriterService::start(&vsc).expect("Error starting vector writer");
+        assert_eq!(writer.channel, Channel::EXPERIMENTAL);
+
         let indexes: HashMap<_, _> = (0..10)
             .map(|i| create_vector_set(&mut writer, i.to_string()))
             .collect();
@@ -496,6 +513,7 @@ mod tests {
             similarity: Some(VectorSimilarity::Cosine),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),

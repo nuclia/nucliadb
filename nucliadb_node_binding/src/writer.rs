@@ -79,6 +79,7 @@ impl NodeWriter {
 
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_telemetry_event(TelemetryEvent::Create);
+
         let request =
             NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
         let metadata = ShardMetadata::from(request);

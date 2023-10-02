@@ -49,7 +49,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     async with driver.transaction() as txn:
         response = KnowledgeBoxList()
         async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
-            response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
+            response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))  # type: ignore
         return response
 
 
@@ -71,7 +71,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 
         return KnowledgeBoxObj(
             uuid=kbid,
-            slug=kb_config.slug,
+            slug=kb_config.slug,  # type: ignore
             config=KnowledgeBoxConfig.from_message(kb_config),
         )
 
@@ -98,6 +98,6 @@ async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
 
         return KnowledgeBoxObj(
             uuid=kbid,
-            slug=kb_config.slug,
+            slug=kb_config.slug,  # type: ignore
             config=KnowledgeBoxConfig.from_message(kb_config),
         )

@@ -49,7 +49,6 @@ proto-clean-py:
 
 python-code-lint:
 	make -C nucliadb_dataset/ format
-	make -C nucliadb_client/ format
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
 	make -C nucliadb_node/ format
@@ -63,7 +62,6 @@ python-code-lint:
 	make -C nucliadb_telemetry/ lint
 	make -C nucliadb_sdk/ lint
 	make -C nucliadb_dataset/ lint
-	make -C nucliadb_client/ lint
 	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
 	make -C nucliadb_node_binding/ lint
@@ -90,7 +88,6 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_models
 	pip install -e ./nucliadb
-	pip install -e ./nucliadb_client
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
 
@@ -98,16 +95,21 @@ base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
 
-build-search-images: build-local-node build-local-sidecar
-
 build-node:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
+build-node-debug:
+	./scripts/download-build.sh && echo "Using build server build" && docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_prebuilt . || ( \
+		echo "Failed to download build from build server. Manually running build." && \
+		docker build -t eu.gcr.io/stashify-218417/node:main --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
+	)
+	
 
 # Not use the base image
 build-base-node-image-scratch:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_local .
 
-build-local-sidecar:
+build-sidecar:
 	docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
 
 
@@ -123,7 +125,7 @@ debug-run-nucliadb-redis:
 
 build-node-binding:
 	rm -rf target/wheels/*
-	maturin build -m nucliadb_node_binding/Cargo.toml --release
+	maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-node-binding-debug:

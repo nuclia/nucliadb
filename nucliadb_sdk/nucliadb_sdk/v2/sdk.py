@@ -20,18 +20,37 @@ import asyncio
 import base64
 import enum
 import io
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    AsyncGenerator,
+    AsyncIterable,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 import httpx
 import orjson
 from pydantic import BaseModel
 
+from nucliadb_models.configuration import KBConfiguration
 from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     EntitiesGroup,
     KnowledgeBoxEntities,
     UpdateEntitiesGroupPayload,
+)
+from nucliadb_models.export_import import (
+    CreateExportResponse,
+    CreateImportResponse,
+    StatusResponse,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import (
@@ -73,6 +92,9 @@ class ChatResponse(BaseModel):
     learning_id: Optional[str]
 
 
+RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
+
+
 def chat_response_parser(response: httpx.Response) -> ChatResponse:
     raw = io.BytesIO(response.content)
     header = raw.read(4)
@@ -92,7 +114,7 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
 
     return ChatResponse(
         result=find_result,
-        answer=answer,
+        answer=answer.decode("utf-8"),
         relations=relations_result,
         learning_id=learning_id,
     )
@@ -120,6 +142,14 @@ def _parse_response(response_type, resp: httpx.Response) -> Any:
         return resp.content
 
 
+def is_raw_request_content(content: Any) -> bool:
+    return (
+        isinstance(content, str)
+        or isinstance(content, bytes)
+        or (isinstance(content, Iterable) and not isinstance(content, (list, tuple)))
+    )
+
+
 def _request_builder(
     *,
     name: str,
@@ -128,8 +158,13 @@ def _request_builder(
     path_params: Tuple[str, ...],
     request_type: Optional[Union[Type[BaseModel], List[Any]]],
     response_type: Optional[
-        Union[Type[BaseModel], Callable[[httpx.Response], BaseModel]]
+        Union[
+            Type[BaseModel],
+            Callable[[httpx.Response], BaseModel],
+            Callable[[httpx.Response], Iterator[bytes]],
+        ]
     ],
+    stream_response: bool = False,
     docstring: Optional[docstrings.Docstring] = None,
 ):
     def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
@@ -141,6 +176,7 @@ def _request_builder(
 
         path = path_template.format(**path_data)
         data = None
+        raw_content: Optional[RawRequestContent] = None
         if request_type is not None:
             if content is not None:
                 try:
@@ -159,22 +195,30 @@ def _request_builder(
                     if key in request_type.__fields__:  # type: ignore
                         content_data[key] = kwargs.pop(key)
                 data = request_type.parse_obj(content_data).json(by_alias=True)  # type: ignore
-
+        elif is_raw_request_content(content):
+            raw_content = content
         query_params = kwargs.pop("query_params", None)
         if len(kwargs) > 0:
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
-        resp = self._request(path, method, data=data, query_params=query_params)
+        if not stream_response:
+            resp = self._request(
+                path, method, data=data, query_params=query_params, content=raw_content
+            )
+            if asyncio.iscoroutine(resp):
 
-        if asyncio.iscoroutine(resp):
+                async def _wrapped_resp():
+                    real_resp = await resp
+                    return _parse_response(response_type, real_resp)
 
-            async def _wrapped_resp():
-                real_resp = await resp
-                return _parse_response(response_type, real_resp)
-
-            return _wrapped_resp()
+                return _wrapped_resp()
+            else:
+                return _parse_response(response_type, resp)
         else:
-            return _parse_response(response_type, resp)
+            resp = self._stream_request(
+                path, method, data=data, query_params=query_params
+            )
+            return resp
 
     docstrings.inject_documentation(
         _func,
@@ -222,6 +266,15 @@ class _NucliaDBBase:
         self.headers = headers
 
     def _request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[Dict[str, str]] = None,
+    ):
+        raise NotImplementedError
+
+    def _stream_request(
         self,
         path,
         method: str,
@@ -362,6 +415,32 @@ class _NucliaDBBase:
         path_params=("kbid", "rid", "field_id"),
         request_type=List[InputMessage],  # type: ignore
         response_type=ResourceFieldAdded,
+    )
+
+    # Configuration
+    set_configuration = _request_builder(
+        name="set_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="POST",
+        path_params=("kbid",),
+        request_type=KBConfiguration,
+        response_type=None,
+    )
+    delete_configuration = _request_builder(
+        name="delete_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="DELETE",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    )
+    get_configuration = _request_builder(
+        name="get_configuration",
+        path_template="/v1/kb/{kbid}/configuration",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KBConfiguration,
     )
 
     # Labels
@@ -514,6 +593,57 @@ class _NucliaDBBase:
         response_type=None,
     )
 
+    start_export = _request_builder(
+        name="start_export",
+        path_template="/v1/kb/{kbid}/export",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=CreateExportResponse,
+        docstring=docstrings.START_EXPORT,
+    )
+
+    export_status = _request_builder(
+        name="export_status",
+        path_template="/v1/kb/{kbid}/export/{export_id}/status",
+        method="GET",
+        path_params=("kbid", "export_id"),
+        request_type=None,
+        response_type=StatusResponse,
+        docstring=docstrings.EXPORT_STATUS,
+    )
+
+    download_export = _request_builder(
+        name="download_export",
+        path_template="/v1/kb/{kbid}/export/{export_id}",
+        method="GET",
+        path_params=("kbid", "export_id"),
+        request_type=None,
+        response_type=None,
+        stream_response=True,
+        docstring=docstrings.DOWNLOAD_EXPORT,
+    )
+
+    start_import = _request_builder(
+        name="start_import",
+        path_template="/v1/kb/{kbid}/import",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=CreateImportResponse,
+        docstring=docstrings.START_IMPORT,
+    )
+
+    import_status = _request_builder(
+        name="import_status",
+        path_template="/v1/kb/{kbid}/import/{import_id}/status",
+        method="GET",
+        path_params=("kbid", "import_id"),
+        request_type=None,
+        response_type=StatusResponse,
+        docstring=docstrings.IMPORT_STATUS,
+    )
+
 
 class NucliaDB(_NucliaDBBase):
     """
@@ -573,6 +703,7 @@ class NucliaDB(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -580,8 +711,32 @@ class NucliaDB(_NucliaDBBase):
             opts["data"] = data
         if query_params is not None:
             opts["params"] = query_params
+        if content is not None:
+            opts["content"] = content
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
+
+    def _stream_request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[Dict[str, str]] = None,
+    ) -> Callable[[Optional[int]], Iterator[bytes]]:
+        url = f"{self.base_url}{path}"
+        opts: Dict[str, Any] = {}
+        if data is not None:
+            opts["data"] = data
+        if query_params is not None:
+            opts["params"] = query_params
+
+        def iter_bytes(chunk_size=None) -> Iterator[bytes]:
+            with self.session.stream(method.lower(), url=url, **opts) as response:
+                self._check_response(response)
+                for chunk in response.iter_raw(chunk_size=chunk_size):
+                    yield chunk
+
+        return iter_bytes
 
 
 class NucliaDBAsync(_NucliaDBBase):
@@ -652,3 +807,25 @@ class NucliaDBAsync(_NucliaDBBase):
         )
         self._check_response(response)
         return response
+
+    def _stream_request(
+        self,
+        path,
+        method: str,
+        data: Optional[Union[str, bytes]] = None,
+        query_params: Optional[Dict[str, str]] = None,
+    ) -> Callable[[Optional[int]], AsyncGenerator[bytes, None]]:
+        url = f"{self.base_url}{path}"
+        opts: Dict[str, Any] = {}
+        if data is not None:
+            opts["data"] = data
+        if query_params is not None:
+            opts["params"] = query_params
+
+        async def iter_bytes(chunk_size=None) -> AsyncGenerator[bytes, None]:
+            async with self.session.stream(method.lower(), url=url, **opts) as response:
+                self._check_response(response)
+                async for chunk in response.aiter_raw(chunk_size=chunk_size):
+                    yield chunk
+
+        return iter_bytes

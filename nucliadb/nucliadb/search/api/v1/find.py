@@ -19,10 +19,10 @@
 #
 import json
 from datetime import datetime
-from time import time
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
@@ -30,14 +30,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.find_merge import find_merge_results
-from nucliadb.search.search.query import (
-    get_default_min_score,
-    global_query_to_pb,
-    pre_process_query,
-)
-from nucliadb.search.search.utils import should_disable_vector_search
+from nucliadb.search.search.find import find
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -50,17 +43,16 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_audit
 
 FIND_EXAMPLES = {
-    "find_hybrid_search": {
-        "summary": "Do a hybrid search on a Knowledge Box",
-        "description": "Perform a hybrid search that will return text and semantic results matching the query",
-        "value": {
+    "find_hybrid_search": Example(
+        summary="Do a hybrid search on a Knowledge Box",
+        description="Perform a hybrid search that will return text and semantic results matching the query",
+        value={
             "query": "How can I be an effective product manager?",
             "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
         },
-    }
+    )
 }
 
 
@@ -151,7 +143,7 @@ async def find_knowledgebox(
         return HTTPClientError(status_code=422, detail=detail)
     try:
         results, _ = await find(
-            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
         return results
     except KnowledgeBoxNotFound:
@@ -175,98 +167,16 @@ async def find_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: FindRequest = Body(examples=FIND_EXAMPLES),
+    item: FindRequest = Body(openapi_examples=FIND_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         results, incomplete = await find(
-            response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
         )
         response.status_code = 206 if incomplete else 200
         return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-
-
-async def find(
-    response: Response,
-    kbid: str,
-    item: FindRequest,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-    do_audit: bool = True,
-) -> Tuple[KnowledgeboxFindResults, bool]:
-    audit = get_audit()
-    start_time = time()
-
-    if SearchOptions.VECTOR in item.features:
-        if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.VECTOR)
-
-    min_score = item.min_score
-    if min_score is None:
-        min_score = await get_default_min_score(kbid)
-
-    # We need to query all nodes
-    processed_query = pre_process_query(item.query)
-    pb_query, incomplete_results, autofilters = await global_query_to_pb(
-        kbid,
-        features=item.features,
-        query=processed_query,
-        filters=item.filters,
-        faceted=item.faceted,
-        sort=None,
-        page_number=item.page_number,
-        page_size=item.page_size,
-        min_score=min_score,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
-        fields=item.fields,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_synonyms=item.with_synonyms,
-        autofilter=item.autofilter,
-        key_filters=item.resource_filters,
-    )
-    results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.SEARCH, pb_query, item.shards
-    )
-
-    incomplete_results = incomplete_results or query_incomplete_results
-
-    # We need to merge
-    search_results = await find_merge_results(
-        results,
-        count=item.page_size,
-        page=item.page_number,
-        kbid=kbid,
-        show=item.show,
-        field_type_filter=item.field_type_filter,
-        extracted=item.extracted,
-        requested_relations=pb_query.relation_subgraph,
-        min_score=min_score,
-        highlight=item.highlight,
-    )
-
-    if audit is not None and do_audit:
-        await audit.search(
-            kbid,
-            x_nucliadb_user,
-            x_ndb_client.to_proto(),
-            x_forwarded_for,
-            pb_query,
-            time() - start_time,
-            len(search_results.resources),
-        )
-    if item.debug:
-        search_results.nodes = queried_nodes
-
-    search_results.shards = queried_shards
-    search_results.autofilters = autofilters
-    return search_results, incomplete_results

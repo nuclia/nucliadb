@@ -1,0 +1,7 @@
+error: unexpected end of input, Argument `actor` must be defined
+  --> tests/dont_compile/actor_not_defined.rs:23:1
+   |
+23 | #[measure(metric = "my-test")]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `measure` (in Nightly builds, run with -Z macro-backtrace for more info)

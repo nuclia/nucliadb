@@ -18,10 +18,20 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from unittest import mock
 from uuid import uuid4
 
 import pytest
 from aioresponses import aioresponses
+
+
+@pytest.fixture(scope="function")
+def ingest_util():
+    ingest = mock.Mock()
+    ingest.GetConfiguration = mock.AsyncMock()
+    with mock.patch("nucliadb.ingest.processing.get_ingest") as mock_get_ingest:
+        mock_get_ingest.return_value = ingest
+        yield
 
 
 @pytest.mark.parametrize("onprem", [True, False])
@@ -37,7 +47,7 @@ from aioresponses import aioresponses
     ],
 )
 @pytest.mark.asyncio
-async def test_send_to_process(onprem, mock_payload):
+async def test_send_to_process(onprem, mock_payload, ingest_util):
     """
     Test that send_to_process does not fail
     """

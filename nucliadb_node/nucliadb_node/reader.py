@@ -42,7 +42,7 @@ class Reader:
     def __init__(self, grpc_reader_address: str):
         self.lock = asyncio.Lock()
         self.channel = get_traced_grpc_channel(grpc_reader_address, SERVICE_NAME)
-        self.stub = NodeReaderStub(self.channel)
+        self.stub = NodeReaderStub(self.channel)  # type: ignore
 
     async def get_shard(self, pb: ShardId) -> Optional[Shard]:
         if pb.id not in CACHE:

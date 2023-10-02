@@ -9,7 +9,13 @@ on:
       - main
 
 jobs:
-  e2e:
+  e2e-k8s-cluster:
+    #
+    # E2E tests run against a Kubernetes cluster.
+    # These tests setup microk8s and run NucliaDB with PostgreSQL.
+    # Chart configuration: e2e/conf/chart.values.yaml
+    #
+    name: E2E Kubernetes Cluster Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -34,7 +40,7 @@ jobs:
       - name: Install PostgreSQL with Helm
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm install my-postgresql bitnami/postgresql
+          helm install my-postgresql bitnami/postgresql --version 12.9.0
 
       - name: Wait for PostgreSQL to be ready
         run: |
@@ -57,7 +63,7 @@ jobs:
           helm install nucliadb charts/nucliadb \
             --timeout 5m \
             --namespace nucliadb \
-            --values e2e/chart.values.yaml \
+            --values e2e/conf/chart.values.yaml \
             --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.envs.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}"
           sleep 10
@@ -88,3 +94,63 @@ jobs:
               kubectl logs -n nucliadb pod/nucliadb-0 &&
               kubectl logs -n nucliadb pod/nucliadb-1 &&
               exit 1)
+
+  e2e-vm-cluster:
+    runs-on: ubuntu-latest
+    name: E2E VM Cluster Tests
+    strategy:
+      matrix:
+        ostypes: ["debian:bookworm-slim", "fedora:38"]
+
+    container:
+      image: ${{ matrix.ostypes }}
+      volumes:
+        - /opt/
+
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Install NucliaDB
+        # tests that installation script works
+        run: |
+          ./scripts/install-vm.sh
+        
+      - name: Install local nucliadb
+        # Now, let's install the current version of nucliadb to
+        # run the tests against.
+        # Unfortunately, we're not testing against the released version
+        # of NucliaDB; however, it seems more important to test against
+        # the current branch.
+        run: |
+          bash -c 'source /opt/nucliadb/bin/activate && make -C nucliadb install-dev'
+
+      - name: Run Cluster and tests
+        env:
+          DRIVER: PG
+          FILE_BACKEND: PG
+          DRIVER_PG_URL: postgresql://postgres:postgres@postgres:5432/postgres
+          NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
+          cluster_discovery_mode: manual
+          cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
+          DEBUG: "1"
+          NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
+        run: bash e2e/run-e2e-tests.sh

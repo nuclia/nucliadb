@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-
+use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -29,21 +29,35 @@ use serde_json::json;
 use vectors_benchmark::cli_interface::*;
 use vectors_benchmark::json_writer::write_json;
 
-fn dir_size(path: &Path) -> Byte {
+fn dir_size(path: &Path) -> Result<Byte, Box<dyn Error>> {
     let mut total_size: u128 = 0;
 
     if path.is_dir() {
-        for entry in fs::read_dir(path).unwrap() {
-            let entry = entry.unwrap();
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
             let entry_path = entry.path();
+
             if entry_path.is_dir() {
-                total_size += dir_size(&entry_path).get_bytes();
+                match dir_size(&entry_path) {
+                    Ok(size) => total_size += u128::from(size),
+                    Err(err) => {
+                        eprintln!("Error calculating directory size: {}", err);
+                        return Ok(Byte::from_bytes(0));
+                    }
+                }
             } else {
-                total_size += entry.metadata().unwrap().len() as u128;
+                match entry.metadata() {
+                    Ok(metadata) => total_size += metadata.len() as u128,
+                    Err(err) => {
+                        eprintln!("Error getting file metadata: {}", err);
+                        return Ok(Byte::from_bytes(0));
+                    }
+                }
             }
         }
     }
-    Byte::from_bytes(total_size)
+
+    Ok(Byte::from_bytes(total_size))
 }
 
 fn main() -> std::io::Result<()> {
@@ -73,7 +87,7 @@ fn main() -> std::io::Result<()> {
     stop_point.store(true, Ordering::SeqCst);
     reader_handler.join().unwrap();
 
-    let storage_size = dir_size(location.as_ref());
+    let storage_size = dir_size(location.as_ref()).unwrap();
 
     let json_results = vec![json!({
         "name": "Total Storage Size",
@@ -81,7 +95,7 @@ fn main() -> std::io::Result<()> {
         "value": storage_size.get_bytes(),
     })];
 
-    write_json(args.json_output(), json_results)?;
+    write_json(args.json_output(), json_results, args.merge).unwrap();
 
     println!(
         "Total vector storage size: {}",

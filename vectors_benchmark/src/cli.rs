@@ -59,6 +59,9 @@ pub struct Args {
     /// Path of the json output file
     #[clap(short, long, default_value_t = String::from("./benchmark.json"))]
     json_output: String,
+    /// Merge results if json output file exists
+    #[clap(short, long, action)]
+    pub merge: bool,
 }
 
 impl Default for Args {

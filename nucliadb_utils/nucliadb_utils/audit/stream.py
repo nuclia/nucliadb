@@ -21,6 +21,7 @@ import asyncio
 from datetime import datetime
 from typing import List, Optional
 
+import backoff
 import mmh3  # type: ignore
 import nats
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -110,17 +111,23 @@ class StreamAuditStorage(AuditStorage):
 
     async def run(self):
         while True:
+            item_dequeued = False
             try:
                 audit = await self.queue.get()
+                item_dequeued = True
                 await self._send(audit)
             except (asyncio.CancelledError, KeyboardInterrupt, RuntimeError):
                 return
             except Exception:  # pragma: no cover
                 logger.exception("Could not send audit", stack_info=True)
+            finally:
+                if item_dequeued:
+                    self.queue.task_done()
 
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
 
+    @backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
     async def _send(self, message: AuditRequest):
         if self.js is None:  # pragma: no cover
             raise AttributeError()
@@ -156,7 +163,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.rid = rid or ""
         auditrequest.origin = origin or ""
         auditrequest.type = audit_type
-        if when is None:
+        if when is None or when.SerializeToString() == b"":
             auditrequest.time.FromDatetime(datetime.now())
         else:
             auditrequest.time.CopyFrom(when)

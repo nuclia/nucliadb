@@ -20,6 +20,7 @@
 from typing import Union
 
 from fastapi import Body, Header, Request, Response
+from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -34,18 +35,19 @@ from nucliadb.search.search.exceptions import ResourceNotFoundError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, AskResponse, TextBlocks
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 ASK_EXAMPLES = {
-    "Ask a Resource": {
-        "summary": "Ask a question to the document",
-        "description": "Ask a question to the document. The whole document is sent as context to the generative AI",
-        "value": {
+    "Ask a Resource": Example(
+        summary="Ask a question to the document",
+        description="Ask a question to the document. The whole document is sent as context to the generative AI",
+        value={
             "question": "Does this document contain personal information?",
         },
-    }
+    )
 }
 
 
@@ -56,6 +58,9 @@ ASK_EXAMPLES = {
     summary="Ask a question to a resource",
     description="Ask to the complete content of the resource",
     tags=["Search"],
+    response_model=None,
+    # TODO: set to True once feature is fully enabled
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -65,10 +70,13 @@ async def resource_ask_endpoint(
     kbid: str,
     rid: str,
     item: AskRequest = Body(
-        examples=ASK_EXAMPLES, description="Ask a question payload"
+        openapi_examples=ASK_EXAMPLES, description="Ask a question payload"
     ),
     x_nucliadb_user: str = Header("", description="User Id", include_in_schema=False),
 ) -> Union[AskResponse, HTTPClientError]:
+    if not has_feature(const.Features.ASK_YOUR_DOCUMENTS):
+        return HTTPClientError(status_code=404, detail="Feature not yet available")
+
     try:
         return await resource_ask(kbid, rid, item, user_id=x_nucliadb_user)
     except ResourceNotFoundError:

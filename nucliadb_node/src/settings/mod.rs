@@ -81,6 +81,9 @@ pub struct Settings {
     )]
     span_levels: Vec<(String, Level)>,
 
+    #[builder(default = "false", setter(custom))]
+    plain_logs: bool,
+
     // Telemetry
     #[builder(default = "false", setter(custom))]
     jaeger_enabled: bool,
@@ -157,6 +160,11 @@ impl Settings {
     /// Log levels. Every element is a crate-level pair
     pub fn log_levels(&self) -> &[(String, Level)] {
         &self.log_levels
+    }
+
+    /// When enabled, stdout logs are formatted as plain compact
+    pub fn plain_logs(&self) -> bool {
+        self.plain_logs
     }
 
     /// Span levels. Every element is a crate-level pair

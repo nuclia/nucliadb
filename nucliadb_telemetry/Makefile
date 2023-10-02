@@ -23,7 +23,7 @@ lint:
 	flake8 nucliadb_telemetry --config=setup.cfg
 	cd .. && isort -c --profile black nucliadb_telemetry
 	black --check .
-	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
+	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 .PHONY: test
 test:

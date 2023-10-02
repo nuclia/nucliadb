@@ -5,6 +5,10 @@ LABEL org.opencontainers.image.vendor="Nuclia Inc."
 
 WORKDIR /nucliadb
 
+# Install system dependencies
+COPY scripts/install-system-deps.sh /tmp/
+RUN /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh
+
 RUN apt-get -y update \
     && apt-get -y install ca-certificates \
     cmake \
@@ -43,6 +47,7 @@ COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
 COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
@@ -79,6 +84,7 @@ COPY nucliadb_core /nucliadb/nucliadb_core
 COPY nucliadb_node /nucliadb/nucliadb_node
 COPY nucliadb_node_binding /nucliadb/nucliadb_node_binding
 COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
+COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
 COPY nucliadb_telemetry /nucliadb/nucliadb_telemetry
@@ -96,6 +102,7 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
     && echo "Moving binaries to /nucliadb/bin" \
     && mkdir -p /nucliadb/bin \
     && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /nucliadb/bin \; \
+    && cargo install rust-spy \
     && cargo clean
 
 # --------------------------------------------------------------------
@@ -110,11 +117,13 @@ RUN apt-get -y update \
     && apt-get -y install ca-certificates curl \
     libssl1.1 \
     lmdb-utils \
+    libdw-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=base /bin/grpc_health_probe /bin/grpc_health_probe
 
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer
+COPY --from=builder /usr/local/cargo/bin/rust-spy /usr/local/bin/rust-spy
 
 EXPOSE 4444/udp

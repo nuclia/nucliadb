@@ -34,6 +34,7 @@ from opentelemetry.propagators.b3 import B3MultiFormat
 from nucliadb_client import logger
 from nucliadb_client.exceptions import ConflictError
 from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_client.utils import warn_deprecated
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxList,
@@ -67,6 +68,9 @@ class NucliaDBClient:
         grpc_host: Optional[str] = None,
         train_host: Optional[str] = None,
     ):
+        warn_deprecated(
+            "nucliadb_client is deprecated and no longer maintained. Please use nucliadb_sdk instead"
+        )
         if reader_host is None:
             reader_host = host
         if writer_host is None:

@@ -42,7 +42,6 @@ class ManualDiscovery(AbstractClusterDiscovery):
     async def watch(self) -> None:
         while True:
             try:
-                await asyncio.sleep(15)
                 await self.discover()
             except asyncio.CancelledError:
                 return
@@ -50,9 +49,10 @@ class ManualDiscovery(AbstractClusterDiscovery):
                 logger.exception(
                     "Error while watching cluster members. Will retry at started interval"
                 )
+            finally:
+                await asyncio.sleep(15)
 
     async def initialize(self) -> None:
-        await self.discover()
         self.task = asyncio.create_task(self.watch())
 
     async def finalize(self) -> None:

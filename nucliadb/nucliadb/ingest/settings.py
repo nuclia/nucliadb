@@ -41,20 +41,22 @@ class DriverConfig(str, Enum):
 
 
 class DriverSettings(BaseSettings):
-    driver: DriverConfig = Field(DriverConfig.NOT_SET, description="K/V storage driver")
+    driver: DriverConfig = Field(
+        default=DriverConfig.NOT_SET, description="K/V storage driver"
+    )
     driver_redis_url: Optional[str] = Field(
-        None, description="Redis URL. Example: redis://localhost:6379"
+        default=None, description="Redis URL. Example: redis://localhost:6379"
     )
     driver_tikv_url: Optional[List[str]] = Field(
-        None,
+        default=None,
         description="TiKV PD (Placement Dricer) URL. The URL to the cluster manager of TiKV. Example: tikv-pd.svc:2379",
     )
     driver_local_url: Optional[str] = Field(
-        None,
+        default=None,
         description="Local path to store data on file system. Example: /nucliadb/data/main",
     )
     driver_pg_url: Optional[str] = Field(
-        None,
+        default=None,
         description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://nucliadb:nucliadb@postgres:5432/nucliadb. See the complete PostgreSQL documentation: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",  # noqa
     )
 

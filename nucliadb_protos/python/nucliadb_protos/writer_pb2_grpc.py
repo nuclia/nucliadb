@@ -155,6 +155,21 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
+        self.SetConfiguration = channel.unary_unary(
+                '/fdbwriter.Writer/SetConfiguration',
+                request_serializer=nucliadb__protos_dot_writer__pb2.SetKBConfigurationRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
+                )
+        self.DelConfiguration = channel.unary_unary(
+                '/fdbwriter.Writer/DelConfiguration',
+                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
+                )
+        self.GetConfiguration = channel.unary_unary(
+                '/fdbwriter.Writer/GetConfiguration',
+                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.GetConfigurationResponse.FromString,
+                )
         self.Status = channel.unary_unary(
                 '/fdbwriter.Writer/Status',
                 request_serializer=nucliadb__protos_dot_writer__pb2.WriterStatusRequest.SerializeToString,
@@ -367,6 +382,25 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetConfiguration(self, request, context):
+        """Configuration
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DelConfiguration(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetConfiguration(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def Status(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -551,6 +585,21 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.DelSynonyms,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
+            ),
+            'SetConfiguration': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetConfiguration,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.SetKBConfigurationRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
+            ),
+            'DelConfiguration': grpc.unary_unary_rpc_method_handler(
+                    servicer.DelConfiguration,
+                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
+            ),
+            'GetConfiguration': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetConfiguration,
+                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.GetConfigurationResponse.SerializeToString,
             ),
             'Status': grpc.unary_unary_rpc_method_handler(
                     servicer.Status,
@@ -1070,6 +1119,57 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelSynonyms',
             nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetConfiguration(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetConfiguration',
+            nucliadb__protos_dot_writer__pb2.SetKBConfigurationRequest.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DelConfiguration(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelConfiguration',
+            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetConfiguration(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/GetConfiguration',
+            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.GetConfigurationResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

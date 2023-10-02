@@ -17,13 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{Arc, RwLock, TryLockError};
+
 use dashmap::DashMap;
 use tokio_metrics::{Instrumented, TaskMetrics, TaskMonitor};
 
+use crate::tracing::error;
+
 pub type TaskId = String;
+type TaskIntervals = dyn Iterator<Item = TaskMetrics> + Send + Sync;
 
 pub struct MultiTaskMonitor {
-    task_monitors: DashMap<TaskId, TaskMonitor>,
+    task_monitors: DashMap<TaskId, (TaskMonitor, Arc<RwLock<TaskIntervals>>)>,
 }
 
 impl MultiTaskMonitor {
@@ -43,15 +48,29 @@ impl MultiTaskMonitor {
     pub fn export_all(&self) -> impl Iterator<Item = (TaskId, TaskMetrics)> + '_ {
         self.task_monitors.iter().filter_map(|item| {
             let task_id = item.key().to_owned();
-            let metrics = item.value().intervals().next();
-            metrics.map(|metrics| (task_id, metrics))
+
+            let maybe_intervals = match item.1.try_write() {
+                Ok(intervals) => Some(intervals),
+                Err(TryLockError::Poisoned(inner)) => Some(inner.into_inner()),
+                Err(TryLockError::WouldBlock) => {
+                    error!(
+                        "Multi task monitor would block acquiring the lock. There is a \
+                         simultaneous export ongoing?"
+                    );
+                    None
+                }
+            };
+
+            maybe_intervals
+                .and_then(|mut intervals| intervals.next())
+                .map(|metrics| (task_id, metrics))
         })
     }
 }
 
 pub struct Monitor<'a> {
     task_id: TaskId,
-    monitors: &'a DashMap<TaskId, TaskMonitor>,
+    monitors: &'a DashMap<TaskId, (TaskMonitor, Arc<RwLock<TaskIntervals>>)>,
 }
 
 impl<'a> Monitor<'a> {
@@ -60,13 +79,15 @@ impl<'a> Monitor<'a> {
     pub fn instrument<F>(self, task: F) -> Instrumented<F> {
         if !self.monitors.contains_key(&self.task_id) {
             let monitor = TaskMonitor::new();
-            self.monitors.insert(self.task_id.clone(), monitor);
+            let intervals = Arc::new(RwLock::new(monitor.intervals()));
+            self.monitors
+                .insert(self.task_id.clone(), (monitor, intervals));
         }
         let monitor = self
             .monitors
             .get(&self.task_id)
             .expect("Task existed or just inserted");
 
-        monitor.instrument(task)
+        monitor.0.instrument(task)
     }
 }

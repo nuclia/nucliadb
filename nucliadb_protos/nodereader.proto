@@ -346,10 +346,17 @@ message SearchRequest {
     float min_score = 23;
 }
 
+enum SuggestFeatures {
+    ENTITIES = 0;
+    PARAGRAPHS = 1;
+}
+
 message SuggestRequest {
     string shard = 1;
 
     string body = 2;
+    repeated SuggestFeatures features = 6;
+
     Filter filter = 3;
     Timestamps timestamps = 4;
     repeated string fields = 5;

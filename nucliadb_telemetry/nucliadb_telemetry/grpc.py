@@ -220,7 +220,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
                 with self._set_remote_context(context):
                     with self.start_span_server(
                         handler_call_details,
-                        context,
+                        context,  # type: ignore
                         set_status_on_exception=False,
                     ) as span:
                         # And now we run the actual RPC.
@@ -252,7 +252,10 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
         self.tracer = tracer
 
     async def intercept_unary_unary(
-        self, continuation, client_call_details: ClientCallDetails, request
+        self,
+        continuation,
+        client_call_details: ClientCallDetails,  # type: ignore
+        request,
     ):
         span = start_span_client(self.tracer, client_call_details)
         try:
@@ -273,7 +276,10 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
         self.tracer = tracer
 
     async def intercept_unary_stream(
-        self, continuation, client_call_details: ClientCallDetails, request
+        self,
+        continuation,
+        client_call_details: ClientCallDetails,  # type: ignore
+        request,
     ):
         span = start_span_client(self.tracer, client_call_details)
 
@@ -296,7 +302,10 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
         self.tracer = tracer
 
     async def intercept_stream_stream(
-        self, continuation, client_call_details: ClientCallDetails, request_iterator
+        self,
+        continuation,
+        client_call_details: ClientCallDetails,  # type: ignore
+        request_iterator,
     ):
         span = start_span_client(self.tracer, client_call_details)
         try:
@@ -318,7 +327,10 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
         self.tracer = tracer
 
     async def intercept_stream_unary(
-        self, continuation, client_call_details: ClientCallDetails, request_iterator
+        self,
+        continuation,
+        client_call_details: ClientCallDetails,  # type: ignore
+        request_iterator,
     ):
         span = start_span_client(self.tracer, client_call_details)
         try:

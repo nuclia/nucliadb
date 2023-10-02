@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -190,3 +191,65 @@ async def test_find_min_score(
     )
     assert resp.status_code == 200
     assert resp.json()["min_score"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_story_7286(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+    caplog,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{knowledgebox}/resource/{rid}",
+        json={
+            "fieldmetadata": [
+                {
+                    "field": {
+                        "field": "text1",
+                        "field_type": "text",
+                    },
+                    "paragraphs": [
+                        {
+                            "key": f"{rid}/t/text1/0-7",
+                            "classifications": [{"labelset": "ls1", "label": "label"}],
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    assert resp.status_code == 200
+
+    with patch("nucliadb.search.search.find_merge.serialize", return_value=None):
+        # should get no result (because serialize returns None, as the resource is not found in the DB)
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/find",
+            json={
+                "query": "title",
+                "features": ["paragraph", "vector", "relations"],
+                "shards": [],
+                "highlight": True,
+                "autofilter": False,
+                "page_number": 0,
+                "show": ["basic", "values", "origin"],
+                "filters": [],
+            },
+        )
+        assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+    assert caplog.record_tuples[0][2] == f"Resource {rid} not found in {knowledgebox}"

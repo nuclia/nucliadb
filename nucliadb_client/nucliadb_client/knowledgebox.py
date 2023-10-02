@@ -41,7 +41,7 @@ from nucliadb_protos.writer_pb2 import (
     UploadBinaryData,
 )
 
-from nucliadb_client.utils import collect_cfs
+from nucliadb_client.utils import collect_cfs, warn_deprecated
 from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
 from nucliadb_models.search import (
     KnowledgeboxCounters,
@@ -74,6 +74,9 @@ class KnowledgeBox:
     http_manager_v1: httpx.Client
 
     def __init__(self, kbid: str, client: "NucliaDBClient", slug: Optional[str] = None):
+        warn_deprecated(
+            "nucliadb_client is deprecated and no longer maintained. Please use nucliadb_sdk instead"
+        )
         self.kbid = kbid
         self.client = client
         self.http_reader_v1 = httpx.Client(

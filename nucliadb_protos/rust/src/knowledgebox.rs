@@ -183,6 +183,11 @@ pub struct DeletedEntitiesGroups {
     #[prost(string, repeated, tag="1")]
     pub entities_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EntitiesGroups {
+    #[prost(map="string, message", tag="1")]
+    pub entities_groups: ::std::collections::HashMap<::prost::alloc::string::String, EntitiesGroup>,
+}
 // Vectorsets
 
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -218,6 +223,21 @@ pub struct SemanticModelMetadata {
     pub vector_dimension: ::core::option::Option<i32>,
     #[prost(float, optional, tag="3")]
     pub default_min_score: ::core::option::Option<f32>,
+}
+// Do not update this model without confirmation of internal Learning Config API
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KbConfiguration {
+    #[prost(string, tag="2")]
+    pub semantic_model: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub generative_model: ::prost::alloc::string::String,
+    #[prost(string, tag="4")]
+    pub ner_model: ::prost::alloc::string::String,
+    #[prost(string, tag="5")]
+    pub anonymization_model: ::prost::alloc::string::String,
+    #[prost(string, tag="6")]
+    pub visual_labeling: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

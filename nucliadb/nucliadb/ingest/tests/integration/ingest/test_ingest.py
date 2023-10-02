@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-import traceback
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
@@ -203,7 +202,7 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
 
 @pytest.mark.asyncio
 async def test_ingest_error_message(
-    kbid: str, gcs_storage: Storage, txn, cache, processor
+    kbid: str, gcs_storage: Storage, processor, maindb_driver
 ):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
@@ -212,6 +211,7 @@ async def test_ingest_error_message(
     message0.ParseFromString(data)
     message0.kbid = kbid
     message0.source = BrokerMessage.MessageSource.WRITER
+
     await processor.process(message=message0, seqid=1)
 
     filename = f"{dirname(__file__)}/assets/error.pb"
@@ -222,33 +222,33 @@ async def test_ingest_error_message(
     message1.kbid = kbid
     message1.ClearField("field_vectors")
     message1.source = BrokerMessage.MessageSource.WRITER
+
     await processor.process(message=message1, seqid=2)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
-    r = await kb_obj.get(message1.uuid)
-    assert r is not None
-    field_obj = await r.get_field("wikipedia_ml", TEXT)
-    ext1 = await field_obj.get_extracted_text()
-    lfm1 = await field_obj.get_large_field_metadata()
-    fm1 = await field_obj.get_field_metadata()
-    basic = await r.get_basic()
-    assert basic is not None
-    assert basic.slug == message1.slug
-    assert basic.summary == message0.basic.summary
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        r = await kb_obj.get(message1.uuid)
+        assert r is not None
+        field_obj = await r.get_field("wikipedia_ml", TEXT)
+        ext1 = await field_obj.get_extracted_text()
+        lfm1 = await field_obj.get_large_field_metadata()
+        fm1 = await field_obj.get_field_metadata()
+        basic = await r.get_basic()
+        assert basic is not None
+        assert basic.slug == message1.slug
+        assert basic.summary == message0.basic.summary
 
-    assert ext1.text == message1.extracted_text[0].body.text
+        assert ext1.text == message1.extracted_text[0].body.text
 
-    assert lfm1 is not None
-    assert fm1 is not None
-    assert field_obj.value.body == message0.texts["wikipedia_ml"].body
+        assert lfm1 is not None
+        assert fm1 is not None
+        assert field_obj.value.body == message0.texts["wikipedia_ml"].body
 
 
 @pytest.mark.asyncio
 async def test_ingest_messages_origin(
     local_files,
     gcs_storage: Storage,
-    txn,
-    cache,
     fake_node,
     processor,
     knowledgebox_ingest,
@@ -263,10 +263,11 @@ async def test_ingest_messages_origin(
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
-    storage = await get_storage(service_name=SERVICE_NAME)
-    kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
-    res = Resource(txn, storage, kb, rid)
-    origin = await res.get_origin()
+    async with processor.driver.transaction() as txn:
+        storage = await get_storage(service_name=SERVICE_NAME)
+        kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
+        res = Resource(txn, storage, kb, rid)
+        origin = await res.get_origin()
 
     # should not be set
     assert origin is None
@@ -281,10 +282,10 @@ async def test_ingest_messages_origin(
     )
     await processor.process(message=message1, seqid=2)
 
-    await txn.abort()  # force clearing txn cache from last pull
-    kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
-    res = Resource(txn, storage, kb, rid)
-    origin = await res.get_origin()
+    async with processor.driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, knowledgebox_ingest)
+        res = Resource(txn, storage, kb, rid)
+        origin = await res.get_origin()
 
     assert origin is not None
     assert origin.url == "http://www.google.com"
@@ -352,7 +353,7 @@ async def test_ingest_audit_stream_files_only(
     knowledgebox_ingest,
     stream_processor,
     stream_audit: StreamAuditStorage,
-    redis_driver,
+    maindb_driver,
 ):
     from nucliadb_utils.settings import audit_settings
 
@@ -473,7 +474,7 @@ async def test_ingest_audit_stream_files_only(
 
     # Test 5: Delete knowledgebox
 
-    txn = await redis_driver.begin()
+    txn = await maindb_driver.begin()
     kb = await KnowledgeBox.get_kb(txn, knowledgebox_ingest)
 
     set_utility(Utility.AUDIT, stream_audit)
@@ -501,12 +502,10 @@ async def test_ingest_audit_stream_files_only(
 async def test_ingest_audit_stream_mixed(
     local_files,
     gcs_storage: Storage,
-    txn,
     cache,
     fake_node,
     stream_processor,
     stream_audit: StreamAuditStorage,
-    redis_driver,
     test_resource: Resource,
 ):
     from nucliadb_utils.settings import audit_settings
@@ -565,8 +564,6 @@ async def test_ingest_audit_stream_mixed(
 
     assert auditreq.type == AuditRequest.AuditType.DELETED
 
-    await txn.abort()
-
     await client.drain()
     await client.close()
 
@@ -575,13 +572,11 @@ async def test_ingest_audit_stream_mixed(
 async def test_ingest_account_seq_stored(
     local_files,
     gcs_storage: Storage,
-    txn,
-    cache,
     fake_node,
     stream_processor,
-    redis_driver,
     test_resource: Resource,
 ):
+    driver = stream_processor.driver
     kbid = test_resource.kb.kbid
     rid = test_resource.uuid
 
@@ -590,41 +585,30 @@ async def test_ingest_account_seq_stored(
     add_filefields(message, [("file_1", "file.png")])
     await stream_processor.process(message=message, seqid=1)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
-    r = await kb_obj.get(message.uuid)
-    assert r is not None
+    async with driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        r = await kb_obj.get(message.uuid)
+        assert r is not None
+        basic = await r.get_basic()
 
-    basic = await r.get_basic()
     assert basic is not None
     assert basic.last_account_seq == 2
     assert basic.queue == 0
 
-    await txn.abort()
-
 
 @pytest.mark.asyncio
-async def test_ingest_txn_missing_kb(
+async def test_ingest_processor_handles_missing_kb(
     local_files,
     gcs_storage: Storage,
-    txn,
-    cache,
     fake_node,
     stream_processor,
-    redis_driver,
     test_resource: Resource,
 ):
     kbid = str(uuid4())
     rid = str(uuid4())
     message = make_message(kbid, rid)
     message.account_seq = 1
-    try:
-        await stream_processor.process(message=message, seqid=1)
-    except Exception:
-        assert (
-            False
-        ), f"Processing should not fail due to a missing Knowledgebox:\n\n{str(traceback.format_exc())}"
-
-    await txn.abort()
+    await stream_processor.process(message=message, seqid=1)
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,26 @@
+FROM debian:bookworm-slim
+
+ENV DATA_PATH=data
+ENV RUST_LOG=nucliadb_node=DEBUG
+ENV RUST_BACKTRACE=1
+
+COPY scripts/install-system-deps.sh /tmp/
+RUN apt-get -y update \
+    && apt-get -y install ca-certificates curl \
+    lmdb-utils \
+    libdw-dev \
+    libssl-dev \
+    libc6  \
+    build-essential && \
+    /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh && rm -rf /var/lib/apt/lists/*
+
+COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bin/grpc_health_probe
+
+
+COPY ./builds/node_reader /usr/local/bin/node_reader
+COPY ./builds/node_writer /usr/local/bin/node_writer
+
+RUN chmod +x /usr/local/bin/node_reader
+RUN chmod +x /usr/local/bin/node_writer
+
+EXPOSE 4444/udp

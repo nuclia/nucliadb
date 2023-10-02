@@ -1,0 +1,5 @@
+error: Argument `metric` is expected only once
+  --> tests/dont_compile/metric_defined_twice.rs:23:50
+   |
+23 | #[measure(actor = "vectors", metric = "my-test", metric = "my-other-test")]
+   |                                                  ^^^^^^

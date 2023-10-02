@@ -31,7 +31,7 @@ from nucliadb_utils.grpc import get_traced_grpc_server
 
 
 async def start_grpc(service_name: Optional[str] = None):
-    aio.init_grpc_aio()
+    aio.init_grpc_aio()  # type: ignore
 
     await setup_telemetry(service_name or "ingest")
     server = get_traced_grpc_server(

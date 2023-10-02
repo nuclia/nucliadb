@@ -1,0 +1,32 @@
+{
+  "datasets": [
+    {
+      "name": "large",
+      "shards": {
+        "url": "https://storage.googleapis.com/nucliadb_indexer/4508ea2f-b3e2-41ca-89b6-224172f5bb3e.tar.gz",
+        "root_path": "data/shards",
+        "ids": [
+          "4508ea2f-b3e2-41ca-89b6-224172f5bb3e"
+        ]
+      },
+      "queries": [
+        {
+          "name": "unfiltered",
+          "query": "la entrada de un ejército en un país",
+          "min_results": 5
+        },
+        {
+          "name": "single-match-key-prefix",
+          "query": "la entrada de un ejército en un país",
+          "tags": [
+            "f/ecc8c259cf0d926fcf4e140621f1615b"
+          ],
+          "key_prefixes": [
+            "ecc8c259cf0d926fcf4e140621f1615b/f/ecc8c259cf0d926fcf4e140621f1615b/175/84949"
+          ],
+          "num_results": 1
+        }
+      ]
+    }
+  ]
+}

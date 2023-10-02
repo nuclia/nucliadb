@@ -24,26 +24,17 @@ import string
 from typing import Optional
 
 from nucliadb_protos.utils_pb2 import ExtractedText
-from redis import asyncio as aioredis
-from redis.asyncio.client import Redis
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.search.settings import settings
 from nucliadb_telemetry import metrics
-from nucliadb_utils.utilities import get_utility, set_utility
 
 from .cache import get_resource_from_cache
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
 
-CACHE_OPS = metrics.Counter("nucliadb_paragraph_cache_ops", labels={"type": "miss"})
-CACHE_HIT_DISTRIBUTION = metrics.Histogram(
-    "nucliadb_paragraph_cache_dist",
-    buckets=[1, 2, 4, 8, 16, 32, 64, 128, 512, 1024, metrics.INF],
-)
 GET_PARAGRAPH_LATENCY = metrics.Observer(
     "nucliadb_get_paragraph",
     buckets=[
@@ -64,7 +55,6 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
     labels={"type": "full"},
 )
 
-_PARAGRAPHS_CACHE_UTIL = "paragraphs_cache"
 
 EXTRACTED_CACHE_OPS = metrics.Counter(
     "nucliadb_extracted_text_cache_ops", labels={"type": ""}
@@ -93,86 +83,6 @@ class ExtractedTextCache:
     def clear(self):
         self.values.clear()
         self.locks.clear()
-
-
-class ParagraphsCache:
-    """
-    Skeleton of paragraph cache.
-
-    For now, it will be used for us to track hits/misses on a potential
-    paragraph cache implementation.
-    """
-
-    consumer_task: Optional[asyncio.Task] = None
-    redis: Redis
-
-    def __init__(self):
-        self.queue = asyncio.Queue()
-
-    async def initialize(self) -> None:
-        if (
-            settings.search_cache_redis_host is None
-            or settings.search_cache_redis_port is None
-        ):
-            # Cache is not configured, ignore
-            return
-        self.consumer_task = asyncio.create_task(self.queue_consumer())
-        self.redis = aioredis.from_url(
-            f"redis://{settings.search_cache_redis_host}:{settings.search_cache_redis_port}"
-        )
-
-    async def finalize(self) -> None:
-        if self.consumer_task is None:
-            return
-        self.consumer_task.cancel()
-        await self.redis.close(close_connection_pool=True)
-
-    async def queue_consumer(self) -> None:
-        while True:
-            try:
-                key = await self.queue.get()
-                key = key + "_hits"
-                val = await self.redis.get(key)
-                if val is None:
-                    CACHE_OPS.inc({"type": "miss"})
-                else:
-                    CACHE_OPS.inc({"type": "hit"})
-                    CACHE_HIT_DISTRIBUTION.observe(int(val))
-                await self.redis.incr(key, 1)
-                await self.redis.expire(key, 60 * 60)
-                self.queue.task_done()
-            except (
-                asyncio.CancelledError,
-                asyncio.TimeoutError,
-                RuntimeError,
-            ):
-                return
-            except Exception:  # pragma: no cover
-                logger.exception("Error in queue consumer, retrying...")
-                await asyncio.sleep(1)
-
-    async def get(
-        self,
-        *,
-        kbid: str,
-        rid: str,
-        field: str,
-        field_id: str,
-        start: int,
-        end: int,
-        split: Optional[str],
-    ) -> Optional[str]:
-        if self.consumer_task is None:
-            return None
-        key = f"{kbid}/{rid}/{field}/{field_id}::{start}-{end}:{split or ''}"
-        self.queue.put_nowait(key)
-        return None
-
-
-async def initialize_cache() -> None:
-    paragraphs_cache = ParagraphsCache()
-    await paragraphs_cache.initialize()
-    set_utility(_PARAGRAPHS_CACHE_UTIL, paragraphs_cache)
 
 
 async def get_field_extracted_text(
@@ -253,23 +163,6 @@ async def get_paragraph_text(
     _, field_type, field = field.split("/")
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-
-    paragraphs_cache: ParagraphsCache = get_utility(_PARAGRAPHS_CACHE_UTIL)
-    cache_val = (
-        paragraphs_cache is not None
-        and await paragraphs_cache.get(
-            kbid=kbid,
-            rid=rid,
-            field=field,
-            field_id=field_obj.id,
-            start=start,
-            end=end,
-            split=split,
-        )
-        or None
-    )
-    if cache_val is not None:
-        return cache_val
 
     text = await get_paragraph_from_full_text(
         field=field_obj,

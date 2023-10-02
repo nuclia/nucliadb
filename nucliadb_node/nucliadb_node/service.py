@@ -31,7 +31,7 @@ from nucliadb_utils.grpc import get_traced_grpc_server
 
 
 async def start_grpc(writer: Writer, reader: Reader):
-    aio.init_grpc_aio()
+    aio.init_grpc_aio()  # type: ignore
 
     server = get_traced_grpc_server(SERVICE_NAME)
     servicer = SidecarServicer(reader=reader, writer=writer)

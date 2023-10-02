@@ -1,0 +1,16 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reader
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+spec:
+  selector:
+    matchLabels:
+      app: reader
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  minAvailable: 1  # simple for now, we can add more complex rules later

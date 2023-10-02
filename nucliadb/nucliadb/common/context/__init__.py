@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
@@ -34,8 +36,11 @@ from nucliadb_utils.utilities import (
     start_indexing_utility,
     start_nats_manager,
     start_partitioning_utility,
+    start_transaction_utility,
     stop_indexing_utility,
     stop_nats_manager,
+    stop_partitioning_utility,
+    stop_transaction_utility,
 )
 
 
@@ -49,25 +54,42 @@ class ApplicationContext:
 
     def __init__(self, service_name: str = "service") -> None:
         self.service_name = service_name
+        self._initialized: bool = False
+        self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
+        if self._initialized:
+            return
+        async with self._lock:
+            if self._initialized:
+                return
+            await self._initialize()
+            self._initialized = True
+
+    async def _initialize(self):
         self.kv_driver = await setup_driver()
         self.blob_storage = await get_storage()
         self.shard_manager = await setup_cluster()
         self.partitioning = start_partitioning_utility()
-        if not cluster_settings.standalone_mode:
+        if not in_standalone_mode():
             self.indexing = await start_indexing_utility()
-        self.nats_manager = await start_nats_manager(
-            self.service_name,
-            indexing_settings.index_jetstream_servers,
-            indexing_settings.index_jetstream_auth,
-        )
+            self.nats_manager = await start_nats_manager(
+                self.service_name,
+                indexing_settings.index_jetstream_servers,
+                indexing_settings.index_jetstream_auth,
+            )
+        self.transaction = await start_transaction_utility(self.service_name)
 
     async def finalize(self) -> None:
+        if not self._initialized:
+            return
+
         await teardown_driver()
         await teardown_cluster()
         await self.blob_storage.finalize()
         await stop_indexing_utility()
         await stop_nats_manager()
+        await stop_transaction_utility()
+        stop_partitioning_utility()
         clean_utility(Utility.STORAGE)
-        clean_utility(Utility.PARTITION)
+        self._initialized = False

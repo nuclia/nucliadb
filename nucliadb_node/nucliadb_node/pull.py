@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# We need to pull from jetstream key partition
-
 import asyncio
 from typing import List, Optional
 
@@ -38,7 +36,8 @@ from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
-from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.nats import MessageProgressUpdater, get_traced_jetstream
+from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.exceptions import IndexDataNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_pubsub, get_storage
@@ -150,7 +149,6 @@ class Worker:
         self.writer = writer
         self.reader = reader
         self.subscriptions = []
-        self.ack_wait = 10 * 60
         self.node = node
         self.publisher = IndexedPublisher()
         self.load_seqid()
@@ -299,7 +297,9 @@ class Worker:
         pb.ParseFromString(msg.data)
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
-        async with sm.lock:
+        async with MessageProgressUpdater(
+            msg, nats_consumer_settings.nats_ack_wait * 0.66
+        ), sm.lock:
             try:
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
@@ -377,10 +377,10 @@ class Worker:
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
                 opt_start_seq=self.last_seqid or 1,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_deliver=10000,
-                max_ack_pending=1,
-                ack_wait=self.ack_wait,
-                idle_heartbeat=5,
+                max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
+                max_deliver=nats_consumer_settings.nats_max_deliver,
+                ack_wait=nats_consumer_settings.nats_ack_wait,
+                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
         self.subscriptions.append(res)

@@ -35,14 +35,13 @@ async def test_materialize_kb_data(
     pubsub,
     gcs_storage,
     fake_node,
-    redis_driver,
     knowledgebox_ingest,
 ):
     count = 10
     for _ in range(count):
         await create_resource(
             storage=gcs_storage,
-            driver=redis_driver,
+            driver=maindb_driver,
             knowledgebox_ingest=knowledgebox_ingest,
         )
 

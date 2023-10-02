@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     data_path: str = "./data/node"
     standalone_mode: bool = False
     standalone_node_port: int = Field(
-        10009,
+        default=10009,
         title="Standalone node port",
         description="Port to use for standalone nodes to communication with each other through",
     )
@@ -50,18 +50,18 @@ class Settings(BaseSettings):
 
     # Node limits
     max_shard_paragraphs: int = Field(
-        1_000_000,
+        default=1_000_000,
         title="Max shard paragraphs",
         description="Maximum number of paragraphs to target per shard",
     )
     max_shard_fields: int = Field(
-        500_000,
+        default=500_000,
         title="Max shard fields",
         description="Maximum number of fields to target per shard. "
         "If this is reached before max_shard_paragraphs, we will create a new shard",
     )
     max_node_replicas: int = Field(
-        650,
+        default=650,
         title="Max node replicas",
         description="Maximum number of shard replicas a single node will manage",
     )
@@ -76,3 +76,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def in_standalone_mode() -> bool:
+    return settings.standalone_mode

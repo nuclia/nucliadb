@@ -21,12 +21,11 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use nucliadb_core::metrics;
-use nucliadb_core::metrics::request_time;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_procs::measure;
 
 use super::utils::*;
 use crate::errors::RelationsErr as InnerErr;
@@ -55,7 +54,9 @@ impl RelationsWriterService {
         Ok(())
     }
 }
+
 impl RelationWriter for RelationsWriterService {
+    #[measure(actor = "relations", metric = "delete_nodes")]
     #[tracing::instrument(skip_all)]
     fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -72,14 +73,13 @@ impl RelationWriter for RelationsWriterService {
         }
         let result = Ok(writer.commit(&mut self.wmode)?);
 
-        let metrics = metrics::get_metrics();
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("delete_nodes".to_string());
-        metrics.record_request_time(metric, took);
         debug!("{id:?} - Ending at {took} ms");
 
         result
     }
+
+    #[measure(actor = "relations", metric = "join_graph")]
     #[tracing::instrument(skip_all)]
     fn join_graph(&mut self, graph: &JoinGraph) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -129,16 +129,10 @@ impl RelationWriter for RelationsWriterService {
             debug!("Ending at {v} ms")
         }
 
-        let result = Ok(writer.commit(&mut self.wmode)?);
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("join_graph".to_string());
-        metrics.record_request_time(metric, took);
-
-        result
+        Ok(writer.commit(&mut self.wmode)?)
     }
 }
+
 impl std::fmt::Debug for RelationsWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RelationWriterService").finish()
@@ -146,6 +140,7 @@ impl std::fmt::Debug for RelationsWriterService {
 }
 
 impl WriterChild for RelationsWriterService {
+    #[measure(actor = "relations", metric = "count")]
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
@@ -161,13 +156,10 @@ impl WriterChild for RelationsWriterService {
             debug!("Ending at {v} ms")
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("count".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(count as usize)
     }
+
+    #[measure(actor = "relations", metric = "delete_resource")]
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -182,13 +174,10 @@ impl WriterChild for RelationsWriterService {
             debug!("{id:?} - Ending at {v} ms")
         }
 
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("delete_resource".to_string());
-        metrics.record_request_time(metric, took);
-
         Ok(())
     }
+
+    #[measure(actor = "relations", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
         let time = SystemTime::now();
@@ -231,11 +220,6 @@ impl WriterChild for RelationsWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Ending at {v} ms")
         }
-
-        let metrics = metrics::get_metrics();
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        let metric = request_time::RequestTimeKey::relations("set_resource".to_string());
-        metrics.record_request_time(metric, took);
 
         Ok(())
     }

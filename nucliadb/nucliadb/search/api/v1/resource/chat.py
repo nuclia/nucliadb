@@ -24,20 +24,15 @@ from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search.api.v1.find import find
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.predict import SendToPredictError
-from nucliadb.search.search.chat.query import chat, rephrase_query_from_context
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import (
-    ChatRequest,
-    FindRequest,
-    NucliaDBClientType,
-    SearchOptions,
-)
+from nucliadb_models.search import ChatRequest, NucliaDBClientType
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+
+from ..chat import create_chat_response
 
 
 @api.post(
@@ -47,90 +42,45 @@ from nucliadb_utils.exceptions import LimitsExceededError
     summary="Chat with a resource",
     description="Chat with a resource",
     tags=["Search"],
+    response_model=None,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def resource_chat_endpoint(
     request: Request,
-    response: Response,
     kbid: str,
     rid: str,
     item: ChatRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> Union[StreamingResponse, HTTPClientError]:
+    x_synchronous: bool = Header(
+        False,
+        description="Output response as JSON in a non-streaming way. "
+        "This is slower and requires waiting for entire answer to be ready.",
+    ),
+) -> Union[StreamingResponse, HTTPClientError, Response]:
     try:
-        return await resource_chat(
-            response, kbid, rid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+        item.resource_filters = [rid]
+        return await create_chat_response(
+            kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except SendToPredictError:
+    except predict.SendToPredictError:
         return HTTPClientError(status_code=503, detail="Chat service not available")
     except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,
             detail="Temporary error on information retrieval. Please try again.",
         )
-
-
-async def resource_chat(
-    response: Response,
-    kbid: str,
-    rid: str,
-    item: ChatRequest,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-):
-    user_query = item.query
-    rephrased_query = None
-    if item.context and len(item.context) > 0:
-        rephrased_query = await rephrase_query_from_context(
-            kbid, item.context, item.query, x_nucliadb_user
+    except predict.RephraseMissingContextError:
+        return HTTPClientError(
+            status_code=412,
+            detail="Unable to rephrase the query with the provided context.",
         )
-
-    find_request = FindRequest()
-    find_request.resource_filters = [rid]
-    find_request.features = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.VECTOR,
-    ]
-    find_request.query = rephrased_query or user_query
-    find_request.fields = item.fields
-    find_request.filters = item.filters
-    find_request.field_type_filter = item.field_type_filter
-    find_request.min_score = item.min_score
-    find_request.range_creation_start = item.range_creation_start
-    find_request.range_creation_end = item.range_creation_end
-    find_request.range_modification_start = item.range_modification_start
-    find_request.range_modification_end = item.range_modification_end
-    find_request.show = item.show
-    find_request.extracted = item.extracted
-    find_request.shards = item.shards
-    find_request.autofilter = item.autofilter
-    find_request.highlight = item.highlight
-
-    find_results, incomplete = await find(
-        response,
-        kbid,
-        find_request,
-        x_ndb_client,
-        x_nucliadb_user,
-        x_forwarded_for,
-        do_audit=True,
-    )
-    if incomplete:
-        raise IncompleteFindResultsError()
-
-    return await chat(
-        kbid,
-        user_query,
-        rephrased_query,
-        find_results,
-        item,
-        x_nucliadb_user,
-        x_ndb_client,
-        x_forwarded_for,
-    )
+    except predict.RephraseError as err:
+        return HTTPClientError(
+            status_code=529,
+            detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
+        )

@@ -248,6 +248,16 @@ class ResourceBrain:
                 ssentence.ClearField("vector")  # clear first to prevent duplicates
                 ssentence.vector.extend(vector.vector)
 
+                # we only care about start/stop position of the paragraph for a given sentence here
+                # the key has the sentence position
+                ssentence.metadata.position.start = vector.start_paragraph
+                ssentence.metadata.position.end = vector.end_paragraph
+
+                ssentence.metadata.position.page_number = (
+                    sparagraph.metadata.position.page_number
+                )
+                ssentence.metadata.position.index = sparagraph.metadata.position.index
+
         for index, vector in enumerate(vo.vectors.vectors):
             para_key = f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
             paragraph = self.brain.paragraphs[field_key].paragraphs[para_key]
@@ -257,8 +267,10 @@ class ResourceBrain:
             sentence.ClearField("vector")  # clear first to prevent duplicates
             sentence.vector.extend(vector.vector)
 
-            sentence.metadata.position.start = vector.start
-            sentence.metadata.position.end = vector.end
+            # we only care about start/stop position of the paragraph for a given sentence here
+            # the key has the sentence position
+            sentence.metadata.position.start = vector.start_paragraph
+            sentence.metadata.position.end = vector.end_paragraph
 
             # does it make sense to copy forward paragraph values here?
             sentence.metadata.position.page_number = (
@@ -307,8 +319,13 @@ class ResourceBrain:
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
-        self.brain.metadata.created.CopyFrom(basic.created)
-        self.brain.metadata.modified.CopyFrom(basic.modified)
+        if basic.HasField("created"):
+            self.brain.metadata.created.CopyFrom(basic.created)
+
+        if basic.HasField("modified"):
+            self.brain.metadata.modified.CopyFrom(basic.modified)
+        elif basic.HasField("created"):
+            self.brain.metadata.modified.CopyFrom(basic.created)
 
         relationnodedocument = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE

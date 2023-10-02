@@ -22,7 +22,6 @@ from nucliadb.common.maindb.utils import setup_driver  # type: ignore
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import start_predict_engine
-from nucliadb.search.search import paragraphs
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.utilities import (
     Utility,
@@ -42,8 +41,6 @@ async def initialize() -> None:
 
     await setup_driver()
     await setup_cluster()
-
-    await paragraphs.initialize_cache()
 
     await start_audit_utility(SERVICE_NAME)
 

@@ -37,6 +37,10 @@ pub fn shards_path() -> PathBuf {
     data_path().join("shards")
 }
 
+pub fn is_debug() -> bool {
+    env::var("DEBUG").is_ok()
+}
+
 pub fn log_level() -> Vec<(String, Level)> {
     let default = "nucliadb_node=WARN".to_string();
     match env::var("RUST_LOG") {
@@ -81,5 +85,33 @@ pub fn host_key_path() -> PathBuf {
     match env::var("HOST_KEY_PATH") {
         Ok(var) => PathBuf::from(var),
         Err(_) => PathBuf::from("host_key"),
+    }
+}
+
+pub fn num_paragraph_search_threads() -> usize {
+    match env::var("NUM_PARAGRAPH_SEARCH_THREADS") {
+        Ok(threadstr) => {
+            if let Ok(threads) = threadstr.parse() {
+                threads
+            } else {
+                error!("NUM_PARAGRAPH_SEARCH_THREADS defined incorrectly. Defaulting to num cpus.");
+                num_cpus::get()
+            }
+        }
+        Err(_) => num_cpus::get(),
+    }
+}
+
+pub fn num_global_rayon_threads() -> usize {
+    match env::var("NUM_GLOBAL_RAYON_THREADS") {
+        Ok(threadstr) => {
+            if let Ok(threads) = threadstr.parse() {
+                threads
+            } else {
+                error!("NUM_GLOBAL_RAYON_THREADS defined incorrectly. Defaulting to num cpus.");
+                10
+            }
+        }
+        Err(_) => 10,
     }
 }

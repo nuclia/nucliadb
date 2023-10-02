@@ -22,6 +22,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
+use crate::Channel;
 
 pub type VectorsReaderPointer = Arc<dyn VectorReader>;
 pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
@@ -31,6 +32,7 @@ pub struct VectorConfig {
     pub similarity: Option<VectorSimilarity>,
     pub path: PathBuf,
     pub vectorset: PathBuf,
+    pub channel: Channel,
 }
 
 pub trait VectorReader:

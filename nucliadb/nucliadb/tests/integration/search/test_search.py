@@ -37,7 +37,6 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb.ingest.tests.vectors import V1
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
-from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -427,6 +426,54 @@ async def test_catalog_can_filter_by_processing_status(
         assert facets["/n/s"][f"/n/s/{status}"] == 1
 
 
+@pytest.mark.skip(reason="Needs sc-5626")
+@pytest.mark.asyncio
+async def test_catalog_prefix_search(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "Rust for dummies",
+        },
+    )
+    assert resp.status_code == 201
+    rust_for_dummies = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "Introduction to Python",
+        },
+    )
+    assert resp.status_code == 201
+    intro_to_python = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "Rust",
+        },
+    )
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 1
+    assert rust_for_dummies in resources
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "Intro",
+        },
+    )
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(resources) == 1
+    assert intro_to_python in resources
+
+
 @pytest.mark.asyncio
 async def test_search_returns_sentence_positions(
     nucliadb_reader: AsyncClient,
@@ -679,75 +726,6 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     resp_json = resp.json()
     facets = resp_json["fulltext"]["facets"]
     assert facets["/n/s"] == {"/n/s/PENDING": 1}
-
-
-@pytest.mark.asyncio
-async def test_search_pre_processes_query(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_grpc,
-    knowledgebox,
-):
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json=dict(title="The Good, the Bad and the Ugly.mov"),
-        headers={"X-Synchronous": "true"},
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    for query in ("G.o:o!d?", "B;a,d", "U¿g¡ly"):
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/search",
-            json={
-                "fields": ["a/title"],
-                "query": query,
-            },
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["resources"][rid]
-
-    # Check that if processing the query outputs an empty string we
-    # don't return all results
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
-        json={
-            "fields": ["a/title"],
-            "query": "?¿!,",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 1
-
-    # Check that query is not pre-processed if user is searching with double-quotes
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
-        json={
-            "fields": ["a/title"],
-            "query": '"B;a,d"',
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 0
-
-
-@pytest.mark.parametrize(
-    "user_query,processed_query",
-    [
-        ("¿Where is my beer?", "Where is my beer"),  # removes question marks
-        ("   My document ", "My document"),  # removes spaces
-        ("?¿!;,.:", ""),  # return user query if processed_query == ""
-        ("Hola?!", "Hola"),
-        (" Hola que tal ? ! asd      ", "Hola que tal asd"),
-        (' Hola que "tal ? ! asd     " ', 'Hola que "tal ? ! asd "'),
-        ("", ""),
-    ],
-)
-def test_pre_process_query(user_query, processed_query):
-    assert pre_process_query(user_query) == processed_query
 
 
 @pytest.mark.asyncio

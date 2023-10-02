@@ -20,3 +20,10 @@
 [build]
 rustflags = ["--cfg", "tokio_unstable"]
 rustdocflags = ["--cfg", "tokio_unstable"]
+
+[profile.release]
+debug = true
+
+[profile.release-wheel]
+inherits = "release"
+debug = false

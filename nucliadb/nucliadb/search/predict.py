@@ -24,9 +24,13 @@ from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 import aiohttp
 import backoff
+from async_lru import alru_cache
+from nucliadb_protos.knowledgebox_pb2 import KBConfiguration
 from nucliadb_protos.utils_pb2 import RelationNode
 
+from nucliadb.ingest.orm.knowledgebox import KB_CONFIGURATION
 from nucliadb.ingest.tests.vectors import Q, Qm2023
+from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.search import logger
 from nucliadb_models.search import (
     AskDocumentModel,
@@ -49,6 +53,14 @@ class PredictVectorMissing(Exception):
 
 
 class NUAKeyMissingError(Exception):
+    pass
+
+
+class RephraseError(Exception):
+    pass
+
+
+class RephraseMissingContextError(Exception):
     pass
 
 
@@ -104,6 +116,8 @@ async def start_predict_engine():
             nuclia_settings.nuclia_service_account,
             nuclia_settings.nuclia_zone,
             nuclia_settings.onprem,
+            nuclia_settings.local_predict,
+            nuclia_settings.local_predict_headers,
         )
     await predict_util.initialize()
     set_utility(Utility.PREDICT, predict_util)
@@ -123,6 +137,12 @@ def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNod
 class DummyPredictEngine:
     def __init__(self):
         self.calls = []
+        self.generated_answer = [
+            b"valid ",
+            b"answer ",
+            b" to",
+            AnswerStatusCode.SUCCESS.encode(),
+        ]
 
     async def initialize(self):
         pass
@@ -151,9 +171,8 @@ class DummyPredictEngine:
         self.calls.append(item)
 
         async def generate():
-            for i in [b"valid ", b"answer ", b" to"]:
+            for i in self.generated_answer:
                 yield i
-            yield AnswerStatusCode.SUCCESS.encode()
 
         return (DUMMY_LEARNING_ID, generate())
 
@@ -190,6 +209,8 @@ class PredictEngine:
         nuclia_service_account: Optional[str] = None,
         zone: Optional[str] = None,
         onprem: bool = False,
+        local_predict: bool = False,
+        local_predict_headers: Optional[Dict[str, str]] = None,
     ):
         self.nuclia_service_account = nuclia_service_account
         self.cluster_url = cluster_url
@@ -199,6 +220,8 @@ class PredictEngine:
             self.public_url = None
         self.zone = zone
         self.onprem = onprem
+        self.local_predict = local_predict
+        self.local_predict_headers = local_predict_headers
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
@@ -206,8 +229,27 @@ class PredictEngine:
     async def finalize(self):
         await self.session.close()
 
+    async def get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
+        if self.onprem is False:
+            return None
+        return await self._get_configuration(kbid)
+
+    @alru_cache(maxsize=None)
+    async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
+        txn = await get_transaction()
+        config_key = KB_CONFIGURATION.format(kbid=kbid)
+        payload = await txn.get(config_key)
+        if payload is None:
+            return None
+
+        kb_pb = KBConfiguration()
+        kb_pb.ParseFromString(payload)
+        return kb_pb
+
     def check_nua_key_is_configured_for_onprem(self):
-        if self.onprem and self.nuclia_service_account is None:
+        if self.onprem and (
+            self.nuclia_service_account is None and self.local_predict is False
+        ):
             raise NUAKeyMissingError()
 
     def get_predict_url(self, endpoint: str) -> str:
@@ -216,9 +258,24 @@ class PredictEngine:
         else:
             return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
-    def get_predict_headers(self, kbid: str) -> dict[str, str]:
+    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:
-            return {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            config = await self.get_configuration(kbid)
+            if self.local_predict_headers is not None:
+                headers.update(self.local_predict_headers)
+            if config is not None:
+                if config.anonymization_model:
+                    headers["X-STF-ANONYMIZATION-MODEL"] = config.anonymization_model
+                if config.semantic_model:
+                    headers["X-STF-SEMANTIC-MODEL"] = config.semantic_model
+                if config.ner_model:
+                    headers["X-STF-NER-MODEL"] = config.ner_model
+                if config.generative_model:
+                    headers["X-STF-GENERATIVE-MODEL"] = config.generative_model
+                if config.visual_labeling:
+                    headers["X-STF-VISUAL-LABELING"] = config.visual_labeling
+            return headers
         else:
             return {"X-STF-KBID": kbid}
 
@@ -262,7 +319,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(FEEDBACK),
             json=data,
-            headers=self.get_predict_headers(kbid),
+            headers=await self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=204)
 
@@ -279,10 +336,10 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(REPHRASE),
             json=item.dict(),
-            headers=self.get_predict_headers(kbid),
+            headers=await self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=200)
-        return await resp.json()
+        return await _parse_rephrase_response(resp)
 
     @predict_observer.wrap({"type": "chat"})
     async def chat_query(
@@ -299,7 +356,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(CHAT),
             json=item.dict(),
-            headers=self.get_predict_headers(kbid),
+            headers=await self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
@@ -321,7 +378,7 @@ class PredictEngine:
             "POST",
             url=self.get_predict_url(ASK_DOCUMENT),
             json=item.dict(),
-            headers=self.get_predict_headers(kbid),
+            headers=await self.get_predict_headers(kbid),
             timeout=None,
         )
         await self.check_response(resp, expected=200)
@@ -341,7 +398,7 @@ class PredictEngine:
             "GET",
             url=self.get_predict_url(SENTENCE),
             params={"text": sentence},
-            headers=self.get_predict_headers(kbid),
+            headers=await self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=200)
         data = await resp.json()
@@ -363,7 +420,7 @@ class PredictEngine:
             "GET",
             url=self.get_predict_url(TOKENS),
             params={"text": sentence},
-            headers=self.get_predict_headers(kbid),
+            headers=await self.get_predict_headers(kbid),
         )
         await self.check_response(resp, expected=200)
         data = await resp.json()
@@ -387,3 +444,24 @@ def get_answer_generator(response: aiohttp.ClientResponse):
                 buffer = b""
 
     return _iter_answer_chunks(response.content.iter_chunks())
+
+
+async def _parse_rephrase_response(
+    resp: aiohttp.ClientResponse,
+) -> str:
+    """
+    Predict api is returning a json payload that is a string with the following format:
+    <rephrased_query><status_code>
+    where status_code is "0" for success, "-1" for error and "-2" for no context
+    it will raise an exception if the status code is not 0
+    """
+    content = await resp.json()
+    if content.endswith("0"):
+        return content[:-1]
+    elif content.endswith("-1"):
+        raise RephraseError(content[:-2])
+    elif content.endswith("-2"):
+        raise RephraseMissingContextError(content[:-2])
+    else:
+        # bw compatibility
+        return content
