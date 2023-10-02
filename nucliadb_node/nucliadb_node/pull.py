@@ -130,6 +130,7 @@ class ShardManager:
             try:
                 with gc_observer():
                     await self._writer.garbage_collector(self._shard_id)
+                    logger.info("Garbage collection finished", extra={"shard": self._shard_id})
             except Exception:
                 logger.exception(
                     "Could not garbage collect", extra={"shard": self._shard_id}
@@ -283,9 +284,6 @@ class Worker:
         subject = msg.subject
         reply = msg.reply
         seqid = int(msg.reply.split(".")[5])
-        logger.info(
-            f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
-        )
         if self.last_seqid and self.last_seqid >= seqid:
             logger.warning(
                 f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
@@ -295,6 +293,11 @@ class Worker:
 
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
+        logger.info(
+            "Message received",
+            extra={"shard": pb.shard, "subject": subject, "reply": reply, "seqid": seqid, "storage_key": pb.storage_key},
+        )
+
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
         async with MessageProgressUpdater(
