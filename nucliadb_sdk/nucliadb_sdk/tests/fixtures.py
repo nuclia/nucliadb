@@ -19,6 +19,7 @@
 #
 import asyncio
 import os
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 from uuid import uuid4
@@ -51,6 +52,10 @@ images.settings["nucliadb"] = {
 NUCLIA_DOCS_dataset = (
     "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia.export"
 )
+
+
+MB = 1024 * 1024
+CHUNK_SIZE = 5 * MB
 
 
 class NucliaDB(BaseImage):
@@ -142,12 +147,13 @@ async def init_fixture(
     dataset_location: str,
 ):
     sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
-    kb_obj = sdk.create_knowledge_box()
+    slug = uuid.uuid4().hex
+    kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
 
     def dataset_generator():
         with requests.get(dataset_location, stream=True) as resp:
-            for chunk in resp.iter_content():
+            for chunk in resp.iter_content(chunk_size=CHUNK_SIZE):
                 yield chunk
 
     import_id = sdk.start_import(kbid=kbid, content=dataset_generator()).import_id
