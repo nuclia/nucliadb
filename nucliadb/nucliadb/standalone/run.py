@@ -71,7 +71,7 @@ def run():
     if settings.fork:  # pragma: no cover
         pid = os.fork()
         if pid != 0:
-            logger.warning(f"Server forked and running on pid {pid}")
+            logger.warning(f"Server forked and running on pid {pid}.")
             return
 
     logger.warning(
