@@ -49,9 +49,7 @@ images.settings["nucliadb"] = {
     },
 }
 
-NUCLIA_DOCS_dataset = (
-    "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia.export"
-)
+NUCLIA_DOCS_dataset = "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia-datasets.export"
 
 
 MB = 1024 * 1024
