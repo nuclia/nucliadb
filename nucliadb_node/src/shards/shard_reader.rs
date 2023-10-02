@@ -35,7 +35,6 @@ use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
-use crate::env;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;

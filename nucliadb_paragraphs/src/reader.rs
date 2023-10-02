@@ -256,7 +256,7 @@ impl ParagraphReaderService {
             return Err(node_error!("Invalid path {:?}", config.path));
         }
         let paragraph_schema = ParagraphSchema::default();
-        let mut index = Index::open_in_dir(&config.path)?;
+        let index = Index::open_in_dir(&config.path)?;
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
