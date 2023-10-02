@@ -56,10 +56,10 @@ jobs:
             platform: linux
           - os: windows
             ls: dir
-            interpreter: 3.10 3.11
+            interpreter: 3.11
           - os: macos
             target: aarch64
-            interpreter: 3.10 3.11
+            interpreter: 3.11
           # - os: ubuntu
           #   platform: linux
           #   target: i686
