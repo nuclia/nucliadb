@@ -106,19 +106,19 @@ impl LogLevelsFilter {
         }
 
         let metadata_target = metadata.target();
+
         // exact match
-        if let Some(log_level) = self.logs_map.get(metadata_target) {
-            if log_level >= level {
-                return true;
-            }
+        if self.logs_map.get(metadata_target) >= Some(level) {
+            return true;
         }
+
         // prefixes match
-        for (prefix, log_level) in self.prefixes.iter() {
-            if log_level >= level && metadata_target.starts_with(prefix) {
-                return true;
-            }
-        }
-        false
+        let possible_match = self
+            .prefixes
+            .iter()
+            .find(|(prefix, log_level)| log_level >= level && metadata_target.starts_with(prefix));
+
+        possible_match.is_some()
     }
 }
 
