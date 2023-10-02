@@ -508,7 +508,7 @@ class Resource:
             value = await field.get_value()
             bm.files[field_id].CopyFrom(value)
         elif type_id == FieldType.CONVERSATION:
-            value = await field.get_value()
+            value = await self.get_full_conversation(field)  # type: ignore
             bm.conversations[field_id].CopyFrom(value)
         elif type_id == FieldType.KEYWORDSET:
             value = await field.get_value()
@@ -519,6 +519,24 @@ class Resource:
         elif type_id == FieldType.LAYOUT:
             value = await field.get_value()
             bm.layouts[field_id].CopyFrom(value)
+
+    async def get_full_conversation(
+        self,
+        conversation_field: Conversation,
+    ) -> Optional[PBConversation]:
+        """
+        Messages of a conversations may be stored across several pages.
+        This method fetches them all and returns a single complete conversation.
+        """
+        full_conv = PBConversation()
+        n_page = 1
+        while True:
+            page = await conversation_field.get_value(page=n_page)
+            if page is None:
+                break
+            full_conv.messages.extend(page.messages)
+            n_page += 1
+        return full_conv
 
     async def generate_broker_message(self) -> BrokerMessage:
         # full means downloading all the pointers
