@@ -42,12 +42,11 @@ from nucliadb_utils.authentication import requires_one
     status_code=200,
     name="Download a Knowledge Box export",
     tags=["Knowledge Boxes"],
+    response_class=StreamingResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def download_export_kb_endpoint(
-    request: Request, kbid: str, export_id: str
-) -> Union[StreamingResponse, HTTPClientError]:
+async def download_export_kb_endpoint(request: Request, kbid: str, export_id: str):
     context = get_app_context(request.app)
     if in_standalone_mode():
         # In standalone mode, we stream the export as we generate it.
