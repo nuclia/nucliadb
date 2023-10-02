@@ -278,12 +278,11 @@ class GCSStorageField(StorageField):
         headers.update(
             {
                 "X-Upload-Content-Type": cf.content_type,
+                "X-Upload-Content-Length": str(cf.size),
                 "Content-Type": "application/json; charset=UTF-8",
                 "Content-Length": str(call_size),
             }
         )
-        if cf.size > 0:
-            headers["X-Upload-Content-Length"] = str(cf.size)
 
         async with self.storage.session.post(
             init_url,
