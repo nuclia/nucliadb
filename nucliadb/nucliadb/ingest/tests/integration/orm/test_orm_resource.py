@@ -43,7 +43,10 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.tests.fixtures import create_resource
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
+from nucliadb_protos import utils_pb2 as upb
 
 
 @pytest.mark.asyncio
@@ -94,13 +97,13 @@ async def test_create_resource_orm_with_basic(
     o2 = PBOrigin()
     assert o2 is not None
     o2.source = PBOrigin.Source.API
-    o2.source_id = "My Surce"
+    o2.source_id = "My Source"
     o2.created.FromDatetime(datetime.now())
 
     await r.set_origin(o2)
     o2 = await r.get_origin()
     assert o2 is not None
-    assert o2.source_id == "My Surce"
+    assert o2.source_id == "My Source"
 
 
 @pytest.mark.asyncio
@@ -215,3 +218,140 @@ async def test_vector_duplicate_fields(
                 ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
 
     assert count == 1
+
+
+async def test_generate_broker_message(
+    gcs_storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+):
+    # Create a resource with all possible metadata in it
+    resource = await create_resource(gcs_storage, maindb_driver, knowledgebox_ingest)
+
+    # Now fetch it
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+        r = await kb_obj.get(resource.uuid)
+        assert r is not None
+
+    async with maindb_driver.transaction() as txn:
+        r.txn = txn
+        bm = await r.generate_broker_message()
+
+    # Check generated broker message has the same metadata as the created resource
+
+    # 1. ROOT ELEMENTS
+    # 1.1 BASIC
+    basic = bm.basic
+    assert basic.HasField("created")
+    assert basic.HasField("modified")
+    assert basic.title == "My title"
+    assert basic.summary == "My summary"
+    assert basic.icon == "text/plain"
+    assert basic.layout == "basic"
+    assert basic.thumbnail == "/file"
+    assert basic.last_seqid == 1
+    assert basic.last_account_seq == 2
+    basic_metadata = basic.metadata
+    assert basic_metadata.metadata["key"] == "value"
+    assert basic_metadata.language == "ca"
+    assert basic_metadata.useful is True
+    assert basic_metadata.status == rpb.Metadata.Status.PROCESSED
+    basic_usermetadata = basic.usermetadata
+    assert len(basic_usermetadata.classifications) == 1
+    assert basic_usermetadata.classifications[0].label == "label1"
+    assert basic_usermetadata.classifications[0].labelset == "labelset1"
+    assert len(basic_usermetadata.relations) == 1
+    assert basic_usermetadata.relations[0].to.value == "000001"
+    basic_fieldmetadata = basic.fieldmetadata
+    assert len(basic_fieldmetadata) == 1
+    assert basic_fieldmetadata[0].field.field == "text1"
+    assert basic_fieldmetadata[0].token[0].token == "My home"
+    assert basic_fieldmetadata[0].token[0].klass == "Location"
+
+    # 1.2 RELATIONS
+    assert len(bm.relations) == 1
+    assert bm.relations[0].relation == upb.Relation.CHILD
+    assert bm.relations[0].source.value == resource.uuid
+    assert bm.relations[0].source.ntype == upb.RelationNode.NodeType.RESOURCE
+    assert bm.relations[0].to.value == "000001"
+    assert bm.relations[0].to.ntype == upb.RelationNode.NodeType.RESOURCE
+
+    # 1.3 ORIGIN
+    assert bm.origin.source_id == "My Source"
+    assert bm.origin.source == rpb.Origin.Source.API
+    assert bm.origin.HasField("created")
+    assert bm.origin.HasField("modified")
+
+    # 2. FIELDS
+    # 2.1 FILE FIELD
+    file_field = bm.files["file1"]
+    assert file_field.language == "es"
+    assert file_field.HasField("added")
+    assert file_field.file.uri
+    assert file_field.file.filename == "text.pb"
+    assert file_field.file.source == gcs_storage.source
+    assert file_field.file.bucket_name
+    assert file_field.file.size
+    assert file_field.file.content_type == "application/octet-stream"
+    assert file_field.file.filename == "text.pb"
+    assert file_field.file.md5 == "01cca3f53edb934a445a3112c6caa652"
+
+    # 2.2 LINK FIELD
+    link_field = bm.links["link1"]
+    assert link_field.uri == "htts://nuclia.cloud"
+    assert link_field.language == "ca"
+    assert link_field.HasField("added")
+    assert link_field.headers["AUTHORIZATION"] == "Bearer xxxxx"
+
+    assert len(bm.link_extracted_data) == 1
+    led = bm.link_extracted_data[0]
+    assert led.HasField("date")
+    assert led.language == "ca"
+    assert led.title == "My Title"
+    assert led.field == "link1"
+    assert led.HasField("link_preview")
+    assert led.HasField("link_thumbnail")
+
+    # Link extracted text
+    letxt = [et for et in bm.extracted_text if et.field.field == "link1"][0]
+    assert letxt.body.text == "MyText"
+
+    # Link field computed metadata
+    lfcm = [fcm for fcm in bm.field_metadata if fcm.field.field == "link1"][0]
+    assert lfcm.metadata.metadata.links[0] == "https://nuclia.com"
+    assert len(lfcm.metadata.metadata.paragraphs) == 1
+    assert len(lfcm.metadata.metadata.positions) == 1
+    assert lfcm.metadata.metadata.HasField("last_index")
+    assert lfcm.metadata.metadata.HasField("last_understanding")
+    assert lfcm.metadata.metadata.HasField("last_extract")
+    assert lfcm.metadata.metadata.HasField("last_summary")
+    assert lfcm.metadata.metadata.HasField("thumbnail")
+
+    # Large field metadata
+    llfm = [lfm for lfm in bm.field_large_metadata if lfm.field.field == "link1"][0]
+    assert len(llfm.real.metadata.entities) == 2
+    assert llfm.real.metadata.tokens["tok"] == 3
+
+    # Field vectors
+    lfv = [v for v in bm.field_vectors if v.field.field == "link1"][0]
+    assert len(lfv.vectors.vectors.vectors) == 1
+    assert lfv.vectors.vectors.vectors[0].start == 1
+    assert lfv.vectors.vectors.vectors[0].end == 2
+    assert lfv.vectors.vectors.vectors[0].vector == list(map(int, b"ansjkdn"))
+
+    # 2.3 CONVERSATION FIELD
+    conv_field = bm.conversations["conv1"]
+    assert len(conv_field.messages) == 300
+    for i, msg in enumerate(conv_field.messages):
+        assert msg.HasField("timestamp")
+        assert msg.who == "myself"
+        assert msg.content.text == f"{i} hello"
+        assert msg.content.format == rpb.MessageContent.Format.PLAIN
+        if i == 33:
+            assert len(msg.content.attachments) == 2
+
+    # Extracted text
+    cfet = [et for et in bm.extracted_text if et.field.field == "conv1"][0]
+    assert cfet.body.text == "MyText"
+
+    # TODO: Add checks for remaining field types and
+    # other broker message metadata that is missing
