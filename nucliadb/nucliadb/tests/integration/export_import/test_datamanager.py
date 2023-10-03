@@ -29,8 +29,8 @@ def datamanager(maindb_driver, gcs_storage):
     return ExportImportDataManager(maindb_driver, gcs_storage)
 
 
-EXPORT = b"some-export-bytes"
-IMPORT = b"some-import-bytes"
+EXPORT = b"some-export-bytes" * 1024 * 1024
+IMPORT = b"some-import-bytes" * 1024 * 1024
 
 
 @pytest.fixture(scope="function")
