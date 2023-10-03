@@ -279,6 +279,11 @@ impl Index {
         }
         Ok(())
     }
+    pub fn try_elock(&self) -> VectorR<ELock> {
+        let lock = fs_state::try_exclusive_lock(&self.location)?;
+        self.update(&lock)?;
+        Ok(lock)
+    }
     pub fn get_elock(&self) -> VectorR<ELock> {
         let lock = fs_state::exclusive_lock(&self.location)?;
         self.update(&lock)?;
