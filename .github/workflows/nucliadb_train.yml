@@ -86,11 +86,10 @@ jobs:
           COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
           BRANCH: ${{ steps.git.outputs.branch }}
           MATURIN: "true"
-        run: make build-node-binding-debug
-        # run: |
-        #   ./scripts/download-build.sh && pip install builds/wheels/*_x86_64.whl || (
-        #     echo "Failed building from the build server." && make build-node-binding-debug
-        #   )
+        run: |
+          ./scripts/download-build.sh && pip install builds/wheels/*_x86_64.whl || (
+            echo "Failed building from the build server." && make build-node-binding-debug
+          )
 
       - name: Run tests
         uses: nick-fields/retry@v2
