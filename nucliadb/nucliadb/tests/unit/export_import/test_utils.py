@@ -25,11 +25,14 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 from nucliadb.export_import.exceptions import ExportStreamExhausted
+from nucliadb.export_import.models import ImportMetadata
 from nucliadb.export_import.utils import (
     IteratorExportStream,
+    TaskRetryHandler,
     get_cloud_files,
     import_broker_message,
 )
+from nucliadb_models.export_import import Status
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.const import Streams
 
@@ -190,3 +193,58 @@ async def test_export_stream():
     assert await export_stream.read(50) == b"foobar"
     with pytest.raises(ExportStreamExhausted):
         await export_stream.read(0)
+
+
+class TestTaskRetryHandler:
+    @pytest.fixture(scope="function")
+    def callback(self):
+        return AsyncMock()
+
+    @pytest.fixture(scope="function")
+    def dm(self):
+        dm = Mock()
+        dm.set_metadata = AsyncMock()
+        return dm
+
+    @pytest.fixture(scope="function")
+    def metadata(self):
+        return ImportMetadata(kbid="kbid", id="import_id")
+
+    async def test_ok(self, callback, dm, metadata):
+        trh = TaskRetryHandler("foo", dm, metadata)
+        callback_retried = trh.wrap(callback)
+
+        await callback_retried("foo", bar="baz")
+
+        callback.assert_called_once_with("foo", bar="baz")
+
+        assert metadata.task.status == Status.FINISHED
+
+    async def test_errors_are_retried(self, callback, dm, metadata):
+        callback.side_effect = ValueError("foo")
+
+        trh = TaskRetryHandler("foo", dm, metadata, max_tries=2)
+        callback_retried = trh.wrap(callback)
+
+        with pytest.raises(ValueError):
+            await callback_retried("foo", bar="baz")
+
+        callback.assert_called_once_with("foo", bar="baz")
+
+        assert metadata.task.status == Status.FAILED
+        assert metadata.task.retries == 1
+
+        with pytest.raises(ValueError):
+            await callback_retried("foo", bar="baz")
+
+        assert metadata.task.status == Status.FAILED
+        assert metadata.task.retries == 2
+
+    async def test_ignored_statuses(self, callback, dm, metadata):
+        trh = TaskRetryHandler("foo", dm, metadata)
+        callback_retried = trh.wrap(callback)
+
+        for status in (Status.ERRORED, Status.FINISHED, Status.CANCELLED):
+            metadata.task.status = status
+            await callback_retried("foo", bar="baz")
+            callback.assert_not_called()

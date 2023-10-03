@@ -22,12 +22,28 @@ from uuid import uuid4
 from fastapi_versioning import version
 from starlette.requests import Request
 
+from nucliadb.common.cluster.settings import in_standalone_mode
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.export_import import importer
+from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.models import (
+    ExportMetadata,
+    ImportMetadata,
+    NatsTaskMessage,
+)
+from nucliadb.export_import.tasks import get_exports_producer, get_imports_producer
 from nucliadb.export_import.utils import IteratorExportStream
+from nucliadb.models.responses import HTTPClientError
+from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb_models.export_import import CreateExportResponse, CreateImportResponse
+from nucliadb_models.export_import import (
+    CreateExportResponse,
+    CreateImportResponse,
+    Status,
+)
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
 
 
@@ -36,13 +52,20 @@ from nucliadb_utils.authentication import requires_one
     status_code=200,
     name="Start an export of a Knowledge Box",
     tags=["Knowledge Boxes"],
+    response_model=CreateExportResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_export_endpoint(request: Request, kbid: str) -> CreateExportResponse:
+async def start_kb_export_endpoint(request: Request, kbid: str):
+    context = get_app_context(request.app)
     export_id = uuid4().hex
-    response = CreateExportResponse(export_id=export_id)
-    return response
+    if in_standalone_mode():
+        # In standalone mode, exports are generated at download time.
+        # We simply return an export_id to keep the API consistent with hosted nucliadb.
+        return CreateExportResponse(export_id=export_id)
+    else:
+        await start_export_task(context, kbid, export_id)
+        return CreateExportResponse(export_id=export_id)
 
 
 @api.post(
@@ -50,19 +73,84 @@ async def start_kb_export_endpoint(request: Request, kbid: str) -> CreateExportR
     status_code=200,
     name="Start an import to a Knowledge Box",
     tags=["Knowledge Boxes"],
+    response_model=CreateImportResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_import_endpoint(request: Request, kbid: str) -> CreateImportResponse:
+async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     import_id = uuid4().hex
-    stream = FastAPIExportStream(request)
-    await importer.import_kb(
-        context=context,
+    if in_standalone_mode():
+        # In standalone mode, we import directly from the request content stream.
+        # Note that we return an import_id simply to keep the API consistent with hosted nucliadb.
+        stream = FastAPIExportStream(request)
+        await importer.import_kb(
+            context=context,
+            kbid=kbid,
+            stream=stream,
+        )
+        return CreateImportResponse(import_id=import_id)
+    else:
+        content_length = int(request.headers.get("Content-Length", "0"))
+        if content_length == 0:
+            return HTTPClientError(status_code=412, detail="Empty request content")
+
+        # TODO: Implement range/resumable uploads to better suppor big exports.
+        await upload_import_to_blob_storage(
+            context=context,
+            request=request,
+            kbid=kbid,
+            import_id=import_id,
+        )
+        await start_import_task(context, kbid, import_id)
+        return CreateImportResponse(import_id=import_id)
+
+
+async def upload_import_to_blob_storage(
+    context: ApplicationContext, request: Request, kbid: str, import_id: str
+):
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+    await dm.upload_import(
+        import_bytes=request.stream(),
         kbid=kbid,
-        stream=stream,
+        import_id=import_id,
     )
-    return CreateImportResponse(import_id=import_id)
+
+
+async def start_export_task(context: ApplicationContext, kbid: str, export_id: str):
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+    metadata = ExportMetadata(kbid=kbid, id=export_id)
+    metadata.task.status = Status.SCHEDULED
+    await dm.set_metadata("export", metadata)
+    try:
+        producer = await get_exports_producer(context)
+        msg = NatsTaskMessage(kbid=kbid, id=export_id)
+        seqid = await producer(msg)  # type: ignore
+        logger.info(
+            f"Export task produced. seqid={seqid} kbid={kbid} export_id={export_id}"
+        )
+    except Exception as e:
+        errors.capture_exception(e)
+        await dm.delete_metadata("export", metadata)
+        raise
+
+
+async def start_import_task(context: ApplicationContext, kbid: str, import_id: str):
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+    metadata = ImportMetadata(kbid=kbid, id=import_id)
+    metadata.task.status = Status.SCHEDULED
+    await dm.set_metadata("import", metadata)
+    try:
+        producer = await get_imports_producer(context)
+        msg = NatsTaskMessage(kbid=kbid, id=import_id)
+        seqid = await producer(msg)  # type: ignore
+        logger.info(
+            f"Import task produced. seqid={seqid} kbid={kbid} import_id={import_id}"
+        )
+    except Exception as e:
+        errors.capture_exception(e)
+        await dm.delete_metadata("import", metadata)
+        raise
 
 
 class FastAPIExportStream(IteratorExportStream):

@@ -20,8 +20,17 @@
 from enum import Enum
 from typing import Any
 
+from pydantic import BaseModel
+
+from nucliadb_models.export_import import Status
+
 
 class ExportedItemType(str, Enum):
+    """
+    Enum for the different types of items that can be exported.
+    This is used when generating and parsing the bytes of an export.
+    """
+
     RESOURCE = "RES"
     LABELS = "LAB"
     ENTITIES = "ENT"
@@ -29,3 +38,38 @@ class ExportedItemType(str, Enum):
 
 
 ExportItem = tuple[ExportedItemType, Any]
+
+
+class TaskMetadata(BaseModel):
+    status: Status
+    retries: int = 0
+
+
+class Metadata(BaseModel):
+    """
+    Model for the state metadata of the exports and imports that is stored on maindb
+    """
+
+    kbid: str
+    id: str
+    task: TaskMetadata = TaskMetadata(status=Status.SCHEDULED)
+    total: int = 0
+    processed: int = 0
+
+
+class ExportMetadata(Metadata):
+    resources_to_export: list[str] = list()
+    exported_resources: list[str] = list()
+
+
+class ImportMetadata(Metadata):
+    read_bytes: int = 0
+
+
+class NatsTaskMessage(BaseModel):
+    """
+    Model for the messages sent through NATS to start exports and imports
+    """
+
+    kbid: str
+    id: str

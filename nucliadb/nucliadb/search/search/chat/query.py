@@ -20,7 +20,7 @@
 import asyncio
 from dataclasses import dataclass
 from time import monotonic as time
-from typing import AsyncIterator, List, Optional
+from typing import AsyncGenerator, AsyncIterator, List, Optional
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 
@@ -46,6 +46,7 @@ from nucliadb_models.search import (
     SearchOptions,
 )
 from nucliadb_protos import audit_pb2
+from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.utilities import get_audit
 
 NOT_ENOUGH_CONTEXT_ANSWER = "Not enough data to answer this."
@@ -88,7 +89,7 @@ async def rephrase_query_from_chat_history(
 
 
 async def format_generated_answer(
-    answer_generator: AsyncIterator[bytes], output_status_code: FoundStatusCode
+    answer_generator: AsyncGenerator[bytes, None], output_status_code: FoundStatusCode
 ):
     answer = []
     status_code: Optional[AnswerStatusCode] = None
@@ -254,30 +255,6 @@ async def chat(
         status_code=status_code,
         find_results=find_results,
     )
-
-
-async def async_gen_lookahead(gen: AsyncIterator[bytes]):
-    """Async generator that yields the next chunk and whether it's the last one.
-    Empty chunks are ignored.
-
-    """
-    buffered_chunk = None
-    async for chunk in gen:
-        if buffered_chunk is None:
-            # Buffer the first chunk
-            buffered_chunk = chunk
-            continue
-
-        if len(chunk) == 0:
-            continue
-
-        # Yield the previous chunk and buffer the current one
-        yield buffered_chunk, False
-        buffered_chunk = chunk
-
-    # Yield the last chunk if there is one
-    if buffered_chunk is not None:
-        yield buffered_chunk, True
 
 
 def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:

@@ -27,6 +27,7 @@ from nats.aio.client import Msg
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
+from nucliadb.tasks.models import MsgType
 from nucliadb.tasks.registry import get_registered_task
 from nucliadb.tasks.utils import TaskCallback, create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
@@ -41,7 +42,7 @@ class NatsTaskConsumer:
         name: str,
         stream: const.Streams,
         callback: TaskCallback,
-        msg_type: pydantic.BaseModel,
+        msg_type: MsgType,
     ):
         self.name = name
         self.stream = stream
@@ -119,7 +120,7 @@ class NatsTaskConsumer:
                     },
                 )
                 # Nak the message to retry
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
                 await msg.nak()
             else:
                 logger.info(
@@ -137,7 +138,7 @@ def create_consumer(
     name: str,
     stream: const.Streams,
     callback: TaskCallback,
-    msg_type: pydantic.BaseModel,
+    msg_type: MsgType,
 ) -> NatsTaskConsumer:
     """
     Returns a non-initialized consumer
@@ -164,8 +165,8 @@ async def start_consumer(
     consumer = create_consumer(
         name=f"{task_name}_consumer",
         stream=task.stream,
-        callback=task.callback,
-        msg_type=task.msg_type,
+        callback=task.callback,  # type: ignore
+        msg_type=task.msg_type,  # type: ignore
     )
     await consumer.initialize(context)
     return consumer

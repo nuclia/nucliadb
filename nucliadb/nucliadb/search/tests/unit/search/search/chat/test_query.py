@@ -21,11 +21,7 @@ from unittest import mock
 import pytest
 
 from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import (
-    _parse_answer_status_code,
-    async_gen_lookahead,
-    chat,
-)
+from nucliadb.search.search.chat.query import _parse_answer_status_code, chat
 from nucliadb_models.search import (
     ChatRequest,
     KnowledgeboxFindResults,
@@ -40,30 +36,6 @@ def predict():
         "nucliadb.search.search.chat.query.get_predict", return_value=predict
     ):
         yield predict
-
-
-async def test_async_gen_lookahead():
-    async def gen(n):
-        for i in range(n):
-            yield f"{i}".encode()
-
-    assert [item async for item in async_gen_lookahead(gen(0))] == []
-    assert [item async for item in async_gen_lookahead(gen(1))] == [(b"0", True)]
-    assert [item async for item in async_gen_lookahead(gen(2))] == [
-        (b"0", False),
-        (b"1", True),
-    ]
-
-
-async def test_async_gen_lookahead_last_chunk_is_empty():
-    async def gen():
-        for chunk in [b"empty", b"chunk", b""]:
-            yield chunk
-
-    assert [item async for item in async_gen_lookahead(gen())] == [
-        (b"empty", False),
-        (b"chunk", True),
-    ]
 
 
 async def test_chat_does_not_call_predict_if_no_find_results(

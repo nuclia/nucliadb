@@ -17,22 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Type
-
-import pydantic
-
-from nucliadb.common.context import ApplicationContext
-from nucliadb_utils import const
-
-MsgType = Type[pydantic.BaseModel]
-
-# async def callback(context: ApplicationContext, msg: MyPydanticModel):
-Callback = Callable[[ApplicationContext, MsgType], Coroutine[Any, Any, Any]]
+from nucliadb.export_import.datamanager import _iter_and_add_size_to_cf
+from nucliadb_protos import resources_pb2
 
 
-@dataclass
-class RegisteredTask:
-    stream: const.Streams
-    callback: Callback
-    msg_type: MsgType
+async def test_iter_and_add_size_to_cf():
+    cf = resources_pb2.CloudFile()
+
+    async def iter():
+        yield b"foo"
+        yield b"bar"
+
+    cf.size = 0
+    async for _ in _iter_and_add_size_to_cf(iter(), cf):
+        pass
+
+    assert cf.size == 6

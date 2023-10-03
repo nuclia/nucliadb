@@ -17,22 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Type
-
-import pydantic
-
-from nucliadb.common.context import ApplicationContext
-from nucliadb_utils import const
-
-MsgType = Type[pydantic.BaseModel]
-
-# async def callback(context: ApplicationContext, msg: MyPydanticModel):
-Callback = Callable[[ApplicationContext, MsgType], Coroutine[Any, Any, Any]]
+from typing import AsyncGenerator
 
 
-@dataclass
-class RegisteredTask:
-    stream: const.Streams
-    callback: Callback
-    msg_type: MsgType
+async def async_gen_lookahead(
+    gen: AsyncGenerator[bytes, None]
+) -> AsyncGenerator[tuple[bytes, bool], None]:
+    """Async generator that yields the next chunk and whether it's the last one.
+    Empty chunks are ignored.
+
+    """
+    buffered_chunk = None
+    async for chunk in gen:
+        if buffered_chunk is None:
+            # Buffer the first chunk
+            buffered_chunk = chunk
+            continue
+
+        if len(chunk) == 0:
+            continue
+
+        # Yield the previous chunk and buffer the current one
+        yield buffered_chunk, False
+        buffered_chunk = chunk
+
+    # Yield the last chunk if there is one
+    if buffered_chunk is not None:
+        yield buffered_chunk, True

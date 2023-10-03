@@ -17,14 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncGenerator, Callable, cast
+from typing import AsyncGenerator, Callable, Optional, cast
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import import logger
-from nucliadb.export_import.models import ExportedItemType
+from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.models import (
+    ExportedItemType,
+    ImportMetadata,
+    NatsTaskMessage,
+)
 from nucliadb.export_import.utils import (
     ExportStream,
     ExportStreamReader,
+    IteratorExportStream,
+    TaskRetryHandler,
     import_binary,
     import_broker_message,
     set_entities_groups,
@@ -38,13 +45,24 @@ BinaryStreamGenerator = Callable[[int], BinaryStream]
 
 
 async def import_kb(
-    context: ApplicationContext, kbid: str, stream: ExportStream
+    context: ApplicationContext,
+    kbid: str,
+    stream: ExportStream,
+    metadata: Optional[ImportMetadata] = None,
 ) -> None:
     """
     Imports exported data from a stream into a knowledgebox.
+    If metadata is provided, the import will be resumable as it will store checkpoints.
     """
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     stream_reader = ExportStreamReader(stream)
+
+    if metadata and metadata.read_bytes > 0:
+        await stream_reader.seek(metadata.read_bytes)
+
+    count = 0
     async for item_type, data in stream_reader.iter_items():
+        count += 1
         if item_type == ExportedItemType.RESOURCE:
             bm = cast(writer_pb2.BrokerMessage, data)
             await import_broker_message(context, kbid, bm)
@@ -65,3 +83,29 @@ async def import_kb(
         else:
             logger.warning(f"Unknown exporteed item type: {item_type}")
             continue
+
+        if metadata and count % 10 == 0:
+            # Update metadata every 10 items
+            metadata.read_bytes = stream_reader.read_bytes
+            await dm.set_metadata("import", metadata)
+
+
+async def import_kb_from_blob_storage(
+    context: ApplicationContext, msg: NatsTaskMessage
+):
+    """
+    Imports to a knowledgebox from an export stored in the blob storage service.
+    """
+    kbid, import_id = msg.kbid, msg.id
+    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+    metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
+    iterator = dm.download_import(kbid, import_id)
+    stream = IteratorExportStream(iterator)
+
+    retry_handler = TaskRetryHandler("import", dm, metadata)
+
+    @retry_handler.wrap
+    async def import_kb_retried(context, kbid, stream, metadata):
+        await import_kb(context, kbid, stream, metadata)
+
+    await import_kb_retried(context, kbid, stream, metadata)  # type: ignore

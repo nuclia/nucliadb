@@ -70,7 +70,7 @@ async def dummy_processing():
     nuclia_settings.dummy_processing = True
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=True)
 def telemetry_disabled():
     os.environ["NUCLIADB_DISABLE_TELEMETRY"] = "True"
     yield
@@ -122,20 +122,17 @@ async def nucliadb(dummy_processing, telemetry_disabled, driver_settings, tmpdir
 
     # we need to force DATA_PATH updates to run every test on the proper
     # temporary directory
-    os.environ["DATA_PATH"] = f"{tmpdir}/node"
+    data_path = f"{tmpdir}/node"
+    os.environ["DATA_PATH"] = data_path
     settings = Settings(
-        driver=driver_settings.driver,
-        driver_local_url=driver_settings.driver_local_url,
-        driver_pg_url=driver_settings.driver_pg_url,
-        driver_redis_url=driver_settings.driver_redis_url,
-        driver_tikv_url=driver_settings.driver_tikv_url,
         file_backend="local",
         local_files=f"{tmpdir}/blob",
-        data_path=f"{tmpdir}/node",
+        data_path=data_path,
         http_port=free_port(),
         ingest_grpc_port=free_port(),
         train_grpc_port=free_port(),
         standalone_node_port=free_port(),
+        **driver_settings.dict(),
     )
 
     config_nucliadb(settings)

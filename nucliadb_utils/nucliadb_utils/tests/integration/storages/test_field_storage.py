@@ -20,6 +20,7 @@
 import uuid
 
 import pytest
+from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
@@ -71,3 +72,17 @@ async def storage_field_test(storage: Storage):
     async for data in sfield.iter_data():
         downloaded_data += data
     assert downloaded_data == binary_data
+
+    # Test
+    if storage.source == CloudFile.Source.LOCAL:
+        # There is a bug to be fixed in the copy method on the local storage driver
+        return
+
+    kbid2 = uuid.uuid4().hex
+    assert await storage.create_kb(kbid2)
+    bucket2 = storage.get_bucket_name(kbid2)
+    rid = "rid"
+    field_id = "field1"
+    field_key = KB_RESOURCE_FIELD.format(kbid=kbid2, uuid=rid, field=field_id)
+
+    await sfield.copy(sfield.key, field_key, bucket, bucket2)

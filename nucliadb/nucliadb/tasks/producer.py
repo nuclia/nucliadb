@@ -19,10 +19,9 @@
 #
 from typing import Optional
 
-import pydantic
-
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
+from nucliadb.tasks.models import MsgType
 from nucliadb.tasks.registry import get_registered_task
 from nucliadb.tasks.utils import create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors
@@ -34,7 +33,7 @@ class NatsTaskProducer:
         self,
         name: str,
         stream: const.Streams,
-        msg_type: pydantic.BaseModel,
+        msg_type: MsgType,
     ):
         self.name = name
         self.stream = stream
@@ -49,7 +48,7 @@ class NatsTaskProducer:
         )
         self.initialized = True
 
-    async def __call__(self, msg: pydantic.BaseModel) -> int:
+    async def __call__(self, msg: MsgType) -> int:  # type: ignore
         """
         Publish message to the producer's nats stream.
         Returns the sequence number of the published message.
@@ -78,7 +77,7 @@ class NatsTaskProducer:
 def create_producer(
     name: str,
     stream: const.Streams,
-    msg_type: pydantic.BaseModel,
+    msg_type: MsgType,
 ) -> NatsTaskProducer:
     """
     Returns a non-initialized producer.

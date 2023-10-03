@@ -17,20 +17,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import functools
 from io import BytesIO
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
-from google import protobuf
+from google.protobuf.message import DecodeError as ProtobufDecodeError
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.entities import EntitiesDataManager
 from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.export_import import logger
+from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import (
     ExportStreamExhausted,
     WrongExportStreamFormat,
 )
-from nucliadb.export_import.models import ExportedItemType, ExportItem
+from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
+from nucliadb_models.export_import import Status
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_utils.const import Streams
@@ -365,5 +369,64 @@ class ExportStreamReader:
                 yield item_type, data
             except ExportStreamExhausted:
                 break
-            except protobuf.message.DecodeError as e:
+            except ProtobufDecodeError as e:
                 raise WrongExportStreamFormat() from e
+
+
+class TaskRetryHandler:
+    """
+    Class that wraps an import/export task and adds retry logic to it.
+    """
+
+    def __init__(
+        self,
+        type: str,
+        data_manager: ExportImportDataManager,
+        metadata: Metadata,
+        max_tries: int = 5,
+    ):
+        self.type = type
+        self.max_tries = max_tries
+        self.dm = data_manager
+        self.metadata = metadata
+
+    def wrap(self, func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            metadata = self.metadata
+            task = metadata.task
+            if task.status in (Status.FINISHED, Status.ERRORED, Status.CANCELLED):
+                logger.info(
+                    f"{self.type} task is {task.status.value}. Skipping",
+                    extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
+                )
+                return
+
+            if task.retries >= self.max_tries:
+                task.status = Status.ERRORED
+                logger.info(
+                    f"{self.type} task reached max retries. Setting to ERRORED state",
+                    extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
+                )
+                await self.dm.set_metadata(self.type, metadata)
+                return
+            try:
+                await func(*args, **kwargs)
+            except Exception:
+                task.retries += 1
+                task.status = Status.FAILED
+                logger.info(
+                    f"{self.type} failed. Will be retried",
+                    extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
+                )
+                raise
+            else:
+                logger.info(
+                    f"{self.type} finished successfully",
+                    extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
+                )
+                task.status = Status.FINISHED
+            finally:
+                await self.dm.set_metadata(self.type, metadata)
+
+        return wrapper

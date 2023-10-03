@@ -16,3 +16,30 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+from nucliadb_utils.helpers import async_gen_lookahead
+
+
+async def test_async_gen_lookahead():
+    async def gen(n):
+        for i in range(n):
+            yield f"{i}".encode()
+
+    assert [item async for item in async_gen_lookahead(gen(0))] == []
+    assert [item async for item in async_gen_lookahead(gen(1))] == [(b"0", True)]
+    assert [item async for item in async_gen_lookahead(gen(2))] == [
+        (b"0", False),
+        (b"1", True),
+    ]
+
+
+async def test_async_gen_lookahead_last_chunk_is_empty():
+    async def gen():
+        for chunk in [b"empty", b"chunk", b""]:
+            yield chunk
+
+    assert [item async for item in async_gen_lookahead(gen())] == [
+        (b"empty", False),
+        (b"chunk", True),
+    ]

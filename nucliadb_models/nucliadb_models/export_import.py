@@ -41,3 +41,5 @@ class Status(str, Enum):
 
 class StatusResponse(BaseModel):
     status: Status
+    total: int = 0
+    processed: int = 0
