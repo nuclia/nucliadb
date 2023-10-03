@@ -61,7 +61,6 @@ async def test_get_broker_message_proxied(consumer: IngestConsumer, storage):
 
 @pytest.mark.asyncio
 async def test_clean_broker_message_proxied(consumer: IngestConsumer, storage):
-    bm = BrokerMessage(kbid="kbid")
     bmr = BrokerMessageBlobReference(kbid="kbid", storage_key="storage_key")
     msg = Mock(data=bmr.SerializeToString(), headers={"X-MESSAGE-TYPE": "PROXY"})
 
