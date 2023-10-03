@@ -77,10 +77,8 @@ jobs:
 
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
-        env:
-          RUSTFLAGS: "--cfg tokio_unstable"
         run: |
-          maturin build -m nucliadb_node_binding/Cargo.toml
+          make build-node-binding-debug
           pip install target/wheels/*_x86_64.whl
 
       - name: Run tests
