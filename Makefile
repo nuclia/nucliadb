@@ -49,7 +49,6 @@ proto-clean-py:
 
 python-code-lint:
 	make -C nucliadb_dataset/ format
-	make -C nucliadb_client/ format
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
 	make -C nucliadb_node/ format
@@ -63,7 +62,6 @@ python-code-lint:
 	make -C nucliadb_telemetry/ lint
 	make -C nucliadb_sdk/ lint
 	make -C nucliadb_dataset/ lint
-	make -C nucliadb_client/ lint
 	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
 	make -C nucliadb_node_binding/ lint
@@ -90,7 +88,6 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_models
 	pip install -e ./nucliadb
-	pip install -e ./nucliadb_client
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
 

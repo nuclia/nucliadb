@@ -20,11 +20,16 @@
 from io import BytesIO
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
+from google import protobuf
+
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.entities import EntitiesDataManager
 from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
-from nucliadb.export_import.exceptions import ExportStreamExhausted
+from nucliadb.export_import.exceptions import (
+    ExportStreamExhausted,
+    WrongExportStreamFormat,
+)
 from nucliadb.export_import.models import ExportedItemType, ExportItem
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
@@ -360,3 +365,5 @@ class ExportStreamReader:
                 yield item_type, data
             except ExportStreamExhausted:
                 break
+            except protobuf.message.DecodeError as e:
+                raise WrongExportStreamFormat() from e

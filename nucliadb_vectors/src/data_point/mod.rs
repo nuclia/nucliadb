@@ -21,10 +21,10 @@
 pub mod disk_hnsw;
 pub mod node;
 pub mod ops_hnsw;
+mod params;
 pub mod ram_hnsw;
 #[cfg(test)]
 mod tests;
-
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use std::{fs, io, path};

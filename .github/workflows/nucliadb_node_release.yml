@@ -6,13 +6,37 @@ on:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/Cargo.toml"
+      - "nucliadb_node_binding/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_core/**"
+      - "nucliadb_node/src/**"
+      - "nucliadb_node/Cargo.toml"
+      - "nucliadb_vectors/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_core/**"
+      - "nucliadb_relations/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/Cargo.toml"
+      - "nucliadb_node_binding/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_core/**"
+      - "nucliadb_node/src/**"
+      - "nucliadb_node/Cargo.toml"
+      - "nucliadb_vectors/**"
+      - "nucliadb_texts/**"
+      - "nucliadb_paragraphs/**"
+      - "nucliadb_core/**"
+      - "nucliadb_relations/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -24,23 +48,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos, windows]
+        os: [ubuntu, macos]
         target: [x86_64, aarch64]
         manylinux: [auto]
         include:
           - os: ubuntu
             platform: linux
-          - os: windows
-            ls: dir
-            interpreter: 3.8 3.9 3.10 3.11
-          # - os: windows
-          #   ls: dir
-          #   target: i686
-          #   python-architecture: x86
-          #   interpreter: 3.8 3.9 3.10
           - os: macos
             target: aarch64
-            interpreter: 3.8 3.9 3.10 3.11
+            interpreter: 3.9 3.10 3.11
           # - os: ubuntu
           #   platform: linux
           #   target: i686
@@ -50,11 +66,6 @@ jobs:
             platform: linux
             target: aarch64
             container: messense/manylinux_2_24-cross:aarch64
-          # - os: ubuntu
-          #   platform: linux
-          #   target: armv7
-          #   container: messense/manylinux_2_24-cross:armv7
-          #   interpreter: 3.8 3.9 3.10 3.11
           # musllinux
           - os: ubuntu
             platform: linux
@@ -64,10 +75,6 @@ jobs:
             platform: linux
             target: aarch64
             manylinux: musllinux_1_1
-        exclude:
-          # Windows on arm64 only supports Python 3.11+
-          - os: windows
-            target: aarch64
 
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -78,11 +85,14 @@ jobs:
         with:
           python-version: "3.11"
           architecture: ${{ matrix.python-architecture || 'x64' }}
+      
+      - name: Setup env
+        run: |
+          python bump.py --build=${{github.run_number}}
 
       - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
       - name: Check system deps
-        if: ${{ matrix.os != 'windows' }}
         run: make -C nucliadb check-system
 
       - name: build sdist
@@ -102,7 +112,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.8 3.9 3.10 3.11 pypy3.8 pypy3.9' }}
+          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11' }}
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
@@ -110,12 +120,14 @@ jobs:
       - run: twine check dist/*
 
       - uses: actions/upload-artifact@v3
+        if: github.event_name == 'push'
         with:
           name: pypi_files
           path: dist
 
   list-pypi-files:
     needs: [build]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:

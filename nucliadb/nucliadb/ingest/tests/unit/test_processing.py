@@ -113,6 +113,14 @@ async def test_convert_filefield_to_str_402(engine):
     assert exc.value.status_code == 402
 
 
+async def test_convert_filefield_to_str_429(engine):
+    engine.session = get_mocked_session("POST", 429, json={"detail": "limits exceeded"})
+
+    with pytest.raises(LimitsExceededError) as exc:
+        await engine.convert_filefield_to_str(TEST_FILE)
+    assert exc.value.status_code == 429
+
+
 async def test_convert_filefield_to_str_500(engine):
     engine.session = get_mocked_session("POST", 500, text="error")
 
@@ -133,6 +141,14 @@ async def test_convert_internal_cf_to_str_402(engine):
     with pytest.raises(LimitsExceededError) as exc:
         await engine.convert_internal_cf_to_str(TEST_CLOUD_FILE, Mock())
     assert exc.value.status_code == 402
+
+
+async def test_convert_internal_cf_to_str_429(engine):
+    engine.session = get_mocked_session("POST", 429, json={"detail": "limits exceeded"})
+
+    with pytest.raises(LimitsExceededError) as exc:
+        await engine.convert_internal_cf_to_str(TEST_CLOUD_FILE, Mock())
+    assert exc.value.status_code == 429
 
 
 async def test_convert_internal_cf_to_str_500(engine):
@@ -164,6 +180,16 @@ async def test_send_to_process_limits_exceeded(status, engine):
     with pytest.raises(LimitsExceededError) as exc:
         await engine.send_to_process(TEST_ITEM, 1)
     assert exc.value.status_code == status
+
+
+async def test_send_to_process_limits_exceeded_429(engine):
+    engine.session = get_mocked_session(
+        "POST", 429, json={"detail": "limits exceeded"}, context_manager=False
+    )
+
+    with pytest.raises(LimitsExceededError) as exc:
+        await engine.send_to_process(TEST_ITEM, 1)
+    assert exc.value.status_code == 429
 
 
 async def test_send_to_process_500(engine):

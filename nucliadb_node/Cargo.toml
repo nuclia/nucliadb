@@ -87,6 +87,7 @@ tracing-subscriber = { version = "0.3.11", features = [
 tracing-log = { version = "0.1.3", features = ["env_logger"] }
 opentelemetry-zipkin = "0.15.0"
 sentry-tracing = "0.27.0"
+tracing-core = "0.1.31"
 
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }

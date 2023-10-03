@@ -37,6 +37,10 @@ pub fn shards_path() -> PathBuf {
     data_path().join("shards")
 }
 
+pub fn is_debug() -> bool {
+    env::var("DEBUG").is_ok()
+}
+
 pub fn log_level() -> Vec<(String, Level)> {
     let default = "nucliadb_node=WARN".to_string();
     match env::var("RUST_LOG") {

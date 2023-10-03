@@ -7,7 +7,6 @@ install-dev:
 		-r nucliadb_sdk/requirements-sources.txt \
 		-r nucliadb_sdk/requirements.txt \
 		-r nucliadb_sdk/requirements-test.txt
-	pip install -e ../nucliadb_client/
 	pip install -e .
 
 .PHONY: format

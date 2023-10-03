@@ -37,6 +37,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
@@ -50,6 +51,7 @@ from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -496,7 +498,9 @@ def broker_resource(
     return message1
 
 
-async def create_resource(storage, driver: Driver, knowledgebox_ingest: str):
+async def create_resource(
+    storage: Storage, driver: Driver, knowledgebox_ingest: str
+) -> Resource:
     txn = await driver.begin()
 
     rid = str(uuid.uuid4())

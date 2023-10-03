@@ -59,7 +59,7 @@ and inference. We do all the hard work for you.
 ## Architecture
 
 <p align="center">
-  <img src="docs/assets/images/arquitecture.svg" alt="Architecture" width="500px" style="background-color: #fff">
+  <img src="docs/assets/images/nucliadb-arch-overview.png" alt="Architecture" width="500px" style="background-color: #fff">
 </p>
 
 ## Quickstart

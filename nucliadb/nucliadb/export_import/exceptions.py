@@ -25,3 +25,11 @@ class ExportStreamExhausted(Exception):
     """
 
     pass
+
+
+class WrongExportStreamFormat(Exception):
+    """
+    Raised then data being imported does not follow the expected format
+    """
+
+    pass

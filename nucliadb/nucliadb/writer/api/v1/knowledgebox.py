@@ -56,7 +56,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     requestpb = KnowledgeBoxNew()
     if item.slug:
         requestpb.slug = item.slug
-
     if item.title:
         requestpb.config.title = item.title
     if item.description:
