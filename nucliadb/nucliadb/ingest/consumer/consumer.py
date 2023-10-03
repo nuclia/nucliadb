@@ -26,7 +26,7 @@ import backoff
 import nats
 import nats.js.api
 from nats.aio.client import Msg
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
@@ -77,6 +77,7 @@ class IngestConsumer:
         self.driver = driver
         self.partition = partition
         self.nats_connection_manager = nats_connection_manager
+        self.storage = storage
         self.initialized = False
 
         self.lock = asyncio.Lock()
@@ -116,6 +117,27 @@ class IngestConsumer:
     async def _process(self, pb: BrokerMessage, seqid: int):
         await self.processor.process(pb, seqid, self.partition)
 
+    async def get_broker_message(self, msg: Msg) -> BrokerMessage:
+        pb_data = msg.data
+        if msg.headers is not None and msg.headers.get("X-MESSAGE-TYPE") == "PROXY":
+            # this is a message that is referencing a blob because
+            # it was too big to be sent through NATS
+            ref_pb = BrokerMessageBlobReference()
+            ref_pb.ParseFromString(pb_data)
+            pb_data = await self.storage.get_stream_message(ref_pb.storage_key)
+        pb = BrokerMessage()
+        pb.ParseFromString(pb_data)
+        return pb
+
+    async def clean_broker_message(self, msg: Msg) -> None:
+        if msg.headers is not None and msg.headers.get("X-MESSAGE-TYPE") == "PROXY":
+            ref_pb = BrokerMessageBlobReference()
+            ref_pb.ParseFromString(msg.data)
+            try:
+                await self.storage.del_stream_message(ref_pb.storage_key)
+            except Exception:  # pragma: no cover
+                logger.warning("Could not delete blob reference", exc_info=True)
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -130,8 +152,7 @@ class IngestConsumer:
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), self.lock:
             try:
-                pb = BrokerMessage()
-                pb.ParseFromString(msg.data)
+                pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
                     message_source = "processing"
                 elif pb.source == pb.MessageSource.WRITER:
@@ -200,17 +221,17 @@ class IngestConsumer:
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
                 errors.capture_exception(e)
-                logger.info(
+                logger.exception(
                     f"An error happend while processing a message from {message_source}. "
                     "Message has not been ACKd and will be retried. "
                     f"Check sentry for more details: {str(e)}"
                 )
-                await asyncio.sleep(2)
                 await msg.nak()
                 raise e
             else:
                 # Successful processing
                 await msg.ack()
+                await self.clean_broker_message(msg)
 
 
 class IngestProcessedConsumer(IngestConsumer):

@@ -537,6 +537,27 @@ class BrokerMessage(google.protobuf.message.Message):
 global___BrokerMessage = BrokerMessage
 
 @typing_extensions.final
+class BrokerMessageBlobReference(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    UUID_FIELD_NUMBER: builtins.int
+    STORAGE_KEY_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    uuid: builtins.str
+    storage_key: builtins.str
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+        uuid: builtins.str = ...,
+        storage_key: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "storage_key", b"storage_key", "uuid", b"uuid"]) -> None: ...
+
+global___BrokerMessageBlobReference = BrokerMessageBlobReference
+
+@typing_extensions.final
 class WriterStatusResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

@@ -148,6 +148,15 @@ pub mod broker_message {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct BrokerMessageBlobReference {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub storage_key: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct WriterStatusResponse {
     #[prost(string, repeated, tag="1")]
     pub knowledgeboxes: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,

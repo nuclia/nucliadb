@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import abc
 import hashlib
+import uuid
 from io import BytesIO
 from typing import (
     Any,
@@ -32,6 +33,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
@@ -53,6 +55,8 @@ STORAGE_FILE_EXTRACTED = "kbs/{kbid}/r/{uuid}/e/{field_type}/{field}/{key}"
 DEADLETTER = "deadletter/{partition}/{seqid}/{seq}"
 OLD_INDEXING_KEY = "index/{node}/{shard}/{txid}"
 INDEXING_KEY = "index/{kb}/{shard}/{resource}/{txid}"
+# temporary storage for large stream data
+MESSAGE_KEY = "message/{kbid}/{rid}/{mid}"
 
 
 class StorageField:
@@ -89,7 +93,7 @@ class StorageField:
     async def delete(self) -> bool:
         deleted = False
         if self.field is not None:
-            await self.storage.delete_upload(self.bucket, self.field.uri)
+            await self.storage.delete_upload(self.field.uri, self.bucket)
             deleted = True
         return deleted
 
@@ -210,11 +214,10 @@ class Storage:
             resource_uid=message.resource.uuid,
             txid=reindex_id,
         )
-        logger.info("Starting to serialize message")
         message_serialized = message.SerializeToString()
-        logger.info("Starting to upload bytes")
+        logger.debug("Starting to upload bytes")
         await self.uploadbytes(self.indexing_bucket, key, message_serialized)
-        logger.info("Finished to upload bytes")
+        logger.debug("Finished to upload bytes")
         response = IndexMessage()
         response.reindex_id = reindex_id
         response.typemessage = TypeMessage.CREATION
@@ -534,3 +537,17 @@ class Storage:
 
     async def schedule_delete_kb(self, kbid: str) -> bool:
         raise NotImplementedError()
+
+    async def set_stream_message(self, kbid: str, rid: str, data: bytes) -> str:
+        key = MESSAGE_KEY.format(kbid=kbid, rid=rid, mid=uuid.uuid4())
+        await self.uploadbytes(cast(str, self.indexing_bucket), key, data)
+        return key
+
+    async def get_stream_message(self, key: str) -> bytes:
+        bytes_buffer = await self.downloadbytes(cast(str, self.indexing_bucket), key)
+        if bytes_buffer.getbuffer().nbytes == 0:
+            raise KeyError(f'Stream message data not found for key "{key}"')
+        return bytes_buffer.read()
+
+    async def del_stream_message(self, key: str) -> None:
+        await self.delete_upload(key, cast(str, self.indexing_bucket))

@@ -121,6 +121,12 @@ message BrokerMessage {
     resources.Extra extra = 37;
 }
 
+message BrokerMessageBlobReference {
+    string kbid = 1;
+    string uuid = 2;
+    string storage_key = 3;
+}
+
 
 message WriterStatusResponse {
     repeated string knowledgeboxes = 1;

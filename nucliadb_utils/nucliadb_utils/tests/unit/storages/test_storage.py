@@ -44,7 +44,7 @@ class TestStorageField:
     @pytest.mark.asyncio
     async def test_delete(self, storage_field: StorageField, storage):
         await storage_field.delete()
-        storage.delete_upload.assert_called_once_with("bucket", "uri")
+        storage.delete_upload.assert_called_once_with("uri", "bucket")
 
     def test_build_cf(self, storage_field: StorageField):
         cf = CloudFile()

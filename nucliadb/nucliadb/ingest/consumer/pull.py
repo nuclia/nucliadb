@@ -22,9 +22,10 @@ import base64
 from typing import List, Optional
 
 import nats
+import nats.errors
 from aiohttp.client_exceptions import ClientConnectorError
 from nats.aio.subscription import Subscription
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb.common.maindb.driver import Driver
@@ -36,7 +37,7 @@ from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_transaction_utility
+from nucliadb_utils.utilities import get_storage, get_transaction_utility
 
 
 class PullWorker:
@@ -74,7 +75,8 @@ class PullWorker:
 
     async def handle_message(self, payload: str) -> None:
         pb = BrokerMessage()
-        pb.ParseFromString(base64.b64decode(payload))
+        data = base64.b64decode(payload)
+        pb.ParseFromString(data)
 
         logger.debug(
             f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}"
@@ -84,12 +86,28 @@ class PullWorker:
             transaction_utility = get_transaction_utility()
             if transaction_utility is None:
                 raise Exception("No transaction utility defined")
-            await transaction_utility.commit(
-                writer=pb,
-                partition=int(self.partition),
-                # send to separate processor
-                target_subject=const.Streams.INGEST_PROCESSED.subject,
-            )
+            try:
+                await transaction_utility.commit(
+                    writer=pb,
+                    partition=int(self.partition),
+                    # send to separate processor
+                    target_subject=const.Streams.INGEST_PROCESSED.subject,
+                )
+            except nats.errors.MaxPayloadError:
+                storage = await get_storage()
+                stored_key = await storage.set_stream_message(
+                    kbid=pb.kbid, rid=pb.uuid, data=data
+                )
+                referenced_pb = BrokerMessageBlobReference(
+                    uuid=pb.uuid, kbid=pb.kbid, storage_key=stored_key
+                )
+                await transaction_utility.commit(
+                    writer=referenced_pb,
+                    partition=int(self.partition),
+                    # send to separate processor
+                    target_subject=const.Streams.INGEST_PROCESSED.subject,
+                    headers={"X-MESSAGE-TYPE": "PROXY"},
+                )
         else:
             # No nats defined == monolitic nucliadb
             await self.processor.process(
