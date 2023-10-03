@@ -21,10 +21,11 @@ use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metric::request_time;
+use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpMetric, GrpcOpValue};
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
 use crate::metrics::metric::tokio_runtime::TokioRuntimeObserver;
 use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
+use crate::metrics::metric::{grpc_ops, request_time};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::{debug, error};
 use crate::NodeResult;
@@ -32,6 +33,7 @@ use crate::NodeResult;
 pub struct PrometheusMeter {
     registry: Registry,
     request_time_metric: RequestTimeMetric,
+    grpc_op_metric: GrpcOpMetric,
     tokio_tasks_observer: TokioTasksObserver,
     tokio_runtime_observer: TokioRuntimeObserver,
 }
@@ -62,6 +64,10 @@ impl Meter for PrometheusMeter {
             .observe(value);
     }
 
+    fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue) {
+        self.grpc_op_metric.get_or_create(&method).observe(value);
+    }
+
     fn task_monitor(&self, task_id: TaskId) -> Option<Monitor> {
         Some(self.tokio_tasks_observer.get_monitor(task_id))
     }
@@ -71,8 +77,8 @@ impl PrometheusMeter {
     pub fn new() -> Self {
         let mut registry = Registry::default();
 
-        // This must be done for every metric
         let request_time_metric = request_time::register_request_time(&mut registry);
+        let grpc_op_metric = grpc_ops::register_grpc_ops(&mut registry);
 
         let prefixed_subregistry = registry.sub_registry_with_prefix("nucliadb_node");
         let tokio_tasks_observer = TokioTasksObserver::new(prefixed_subregistry);
@@ -81,6 +87,7 @@ impl PrometheusMeter {
         Self {
             registry,
             request_time_metric,
+            grpc_op_metric,
             tokio_tasks_observer,
             tokio_runtime_observer,
         }

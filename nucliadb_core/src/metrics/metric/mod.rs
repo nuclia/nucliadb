@@ -24,6 +24,7 @@
 //! - If the metric is called SomeName, a struct 'SomeNameKey' must be defined.
 //! - If the metric is called SomeName, a struct 'SomeNameValue' must be defined.
 
+pub mod grpc_ops;
 pub mod request_time;
 pub mod tokio_runtime;
 pub mod tokio_tasks;

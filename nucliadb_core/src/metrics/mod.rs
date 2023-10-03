@@ -21,13 +21,14 @@ mod meters;
 mod metric;
 mod task_monitor;
 
+pub use metric::{grpc_ops, request_time};
+
 #[cfg(test)]
 mod tests;
 
 use std::sync::Arc;
 
 use lazy_static::lazy_static;
-pub use metric::request_time;
 
 use self::meters::Meter;
 
