@@ -18,18 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metric::request_time;
+use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
+use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
 use crate::NodeResult;
 
 pub struct NoOpMeter;
 impl Meter for NoOpMeter {
+    fn record_request_time(&self, _metric: RequestTimeKey, _value: RequestTimeValue) {}
+
+    fn record_grpc_op(&self, _method: GrpcOpKey, _value: GrpcOpValue) {}
+
     fn export(&self) -> NodeResult<String> {
         Ok(Default::default())
-    }
-    fn record_request_time(
-        &self,
-        _: request_time::RequestTimeKey,
-        _: request_time::RequestTimeValue,
-    ) {
     }
 }

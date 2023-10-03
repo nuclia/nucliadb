@@ -23,16 +23,14 @@ mod prometheus;
 pub use noop::NoOpMeter;
 pub use prometheus::PrometheusMeter;
 
-use crate::metrics::metric::request_time;
+use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
+use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::NodeResult;
 
 pub trait Meter: Send + Sync {
-    fn record_request_time(
-        &self,
-        metric: request_time::RequestTimeKey,
-        value: request_time::RequestTimeValue,
-    );
+    fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue);
+    fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue);
 
     fn export(&self) -> NodeResult<String>;
 

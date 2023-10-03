@@ -166,7 +166,7 @@ impl ShardWriter {
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
-    #[measure(actor = "shard", metric = "writer/new")]
+    #[measure(actor = "shard", metric = "new")]
     pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
@@ -196,7 +196,7 @@ impl ShardWriter {
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
-    #[measure(actor = "shard", metric = "writer/open")]
+    #[measure(actor = "shard", metric = "open")]
     pub fn open(id: String, path: &Path) -> NodeResult<ShardWriter> {
         let metadata_path = path.join(METADATA_FILE);
         let metadata = ShardMetadata::open(&metadata_path)?;
@@ -224,7 +224,7 @@ impl ShardWriter {
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
 
-    #[measure(actor = "shard", metric = "writer/set_resource")]
+    #[measure(actor = "shard", metric = "set_resource")]
     #[tracing::instrument(skip_all)]
     pub fn set_resource(&self, resource: &Resource) -> NodeResult<()> {
         let span = tracing::Span::current();
@@ -296,7 +296,7 @@ impl ShardWriter {
         Ok(())
     }
 
-    #[measure(actor = "shard", metric = "writer/remove_resource")]
+    #[measure(actor = "shard", metric = "remove_resource")]
     #[tracing::instrument(skip_all)]
     pub fn remove_resource(&self, resource: &ResourceId) -> NodeResult<()> {
         let span = tracing::Span::current();
@@ -353,7 +353,7 @@ impl ShardWriter {
         Ok(())
     }
 
-    #[measure(actor = "shard", metric = "writer/get_opstatus")]
+    #[measure(actor = "shard", metric = "get_opstatus")]
     #[tracing::instrument(skip_all)]
     pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
         let span = tracing::Span::current();
