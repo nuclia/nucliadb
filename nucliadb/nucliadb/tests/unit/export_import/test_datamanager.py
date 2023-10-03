@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.export_import.datamanager import _iter_and_add_size_to_cf
+from nucliadb.export_import.datamanager import iter_and_add_size, iter_in_chunk_size
 from nucliadb_protos import resources_pb2
 
 
-async def test_iter_and_add_size_to_cf():
+async def testiter_and_add_size():
     cf = resources_pb2.CloudFile()
 
     async def iter():
@@ -29,7 +29,21 @@ async def test_iter_and_add_size_to_cf():
         yield b"bar"
 
     cf.size = 0
-    async for _ in _iter_and_add_size_to_cf(iter(), cf):
+    async for _ in iter_and_add_size(iter(), cf):
         pass
 
     assert cf.size == 6
+
+
+async def test_iter_in_chunk_size():
+    async def iterable(n):
+        for i in range(n):
+            yield str(i).encode()
+
+    chunks = [chunk async for chunk in iter_in_chunk_size(iterable(10), chunk_size=4)]
+    assert len(chunks[0]) == 4
+    assert len(chunks[1]) == 4
+    assert len(chunks[2]) == 2
+
+    chunks = [chunk async for chunk in iter_in_chunk_size(iterable(0), chunk_size=4)]
+    assert len(chunks) == 0
