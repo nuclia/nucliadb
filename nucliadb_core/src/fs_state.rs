@@ -59,6 +59,9 @@ where
     Ok(())
 }
 
+pub fn try_exclusive_lock(path: &Path) -> FsResult<ELock> {
+    Ok(ELock::try_new(path)?)
+}
 pub fn exclusive_lock(path: &Path) -> FsResult<ELock> {
     Ok(ELock::new(path)?)
 }
@@ -113,6 +116,12 @@ impl Lock {
             .open(path.join(names::LOCK))?;
         Ok(file)
     }
+    fn try_exclusive(path: &Path) -> io::Result<Lock> {
+        let path = path.to_path_buf();
+        let lock = Lock::open_lock(&path)?;
+        lock.try_lock_exclusive()?;
+        Ok(Lock { lock, path })
+    }
     fn exclusive(path: &Path) -> io::Result<Lock> {
         let path = path.to_path_buf();
         let lock = Lock::open_lock(&path)?;
@@ -135,6 +144,9 @@ impl AsRef<Path> for Lock {
 /// A exclusive lock
 pub struct ELock(Lock);
 impl ELock {
+    pub(super) fn try_new(path: &Path) -> io::Result<ELock> {
+        Lock::try_exclusive(path).map(ELock)
+    }
     pub(super) fn new(path: &Path) -> io::Result<ELock> {
         Lock::exclusive(path).map(ELock)
     }

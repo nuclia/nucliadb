@@ -323,7 +323,7 @@ impl WriterChild for VectorWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
 
-        let lock = self.index.get_elock()?;
+        let lock = self.index.try_elock()?;
         self.index.collect_garbage(&lock)?;
 
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);

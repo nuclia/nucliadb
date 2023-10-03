@@ -130,6 +130,7 @@ class ShardManager:
             self._change_count = 0
             try:
                 with gc_observer():
+                    # NOTE: garbage collector may not run if the shard is busy. We currently don't do anything to retry.
                     await self._writer.garbage_collector(self._shard_id)
                     logger.info(
                         "Garbage collection finished", extra={"shard": self._shard_id}
