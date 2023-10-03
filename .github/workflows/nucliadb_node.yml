@@ -198,17 +198,6 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq
 
-      - name: Install rust binding for testing
-        env:
-          SECRET_KEY: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
-          COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
-          BRANCH: ${{ steps.git.outputs.branch }}
-          MATURIN: "true"
-        run: |
-          ./scripts/download-build.sh && pip install builds/wheels/*_x86_64.whl || (
-            echo "Failed building from the build server." && maturin build -m nucliadb_node_binding/Cargo.toml && pip install target/wheels/*_x86_64.whl
-          )
-
       - uses: dorny/paths-filter@v2
         id: filter
         with:

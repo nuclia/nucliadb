@@ -15,6 +15,10 @@ concurrency:
 jobs:
   pre-checks:
     name: NucliaDBModelsTests
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
     uses: ./.github/workflows/_component_prechecks.yml
     with:
+      python_version: "${{ matrix.python-version }}"
       component: "nucliadb_models"

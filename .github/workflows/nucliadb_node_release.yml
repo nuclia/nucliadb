@@ -48,23 +48,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos, windows]
+        os: [ubuntu, macos]
         target: [x86_64, aarch64]
         manylinux: [auto]
         include:
           - os: ubuntu
             platform: linux
-          - os: windows
-            ls: dir
-            interpreter: 3.8 3.9 3.10 3.11
-          # - os: windows
-          #   ls: dir
-          #   target: i686
-          #   python-architecture: x86
-          #   interpreter: 3.8 3.9 3.10
           - os: macos
             target: aarch64
-            interpreter: 3.8 3.9 3.10 3.11
+            interpreter: 3.9 3.10 3.11
           # - os: ubuntu
           #   platform: linux
           #   target: i686
@@ -74,11 +66,6 @@ jobs:
             platform: linux
             target: aarch64
             container: messense/manylinux_2_24-cross:aarch64
-          # - os: ubuntu
-          #   platform: linux
-          #   target: armv7
-          #   container: messense/manylinux_2_24-cross:armv7
-          #   interpreter: 3.8 3.9 3.10 3.11
           # musllinux
           - os: ubuntu
             platform: linux
@@ -88,10 +75,6 @@ jobs:
             platform: linux
             target: aarch64
             manylinux: musllinux_1_1
-        exclude:
-          # Windows on arm64 only supports Python 3.11+
-          - os: windows
-            target: aarch64
 
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -110,7 +93,6 @@ jobs:
       - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
       - name: Check system deps
-        if: ${{ matrix.os != 'windows' }}
         run: make -C nucliadb check-system
 
       - name: build sdist
@@ -130,7 +112,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --interpreter ${{ matrix.interpreter || '3.8 3.9 3.10 3.11 pypy3.8 pypy3.9' }}
+          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel --interpreter ${{ matrix.interpreter || '3.9 3.10 3.11' }}
           rust-toolchain: stable
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/

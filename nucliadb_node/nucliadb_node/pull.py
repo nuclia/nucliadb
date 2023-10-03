@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import time
 from typing import List, Optional
 
 import nats
@@ -80,7 +81,7 @@ gc_observer = metrics.Observer(
 
 
 class ShardManager:
-    schedule_delay_seconds = 5.0
+    schedule_delay_seconds = 30.0
 
     def __init__(self, shard_id: str, writer: Writer, gc_lock: asyncio.Semaphore):
         self.lock = asyncio.Lock()  # write lock for this shard
@@ -129,7 +130,11 @@ class ShardManager:
             self._change_count = 0
             try:
                 with gc_observer():
+                    # NOTE: garbage collector may not run if the shard is busy. We currently don't do anything to retry.
                     await self._writer.garbage_collector(self._shard_id)
+                    logger.info(
+                        "Garbage collection finished", extra={"shard": self._shard_id}
+                    )
             except Exception:
                 logger.exception(
                     "Could not garbage collect", extra={"shard": self._shard_id}
@@ -283,9 +288,6 @@ class Worker:
         subject = msg.subject
         reply = msg.reply
         seqid = int(msg.reply.split(".")[5])
-        logger.info(
-            f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
-        )
         if self.last_seqid and self.last_seqid >= seqid:
             logger.warning(
                 f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
@@ -295,8 +297,20 @@ class Worker:
 
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
+        logger.info(
+            "Message received",
+            extra={
+                "shard": pb.shard,
+                "subject": subject,
+                "reply": reply,
+                "seqid": seqid,
+                "storage_key": pb.storage_key,
+            },
+        )
+
         status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
+        start = time.time()
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), sm.lock:
@@ -351,6 +365,15 @@ class Worker:
                 f"An error on subscription_worker. Check sentry for more details."
             )
             raise e
+        else:
+            logger.info(
+                "Message finished",
+                extra={
+                    "shard": pb.shard,
+                    "storage_key": pb.storage_key,
+                    "time": time.time() - start,
+                },
+            )
 
     async def subscribe(self):
         logger.info(f"Last seqid {self.last_seqid}")

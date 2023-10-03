@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+import os
 
 import pkg_resources
 import pydantic_argparse
@@ -67,6 +68,13 @@ def run():
     settings = setup()
     app, server = get_server(settings)
     instrument_app(app, excluded_urls=["/"], metrics=True)
+
+    if settings.fork:  # pragma: no cover
+        pid = os.fork()
+        if pid != 0:
+            logger.warning(f"Server forked and running on pid {pid}.")
+            return
+
     logger.warning(
         f"======= Starting server on http://0.0.0.0:{settings.http_port}/ ======"
     )
