@@ -56,18 +56,18 @@ class Streams:
         Exporting kbs
         """
 
-        name = "nucliadb-exports"
-        subject = "ndb.exports"
-        group = "nucliadb-exports"
+        name = "ndb-exports"
+        subject = "ndb-exports"
+        group = "ndb-exports"
 
     class KB_IMPORTS:
         """
         Importing kbs
         """
 
-        name = "nucliadb-imports"
-        subject = "ndb.imports"
-        group = "nucliadb-imports"
+        name = "ndb-imports"
+        subject = "ndb-imports"
+        group = "ndb-imports"
 
 
 class Features:
