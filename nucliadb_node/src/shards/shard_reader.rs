@@ -94,7 +94,7 @@ impl ShardReader {
         }
     }
 
-    #[measure(actor = "shard", metric = "reader/get_info")]
+    #[measure(actor = "shard", metric = "get_info")]
     #[tracing::instrument(skip_all)]
     pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
         let span = tracing::Span::current();
@@ -161,7 +161,7 @@ impl ShardReader {
         self.relation_reader.get_node_types()
     }
 
-    #[measure(actor = "shard", metric = "reader/new")]
+    #[measure(actor = "shard", metric = "new")]
     #[tracing::instrument(skip_all)]
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReader> {
         let span = tracing::Span::current();
@@ -253,7 +253,7 @@ impl ShardReader {
         prefixes
     }
 
-    #[measure(actor = "shard", metric = "reader/suggest")]
+    #[measure(actor = "shard", metric = "suggest")]
     #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> NodeResult<SuggestResponse> {
         let span = tracing::Span::current();
