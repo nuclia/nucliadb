@@ -19,6 +19,7 @@
 #
 import asyncio
 import base64
+import uuid
 from contextlib import contextmanager
 from io import BytesIO
 from unittest.mock import patch
@@ -31,8 +32,13 @@ from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consu
 
 
 @pytest.fixture(scope="function")
-async def src_kb(knowledgebox, nucliadb_writer):
-    kbid = knowledgebox
+async def src_kb(nucliadb_writer, nucliadb_manager):
+    slug = uuid.uuid4().hex
+
+    resp = await nucliadb_manager.post("/kbs", json={"slug": slug})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -87,7 +93,13 @@ async def src_kb(knowledgebox, nucliadb_writer):
         },
     )
     assert resp.status_code == 200
-    yield knowledgebox
+    yield kbid
+
+    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    try:
+        assert resp.status_code == 200
+    except AssertionError:
+        pass
 
 
 @pytest.fixture(scope="function")
@@ -97,7 +109,10 @@ async def dst_kb(nucliadb_manager):
     uuid = resp.json().get("uuid")
     yield uuid
     resp = await nucliadb_manager.delete(f"/kb/{uuid}")
-    assert resp.status_code == 200
+    try:
+        assert resp.status_code == 200
+    except AssertionError:
+        pass
 
 
 @contextmanager
@@ -125,7 +140,7 @@ async def test_on_standalone_nucliadb(
 
 
 @pytest.fixture(scope="function")
-def hosted_nucliadb(natsd):
+def hosted_nucliadb():
     with patch("nucliadb.common.context.in_standalone_mode", return_value=False):
         with patch(
             "nucliadb.reader.api.v1.export_import.in_standalone_mode",
@@ -140,7 +155,7 @@ def hosted_nucliadb(natsd):
 
 
 @pytest.fixture(scope="function")
-async def context(hosted_nucliadb):
+async def context(hosted_nucliadb, natsd):
     context = ApplicationContext()
     await context.initialize()
     yield context

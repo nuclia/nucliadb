@@ -34,6 +34,7 @@ from nucliadb.export_import.models import (
 )
 from nucliadb.export_import.tasks import get_exports_producer, get_imports_producer
 from nucliadb.export_import.utils import IteratorExportStream
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.export_import import (
@@ -51,10 +52,11 @@ from nucliadb_utils.authentication import requires_one
     status_code=200,
     name="Start an export of a Knowledge Box",
     tags=["Knowledge Boxes"],
+    response_model=CreateExportResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_export_endpoint(request: Request, kbid: str) -> CreateExportResponse:
+async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     export_id = uuid4().hex
     if in_standalone_mode():
@@ -71,10 +73,11 @@ async def start_kb_export_endpoint(request: Request, kbid: str) -> CreateExportR
     status_code=200,
     name="Start an import to a Knowledge Box",
     tags=["Knowledge Boxes"],
+    response_model=CreateImportResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_import_endpoint(request: Request, kbid: str) -> CreateImportResponse:
+async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     import_id = uuid4().hex
     if in_standalone_mode():
@@ -88,6 +91,10 @@ async def start_kb_import_endpoint(request: Request, kbid: str) -> CreateImportR
         )
         return CreateImportResponse(import_id=import_id)
     else:
+        content_length = int(request.headers.get("Content-Length", "0"))
+        if content_length == 0:
+            return HTTPClientError(status_code=412, detail="Empty request content")
+
         # TODO: Implement range/resumable uploads to better suppor big exports.
         await upload_import_to_blob_storage(
             context=context,
