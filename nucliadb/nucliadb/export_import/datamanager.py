@@ -91,7 +91,7 @@ class ExportImportDataManager:
         cf.content_type = "binary/octet-stream"
         cf.source = resources_pb2.CloudFile.Source.EXPORT
         field: StorageField = self._get_storage_field(kbid, key, cf)
-        iterator = _iter_and_add_size_to_cf(export_bytes, cf)
+        iterator = iterate_storage_compatible(export_bytes, self.storage, cf)
         await self.storage.uploaditerator(iterator, field, cf)
 
     async def download_export(
@@ -113,7 +113,7 @@ class ExportImportDataManager:
         cf.bucket_name = self.storage.get_bucket_name(kbid)
         cf.content_type = "binary/octet-stream"
         field: StorageField = self._get_storage_field(kbid, key, cf)
-        iterator = _iter_and_add_size_to_cf(import_bytes, cf)
+        iterator = iterate_storage_compatible(import_bytes, self.storage, cf)
         await self.storage.uploaditerator(iterator, field, cf)
 
     async def download_import(self, kbid: str, import_id: str):
@@ -131,7 +131,7 @@ class ExportImportDataManager:
         )
 
 
-async def _iter_and_add_size_to_cf(
+async def iter_and_add_size(
     stream: AsyncGenerator[bytes, None], cf: resources_pb2.CloudFile
 ) -> AsyncGenerator[bytes, None]:
     # This is needed to upload exports to GCS because it requires the size of
@@ -141,4 +141,28 @@ async def _iter_and_add_size_to_cf(
         total_size += len(chunk)
         if is_last:
             cf.size = total_size
+        yield chunk
+
+
+async def iter_in_chunk_size(
+    stream: AsyncGenerator[bytes, None], chunk_size: int
+) -> AsyncGenerator[bytes, None]:
+    # This is needed to make sure bytes uploaded to the blob storage complies with a particular chunk size.
+    buffer = b""
+    async for chunk in stream:
+        buffer += chunk
+        if len(buffer) >= chunk_size:
+            yield buffer[:chunk_size]
+            buffer = buffer[chunk_size:]
+    # The last chunk can be smaller than chunk size
+    if len(buffer) > 0:
+        yield buffer
+
+
+async def iterate_storage_compatible(
+    stream: AsyncGenerator[bytes, None], storage: Storage, cf: resources_pb2.CloudFile
+) -> AsyncGenerator[bytes, None]:
+    async for chunk in iter_in_chunk_size(
+        iter_and_add_size(stream, cf), chunk_size=storage.chunk_size
+    ):
         yield chunk
