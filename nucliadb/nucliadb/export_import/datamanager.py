@@ -23,6 +23,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import.exceptions import MetadataNotFound
 from nucliadb.export_import.models import ExportMetadata, ImportMetadata
 from nucliadb_protos import resources_pb2
+from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 MAINDB_EXPORT_KEY = "/kbs/{kbid}/exports/{id}"
@@ -141,25 +142,3 @@ async def _iter_and_add_size_to_cf(
         if is_last:
             cf.size = total_size
         yield chunk
-
-
-async def async_gen_lookahead(
-    stream: AsyncGenerator[bytes, None]
-) -> AsyncGenerator[tuple[bytes, bool], None]:
-    """Async generator that yields the next chunk and whether it's the last one.
-    Empty chunks are ignored.
-    """
-    buffered_chunk = None
-    async for chunk in stream:
-        if buffered_chunk is None:
-            # Buffer the first chunk
-            buffered_chunk = chunk
-            continue
-
-        # Yield the previous chunk and buffer the current one
-        yield buffered_chunk, False
-        buffered_chunk = chunk
-
-    # Yield the last chunk if there is one
-    if buffered_chunk is not None:
-        yield buffered_chunk, True
