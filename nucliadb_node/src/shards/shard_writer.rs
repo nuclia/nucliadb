@@ -149,7 +149,6 @@ impl ShardWriter {
 
         let psc = ParagraphConfig {
             path: path.join(PARAGRAPHS_DIR),
-            num_threads: num_cpus::get(),
         };
 
         let channel = metadata.channel.unwrap_or_default();
@@ -174,7 +173,6 @@ impl ShardWriter {
 
         let psc = ParagraphConfig {
             path: path.join(PARAGRAPHS_DIR),
-            num_threads: num_cpus::get(),
         };
 
         let channel = metadata.channel.unwrap_or_default();
@@ -206,7 +204,6 @@ impl ShardWriter {
 
         let psc = ParagraphConfig {
             path: path.join(PARAGRAPHS_DIR),
-            num_threads: num_cpus::get(),
         };
 
         let channel = metadata.channel.unwrap_or_default();
