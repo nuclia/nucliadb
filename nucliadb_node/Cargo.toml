@@ -6,7 +6,7 @@ authors = ["NucliaDB <nucliadb@nuclia.com>"]
 license = 'AGPL-3.0-or-later'
 description = "Node of nucliadb"
 repository = "https://github.com/nuclia/nucliadb"
-homepage = "https://nuclia.com/"
+homepage = "https://nuclia.com"
 documentation = "https://nuclia.com"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
