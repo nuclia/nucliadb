@@ -117,6 +117,27 @@ class IngestConsumer:
     async def _process(self, pb: BrokerMessage, seqid: int):
         await self.processor.process(pb, seqid, self.partition)
 
+    async def get_broker_message(self, msg: Msg) -> BrokerMessage:
+        pb_data = msg.data
+        if msg.headers is not None and msg.headers.get("X-MESSAGE-TYPE") == "PROXY":
+            # this is a message that is referencing a blob because
+            # it was too big to be sent through NATS
+            ref_pb = BrokerMessageBlobReference()
+            ref_pb.ParseFromString(pb_data)
+            pb_data = await self.storage.get_stream_message(ref_pb.storage_key)
+        pb = BrokerMessage()
+        pb.ParseFromString(pb_data)
+        return pb
+
+    async def clean_broker_message(self, msg: Msg) -> None:
+        if msg.headers is not None and msg.headers.get("X-MESSAGE-TYPE") == "PROXY":
+            ref_pb = BrokerMessageBlobReference()
+            ref_pb.ParseFromString(msg.data)
+            try:
+                await self.storage.del_stream_message(ref_pb.storage_key)
+            except Exception:  # pragma: no cover
+                logger.warning("Could not delete blob reference", exc_info=True)
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -126,24 +147,12 @@ class IngestConsumer:
         )
         message_source = "<msg source not set>"
         start = time.monotonic()
-        ref_pb = None
 
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), self.lock:
             try:
-                pb_data = msg.data
-                if (
-                    msg.headers is not None
-                    and msg.headers.get("X-MESSAGE-TYPE") == "PROXY"
-                ):
-                    # this is a message that is referencing a blob because
-                    # it was too big to be sent through NATS
-                    ref_pb = BrokerMessageBlobReference()
-                    ref_pb.ParseFromString(pb_data)
-                    pb_data = await self.storage.get_stream_message(ref_pb.storage_key)
-                pb = BrokerMessage()
-                pb.ParseFromString(pb_data)
+                pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
                     message_source = "processing"
                 elif pb.source == pb.MessageSource.WRITER:
@@ -222,12 +231,7 @@ class IngestConsumer:
             else:
                 # Successful processing
                 await msg.ack()
-                if ref_pb is not None:
-                    # If this was a message that was referencing a blob, we need to remove it
-                    try:
-                        await self.storage.del_stream_message(ref_pb.storage_key)
-                    except Exception:  # pragma: no cover
-                        logger.warning("Could not delete blob reference", exc_info=True)
+                await self.clean_broker_message(msg)
 
 
 class IngestProcessedConsumer(IngestConsumer):
