@@ -229,6 +229,9 @@ class ResourceSearchResults(BaseModel):
     nodes: Optional[List[Tuple[str, str, str]]] = None
     shards: Optional[List[str]] = None
 
+    def __str__(self):
+        return self.json()
+
 
 class KnowledgeboxSearchResults(BaseModel):
     """Search on knowledgebox results"""
@@ -242,6 +245,9 @@ class KnowledgeboxSearchResults(BaseModel):
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
+    def __str__(self):
+        return self.json()
+
 
 class KnowledgeboxSuggestResults(BaseModel):
     """Suggest on resource results"""
@@ -249,6 +255,9 @@ class KnowledgeboxSuggestResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     entities: Optional[RelatedEntities] = None
     shards: Optional[List[str]] = None
+
+    def __str__(self):
+        return self.json()
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -789,6 +798,9 @@ class KnowledgeboxFindResults(BaseModel):
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
+
+    def __str__(self):
+        return self.json()
 
 
 class FeedbackTasks(str, Enum):
