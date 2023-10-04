@@ -27,8 +27,8 @@ use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
-    StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
-    VectorSearchResponse,
+    ShardFileChunk, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse, TypeList,
+    VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
@@ -42,6 +42,22 @@ use crate::telemetry::run_with_telemetry;
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 
+pub struct ShardFileChunkIterator(Box<dyn Iterator<Item = ShardFileChunk> + Send>);
+impl ShardFileChunkIterator {
+    pub fn new<I>(inner: I) -> ShardFileChunkIterator
+    where
+        I: Iterator<Item = ShardFileChunk> + Send + 'static,
+    {
+        ShardFileChunkIterator(Box::new(inner))
+    }
+}
+impl Iterator for ShardFileChunkIterator {
+    type Item = ShardFileChunk;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
 #[derive(Debug)]
 pub struct ShardReader {
     pub id: String,
@@ -50,6 +66,7 @@ pub struct ShardReader {
     paragraph_reader: ParagraphsReaderPointer,
     vector_reader: VectorsReaderPointer,
     relation_reader: RelationsReaderPointer,
+    file_reader: FilesReaderPointer,
     document_service_version: i32,
     paragraph_service_version: i32,
     vector_service_version: i32,
@@ -459,7 +476,7 @@ impl ShardReader {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn paragraph_iterator(&self, request: StreamRequest) -> NodeResult<ParagraphIterator> {
+    pub fn paragraph_iterator(&self, request: StreamRequest) -> NodeResult<ShardFileChunkIterator> {
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "paragraph iteration"), || {
             self.paragraph_reader.iterator(&request)
@@ -471,6 +488,17 @@ impl ShardReader {
         let span = tracing::Span::current();
         run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
             self.text_reader.iterator(&request)
+        })
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn download_file_iterator(
+        &self,
+        request: StreamRequest,
+    ) -> NodeResult<ShardFileChunkIterator> {
+        let span = tracing::Span::current();
+        run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
+            self.file_reader.iterator(&request)
         })
     }
 

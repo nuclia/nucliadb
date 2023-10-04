@@ -432,6 +432,29 @@ message StreamRequest {
     StreamFilter filter = 4;
 }
 
+message GetShardFilesRequest {
+    string id = 1;
+}
+
+message ShardFileList {
+  repeated ShardFile files = 2;
+}
+
+message ShardFile {
+    string relative_path = 1;
+    uint64 size = 2;
+}
+
+message DownloadShardFileRequest {
+    string id = 1;
+    string relative_path = 2;
+}
+
+message ShardFileChunk {
+    bytes chunk_data = 1;
+    int32 chunk_index = 2;
+}
+
 // Implemented at nucliadb_object_storage
 
 service NodeReader {
@@ -455,4 +478,8 @@ service NodeReader {
     // Streams
     rpc Paragraphs(StreamRequest) returns (stream ParagraphItem) {}
     rpc Documents(StreamRequest) returns (stream DocumentItem) {}
+
+    // Shard Download
+    rpc GetShardFiles(GetShardFilesRequest) returns (ShardFileList) {};
+    rpc DownloadShardFile(DownloadShardFileRequest) returns (stream ShardFileChunk) {};
 }
