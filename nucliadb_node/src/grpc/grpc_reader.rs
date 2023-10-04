@@ -112,7 +112,7 @@ impl futures_core::Stream for GrpcStreaming<ShardFileChunkIterator> {
 impl NodeReader for NodeReaderGRPCDriver {
     type ParagraphsStream = GrpcStreaming<ParagraphIterator>;
     type DocumentsStream = GrpcStreaming<DocumentIterator>;
-    type ShardFileChunksStream = GrpcStreaming<ShardFileChunkIterator>;
+    type DownloadShardFileStream = GrpcStreaming<ShardFileChunkIterator>;
 
     async fn paragraphs(
         &self,
@@ -412,13 +412,14 @@ impl NodeReader for NodeReaderGRPCDriver {
     async fn download_shard_file(
         &self,
         request: tonic::Request<DownloadShardFileRequest>,
-    ) -> Result<tonic::Response<Self::ShardFileChunksStream>, tonic::Status> {
+    ) -> Result<tonic::Response<Self::DownloadShardFileStream>, tonic::Status> {
         let span = Span::current();
-        let shard_id = request.into_inner().id;
-        let path = request.into_inner().relative_path;
+        let request = request.into_inner();
+        let shard_id = request.id;
+        let path = request.relative_path;
         let shard = self.obtain_shard(shard_id.clone()).await?;
         let info = info_span!(parent: &span, "document ids");
-        match shard.download_file_iterator(request) {
+        match shard.download_file_iterator(path) {
             Ok(iterator) => Ok(tonic::Response::new(GrpcStreaming(iterator))),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
