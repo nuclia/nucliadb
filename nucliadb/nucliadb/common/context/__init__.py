@@ -84,11 +84,11 @@ class ApplicationContext:
         if not self._initialized:
             return
 
+        await stop_nats_manager()
         await teardown_driver()
         await teardown_cluster()
         await self.blob_storage.finalize()
         await stop_indexing_utility()
-        await stop_nats_manager()
         await stop_transaction_utility()
         stop_partitioning_utility()
         clean_utility(Utility.STORAGE)

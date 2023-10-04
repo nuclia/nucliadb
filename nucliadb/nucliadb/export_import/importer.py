@@ -66,6 +66,8 @@ async def import_kb(
         if item_type == ExportedItemType.RESOURCE:
             bm = cast(writer_pb2.BrokerMessage, data)
             await import_broker_message(context, kbid, bm)
+            if metadata:
+                metadata.processed += 1
 
         elif item_type == ExportedItemType.BINARY:
             cf = cast(resources_pb2.CloudFile, data[0])
@@ -85,9 +87,13 @@ async def import_kb(
             continue
 
         if metadata and count % 10 == 0:
-            # Update metadata every 10 items
+            # Save checkpoint in metadata every 10 items
             metadata.read_bytes = stream_reader.read_bytes
             await dm.set_metadata("import", metadata)
+
+    if metadata:
+        metadata.read_bytes = stream_reader.read_bytes
+        await dm.set_metadata("import", metadata)
 
 
 async def import_kb_from_blob_storage(
