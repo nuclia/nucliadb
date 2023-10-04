@@ -105,9 +105,9 @@ async fn start_writer(addr: SocketAddr) {
 
     tokio::spawn(async move {
         let settings = SETTINGS.clone();
-        let sender = lifecycle::initialize_writer(&data_path, &shards_path)
+        lifecycle::initialize_writer(&data_path, &shards_path)
             .expect("Writer initialization has failed");
-        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(settings, sender));
+        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(settings));
         Server::builder()
             .add_service(writer_server)
             .serve(addr)
