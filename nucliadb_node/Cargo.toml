@@ -86,6 +86,7 @@ opentelemetry-zipkin = "0.15.0"
 sentry-tracing = "0.27.0"
 crossbeam = "0.8.2"
 lazy_static = "1.4.0"
+tracing-core = "0.1.31"
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }
 
@@ -124,12 +125,6 @@ uuid = { version = "1.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 serial_test = "2.0.0"
 
 
-<<<<<<< HEAD
-lazy_static = "1.4.0"
-=======
-
->>>>>>> 594da1de (rebase)
 tempfile = "3.2.0"
 regex = "1.5.5"
 openssl = { version = "0.10.57", features = ["vendored"] }
-openssl = { version = "0.10", features = ["vendored"] }
