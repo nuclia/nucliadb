@@ -237,14 +237,14 @@ class ExportStream:
     def __init__(self, export: BytesIO):
         self.export = export
         self.read_bytes = 0
-        self.length = len(export.getvalue())
+        self._length = len(export.getvalue())
 
     async def read(self, n_bytes):
         """
         Reads n_bytes from the export stream.
         Raises ExportStreamExhausted if there are no more bytes to read.
         """
-        if self.read_bytes >= self.length:
+        if self.read_bytes == self._length:
             raise ExportStreamExhausted()
         chunk = self.export.read(n_bytes)
         self.read_bytes += len(chunk)
@@ -259,10 +259,12 @@ class IteratorExportStream(ExportStream):
     def __init__(self, iterator: AsyncIterator[bytes]):
         self.iterator = iterator
         self.buffer = b""
+        self.read_bytes = 0
 
     def _read_from_buffer(self, n_bytes: int) -> bytes:
         value = self.buffer[:n_bytes]
         self.buffer = self.buffer[n_bytes:]
+        self.read_bytes += len(value)
         return value
 
     async def read(self, n_bytes: int) -> bytes:

@@ -25,6 +25,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 from nucliadb.export_import.exceptions import ExportStreamExhausted
+from nucliadb.export_import.importer import ExportStream
 from nucliadb.export_import.models import ImportMetadata
 from nucliadb.export_import.utils import (
     IteratorExportStream,
@@ -147,6 +148,22 @@ def test_get_cloud_files(broker_message):
         assert cf.source == resources_pb2.CloudFile.Source.EXPORT
 
 
+async def test_export_stream():
+    export = BytesIO(b"1234567890")
+    stream = ExportStream(export)
+    assert stream.read_bytes == 0
+    assert await stream.read(0) == b""
+    assert stream.read_bytes == 0
+    assert await stream.read(1) == b"1"
+    assert stream.read_bytes == 1
+    assert await stream.read(2) == b"23"
+    assert stream.read_bytes == 3
+    assert await stream.read(50) == b"4567890"
+    assert stream.read_bytes == 10
+    with pytest.raises(ExportStreamExhausted):
+        await stream.read(1)
+
+
 class TestRequest(Request):
     def __init__(self, data: bytes, receive_chunk_size: int = 10):
         super().__init__(
@@ -169,17 +186,20 @@ class TestRequest(Request):
         return {"type": "http.request", "body": chunk, "more_body": more_data}
 
 
-async def test_export_stream():
+async def test_iterator_export_stream():
     request = TestRequest(data=b"01234XYZ", receive_chunk_size=2)
 
     iterator = request.stream().__aiter__()
     export_stream = IteratorExportStream(iterator)
     assert await export_stream.read(0) == b""
+    assert export_stream.read_bytes == 0
 
     for i in range(5):
         assert await export_stream.read(1) == f"{i}".encode()
+    assert export_stream.read_bytes == 5
 
     assert await export_stream.read(3) == b"XYZ"
+    assert export_stream.read_bytes == 8
 
     with pytest.raises(ExportStreamExhausted):
         await export_stream.read(1)
@@ -191,6 +211,8 @@ async def test_export_stream():
     iterator = request.stream().__aiter__()
     export_stream = IteratorExportStream(iterator)
     assert await export_stream.read(50) == b"foobar"
+    assert export_stream.read_bytes == 6
+
     with pytest.raises(ExportStreamExhausted):
         await export_stream.read(0)
 
