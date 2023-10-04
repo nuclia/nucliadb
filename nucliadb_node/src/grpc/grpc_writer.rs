@@ -213,9 +213,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             })?;
         match status {
             Ok(mut status) => {
+                tokio::task::spawn_blocking(merge_task);
                 status.status = 0;
                 status.detail = "Success!".to_string();
-                tokio::task::spawn_blocking(merge_task);
                 Ok(tonic::Response::new(status))
             }
             Err(error) => {
@@ -255,9 +255,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             })?;
         match status {
             Ok(mut status) => {
+                tokio::task::spawn_blocking(merge_task);
                 status.status = 0;
                 status.detail = "Success!".to_string();
-                tokio::task::spawn_blocking(merge_task);
                 Ok(tonic::Response::new(status))
             }
             Err(error) => {
