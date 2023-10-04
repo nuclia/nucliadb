@@ -49,11 +49,7 @@ jobs:
 
       - name: Install tikv
         if: matrix.maindb_driver == 'tikv'
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
-          source /home/runner/.profile
-          tiup playground 5.3.1 --mode tikv-slim --without-monitor &
-          ./scripts/wait-for-service.sh 2379
+        run: ./scripts/run-tikv.sh
 
       - uses: dorny/paths-filter@v2
         id: filter
@@ -66,11 +62,11 @@ jobs:
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
 
-      -  name: Calc git info
-         id: git
-         run: |-
-            BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+      - name: Calc git info
+        id: git
+        run: |-
+          BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
