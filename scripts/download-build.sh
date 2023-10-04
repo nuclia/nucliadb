@@ -21,6 +21,7 @@ fi
 TEST=${TEST:-false}
 RELEASE=${RELEASE:-false}
 MATURIN=${MATURIN:-false}
+ENV=${ENV:-\{\}}
 
 echo "Building: $BRANCH $COMMIT_HASH -- test: $TEST"
 
@@ -31,7 +32,15 @@ json_data=$(curl -f "$BUILD_SERVER_URL/build" \
     --retry-delay 1 \
     -H "X-Secret-Key:$SECRET_KEY" \
     -H 'content-type: application/json' \
-    --data "{\"git_url\": \"https://github.com/nuclia/nucliadb.git\",\"branch\": \"$BRANCH\",\"commit_hash\": \"$COMMIT_HASH\",\"release\": $RELEASE, \"test\": $TEST, \"maturin\": $MATURIN, \"cargo_file\": \"nucliadb_node_binding/Cargo.toml\"}")
+    --data "{
+        \"git_url\": \"https://github.com/nuclia/nucliadb.git\",
+        \"branch\": \"$BRANCH\",
+        \"commit_hash\": \"$COMMIT_HASH\",
+        \"release\": $RELEASE,
+        \"test\": $TEST,
+        \"maturin\": $MATURIN,
+        \"env\": $ENV,
+        \"cargo_file\": \"nucliadb_node_binding/Cargo.toml\"}")
 
 echo "JSON data:"
 echo $json_data

@@ -66,13 +66,24 @@ jobs:
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
 
-      - uses: Swatinem/rust-cache@v2
+      -  name: Calc git info
+         id: git
+         run: |-
+            BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'
+        env:
+          SECRET_KEY: ${{ secrets.RUST_BUILD_SERVER_SECRET }}
+          COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
+          BRANCH: ${{ steps.git.outputs.branch }}
+          MATURIN: "true"
+          ENV: '{"RUSTFLAGS": "--cfg tokio_unstable"}'
         run: |
-          make build-node-binding-debug
-          pip install target/wheels/*_x86_64.whl
+          ./scripts/download-build.sh && pip install builds/wheels/*_x86_64.whl || (
+            echo "Failed building from the build server." && make build-node-binding-debug
+          )
 
       - name: Run tests
         # These tests can be flaky, let's retry them...
