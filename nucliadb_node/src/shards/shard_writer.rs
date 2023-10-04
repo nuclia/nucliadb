@@ -478,23 +478,23 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<()> {
-        let writes_performed = self.writes_since_merge.load(Ordering::SeqCst);
-        if writes_performed >= MERGE_THRESHOLD {
-            // TODO: add relations merge when it becomes a Tantivy only index.
-            paragraph_write(&self.paragraph_writer).merge()?;
-            text_write(&self.text_writer).merge()?;
-            vector_write(&self.vector_writer).merge()?;
-
-            // After merging GC is applied
-            // TODO: add relations gc when it becomes a Tantivy only index.
-            paragraph_write(&self.paragraph_writer).garbage_collection()?;
-            text_write(&self.text_writer).garbage_collection()?;
-            vector_write(&self.vector_writer).garbage_collection()?;
-
-            // Updating the write counter.
+        let writes_performed = self.writes_since_merge.swap(0, Ordering::SeqCst);
+        if writes_performed < MERGE_THRESHOLD {
             self.writes_since_merge
-                .fetch_sub(writes_performed, Ordering::SeqCst);
+                .fetch_add(writes_performed, Ordering::SeqCst);
+            return Ok(());
         }
+
+        // TODO: add relations merge when it becomes a Tantivy only index.
+        paragraph_write(&self.paragraph_writer).merge()?;
+        text_write(&self.text_writer).merge()?;
+        vector_write(&self.vector_writer).merge()?;
+
+        // After merging GC is applied
+        // TODO: add relations gc when it becomes a Tantivy only index.
+        paragraph_write(&self.paragraph_writer).garbage_collection()?;
+        text_write(&self.text_writer).garbage_collection()?;
+        vector_write(&self.vector_writer).garbage_collection()?;
         Ok(())
     }
 
