@@ -120,7 +120,7 @@ class NatsTaskConsumer:
                     },
                 )
                 # Nak the message to retry
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
                 await msg.nak()
             else:
                 logger.info(
