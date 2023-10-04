@@ -244,7 +244,7 @@ class ExportStream:
         Reads n_bytes from the export stream.
         Raises ExportStreamExhausted if there are no more bytes to read.
         """
-        if self.read_bytes >= self._length:
+        if self.read_bytes == self._length:
             raise ExportStreamExhausted()
         chunk = self.export.read(n_bytes)
         self.read_bytes += len(chunk)
