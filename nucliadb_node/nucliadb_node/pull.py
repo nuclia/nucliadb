@@ -101,7 +101,6 @@ class Worker:
         self.storage = await get_storage(service_name=SERVICE_NAME)
         await self.publisher.initialize()
         await self.subscriber_initialize()
-        await self.garbage_collect_all()
 
     async def finalize(self):
         await self.publisher.finalize()
