@@ -514,7 +514,7 @@ message FieldID {
     string field = 2;
 }
 
-// This message is used to store a list of all field ids of a particular 
+// This message is used to store a list of all field ids of a particular
 // resource. Note that title and summary fields are not included.
 message AllFieldIDs {
     repeated FieldID fields = 1;

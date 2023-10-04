@@ -64,7 +64,7 @@ message FacetResults {
 message DocumentSearchRequest {
     string id = 1;
     string body = 2;
-    
+
     repeated string fields = 3;
 
     Filter filter = 4;
@@ -75,7 +75,7 @@ message DocumentSearchRequest {
     int32 result_per_page = 8;
 
     Timestamps timestamps = 9;
-    
+
     bool reload = 10 [deprecated = true];
     bool only_faceted = 15;
     optional noderesources.Resource.ResourceStatus with_status = 16;
@@ -91,19 +91,19 @@ message ParagraphSearchRequest {
     repeated string fields = 3;
     // query this text in all the paragraphs
     string body = 4;
-    
+
     Filter filter = 5;
-    
+
     OrderBy order = 7;
-    
+
     // Faceted{ tags: Vec<String>}
     Faceted faceted = 8;
-    
+
     int32 page_number = 10;
     int32 result_per_page = 11;
-    
+
     Timestamps timestamps = 12;
-    
+
     bool reload = 13 [deprecated = true];
     bool with_duplicates = 14;
     bool only_faceted = 15;
@@ -113,7 +113,7 @@ message ParagraphSearchRequest {
 
 message ResultScore {
     float bm25 = 1;
-    // In the case of two equal bm25 scores, booster 
+    // In the case of two equal bm25 scores, booster
     // decides
     float booster = 2;
 }
@@ -131,7 +131,7 @@ message DocumentSearchResponse {
     repeated DocumentResult results = 2;
 
     map<string, FacetResults> facets = 3;
-    
+
     int32 page_number = 4;
     int32 result_per_page = 5;
 
@@ -163,7 +163,7 @@ message ParagraphResult {
 message ParagraphSearchResponse {
     int32 fuzzy_distance = 10;
     int32 total = 1;
-    // 
+    //
     repeated ParagraphResult results = 2;
 
     // For each field what facets are.
@@ -190,7 +190,7 @@ message VectorSearchRequest {
     // Embedded vector search.
     repeated float vector = 2;
     // tags to filter
-    repeated string tags = 3; 
+    repeated string tags = 3;
     // What page is the answer.
     int32 page_number = 4;
 
@@ -200,7 +200,7 @@ message VectorSearchRequest {
     bool with_duplicates = 14;
     // ID for the vector set.
     // Empty for searching on the original index
-    string vector_set = 15; 
+    string vector_set = 15;
     repeated string key_filters = 16;
 
     float min_score = 17;
@@ -332,7 +332,7 @@ message SearchRequest {
 
     bool with_duplicates = 14;
     bool only_faceted = 16;
-    
+
     optional string advanced_query = 18;
     optional noderesources.Resource.ResourceStatus with_status = 17;
 
@@ -393,7 +393,7 @@ message IdCollection {
 
 message RelationEdge {
     utils.Relation.RelationType edge_type = 1;
-    string property = 2;   
+    string property = 2;
 }
 
 message EdgeList {
@@ -417,7 +417,7 @@ message GetShardRequest {
 message ParagraphItem {
     string id = 1;
     repeated string labels = 2;
-} 
+}
 
 message DocumentItem {
     string uuid = 1;
@@ -445,10 +445,10 @@ service NodeReader {
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
     rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
-    
+
     rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
     rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
-    
+
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
 
