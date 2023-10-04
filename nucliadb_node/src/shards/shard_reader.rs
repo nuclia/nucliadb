@@ -53,7 +53,7 @@ pub struct ShardFileChunkIterator {
 
 impl ShardFileChunkIterator {
     pub fn new(file_path: PathBuf, chunk_size: usize) -> NodeResult<ShardFileChunkIterator> {
-        let file = File::open(&file_path)?;
+        let file = File::open(file_path)?;
         let reader = BufReader::new(file);
         Ok(ShardFileChunkIterator {
             reader,
@@ -530,10 +530,7 @@ impl ShardReader {
     ) -> NodeResult<ShardFileChunkIterator> {
         // TODO: metrics and async
 
-        Ok(ShardFileChunkIterator::new(
-            self.root_path.join(relative_path),
-            CHUNK_SIZE,
-        )?)
+        ShardFileChunkIterator::new(self.root_path.join(relative_path), CHUNK_SIZE)
     }
 
     fn visit_directories(
@@ -563,7 +560,7 @@ impl ShardReader {
 
     #[tracing::instrument(skip_all)]
     pub fn get_shard_files(&self) -> NodeResult<ShardFileList> {
-        let mut to_visit = vec![self.root_path.clone().into()];
+        let mut to_visit = vec![self.root_path.clone()];
         let mut files = Vec::new();
 
         while let Some(path) = to_visit.pop() {
