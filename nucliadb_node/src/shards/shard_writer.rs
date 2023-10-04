@@ -17,6 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -34,12 +35,14 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
+const MERGE_THRESHOLD: usize = 5;
+
 #[derive(Debug)]
 pub struct ShardWriter {
     pub metadata: ShardMetadata,
     pub id: String,
     pub path: PathBuf,
-    #[allow(unused)]
+    writes_since_merge: AtomicUsize,
     text_writer: TextsWriterPointer,
     paragraph_writer: ParagraphsWriterPointer,
     vector_writer: VectorsWriterPointer,
@@ -123,6 +126,7 @@ impl ShardWriter {
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
+            writes_since_merge: AtomicUsize::new(1),
             document_service_version: versions.version_texts() as i32,
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
@@ -313,6 +317,7 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
+        self.writes_since_merge.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -370,6 +375,7 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
+        self.writes_since_merge.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -472,19 +478,29 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<()> {
-        // TODO: add relations merge when it becomes a Tantivy only index
-        paragraph_write(&self.paragraph_writer).merge()?;
-        text_write(&self.text_writer).merge()?;
-        vector_write(&self.vector_writer).merge()?;
+        let writes_performed = self.writes_since_merge.load(Ordering::SeqCst);
+        if writes_performed >= MERGE_THRESHOLD {
+            // TODO: add relations merge when it becomes a Tantivy only index.
+            paragraph_write(&self.paragraph_writer).merge()?;
+            text_write(&self.text_writer).merge()?;
+            vector_write(&self.vector_writer).merge()?;
+
+            // After merging GC is applied
+            // TODO: add relations gc when it becomes a Tantivy only index.
+            paragraph_write(&self.paragraph_writer).garbage_collection()?;
+            text_write(&self.text_writer).garbage_collection()?;
+            vector_write(&self.vector_writer).garbage_collection()?;
+
+            // Updating the write counter.
+            self.writes_since_merge
+                .fetch_sub(writes_performed, Ordering::SeqCst);
+        }
         Ok(())
     }
 
     #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
-        // TODO: add relations gc when it becomes a Tantivy only index
-        paragraph_write(&self.paragraph_writer).garbage_collection()?;
-        text_write(&self.text_writer).garbage_collection()?;
-        vector_write(&self.vector_writer).garbage_collection()?;
+        // TODO: remove this operation from the interface
         Ok(())
     }
 }

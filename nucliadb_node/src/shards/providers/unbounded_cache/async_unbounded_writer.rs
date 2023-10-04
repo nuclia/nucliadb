@@ -31,22 +31,18 @@ use uuid::Uuid;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardWriterProvider;
-use crate::shards::segment_manager::RequestSender;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
 pub struct AsyncUnboundedShardWriterCache {
-    #[allow(unused)]
-    segment_manager: RequestSender,
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
 }
 
 impl AsyncUnboundedShardWriterCache {
-    pub fn new(shards_path: PathBuf, segment_manager: RequestSender) -> Self {
+    pub fn new(shards_path: PathBuf) -> Self {
         Self {
-            segment_manager,
             shards_path,
             // NOTE: as it's not probable all shards will be written, we don't
             // assign any initial capacity to the HashMap under the

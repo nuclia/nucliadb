@@ -63,13 +63,12 @@ async fn main() -> NodeResult<()> {
     }
 
     // XXX it probably should be moved to a more clear abstraction
-    let segment_manager = lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
+    lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
     let node_metadata = NodeMetadata::new().await?;
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_sender = metadata_sender.clone();
     let writer_settings = Arc::clone(&settings);
-    let grpc_driver =
-        NodeWriterGRPCDriver::new(writer_settings, segment_manager).with_sender(grpc_sender);
+    let grpc_driver = NodeWriterGRPCDriver::new(writer_settings).with_sender(grpc_sender);
     grpc_driver.initialize().await?;
 
     let host_key_path = settings.host_key_path();

@@ -22,6 +22,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
+use nucliadb_core::tracing;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
@@ -68,11 +69,11 @@ impl NodeWriter {
     pub fn new() -> PyResult<Self> {
         let data_path = env::data_path();
         let shards_path = env::shards_path();
-        let manager = lifecycle::initialize_writer(&data_path, &shards_path)
+        lifecycle::initialize_writer(&data_path, &shards_path)
             .map_err(|error| format!("Unable to initialize writer: {error}"))
             .map_err(IndexNodeException::new_err)?;
         Ok(Self {
-            shards: UnboundedShardWriterCache::new(shards_path, manager),
+            shards: UnboundedShardWriterCache::new(shards_path),
         })
     }
 
@@ -149,8 +150,12 @@ impl NodeWriter {
         let status = shard
             .set_resource(&resource)
             .and_then(|()| shard.get_opstatus());
+
         match status {
             Ok(mut status) => {
+                if let Err(err) = shard.merge() {
+                    tracing::info!("A merge was attempted, but failed: {err:?}")
+                }
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
@@ -182,6 +187,9 @@ impl NodeWriter {
             .and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
+                if let Err(err) = shard.merge() {
+                    tracing::info!("A merge was attempted, but failed: {err:?}")
+                }
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))

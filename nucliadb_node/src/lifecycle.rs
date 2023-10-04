@@ -27,30 +27,20 @@ use nucliadb_core::thread::ThreadPoolBuilder;
 
 //  use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use crate::env;
-use crate::shards::segment_manager;
-use crate::shards::segment_manager::RequestSender;
 
-lazy_static::lazy_static! {
-    static ref SEGMENT_MANAGER: RequestSender = {
-        let (installer, manager) = segment_manager::SegmentManager::install();
-        std::thread::spawn(installer);
-        manager
-    };
-}
 /// Initialize the index node writer. This function must be called before using
 /// a writer
-pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<RequestSender> {
+pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()> {
     if !data_path.exists() {
         return Err(node_error!(
             "Data directory ({:?}) should be already created",
             data_path
         ));
     }
-
     if !shards_path.exists() {
         std::fs::create_dir(shards_path)?;
     }
-    Ok(SEGMENT_MANAGER.clone())
+    Ok(())
 }
 
 /// Initialize the index node reader. This function must be called before using
