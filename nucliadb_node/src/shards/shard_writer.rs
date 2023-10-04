@@ -478,10 +478,10 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<()> {
-        let writes_performed = self.writes_since_merge.swap(0, Ordering::SeqCst);
-        if writes_performed < MERGE_THRESHOLD {
-            self.writes_since_merge
-                .fetch_add(writes_performed, Ordering::SeqCst);
+        let current = self.writes_since_merge.swap(0, Ordering::SeqCst);
+
+        if current < MERGE_THRESHOLD {
+            self.writes_since_merge.fetch_add(current, Ordering::SeqCst);
             return Ok(());
         }
 
