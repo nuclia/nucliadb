@@ -17,7 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -42,7 +42,8 @@ pub struct ShardWriter {
     pub metadata: ShardMetadata,
     pub id: String,
     pub path: PathBuf,
-    writes_since_merge: AtomicUsize,
+    merging_available: AtomicBool,
+    writes_without_merge: AtomicUsize,
     text_writer: TextsWriterPointer,
     paragraph_writer: ParagraphsWriterPointer,
     vector_writer: VectorsWriterPointer,
@@ -126,7 +127,8 @@ impl ShardWriter {
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
-            writes_since_merge: AtomicUsize::new(1),
+            merging_available: AtomicBool::new(true),
+            writes_without_merge: AtomicUsize::new(0),
             document_service_version: versions.version_texts() as i32,
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
@@ -317,7 +319,7 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
-        self.writes_since_merge.fetch_add(1, Ordering::SeqCst);
+        self.writes_without_merge.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -375,7 +377,7 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
-        self.writes_since_merge.fetch_add(1, Ordering::SeqCst);
+        self.writes_without_merge.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -478,13 +480,27 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<()> {
-        let current = self.writes_since_merge.swap(0, Ordering::SeqCst);
-
-        if current < MERGE_THRESHOLD {
-            self.writes_since_merge.fetch_add(current, Ordering::SeqCst);
+        if !self.merging_available.swap(false, Ordering::SeqCst) {
             return Ok(());
         }
 
+        // Critical section, only one merge at a time
+
+        let current_writes = self.writes_without_merge.swap(0, Ordering::SeqCst);
+        let merge_result = if current_writes >= MERGE_THRESHOLD {
+            self.inner_merge()
+        } else {
+            self.writes_without_merge
+                .fetch_add(current_writes, Ordering::SeqCst);
+            Ok(())
+        };
+
+        // Merging is available again
+        self.merging_available.store(true, Ordering::SeqCst);
+        merge_result
+    }
+
+    fn inner_merge(&self) -> NodeResult<()> {
         // TODO: add relations merge when it becomes a Tantivy only index.
         paragraph_write(&self.paragraph_writer).merge()?;
         text_write(&self.text_writer).merge()?;
@@ -495,6 +511,7 @@ impl ShardWriter {
         paragraph_write(&self.paragraph_writer).garbage_collection()?;
         text_write(&self.text_writer).garbage_collection()?;
         vector_write(&self.vector_writer).garbage_collection()?;
+
         Ok(())
     }
 
