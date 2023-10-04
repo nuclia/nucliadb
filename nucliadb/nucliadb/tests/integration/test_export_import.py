@@ -39,33 +39,34 @@ async def src_kb(nucliadb_writer, nucliadb_manager):
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "title": "Test",
-            "thumbnail": "foobar",
-            "icon": "application/pdf",
-            "slug": "test",
-        },
-        headers={"X-SYNCHRONOUS": "true"},
-        timeout=None,
-    )
-    assert resp.status_code == 201
-    body = resp.json()
-    rid = body["uuid"]
+    for i in range(11):
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "title": "Test",
+                "thumbnail": "foobar",
+                "icon": "application/pdf",
+                "slug": f"test-{i}",
+            },
+            headers={"X-SYNCHRONOUS": "true"},
+            timeout=None,
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        rid = body["uuid"]
 
-    content = b"Test for /upload endpoint"
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resource/{rid}/file/file/upload",
-        headers={
-            "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
-            "X-Synchronous": "true",
-            "Content-Type": "text/plain",
-        },
-        content=base64.b64encode(content),
-        timeout=None,
-    )
-    assert resp.status_code == 201
+        content = b"Test for /upload endpoint"
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resource/{rid}/file/file/upload",
+            headers={
+                "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
+                "X-Synchronous": "true",
+                "Content-Type": "text/plain",
+            },
+            content=base64.b64encode(content),
+            timeout=None,
+        )
+        assert resp.status_code == 201
 
     # Create an entity group with a few entities
     resp = await nucliadb_writer.post(
@@ -240,28 +241,28 @@ async def _check_kb(nucliadb_reader, kbid):
     assert resp.status_code == 200
     body = resp.json()
     resources = body["resources"]
-    assert len(resources) == 1
-    resource = resources[0]
-    rid = resource["id"]
-    assert resource["slug"] == "test"
-    assert resource["title"] == "Test"
-    assert resource["icon"] == "application/pdf"
-    assert resource["thumbnail"] == "foobar"
+    assert len(resources) == 11
+    for resource in resources:
+        rid = resource["id"]
+        assert resource["slug"].startswith("test-")
+        assert resource["title"] == "Test"
+        assert resource["icon"] == "application/pdf"
+        assert resource["thumbnail"] == "foobar"
 
-    # File uploaded (metadata)
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/file/file")
-    assert resp.status_code == 200
-    body = resp.json()
-    field = body["value"]["file"]
-    assert field["content_type"] == "text/plain"
-    assert field["filename"] == "testfile"
-    assert field["size"] == 36
-    assert kbid in field["uri"]
+        # File uploaded (metadata)
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/file/file")
+        assert resp.status_code == 200
+        body = resp.json()
+        field = body["value"]["file"]
+        assert field["content_type"] == "text/plain"
+        assert field["filename"] == "testfile"
+        assert field["size"] == 36
+        assert kbid in field["uri"]
 
-    # File uploaded (content)
-    resp = await nucliadb_reader.get(field["uri"])
-    assert resp.status_code == 200
-    assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
+        # File uploaded (content)
+        resp = await nucliadb_reader.get(field["uri"])
+        assert resp.status_code == 200
+        assert base64.b64decode(resp.content) == b"Test for /upload endpoint"
 
     # Entities
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=true")
