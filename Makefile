@@ -125,12 +125,12 @@ debug-run-nucliadb-redis:
 
 build-node-binding:
 	rm -rf target/wheels/*
-	RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
+	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-node-binding-debug:
 	rm -rf target/wheels/*
-	RUSTFLAGS="--cfg prometheus_metrics --cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml
+	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
