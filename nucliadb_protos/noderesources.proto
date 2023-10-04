@@ -161,7 +161,7 @@ message Resource {
 
     string shard_id = 11;
 
-    map<string, utils.UserVectors> vectors = 12; // vectorset is the key 
+    map<string, utils.UserVectors> vectors = 12; // vectorset is the key
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
 }
 

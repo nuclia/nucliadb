@@ -56,7 +56,7 @@ message JoinGraphEdge {
 }
 
 message JoinGraph {
-    map<int32, RelationNode> nodes = 1; 
+    map<int32, RelationNode> nodes = 1;
     repeated JoinGraphEdge edges = 2;
 }
 

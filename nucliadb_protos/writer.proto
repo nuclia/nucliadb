@@ -480,7 +480,7 @@ message UploadBinaryData {
 }
 
 message FileUploaded {
-    
+
 }
 
 message SynonymsRequest {
@@ -535,7 +535,7 @@ service Writer {
     rpc GetVectorSets(GetVectorSetsRequest) returns (GetVectorSetsResponse) {}
     rpc DelVectorSet(DelVectorSetRequest) returns (OpStatusWriter) {}
     rpc SetVectorSet(SetVectorSetRequest) returns (OpStatusWriter) {}
-    
+
     // Entities
     rpc NewEntitiesGroup(NewEntitiesGroupRequest) returns (NewEntitiesGroupResponse) {}
     rpc GetEntities(GetEntitiesRequest) returns (GetEntitiesResponse) {}
@@ -554,7 +554,7 @@ service Writer {
     rpc SetConfiguration(SetKBConfigurationRequest) returns (OpStatusWriter) {}
     rpc DelConfiguration(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
     rpc GetConfiguration(knowledgebox.KnowledgeBoxID) returns (GetConfigurationResponse) {}
-    
+
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
     rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
