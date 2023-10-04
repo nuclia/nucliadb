@@ -531,7 +531,7 @@ impl ShardReader {
         // TODO: metrics and async
 
         Ok(ShardFileChunkIterator::new(
-            relative_path.into(),
+            self.root_path.join(relative_path),
             CHUNK_SIZE,
         )?)
     }
