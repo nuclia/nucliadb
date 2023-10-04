@@ -16,7 +16,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
 
 use crossbeam_utils::thread as crossbeam_thread;
 use nucliadb_core::prelude::*;
@@ -24,12 +26,11 @@ use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, DownloadShardFileRequest, EdgeList,
-    GetShardRequest, ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities,
-    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, Shard, ShardFile, ShardFileChunk, ShardFileList, StreamRequest,
-    SuggestFeatures, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
-    VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
+    RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard, ShardFile,
+    ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
+    TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
@@ -42,20 +43,46 @@ use crate::telemetry::run_with_telemetry;
 
 const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
+const CHUNK_SIZE: usize = 65535;
 
-pub struct ShardFileChunkIterator(Box<dyn Iterator<Item = ShardFileChunk> + Send>);
+pub struct ShardFileChunkIterator {
+    reader: BufReader<File>,
+    chunk_size: usize,
+    idx: i32,
+}
+
 impl ShardFileChunkIterator {
-    pub fn new<I>(inner: I) -> ShardFileChunkIterator
-    where
-        I: Iterator<Item = ShardFileChunk> + Send + 'static,
-    {
-        ShardFileChunkIterator(Box::new(inner))
+    pub fn new(file_path: PathBuf, chunk_size: usize) -> NodeResult<ShardFileChunkIterator> {
+        let file = File::open(&file_path)?;
+        let reader = BufReader::new(file);
+        Ok(ShardFileChunkIterator {
+            reader,
+            chunk_size,
+            idx: 0,
+        })
     }
 }
+
 impl Iterator for ShardFileChunkIterator {
     type Item = ShardFileChunk;
+
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
+        let mut buffer = vec![0; self.chunk_size];
+
+        match self.reader.read(&mut buffer) {
+            Ok(0) => None, // End of file
+            Ok(bytes_read) => {
+                buffer.truncate(bytes_read);
+                let chunk = ShardFileChunk {
+                    chunk_data: buffer,
+                    chunk_index: self.idx,
+                };
+                self.idx += 1;
+                Some(chunk)
+            }
+            // TODO:
+            Err(_e) => None,
+        }
     }
 }
 
@@ -63,6 +90,8 @@ impl Iterator for ShardFileChunkIterator {
 pub struct ShardReader {
     pub id: String,
     pub metadata: ShardMetadata,
+    root_path: PathBuf,
+    suffixed_root_path: String,
     text_reader: TextsReaderPointer,
     paragraph_reader: ParagraphsReaderPointer,
     vector_reader: VectorsReaderPointer,
@@ -232,10 +261,13 @@ impl ShardReader {
         let paragraphs = paragraph_result.transpose()?;
         let vectors = vector_result.transpose()?;
         let relations = relation_result.transpose()?;
+        let suffixed_root_path = shard_path.to_str().unwrap().to_owned() + "/";
 
         Ok(ShardReader {
             id,
             metadata,
+            root_path: shard_path.to_path_buf(),
+            suffixed_root_path,
             text_reader: fields.unwrap(),
             paragraph_reader: paragraphs.unwrap(),
             vector_reader: vectors.unwrap(),
@@ -496,24 +528,55 @@ impl ShardReader {
         &self,
         relative_path: String,
     ) -> NodeResult<ShardFileChunkIterator> {
-        let span = tracing::Span::current();
-        run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
-            // TODO: iterate on files belonging to this shard
-        });
+        // TODO: metrics and async
 
-        let inner_iterator = vec![ShardFileChunk {
-            chunk_data: "ok".into(),
-            chunk_index: 0,
-        }]
-        .into_iter();
+        Ok(ShardFileChunkIterator::new(
+            relative_path.into(),
+            CHUNK_SIZE,
+        )?)
+    }
 
-        Ok(ShardFileChunkIterator::new(inner_iterator))
+    fn one_level(&self, path: PathBuf, to_visit: &mut Vec<PathBuf>) -> NodeResult<Vec<ShardFile>> {
+        let dir = fs::read_dir(path)?;
+        let mut files = Vec::new();
+
+        for child in dir {
+            let child = child?;
+            if child.metadata()?.is_dir() {
+                to_visit.push(child.path());
+            } else if let Ok(metadata) = child.metadata() {
+                let path = child.path().into_os_string().into_string().unwrap();
+                if let Some(path) = path.strip_prefix(&self.suffixed_root_path) {
+                    files.push(ShardFile {
+                        relative_path: path.to_string(),
+                        size: metadata.len(),
+                    });
+                }
+            }
+        }
+        Ok(files)
+    }
+
+    fn find_all_files(&self) -> NodeResult<Vec<ShardFile>> {
+        let mut to_visit = vec![self.root_path.clone().into()];
+        let mut files = Vec::new();
+
+        while let Some(path) = to_visit.pop() {
+            match self.one_level(path, &mut to_visit) {
+                Ok(mut files_found) => {
+                    files.append(&mut files_found);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(files)
     }
 
     #[tracing::instrument(skip_all)]
     pub fn get_shard_files(&self) -> NodeResult<ShardFileList> {
-        // TODO:
-        Ok(ShardFileList { files: vec![] })
+        let files = self.find_all_files()?;
+        Ok(ShardFileList { files })
     }
 
     #[tracing::instrument(skip_all)]

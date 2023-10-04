@@ -413,12 +413,12 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<DownloadShardFileRequest>,
     ) -> Result<tonic::Response<Self::DownloadShardFileStream>, tonic::Status> {
-        let span = Span::current();
         let request = request.into_inner();
         let shard_id = request.id;
         let path = request.relative_path;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-        let info = info_span!(parent: &span, "document ids");
+
+        // TODO: metrics, async
         match shard.download_file_iterator(path) {
             Ok(iterator) => Ok(tonic::Response::new(GrpcStreaming(iterator))),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
