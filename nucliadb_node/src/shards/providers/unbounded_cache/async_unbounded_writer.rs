@@ -31,25 +31,28 @@ use uuid::Uuid;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::segment_manager::RequestSender;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
-#[derive(Default)]
 pub struct AsyncUnboundedShardWriterCache {
+    #[allow(unused)]
+    segment_manager: RequestSender,
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
 }
 
 impl AsyncUnboundedShardWriterCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(shards_path: PathBuf, segment_manager: RequestSender) -> Self {
         Self {
+            segment_manager,
+            shards_path,
             // NOTE: as it's not probable all shards will be written, we don't
             // assign any initial capacity to the HashMap under the
             // consideration a resize blocking is not performance critical while
             // writting.
             cache: RwLock::new(HashMap::new()),
-            shards_path,
         }
     }
 }
@@ -67,6 +70,7 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn load(&self, id: ShardId) -> NodeResult<()> {
+        let shard_key = id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
 
         if self.cache.read().await.contains_key(&id) {
@@ -75,7 +79,6 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
-        let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
                 return Err(node_error!(ShardNotFoundError(
@@ -89,7 +92,7 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         .await
         .context("Blocking task panicked")??;
 
-        self.cache.write().await.insert(id_, Arc::new(shard));
+        self.cache.write().await.insert(shard_key, Arc::new(shard));
 
         Ok(())
     }

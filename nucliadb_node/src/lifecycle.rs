@@ -24,13 +24,22 @@ use std::path::Path;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
-use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 
+//  use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use crate::env;
+use crate::shards::segment_manager;
+use crate::shards::segment_manager::RequestSender;
 
+lazy_static::lazy_static! {
+    static ref SEGMENT_MANAGER: RequestSender = {
+        let (installer, manager) = segment_manager::SegmentManager::install();
+        std::thread::spawn(installer);
+        manager
+    };
+}
 /// Initialize the index node writer. This function must be called before using
 /// a writer
-pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()> {
+pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<RequestSender> {
     if !data_path.exists() {
         return Err(node_error!(
             "Data directory ({:?}) should be already created",
@@ -41,14 +50,7 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
     if !shards_path.exists() {
         std::fs::create_dir(shards_path)?;
     }
-
-    // We shallow the error if the threadpools were already initialized
-    let _ = ThreadPoolBuilder::new()
-        .num_threads(env::num_global_rayon_threads())
-        .build_global();
-    let _ = VectorsMerger::install_global().map(std::thread::spawn);
-
-    Ok(())
+    Ok(SEGMENT_MANAGER.clone())
 }
 
 /// Initialize the index node reader. This function must be called before using

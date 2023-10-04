@@ -29,21 +29,24 @@ use uuid::Uuid;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::ShardWriterProvider;
+use crate::shards::segment_manager::RequestSender;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
-#[derive(Default)]
 pub struct UnboundedShardWriterCache {
+    #[allow(unused)]
+    segment_manager: RequestSender,
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
 }
 
 impl UnboundedShardWriterCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(shards_path: PathBuf, segment_manager: RequestSender) -> Self {
         Self {
-            cache: RwLock::new(HashMap::new()),
             shards_path,
+            segment_manager,
+            cache: RwLock::new(HashMap::new()),
         }
     }
 

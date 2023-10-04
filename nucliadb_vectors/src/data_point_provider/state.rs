@@ -265,9 +265,6 @@ impl State {
     pub fn no_nodes(&self) -> usize {
         self.no_nodes
     }
-    pub fn work_stack_len(&self) -> usize {
-        self.work_stack.len()
-    }
     pub fn current_work_unit(&self) -> Option<&[Journal]> {
         self.work_stack.back().map(|wu| wu.load.as_slice())
     }

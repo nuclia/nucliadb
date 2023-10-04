@@ -38,7 +38,6 @@ use crate::errors::{IndexNodeException, LoadShardError, ShardNotFound};
 use crate::RawProtos;
 
 #[pyclass]
-#[derive(Default)]
 pub struct NodeWriter {
     shards: UnboundedShardWriterCache,
 }
@@ -67,13 +66,13 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        if let Err(error) = lifecycle::initialize_writer(&env::data_path(), &env::shards_path()) {
-            return Err(IndexNodeException::new_err(format!(
-                "Unable to initialize writer: {error}"
-            )));
-        };
+        let data_path = env::data_path();
+        let shards_path = env::shards_path();
+        let manager = lifecycle::initialize_writer(&data_path, &shards_path)
+            .map_err(|error| format!("Unable to initialize writer: {error}"))
+            .map_err(IndexNodeException::new_err)?;
         Ok(Self {
-            shards: UnboundedShardWriterCache::new(env::shards_path()),
+            shards: UnboundedShardWriterCache::new(shards_path, manager),
         })
     }
 

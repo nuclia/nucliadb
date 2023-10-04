@@ -39,6 +39,7 @@ use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::segment_manager::RequestSender;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 
@@ -55,11 +56,12 @@ pub enum NodeWriterEvent {
 }
 
 impl NodeWriterGRPCDriver {
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Arc<Settings>, segment_manager: RequestSender) -> Self {
+        let shards = AsyncUnboundedShardWriterCache::new(settings.shards_path(), segment_manager);
         Self {
-            shards: AsyncUnboundedShardWriterCache::new(settings.shards_path()),
-            sender: None,
+            shards,
             settings,
+            sender: None,
         }
     }
 
