@@ -18,9 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use prometheus_client::encoding::EncodeLabelSet;
+use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
+
+use super::PrometheusMetricObserver;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 pub struct GrpcOpKey {
@@ -28,7 +31,8 @@ pub struct GrpcOpKey {
 }
 pub type GrpcOpValue = f64;
 
-pub type GrpcOpMetric = Family<GrpcOpKey, Histogram>;
+type GrpcOpCount = Family<GrpcOpKey, Counter>;
+type GrpcOpDuration = Family<GrpcOpKey, Histogram>;
 
 const BUCKETS: [f64; 14] = [
     0.005,
@@ -47,13 +51,22 @@ const BUCKETS: [f64; 14] = [
     5.0 * 60.0,
 ];
 
-pub fn register_grpc_ops(registry: &mut Registry) -> GrpcOpMetric {
+pub fn register_grpc_ops(registry: &mut Registry) -> PrometheusMetricObserver<GrpcOpKey> {
+    let counter_metric = GrpcOpCount::default();
+    registry.register(
+        "grpc_server_op_count",
+        "Number of times a gRPC server operations have been called",
+        counter_metric.clone(),
+    );
+
     let constructor = || Histogram::new(BUCKETS.iter().copied());
-    let metric = GrpcOpMetric::new_with_constructor(constructor);
+    let duration_metric = GrpcOpDuration::new_with_constructor(constructor);
     registry.register(
         "grpc_server_op_duration_seconds",
         "gRPC server operations duration in seconds",
-        metric.clone(),
+        duration_metric.clone(),
     );
-    metric
+
+    let observer = PrometheusMetricObserver::new(counter_metric, duration_metric);
+    observer
 }

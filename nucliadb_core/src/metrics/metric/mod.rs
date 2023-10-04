@@ -28,3 +28,7 @@ pub mod grpc_ops;
 pub mod request_time;
 pub mod tokio_runtime;
 pub mod tokio_tasks;
+
+mod prometheus_metric_observer;
+
+pub use prometheus_metric_observer::PrometheusMetricObserver;

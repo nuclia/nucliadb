@@ -29,7 +29,10 @@ use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::NodeResult;
 
 pub trait Meter: Send + Sync {
+    /// Record latencies across the code (generic metric)
     fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue);
+
+    /// Record gRPC operations
     fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue);
 
     fn export(&self) -> NodeResult<String>;

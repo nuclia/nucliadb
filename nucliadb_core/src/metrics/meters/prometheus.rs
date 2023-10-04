@@ -21,19 +21,19 @@ use prometheus_client::encoding;
 use prometheus_client::registry::Registry;
 
 use crate::metrics::meters::Meter;
-use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpMetric, GrpcOpValue};
-use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
+use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
+use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
 use crate::metrics::metric::tokio_runtime::TokioRuntimeObserver;
 use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
-use crate::metrics::metric::{grpc_ops, request_time};
+use crate::metrics::metric::{grpc_ops, request_time, PrometheusMetricObserver};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::{debug, error};
 use crate::NodeResult;
 
 pub struct PrometheusMeter {
     registry: Registry,
-    request_time_metric: RequestTimeMetric,
-    grpc_op_metric: GrpcOpMetric,
+    request_time_metric: PrometheusMetricObserver<RequestTimeKey>,
+    grpc_op_metric: PrometheusMetricObserver<GrpcOpKey>,
     tokio_tasks_observer: TokioTasksObserver,
     tokio_runtime_observer: TokioRuntimeObserver,
 }
@@ -59,13 +59,11 @@ impl Meter for PrometheusMeter {
 
     fn record_request_time(&self, metric: RequestTimeKey, value: RequestTimeValue) {
         debug!("{metric:?} : {value:?}");
-        self.request_time_metric
-            .get_or_create(&metric)
-            .observe(value);
+        self.request_time_metric.observe(metric, value);
     }
 
     fn record_grpc_op(&self, method: GrpcOpKey, value: GrpcOpValue) {
-        self.grpc_op_metric.get_or_create(&method).observe(value);
+        self.grpc_op_metric.observe(method, value);
     }
 
     fn task_monitor(&self, task_id: TaskId) -> Option<Monitor> {
@@ -75,7 +73,7 @@ impl Meter for PrometheusMeter {
 
 impl PrometheusMeter {
     pub fn new() -> Self {
-        let mut registry = Registry::default();
+        let mut registry = Registry::with_prefix("nucliadb_node");
 
         let request_time_metric = request_time::register_request_time(&mut registry);
         let grpc_op_metric = grpc_ops::register_grpc_ops(&mut registry);
