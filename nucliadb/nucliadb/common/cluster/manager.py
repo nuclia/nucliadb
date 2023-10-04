@@ -362,7 +362,6 @@ class StandaloneKBShardManager(KBShardManager):
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
             await self.maybe_create_new_shard(kbid, shard_info)
-            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
     async def delete_resource(
         self,
