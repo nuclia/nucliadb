@@ -536,7 +536,11 @@ impl ShardReader {
         )?)
     }
 
-    fn one_level(&self, path: PathBuf, to_visit: &mut Vec<PathBuf>) -> NodeResult<Vec<ShardFile>> {
+    fn visit_directories(
+        &self,
+        path: PathBuf,
+        to_visit: &mut Vec<PathBuf>,
+    ) -> NodeResult<Vec<ShardFile>> {
         let dir = fs::read_dir(path)?;
         let mut files = Vec::new();
 
@@ -557,12 +561,13 @@ impl ShardReader {
         Ok(files)
     }
 
-    fn find_all_files(&self) -> NodeResult<Vec<ShardFile>> {
+    #[tracing::instrument(skip_all)]
+    pub fn get_shard_files(&self) -> NodeResult<ShardFileList> {
         let mut to_visit = vec![self.root_path.clone().into()];
         let mut files = Vec::new();
 
         while let Some(path) = to_visit.pop() {
-            match self.one_level(path, &mut to_visit) {
+            match self.visit_directories(path, &mut to_visit) {
                 Ok(mut files_found) => {
                     files.append(&mut files_found);
                 }
@@ -570,12 +575,6 @@ impl ShardReader {
             }
         }
 
-        Ok(files)
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn get_shard_files(&self) -> NodeResult<ShardFileList> {
-        let files = self.find_all_files()?;
         Ok(ShardFileList { files })
     }
 
