@@ -35,6 +35,8 @@ from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
+BEFORE_NAK_SLEEP_SECONDS = 2
+
 
 class NatsTaskConsumer:
     def __init__(
@@ -120,7 +122,7 @@ class NatsTaskConsumer:
                     },
                 )
                 # Nak the message to retry
-                await asyncio.sleep(2)
+                await asyncio.sleep(BEFORE_NAK_SLEEP_SECONDS)
                 await msg.nak()
             else:
                 logger.info(
