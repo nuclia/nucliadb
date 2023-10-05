@@ -783,7 +783,7 @@ class FindResource(Resource):
             self.__setattr__(key, getattr(origin, key))
 
 
-class KnowledgeboxFindResults(BaseModel):
+class KnowledgeboxFindResults(JsonBaseModel):
     """Find on knowledgebox results"""
 
     resources: Dict[str, FindResource]
@@ -798,9 +798,6 @@ class KnowledgeboxFindResults(BaseModel):
     shards: Optional[List[str]] = None
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: float = ModelParamDefaults.min_score.to_pydantic_field()
-
-    def __str__(self):
-        return self.json()
 
 
 class FeedbackTasks(str, Enum):
