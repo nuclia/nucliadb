@@ -46,6 +46,7 @@ const MIN_VIABLE_PREFIX_SUGGEST: usize = 1;
 const CHUNK_SIZE: usize = 65535;
 
 pub struct ShardFileChunkIterator {
+    file_path: PathBuf,
     reader: BufReader<File>,
     chunk_size: usize,
     idx: i32,
@@ -53,9 +54,10 @@ pub struct ShardFileChunkIterator {
 
 impl ShardFileChunkIterator {
     pub fn new(file_path: PathBuf, chunk_size: usize) -> NodeResult<ShardFileChunkIterator> {
-        let file = File::open(file_path)?;
+        let file = File::open(file_path.clone())?;
         let reader = BufReader::new(file);
         Ok(ShardFileChunkIterator {
+            file_path,
             reader,
             chunk_size,
             idx: 0,
@@ -80,8 +82,10 @@ impl Iterator for ShardFileChunkIterator {
                 self.idx += 1;
                 Some(chunk)
             }
-            // TODO:
-            Err(_e) => None,
+            Err(e) => {
+                warn!("Error reading file {:?} - {:?}", self.file_path, e);
+                None
+            }
         }
     }
 }
@@ -528,9 +532,10 @@ impl ShardReader {
         &self,
         relative_path: String,
     ) -> NodeResult<ShardFileChunkIterator> {
-        // TODO: metrics and async
-
-        ShardFileChunkIterator::new(self.root_path.join(relative_path), CHUNK_SIZE)
+        let span = tracing::Span::current();
+        run_with_telemetry(info_span!(parent: &span, "download file iteration"), || {
+            ShardFileChunkIterator::new(self.root_path.join(relative_path), CHUNK_SIZE)
+        })
     }
 
     fn visit_directories(
