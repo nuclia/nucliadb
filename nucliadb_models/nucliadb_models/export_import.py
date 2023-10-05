@@ -34,12 +34,11 @@ class Status(str, Enum):
     SCHEDULED = "scheduled"
     RUNNING = "running"
     FINISHED = "finished"
-    FAILED = "failed"
     ERRORED = "errored"
-    CANCELLED = "cancelled"
 
 
 class StatusResponse(BaseModel):
     status: Status
     total: int = 0
     processed: int = 0
+    retries: int = 0

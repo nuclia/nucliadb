@@ -228,8 +228,8 @@ async def wait_for(nucliadb_reader, type: str, kbid: str, id: str, max_retries=3
         resp = await nucliadb_reader.get(url, timeout=None)
         assert resp.status_code == 200
         status = resp.json()["status"]
-        assert status not in ("error", "failed")
-        if resp.json()["status"] == "finished":
+        assert status != "error"
+        if status == "finished":
             finished = True
             break
     assert finished

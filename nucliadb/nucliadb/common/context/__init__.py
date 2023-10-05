@@ -72,24 +72,25 @@ class ApplicationContext:
         self.shard_manager = await setup_cluster()
         self.partitioning = start_partitioning_utility()
         if not in_standalone_mode():
-            self.indexing = await start_indexing_utility()
             self.nats_manager = await start_nats_manager(
                 self.service_name,
                 indexing_settings.index_jetstream_servers,
                 indexing_settings.index_jetstream_auth,
             )
+            self.indexing = await start_indexing_utility()
         self.transaction = await start_transaction_utility(self.service_name)
 
     async def finalize(self) -> None:
         if not self._initialized:
             return
 
-        await teardown_driver()
-        await teardown_cluster()
-        await self.blob_storage.finalize()
-        await stop_indexing_utility()
-        await stop_nats_manager()
         await stop_transaction_utility()
+        if not in_standalone_mode():
+            await stop_indexing_utility()
+            await stop_nats_manager()
         stop_partitioning_utility()
+        await teardown_cluster()
+        await teardown_driver()
+        await self.blob_storage.finalize()
         clean_utility(Utility.STORAGE)
         self._initialized = False

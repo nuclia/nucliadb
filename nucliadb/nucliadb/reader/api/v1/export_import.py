@@ -35,6 +35,8 @@ from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.export_import import Status, StatusResponse
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
+from nucliadb_utils.const import Features
+from nucliadb_utils.utilities import has_feature
 
 
 @api.get(
@@ -48,7 +50,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def download_export_kb_endpoint(request: Request, kbid: str, export_id: str):
     context = get_app_context(request.app)
-    if in_standalone_mode():
+    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, we stream the export as we generate it.
         return StreamingResponse(
             exporter.export_kb(context, kbid),
@@ -71,8 +73,6 @@ async def download_export_kb_endpoint(request: Request, kbid: str, export_id: st
             status_code=412,
             detail=f"Export not yet finished",
         )
-    except export_exceptions.TaskCancelledError:
-        return HTTPClientError(status_code=412, detail="Export cancelled")
     except export_exceptions.TaskErrored:
         return HTTPClientError(status_code=500, detail=f"Export errored")
 
@@ -124,7 +124,7 @@ async def _get_status(
     if type not in ("export", "import"):
         raise ValueError(f"Incorrect type: {type}")
 
-    if in_standalone_mode():
+    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode exports/imports are not actually run in a background task.
         # We return always FINISHED status to keep the API compatible with the hosted mode.
         return StatusResponse(status=Status.FINISHED)
@@ -136,6 +136,7 @@ async def _get_status(
             status=metadata.task.status,
             total=metadata.total,
             processed=metadata.processed,
+            retries=metadata.task.retries,
         )
     except MetadataNotFound:
         return HTTPClientError(status_code=404, detail=f"{type.capitalize()} not found")
