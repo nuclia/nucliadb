@@ -309,7 +309,10 @@ class ExportStreamReader:
 
     async def read_type(self) -> ExportedItemType:
         type_bytes = await self.stream.read(3)
-        return ExportedItemType(type_bytes.decode())
+        try:
+            return ExportedItemType(type_bytes.decode())
+        except ValueError:
+            raise WrongExportStreamFormat()
 
     async def read_item(self) -> bytes:
         size_bytes = await self.stream.read(4)
@@ -322,8 +325,10 @@ class ExportStreamReader:
     ) -> tuple[resources_pb2.CloudFile, BinaryStreamGenerator]:
         data = await self.read_item()
         cf = resources_pb2.CloudFile()
-        cf.ParseFromString(data)
-
+        try:
+            cf.ParseFromString(data)
+        except ProtobufDecodeError:
+            raise WrongExportStreamFormat()
         binary_size_bytes = await self.stream.read(4)
         binary_size = int.from_bytes(binary_size_bytes, byteorder="big")
 
@@ -342,19 +347,28 @@ class ExportStreamReader:
     async def read_bm(self) -> writer_pb2.BrokerMessage:
         data = await self.read_item()
         bm = writer_pb2.BrokerMessage()
-        bm.ParseFromString(data)
+        try:
+            bm.ParseFromString(data)
+        except ProtobufDecodeError:
+            raise WrongExportStreamFormat()
         return bm
 
     async def read_entities(self) -> kb_pb2.EntitiesGroups:
         data = await self.read_item()
         entities = kb_pb2.EntitiesGroups()
-        entities.ParseFromString(data)
+        try:
+            entities.ParseFromString(data)
+        except ProtobufDecodeError:
+            raise WrongExportStreamFormat()
         return entities
 
     async def read_labels(self) -> kb_pb2.Labels:
         data = await self.read_item()
         labels = kb_pb2.Labels()
-        labels.ParseFromString(data)
+        try:
+            labels.ParseFromString(data)
+        except ProtobufDecodeError:
+            raise WrongExportStreamFormat()
         return labels
 
     async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
@@ -371,8 +385,6 @@ class ExportStreamReader:
                 yield item_type, data
             except ExportStreamExhausted:
                 break
-            except ProtobufDecodeError as e:
-                raise WrongExportStreamFormat() from e
 
 
 class TaskRetryHandler:
