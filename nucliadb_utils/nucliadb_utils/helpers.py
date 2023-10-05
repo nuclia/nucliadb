@@ -34,7 +34,7 @@ async def async_gen_lookahead(
             buffered_chunk = chunk
             continue
 
-        if len(chunk) == 0:
+        if chunk is None or len(chunk) == 0:
             continue
 
         # Yield the previous chunk and buffer the current one

@@ -75,3 +75,4 @@ class Features:
     DEFAULT_MIN_SCORE = "nucliadb_default_min_score"
     ROLLOVER_SHARDS = "nuclaidb_rollover_shards"
     ASK_YOUR_DOCUMENTS = "nucliadb_ask_your_documents"
+    EXPORT_IMPORT_TASKS = "nucliadb_export_import_tasks"

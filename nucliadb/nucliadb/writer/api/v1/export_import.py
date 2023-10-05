@@ -45,6 +45,8 @@ from nucliadb_models.export_import import (
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
+from nucliadb_utils.const import Features
+from nucliadb_utils.utilities import has_feature
 
 
 @api.post(
@@ -59,7 +61,7 @@ from nucliadb_utils.authentication import requires_one
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     export_id = uuid4().hex
-    if in_standalone_mode():
+    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, exports are generated at download time.
         # We simply return an export_id to keep the API consistent with hosted nucliadb.
         return CreateExportResponse(export_id=export_id)
@@ -80,7 +82,7 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
     import_id = uuid4().hex
-    if in_standalone_mode():
+    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, we import directly from the request content stream.
         # Note that we return an import_id simply to keep the API consistent with hosted nucliadb.
         stream = FastAPIExportStream(request)

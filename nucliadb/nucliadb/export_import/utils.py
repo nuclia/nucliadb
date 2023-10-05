@@ -397,7 +397,7 @@ class TaskRetryHandler:
         async def wrapper(*args, **kwargs):
             metadata = self.metadata
             task = metadata.task
-            if task.status in (Status.FINISHED, Status.ERRORED, Status.CANCELLED):
+            if task.status in (Status.FINISHED, Status.ERRORED):
                 logger.info(
                     f"{self.type} task is {task.status.value}. Skipping",
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
@@ -413,10 +413,10 @@ class TaskRetryHandler:
                 await self.dm.set_metadata(self.type, metadata)
                 return
             try:
+                metadata.task.status = Status.RUNNING
                 await func(*args, **kwargs)
             except Exception:
                 task.retries += 1
-                task.status = Status.FAILED
                 logger.info(
                     f"{self.type} failed. Will be retried",
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
