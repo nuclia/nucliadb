@@ -417,8 +417,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.shard_id;
         let path = request.relative_path;
         let shard = self.obtain_shard(shard_id.clone()).await?;
-
-        // TODO: metrics, async
         match shard.download_file_iterator(path) {
             Ok(iterator) => Ok(tonic::Response::new(GrpcStreaming(iterator))),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
