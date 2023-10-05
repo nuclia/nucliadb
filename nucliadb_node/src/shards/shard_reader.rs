@@ -74,8 +74,8 @@ impl Iterator for ShardFileChunkIterator {
             Ok(bytes_read) => {
                 buffer.truncate(bytes_read);
                 let chunk = ShardFileChunk {
-                    chunk_data: buffer,
-                    chunk_index: self.idx,
+                    data: buffer,
+                    index: self.idx,
                 };
                 self.idx += 1;
                 Some(chunk)

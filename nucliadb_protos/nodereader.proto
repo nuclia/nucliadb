@@ -433,7 +433,7 @@ message StreamRequest {
 }
 
 message GetShardFilesRequest {
-    string id = 1;
+    string shard_id = 1;
 }
 
 message ShardFileList {
@@ -446,13 +446,13 @@ message ShardFile {
 }
 
 message DownloadShardFileRequest {
-    string id = 1;
+    string shard_id = 1;
     string relative_path = 2;
 }
 
 message ShardFileChunk {
-    bytes chunk_data = 1;
-    int32 chunk_index = 2;
+    bytes data = 1;
+    int32 index = 2;
 }
 
 // Implemented at nucliadb_object_storage

@@ -39,18 +39,18 @@ async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
     // lets download it, first we get the list of files
     let response = reader
         .get_shard_files(Request::new(GetShardFilesRequest {
-            id: shard.id.clone(),
+            shard_id: shard.id.clone(),
         }))
         .await
         .unwrap()
         .into_inner();
 
-    assert_eq!(response.files.len() > 0, true);
+    assert!(!response.files.is_empty());
 
     // then we iterate on them
     for shard_file in response.files.into_iter() {
         let req = DownloadShardFileRequest {
-            id: shard.id.clone(),
+            shard_id: shard.id.clone(),
             relative_path: shard_file.relative_path.clone(),
         };
 
@@ -67,7 +67,7 @@ async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
 
             while let Some(response) = response_stream.message().await? {
                 // Process the response element (FileChunk in this case).
-                let chunk = String::from_utf8_lossy(&response.chunk_data);
+                let chunk = String::from_utf8_lossy(&response.data);
                 content.push_str(&chunk);
             }
 

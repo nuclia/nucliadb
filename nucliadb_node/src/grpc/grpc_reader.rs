@@ -396,7 +396,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<GetShardFilesRequest>,
     ) -> Result<tonic::Response<ShardFileList>, tonic::Status> {
         let span = Span::current();
-        let shard_id = request.into_inner().id;
+        let shard_id = request.into_inner().shard_id;
         let shard = self.obtain_shard(shard_id.clone()).await?;
         let info = info_span!(parent: &span, "get shard files");
         let task = || run_with_telemetry(info, move || shard.get_shard_files());
@@ -414,7 +414,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<DownloadShardFileRequest>,
     ) -> Result<tonic::Response<Self::DownloadShardFileStream>, tonic::Status> {
         let request = request.into_inner();
-        let shard_id = request.id;
+        let shard_id = request.shard_id;
         let path = request.relative_path;
         let shard = self.obtain_shard(shard_id.clone()).await?;
 

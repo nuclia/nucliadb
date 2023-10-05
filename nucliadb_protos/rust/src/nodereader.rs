@@ -553,7 +553,7 @@ pub struct StreamRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetShardFilesRequest {
     #[prost(string, tag="1")]
-    pub id: ::prost::alloc::string::String,
+    pub shard_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardFileList {
@@ -570,16 +570,16 @@ pub struct ShardFile {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DownloadShardFileRequest {
     #[prost(string, tag="1")]
-    pub id: ::prost::alloc::string::String,
+    pub shard_id: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub relative_path: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardFileChunk {
     #[prost(bytes="vec", tag="1")]
-    pub chunk_data: ::prost::alloc::vec::Vec<u8>,
+    pub data: ::prost::alloc::vec::Vec<u8>,
     #[prost(int32, tag="2")]
-    pub chunk_index: i32,
+    pub index: i32,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
