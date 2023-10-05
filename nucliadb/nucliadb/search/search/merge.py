@@ -426,6 +426,7 @@ async def merge_paragraph_results(
     )
 
 
+@merge_observer.wrap({"type": "merge_relations"})
 async def merge_relations_results(
     relations_responses: List[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
