@@ -9,6 +9,7 @@ ENV = "stashify.cloud"
 LOCAL_NDB = True
 URL = "http://localhost:8080/api/v1"
 
+
 def get_base_url():
     if LOCAL_NDB and URL:
         return URL
@@ -37,4 +38,9 @@ class Client:
 @scenario(weight=50)
 async def test_find_default(session):
     client = Client(session, get_base_url())
-    await client.make_request(f"/kb/{kbid}/find", params={"query": fake.sentence()})
+    await client.make_request(
+        "GET",
+        f"/kb/{kbid}/find",
+        params={"query": fake.sentence()},
+        headers={"x-nucliadb-roles": "READER"},
+    )
