@@ -168,6 +168,6 @@ class FastAPIExportStream(IteratorExportStream):
         super().__init__(iterator)
 
 
-async def exists_kb(context, kbid) -> bool:
+async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
     dm = KnowledgeBoxDataManager(context.kv_driver)
     return await dm.exists_kb(kbid)

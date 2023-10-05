@@ -152,6 +152,6 @@ async def _get_status(
         return HTTPClientError(status_code=404, detail=f"{type.capitalize()} not found")
 
 
-async def exists_kb(context, kbid) -> bool:
+async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
     dm = KnowledgeBoxDataManager(context.kv_driver)
     return await dm.exists_kb(kbid)
