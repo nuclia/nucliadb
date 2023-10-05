@@ -101,8 +101,8 @@ class JsonBaseModel(BaseModel):
         try:
             return self.json()
         except Exception:
-            # fallback to BaseModel string repr
-            return self.__repr_str__(" ")
+            # fallback to BaseModel implementation
+            return super().__str__()
 
 
 class Facet(BaseModel):
