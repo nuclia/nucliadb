@@ -22,11 +22,11 @@ mod common;
 
 use std::collections::HashMap;
 
-use serde_json::value::Value;
 use common::{node_reader, node_writer, resources, TestNodeWriter};
 use nucliadb_core::protos::{
     op_status, DownloadShardFileRequest, GetShardFilesRequest, NewShardRequest,
 };
+use serde_json::value::Value;
 use tonic::Request;
 
 #[tokio::test]
@@ -56,14 +56,12 @@ async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
 
         // grabbing a JSON file and making sure it's readable
         if shard_file.relative_path == "paragraph/meta.json" {
-
             let mut content = String::new();
             let mut response_stream = reader
                 .download_shard_file(Request::new(req))
                 .await
                 .unwrap()
                 .into_inner();
-
 
             while let Some(response) = response_stream.message().await? {
                 // Process the response element (FileChunk in this case).
@@ -74,7 +72,6 @@ async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
             let json_content: Value = serde_json::from_str(content.as_str()).unwrap();
             assert_eq!(json_content["opstamp"], 14);
         }
-
     }
 
     Ok(())
