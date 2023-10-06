@@ -20,6 +20,7 @@
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
+    Classification,
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
@@ -34,10 +35,13 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb.tests.utils import broker_resource, inject_message
 
 
-def get_broker_message_with_entity_in_field(kbid, entity):
+def get_test_broker_message(kbid):
     """
     This simulates a broker messages coming from processing
     where an entity COUNTRY/Spain has been detected for a the field.
+
+    Also, the broker message has some labels at every
+    level (resource, field and paragraph).
     """
     bm = broker_resource(kbid=kbid)
     field_id = "text"
@@ -61,10 +65,16 @@ def get_broker_message_with_entity_in_field(kbid, entity):
     # Add field computed metadata with the detected entity
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
+    entity = "COUNTRY/Spain"
     family, ent = entity.split("/")
     fmw.metadata.metadata.ner[ent] = family
     pos = Position(start=60, end=64)
     fmw.metadata.metadata.positions[entity].position.append(pos)
+    # Add a classification label
+    c1 = Classification()
+    c1.labelset = "Foo"
+    c1.label = "bar"
+    fmw.metadata.metadata.classifications.append(c1)
 
     par1 = Paragraph()
     par1.start = 0
@@ -101,15 +111,15 @@ async def test_find_with_entity_filters(
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
-    bm = get_broker_message_with_entity_in_field(knowledgebox, entity="COUNTRY/Spain")
+    bm = get_test_broker_message(knowledgebox)
     await inject_message(nucliadb_grpc, bm)
 
     # Find + entity filter should return paragraphs of that
-    # field even if the paragraphs are not labeled with the entity.
+    # field even if the paragraphs are not labeled with the entity individually.
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
         json=dict(
-            query="foo",
+            query="",
             filters=["/e/COUNTRY/Spain"],
             features=["vector"],
             vector=[0.5, 0.5, 0.5],
