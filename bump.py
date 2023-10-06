@@ -60,7 +60,7 @@ def run(args):
                 if line.startswith("nucliadb-") and (
                     "=" not in line and ">" not in line and "~" not in line
                 ):
-                    line = f"nucliadb>={version}"
+                    line = f"{line}>={version}"
                 req_lines.append(line)
 
         with open(req_filepath, "w") as f:
