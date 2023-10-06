@@ -41,7 +41,7 @@ jobs:
           pip install -e ./nucliadb/
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry / ./nucliadb_dataset/ ./nucliadb/
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
 
       # XXX wait for tests to run successfully in all dependencies before we actually release
       - name: Wait for utils
