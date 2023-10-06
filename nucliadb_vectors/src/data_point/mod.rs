@@ -511,6 +511,8 @@ impl DataPoint {
             .iter()
             .map(|(dlog, dp_id)| DataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
             .collect::<VectorR<Vec<_>>>()?;
+
+        // Creating the node store
         let node_producers = operants
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
@@ -531,6 +533,7 @@ impl DataPoint {
             (None, None)
         };
 
+        // Creating the hnsw for the new node store.
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
         let mut ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();

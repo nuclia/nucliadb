@@ -35,7 +35,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-use crate::errors::{IndexNodeException, LoadShardError, ShardNotFound};
+use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
 
 #[pyclass]
@@ -45,19 +45,14 @@ pub struct NodeWriter {
 
 impl NodeWriter {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardWriter>, PyErr> {
-        let loaded = self.shards.load(shard_id.clone());
-        if let Err(error) = loaded {
-            return Err(LoadShardError::new_err(format!(
+        if let Some(shard) = self.shards.get(shard_id.clone()) {
+            return Ok(shard);
+        }
+        match self.shards.load(shard_id.clone()) {
+            Ok(shard) => Ok(shard),
+            Err(error) => Err(LoadShardError::new_err(format!(
                 "Error loading shard {}: {}",
                 shard_id, error
-            )));
-        }
-
-        match self.shards.get(shard_id.clone()) {
-            Some(shard) => Ok(shard),
-            None => Err(ShardNotFound::new_err(format!(
-                "Shard {} not found",
-                shard_id
             ))),
         }
     }

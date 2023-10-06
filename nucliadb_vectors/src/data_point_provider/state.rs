@@ -233,11 +233,11 @@ impl State {
         if let Some(age_cap) = age_cap {
             self.delete_log.prune(age_cap);
         }
-        unit.load.iter().cloned().for_each(|dp| {
+        for dp in unit.load.iter() {
             // The data_point may be older that the refactor
             self.data_points.remove(&dp.id());
             self.no_nodes -= dp.no_nodes();
-        });
+        }
         self.add(journal);
     }
     pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {

@@ -65,13 +65,14 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         Ok(new_shard)
     }
 
-    async fn load(&self, id: ShardId) -> NodeResult<()> {
+    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
         let shard_key = id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+        let mut cache = self.cache.write().await;
 
-        if self.cache.read().await.contains_key(&id) {
+        if let Some(shard) = cache.get(&id) {
             debug!("Shard {shard_path:?} is already on memory");
-            return Ok(());
+            return Ok(Arc::clone(shard));
         }
 
         // Avoid blocking while interacting with the file system
@@ -88,9 +89,9 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         .await
         .context("Blocking task panicked")??;
 
-        self.cache.write().await.insert(shard_key, Arc::new(shard));
-
-        Ok(())
+        let shard = Arc::new(shard);
+        cache.insert(shard_key, Arc::clone(&shard));
+        Ok(shard)
     }
 
     async fn load_all(&self) -> NodeResult<()> {

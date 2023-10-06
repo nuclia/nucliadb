@@ -93,21 +93,17 @@ impl NodeWriterGRPCDriver {
 
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardWriter>, tonic::Status> {
         let id = id.into();
-
-        self.shards.load(id.clone()).await.map_err(|error| {
+        if let Some(shard) = self.shards.get(id.clone()).await {
+            return Ok(shard);
+        }
+        let shard = self.shards.load(id.clone()).await.map_err(|error| {
             if error.is::<ShardNotFoundError>() {
                 tonic::Status::not_found(error.to_string())
             } else {
                 tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
             }
         })?;
-
-        match self.shards.get(id.clone()).await {
-            Some(shard) => Ok(shard),
-            None => Err(tonic::Status::not_found(format!(
-                "Error loading shard {id}: shard not found"
-            ))),
-        }
+        Ok(shard)
     }
 
     #[tracing::instrument(skip_all)]

@@ -169,11 +169,12 @@ impl Index {
     pub fn no_nodes(&self, _: &Lock) -> usize {
         self.read_state().no_nodes()
     }
-    pub fn merge(&mut self, _lock: &SLock) -> VectorR<()> {
+    pub fn merge(&mut self, _lock: &Lock) -> VectorR<()> {
         let location = self.location();
         let similarity = self.metadata.similarity;
         let channel = self.metadata.channel;
-        let state: State = fs_state::load_state(location)?;
+        let mut state = self.write_state();
+        let mut date = self.write_date();
 
         let Some(work) = state.current_work_unit().map(|work| {
             work.iter()
@@ -185,9 +186,8 @@ impl Index {
         };
 
         let new_dp = DataPoint::merge(location, &work, similarity, channel)?;
+        std::mem::drop(work);
 
-        let mut state = self.write_state();
-        let mut date = self.write_date();
         state.replace_work_unit(new_dp.meta());
         fs_state::persist_state::<State>(&self.location, &state)?;
         *date = fs_state::crnt_version(&self.location)?;
