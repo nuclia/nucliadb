@@ -56,7 +56,7 @@ def run(args):
     ):
         with open(req_filepath, "r") as f:
             req_lines = []
-            for line in f.readlines():
+            for line in f.read().splitlines():
                 if line.startswith("nucliadb-") and (
                     "=" not in line and ">" not in line and "~" not in line
                 ):
