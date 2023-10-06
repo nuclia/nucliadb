@@ -33,6 +33,7 @@ jobs:
       - name: Install all packages
         run: |
           pip install -e ./nucliadb_protos/python/
+          pip install -e ./nucliadb_telemetry/
           pip install -e ./nucliadb_utils/
           pip install -e ./nucliadb_models/
           pip install -e ./nucliadb_sdk/
