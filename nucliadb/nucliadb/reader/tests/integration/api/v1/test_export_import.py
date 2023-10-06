@@ -33,6 +33,7 @@ async def test_api(reader_api, knowledgebox_ingest):
         resp = await client.get(f"/kb/{kbid}/import/foo/status")
         assert resp.status_code < 500
 
+        # Check that for non-existing kbs, endpoints return a 404
         for endpoint in (
             "/kb/idonotexist/export/foo",
             "/kb/idonotexist/export/foo/status",
