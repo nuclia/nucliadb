@@ -548,14 +548,15 @@ impl ShardReader {
 
         for child in dir {
             let child = child?;
-            if child.metadata()?.is_dir() {
+            let child_metadata = child.metadata()?;
+            if child_metadata.is_dir() {
                 to_visit.push(child.path());
-            } else if let Ok(metadata) = child.metadata() {
+            } else {
                 let path = child.path().into_os_string().into_string().unwrap();
                 if let Some(path) = path.strip_prefix(&self.suffixed_root_path) {
                     files.push(ShardFile {
                         relative_path: path.to_string(),
-                        size: metadata.len(),
+                        size: child_metadata.len(),
                     });
                 }
             }
@@ -569,12 +570,8 @@ impl ShardReader {
         let mut files = Vec::new();
 
         while let Some(path) = to_visit.pop() {
-            match self.visit_directories(path, &mut to_visit) {
-                Ok(mut files_found) => {
-                    files.append(&mut files_found);
-                }
-                Err(e) => return Err(e),
-            }
+            let mut files_found = self.visit_directories(path, &mut to_visit)?;
+            files.append(&mut files_found);
         }
 
         Ok(ShardFileList { files })
