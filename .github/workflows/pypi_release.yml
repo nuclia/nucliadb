@@ -90,6 +90,13 @@ jobs:
           check-name: NucliaDBTelemetryTests (3.11)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
+      - name: Wait for nucliadb tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBTests (3.11, pg)
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
 
       - name: Upload to pypi
         run: twine upload dist/*
