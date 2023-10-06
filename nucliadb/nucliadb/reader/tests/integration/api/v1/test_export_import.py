@@ -32,3 +32,12 @@ async def test_api(reader_api, knowledgebox_ingest):
 
         resp = await client.get(f"/kb/{kbid}/import/foo/status")
         assert resp.status_code < 500
+
+        for endpoint in (
+            "/kb/idonotexist/export/foo",
+            "/kb/idonotexist/export/foo/status",
+            "/kb/idonotexist/import/foo/status",
+        ):
+            resp = await client.get(endpoint)
+            assert resp.status_code == 404
+            assert resp.json()["detail"] == "Knowledge Box not found"

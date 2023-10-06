@@ -37,13 +37,19 @@ class KnowledgeBoxDataManager:
         self, kbid: str
     ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
         async with self.driver.transaction() as txn:
-            key = KB_UUID.format(kbid=kbid)
-            payload = await txn.get(key)
-            if payload is None:
-                return None
-            response = knowledgebox_pb2.KnowledgeBoxConfig()
-            response.ParseFromString(payload)
-            return response
+            return await self._get_config(txn, kbid)
+
+    @classmethod
+    async def _get_config(
+        cls, txn, kbid: str
+    ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+        key = KB_UUID.format(kbid=kbid)
+        payload = await txn.get(key)
+        if payload is None:
+            return None
+        response = knowledgebox_pb2.KnowledgeBoxConfig()
+        response.ParseFromString(payload)
+        return response
 
     async def get_shards_object(self, kbid: str) -> writer_pb2.Shards:
         key = KB_SHARDS.format(kbid=kbid)
