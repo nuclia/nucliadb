@@ -270,7 +270,6 @@ async def test_suggest_related_entities(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
->>>>>>> 9cf1505a (parametrization)
 async def test_suggestion_on_link_computed_titles_sc6088(
     nucliadb_writer,
     nucliadb_grpc,

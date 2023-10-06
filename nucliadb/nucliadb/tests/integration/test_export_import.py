@@ -116,7 +116,6 @@ async def dst_kb(nucliadb_manager):
         pass
 
 
-<<<<<<< HEAD
 @contextmanager
 def set_standalone_mode_settings(standalone: bool):
     prev = cluster_settings.standalone_mode
