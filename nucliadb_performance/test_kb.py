@@ -3,7 +3,18 @@ from molotov import scenario
 import nucliadb_sdk
 from faker import Faker
 import random
+from nucliadb_sdk import NucliaDB
 
+
+def get_ndb_client():
+    api_key = ""
+    return NucliaDB(
+        url="https://europe-1.stashify.cloud/api",
+        api_key=api_key
+    )
+
+
+ndb = get_ndb_client()
 fake = Faker()
 REGION = "europe-1"
 ENV = "stashify.cloud"
@@ -35,7 +46,7 @@ else:
 _KBS = None
 
 
-def get_kbs():
+def get_kbs(ndb):
     import requests    
     resp = requests.get("http://reader.nucliadb.svc.cluster.local:8080/api/v1/kbs", headers={"X-nucliadb-roles": "MANAGER"})
     assert resp.status_code == 200
