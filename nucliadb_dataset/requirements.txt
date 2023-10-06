@@ -12,7 +12,9 @@ boto3-stubs
 google-auth-stubs
 types-google-cloud-ndb
 types-boto3
+urllib3<1.27,>=1.21.1
+
+# automatically bumped during release
 nucliadb-protos
 nucliadb-sdk
 nucliadb-models
-urllib3<1.27,>=1.21.1
