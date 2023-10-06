@@ -1,0 +1,26 @@
+name: Component pre-checks
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        required: true
+        type: string
+      python_version:
+        required: true
+        type: string
+
+jobs:
+  # Job to run pre-checks
+  pre_checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Install package
+        run: make -C ${{ inputs.component }}/ install-dev
+
+      - name: Run pre-checks
+        run: make -C ${{ inputs.component }}/ lint
