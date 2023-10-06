@@ -32,6 +32,7 @@ from nucliadb_sdk.utils import (
 from nucliadb_sdk.v2 import NucliaDB, NucliaDBAsync, Region, exceptions
 from nucliadb_sdk.vectors import Vector
 
+
 # backward compatibility
 NucliaSDK = NucliaDB
 NucliaSDKAsync = NucliaDBAsync
