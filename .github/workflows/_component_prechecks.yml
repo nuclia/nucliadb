@@ -19,6 +19,12 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: "pip"
+
       - name: Install package
         run: make -C ${{ inputs.component }}/ install-dev
 
