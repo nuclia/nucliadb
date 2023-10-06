@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build_wheels:
@@ -32,13 +35,12 @@ jobs:
           pip install -e ./nucliadb_protos/python/
           pip install -e ./nucliadb_utils/
           pip install -e ./nucliadb_models/
-          pip install -e ./nucliadb_client/
           pip install -e ./nucliadb_sdk/
           pip install -e ./nucliadb_dataset/
           pip install -e ./nucliadb/
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_client/ ./nucliadb_dataset/ ./nucliadb/
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry / ./nucliadb_dataset/ ./nucliadb/
 
       # XXX wait for tests to run successfully in all dependencies before we actually release
       - name: Wait for utils
@@ -46,13 +48,6 @@ jobs:
         with:
           ref: main
           check-name: NucliaDBUtilsTests (3.11)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-      - name: Wait for models
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          ref: main
-          check-name: NucliaDBModelsTests (3.11)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
       - name: Wait for sdk tests
@@ -69,6 +64,13 @@ jobs:
           check-name: NucliaDBDatasetTests (3.11)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
+      - name: Wait for telemetry tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBTelemetryTests (3.11)
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
       - name: Wait for nucliadb tests
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
@@ -77,11 +79,11 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 
-      - name: Upload to pypi
-        run: twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      # - name: Upload to pypi
+      #   run: twine upload dist/*
+      #   env:
+      #     TWINE_USERNAME: __token__
+      #     TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
       # failing, disable for now
       # - name: Run Nuclia SDK tests
