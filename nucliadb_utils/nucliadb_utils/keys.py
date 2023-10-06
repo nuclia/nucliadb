@@ -18,3 +18,4 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 KB_SHARDS = "/kbs/{kbid}/shards"
+KB_UUID = "/kbs/{kbid}/config"

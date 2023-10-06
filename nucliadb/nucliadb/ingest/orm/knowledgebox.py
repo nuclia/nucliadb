@@ -54,14 +54,13 @@ from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import compute_paragraph_key, get_basic, set_basic
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import writer_pb2
-from nucliadb_utils.keys import KB_SHARDS
+from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_audit, get_storage
 
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
 KB_KEYS = "/kbs/{kbid}/"
-KB_UUID = "/kbs/{kbid}/config"
 
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
 KB_CONFIGURATION = "/kbs/{kbid}/configuration"
@@ -88,12 +87,10 @@ class KnowledgeBox:
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
-            payload = await self.txn.get(KB_UUID.format(kbid=self.kbid))
-            if payload is not None:
-                response = KnowledgeBoxConfig()
-                response.ParseFromString(payload)
-                self._config = response
-                return response
+            config = await KnowledgeBoxDataManager._get_config(self.txn, self.kbid)
+            if config is not None:
+                self._config = config
+                return config
             else:
                 return None
         else:

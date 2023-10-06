@@ -29,3 +29,9 @@ async def test_api(writer_api, knowledgebox_ingest):
 
         resp = await client.post(f"/kb/{kbid}/export")
         assert resp.status_code < 500
+
+        # Check that for non-existing kbs, endpoints return a 404
+        for endpoint in ("/kb/idonotexist/import", "/kb/idonotexist/export"):
+            resp = await client.post(endpoint)
+            assert resp.status_code == 404
+            assert resp.json()["detail"] == "Knowledge Box not found"

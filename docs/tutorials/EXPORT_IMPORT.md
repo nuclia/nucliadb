@@ -4,15 +4,15 @@ NucliaDB allows you to generate an export of all the extracted information that 
 ## EXPORTING
 
 Via HTTP
-```
-# To start an export
-curl -XPOST http://localhost:8080/api/v1/kb/{kbid}/export
+```bash
+# To start an export. You get the export id in the response
+EXPORT_ID=`curl -XPOST 'http://localhost:8080/api/v1/kb/$KBID/export' -s -H "x-nucliadb-roles: MANAGER" | jq .export_id`
 
 # To check the status of the export
-curl -XGET http://localhost:8080/api/v1/kb/{kbid}/export/{export_id}/status
+curl -XGET http://localhost:8080/api/v1/kb/$KBID/export/$EXPORT_ID/status -H "x-nucliadb-roles: READER"
 
 # To download the export once it has been finished
-curl -XGET http://localhost:8080/api/v1/kb/{kbid}/export/{export_id} -o /path/to/export/file
+curl -XGET http://localhost:8080/api/v1/kb/$KBID/export/$EXPORT_ID -o /path/to/export/file
 ```
 
 Via python
@@ -39,12 +39,12 @@ with open("/path/to/export/file", "wb") as f:
 ## IMPORTING
 
 Via HTTP
-```
-# To upload the exported data and start an import
-curl -XPOST http://localhost:8080/api/v1/kb/{kbid}/import -d /path/to/export/file
+```bash
+# To upload the exported data and start an import. You get the import id in the response
+curl http://localhost:8080/api/v1/kb/$KBID/import -H 'x-nucliadb-roles: MANAGER' -H 'Content-Type: binary/octet-stream' --data-binary @/path/to/export/file
 
 # To check the status of the import
-curl -XGET http://localhost:8080/api/v1/kb/{kbid}/import/{import_id}/status
+curl -XGET http://localhost:8080/api/v1/kb/$KBID/import/$IMPORT_ID/status -H 'x-nucliadb-roles: READER'
 ```
 
 Via python

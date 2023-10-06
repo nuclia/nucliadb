@@ -25,6 +25,7 @@ from starlette.requests import Request
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.models import (
@@ -60,6 +61,9 @@ from nucliadb_utils.utilities import has_feature
 @version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
     export_id = uuid4().hex
     if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, exports are generated at download time.
@@ -81,6 +85,9 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 @version(1)
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
     import_id = uuid4().hex
     if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, we import directly from the request content stream.
@@ -159,3 +166,8 @@ class FastAPIExportStream(IteratorExportStream):
     def __init__(self, request: Request):
         iterator = request.stream().__aiter__()
         super().__init__(iterator)
+
+
+async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
+    dm = KnowledgeBoxDataManager(context.kv_driver)
+    return await dm.exists_kb(kbid)
