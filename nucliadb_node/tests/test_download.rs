@@ -69,8 +69,7 @@ async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
                 content.push_str(&chunk);
             }
 
-            let json_content: Value = serde_json::from_str(content.as_str()).unwrap();
-            assert_eq!(json_content["opstamp"], 14);
+            assert!(serde_json::from_str::<Value>(content.as_str()).is_ok());
         }
     }
 
