@@ -6,7 +6,7 @@ mmh3>=3.0.0
 nats-py[nkeys]==2.2.0
 pyjwt>=2.4.0
 memorylru>=1.1.2
-nucliadb-protos>=2.24.0
-nucliadb-telemetry>=1.15.0
+nucliadb-protos
+nucliadb-telemetry
 mrflagly
 urllib3<1.27,>=1.21.1
