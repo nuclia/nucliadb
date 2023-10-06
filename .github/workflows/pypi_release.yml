@@ -28,6 +28,23 @@ jobs:
       - name: Set dependency versions in requirements
         run: |
           python bump.py --build=${{github.run_number}}
+      
+      - uses: dorny/paths-filter@v2
+        id: component_changes
+        with:
+          filters: |
+            nucliadb_protos:
+              - 'nucliadb_protos/**'
+            nucliadb_utils:
+              - 'nucliadb_utils/**'
+            nucliadb_models:
+              - 'nucliadb_models/**'
+            nucliadb_sdk:
+              - 'nucliadb_sdk/**'
+            nucliadb_dataset:
+              - 'nucliadb_dataset/**'
+            nucliadb_telemetry:
+              - 'nucliadb_telemetry/**'
 
       # Install all packages we are going to release
       - name: Install all packages
@@ -46,6 +63,7 @@ jobs:
       # XXX wait for tests to run successfully in all dependencies before we actually release
       - name: Wait for utils
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_utils == 'true'
         with:
           ref: main
           check-name: NucliaDBUtilsTests (3.11)
@@ -53,6 +71,7 @@ jobs:
           wait-interval: 10
       - name: Wait for sdk tests
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_sdk == 'true'
         with:
           ref: main
           check-name: NucliaDBSDKTests (3.11)
@@ -60,6 +79,7 @@ jobs:
           wait-interval: 10
       - name: Wait for dataset tests
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_dataset == 'true'
         with:
           ref: main
           check-name: NucliaDBDatasetTests (3.11)
@@ -67,16 +87,10 @@ jobs:
           wait-interval: 10
       - name: Wait for telemetry tests
         uses: lewagon/wait-on-check-action@v1.3.1
+        if: steps.component_changes.outputs.nucliadb_telemetry == 'true'
         with:
           ref: main
           check-name: NucliaDBTelemetryTests (3.11)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-      - name: Wait for nucliadb tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          ref: main
-          check-name: NucliaDBTests (3.11, pg)
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 
