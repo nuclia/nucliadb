@@ -25,7 +25,6 @@ from functools import partial
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import noderesources_pb2, nodesidecar_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -103,7 +102,5 @@ class ShardCreatorHandler:
         await self.shard_manager.maybe_create_new_shard(
             kbid,
             shard_counter,  # type: ignore
-            release_channel=ReleaseChannel.from_message(
-                kb_shards.release_channel
-            ).value,
+            release_channel=kb_shards.release_channel,
         )
