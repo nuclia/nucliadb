@@ -216,7 +216,7 @@ pub struct Resource {
     pub relations_to_delete: ::prost::alloc::vec::Vec<super::utils::Relation>,
     #[prost(string, tag="11")]
     pub shard_id: ::prost::alloc::string::String,
-    /// vectorset is the key 
+    /// vectorset is the key
     #[prost(map="string, message", tag="12")]
     pub vectors: ::std::collections::HashMap<::prost::alloc::string::String, super::utils::UserVectors>,
     /// Vectorset prefix vector id

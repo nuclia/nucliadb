@@ -143,7 +143,7 @@ pub struct ParagraphSearchRequest {
 pub struct ResultScore {
     #[prost(float, tag="1")]
     pub bm25: f32,
-    /// In the case of two equal bm25 scores, booster 
+    /// In the case of two equal bm25 scores, booster
     /// decides
     #[prost(float, tag="2")]
     pub booster: f32,
@@ -212,7 +212,7 @@ pub struct ParagraphSearchResponse {
     pub fuzzy_distance: i32,
     #[prost(int32, tag="1")]
     pub total: i32,
-    /// 
+    ///
     #[prost(message, repeated, tag="2")]
     pub results: ::prost::alloc::vec::Vec<ParagraphResult>,
     /// For each field what facets are.
@@ -549,6 +549,37 @@ pub struct StreamRequest {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
     #[prost(message, optional, tag="4")]
     pub filter: ::core::option::Option<StreamFilter>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetShardFilesRequest {
+    #[prost(string, tag="1")]
+    pub shard_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShardFileList {
+    #[prost(message, repeated, tag="2")]
+    pub files: ::prost::alloc::vec::Vec<ShardFile>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShardFile {
+    #[prost(string, tag="1")]
+    pub relative_path: ::prost::alloc::string::String,
+    #[prost(uint64, tag="2")]
+    pub size: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DownloadShardFileRequest {
+    #[prost(string, tag="1")]
+    pub shard_id: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub relative_path: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShardFileChunk {
+    #[prost(bytes="vec", tag="1")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+    #[prost(int32, tag="2")]
+    pub index: i32,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -912,6 +943,48 @@ pub mod node_reader_client {
             );
             self.inner.server_streaming(request.into_request(), path, codec).await
         }
+        /// Shard Download
+        pub async fn get_shard_files(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetShardFilesRequest>,
+        ) -> Result<tonic::Response<super::ShardFileList>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/GetShardFiles",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn download_shard_file(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DownloadShardFileRequest>,
+        ) -> Result<
+            tonic::Response<tonic::codec::Streaming<super::ShardFileChunk>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/DownloadShardFile",
+            );
+            self.inner.server_streaming(request.into_request(), path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -994,6 +1067,21 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::StreamRequest>,
         ) -> Result<tonic::Response<Self::DocumentsStream>, tonic::Status>;
+        /// Shard Download
+        async fn get_shard_files(
+            &self,
+            request: tonic::Request<super::GetShardFilesRequest>,
+        ) -> Result<tonic::Response<super::ShardFileList>, tonic::Status>;
+        ///Server streaming response type for the DownloadShardFile method.
+        type DownloadShardFileStream: futures_core::Stream<
+                Item = Result<super::ShardFileChunk, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        async fn download_shard_file(
+            &self,
+            request: tonic::Request<super::DownloadShardFileRequest>,
+        ) -> Result<tonic::Response<Self::DownloadShardFileStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct NodeReaderServer<T: NodeReader> {
@@ -1619,6 +1707,88 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DocumentsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/GetShardFiles" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetShardFilesSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::UnaryService<super::GetShardFilesRequest>
+                    for GetShardFilesSvc<T> {
+                        type Response = super::ShardFileList;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetShardFilesRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).get_shard_files(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetShardFilesSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/DownloadShardFile" => {
+                    #[allow(non_camel_case_types)]
+                    struct DownloadShardFileSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::ServerStreamingService<
+                        super::DownloadShardFileRequest,
+                    > for DownloadShardFileSvc<T> {
+                        type Response = super::ShardFileChunk;
+                        type ResponseStream = T::DownloadShardFileStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DownloadShardFileRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).download_shard_file(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DownloadShardFileSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

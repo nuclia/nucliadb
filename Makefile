@@ -105,7 +105,7 @@ build-node-debug:
 		echo "Failed to download build from build server. Manually running build." && \
 		docker build -t eu.gcr.io/stashify-218417/node:main --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
 	)
-	
+
 
 # Not use the base image
 build-base-node-image-scratch:
