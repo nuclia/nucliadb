@@ -20,7 +20,6 @@ lint:
 
 .PHONY: test-search-cluster
 test-search-cluster:
-	echo " *  Test Started at: $$(date)"
+	echo " *  Test Started at: $$(date -u)"
 	molotov ./nucliadb_performance/test_search_cluster.py --sizing --sizing-tolerance=10 -w 100 --ramp-up 500 -d 600 --force-shutdown
-
-	echo " *  Test Finished at: $$(date)"
+	echo " *  Test Finished at: $$(date -u)"
