@@ -33,6 +33,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardNotFound
@@ -177,7 +178,7 @@ class KnowledgeBox:
         semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
-        release_channel: Optional[str] = None,
+        release_channel: Optional[ReleaseChannel.ValueType] = None,
     ) -> Tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
@@ -215,7 +216,7 @@ class KnowledgeBox:
             failed = True
 
         if release_channel is None:
-            release_channel = "STABLE"
+            release_channel = ReleaseChannel.STABLE
 
         if failed is False:
             shard_manager = get_shard_manager()

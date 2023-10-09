@@ -103,5 +103,7 @@ class ShardCreatorHandler:
         await self.shard_manager.maybe_create_new_shard(
             kbid,
             shard_counter,  # type: ignore
-            release_channel=ReleaseChannel(kb_shards.release_channel).value,
+            release_channel=ReleaseChannel.from_message(
+                kb_shards.release_channel
+            ).value,
         )

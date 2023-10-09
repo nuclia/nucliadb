@@ -158,7 +158,7 @@ class KBShardManager:
         txn: Transaction,
         kbid: str,
         semantic_model: SemanticModelMetadata,
-        release_channel: str,
+        release_channel: ReleaseChannel,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -184,7 +184,7 @@ class KBShardManager:
             kb_shards = writer_pb2.Shards()
             kb_shards.ParseFromString(kb_shards_binary)
 
-        kb_shards.release_channel = ReleaseChannel(release_channel).to_pb()
+        kb_shards.release_channel = release_channel
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]

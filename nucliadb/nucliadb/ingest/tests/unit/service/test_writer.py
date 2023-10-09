@@ -220,6 +220,7 @@ class TestWriterServicer:
             request.config,
             expected_model_metadata,
             forceuuid=request.forceuuid,
+            release_channel=0,
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
@@ -243,6 +244,7 @@ class TestWriterServicer:
             request.config,
             expected_model_metadata,
             forceuuid=request.forceuuid,
+            release_channel=0,
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
