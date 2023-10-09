@@ -322,37 +322,35 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
-    def should_create_new_shard(self, shard_info: noderesources_pb2.Shard) -> bool:
+    def should_create_new_shard(self, num_paragraphs: int, num_fields: int) -> bool:
         return (
-            shard_info.paragraphs > settings.max_shard_paragraphs
-            or shard_info.fields > settings.max_shard_fields
+            num_paragraphs > settings.max_shard_paragraphs
+            or num_fields > settings.max_shard_fields
         )
 
     async def maybe_create_new_shard(
         self,
         kbid: str,
-        shard_info: noderesources_pb2.Shard,
-        release_channel: Optional[utils_pb2.ReleaseChannel.ValueType] = None,
+        num_paragraphs: int,
+        num_fields: int,
+        release_channel: utils_pb2.ReleaseChannel.ValueType = utils_pb2.ReleaseChannel.STABLE,
     ):
-        if self.should_create_new_shard(shard_info):
-            logger.warning({"message": "Adding shard", "kbid": kbid})
-            kbdm = KnowledgeBoxDataManager(get_driver())
-            model = await kbdm.get_model_metadata(kbid)
-            driver = get_driver()
+        if not self.should_create_new_shard(num_paragraphs, num_fields):
+            return
 
-            # The API can be called with a Counter that has no metadata
-            # in that case, the release channel is explicitely passed
-            if release_channel is None:
-                release_channel = shard_info.metadata.release_channel
+        logger.warning({"message": "Adding shard", "kbid": kbid})
+        kbdm = KnowledgeBoxDataManager(get_driver())
+        model = await kbdm.get_model_metadata(kbid)
+        driver = get_driver()
 
-            async with driver.transaction() as txn:
-                await self.create_shard_by_kbid(
-                    txn,
-                    kbid,
-                    semantic_model=model,
-                    release_channel=release_channel,
-                )
-                await txn.commit()
+        async with driver.transaction() as txn:
+            await self.create_shard_by_kbid(
+                txn,
+                kbid,
+                semantic_model=model,
+                release_channel=release_channel,
+            )
+            await txn.commit()
 
 
 class StandaloneKBShardManager(KBShardManager):
@@ -380,11 +378,15 @@ class StandaloneKBShardManager(KBShardManager):
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
-            # TODO: how do I get the release channel from that shard
             await self.maybe_create_new_shard(
-                kbid, shard_info, utils_pb2.ReleaseChannel.STABLE
+                kbid,
+                shard_info.paragraphs,
+                shard_info.fields,
+                shard_info.metadata.release_channel,
             )
-            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
+            await index_node.writer.GC(
+                noderesources_pb2.ShardId(id=shard_id)
+            )  # type: ignore
 
     async def delete_resource(
         self,
