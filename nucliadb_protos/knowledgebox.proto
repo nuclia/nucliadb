@@ -39,6 +39,7 @@ message KnowledgeBoxConfig {
     string slug = 5;
     bool disable_vectors = 6 [deprecated = true];
     int64 migration_version = 7;
+    utils.ReleaseChannel release_channel = 8;
 }
 
 // NEW

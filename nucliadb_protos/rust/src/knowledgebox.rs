@@ -36,6 +36,8 @@ pub struct KnowledgeBoxConfig {
     pub disable_vectors: bool,
     #[prost(int64, tag="7")]
     pub migration_version: i64,
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="8")]
+    pub release_channel: i32,
 }
 // NEW
 

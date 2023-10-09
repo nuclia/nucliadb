@@ -37,6 +37,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
+from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
@@ -321,8 +322,19 @@ class Processor:
             if shard is None:
                 # no shard available, create a new one
                 model = await self.kb_data_manager.get_model_metadata(kbid)
+                config = await kb.get_config()
+                if config is not None:
+                    release_channel = ReleaseChannel.from_message(
+                        config.release_channel
+                    ).value
+                else:
+                    release_channel = "STABLE"
+
                 shard = await self.shard_manager.create_shard_by_kbid(
-                    txn, kbid, semantic_model=model
+                    txn,
+                    kbid,
+                    semantic_model=model,
+                    release_channel=release_channel,
                 )
             await kb.set_resource_shard_id(uuid, shard.shard)
 

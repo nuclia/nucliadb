@@ -38,6 +38,7 @@ from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
@@ -183,6 +184,7 @@ class KBShardManager:
             kb_shards = writer_pb2.Shards()
             kb_shards.ParseFromString(kb_shards_binary)
 
+        kb_shards.release_channel = ReleaseChannel(release_channel).to_pb()
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
@@ -209,7 +211,7 @@ class KBShardManager:
                     shard_created = await node.new_shard(
                         kbid,
                         similarity=kb_shards.similarity,
-                        release_channel=release_channel,
+                        release_channel=kb_shards.release_channel,
                     )
                 except Exception as e:
                     errors.capture_exception(e)

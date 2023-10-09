@@ -118,6 +118,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
     MIGRATION_VERSION_FIELD_NUMBER: builtins.int
+    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     @property
@@ -127,6 +128,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     slug: builtins.str
     disable_vectors: builtins.bool
     migration_version: builtins.int
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
@@ -137,8 +139,9 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         slug: builtins.str = ...,
         disable_vectors: builtins.bool = ...,
         migration_version: builtins.int = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "slug", b"slug", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 

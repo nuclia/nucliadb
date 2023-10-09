@@ -89,7 +89,9 @@ async def create_rollover_shards(
                     continue
                 try:
                     shard_created = await node.new_shard(
-                        kbid, similarity=kb_shards.similarity
+                        kbid,
+                        similarity=kb_shards.similarity,
+                        release_channel=kb_shards.release_channel,
                     )
                 except Exception as e:
                     errors.capture_exception(e)

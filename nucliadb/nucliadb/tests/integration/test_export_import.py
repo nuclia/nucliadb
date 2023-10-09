@@ -130,7 +130,6 @@ def standalone_nucliadb():
         yield
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_on_standalone_nucliadb(
     standalone_nucliadb,
     natsd,
