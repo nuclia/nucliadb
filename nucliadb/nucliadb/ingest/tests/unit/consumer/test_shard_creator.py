@@ -101,7 +101,7 @@ async def test_handle_message_create_new_shard(
     await asyncio.sleep(0.06)
 
     shard_manager.maybe_create_new_shard.assert_called_with(
-        "kbid", ANY, release_channel="STABLE"
+        "kbid", ANY, release_channel=0
     )
 
 
