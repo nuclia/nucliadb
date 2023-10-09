@@ -1,7 +1,12 @@
 from faker import Faker
 from molotov import global_setup, scenario
 
-from .utils import get_fake_word, get_random_kb, get_search_client, load_kbs
+from nucliadb_performance.utils import (
+    get_fake_word,
+    get_random_kb,
+    get_search_client,
+    load_kbs,
+)
 
 fake = Faker()
 
@@ -52,7 +57,7 @@ async def test_chat(session):
         "POST",
         f"/kb/{kbid}/chat",
         json={"query": fake.sentence()},
-        headers={"x-nucliadb-roles": "READER", "X-Synchronous": True},
+        headers={"x-nucliadb-roles": "READER", "X-Synchronous": "true"},
     )
 
 
