@@ -17,8 +17,10 @@ lint:
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 
+
 .PHONY: test-search-cluster
 test-search-cluster:
-	echo "Test started at $(shell date)"
-	molotov ./nucliadb_performance/test_search_cluster.py --sizing --sizing-tolerance=10 -w 100 --ramp-up 500 -d 600
-	echo "Test finished at $(shell date)"
+	echo " *  Test Started at: $$(date)"
+	molotov ./nucliadb_performance/test_search_cluster.py --sizing --sizing-tolerance=10 -w 100 --ramp-up 500 -d 600 --force-shutdown
+
+	echo " *  Test Finished at: $$(date)"
