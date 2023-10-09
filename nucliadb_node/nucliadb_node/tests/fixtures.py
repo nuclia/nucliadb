@@ -29,8 +29,9 @@ from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
 from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
-from nucliadb_protos.nodewriter_pb2 import NewShardRequest, ReleaseChannel
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
