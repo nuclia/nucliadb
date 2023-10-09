@@ -100,5 +100,8 @@ class ShardCreatorHandler:
             noderesources_pb2.ShardId(id=shard_id)  # type: ignore
         )
         await self.shard_manager.maybe_create_new_shard(
-            kbid, shard_counter, kb_shards.release_channel  # type: ignore
+            kbid,
+            shard_counter.paragraphs,
+            shard_counter.fields,
+            kb_shards.release_channel,
         )
