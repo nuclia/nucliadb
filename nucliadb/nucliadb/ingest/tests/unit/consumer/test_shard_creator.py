@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from nucliadb_protos.nodesidecar_pb2 import Counter

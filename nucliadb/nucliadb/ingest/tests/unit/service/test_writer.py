@@ -23,7 +23,7 @@ import pytest
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
-from nucliadb_protos.utils_pb2 import VectorSimilarity
+from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
@@ -32,8 +32,6 @@ from nucliadb.ingest.service.writer import (
     update_shards_with_updated_replica,
 )
 from nucliadb_protos import writer_pb2
-
-pytestmark = pytest.mark.asyncio
 
 
 def test_update_shards_pb_replica():
@@ -221,6 +219,28 @@ class TestWriterServicer:
             expected_model_metadata,
             forceuuid=request.forceuuid,
             release_channel=0,
+        )
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
+
+    async def test_NewKnowledgeBox_experimental_channel(self, writer: WriterServicer):
+        request = writer_pb2.KnowledgeBoxNew(
+            slug="slug",
+            similarity=VectorSimilarity.DOT,
+            release_channel=ReleaseChannel.EXPERIMENTAL,
+        )
+        writer.proc.create_kb.return_value = "kbid"
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        expected_model_metadata = SemanticModelMetadata(
+            similarity_function=VectorSimilarity.DOT
+        )
+        writer.proc.create_kb.assert_called_once_with(
+            request.slug,
+            request.config,
+            expected_model_metadata,
+            forceuuid=request.forceuuid,
+            release_channel=1,
         )
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
 
