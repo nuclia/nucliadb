@@ -332,16 +332,25 @@ class KBShardManager:
         self,
         kbid: str,
         shard_info: noderesources_pb2.Shard,
-        release_channel: utils_pb2.ReleaseChannel.ValueType,
+        release_channel: Optional[utils_pb2.ReleaseChannel.ValueType] = None,
     ):
         if self.should_create_new_shard(shard_info):
             logger.warning({"message": "Adding shard", "kbid": kbid})
             kbdm = KnowledgeBoxDataManager(get_driver())
             model = await kbdm.get_model_metadata(kbid)
             driver = get_driver()
+
+            # The API can be called with a Counter that has no metadata
+            # in that case, the release channel is explicitely passed
+            if release_channel is None:
+                release_channel = shard_info.metadata.release_channel
+
             async with driver.transaction() as txn:
                 await self.create_shard_by_kbid(
-                    txn, kbid, semantic_model=model, release_channel=release_channel
+                    txn,
+                    kbid,
+                    semantic_model=model,
+                    release_channel=release_channel,
                 )
                 await txn.commit()
 
@@ -375,6 +384,7 @@ class StandaloneKBShardManager(KBShardManager):
             await self.maybe_create_new_shard(
                 kbid, shard_info, utils_pb2.ReleaseChannel.STABLE
             )
+            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
     async def delete_resource(
         self,

@@ -692,13 +692,16 @@ class ShardMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     KBID_FIELD_NUMBER: builtins.int
+    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     kbid: builtins.str
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
         kbid: builtins.str = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "release_channel", b"release_channel"]) -> None: ...
 
 global___ShardMetadata = ShardMetadata
 

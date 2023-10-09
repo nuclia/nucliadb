@@ -167,6 +167,7 @@ message Resource {
 
 message ShardMetadata {
     string kbid = 1;
+    utils.ReleaseChannel release_channel = 2;
 }
 
 message NodeMetadata {
