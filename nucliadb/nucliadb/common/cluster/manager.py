@@ -38,11 +38,11 @@ from nucliadb.common.datamanagers.cluster import ClusterDataManager
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
     nodewriter_pb2,
+    utils_pb2,
     writer_pb2,
 )
 from nucliadb_telemetry import errors
@@ -158,7 +158,7 @@ class KBShardManager:
         txn: Transaction,
         kbid: str,
         semantic_model: SemanticModelMetadata,
-        release_channel: ReleaseChannel,
+        release_channel: utils_pb2.ReleaseChannel.ValueType,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -329,7 +329,10 @@ class KBShardManager:
         )
 
     async def maybe_create_new_shard(
-        self, kbid: str, shard_info: noderesources_pb2.Shard, release_channel: str
+        self,
+        kbid: str,
+        shard_info: noderesources_pb2.Shard,
+        release_channel: utils_pb2.ReleaseChannel.ValueType,
     ):
         if self.should_create_new_shard(shard_info):
             logger.warning({"message": "Adding shard", "kbid": kbid})
@@ -368,7 +371,10 @@ class StandaloneKBShardManager(KBShardManager):
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
-            await self.maybe_create_new_shard(kbid, shard_info)
+            # TODO: how do I get the release channel from that shard
+            await self.maybe_create_new_shard(
+                kbid, shard_info, utils_pb2.ReleaseChannel.STABLE
+            )
 
     async def delete_resource(
         self,
