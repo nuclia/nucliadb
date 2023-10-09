@@ -38,7 +38,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models.resource import ReleaseChannel
-from nucliadb_protos import knowledgebox_pb2, writer_pb2, utils_pb2
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
