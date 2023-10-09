@@ -92,6 +92,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
+<<<<<<< HEAD
             pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json  --shard-id=0 --num-shards=3 nucliadb/nucliadb/tests
 
       - name: Run PG tests 2/3
