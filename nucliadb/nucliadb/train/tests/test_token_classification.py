@@ -206,6 +206,7 @@ async def inject_resource_with_token_classification(knowledgebox, writer):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_token_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
