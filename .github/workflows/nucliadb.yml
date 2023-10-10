@@ -30,10 +30,10 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      max-parallel: 4
+      max-parallel: 6
       matrix:
         python-version: ["3.11"]
-        maindb_driver: ["tikv", "tikv_2", "tikv_3", "pg", "pg_2"]
+        maindb_driver: ["tikv", "tikv_2", "tikv_3", "pg", "pg_2", "pg_3"]
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -81,7 +81,7 @@ jobs:
             echo "Failed building from the build server." && make build-node-binding-debug
           )
 
-      - name: Run PG tests 1/2
+      - name: Run PG tests 1/3
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
         if: matrix.maindb_driver == 'pg'
@@ -92,9 +92,9 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json  --shard-id=0 --num-shards=2 nucliadb/nucliadb/tests
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json  --shard-id=0 --num-shards=3 nucliadb/nucliadb/tests
 
-      - name: Run PG tests 2/2
+      - name: Run PG tests 2/3
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
         if: matrix.maindb_driver == 'pg_2'
@@ -105,7 +105,20 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=2 nucliadb/nucliadb/tests
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=3 nucliadb/nucliadb/tests
+
+      - name: Run PG tests 2/3
+        # These tests can be flaky, let's retry them...
+        uses: nick-fields/retry@v2
+        if: matrix.maindb_driver == 'pg_3'
+        env:
+          TESTING_MAINDB_DRIVERS: pg
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=2 --num-shards=3 nucliadb/nucliadb/tests
 
       - name: Run Tikv tests 1/2
         # These tests can be flaky, let's retry them...
