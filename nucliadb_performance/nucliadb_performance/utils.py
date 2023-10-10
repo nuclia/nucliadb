@@ -2,21 +2,35 @@ import random
 from typing import Optional
 
 from faker import Faker
+from pydantic import BaseSettings
 
 from nucliadb_sdk import NucliaDB
 
 fake = Faker()
 
 
-def get_base_url():
-    return "http://search.nucliadb.svc.cluster.local:8080/api/v1"
+def get_search_api_url():
+    return settings.search_api or settings.main_api
 
 
-def get_url(path):
-    return get_base_url() + path
+def get_reader_api_url():
+    return settings.reader_api or settings.main_api
+
+
+def get_search_url(path):
+    return get_search_api_url() + path
 
 
 _DATA = {}
+
+
+class Settings(BaseSettings):
+    main_api: str = "http://localhost:8080/api"
+    search_api: Optional[str] = None
+    reader_api: Optional[str] = None
+
+
+settings = Settings()
 
 
 class Client:
@@ -38,7 +52,7 @@ class Client:
 
 def get_kbs():
     ndb = NucliaDB(
-        url="http://reader.nucliadb.svc.cluster.local:8080/api",
+        url=settings.reader_api,
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     resp = ndb.list_knowledge_boxes()
@@ -60,7 +74,7 @@ def get_entities(kbs):
 
 def get_kb_entities(kbid):
     ndb = NucliaDB(
-        url="http://reader.nucliadb.svc.cluster.local:8080/api",
+        url=settings.reader_api,
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
     entities = ndb.get_entitygroups(kbid=kbid, query_params={"show_entities": True})
@@ -83,4 +97,4 @@ def get_fake_word():
 
 
 def get_search_client(session):
-    return Client(session, get_base_url(), headers={"X-NUCLIADB-ROLES": "READER"})
+    return Client(session, get_search_api_url(), headers={"X-NUCLIADB-ROLES": "READER"})

@@ -32,7 +32,7 @@ async def test_suggest(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/suggest",
+        f"/v1/kb/{kbid}/suggest",
         params={"query": get_fake_word()},
     )
 
@@ -43,7 +43,7 @@ async def test_catalog(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/catalog",
+        f"/v1/kb/{kbid}/catalog",
     )
 
 
@@ -53,7 +53,7 @@ async def test_chat(session):
     kbid = get_random_kb()
     await client.make_request(
         "POST",
-        f"/kb/{kbid}/chat",
+        f"/v1/kb/{kbid}/chat",
         json={"query": fake.sentence()},
         headers={"X-Synchronous": "true"},
     )
@@ -65,7 +65,7 @@ async def test_find(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/find",
+        f"/v1/kb/{kbid}/find",
         params={"query": fake.sentence()},
     )
 
@@ -76,6 +76,6 @@ async def test_search(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/search",
+        f"/v1/kb/{kbid}/search",
         params={"query": fake.sentence()},
     )
