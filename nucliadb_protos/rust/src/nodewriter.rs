@@ -44,6 +44,8 @@ pub struct IndexMessage {
     pub storage_key: ::prost::alloc::string::String,
     #[prost(string, tag="9")]
     pub kbid: ::prost::alloc::string::String,
+    #[prost(enumeration="IndexMessageSource", tag="10")]
+    pub source: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetGraph {
@@ -82,6 +84,12 @@ pub struct NewVectorSetRequest {
 pub enum TypeMessage {
     Creation = 0,
     Deletion = 1,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum IndexMessageSource {
+    Processor = 0,
+    Writer = 1,
 }
 /// Generated client implementations.
 pub mod node_writer_client {

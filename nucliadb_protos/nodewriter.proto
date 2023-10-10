@@ -26,6 +26,11 @@ enum TypeMessage {
     DELETION = 1;
 }
 
+enum IndexMessageSource {
+    PROCESSOR = 0;
+    WRITER = 1;
+}
+
 message IndexMessage {
     string node = 1;
     string shard = 2;  // physical shard message is for
@@ -36,6 +41,7 @@ message IndexMessage {
     optional string partition = 7;
     string storage_key = 8;
     string kbid = 9;
+    IndexMessageSource source = 10;
 }
 
 message SetGraph {
