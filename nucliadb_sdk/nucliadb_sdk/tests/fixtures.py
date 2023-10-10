@@ -45,6 +45,7 @@ images.settings["nucliadb"] = {
         "max_receive_message_length": "40",
         "TEST_SENTENCE_ENCODER": "multilingual-2023-02-21",
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
+        "LOG_LEVEL": "DEBUG",
         "DEBUG": "True",
     },
 }
