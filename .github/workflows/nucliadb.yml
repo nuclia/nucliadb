@@ -94,7 +94,7 @@ jobs:
           command: |
             pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests
 
-      - name: Run Tikv tests
+      - name: Run Tikv integration tests
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
         if: matrix.maindb_driver == 'tikv'
@@ -106,6 +106,19 @@ jobs:
           timeout_minutes: 20
           command: |
             pytest -rfE -n auto --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/integration
+
+      - name: Run Tikv unit tests
+        # These tests can be flaky, let's retry them...
+        uses: nick-fields/retry@v2
+        if: matrix.maindb_driver == 'tikv'
+        env:
+          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 20
+          command: |
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/unit nucliadb/nucliadb/tests/benchmarks
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
