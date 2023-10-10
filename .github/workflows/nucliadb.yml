@@ -48,7 +48,7 @@ jobs:
         run: make -C nucliadb/ install-dev
 
       - name: Install tikv
-        if: matrix.maindb_driver == 'tikv'
+        if: matrix.maindb_driver == 'tikv' || matrix.maindb_driver == 'tikv_xdist'
         run: ./scripts/run-tikv.sh
 
       - uses: dorny/paths-filter@v2
