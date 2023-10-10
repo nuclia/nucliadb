@@ -18,19 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
 import tempfile
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from nucliadb.common.cluster.settings import Settings
 from nucliadb.common.cluster.standalone import service
 from nucliadb_protos import nodereader_pb2, standalone_pb2
 
 pytestmark = pytest.mark.asyncio
-
-
-from nucliadb.common.cluster.settings import Settings
-from nucliadb.common.cluster.standalone import utils
 
 
 @pytest.fixture
