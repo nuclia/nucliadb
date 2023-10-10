@@ -105,7 +105,7 @@ jobs:
           retry_on: error
           timeout_minutes: 20
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/integration/*.py nucliadb/nucliadb/tests/integration/tasks nucliadb/nucliadb/tests/integration/export_import nucliadb/nucliadb/tests/integration/migrator
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=0 --num-shards=2 nucliadb/nucliadb/tests
 
       - name: Run Tikv tests 2/2
         # These tests can be flaky, let's retry them...
@@ -118,7 +118,7 @@ jobs:
           retry_on: error
           timeout_minutes: 20
           command: |
-            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/unit nucliadb/nucliadb/tests/benchmarks nucliadb/tests/integration/common nucliadb/nucliadb/tests/integration/search
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=2 nucliadb/nucliadb/tests
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
