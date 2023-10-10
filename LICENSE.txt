@@ -1,4 +1,3 @@
-
 Copyright (C) 2021 Bosutech XXI S.L.
 
 NucliaDB is offered under the [GNU Affero General Public License v3.0](https://opensource.org/licenses/AGPL-3.0)
