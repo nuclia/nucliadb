@@ -105,6 +105,8 @@ def nucliadb():
             container=container.container_obj,
             url=f"http://{host}:{port}/api",
         )
+        logs = container.container_obj.logs().decode("utf-8")
+        print(f"nucliadb logs:\n{logs}")
         container.stop()
 
 
