@@ -169,7 +169,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ./cache
-          key: ${{ runner.os }}-nucliadb-benchmark
+          key: ${{ runner.os }}-${{matrix.maindb_driver}}-nucliadb-benchmark
 
       - name: Comment and Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
