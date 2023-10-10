@@ -70,8 +70,8 @@ def test_priority_ordering():
 
 @pytest.mark.parametrize("lock_klass", [FifoLock, PriorityLock])
 @pytest.mark.asyncio
-async def test_shard_indexing_coordinator_with_fifo_lock_queue_single_shard(lock_klass):
-    """Test how coordination works with a FifoLock and 3 tasks competing for the
+async def test_shard_indexing_coordinator_single_shard(lock_klass):
+    """Test how coordination works with a queue lock and 3 tasks competing for the
     same shard.
 
     We expect tasks to synchronize and make progress one after the other in the
@@ -152,10 +152,10 @@ async def test_shard_indexing_coordinator_with_fifo_lock_queue_single_shard(lock
 
 @pytest.mark.parametrize("lock_klass", [FifoLock, PriorityLock])
 @pytest.mark.asyncio
-async def test_shard_indexing_coordinator_with_fifo_lock_queue_multiple_shards(
+async def test_shard_indexing_coordinator_multiple_shards(
     lock_klass,
 ):
-    """Test how coordination works with a FifoLock and 2 tasks competing for
+    """Test how coordination works with a queue lock and 2 tasks competing for
     different shards.
 
     The expected behaviour is a non blocking scenario where both tasks can get
@@ -205,6 +205,89 @@ async def test_shard_indexing_coordinator_with_fifo_lock_queue_multiple_shards(
         Event("2", When.AFTER, LockStatus.ACQUIRE),
         Event("1", When.BEFORE, LockStatus.RELEASE),
         Event("1", When.AFTER, LockStatus.RELEASE),
+        Event("2", When.BEFORE, LockStatus.RELEASE),
+        Event("2", When.AFTER, LockStatus.RELEASE),
+    ]
+    assert events.events == expected
+
+
+@pytest.mark.parametrize("lock_klass", [PriorityLock])
+@pytest.mark.asyncio
+async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass):
+    """Test how coordination works with a priority queue lock and 3 tasks competing
+    for the same shard.
+
+    We expect tasks to synchronize and make progress one after the other in the
+    request shard order.
+
+    """
+    sic = ShardIndexingCoordinator(lock_klass)
+    shard = "my-shard"
+    events = EventRecorder()
+
+    async def task_1():
+        nonlocal events, shard, sic
+
+        events.record(Event("1", When.BEFORE, LockStatus.ACQUIRE))
+        await sic.request_shard(shard)
+        events.record(Event("1", When.AFTER, LockStatus.ACQUIRE))
+
+        # simulate some async work
+        await asyncio.sleep(0.010)
+
+        events.record(Event("1", When.BEFORE, LockStatus.RELEASE))
+        await sic.release_shard(shard)
+        events.record(Event("1", When.AFTER, LockStatus.RELEASE))
+
+    async def task_2():
+        nonlocal events, shard, sic
+
+        # let's task 1 start the sequence
+        await asyncio.sleep(0)
+
+        events.record(Event("2", When.BEFORE, LockStatus.ACQUIRE))
+        await sic.request_shard(shard)
+        events.record(Event("2", When.AFTER, LockStatus.ACQUIRE))
+
+        # simulate some async work
+        await asyncio.sleep(0.010)
+
+        events.record(Event("2", When.BEFORE, LockStatus.RELEASE))
+        await sic.release_shard(shard)
+        events.record(Event("2", When.AFTER, LockStatus.RELEASE))
+
+    async def task_3():
+        nonlocal events, shard, sic
+
+        # let's tasks 1 and 2 start the sequence
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+        events.record(Event("3", When.BEFORE, LockStatus.ACQUIRE))
+        await sic.request_shard_fast(shard)
+        events.record(Event("3", When.AFTER, LockStatus.ACQUIRE))
+
+        # simulate some async work
+        await asyncio.sleep(0.010)
+
+        events.record(Event("3", When.BEFORE, LockStatus.RELEASE))
+        await sic.release_shard(shard)
+        events.record(Event("3", When.AFTER, LockStatus.RELEASE))
+
+    await asyncio.gather(task_1(), task_2(), task_3())
+
+    expected = [
+        Event("1", When.BEFORE, LockStatus.ACQUIRE),
+        Event("1", When.AFTER, LockStatus.ACQUIRE),
+        Event("2", When.BEFORE, LockStatus.ACQUIRE),
+        Event("3", When.BEFORE, LockStatus.ACQUIRE),
+        Event("1", When.BEFORE, LockStatus.RELEASE),
+        Event("1", When.AFTER, LockStatus.RELEASE),
+        # 3 has requested with priority, so it will go before 2
+        Event("3", When.AFTER, LockStatus.ACQUIRE),
+        Event("3", When.BEFORE, LockStatus.RELEASE),
+        Event("3", When.AFTER, LockStatus.RELEASE),
+        Event("2", When.AFTER, LockStatus.ACQUIRE),
         Event("2", When.BEFORE, LockStatus.RELEASE),
         Event("2", When.AFTER, LockStatus.RELEASE),
     ]

@@ -80,23 +80,37 @@ class FifoLock(QueueLock):
 
 class PriorityLock(QueueLock):
     def __init__(self):
-        self.locks = {p: asyncio.Lock() for p in Priority}
+        lock = asyncio.Lock()
+        self.conditions = {
+            priority: asyncio.Condition(lock=lock) for priority in Priority
+        }
+        self.lock = asyncio.Lock()
+        self.counts = {priority: 0 for priority in Priority}
 
     async def acquire(self, priority: Priority = Priority.LOW):
-        await self.locks[priority].acquire()
+        async with self.lock:
+            if sum(self.counts.values()) == 0:
+                self.counts[priority] += 1
+                return
 
-    async def release(self, priority: Priority = Priority.LOW):
-        for priority in reversed(sorted(Priority)):
-            lock = self.locks[priority]
-            if lock.locked():
-                lock.release()
-                break
+            self.counts[priority] += 1
+        cond = self.conditions[priority]
+        async with cond:
+            await cond.wait()
+
+    async def release(self):
+        async with self.lock:
+            for priority in reversed(sorted(Priority)):
+                waiting = self.counts[priority]
+                if waiting > 0:
+                    self.counts[priority] -= 1
+                    cond = self.conditions[priority]
+                    async with cond:
+                        cond.notify()
+                    return
 
     def locked(self, priority: Priority = Priority.LOW):
-        for priority in Priority:
-            if self.locks[priority].locked():
-                return True
-        return False
+        return sum(self.counts.values())
 
 
 class ShardIndexingCoordinator:
@@ -106,26 +120,23 @@ class ShardIndexingCoordinator:
         self.lock_klass = lock_klass
 
     async def request_shard(self, shard_id: str):
-        async with self.lock:
-            lock, priority = self.shard_locks.setdefault(
-                shard_id, (self.lock_klass(), Priority.LOW)
-            )
-        await lock.acquire(priority)
+        await self._request_shard(shard_id, Priority.LOW)
 
     async def request_shard_fast(self, shard_id: str):
+        await self._request_shard(shard_id, Priority.HIGH)
+
+    async def _request_shard(self, shard_id: str, priority: Priority):
         async with self.lock:
-            lock, priority = self.shard_locks.setdefault(
-                shard_id, (self.lock_klass(), Priority.HIGH)
-            )
+            lock = self.shard_locks.setdefault(shard_id, self.lock_klass())
         await lock.acquire(priority)
 
     async def release_shard(self, shard_id: str):
         async with self.lock:
-            lock, priority = self.shard_locks.get(shard_id)
+            lock = self.shard_locks.get(shard_id)
             if lock is None:
                 raise ValueError(f"Shard {shard_id} wasn't requested")
 
             if not lock.locked():
                 self.shard_locks.pop(shard_id)
 
-        await lock.release(priority)
+        await lock.release()
