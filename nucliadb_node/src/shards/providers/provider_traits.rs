@@ -59,7 +59,7 @@ pub trait AsyncShardWriterProvider {
     async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
     async fn load_all(&self) -> NodeResult<()>;
 
-    async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;
+    async fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>>;
     async fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>>;
     async fn delete(&self, id: ShardId) -> NodeResult<()>;
 

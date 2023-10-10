@@ -23,7 +23,7 @@ mod common;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
-use common::{node_reader, node_writer, TestNodeWriter};
+use common::{NodeFixture, TestNodeWriter};
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::relation::RelationType;
@@ -328,8 +328,10 @@ async fn create_knowledge_graph(
 
 #[tokio::test]
 async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest::default()))
@@ -489,8 +491,10 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
 
 #[tokio::test]
 async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest::default()))

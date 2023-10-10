@@ -19,6 +19,7 @@
 
 use crate::metrics::meters::Meter;
 use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
+use crate::metrics::metric::replication;
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
 use crate::NodeResult;
 
@@ -31,4 +32,6 @@ impl Meter for NoOpMeter {
     fn export(&self) -> NodeResult<String> {
         Ok(Default::default())
     }
+    fn record_replicated_bytes(&self, _value: replication::ReplicatedBytesValue) {}
+    fn record_replication_op(&self, _key: replication::ShardOpsKey) {}
 }

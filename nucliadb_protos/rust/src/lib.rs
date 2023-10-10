@@ -25,6 +25,7 @@ pub mod knowledgebox;
 pub mod nodereader;
 pub mod noderesources;
 pub mod nodewriter;
+pub mod replication;
 pub mod resources;
 pub mod utils;
 

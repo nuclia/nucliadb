@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 mod meters;
-mod metric;
+pub mod metric;
 mod task_monitor;
 
 pub use metric::{grpc_ops, request_time};

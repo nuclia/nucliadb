@@ -28,7 +28,7 @@ use nucliadb_core::{node_error, Channel, NodeResult};
 use serde::*;
 
 #[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum Similarity {
+pub enum Similarity {
     #[default]
     Cosine,
     Dot,
@@ -39,6 +39,23 @@ impl From<VectorSimilarity> for Similarity {
         match value {
             VectorSimilarity::Cosine => Similarity::Cosine,
             VectorSimilarity::Dot => Similarity::Dot,
+        }
+    }
+}
+impl ToString for Similarity {
+    fn to_string(&self) -> String {
+        match self {
+            Similarity::Cosine => "Cosine".to_string(),
+            Similarity::Dot => "Dot".to_string(),
+        }
+    }
+}
+impl From<String> for Similarity {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "Cosine" => Similarity::Cosine,
+            "Dot" => Similarity::Dot,
+            _ => Similarity::Cosine,
         }
     }
 }
@@ -53,8 +70,9 @@ impl From<Similarity> for VectorSimilarity {
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct ShardMetadata {
-    kbid: Option<String>,
-    similarity: Option<Similarity>,
+    pub kbid: Option<String>,
+    pub similarity: Option<Similarity>,
+    pub id: Option<String>,
     #[serde(default)]
     pub channel: Option<Channel>,
 }
@@ -73,6 +91,7 @@ impl From<NewShardRequest> for ShardMetadata {
             similarity: Some(value.similarity().into()),
             kbid: Some(value.kbid).filter(|s| !s.is_empty()),
             channel: Some(Channel::from(value.release_channel)),
+            id: None,
         }
     }
 }
@@ -116,6 +135,7 @@ mod test {
             kbid: Some("KB".to_string()),
             similarity: Some(Similarity::Cosine),
             channel: Some(Channel::EXPERIMENTAL),
+            id: None,
         };
         meta.serialize(&metadata_path).unwrap();
         let meta_disk = ShardMetadata::open(&metadata_path).unwrap();

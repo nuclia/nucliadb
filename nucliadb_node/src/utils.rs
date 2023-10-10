@@ -26,8 +26,11 @@ use std::{fs, thread};
 use http::Uri;
 use nucliadb_core::tracing::{info, Level};
 use nucliadb_core::{Context, NodeResult};
+use tokio::fs as tfs;
 use tonic::transport::Endpoint;
 use uuid::Uuid;
+
+use crate::replication::NodeRole;
 
 pub static ALL_TARGETS: &str = "*";
 
@@ -102,6 +105,31 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
     Ok(host_key)
 }
 
+pub fn parse_node_role(role: &str) -> NodeRole {
+    match role {
+        "primary" => NodeRole::Primary,
+        "secondary" => NodeRole::Secondary,
+        _ => panic!(
+            "Invalid node role, allowed values are 'primary' and 'secondary'. Provided: '{}'",
+            role
+        ),
+    }
+}
+
+pub async fn list_shards(shards_path: PathBuf) -> Vec<String> {
+    let mut entries = tfs::read_dir(shards_path).await.unwrap();
+    let mut shard_ids = Vec::new();
+    while let Some(entry) = entries.next_entry().await.unwrap() {
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+            if let Some(id) = entry_path.file_name().map(|s| s.to_str().map(String::from)) {
+                shard_ids.push(id.unwrap());
+            }
+        }
+    }
+    shard_ids
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,5 +155,11 @@ mod tests {
             ],
             res
         );
+    }
+
+    #[test]
+    fn test_parse_node_role() {
+        matches!(parse_node_role("primary"), NodeRole::Primary);
+        matches!(parse_node_role("secondary"), NodeRole::Secondary);
     }
 }

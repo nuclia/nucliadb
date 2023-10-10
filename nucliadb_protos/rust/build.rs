@@ -29,6 +29,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=../nodesidecar.proto");
     println!("cargo:rerun-if-changed=../nodewriter.proto");
     println!("cargo:rerun-if-changed=../nodereader.proto");
+    println!("cargo:rerun-if-changed=../replication.proto");
 
     let mut prost_config = prost_build::Config::default();
 
@@ -41,6 +42,7 @@ fn main() -> Result<()> {
             "nucliadb_protos/writer.proto",
             "nucliadb_protos/nodewriter.proto",
             "nucliadb_protos/nodereader.proto",
+            "nucliadb_protos/replication.proto",
         ],
         &["../../"],
     )?;
@@ -52,6 +54,7 @@ fn main() -> Result<()> {
             &[
                 "nucliadb_protos/nodewriter.proto",
                 "nucliadb_protos/nodereader.proto",
+                "nucliadb_protos/replication.proto",
             ],
             &["../../"],
         )?;

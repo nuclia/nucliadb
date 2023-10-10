@@ -16,8 +16,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Mutex, MutexGuard};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -26,12 +28,12 @@ use nucliadb_core::protos::shard_created::{
 use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity,
 };
-use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
-use crate::shards::metadata::ShardMetadata;
+use crate::shards::metadata::{ShardMetadata, Similarity};
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
@@ -52,6 +54,8 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
+    gc_lock: Mutex<()>,    // lock to be able to do GC or not
+    write_lock: Mutex<()>, // be able to lock writes on the shard
 }
 
 impl PartialOrd for ShardWriter {
@@ -133,6 +137,8 @@ impl ShardWriter {
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
             relation_service_version: versions.version_relations() as i32,
+            gc_lock: Mutex::new(()),
+            write_lock: Mutex::new(()),
         })
     }
 
@@ -308,6 +314,8 @@ impl ShardWriter {
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
+
+        let _lock = self.write_lock.lock().unwrap();
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -320,6 +328,8 @@ impl ShardWriter {
         vector_result?;
         relation_result?;
         self.writes_without_merge.fetch_add(1, Ordering::SeqCst);
+
+        self.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
         Ok(())
     }
 
@@ -366,6 +376,8 @@ impl ShardWriter {
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
+
+        let _lock = self.write_lock.lock().unwrap();
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -378,6 +390,9 @@ impl ShardWriter {
         vector_result?;
         relation_result?;
         self.writes_without_merge.fetch_add(1, Ordering::SeqCst);
+
+        self.new_generation_id();
+
         Ok(())
     }
 
@@ -439,6 +454,9 @@ impl ShardWriter {
     ) -> NodeResult<()> {
         let mut writer = vector_write(&self.vector_writer);
         writer.add_vectorset(setid, similarity)?;
+
+        self.new_generation_id();
+
         Ok(())
     }
 
@@ -446,6 +464,9 @@ impl ShardWriter {
     pub fn remove_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
         let mut writer = vector_write(&self.vector_writer);
         writer.remove_vectorset(setid)?;
+
+        self.new_generation_id();
+
         Ok(())
     }
 
@@ -506,6 +527,11 @@ impl ShardWriter {
         text_write(&self.text_writer).merge()?;
         vector_write(&self.vector_writer).merge()?;
 
+        let gc_lock = self.gc_lock.try_lock();
+        if gc_lock.is_err() {
+            // skip GC if something else has this lock
+            return Ok(());
+        }
         // After merging GC is applied
         // TODO: add relations gc when it becomes a Tantivy only index.
         paragraph_write(&self.paragraph_writer).garbage_collection()?;
@@ -519,5 +545,85 @@ impl ShardWriter {
     pub fn gc(&self) -> NodeResult<()> {
         // TODO: remove this operation from the interface
         Ok(())
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn get_generation_id(&self) -> String {
+        // we can not cache this on the ShardWriter instance unless we get swap our
+        // Arc implementation for a RwLock implementation because we'd need
+        // to write the cache on modification
+
+        let filepath = self.path.join(GENERATION_FILE);
+        // check if file does not exist
+        if !filepath.exists() {
+            return self.new_generation_id();
+        }
+        return std::fs::read_to_string(filepath).unwrap();
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn new_generation_id(&self) -> String {
+        let generation_id = uuid::Uuid::new_v4().to_string();
+        self.set_generation_id(generation_id.clone());
+        generation_id
+    }
+
+    pub fn set_generation_id(&self, generation_id: String) {
+        let filepath = self.path.join(GENERATION_FILE);
+        std::fs::write(filepath, generation_id).unwrap();
+    }
+
+    pub fn get_kbid(&self) -> String {
+        self.metadata.kbid().unwrap_or_default().to_string()
+    }
+
+    pub fn get_similarity(&self) -> Similarity {
+        self.metadata.similarity().into()
+    }
+
+    pub fn wait_for_gc_lock(&self) -> MutexGuard<()> {
+        self.gc_lock.lock().unwrap()
+    }
+
+    pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
+        let mut segments = HashMap::new();
+
+        segments.insert(
+            "paragraph".to_string(),
+            paragraph_read(&self.paragraph_writer).get_segment_ids()?,
+        );
+        segments.insert(
+            "text".to_string(),
+            text_read(&self.text_writer).get_segment_ids()?,
+        );
+        segments.insert(
+            "vector".to_string(),
+            vector_read(&self.vector_writer).get_segment_ids()?,
+        );
+
+        Ok(segments)
+    }
+
+    pub fn get_shard_files(
+        &self,
+        ignored_segement_ids: &HashMap<String, Vec<String>>,
+    ) -> NodeResult<Vec<IndexFiles>> {
+        let mut files = Vec::new();
+        let _lock = self.write_lock.lock().unwrap(); // need to make sure more writes don't happen while we are reading
+
+        files.push(
+            paragraph_read(&self.paragraph_writer)
+                .get_index_files(&ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?,
+        );
+        files.push(
+            text_read(&self.text_writer)
+                .get_index_files(&ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?,
+        );
+        files.push(
+            vector_read(&self.vector_writer)
+                .get_index_files(&ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
+        );
+
+        Ok(files)
     }
 }

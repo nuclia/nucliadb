@@ -40,7 +40,8 @@ use nucliadb_core::tracing::{error, Level};
 pub use providers::{EnvSettingsProvider, SettingsProvider};
 
 use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
-use crate::utils::{parse_log_levels, reliable_lookup_host};
+use crate::replication::NodeRole;
+use crate::utils::{parse_log_levels, parse_node_role, reliable_lookup_host};
 
 #[derive(Builder)]
 #[builder(pattern = "mutable", setter(strip_option, into))]
@@ -99,6 +100,14 @@ pub struct Settings {
 
     #[builder(default = "3030")]
     metrics_port: u16,
+
+    // replications settings
+    #[builder(default = "\"http://localhost:10000\".into()")]
+    primary_address: String,
+    #[builder(default = "parse_node_role(\"primary\")")]
+    node_role: NodeRole,
+    #[builder(default = "3")]
+    replication_delay_seconds: u64,
 }
 
 impl Settings {
@@ -194,6 +203,18 @@ impl Settings {
 
     pub fn metrics_port(&self) -> u16 {
         self.metrics_port
+    }
+
+    /// Address where secondary node read will connect to primary node through
+    pub fn primary_address(&self) -> String {
+        self.primary_address.clone()
+    }
+
+    pub fn node_role(&self) -> NodeRole {
+        self.node_role.clone()
+    }
+    pub fn replication_delay_seconds(&self) -> u64 {
+        self.replication_delay_seconds
     }
 }
 

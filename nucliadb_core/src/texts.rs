@@ -25,6 +25,8 @@ use crate::protos::*;
 
 pub type TextsReaderPointer = Arc<dyn FieldReader>;
 pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
+
+#[derive(Debug, Clone)]
 pub struct TextConfig {
     pub path: PathBuf,
 }
@@ -32,7 +34,9 @@ pub struct TextConfig {
 pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
 impl DocumentIterator {
     pub fn new<I>(inner: I) -> DocumentIterator
-    where I: Iterator<Item = DocumentItem> + Send + 'static {
+    where
+        I: Iterator<Item = DocumentItem> + Send + 'static,
+    {
         DocumentIterator(Box::new(inner))
     }
 }

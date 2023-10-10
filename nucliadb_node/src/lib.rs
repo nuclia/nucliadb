@@ -33,6 +33,7 @@ pub mod grpc;
 pub mod http_server;
 pub mod lifecycle;
 pub mod node_metadata;
+pub mod replication;
 pub mod settings;
 pub mod shards;
 pub mod telemetry;

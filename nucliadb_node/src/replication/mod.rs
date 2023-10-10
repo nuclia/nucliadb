@@ -16,19 +16,13 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::time::Duration;
+pub mod health;
+pub mod replicator;
+pub mod service;
 
-use once_cell::sync::Lazy;
-
-const READER_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-const READER_PORT: u16 = 18031;
-pub static READER_ADDR: Lazy<SocketAddr> = Lazy::new(|| SocketAddr::new(READER_IP, READER_PORT));
-
-const WRITER_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-const WRITER_PORT: u16 = 18030;
-pub static WRITER_ADDR: Lazy<SocketAddr> = Lazy::new(|| SocketAddr::new(WRITER_IP, WRITER_PORT));
-
-pub const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
+#[derive(Clone, PartialEq, Debug)]
+pub enum NodeRole {
+    Primary,
+    Secondary,
+}

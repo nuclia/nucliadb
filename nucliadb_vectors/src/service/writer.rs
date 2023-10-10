@@ -18,15 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fs;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics::request_time;
-use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{metrics, Channel};
+use nucliadb_core::{prelude::*, IndexFiles};
 use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
@@ -43,6 +45,7 @@ pub struct VectorWriterService {
     index: Index,
     indexset: IndexSet,
     channel: Channel,
+    config: VectorConfig,
 }
 
 impl Debug for VectorWriterService {
@@ -333,6 +336,79 @@ impl WriterChild for VectorWriterService {
         self.index.merge(&lock)?;
         Ok(())
     }
+
+    fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
+        let mut seg_ids = self._get_segment_ids(&self.index.location)?;
+        let vectorsets = self.list_vectorsets()?;
+        for vs in vectorsets {
+            let vs_seg_ids = self._get_segment_ids(&self.config.vectorset.join(vs))?;
+            seg_ids.extend(vs_seg_ids);
+        }
+        Ok(seg_ids)
+    }
+
+    fn get_index_files(&self, ignored_segment_ids: &Vec<String>) -> NodeResult<IndexFiles> {
+        // Should be called along with a lock at a higher level to be safe
+        let mut meta_files = HashMap::new();
+        meta_files.insert(
+            "vectors/state.bincode".to_string(),
+            fs::read(self.config.path.join("state.bincode"))?,
+        );
+        meta_files.insert(
+            "vectors/metadata.json".to_string(),
+            fs::read(self.config.path.join("metadata.json"))?,
+        );
+
+        let mut files = Vec::new();
+
+        for segment_id in self._get_segment_ids(&self.index.location)? {
+            if ignored_segment_ids.contains(&segment_id) {
+                continue;
+            }
+            files.push(format!("vectors/{}/index.hnsw", segment_id));
+            files.push(format!("vectors/{}/journal.json", segment_id));
+            files.push(format!("vectors/{}/nodes.kv", segment_id));
+        }
+
+        let vectorsets = self.list_vectorsets()?;
+        if vectorsets.len() > 0 {
+            meta_files.insert(
+                "vectorset/state.bincode".to_string(),
+                fs::read(self.config.vectorset.join("state.bincode"))?,
+            );
+            for vs in vectorsets {
+                for segment_id in self._get_segment_ids(&self.config.vectorset.join(vs.clone()))? {
+                    if ignored_segment_ids.contains(&segment_id) {
+                        continue;
+                    }
+                    files.push(format!("vectorset/{}/{}/index.hnsw", vs, segment_id));
+                    files.push(format!("vectorset/{}/{}/journal.json", vs, segment_id));
+                    files.push(format!("vectorset/{}/{}/nodes.kv", vs, segment_id));
+                }
+                meta_files.insert(
+                    format!("vectorset/{}/state.bincode", vs),
+                    fs::read(self.config.vectorset.join(format!("{}/state.bincode", vs)))?,
+                );
+                meta_files.insert(
+                    format!("vectorset/{}/metadata.json", vs),
+                    fs::read(self.config.vectorset.join(format!("{}/metadata.json", vs)))?,
+                );
+            }
+        }
+
+        if files.len() == 0 {
+            // exit with no changes
+            return Ok(IndexFiles {
+                metadata_files: HashMap::new(),
+                files,
+            });
+        }
+
+        Ok(IndexFiles {
+            metadata_files: meta_files,
+            files,
+        })
+    }
 }
 
 impl VectorWriterService {
@@ -383,6 +459,7 @@ impl VectorWriterService {
                 )?,
                 indexset: IndexSet::new(indexset)?,
                 channel: config.channel,
+                config: config.clone(),
             })
         }
     }
@@ -398,8 +475,23 @@ impl VectorWriterService {
                 index: Index::open(path)?,
                 indexset: IndexSet::new(indexset)?,
                 channel: config.channel,
+                config: config.clone(),
             })
         }
+    }
+
+    fn _get_segment_ids(&self, location: &PathBuf) -> NodeResult<Vec<String>> {
+        let mut ids = Vec::new();
+        for dir_entry in std::fs::read_dir(location)? {
+            let entry = dir_entry?;
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_file() {
+                continue;
+            }
+            ids.push(name);
+        }
+        Ok(ids)
     }
 }
 

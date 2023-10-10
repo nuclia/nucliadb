@@ -26,6 +26,7 @@ use crate::protos::*;
 pub type ParagraphsReaderPointer = Arc<dyn ParagraphReader>;
 pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
 
+#[derive(Debug, Clone)]
 pub struct ParagraphConfig {
     pub path: PathBuf,
 }
@@ -33,7 +34,9 @@ pub struct ParagraphConfig {
 pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
 impl ParagraphIterator {
     pub fn new<I>(inner: I) -> ParagraphIterator
-    where I: Iterator<Item = ParagraphItem> + Send + 'static {
+    where
+        I: Iterator<Item = ParagraphItem> + Send + 'static,
+    {
         ParagraphIterator(Box::new(inner))
     }
 }

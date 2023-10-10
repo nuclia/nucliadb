@@ -30,7 +30,6 @@ use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::NodeResult;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
-use tokio::fs;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
@@ -41,6 +40,7 @@ use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
+use crate::utils::list_shards;
 
 fn create_merge_task(shard: Arc<ShardWriter>) -> impl FnOnce() + Send + 'static {
     let span = Span::current();
@@ -54,7 +54,7 @@ fn create_merge_task(shard: Arc<ShardWriter>) -> impl FnOnce() + Send + 'static 
 }
 
 pub struct NodeWriterGRPCDriver {
-    shards: AsyncUnboundedShardWriterCache,
+    shards: Arc<AsyncUnboundedShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
     settings: Arc<Settings>,
 }
@@ -66,11 +66,10 @@ pub enum NodeWriterEvent {
 }
 
 impl NodeWriterGRPCDriver {
-    pub fn new(settings: Arc<Settings>) -> Self {
-        let shards = AsyncUnboundedShardWriterCache::new(settings.shards_path());
+    pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
         Self {
-            shards,
             settings,
+            shards: shard_cache,
             sender: None,
         }
     }
@@ -173,16 +172,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<ShardIds>, Status> {
-        let mut entries = fs::read_dir(self.shards.shards_path.clone()).await?;
-        let mut shard_ids = Vec::new();
-        while let Some(entry) = entries.next_entry().await? {
-            let entry_path = entry.path();
-            if entry_path.is_dir() {
-                if let Some(id) = entry_path.file_name().map(|s| s.to_str().map(String::from)) {
-                    shard_ids.push(ShardId { id: id.unwrap() });
-                }
-            }
-        }
+        let shard_ids = list_shards(self.shards.shards_path.clone())
+            .await
+            .into_iter()
+            .map(|id| ShardId { id })
+            .collect();
 
         Ok(tonic::Response::new(ShardIds { ids: shard_ids }))
     }

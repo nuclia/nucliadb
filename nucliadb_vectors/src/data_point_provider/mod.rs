@@ -76,7 +76,7 @@ pub struct Index {
     metadata: IndexMetadata,
     state: RwLock<State>,
     date: RwLock<Version>,
-    location: PathBuf,
+    pub location: PathBuf,
     dimension: RwLock<Option<u64>>,
 }
 impl Index {

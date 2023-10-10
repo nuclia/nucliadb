@@ -22,7 +22,7 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{node_reader, node_writer, resources, TestNodeWriter};
+use common::{resources, NodeFixture, TestNodeWriter};
 use nucliadb_core::protos::{
     op_status, DownloadShardFileRequest, GetShardFilesRequest, NewShardRequest,
 };
@@ -31,8 +31,10 @@ use tonic::Request;
 
 #[tokio::test]
 async fn test_download_shard() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let shard = create_shard(&mut writer).await;
 

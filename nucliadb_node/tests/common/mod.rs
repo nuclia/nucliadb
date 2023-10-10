@@ -21,11 +21,8 @@
 /// Utilities to test NucliaDB node
 
 #[allow(dead_code)] // clippy don't detect it's used in our integration tests]
-mod constants;
-#[allow(dead_code)] // clippy don't detect it's used in our integration tests]
 mod node_services;
 #[allow(dead_code)] // clippy don't detect it's used in our integration tests]
 pub mod resources;
 
-pub use constants::*;
 pub use node_services::*;

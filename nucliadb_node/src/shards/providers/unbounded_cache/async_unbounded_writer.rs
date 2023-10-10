@@ -55,13 +55,18 @@ impl AsyncUnboundedShardWriterCache {
 
 #[async_trait]
 impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
-    async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
-        let shard_id = Uuid::new_v4().to_string();
+    async fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
+        let shard_id = metadata.id.clone().unwrap_or(Uuid::new_v4().to_string());
+        let shard_id_moved = shard_id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
-        let new_shard =
-            tokio::task::spawn_blocking(move || ShardWriter::new(shard_id, &shard_path, metadata))
-                .await
-                .context("Blocking task panicked")??;
+        let new_shard = Arc::new(
+            tokio::task::spawn_blocking(move || {
+                ShardWriter::new(shard_id_moved, &shard_path, metadata)
+            })
+            .await
+            .context("Blocking task panicked")??,
+        );
+        self.cache.write().await.insert(shard_id, new_shard.clone());
         Ok(new_shard)
     }
 
@@ -76,21 +81,23 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
-        let shard = tokio::task::spawn_blocking(move || {
-            if !shard_path.is_dir() {
-                return Err(node_error!(ShardNotFoundError(
-                    "Shard {shard_path:?} is not on disk"
-                )));
-            }
-            ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
-                node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+        let shard = Arc::new(
+            tokio::task::spawn_blocking(move || {
+                if !shard_path.is_dir() {
+                    return Err(node_error!(ShardNotFoundError(
+                        "Shard {shard_path:?} is not on disk"
+                    )));
+                }
+                ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
+                    node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
+                })
             })
-        })
-        .await
-        .context("Blocking task panicked")??;
+            .await
+            .context("Blocking task panicked")??,
+        );
 
-        let shard = Arc::new(shard);
         cache.insert(shard_key, Arc::clone(&shard));
+
         Ok(shard)
     }
 
