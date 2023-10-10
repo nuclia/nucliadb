@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
+import tempfile
 
 import pytest
 
@@ -27,12 +29,28 @@ from nucliadb_protos import nodereader_pb2, standalone_pb2
 pytestmark = pytest.mark.asyncio
 
 
+from nucliadb.common.cluster.settings import Settings
+from nucliadb.common.cluster.standalone import utils
+
+
 @pytest.fixture
-def self_node():
+def cluster_settings():
+    settings = Settings()
+    with patch(
+        "nucliadb.common.cluster.standalone.service.cluster_settings", settings
+    ), tempfile.TemporaryDirectory() as tmpdir:
+        settings.data_path = tmpdir
+        os.makedirs(os.path.join(tmpdir, "shards"))
+        yield settings
+
+
+@pytest.fixture
+def self_node(cluster_settings):
     self_node = MagicMock(id="id", address="address", shard_count=0)
     self_node.reader = AsyncMock()
     self_node.writer = AsyncMock()
     self_node.reader.Search.return_value = nodereader_pb2.SearchResponse()
+
     with patch("nucliadb.common.cluster.standalone.service.get_self") as mock_get_self:
         mock_get_self.return_value = self_node
         yield self_node
@@ -44,7 +62,9 @@ def servicer(self_node):
 
 
 async def test_node_action(
-    servicer: service.StandaloneClusterServiceServicer, self_node
+    servicer: service.StandaloneClusterServiceServicer,
+    self_node,
+    cluster_settings,
 ):
     resp = await servicer.NodeAction(
         standalone_pb2.NodeActionRequest(
@@ -59,7 +79,9 @@ async def test_node_action(
     )
 
 
-async def test_node_info(servicer: service.StandaloneClusterServiceServicer, self_node):
+async def test_node_info(
+    servicer: service.StandaloneClusterServiceServicer, self_node, cluster_settings
+):
     resp = await servicer.NodeInfo(standalone_pb2.NodeInfoRequest(), None)
     assert resp == standalone_pb2.NodeInfoResponse(
         id=self_node.id,
