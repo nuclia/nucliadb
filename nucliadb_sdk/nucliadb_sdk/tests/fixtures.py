@@ -147,19 +147,22 @@ async def init_fixture(
     dataset_slug: str,
     dataset_location: str,
 ):
-    sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    sdk = nucliadb_sdk.NucliaDB(
+        region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url, timeout=60 * 5
+    )
     slug = uuid.uuid4().hex
     kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
 
     import_resp = requests.get(dataset_location)
+    assert (
+        import_resp.status_code == 200
+    ), f"Error pulling dataset {dataset_location}:{import_resp.status_code}"
     import_data = import_resp.content
 
-    def dataset_generator():
-        yield import_data
-
-    import_id = sdk.start_import(kbid=kbid, content=dataset_generator()).import_id
+    import_id = sdk.start_import(kbid=kbid, content=import_data).import_id
     assert sdk.import_status(kbid=kbid, import_id=import_id).status.value == "finished"
+
     return kbid
 
 
