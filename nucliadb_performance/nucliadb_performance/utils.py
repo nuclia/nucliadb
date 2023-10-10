@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 from faker import Faker
 
@@ -19,13 +20,18 @@ _DATA = {}
 
 
 class Client:
-    def __init__(self, session, base_url):
+    def __init__(self, session, base_url, headers: Optional[dict[str, str]] = None):
         self.session = session
         self.base_url = base_url
+        self.headers = headers or {}
 
     async def make_request(self, method: str, path: str, *args, **kwargs):
         url = self.base_url + path
         func = getattr(self.session, method.lower())
+        base_headers = self.headers.copy()
+        kwargs_headers = kwargs.get("headers") or {}
+        kwargs_headers.update(base_headers)
+        kwargs["headers"] = kwargs_headers
         async with func(url, *args, **kwargs) as resp:
             assert resp.status == 200, resp.status
 
@@ -77,4 +83,4 @@ def get_fake_word():
 
 
 def get_search_client(session):
-    return Client(session, get_base_url())
+    return Client(session, get_base_url(), headers={"X-NUCLIADB-ROLES": "READER"})

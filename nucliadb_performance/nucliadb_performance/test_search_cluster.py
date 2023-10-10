@@ -27,14 +27,13 @@ def init_test(args):
 
 
 @scenario(weight=SUGGEST_WEIGHT)
-async def test_sugest(session):
+async def test_suggest(session):
     client = get_search_client(session)
     kbid = get_random_kb()
     await client.make_request(
         "GET",
         f"/kb/{kbid}/suggest",
         params={"query": get_fake_word()},
-        headers={"x-nucliadb-roles": "READER"},
     )
 
 
@@ -45,7 +44,6 @@ async def test_catalog(session):
     await client.make_request(
         "GET",
         f"/kb/{kbid}/catalog",
-        headers={"x-nucliadb-roles": "READER"},
     )
 
 
@@ -57,7 +55,7 @@ async def test_chat(session):
         "POST",
         f"/kb/{kbid}/chat",
         json={"query": fake.sentence()},
-        headers={"x-nucliadb-roles": "READER", "X-Synchronous": "true"},
+        headers={"X-Synchronous": "true"},
     )
 
 
@@ -69,7 +67,6 @@ async def test_find(session):
         "GET",
         f"/kb/{kbid}/find",
         params={"query": fake.sentence()},
-        headers={"x-nucliadb-roles": "READER"},
     )
 
 
@@ -81,5 +78,4 @@ async def test_search(session):
         "GET",
         f"/kb/{kbid}/search",
         params={"query": fake.sentence()},
-        headers={"x-nucliadb-roles": "READER"},
     )
