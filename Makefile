@@ -56,6 +56,7 @@ python-code-lint:
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
+	make -C nucliadb_performance/ format
 
 	make -C nucliadb/ lint
 	make -C nucliadb_utils/ lint
@@ -65,6 +66,7 @@ python-code-lint:
 	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
 	make -C nucliadb_node_binding/ lint
+	make -C nucliadb_performance/ lint
 
 
 rust-code-lint: fmt-all

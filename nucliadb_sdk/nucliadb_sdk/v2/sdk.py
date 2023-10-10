@@ -508,7 +508,7 @@ class _NucliaDBBase:
         name="get_entitygroups",
         path_template="/v1/kb/{kbid}/entitiesgroups",
         method="GET",
-        path_params=("kbid", "show_entities"),
+        path_params=("kbid",),
         request_type=None,
         response_type=KnowledgeBoxEntities,
     )
