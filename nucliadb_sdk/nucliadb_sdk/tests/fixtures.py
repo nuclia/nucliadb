@@ -152,11 +152,11 @@ async def init_fixture(
     kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
 
+    import_resp = requests.get(dataset_location)
+    import_data = import_resp.content
+
     def dataset_generator():
-        with requests.get(dataset_location, stream=True) as resp:
-            for chunk in resp.iter_content(chunk_size=CHUNK_SIZE):
-                print(f"Uploading chunk from docs import {len(chunk)}")
-                yield chunk
+        yield import_data
 
     import_id = sdk.start_import(kbid=kbid, content=dataset_generator()).import_id
     assert sdk.import_status(kbid=kbid, import_id=import_id).status.value == "finished"
