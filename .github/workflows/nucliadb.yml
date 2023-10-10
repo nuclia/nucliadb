@@ -91,7 +91,7 @@ jobs:
           retry_on: error
           timeout_minutes: 20
           command: |
-            pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+            pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/unit
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
