@@ -34,6 +34,7 @@ jobs:
       matrix:
         python-version: ["3.11"]
         maindb_driver: ["tikv", "pg"]
+        xdist: [true, false]
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -84,7 +85,7 @@ jobs:
       - name: Run PG tests
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
-        if: matrix.maindb_driver == 'pg'
+        if: matrix.maindb_driver == 'pg' && matrix.xdist
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         with:
@@ -97,7 +98,7 @@ jobs:
       - name: Run Tikv integration tests
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
-        if: matrix.maindb_driver == 'tikv'
+        if: matrix.maindb_driver == 'tikv' && matrix.xdist
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         with:
@@ -110,7 +111,7 @@ jobs:
       - name: Run Tikv unit tests
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
-        if: matrix.maindb_driver == 'tikv'
+        if: matrix.maindb_driver == 'tikv' && !matrix.xdist
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         with:
