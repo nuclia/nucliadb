@@ -6,7 +6,7 @@ from typing import List
 from setuptools import find_packages, setup
 
 _dir = Path(__file__).resolve().parent
-VERSION = _dir.joinpath("VERSION").open().read().strip()
+VERSION = _dir.parent.joinpath("VERSION").open().read().strip()
 README = _dir.joinpath("README.md").open().read()
 
 
