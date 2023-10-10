@@ -348,7 +348,7 @@ pub struct Neighbour {
 impl Eq for Neighbour {}
 impl std::hash::Hash for Neighbour {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.node.hash(state);
+        self.id().hash(state)
     }
 }
 impl Ord for Neighbour {
@@ -369,10 +369,10 @@ impl PartialEq for Neighbour {
 
 impl Neighbour {
     #[cfg(test)]
-    pub fn dummy_neighbour(node: &[u8], score: f32) -> Neighbour {
+    pub fn dummy_neighbour(key: &[u8], score: f32) -> Neighbour {
         Neighbour {
             score,
-            node: node.to_vec(),
+            node: Node::serialize(key, [1, 2, 3, 4], [], None as Option<&[u8]>),
         }
     }
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
@@ -389,16 +389,15 @@ impl Neighbour {
     pub fn id(&self) -> &[u8] {
         Node.get_key(&self.node)
     }
+    pub fn vector(&self) -> &[u8] {
+        Node::vector(&self.node)
+    }
     pub fn labels(&self) -> Vec<String> {
         Node::labels(&self.node)
     }
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = Node::metadata(&self.node);
-        if metadata.is_empty() {
-            None
-        } else {
-            Some(metadata)
-        }
+        metadata.is_empty().then(|| metadata)
     }
 }
 

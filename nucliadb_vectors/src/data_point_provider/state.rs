@@ -19,7 +19,7 @@
 //
 
 use std::cmp::Ordering;
-use std::collections::{HashMap, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -75,11 +75,13 @@ impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
 // Fixed-sized sorted collection
 struct Fssc {
     size: usize,
+    with_duplicates: bool,
+    seen: HashSet<Vec<u8>>,
     buff: HashMap<Neighbour, f32>,
 }
 impl From<Fssc> for Vec<Neighbour> {
     fn from(fssv: Fssc) -> Self {
-        let mut result: Vec<_> = fssv.buff.into_iter().map(|i| i.0).collect();
+        let mut result: Vec<_> = fssv.buff.into_keys().collect();
         result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
         result
     }
@@ -88,13 +90,22 @@ impl Fssc {
     fn is_full(&self) -> bool {
         self.buff.len() == self.size
     }
-    fn new(size: usize) -> Fssc {
+    fn new(size: usize, with_duplicates: bool) -> Fssc {
         Fssc {
             size,
+            with_duplicates,
+            seen: HashSet::new(),
             buff: HashMap::with_capacity(size),
         }
     }
     fn add(&mut self, candidate: Neighbour) {
+        if !self.with_duplicates && self.seen.contains(candidate.vector()) {
+            return;
+        } else if !self.with_duplicates {
+            let vector = candidate.vector().to_vec();
+            self.seen.insert(vector);
+        }
+
         let score = candidate.score();
         if self.is_full() {
             let smallest_bigger = self
@@ -105,7 +116,7 @@ impl Fssc {
                 .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap())
                 .map(|(key, _)| key);
             if let Some(key) = smallest_bigger {
-                self.buff.remove(&key);
+                self.buff.remove_entry(&key);
                 self.buff.insert(candidate, score);
             }
         } else {
@@ -194,7 +205,7 @@ impl State {
         let with_duplicates = request.with_duplicates();
         let no_results = request.no_results();
         let min_score = request.min_score();
-        let mut ffsv = Fssc::new(request.no_results());
+        let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
@@ -268,9 +279,6 @@ impl State {
     pub fn current_work_unit(&self) -> Option<&[Journal]> {
         self.work_stack.back().map(|wu| wu.load.as_slice())
     }
-    pub fn closed_work_units_count(&self) -> usize {
-        self.work_stack.len()
-    }
     pub fn stored_len(&self, location: &Path) -> VectorR<Option<u64>> {
         let Some(journal) = self.data_point_iterator().next() else {
             return Ok(None);
@@ -301,13 +309,29 @@ mod test {
             Neighbour::dummy_neighbour(b"k4", 0.0),
         ];
 
-        let mut fssv = Fssc::new(2);
+        let mut fssv = Fssc::new(2, true);
         values.iter().for_each(|i| fssv.add(i.clone()));
         let result: Vec<_> = fssv.into();
         assert_eq!(result[0], values[0]);
         assert_eq!(result[0].score(), values[0].score());
         assert_eq!(result[1], values[1]);
         assert_eq!(result[1].score(), values[1].score());
+    }
+
+    #[test]
+    fn fssv_test_no_duplicates() {
+        let values: &[Neighbour] = &[
+            Neighbour::dummy_neighbour(b"k0", 4.0),
+            Neighbour::dummy_neighbour(b"k1", 3.0),
+            Neighbour::dummy_neighbour(b"k2", 2.0),
+            Neighbour::dummy_neighbour(b"k3", 1.0),
+            Neighbour::dummy_neighbour(b"k4", 0.0),
+        ];
+
+        let mut fssv = Fssc::new(2, false);
+        values.iter().for_each(|i| fssv.add(i.clone()));
+        let result: Vec<_> = fssv.into();
+        assert_eq!(result.len(), 1);
     }
 
     struct DataPointProducer<'a> {

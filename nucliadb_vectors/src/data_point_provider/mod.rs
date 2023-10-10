@@ -40,7 +40,6 @@ use crate::{VectorErr, VectorR};
 pub type TemporalMark = SystemTime;
 
 const METADATA: &str = "metadata.json";
-const MERGE_THRESHOLD: usize = 5;
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -176,11 +175,6 @@ impl Index {
         let channel = self.metadata.channel;
         let mut state = self.write_state();
         let mut date = self.write_date();
-
-        if state.closed_work_units_count() < MERGE_THRESHOLD {
-            return Ok(());
-        }
-
         let Some(work) = state.current_work_unit().map(|work| {
             work.iter()
                 .rev()
