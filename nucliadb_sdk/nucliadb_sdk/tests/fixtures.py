@@ -155,6 +155,7 @@ async def init_fixture(
     def dataset_generator():
         with requests.get(dataset_location, stream=True) as resp:
             for chunk in resp.iter_content(chunk_size=CHUNK_SIZE):
+                print(f"Uploading chunk from docs import {len(chunk)}")
                 yield chunk
 
     import_id = sdk.start_import(kbid=kbid, content=dataset_generator()).import_id
