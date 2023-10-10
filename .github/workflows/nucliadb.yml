@@ -99,7 +99,7 @@ jobs:
         uses: nick-fields/retry@v2
         if: matrix.maindb_driver == 'tikv_xdist'
         env:
-          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
+          TESTING_MAINDB_DRIVERS: tikv
         with:
           max_attempts: 2
           retry_on: error
