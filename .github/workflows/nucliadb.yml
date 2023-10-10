@@ -165,6 +165,51 @@ jobs:
           file: ./coverage.xml
           flags: nucliadb
 
+      - name: Download previous benchmark data
+        uses: actions/cache@v1
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-nucliadb-benchmark
+
+      - name: Comment and Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push'
+        with:
+          tool: "pytest"
+          output-file-path: benchmarks.json
+          external-data-json-path: ./cache/benchmark-data.json
+          save-data-file: true
+          comment-always: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: "@nuclia/nuclia-db"
+
+      - name: Comment benchmark result based on main
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name != 'push'
+        with:
+          tool: "pytest"
+          output-file-path: benchmarks.json
+          external-data-json-path: ./cache/benchmark-data.json
+          save-data-file: false
+          comment-always: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: "@nuclia/nuclia-db"
+
+      - name: Store on GH Pages
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push'
+        with:
+          tool: "pytest"
+          output-file-path: benchmarks.json
+          auto-push: true
+          github-token: ${{ secrets.PERFORMANCE_TOKEN }}
+          gh-repository: github.com/nuclia/nucliadb_performance
+          gh-pages-branch: main
+
   push:
     name: Build and push docker image
     runs-on: ubuntu-latest
