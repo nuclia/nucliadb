@@ -100,10 +100,6 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
         )
         return CreateImportResponse(import_id=import_id)
     else:
-        content_length = int(request.headers.get("Content-Length", "0"))
-        if content_length == 0:
-            return HTTPClientError(status_code=412, detail="Empty request content")
-
         # TODO: Implement range/resumable uploads to better suppor big exports.
         await upload_import_to_blob_storage(
             context=context,
