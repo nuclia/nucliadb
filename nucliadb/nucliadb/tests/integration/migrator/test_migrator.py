@@ -44,10 +44,13 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     await execution_context.data_manager.update_kb_info(
         kbid=knowledgebox, current_version=-1
     )
+    await execution_context.data_manager.update_global_info(current_version=0)
 
     kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
     assert kb_info is not None
     assert kb_info.current_version == -1
+    global_info = await execution_context.data_manager.get_global_info()
+    assert global_info.current_version == 0
 
     # only run first noop migration
     # other tests can be so slow and cumbersome to maintain
