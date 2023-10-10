@@ -105,8 +105,6 @@ def nucliadb():
             container=container.container_obj,
             url=f"http://{host}:{port}/api",
         )
-        logs = container.container_obj.logs().decode("utf-8")
-        print(f"nucliadb logs:\n{logs}")
         container.stop()
 
 
@@ -147,9 +145,7 @@ async def init_fixture(
     dataset_slug: str,
     dataset_location: str,
 ):
-    sdk = nucliadb_sdk.NucliaDB(
-        region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url, timeout=60 * 5
-    )
+    sdk = nucliadb_sdk.NucliaDB(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
     slug = uuid.uuid4().hex
     kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
