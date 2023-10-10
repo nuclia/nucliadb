@@ -92,7 +92,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json  --shard-id=0 --num-shards=2 nucliadb/nucliadb/tests
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json  --shard-id=0 --num-shards=2 nucliadb/nucliadb/tests
 
       - name: Run PG tests 2/2
         # These tests can be flaky, let's retry them...
@@ -105,7 +105,7 @@ jobs:
           retry_on: error
           timeout_minutes: 10
           command: |
-            pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=2 nucliadb/nucliadb/tests
+            pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json --shard-id=1 --num-shards=2 nucliadb/nucliadb/tests
 
       - name: Run Tikv tests 1/2
         # These tests can be flaky, let's retry them...
