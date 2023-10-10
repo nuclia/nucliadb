@@ -81,9 +81,10 @@ jobs:
             echo "Failed building from the build server." && make build-node-binding-debug
           )
 
-      - name: Run tests
+      - name: Run PG tests
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v2
+        if: matrix.maindb_driver == 'pg'
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         with:
@@ -91,7 +92,20 @@ jobs:
           retry_on: error
           timeout_minutes: 20
           command: |
-            pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/unit
+            pytest -n auto -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+
+      - name: Run Tikv tests
+        # These tests can be flaky, let's retry them...
+        uses: nick-fields/retry@v2
+        if: matrix.maindb_driver == 'tikv'
+        env:
+          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 20
+          command: |
+            pytest -rfE -n auto --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests/unit
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
