@@ -333,10 +333,12 @@ def record_features_counter_metric(pb_query: SearchRequest, counter: Counter):
     if len(pb_query.key_filters):
         counter.inc({"type": "key_filters"})
     if pb_query.vectorset:
-        counter.inc({"type": "vectorset_search"})
+        counter.inc({"type": "vectorset"})
     elif pb_query.vector:
-        counter.inc({"type": "vector_search"})
+        counter.inc({"type": "vectors"})
     if pb_query.paragraph:
-        counter.inc({"type": "paragraph_search"})
+        counter.inc({"type": "paragraphs"})
     if len(pb_query.relation_subgraph.entry_points) > 0:
-        counter.inc({"type": "relations_search"})
+        counter.inc({"type": "relations"})
+    if pb_query.document:
+        counter.inc({"type": "documents"})
