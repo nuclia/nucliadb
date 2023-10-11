@@ -23,18 +23,6 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 
 
 @pytest.mark.asyncio
-async def test_disable_vectors_service(
-    nucliadb_reader, nucliadb_manager, knowledgebox_one
-) -> None:
-    data = {"disable_vectors": True}
-    resp = await nucliadb_manager.patch(f"/{KB_PREFIX}/{knowledgebox_one}", json=data)
-    assert resp.status_code == 200
-
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox_one}")
-    assert resp.json()["config"]["disable_vectors"]
-
-
-@pytest.mark.asyncio
 async def test_entities_service(
     nucliadb_reader,
     nucliadb_writer,

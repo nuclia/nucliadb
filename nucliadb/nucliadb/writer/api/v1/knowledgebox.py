@@ -63,8 +63,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     if item.similarity:
         requestpb.similarity = item.similarity.to_pb()
 
-    requestpb.config.disable_vectors = item.disable_vectors
-
     requestpb.config.enabled_filters.extend(item.enabled_filters)
     requestpb.config.enabled_insights.extend(item.enabled_insights)
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
@@ -103,8 +101,6 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
 
     if item.title:
         pbrequest.config.title = item.title
-
-    pbrequest.config.disable_vectors = item.disable_vectors
 
     if item.description:
         pbrequest.config.description = item.description
