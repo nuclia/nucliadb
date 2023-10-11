@@ -37,7 +37,7 @@ message KnowledgeBoxConfig {
     repeated string enabled_filters = 3;
     repeated string enabled_insights = 4;
     string slug = 5;
-    bool disable_vectors = 6;
+    bool disable_vectors = 6 [deprecated = true];
     int64 migration_version = 7;
 }
 
