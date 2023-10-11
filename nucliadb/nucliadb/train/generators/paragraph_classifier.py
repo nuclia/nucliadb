@@ -29,45 +29,7 @@ from nucliadb_protos.dataset_pb2 import (
 from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
-
-
-async def get_paragraph(kbid: str, result: str) -> str:
-    if result.count("/") == 5:
-        rid, field_type, field, split_str, start_end = result.split("/")
-        split = int(split_str)
-        start_str, end_str = start_end.split("-")
-    else:
-        rid, field_type, field, start_end = result.split("/")
-        split = None
-        start_str, end_str = start_end.split("-")
-    start = int(start_str)
-    end = int(end_str)
-
-    orm_resource = await get_resource_from_cache_or_db(kbid, rid)
-
-    if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
-        return ""
-
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return ""
-
-    if split is not None:
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
-
-    return splitted_text
+from nucliadb.train.generators.utils import get_paragraph
 
 
 async def generate_paragraph_classification_payloads(
