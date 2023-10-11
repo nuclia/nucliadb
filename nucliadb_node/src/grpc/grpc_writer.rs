@@ -42,6 +42,17 @@ use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 
+fn create_merge_task(shard: Arc<ShardWriter>) -> impl FnOnce() + Send + 'static {
+    let span = Span::current();
+    let info = info_span!(parent: &span, "merge task");
+    let merge_task = move || {
+        if let Err(err) = shard.merge() {
+            info!("A merge was attempted, but failed: {err:?}")
+        }
+    };
+    move || run_with_telemetry(info, merge_task)
+}
+
 pub struct NodeWriterGRPCDriver {
     shards: AsyncUnboundedShardWriterCache,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
@@ -56,10 +67,11 @@ pub enum NodeWriterEvent {
 
 impl NodeWriterGRPCDriver {
     pub fn new(settings: Arc<Settings>) -> Self {
+        let shards = AsyncUnboundedShardWriterCache::new(settings.shards_path());
         Self {
-            shards: AsyncUnboundedShardWriterCache::new(settings.shards_path()),
-            sender: None,
+            shards,
             settings,
+            sender: None,
         }
     }
 
@@ -81,21 +93,17 @@ impl NodeWriterGRPCDriver {
 
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardWriter>, tonic::Status> {
         let id = id.into();
-
-        self.shards.load(id.clone()).await.map_err(|error| {
+        if let Some(shard) = self.shards.get(id.clone()).await {
+            return Ok(shard);
+        }
+        let shard = self.shards.load(id.clone()).await.map_err(|error| {
             if error.is::<ShardNotFoundError>() {
                 tonic::Status::not_found(error.to_string())
             } else {
                 tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
             }
         })?;
-
-        match self.shards.get(id.clone()).await {
-            Some(shard) => Ok(shard),
-            None => Err(tonic::Status::not_found(format!(
-                "Error loading shard {id}: shard not found"
-            ))),
-        }
+        Ok(shard)
     }
 
     #[tracing::instrument(skip_all)]
@@ -186,18 +194,22 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(&shard_id).await?;
         let info = info_span!(parent: &span, "set resource");
-        let task = || {
+        let merge_task = create_merge_task(Arc::clone(&shard));
+        let write_task = || {
             run_with_telemetry(info, move || {
                 shard
                     .set_resource(&resource)
                     .and_then(|()| shard.get_opstatus())
             })
         };
-        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
-            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-        })?;
+        let status = tokio::task::spawn_blocking(write_task)
+            .await
+            .map_err(|error| {
+                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+            })?;
         match status {
             Ok(mut status) => {
+                tokio::task::spawn_blocking(merge_task);
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
@@ -224,18 +236,22 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(&shard_id).await?;
         let info = info_span!(parent: &span, "remove resource");
-        let task = || {
+        let merge_task = create_merge_task(shard.clone());
+        let write_task = || {
             run_with_telemetry(info, move || {
                 shard
                     .remove_resource(&resource)
                     .and_then(|()| shard.get_opstatus())
             })
         };
-        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
-            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-        })?;
+        let status = tokio::task::spawn_blocking(write_task)
+            .await
+            .map_err(|error| {
+                tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+            })?;
         match status {
             Ok(mut status) => {
+                tokio::task::spawn_blocking(merge_task);
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))

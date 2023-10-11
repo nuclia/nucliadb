@@ -90,7 +90,6 @@ class KnowledgeBoxConfig(BaseModel):
     description: Optional[str] = None
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
-    disable_vectors: bool = False
     similarity: Optional[VectorSimilarity] = None
 
     @validator("slug")

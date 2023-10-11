@@ -140,6 +140,7 @@ class Orderer:
             yield key
 
 
+@merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
     find_resources: Dict[str, FindResource],
     result_paragraphs: List[TempFindParagraph],
@@ -232,6 +233,7 @@ async def fetch_find_metadata(
                 logger.error("Error fetching find metadata", exc_info=task.exception())
 
 
+@merge_observer.wrap({"type": "merge_paragraphs_vectors"})
 def merge_paragraphs_vectors(
     paragraphs_shards: List[List[ParagraphResult]],
     vectors_shards: List[List[DocumentScored]],

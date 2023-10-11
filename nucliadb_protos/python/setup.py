@@ -1,10 +1,9 @@
 from setuptools import find_packages, setup
-import re
 from pathlib import Path
 
 
 _dir = Path(__file__).resolve().parent
-VERSION = _dir.joinpath("VERSION").open().read().strip()
+VERSION = _dir.parent.parent.joinpath("VERSION").open().read().strip()
 README = _dir.joinpath("README.rst").open().read()
 
 

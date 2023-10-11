@@ -34,7 +34,6 @@ async def test_knowledgebox_lifecycle(writer_api):
                 "description": "My lovely knowledgebox",
                 "enabled_filters": ["filter1", "filter2"],
                 "enabled_insights": ["insight1", "insight2"],
-                "disable_vectors": True,
             },
         )
         assert resp.status_code == 201
@@ -47,7 +46,6 @@ async def test_knowledgebox_lifecycle(writer_api):
             json={
                 "slug": "kbid2",
                 "description": "My lovely knowledgebox2",
-                "disable_vectors": True,
             },
         )
         assert resp.status_code == 200

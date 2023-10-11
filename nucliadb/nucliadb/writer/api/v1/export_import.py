@@ -25,6 +25,7 @@ from starlette.requests import Request
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.models import (
@@ -45,6 +46,8 @@ from nucliadb_models.export_import import (
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
+from nucliadb_utils.const import Features
+from nucliadb_utils.utilities import has_feature
 
 
 @api.post(
@@ -58,8 +61,11 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
     export_id = uuid4().hex
-    if in_standalone_mode():
+    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, exports are generated at download time.
         # We simply return an export_id to keep the API consistent with hosted nucliadb.
         return CreateExportResponse(export_id=export_id)
@@ -79,8 +85,11 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 @version(1)
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
+    if not await exists_kb(context, kbid):
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
+
     import_id = uuid4().hex
-    if in_standalone_mode():
+    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
         # In standalone mode, we import directly from the request content stream.
         # Note that we return an import_id simply to keep the API consistent with hosted nucliadb.
         stream = FastAPIExportStream(request)
@@ -91,10 +100,6 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
         )
         return CreateImportResponse(import_id=import_id)
     else:
-        content_length = int(request.headers.get("Content-Length", "0"))
-        if content_length == 0:
-            return HTTPClientError(status_code=412, detail="Empty request content")
-
         # TODO: Implement range/resumable uploads to better suppor big exports.
         await upload_import_to_blob_storage(
             context=context,
@@ -157,3 +162,8 @@ class FastAPIExportStream(IteratorExportStream):
     def __init__(self, request: Request):
         iterator = request.stream().__aiter__()
         super().__init__(iterator)
+
+
+async def exists_kb(context: ApplicationContext, kbid: str) -> bool:
+    dm = KnowledgeBoxDataManager(context.kv_driver)
+    return await dm.exists_kb(kbid)

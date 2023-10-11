@@ -508,7 +508,7 @@ class _NucliaDBBase:
         name="get_entitygroups",
         path_template="/v1/kb/{kbid}/entitiesgroups",
         method="GET",
-        path_params=("kbid", "show_entities"),
+        path_params=("kbid",),
         request_type=None,
         response_type=KnowledgeBoxEntities,
     )
@@ -661,7 +661,7 @@ class NucliaDB(_NucliaDBBase):
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[float] = 60.0,
+        timeout: Optional[float] = 60.0 * 5,
     ):
         """
         Create a new instance of the NucliaDB client

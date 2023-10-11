@@ -17,16 +17,39 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
+
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
-from nucliadb_utils.keys import KB_SHARDS
+from nucliadb_utils.keys import KB_SHARDS, KB_UUID
 
 
 class KnowledgeBoxDataManager:
     def __init__(self, driver: Driver):
         self.driver = driver
+
+    async def exists_kb(self, kbid: str) -> bool:
+        return await self.get_config(kbid) is not None
+
+    async def get_config(
+        self, kbid: str
+    ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+        async with self.driver.transaction() as txn:
+            return await self._get_config(txn, kbid)
+
+    @classmethod
+    async def _get_config(
+        cls, txn, kbid: str
+    ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
+        key = KB_UUID.format(kbid=kbid)
+        payload = await txn.get(key)
+        if payload is None:
+            return None
+        response = knowledgebox_pb2.KnowledgeBoxConfig()
+        response.ParseFromString(payload)
+        return response
 
     async def get_shards_object(self, kbid: str) -> writer_pb2.Shards:
         key = KB_SHARDS.format(kbid=kbid)

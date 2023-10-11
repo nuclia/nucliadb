@@ -35,7 +35,6 @@ use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
-#[derive(Default)]
 pub struct AsyncUnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
@@ -44,12 +43,12 @@ pub struct AsyncUnboundedShardWriterCache {
 impl AsyncUnboundedShardWriterCache {
     pub fn new(shards_path: PathBuf) -> Self {
         Self {
+            shards_path,
             // NOTE: as it's not probable all shards will be written, we don't
             // assign any initial capacity to the HashMap under the
             // consideration a resize blocking is not performance critical while
             // writting.
             cache: RwLock::new(HashMap::new()),
-            shards_path,
         }
     }
 }
@@ -66,16 +65,17 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         Ok(new_shard)
     }
 
-    async fn load(&self, id: ShardId) -> NodeResult<()> {
+    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
+        let shard_key = id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+        let mut cache = self.cache.write().await;
 
-        if self.cache.read().await.contains_key(&id) {
+        if let Some(shard) = cache.get(&id) {
             debug!("Shard {shard_path:?} is already on memory");
-            return Ok(());
+            return Ok(Arc::clone(shard));
         }
 
         // Avoid blocking while interacting with the file system
-        let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
                 return Err(node_error!(ShardNotFoundError(
@@ -89,9 +89,9 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         .await
         .context("Blocking task panicked")??;
 
-        self.cache.write().await.insert(id_, Arc::new(shard));
-
-        Ok(())
+        let shard = Arc::new(shard);
+        cache.insert(shard_key, Arc::clone(&shard));
+        Ok(shard)
     }
 
     async fn load_all(&self) -> NodeResult<()> {

@@ -114,6 +114,15 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.StreamRequest,
         nucliadb_protos.nodereader_pb2.DocumentItem,
     ]
+    GetShardFiles: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.GetShardFilesRequest,
+        nucliadb_protos.nodereader_pb2.ShardFileList,
+    ]
+    """Shard Download"""
+    DownloadShardFile: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
+        nucliadb_protos.nodereader_pb2.ShardFileChunk,
+    ]
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
     """Implemented at nucliadb_object_storage"""
@@ -209,5 +218,18 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.StreamRequest,
         context: grpc.ServicerContext,
     ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.DocumentItem]: ...
+    @abc.abstractmethod
+    def GetShardFiles(
+        self,
+        request: nucliadb_protos.nodereader_pb2.GetShardFilesRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.ShardFileList:
+        """Shard Download"""
+    @abc.abstractmethod
+    def DownloadShardFile(
+        self,
+        request: nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ShardFileChunk]: ...
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

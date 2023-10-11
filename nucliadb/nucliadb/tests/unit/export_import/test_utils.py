@@ -253,20 +253,20 @@ class TestTaskRetryHandler:
 
         callback.assert_called_once_with("foo", bar="baz")
 
-        assert metadata.task.status == Status.FAILED
+        assert metadata.task.status == Status.RUNNING
         assert metadata.task.retries == 1
 
         with pytest.raises(ValueError):
             await callback_retried("foo", bar="baz")
 
-        assert metadata.task.status == Status.FAILED
+        assert metadata.task.status == Status.RUNNING
         assert metadata.task.retries == 2
 
     async def test_ignored_statuses(self, callback, dm, metadata):
         trh = TaskRetryHandler("foo", dm, metadata)
         callback_retried = trh.wrap(callback)
 
-        for status in (Status.ERRORED, Status.FINISHED, Status.CANCELLED):
+        for status in (Status.ERRORED, Status.FINISHED):
             metadata.task.status = status
             await callback_retried("foo", bar="baz")
             callback.assert_not_called()

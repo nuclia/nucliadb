@@ -28,9 +28,10 @@ use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
 use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardReaderCache;
 use crate::shards::providers::AsyncShardReaderProvider;
-use crate::shards::reader::ShardReader;
+use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
 use crate::telemetry::run_with_telemetry;
 
 pub struct NodeReaderGRPCDriver {
@@ -57,19 +58,17 @@ impl NodeReaderGRPCDriver {
 
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
         let id = id.into();
-
-        // Always try to load a shard as, for example, new shards created by the
-        // writer won't be loaded automatically
-        self.shards.load(id.clone()).await.map_err(|error| {
-            tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-        })?;
-
-        match self.shards.get(id.clone()).await {
-            Some(shard) => Ok(shard),
-            None => Err(tonic::Status::not_found(format!(
-                "Error loading shard {id}: shard not found"
-            ))),
+        if let Some(shard) = self.shards.get(id.clone()).await {
+            return Ok(shard);
         }
+        let shard = self.shards.load(id.clone()).await.map_err(|error| {
+            if error.is::<ShardNotFoundError>() {
+                tonic::Status::not_found(error.to_string())
+            } else {
+                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
+            }
+        })?;
+        Ok(shard)
     }
 }
 
@@ -97,10 +96,22 @@ impl futures_core::Stream for GrpcStreaming<DocumentIterator> {
     }
 }
 
+impl futures_core::Stream for GrpcStreaming<ShardFileChunkIterator> {
+    type Item = Result<ShardFileChunk, tonic::Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::task::Poll::Ready(self.0.next().map(Ok))
+    }
+}
+
 #[tonic::async_trait]
 impl NodeReader for NodeReaderGRPCDriver {
     type ParagraphsStream = GrpcStreaming<ParagraphIterator>;
     type DocumentsStream = GrpcStreaming<DocumentIterator>;
+    type DownloadShardFileStream = GrpcStreaming<ShardFileChunkIterator>;
 
     async fn paragraphs(
         &self,
@@ -375,6 +386,38 @@ impl NodeReader for NodeReaderGRPCDriver {
         })?;
         match response {
             Ok(response) => Ok(tonic::Response::new(response)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
+    }
+
+    async fn get_shard_files(
+        &self,
+        request: tonic::Request<GetShardFilesRequest>,
+    ) -> Result<tonic::Response<ShardFileList>, tonic::Status> {
+        let span = Span::current();
+        let shard_id = request.into_inner().shard_id;
+        let shard = self.obtain_shard(shard_id.clone()).await?;
+        let info = info_span!(parent: &span, "get shard files");
+        let task = || run_with_telemetry(info, move || shard.get_shard_files());
+        let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
+        match response {
+            Ok(filelist) => Ok(tonic::Response::new(filelist)),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
+    }
+
+    async fn download_shard_file(
+        &self,
+        request: tonic::Request<DownloadShardFileRequest>,
+    ) -> Result<tonic::Response<Self::DownloadShardFileStream>, tonic::Status> {
+        let request = request.into_inner();
+        let shard_id = request.shard_id;
+        let path = request.relative_path;
+        let shard = self.obtain_shard(shard_id.clone()).await?;
+        match shard.download_file_iterator(path) {
+            Ok(iterator) => Ok(tonic::Response::new(GrpcStreaming(iterator))),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }

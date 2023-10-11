@@ -1331,11 +1331,11 @@ async def test_search_two_logic_shards(
     # Check that search returns the same results
     resp1 = await nucliadb_reader.post(
         f"/kb/{kbid1}/search",
-        json=dict(query="dummy", vector=V1, min_score=-1),
+        json=dict(query="dummy", vector=V1, min_score=-1, with_duplicates=True),
     )
     resp2 = await nucliadb_reader.post(
         f"/kb/{kbid2}/search",
-        json=dict(query="dummy", vector=V1, min_score=-1),
+        json=dict(query="dummy", vector=V1, min_score=-1, with_duplicates=True),
     )
     assert resp1.status_code == resp2.status_code == 200
     content1 = resp1.json()

@@ -16,6 +16,15 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: 3.11
+
+      - name: Setup env
+        run: |
+          pip install wheel
+          pip install -U twine
+
+      - name: Set dependency versions in requirements
+        run: |
+          python bump.py --build=${{github.run_number}}
       
       - uses: dorny/paths-filter@v2
         id: component_changes
@@ -34,31 +43,19 @@ jobs:
             nucliadb_telemetry:
               - 'nucliadb_telemetry/**'
 
-      - name: Setup env
-        run: |
-          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_protos/python/VERSION
-          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_utils/VERSION
-          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_models/VERSION
-          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_sdk/VERSION
-          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_dataset/VERSION
-          python bump.py --build=${{github.run_number}} --version_file=./nucliadb_telemetry/VERSION
-          python bump.py --build=${{github.run_number}}
-          pip install wheel
-          pip install -U twine
-
       # Install all packages we are going to release
       - name: Install all packages
         run: |
           pip install -e ./nucliadb_protos/python/
+          pip install -e ./nucliadb_telemetry/
           pip install -e ./nucliadb_utils/
           pip install -e ./nucliadb_models/
           pip install -e ./nucliadb_sdk/
           pip install -e ./nucliadb_dataset/
-          pip install -e ./nucliadb_telemetry/
           pip install -e ./nucliadb/
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_dataset/ ./nucliadb_telemetry/ ./nucliadb/
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
 
       # XXX wait for tests to run successfully in all dependencies before we actually release
       - name: Wait for utils

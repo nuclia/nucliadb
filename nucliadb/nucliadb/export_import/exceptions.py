@@ -54,21 +54,11 @@ class TaskErrored(Exception):
     pass
 
 
-class TaskCancelledError(Exception):
-    """
-    Raised when a task has been cancelled.
-    """
-
-    pass
-
-
 def raise_for_task_status(status: Status):
     if status == Status.FINISHED:
         return
     raise {
-        Status.FAILED: TaskNotFinishedError,
         Status.ERRORED: TaskErrored,
-        Status.CANCELLED: TaskCancelledError,
         Status.SCHEDULED: TaskNotFinishedError,
         Status.RUNNING: TaskNotFinishedError,
     }[status]

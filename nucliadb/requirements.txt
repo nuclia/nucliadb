@@ -39,10 +39,12 @@ grpc-stubs>=1.24.7
 aiodns>=3.0.0
 
 types-orjson
-nucliadb-telemetry>=1.15.0
-nucliadb-utils[storages,fastapi,cache]>=2.24.0
-nucliadb-protos>=2.24.0
-nucliadb-models>=2.24.0
+
+# nucliadb dependencies are auto pinned on release
+nucliadb-telemetry
+nucliadb-utils[storages,fastapi,cache]
+nucliadb-protos
+nucliadb-models
 nucliadb-contributor-assets~=1.0.0
 
 asyncpg>=0.27.0

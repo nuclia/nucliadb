@@ -56,6 +56,7 @@ python-code-lint:
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
+	make -C nucliadb_performance/ format
 
 	make -C nucliadb/ lint
 	make -C nucliadb_utils/ lint
@@ -65,6 +66,7 @@ python-code-lint:
 	make -C nucliadb_models/ lint
 	make -C nucliadb_node/ lint
 	make -C nucliadb_node_binding/ lint
+	make -C nucliadb_performance/ lint
 
 
 rust-code-lint: fmt-all
@@ -103,7 +105,7 @@ build-node-debug:
 		echo "Failed to download build from build server. Manually running build." && \
 		docker build -t eu.gcr.io/stashify-218417/node:main --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
 	)
-	
+
 
 # Not use the base image
 build-base-node-image-scratch:
@@ -125,12 +127,12 @@ debug-run-nucliadb-redis:
 
 build-node-binding:
 	rm -rf target/wheels/*
-	maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
+	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-node-binding-debug:
 	rm -rf target/wheels/*
-	maturin build -m nucliadb_node_binding/Cargo.toml
+	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:

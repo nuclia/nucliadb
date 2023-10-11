@@ -607,7 +607,11 @@ async def maybe_cleanup_maindb():
     except KeyError:
         pass
     else:
-        await cleanup_maindb(driver)
+        try:
+            await cleanup_maindb(driver)
+        except Exception:
+            logger.error(f"Could not cleanup maindb on test teardown")
+            pass
 
 
 async def cleanup_maindb(driver: Driver):
