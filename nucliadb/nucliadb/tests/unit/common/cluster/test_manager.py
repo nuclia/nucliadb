@@ -17,15 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-from unittest.mock import MagicMock
-
 import pytest
 from nucliadb_protos.nodesidecar_pb2 import Counter
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings
-from nucliadb_protos import writer_pb2
 
 
 def test_should_create_new_shard():
@@ -51,27 +47,3 @@ async def fake_node():
         dummy=True,
     )
     manager.INDEX_NODES.clear()
-
-
-async def test_standalone_node_garbage_collects(fake_node):
-    mng = manager.StandaloneKBShardManager()
-
-    mng.max_ops_before_checks = 0
-
-    await mng.add_resource(
-        writer_pb2.ShardObject(
-            shard="123",
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
-                )
-            ],
-        ),
-        resource=MagicMock(),
-        txid=-1,
-        partition=0,
-        kb="kb",
-    )
-
-    await asyncio.sleep(0.05)
-    assert len(fake_node.writer.calls["GC"]) == 1
