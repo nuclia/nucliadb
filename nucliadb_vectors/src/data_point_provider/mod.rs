@@ -187,7 +187,7 @@ impl Index {
         let new_dp = DataPoint::merge(location, &work, similarity, channel)?;
         std::mem::drop(work);
 
-        state.replace_work_unit(new_dp.meta());
+        state.replace_work_unit(new_dp.journal());
         fs_state::persist_state::<State>(&self.location, &state)?;
         *date = fs_state::crnt_version(&self.location)?;
         Ok(())
@@ -223,14 +223,14 @@ impl Index {
         };
         let Some(state_vector_len) = self.get_dimension() else {
             self.set_dimension(dp.stored_len());
-            state.add(dp.meta());
+            state.add(dp.journal());
             std::mem::drop(state);
             return Ok(());
         };
         if state_vector_len != new_dp_vector_len {
             return Err(VectorErr::InconsistentDimensions);
         }
-        state.add(dp.meta());
+        state.add(dp.journal());
         Ok(())
     }
 

@@ -290,7 +290,7 @@ fn data_merge() {
         Channel::EXPERIMENTAL,
     )
     .unwrap();
-    assert_eq!(dp.meta().no_nodes(), 0);
+    assert_eq!(dp.journal().no_nodes(), 0);
 }
 
 #[test]
