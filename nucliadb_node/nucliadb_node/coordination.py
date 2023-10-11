@@ -119,13 +119,7 @@ class ShardIndexingCoordinator:
         self.shard_locks = {}
         self.lock_klass = lock_klass
 
-    async def request_shard(self, shard_id: str):
-        await self._request_shard(shard_id, Priority.LOW)
-
-    async def request_shard_fast(self, shard_id: str):
-        await self._request_shard(shard_id, Priority.HIGH)
-
-    async def _request_shard(self, shard_id: str, priority: Priority):
+    async def request_shard(self, shard_id: str, priority: Priority = Priority.LOW):
         async with self.lock:
             lock = self.shard_locks.setdefault(shard_id, self.lock_klass())
         await lock.acquire(priority)

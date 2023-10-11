@@ -229,7 +229,7 @@ async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass)
         nonlocal events, shard, sic
 
         events.record(Event("1", When.BEFORE, LockStatus.ACQUIRE))
-        await sic.request_shard(shard)
+        await sic.request_shard(shard, Priority.LOW)
         events.record(Event("1", When.AFTER, LockStatus.ACQUIRE))
 
         # simulate some async work
@@ -246,7 +246,7 @@ async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass)
         await asyncio.sleep(0)
 
         events.record(Event("2", When.BEFORE, LockStatus.ACQUIRE))
-        await sic.request_shard(shard)
+        await sic.request_shard(shard, Priority.LOW)
         events.record(Event("2", When.AFTER, LockStatus.ACQUIRE))
 
         # simulate some async work
@@ -264,7 +264,7 @@ async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass)
         await asyncio.sleep(0)
 
         events.record(Event("3", When.BEFORE, LockStatus.ACQUIRE))
-        await sic.request_shard_fast(shard)
+        await sic.request_shard(shard, Priority.HIGH)
         events.record(Event("3", When.AFTER, LockStatus.ACQUIRE))
 
         # simulate some async work
