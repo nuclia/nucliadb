@@ -32,6 +32,7 @@ pub struct KnowledgeBoxConfig {
     pub enabled_insights: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag="5")]
     pub slug: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(bool, tag="6")]
     pub disable_vectors: bool,
     #[prost(int64, tag="7")]
