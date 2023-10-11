@@ -46,6 +46,7 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
@@ -320,3 +321,22 @@ async def get_default_min_score(kbid: str) -> float:
         # B/w compatible code until we figure out how to
         # set default min score for old on-prem kbs
         return fallback
+
+
+def record_features_counter_metric(pb_query: SearchRequest, counter: Counter):
+    if len(pb_query.filter.tags):
+        counter.inc({"type": "filters"})
+        if any(tag.startswith("/l/") for tag in pb_query.filter.tags):
+            counter.inc({"type": "labels_filters"})
+        if any(tag.startswith("/e/") for tag in pb_query.filter.tags):
+            counter.inc({"type": "entities_filters"})
+    if len(pb_query.key_filters):
+        counter.inc({"type": "key_filters"})
+    if pb_query.vectorset:
+        counter.inc({"type": "vectorset_search"})
+    elif pb_query.vector:
+        counter.inc({"type": "vector_search"})
+    if pb_query.paragraph:
+        counter.inc({"type": "paragraph_search"})
+    if len(pb_query.relation_subgraph.entry_points) > 0:
+        counter.inc({"type": "relations_search"})
