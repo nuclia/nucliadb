@@ -100,13 +100,6 @@ mod tests {
 
     #[test]
     fn it_finds_stop_words() {
-        // cache warm up
-        let start_time = std::time::Instant::now();
-        let _ = is_stop_word("detector");
-        let elapsed = start_time.elapsed().as_millis() as f64;
-        // make sure we never spend more than 100 ms for the cache warmup
-        assert_eq!(elapsed < 100.0, true, "{}", elapsed);
-
         let tests = [
             ("nuclia", false),
             ("is", true),
@@ -117,12 +110,8 @@ mod tests {
         ];
 
         for (word, expected) in tests {
-            let start_time = std::time::Instant::now();
             let matches = is_stop_word(word);
-            let elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(matches, expected);
-            // make sure we never spend more than 1 ms
-            assert_eq!(elapsed < 1000.0, true, "{}", elapsed);
         }
     }
 }

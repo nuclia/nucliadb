@@ -38,6 +38,7 @@ pub mod cli_interface {
 }
 
 pub trait VectorEngine {
+    fn merge(&mut self);
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>);
     fn search(&self, no_results: usize, query: &[f32]);
 }
