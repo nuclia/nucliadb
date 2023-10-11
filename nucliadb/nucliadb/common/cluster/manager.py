@@ -24,7 +24,7 @@ import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata  # type: ignore
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
@@ -323,6 +323,7 @@ class KBShardManager:
         partition: str,
         kb: str,
         reindex_id: Optional[str] = None,
+        source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
@@ -350,6 +351,7 @@ class KBShardManager:
         indexpb.kbid = kb
         if partition:
             indexpb.partition = partition
+        indexpb.source = source
 
         for replica_id, node_id in self.indexing_replicas(shard):
             indexpb.node = node_id
@@ -451,6 +453,7 @@ class StandaloneKBShardManager(KBShardManager):
         partition: str,
         kb: str,
         reindex_id: Optional[str] = None,
+        source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
         index_node = None
         for shardreplica in shard.replicas:
