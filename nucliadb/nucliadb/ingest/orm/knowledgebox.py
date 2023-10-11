@@ -447,14 +447,13 @@ class KnowledgeBox:
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)
         if raw_basic:
-            config = await self.get_config()
             return Resource(
                 txn=self.txn,
                 storage=self.storage,
                 kb=self,
                 uuid=uuid,
                 basic=Resource.parse_basic(raw_basic),
-                disable_vectors=config.disable_vectors if config is not None else True,
+                disable_vectors=False,
             )
         else:
             return None
@@ -530,19 +529,17 @@ class KnowledgeBox:
         basic.slug = slug
         fix_paragraph_annotation_keys(uuid, basic)
         await set_basic(self.txn, self.kbid, uuid, basic)
-        config = await self.get_config()
         return Resource(
             storage=self.storage,
             txn=self.txn,
             kb=self,
             uuid=uuid,
             basic=basic,
-            disable_vectors=config.disable_vectors if config is not None else False,
+            disable_vectors=False,
         )
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
         base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
-        config = await self.get_config()
         async for key in self.txn.keys(match=base, count=-1):
             slug = key.split("/")[-1]
             uuid = await self.get_resource_uuid_by_slug(slug)
@@ -552,9 +549,7 @@ class KnowledgeBox:
                     self.storage,
                     self,
                     uuid,
-                    disable_vectors=config.disable_vectors
-                    if config is not None
-                    else False,
+                    disable_vectors=False,
                 )
 
 
