@@ -397,7 +397,7 @@ impl Neighbour {
     }
     pub fn metadata(&self) -> Option<&[u8]> {
         let metadata = Node::metadata(&self.node);
-        metadata.is_empty().then(|| metadata)
+        metadata.is_empty().then_some(metadata)
     }
 }
 
