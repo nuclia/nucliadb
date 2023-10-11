@@ -35,6 +35,7 @@ from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -46,7 +47,6 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
@@ -90,10 +90,20 @@ async def global_query_to_pb(
     request.min_score = min_score
     request.body = query
     request.with_duplicates = with_duplicates
-    request.filter.tags.extend(filters)
+    if len(filters) > 0:
+        request.filter.tags.extend(filters)
+        node_features.inc({"type": "filters"})
+        if any(tag.startswith("/l/") for tag in filters):
+            node_features.inc({"type": "filters_labels"})
+        if any(tag.startswith("/e/") for tag in filters):
+            node_features.inc({"type": "filters_entities"})
+
     request.faceted.tags.extend(faceted)
     request.fields.extend(fields)
-    request.key_filters.extend(key_filters or [])
+
+    if key_filters is not None and len(key_filters) > 0:
+        request.key_filters.extend(key_filters)
+        node_features.inc({"type": "key_filters"})
 
     if with_status is not None:
         request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]
@@ -126,10 +136,18 @@ async def global_query_to_pb(
             request.order.type = SortOrderMap[sort.order]  # type: ignore
 
     request.document = SearchOptions.DOCUMENT in features
+    if request.document:
+        node_features.inc({"type": "documents"})
+
     request.paragraph = SearchOptions.PARAGRAPH in features
+    if request.paragraph:
+        node_features.inc({"type": "paragraphs"})
 
     incomplete = False
     if SearchOptions.VECTOR in features:
+        node_features.inc({"type": "vectors"})
+        if vectorset is not None:
+            node_features.inc({"type": "vectorset"})
         incomplete = await _parse_vectors(
             request, kbid, query, user_vector=user_vector, vectorset=vectorset
         )
@@ -140,6 +158,7 @@ async def global_query_to_pb(
         if relations_search:
             request.relation_subgraph.entry_points.extend(detected_entities)
             request.relation_subgraph.depth = 1
+            node_features.inc({"type": "relations"})
         if autofilter:
             entity_filters = parse_entities_to_filters(request, detected_entities)
             autofilters.extend(entity_filters)
@@ -321,24 +340,3 @@ async def get_default_min_score(kbid: str) -> float:
         # B/w compatible code until we figure out how to
         # set default min score for old on-prem kbs
         return fallback
-
-
-def record_features_counter_metric(pb_query: SearchRequest, counter: Counter):
-    if len(pb_query.filter.tags):
-        counter.inc({"type": "filters"})
-        if any(tag.startswith("/l/") for tag in pb_query.filter.tags):
-            counter.inc({"type": "labels_filters"})
-        if any(tag.startswith("/e/") for tag in pb_query.filter.tags):
-            counter.inc({"type": "entities_filters"})
-    if len(pb_query.key_filters):
-        counter.inc({"type": "key_filters"})
-    if pb_query.vectorset:
-        counter.inc({"type": "vectorset"})
-    elif pb_query.vector:
-        counter.inc({"type": "vectors"})
-    if pb_query.paragraph:
-        counter.inc({"type": "paragraphs"})
-    if len(pb_query.relation_subgraph.entry_points) > 0:
-        counter.inc({"type": "relations"})
-    if pb_query.document:
-        counter.inc({"type": "documents"})

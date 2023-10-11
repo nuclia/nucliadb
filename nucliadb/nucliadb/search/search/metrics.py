@@ -20,5 +20,4 @@
 from nucliadb_telemetry import metrics
 
 merge_observer = metrics.Observer("merge_results", labels={"type": ""})
-find_features = metrics.Counter("nucliadb_find_features", labels={"type": ""})
-search_features = metrics.Counter("nucliadb_search_features", labels={"type": ""})
+node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})

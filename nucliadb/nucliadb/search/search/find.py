@@ -22,12 +22,7 @@ from typing import Tuple
 
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
-from nucliadb.search.search.metrics import find_features
-from nucliadb.search.search.query import (
-    get_default_min_score,
-    global_query_to_pb,
-    record_features_counter_metric,
-)
+from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
 from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models.search import (
     FindRequest,
@@ -79,7 +74,6 @@ async def find(
         autofilter=item.autofilter,
         key_filters=item.resource_filters,
     )
-    record_features_counter_metric(pb_query, find_features)
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )

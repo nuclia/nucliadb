@@ -34,12 +34,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.metrics import search_features
-from nucliadb.search.search.query import (
-    get_default_min_score,
-    global_query_to_pb,
-    record_features_counter_metric,
-)
+from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
 from nucliadb.search.search.utils import (
     parse_sort_options,
     should_disable_vector_search,
@@ -338,7 +333,6 @@ async def search(
         autofilter=item.autofilter,
     )
 
-    record_features_counter_metric(pb_query, search_features)
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
