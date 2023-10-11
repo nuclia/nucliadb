@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from unittest.mock import patch
-from nucliadb.search.search.merge import merge_paragraphs_results, ResourceSearchResults
+
+from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs_results
 
 
 async def test_str_model():
