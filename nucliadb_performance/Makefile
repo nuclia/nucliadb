@@ -19,8 +19,22 @@ lint:
 
 
 .PHONY: test-search-cluster
+test-search-cluster: export READER_API=http://reader.nucliadb.svc.cluster.local:8080/api
+test-search-cluster: export SEARCH_API=http://search.nucliadb.svc.cluster.local:8080/api
 test-search-cluster:
 	echo " *  Test Started at: $$(date -u)"
 
 	molotov ./nucliadb_performance/test_search_cluster.py --sizing --sizing-tolerance=10 -w 100 --ramp-up 500 -d 600 --force-shutdown
+
+	echo " *  Test Finished at: $$(date -u)"
+
+
+.PHONY: test-search-kb
+test-search-kb: export READER_API=http://reader.nucliadb.svc.cluster.local:8080/api
+test-search-kb: export SEARCH_API=http://search.nucliadb.svc.cluster.local:8080/api
+test-search-kb:
+	echo " *  Test Started at: $$(date -u)"
+
+	molotov ./nucliadb_performance/test_search_kb.py --sizing --sizing-tolerance=10 --ramp-up 500 -d 600 --force-shutdown
+
 	echo " *  Test Finished at: $$(date -u)"

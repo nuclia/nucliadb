@@ -1,3 +1,4 @@
+import json
 import random
 from typing import Optional
 
@@ -52,16 +53,34 @@ class Client:
 
 def get_kbs():
     ndb = NucliaDB(
-        url=settings.reader_api,
+        url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     resp = ndb.list_knowledge_boxes()
     return [kb.uuid for kb in resp.kbs]
 
 
+def get_kb(kbid):
+    ndb = NucliaDB(
+        url=get_reader_api_url(),
+        headers={"X-NUCLIADB-ROLES": "READER"},
+    )
+    return ndb.get_knowledge_box(kbid=kbid)
+
+
 def load_kbs():
     kbs = get_kbs()
     _DATA["kbs"] = kbs
+
+
+def load_kb(kbid):
+    kb = get_kb(kbid)
+    entities = get_kb_entities(kbid)
+    print(f"A total of {len(entities)} found")
+    _DATA["kb"] = {
+        "kb": kb,
+        "entities": entities,
+    }
 
 
 def get_entities(kbs):
@@ -73,20 +92,66 @@ def get_entities(kbs):
 
 
 def get_kb_entities(kbid):
+    entities = _get_cached_kb_entities(kbid)
+    if entities is None:
+        entities = _get_kb_entities(kbid)
+        _cache_kb_entities(kbid, entities)
+    return entities
+
+
+def _cache_kb_entities(kbid, entities):
+    entities_cache = ".entitiescache"
+    try:
+        with open(entities_cache, "r") as f:
+            cached = json.loads(f.read())
+    except FileNotFoundError:
+        cached = {}
+    cached[kbid] = entities
+    with open(entities_cache, "w") as f:
+        f.write(json.dumps(cached))
+
+
+def _get_cached_kb_entities(kbid):
+    entities_cache = ".entitiescache"
+    try:
+        with open(entities_cache, "r") as f:
+            entities = json.loads(f.read())
+    except FileNotFoundError:
+        return None
+    return entities.get(kbid)
+
+
+def _get_kb_entities(kbid):
+    entities = []
     ndb = NucliaDB(
-        url=settings.reader_api,
+        url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
-    entities = ndb.get_entitygroups(kbid=kbid, query_params={"show_entities": True})
-    return [
-        f"{group_id}/{entity_id}"
-        for group_id, group in entities.groups.items()
-        for entity_id in group.entities.keys()
-    ]
+    egroups = ndb.get_entitygroups(kbid=kbid, query_params={"show_entities": False})
+    for group in egroups.groups.keys():
+        gresp = ndb.get_entitygroup(kbid=kbid, group=group)
+        entities.extend([f"{group}/{entity}" for entity in gresp.entities.keys()])
+    return entities
 
 
 def get_random_kb() -> str:
     return random.choice(_DATA["kbs"])
+
+
+def get_loaded_kb():
+    return _DATA["kb"]["kb"].uuid
+
+
+def get_random_kb_entity_filters(n=None):
+    entities = _DATA["kb"]["entities"]
+    filters = []
+    if n is None:
+        n = random.randint(1, 10)
+    while len(filters) < n:
+        choice = random.choice(entities)
+        if choice not in filters:
+            filters.append(f"/e/{choice}")
+    return filters
 
 
 def get_fake_word():
