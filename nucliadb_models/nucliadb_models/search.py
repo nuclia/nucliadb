@@ -96,6 +96,15 @@ class Sort(int, Enum):
     ASC = 1
 
 
+class JsonBaseModel(BaseModel):
+    def __str__(self):
+        try:
+            return self.json()
+        except Exception:
+            # fallback to BaseModel implementation
+            return super().__str__()
+
+
 class Facet(BaseModel):
     facetresults: Dict[str, int]
 
@@ -220,7 +229,7 @@ class RelatedEntities(BaseModel):
     entities: List[str] = []
 
 
-class ResourceSearchResults(BaseModel):
+class ResourceSearchResults(JsonBaseModel):
     """Search on resource results"""
 
     sentences: Optional[Sentences] = None
@@ -230,7 +239,7 @@ class ResourceSearchResults(BaseModel):
     shards: Optional[List[str]] = None
 
 
-class KnowledgeboxSearchResults(BaseModel):
+class KnowledgeboxSearchResults(JsonBaseModel):
     """Search on knowledgebox results"""
 
     resources: Dict[str, Resource] = {}
@@ -243,7 +252,7 @@ class KnowledgeboxSearchResults(BaseModel):
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
-class KnowledgeboxSuggestResults(BaseModel):
+class KnowledgeboxSuggestResults(JsonBaseModel):
     """Suggest on resource results"""
 
     paragraphs: Optional[Paragraphs] = None
@@ -774,7 +783,7 @@ class FindResource(Resource):
             self.__setattr__(key, getattr(origin, key))
 
 
-class KnowledgeboxFindResults(BaseModel):
+class KnowledgeboxFindResults(JsonBaseModel):
     """Find on knowledgebox results"""
 
     resources: Dict[str, FindResource]
