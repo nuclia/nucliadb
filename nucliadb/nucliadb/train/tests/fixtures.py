@@ -41,6 +41,8 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.standalone.settings import Settings
+from nucliadb.tests.utils import inject_message
+from nucliadb.train.tests import resources as test_resources
 from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import clear_global_cache, get_storage
@@ -286,3 +288,10 @@ async def train_client(train_api):  # type: ignore
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
     yield TrainStub(channel)
     clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def resource_with_paragraph_labels(knowledgebox: str, nucliadb_grpc) -> str:
+    bm = test_resources.bm_with_paragraph_labels(knowledgebox)
+    await inject_message(nucliadb_grpc, bm)
+    yield bm.uuid
