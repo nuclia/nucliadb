@@ -426,7 +426,7 @@ impl DataPoint {
     pub fn get_id(&self) -> DpId {
         self.journal.uid
     }
-    pub fn meta(&self) -> Journal {
+    pub fn journal(&self) -> Journal {
         self.journal
     }
     pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
