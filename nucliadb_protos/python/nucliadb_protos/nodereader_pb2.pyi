@@ -389,7 +389,7 @@ class ResultScore(google.protobuf.message.Message):
     BOOSTER_FIELD_NUMBER: builtins.int
     bm25: builtins.float
     booster: builtins.float
-    """In the case of two equal bm25 scores, booster 
+    """In the case of two equal bm25 scores, booster
     decides
     """
     def __init__(
@@ -1318,3 +1318,88 @@ class StreamRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["filter", b"filter", "filter__deprecated", b"filter__deprecated", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
 
 global___StreamRequest = StreamRequest
+
+@typing_extensions.final
+class GetShardFilesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    shard_id: builtins.str
+    def __init__(
+        self,
+        *,
+        shard_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> None: ...
+
+global___GetShardFilesRequest = GetShardFilesRequest
+
+@typing_extensions.final
+class ShardFileList(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FILES_FIELD_NUMBER: builtins.int
+    @property
+    def files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardFile]: ...
+    def __init__(
+        self,
+        *,
+        files: collections.abc.Iterable[global___ShardFile] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["files", b"files"]) -> None: ...
+
+global___ShardFileList = ShardFileList
+
+@typing_extensions.final
+class ShardFile(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RELATIVE_PATH_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
+    relative_path: builtins.str
+    size: builtins.int
+    def __init__(
+        self,
+        *,
+        relative_path: builtins.str = ...,
+        size: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["relative_path", b"relative_path", "size", b"size"]) -> None: ...
+
+global___ShardFile = ShardFile
+
+@typing_extensions.final
+class DownloadShardFileRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    RELATIVE_PATH_FIELD_NUMBER: builtins.int
+    shard_id: builtins.str
+    relative_path: builtins.str
+    def __init__(
+        self,
+        *,
+        shard_id: builtins.str = ...,
+        relative_path: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["relative_path", b"relative_path", "shard_id", b"shard_id"]) -> None: ...
+
+global___DownloadShardFileRequest = DownloadShardFileRequest
+
+@typing_extensions.final
+class ShardFileChunk(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    INDEX_FIELD_NUMBER: builtins.int
+    data: builtins.bytes
+    index: builtins.int
+    def __init__(
+        self,
+        *,
+        data: builtins.bytes = ...,
+        index: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data", "index", b"index"]) -> None: ...
+
+global___ShardFileChunk = ShardFileChunk

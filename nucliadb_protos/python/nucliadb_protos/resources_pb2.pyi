@@ -2112,7 +2112,7 @@ global___FieldID = FieldID
 
 @typing_extensions.final
 class AllFieldIDs(google.protobuf.message.Message):
-    """This message is used to store a list of all field ids of a particular 
+    """This message is used to store a list of all field ids of a particular
     resource. Note that title and summary fields are not included.
     """
 
