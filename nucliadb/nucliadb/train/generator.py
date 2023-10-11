@@ -31,6 +31,9 @@ from nucliadb.train.generators.image_classifier import (
 from nucliadb.train.generators.paragraph_classifier import (
     generate_paragraph_classification_payloads,
 )
+from nucliadb.train.generators.paragraph_streaming import (
+    generate_paragraph_streaming_payloads,
+)
 from nucliadb.train.generators.sentence_classifier import (
     generate_sentence_classification_payloads,
 )
@@ -104,6 +107,14 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             kbid, trainset, node, shard_replica_id
         ):
             payload = image_data.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload
+
+    if trainset.type == TaskType.PARAGRAPH_STREAMING:
+        async for paragraph_batch in generate_paragraph_streaming_payloads(
+            kbid, trainset, node, shard_replica_id
+        ):
+            payload = paragraph_batch.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
