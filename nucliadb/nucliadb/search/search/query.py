@@ -47,8 +47,30 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
+
+ENTITY_TAG_ID = "/e/"
+LABEL_TAG_ID = "/l/"
+
+
+def record_filters_counter(tags: list[str], counter: Counter) -> None:
+    counter.inc({"type": "filters"})
+    tags.sort()
+    e_prefix = False
+    l_prefix = False
+    for tag in tags:
+        if e_prefix and l_prefix:
+            break
+        if tag[0] != "/":
+            break
+        if tag.startswith(ENTITY_TAG_ID):
+            e_prefix = True
+            counter.inc({"type": "filters_entities"})
+        elif tag.startswith(LABEL_TAG_ID):
+            l_prefix = True
+            counter.inc({"type": "filters_labels"})
 
 
 async def global_query_to_pb(
@@ -92,11 +114,7 @@ async def global_query_to_pb(
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
         request.filter.tags.extend(filters)
-        node_features.inc({"type": "filters"})
-        if any(tag.startswith("/l/") for tag in filters):
-            node_features.inc({"type": "filters_labels"})
-        if any(tag.startswith("/e/") for tag in filters):
-            node_features.inc({"type": "filters_entities"})
+        record_filters_counter(filters, node_features)
 
     request.faceted.tags.extend(faceted)
     request.fields.extend(fields)
@@ -129,22 +147,25 @@ async def global_query_to_pb(
     if range_modification_end is not None:
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
-    if SearchOptions.DOCUMENT in features or SearchOptions.PARAGRAPH in features:
+    document_search = SearchOptions.DOCUMENT in features
+    paragraph_search = SearchOptions.PARAGRAPH in features
+    if document_search or paragraph_search:
         sort_field = SortFieldMap[sort.field] if sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[sort.order]  # type: ignore
 
-    request.document = SearchOptions.DOCUMENT in features
-    if request.document:
+    if document_search:
+        request.document = True
         node_features.inc({"type": "documents"})
 
-    request.paragraph = SearchOptions.PARAGRAPH in features
-    if request.paragraph:
+    if paragraph_search:
+        request.paragraph = True
         node_features.inc({"type": "paragraphs"})
 
     incomplete = False
-    if SearchOptions.VECTOR in features:
+    vector_search = SearchOptions.VECTOR in features
+    if vector_search:
         node_features.inc({"type": "vectors"})
         if vectorset is not None:
             node_features.inc({"type": "vectorset"})
@@ -164,7 +185,7 @@ async def global_query_to_pb(
             autofilters.extend(entity_filters)
 
     if with_synonyms:
-        if SearchOptions.VECTOR in features or SearchOptions.RELATIONS in features:
+        if vector_search or relations_search:
             raise HTTPException(
                 status_code=422,
                 detail="Search with custom synonyms is only supported on paragraph and document search",
