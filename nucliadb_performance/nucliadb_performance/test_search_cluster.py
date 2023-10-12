@@ -1,3 +1,6 @@
+import asyncio
+import random
+
 from faker import Faker
 from molotov import global_setup, scenario
 
@@ -51,12 +54,16 @@ async def test_catalog(session):
 async def test_chat(session):
     client = get_search_client(session)
     kbid = get_random_kb()
+    # To avoid calling the LLM in the performance test, we simulate the
+    # chat intraction as a find (the retrieval phase) plus some synthetic
+    # sleep time (the LLM answer generation streaming time)
     await client.make_request(
         "POST",
-        f"/v1/kb/{kbid}/chat",
+        f"/v1/kb/{kbid}/find",
         json={"query": fake.sentence()},
-        headers={"X-Synchronous": "true"},
     )
+    sleep_time = abs(random.gauss(2, 1))
+    await asyncio.sleep(sleep_time)
 
 
 @scenario(weight=FIND_WEIGHT)
