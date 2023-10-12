@@ -115,6 +115,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_conversations(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -160,6 +161,7 @@ async def test_conversations(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_extracted_text_is_serialized_properly(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -179,6 +181,7 @@ async def test_extracted_text_is_serialized_properly(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_conversations(
     nucliadb_reader: AsyncClient,
     knowledgebox,

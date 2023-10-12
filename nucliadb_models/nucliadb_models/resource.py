@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
+from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
 from pydantic import BaseModel, validator
 
 from nucliadb_models.conversation import FieldConversation
@@ -84,6 +85,25 @@ class ExtractedDataTypeName(str, Enum):
     USERVECTORS = "uservectors"
 
 
+class ReleaseChannel(str, Enum):
+    STABLE = "STABLE"
+    EXPERIMENTAL = "EXPERIMENTAL"
+
+    def to_pb(self) -> PBReleaseChannel.ValueType:
+        return RELEASE_CHANNEL_ENUM_TO_PB[self.value]
+
+    @classmethod
+    def from_message(cls, message: PBReleaseChannel.ValueType):
+        return cls(RELEASE_CHANNEL_PB_TO_ENUM[message])
+
+
+RELEASE_CHANNEL_ENUM_TO_PB = {
+    ReleaseChannel.STABLE.value: PBReleaseChannel.STABLE,
+    ReleaseChannel.EXPERIMENTAL.value: PBReleaseChannel.EXPERIMENTAL,
+}
+RELEASE_CHANNEL_PB_TO_ENUM = {v: k for k, v in RELEASE_CHANNEL_ENUM_TO_PB.items()}
+
+
 class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = None
     title: Optional[str] = None
@@ -91,6 +111,7 @@ class KnowledgeBoxConfig(BaseModel):
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
     similarity: Optional[VectorSimilarity] = None
+    release_channel: Optional[ReleaseChannel] = None
 
     @validator("slug")
     def id_check(cls, v: str) -> str:

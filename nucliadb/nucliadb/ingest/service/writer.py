@@ -205,6 +205,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 request.config,
                 parse_model_metadata(request),
                 forceuuid=request.forceuuid,
+                release_channel=request.release_channel,
             )
         except KnowledgeBoxConflict:
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)

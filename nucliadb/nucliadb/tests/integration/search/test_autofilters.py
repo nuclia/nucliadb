@@ -27,6 +27,7 @@ from nucliadb_utils.utilities import Utility, set_utility
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_autofilters_are_returned(
     nucliadb_reader: AsyncClient,
     knowledgebox,

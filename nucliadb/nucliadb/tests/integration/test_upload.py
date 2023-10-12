@@ -26,6 +26,7 @@ from nucliadb.writer.tus import UPLOAD
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_upload(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -67,6 +68,7 @@ async def test_upload(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_upload_guesses_content_type(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

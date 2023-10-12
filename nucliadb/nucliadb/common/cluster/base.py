@@ -94,8 +94,11 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self,
         kbid: str,
         similarity: utils_pb2.VectorSimilarity.ValueType,
+        release_channel: utils_pb2.ReleaseChannel.ValueType,
     ) -> noderesources_pb2.ShardCreated:
-        req = NewShardRequest(kbid=kbid, similarity=similarity)
+        req = NewShardRequest(
+            kbid=kbid, similarity=similarity, release_channel=release_channel
+        )
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 

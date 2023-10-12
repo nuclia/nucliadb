@@ -23,6 +23,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_vectorset(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,

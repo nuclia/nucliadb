@@ -132,6 +132,7 @@ def standalone_nucliadb():
 
 async def test_on_standalone_nucliadb(
     standalone_nucliadb,
+    natsd,
     nucliadb_writer,
     nucliadb_reader,
     src_kb,

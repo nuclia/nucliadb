@@ -38,11 +38,20 @@ async def execution_context(natsd, gcs_storage, redis_config, nucliadb):
         await context.finalize()
 
 
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
-    # this will test run all avilable migrations
+    # this will test run all available migrations
     await execution_context.data_manager.update_kb_info(
         kbid=knowledgebox, current_version=-1
     )
+    await execution_context.data_manager.update_global_info(current_version=0)
+
+    kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
+    assert kb_info is not None
+    assert kb_info.current_version == -1
+    global_info = await execution_context.data_manager.get_global_info()
+    assert global_info.current_version == 0
+
     # only run first noop migration
     # other tests can be so slow and cumbersome to maintain
     await migrator.run(execution_context, target_version=1)

@@ -42,6 +42,7 @@ from nucliadb_protos import (
     nodereader_pb2,
     noderesources_pb2,
     nodewriter_pb2,
+    utils_pb2,
     writer_pb2,
 )
 from nucliadb_telemetry import errors
@@ -157,6 +158,7 @@ class KBShardManager:
         txn: Transaction,
         kbid: str,
         semantic_model: SemanticModelMetadata,
+        release_channel: utils_pb2.ReleaseChannel.ValueType,
     ) -> writer_pb2.ShardObject:
         try:
             check_enough_nodes()
@@ -182,6 +184,7 @@ class KBShardManager:
             kb_shards = writer_pb2.Shards()
             kb_shards.ParseFromString(kb_shards_binary)
 
+        kb_shards.release_channel = release_channel
         existing_kb_nodes = [
             replica.node for shard in kb_shards.shards for replica in shard.replicas
         ]
@@ -206,7 +209,9 @@ class KBShardManager:
                     continue
                 try:
                     shard_created = await node.new_shard(
-                        kbid, similarity=kb_shards.similarity
+                        kbid,
+                        similarity=kb_shards.similarity,
+                        release_channel=kb_shards.release_channel,
                     )
                 except Exception as e:
                     errors.capture_exception(e)
@@ -317,23 +322,35 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
-    def should_create_new_shard(self, shard_info: noderesources_pb2.Shard) -> bool:
+    def should_create_new_shard(self, num_paragraphs: int, num_fields: int) -> bool:
         return (
-            shard_info.paragraphs > settings.max_shard_paragraphs
-            or shard_info.fields > settings.max_shard_fields
+            num_paragraphs > settings.max_shard_paragraphs
+            or num_fields > settings.max_shard_fields
         )
 
     async def maybe_create_new_shard(
-        self, kbid: str, shard_info: noderesources_pb2.Shard
+        self,
+        kbid: str,
+        num_paragraphs: int,
+        num_fields: int,
+        release_channel: utils_pb2.ReleaseChannel.ValueType = utils_pb2.ReleaseChannel.STABLE,
     ):
-        if self.should_create_new_shard(shard_info):
-            logger.warning({"message": "Adding shard", "kbid": kbid})
-            kbdm = KnowledgeBoxDataManager(get_driver())
-            model = await kbdm.get_model_metadata(kbid)
-            driver = get_driver()
-            async with driver.transaction() as txn:
-                await self.create_shard_by_kbid(txn, kbid, semantic_model=model)
-                await txn.commit()
+        if not self.should_create_new_shard(num_paragraphs, num_fields):
+            return
+
+        logger.warning({"message": "Adding shard", "kbid": kbid})
+        kbdm = KnowledgeBoxDataManager(get_driver())
+        model = await kbdm.get_model_metadata(kbid)
+        driver = get_driver()
+
+        async with driver.transaction() as txn:
+            await self.create_shard_by_kbid(
+                txn,
+                kbid,
+                semantic_model=model,
+                release_channel=release_channel,
+            )
+            await txn.commit()
 
 
 class StandaloneKBShardManager(KBShardManager):
@@ -361,7 +378,12 @@ class StandaloneKBShardManager(KBShardManager):
             shard_info: noderesources_pb2.Shard = await index_node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
-            await self.maybe_create_new_shard(kbid, shard_info)
+            await self.maybe_create_new_shard(
+                kbid,
+                shard_info.paragraphs,
+                shard_info.fields,
+                shard_info.metadata.release_channel,
+            )
 
     async def delete_resource(
         self,

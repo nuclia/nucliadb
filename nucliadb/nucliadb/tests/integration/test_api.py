@@ -75,6 +75,7 @@ async def test_kb_creation_with_similarity(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_creation(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -202,12 +203,13 @@ async def test_creation(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ("EXPERIMENTAL", "STABLE"))
 async def test_can_create_knowledgebox_with_colon_in_slug(
-    nucliadb_manager: AsyncClient,
+    nucliadb_manager: AsyncClient, channel
 ):
     resp = await nucliadb_manager.post(
-        f"/kbs",
-        json={"slug": "something:else"},
+        "/kbs",
+        json={"slug": "something:else", "release_channel": channel},
     )
     assert resp.status_code == 201
 
@@ -217,6 +219,7 @@ async def test_can_create_knowledgebox_with_colon_in_slug(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_reprocess_should_set_status_to_pending(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -251,6 +254,7 @@ async def test_reprocess_should_set_status_to_pending(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_serialize_errors(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -304,6 +308,7 @@ async def test_serialize_errors(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_entitygroups(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -350,6 +355,7 @@ async def test_entitygroups(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_extracted_shortened_metadata(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -427,12 +433,16 @@ async def test_extracted_shortened_metadata(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "field_id,error",
+    "field_id,error,knowledgebox",
     [
-        ("foobar", False),
-        ("My_Field_1", False),
-        ("With Spaces Not Allowed", True),
-        ("Invalid&Character", True),
+        ("foobar", False, "EXPERIMENTAL"),
+        ("My_Field_1", False, "EXPERIMENTAL"),
+        ("With Spaces Not Allowed", True, "EXPERIMENTAL"),
+        ("Invalid&Character", True, "EXPERIMENTAL"),
+        ("foobar", False, "STABLE"),
+        ("My_Field_1", False, "STABLE"),
+        ("With Spaces Not Allowed", True, "STABLE"),
+        ("Invalid&Character", True, "STABLE"),
     ],
 )
 async def test_field_ids_are_validated(
@@ -459,6 +469,8 @@ async def test_field_ids_are_validated(
         assert resp.status_code == 201
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_extra(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -543,6 +555,7 @@ async def test_extra(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -578,6 +591,11 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "knowledgebox",
+    ("STABLE", "EXPERIMENTAL"),
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "slug,valid",
     [
         ("foo", True),
@@ -606,6 +624,8 @@ async def test_resource_slug_validation(
         assert detail["msg"].startswith(f"Invalid slug: '{slug}'")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -641,6 +661,8 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     assert resp.json()["icon"] == "text/plain"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_language_metadata(
     nucliadb_writer,
     nucliadb_reader,
@@ -725,6 +747,7 @@ async def test_language_metadata(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_story_7081(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

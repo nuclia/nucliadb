@@ -31,6 +31,7 @@ from nucliadb.search.utilities import get_predict
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -56,6 +57,7 @@ def find_incomplete_results():
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_handles_incomplete_find_results(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -93,6 +95,7 @@ async def resource(nucliadb_writer, knowledgebox):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_handles_status_codes_in_a_different_chunk(
     nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
@@ -109,6 +112,7 @@ async def test_chat_handles_status_codes_in_a_different_chunk(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_handles_status_codes_in_the_same_chunk(
     nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
@@ -125,6 +129,7 @@ async def test_chat_handles_status_codes_in_the_same_chunk(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_handles_status_codes_with_last_chunk_empty(
     nucliadb_reader: AsyncClient, knowledgebox, resource
 ):
@@ -159,6 +164,7 @@ def parse_chat_response(content: bytes):
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_always_returns_relations(
     nucliadb_reader: AsyncClient, knowledgebox
 ):
@@ -172,6 +178,7 @@ async def test_chat_always_returns_relations(
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resource):
     predict = get_predict()
     predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"0"]  # type: ignore

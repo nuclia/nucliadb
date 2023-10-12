@@ -1552,6 +1552,7 @@ class Shards(google.protobuf.message.Message):
     ACTUAL_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
     MODEL_FIELD_NUMBER: builtins.int
+    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     kbid: builtins.str
@@ -1560,6 +1561,7 @@ class Shards(google.protobuf.message.Message):
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     @property
     def model(self) -> nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata: ...
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
@@ -1568,9 +1570,10 @@ class Shards(google.protobuf.message.Message):
         actual: builtins.int = ...,
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         model: nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata | None = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["model", b"model"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "model", b"model", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "model", b"model", "release_channel", b"release_channel", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
 
 global___Shards = Shards
 
