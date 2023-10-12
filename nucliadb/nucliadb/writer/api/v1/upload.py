@@ -133,12 +133,36 @@ async def options_single(
     name="Create new upload on a Resource (by slug)",
     openapi_extra={"x-operation-order": 1},
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def post_rslug_prefix(
+    request: Request,
+    kbid: str,
+    item: Optional[CreateResourcePayload] = None,
+    rslug: Optional[str] = None,
+    field: Optional[str] = None,
+) -> Response:
+    return await _post(request, kbid, item=item, rslug=rslug, field=field)
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{path_rid}}/file/{{field}}/{TUSUPLOAD}",
     tags=["Resource field TUS uploads"],
     name="Create new upload on a Resource (by id)",
     openapi_extra={"x-operation-order": 1},
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def post_resource_prefix(
+    request: Request,
+    kbid: str,
+    item: Optional[CreateResourcePayload] = None,
+    path_rid: Optional[str] = None,
+    field: Optional[str] = None,
+) -> Response:
+    return await _post(request, kbid, item=item, path_rid=path_rid, field=field)
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{TUSUPLOAD}",
     tags=["Knowledge Box TUS uploads"],
@@ -148,6 +172,15 @@ async def options_single(
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
 async def post(
+    request: Request,
+    kbid: str,
+    item: Optional[CreateResourcePayload] = None,
+) -> Response:
+    return await _post(request, kbid, item=item)
+
+
+# called by one the three POST above - there are defined distinctly to produce clean API doc
+async def _post(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
@@ -162,7 +195,7 @@ async def post(
     dm = get_dm()
     storage_manager = get_storage_manager()
 
-    if rslug:
+    if rslug is not None:
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
     implies_resource_creation = path_rid is None
