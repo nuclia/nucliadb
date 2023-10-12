@@ -20,8 +20,9 @@
 from io import BytesIO
 from unittest.mock import AsyncMock, Mock
 
+import nats.errors
 import pytest
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from starlette.requests import Request
 
 from nucliadb.export_import.exceptions import ExportStreamExhausted
@@ -32,6 +33,7 @@ from nucliadb.export_import.utils import (
     TaskRetryHandler,
     get_cloud_files,
     import_broker_message,
+    transaction_commit,
 )
 from nucliadb_models.export_import import Status
 from nucliadb_protos import resources_pb2
@@ -270,3 +272,21 @@ class TestTaskRetryHandler:
             metadata.task.status = status
             await callback_retried("foo", bar="baz")
             callback.assert_not_called()
+
+
+async def test_transaction_commit_sends_storage_reference_on_max_payload_error():
+    context = Mock()
+    context.transaction.commit = AsyncMock(
+        side_effect=[nats.errors.MaxPayloadError, None]
+    )
+    context.blob_storage = AsyncMock()
+    context.blob_storage.set_stream_message.return_value = "key"
+
+    bm = BrokerMessage(kbid="kbid", uuid="uuid")
+
+    await transaction_commit(context, bm, 1)
+
+    assert context.transaction.commit.call_count == 2
+    call = context.transaction.commit.call_args_list[-1]
+    assert isinstance(call[1]["writer"], BrokerMessageBlobReference)
+    assert call[1]["headers"] == {"X-MESSAGE-TYPE": "PROXY"}
