@@ -153,7 +153,7 @@ async def post_rslug_prefix(
 )
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
-async def post_resource_prefix(
+async def post_rid_prefix(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
