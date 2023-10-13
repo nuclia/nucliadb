@@ -249,7 +249,9 @@ message Positions {
 
 message QuestionAnswer {
   string question = 1;
+  string question_language = 1;
   string answer = 2;
+  string answer_language = 2;
 }
 
 message FieldMetadata {
