@@ -16,8 +16,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 import asyncio
+import uuid
+from datetime import datetime
 from typing import AsyncIterator
 
 import aiohttp
@@ -35,6 +36,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb.tests.utils import inject_message
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_protos import resources_pb2 as rpb
 
 
 async def get_paragraph_classification_batch_from_response(
@@ -53,11 +55,6 @@ async def get_paragraph_classification_batch_from_response(
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    import uuid
-    from datetime import datetime
-
-    from nucliadb_protos import resources_pb2 as rpb
-
     rid = str(uuid.uuid4())
     slug = f"{rid}slug1"
 
@@ -196,6 +193,96 @@ async def inject_resource_with_paragraph_labels(knowledgebox, writer):
     return bm.uuid
 
 
+def broker_resource_without_labels(knowledgebox: str) -> BrokerMessage:
+    rid = str(uuid.uuid4())
+    slug = f"{rid}slug1"
+
+    bm: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug=slug,
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+
+    bm.basic.icon = "text/plain"
+    bm.basic.title = "Title Resource"
+    bm.basic.summary = "Summary of document"
+    bm.basic.thumbnail = "doc"
+    bm.basic.layout = "default"
+    bm.basic.metadata.useful = True
+    bm.basic.metadata.status = Metadata.Status.PROCESSED
+    bm.basic.metadata.language = "es"
+    bm.basic.created.FromDatetime(datetime.now())
+    bm.basic.modified.FromDatetime(datetime.now())
+    bm.origin.source = rpb.Origin.Source.WEB
+
+    etw = rpb.ExtractedTextWrapper()
+    text = "My own text Jamon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"  # noqa
+    etw.body.text = text
+    etw.field.field = "text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Summary of document"
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Title Resource"
+    etw.field.field = "title"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    bm.texts["text"].body = text
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "text"
+    fcm.field.field_type = rpb.FieldType.TEXT
+    p1 = rpb.Paragraph(
+        start=0,
+        end=45,
+    )
+    p2 = rpb.Paragraph(
+        start=47,
+        end=64,
+    )
+
+    p3 = rpb.Paragraph(
+        start=65,
+        end=93,
+    )
+
+    p4 = rpb.Paragraph(
+        start=93,
+        end=109,
+    )
+
+    fcm.metadata.metadata.paragraphs.append(p1)
+    fcm.metadata.metadata.paragraphs.append(p2)
+    fcm.metadata.metadata.paragraphs.append(p3)
+    fcm.metadata.metadata.paragraphs.append(p4)
+    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+
+    bm.field_metadata.append(fcm)
+
+    ev = rpb.ExtractedVectorsWrapper()
+    ev.field.field = "text"
+    ev.field.field_type = rpb.FieldType.TEXT
+
+    bm.source = BrokerMessage.MessageSource.WRITER
+    return bm
+
+
+async def inject_resource_without_labels(knowledgebox, writer):
+    bm = broker_resource_without_labels(knowledgebox)
+    await inject_message(writer, bm)
+    return bm.uuid
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_paragraph_classification(
@@ -235,6 +322,37 @@ async def test_generator_paragraph_classification(
     trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
     trainset.filter.labels.append("labelset_paragraphs")
+
+    async with train_rest_api.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        async for batch in get_paragraph_classification_batch_from_response(response):
+            batches.append(batch)
+            assert len(batch.data) == 2
+        assert len(batches) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
+async def test_generator_paragraph_classification_iterates_all_paragraphs(
+    train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
+):
+    await inject_resource_without_labels(knowledgebox, nucliadb_grpc)
+    await asyncio.sleep(0.1)
+    async with train_rest_api.get(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
+    ) as partitions:
+        assert partitions.status == 200
+        data = await partitions.json()
+        assert len(data["partitions"]) == 1
+        partition_id = data["partitions"][0]
+
+    trainset = TrainSet()
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
+    trainset.batch_size = 2
 
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
