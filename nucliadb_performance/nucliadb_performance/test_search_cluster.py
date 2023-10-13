@@ -47,7 +47,7 @@ async def test_catalog(session):
     )
 
 
-@scenario(weight=CHAT_WEIGHT)
+# @scenario(weight=0)
 async def test_chat(session):
     client = get_search_client(session)
     kbid = get_random_kb()
@@ -59,7 +59,7 @@ async def test_chat(session):
     )
 
 
-@scenario(weight=FIND_WEIGHT)
+# @scenario(weight=0)
 async def test_find(session):
     client = get_search_client(session)
     kbid = get_random_kb()
@@ -77,5 +77,8 @@ async def test_search(session):
     await client.make_request(
         "GET",
         f"/kb/{kbid}/search",
-        params={"query": fake.sentence()},
+        params={
+            "query": fake.sentence(),
+            "features": ["paragraph", "document", "relations"],
+        },
     )

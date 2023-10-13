@@ -29,11 +29,12 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     FileExtractedData,
     LinkExtractedData,
+    Metadata,
     Paragraph,
 )
 from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
+from nucliadb_protos.writer_pb2 import BrokerMessage, Error, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
@@ -251,6 +252,54 @@ async def test_reprocess_should_set_status_to_pending(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PENDING"
+
+
+async def check_status(nucliadb_reader, knowledgebox, rid, status):
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == status
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog")
+    assert resp.status_code == 200
+    assert resp.json()["resources"][rid]["metadata"]["status"] == status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_blocked_error_status(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    """ """
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={"title": "Foo resource", "texts": {"text1": {"body": "My text is here"}}},
+        headers={"X-Synchronous": "True"},
+        timeout=None,
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await check_status(nucliadb_reader, knowledgebox, rid, "PENDING")
+
+    bm = BrokerMessage()
+    bm.kbid = knowledgebox
+    bm.uuid = rid
+    bm.basic.metadata.status = Metadata.Status.BLOCKED
+    bm.basic.metadata.useful = True
+    error = Error()
+    error.field = "text1"
+    error.field_type = FieldType.TEXT
+    error.error = "Account blocked for processing"
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.errors.append(error)
+
+    await inject_message(nucliadb_grpc, bm)
+
+    await check_status(nucliadb_reader, knowledgebox, rid, "ERROR")
 
 
 @pytest.mark.asyncio
