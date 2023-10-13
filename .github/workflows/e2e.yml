@@ -153,4 +153,5 @@ jobs:
           cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
           DEBUG: "1"
           NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
+          NUCLIADB_DISABLE_TELEMETRY: "True"
         run: bash e2e/run-e2e-tests.sh
