@@ -431,7 +431,7 @@ async def merge_paragraph_results(
 
 
 @merge_observer.wrap({"type": "merge_relations"})
-async def merge_relations_results(
+def merge_relations_results(
     relations_responses: List[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
 ) -> Relations:
@@ -527,9 +527,7 @@ async def merge_results(
         vectors, resources, kbid, count, page, min_score=min_score
     )
 
-    api_results.relations = await merge_relations_results(
-        relations, requested_relations
-    )
+    api_results.relations = merge_relations_results(relations, requested_relations)
 
     api_results.resources = await fetch_resources(
         resources, kbid, show, field_type_filter, extracted

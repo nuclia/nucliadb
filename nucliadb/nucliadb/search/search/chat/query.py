@@ -171,7 +171,7 @@ async def get_relations_results(
         _,
         _,
     ) = await node_query(kbid, Method.RELATIONS, relation_request, chat_request.shards)
-    return await merge_relations_results(relations_results, relation_request.subgraph)
+    return merge_relations_results(relations_results, relation_request.subgraph)
 
 
 async def not_enough_context_generator():

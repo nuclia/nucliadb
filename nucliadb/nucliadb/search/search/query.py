@@ -35,6 +35,7 @@ from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -46,8 +47,30 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
+from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
+
+ENTITY_FILTER_PREFIX = "/e/"
+LABEL_FILTER_PREFIX = "/l/"
+
+
+def record_filters_counter(filters: list[str], counter: Counter) -> None:
+    counter.inc({"type": "filters"})
+    filters.sort()
+    entity_found = False
+    label_found = False
+    for fltr in filters:
+        if entity_found and label_found:
+            break
+        if fltr[0] != "/":
+            break
+        if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
+            entity_found = True
+            counter.inc({"type": "filters_entities"})
+        elif not label_found and fltr.startswith(LABEL_FILTER_PREFIX):
+            label_found = True
+            counter.inc({"type": "filters_labels"})
 
 
 async def global_query_to_pb(
@@ -89,10 +112,16 @@ async def global_query_to_pb(
     request.min_score = min_score
     request.body = query
     request.with_duplicates = with_duplicates
-    request.filter.tags.extend(filters)
+    if len(filters) > 0:
+        request.filter.tags.extend(filters)
+        record_filters_counter(filters, node_features)
+
     request.faceted.tags.extend(faceted)
     request.fields.extend(fields)
-    request.key_filters.extend(key_filters or [])
+
+    if key_filters is not None and len(key_filters) > 0:
+        request.key_filters.extend(key_filters)
+        node_features.inc({"type": "key_filters"})
 
     if with_status is not None:
         request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]
@@ -118,17 +147,28 @@ async def global_query_to_pb(
     if range_modification_end is not None:
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
-    if SearchOptions.DOCUMENT in features or SearchOptions.PARAGRAPH in features:
+    document_search = SearchOptions.DOCUMENT in features
+    paragraph_search = SearchOptions.PARAGRAPH in features
+    if document_search or paragraph_search:
         sort_field = SortFieldMap[sort.field] if sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[sort.order]  # type: ignore
 
-    request.document = SearchOptions.DOCUMENT in features
-    request.paragraph = SearchOptions.PARAGRAPH in features
+    if document_search:
+        request.document = True
+        node_features.inc({"type": "documents"})
+
+    if paragraph_search:
+        request.paragraph = True
+        node_features.inc({"type": "paragraphs"})
 
     incomplete = False
-    if SearchOptions.VECTOR in features:
+    vector_search = SearchOptions.VECTOR in features
+    if vector_search:
+        node_features.inc({"type": "vectors"})
+        if vectorset is not None:
+            node_features.inc({"type": "vectorset"})
         incomplete = await _parse_vectors(
             request, kbid, query, user_vector=user_vector, vectorset=vectorset
         )
@@ -139,12 +179,13 @@ async def global_query_to_pb(
         if relations_search:
             request.relation_subgraph.entry_points.extend(detected_entities)
             request.relation_subgraph.depth = 1
+            node_features.inc({"type": "relations"})
         if autofilter:
             entity_filters = parse_entities_to_filters(request, detected_entities)
             autofilters.extend(entity_filters)
 
     if with_synonyms:
-        if SearchOptions.VECTOR in features or SearchOptions.RELATIONS in features:
+        if vector_search or relations_search:
             raise HTTPException(
                 status_code=422,
                 detail="Search with custom synonyms is only supported on paragraph and document search",

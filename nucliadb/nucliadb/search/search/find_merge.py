@@ -55,6 +55,7 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
 )
 
 
+@merge_observer.wrap({"type": "set_text_value"})
 async def set_text_value(
     kbid: str,
     result_paragraph: TempFindParagraph,
@@ -84,6 +85,7 @@ async def set_text_value(
         max_operations.release()
 
 
+@merge_observer.wrap({"type": "set_resource_metadada_value"})
 async def set_resource_metadata_value(
     kbid: str,
     resource: str,
@@ -417,9 +419,7 @@ async def find_merge_results(
         highlight,
         ematches,
     )
-    api_results.relations = await merge_relations_results(
-        relations, requested_relations
-    )
+    api_results.relations = merge_relations_results(relations, requested_relations)
 
     await abort_transaction()
     return api_results
