@@ -21,6 +21,7 @@ import functools
 from io import BytesIO
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
+import nats.errors
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
 from nucliadb.common.context import ApplicationContext
@@ -71,12 +72,38 @@ async def import_broker_message(
 ) -> None:
     bm.kbid = kbid
     partition = context.partitioning.generate_partition(kbid, bm.uuid)
-    for import_bm in [get_writer_bm(bm), get_processor_bm(bm)]:
+    for pb in [get_writer_bm(bm), get_processor_bm(bm)]:
+        await transaction_commit(context, pb, partition)
+
+
+async def transaction_commit(
+    context: ApplicationContext, bm: writer_pb2.BrokerMessage, partition: int
+) -> None:
+    """
+    Try to send the broker message over nats. If it's too big, upload
+    it to blob storage and over nats only send a reference to it.
+    """
+    try:
         await context.transaction.commit(
-            import_bm,
+            bm,
             partition,
             wait=False,
             target_subject=Streams.INGEST_PROCESSED.subject,
+        )
+    except nats.errors.MaxPayloadError:
+        stored_key = await context.blob_storage.set_stream_message(
+            kbid=bm.kbid, rid=bm.uuid, data=bm.SerializeToString()
+        )
+        referenced_bm = writer_pb2.BrokerMessageBlobReference(
+            uuid=bm.uuid, kbid=bm.kbid, storage_key=stored_key
+        )
+        await context.transaction.commit(
+            writer=referenced_bm,
+            partition=partition,
+            target_subject=Streams.INGEST_PROCESSED.subject,
+            # This header is needed as it's the way we flag the transaction
+            # consumer to download from storage
+            headers={"X-MESSAGE-TYPE": "PROXY"},
         )
 
 
