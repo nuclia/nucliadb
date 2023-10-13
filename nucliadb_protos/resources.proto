@@ -234,6 +234,7 @@ message Paragraph {
     repeated Sentence sentences = 7;
     string key = 8;
     string text = 9;  // Optional, as a computed value
+    repeated QuestionAnswer question_answer = 14;
 }
 
 message Position {
@@ -244,6 +245,13 @@ message Position {
 message Positions {
     repeated Position position = 1;
     string entity = 2;
+}
+
+message QuestionAnswer {
+  string question = 1;
+  string question_language = 2;
+  string answer = 3;
+  string answer_language = 4;
 }
 
 message FieldMetadata {

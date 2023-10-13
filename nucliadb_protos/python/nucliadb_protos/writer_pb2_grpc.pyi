@@ -117,6 +117,7 @@ from nucliadb_protos.resources_pb2 import (
     ParagraphAnnotation as ParagraphAnnotation,
     Position as Position,
     Positions as Positions,
+    QuestionAnswer as QuestionAnswer,
     Relations as Relations,
     RowsPreview as RowsPreview,
     Sentence as Sentence,

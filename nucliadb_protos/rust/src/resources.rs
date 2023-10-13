@@ -345,6 +345,8 @@ pub struct Paragraph {
     /// Optional, as a computed value
     #[prost(string, tag="9")]
     pub text: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag="14")]
+    pub question_answer: ::prost::alloc::vec::Vec<QuestionAnswer>,
 }
 /// Nested message and enum types in `Paragraph`.
 pub mod paragraph {
@@ -372,6 +374,17 @@ pub struct Positions {
     pub position: ::prost::alloc::vec::Vec<Position>,
     #[prost(string, tag="2")]
     pub entity: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QuestionAnswer {
+    #[prost(string, tag="1")]
+    pub question: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub question_language: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub answer: ::prost::alloc::string::String,
+    #[prost(string, tag="4")]
+    pub answer_language: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldMetadata {

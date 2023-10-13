@@ -905,6 +905,7 @@ class Paragraph(google.protobuf.message.Message):
     SENTENCES_FIELD_NUMBER: builtins.int
     KEY_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
+    QUESTION_ANSWER_FIELD_NUMBER: builtins.int
     start: builtins.int
     end: builtins.int
     @property
@@ -919,6 +920,8 @@ class Paragraph(google.protobuf.message.Message):
     key: builtins.str
     text: builtins.str
     """Optional, as a computed value"""
+    @property
+    def question_answer(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___QuestionAnswer]: ...
     def __init__(
         self,
         *,
@@ -931,8 +934,9 @@ class Paragraph(google.protobuf.message.Message):
         sentences: collections.abc.Iterable[global___Sentence] | None = ...,
         key: builtins.str = ...,
         text: builtins.str = ...,
+        question_answer: collections.abc.Iterable[global___QuestionAnswer] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "question_answer", b"question_answer", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
 
 global___Paragraph = Paragraph
 
@@ -972,6 +976,30 @@ class Positions(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["entity", b"entity", "position", b"position"]) -> None: ...
 
 global___Positions = Positions
+
+@typing_extensions.final
+class QuestionAnswer(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    QUESTION_FIELD_NUMBER: builtins.int
+    QUESTION_LANGUAGE_FIELD_NUMBER: builtins.int
+    ANSWER_FIELD_NUMBER: builtins.int
+    ANSWER_LANGUAGE_FIELD_NUMBER: builtins.int
+    question: builtins.str
+    question_language: builtins.str
+    answer: builtins.str
+    answer_language: builtins.str
+    def __init__(
+        self,
+        *,
+        question: builtins.str = ...,
+        question_language: builtins.str = ...,
+        answer: builtins.str = ...,
+        answer_language: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["answer", b"answer", "answer_language", b"answer_language", "question", b"question", "question_language", b"question_language"]) -> None: ...
+
+global___QuestionAnswer = QuestionAnswer
 
 @typing_extensions.final
 class FieldMetadata(google.protobuf.message.Message):
