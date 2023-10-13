@@ -1,19 +1,14 @@
 from faker import Faker
 from molotov import global_setup, scenario
 
-from nucliadb_performance.utils import (
-    get_loaded_kb,
-    get_random_kb_entity_filters,
-    get_search_client,
-    load_kb,
-)
+from nucliadb_performance.utils import get_loaded_kb, get_search_client, load_kb
 
 fake = Faker()
 
 TINY_KB = "1e11b18a-e829-46ad-91d7-155c4777792b"
 SMALL_KB = "c02b6960-4c0e-4ee3-b006-53836da5a5a9"
 MEDIUM_KB = "3336b978-6af5-460d-b459-a2fdebcc06df"
-
+BIG_KB = "TO_BE_ADDED_YET"
 
 KBID_TO_TEST = SMALL_KB
 
@@ -32,7 +27,7 @@ def init_test(args):
 async def test_find_entity_filter(session):
     client = get_search_client(session)
     kbid = get_loaded_kb()
-    filters = get_random_kb_entity_filters(n=1)
+    filters = [f"/e/COUNTRY/{fake.country()}"]
     await client.make_request(
         "GET",
         f"/v1/kb/{kbid}/find",
