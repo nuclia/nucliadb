@@ -82,6 +82,7 @@ RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CAR
     && rm -rf target \
     && rm -rf /nucliadb/tmp/* \
     && cargo install rust-spy \
+    && cargo install samply \
     && cargo clean
 
 # --------------------------------------------------------------------
@@ -107,6 +108,7 @@ COPY --from=eu.gcr.io/stashify-218417/basenode:latest /bin/grpc_health_probe /bi
 COPY --from=builder /nucliadb/bin/node_reader /usr/local/bin/node_reader
 COPY --from=builder /nucliadb/bin/node_writer /usr/local/bin/node_writer
 COPY --from=builder /usr/local/cargo/bin/rust-spy /usr/local/bin/rust-spy
+COPY --from=builder /usr/local/cargo/bin/samply /usr/local/bin/samply
 
 
 EXPOSE 4444/udp
