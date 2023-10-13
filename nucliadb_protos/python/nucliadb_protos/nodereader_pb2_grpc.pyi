@@ -33,12 +33,15 @@ from nucliadb_protos.noderesources_pb2 import (
 from nucliadb_protos.utils_pb2 import (
     COSINE as COSINE,
     DOT as DOT,
+    EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
+    ReleaseChannel as ReleaseChannel,
+    STABLE as STABLE,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
     UserVectors as UserVectors,
@@ -113,6 +116,15 @@ class NodeReaderStub:
     Documents: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.nodereader_pb2.StreamRequest,
         nucliadb_protos.nodereader_pb2.DocumentItem,
+    ]
+    GetShardFiles: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.GetShardFilesRequest,
+        nucliadb_protos.nodereader_pb2.ShardFileList,
+    ]
+    """Shard Download"""
+    DownloadShardFile: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
+        nucliadb_protos.nodereader_pb2.ShardFileChunk,
     ]
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
@@ -209,5 +221,18 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.StreamRequest,
         context: grpc.ServicerContext,
     ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.DocumentItem]: ...
+    @abc.abstractmethod
+    def GetShardFiles(
+        self,
+        request: nucliadb_protos.nodereader_pb2.GetShardFilesRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.ShardFileList:
+        """Shard Download"""
+    @abc.abstractmethod
+    def DownloadShardFile(
+        self,
+        request: nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ShardFileChunk]: ...
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

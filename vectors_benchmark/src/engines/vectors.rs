@@ -76,4 +76,8 @@ impl VectorEngine for Index {
         let lock = self.get_slock().unwrap();
         self.search(&Request(no_results, query), &lock).unwrap();
     }
+    fn merge(&mut self) {
+        let lock = self.get_slock().unwrap();
+        self.merge(&lock).unwrap();
+    }
 }

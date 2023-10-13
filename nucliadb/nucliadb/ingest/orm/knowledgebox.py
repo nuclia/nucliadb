@@ -33,6 +33,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardNotFound
@@ -177,6 +178,7 @@ class KnowledgeBox:
         semantic_model: SemanticModelMetadata,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
+        release_channel: ReleaseChannel.ValueType = ReleaseChannel.STABLE,
     ) -> Tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
@@ -217,7 +219,10 @@ class KnowledgeBox:
             shard_manager = get_shard_manager()
             try:
                 await shard_manager.create_shard_by_kbid(
-                    txn, uuid, semantic_model=semantic_model
+                    txn,
+                    uuid,
+                    semantic_model=semantic_model,
+                    release_channel=release_channel,
                 )
             except Exception as e:
                 await storage.delete_kb(uuid)
@@ -447,14 +452,13 @@ class KnowledgeBox:
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)
         if raw_basic:
-            config = await self.get_config()
             return Resource(
                 txn=self.txn,
                 storage=self.storage,
                 kb=self,
                 uuid=uuid,
                 basic=Resource.parse_basic(raw_basic),
-                disable_vectors=config.disable_vectors if config is not None else True,
+                disable_vectors=False,
             )
         else:
             return None
@@ -530,19 +534,17 @@ class KnowledgeBox:
         basic.slug = slug
         fix_paragraph_annotation_keys(uuid, basic)
         await set_basic(self.txn, self.kbid, uuid, basic)
-        config = await self.get_config()
         return Resource(
             storage=self.storage,
             txn=self.txn,
             kb=self,
             uuid=uuid,
             basic=basic,
-            disable_vectors=config.disable_vectors if config is not None else False,
+            disable_vectors=False,
         )
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
         base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
-        config = await self.get_config()
         async for key in self.txn.keys(match=base, count=-1):
             slug = key.split("/")[-1]
             uuid = await self.get_resource_uuid_by_slug(slug)
@@ -552,9 +554,7 @@ class KnowledgeBox:
                     self.storage,
                     self,
                     uuid,
-                    disable_vectors=config.disable_vectors
-                    if config is not None
-                    else False,
+                    disable_vectors=False,
                 )
 
 

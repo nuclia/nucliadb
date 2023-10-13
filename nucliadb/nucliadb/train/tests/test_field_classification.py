@@ -197,6 +197,7 @@ async def inject_resource_with_field_labels(knowledgebox, writer):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_field_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):

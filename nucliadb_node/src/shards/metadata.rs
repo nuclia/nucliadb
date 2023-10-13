@@ -63,6 +63,7 @@ impl From<ShardMetadata> for GrpcMetadata {
     fn from(x: ShardMetadata) -> GrpcMetadata {
         GrpcMetadata {
             kbid: x.kbid.unwrap_or_default(),
+            release_channel: x.channel.unwrap_or_default() as i32,
         }
     }
 }

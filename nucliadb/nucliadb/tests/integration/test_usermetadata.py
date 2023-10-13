@@ -22,6 +22,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_labels_sc_2053(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

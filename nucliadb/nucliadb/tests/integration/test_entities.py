@@ -203,6 +203,8 @@ async def entities(
     await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "bird")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_get_entities_groups(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -241,6 +243,8 @@ async def test_get_entities_groups(
     assert body["detail"] == "Entities group 'I-DO-NOT-EXIST' does not exist"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_list_entities_groups(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -256,6 +260,8 @@ async def test_list_entities_groups(
     assert len(body["groups"]["ANIMALS"]["entities"]) == 0
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_create_entities_group_twice(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -274,6 +280,8 @@ async def test_create_entities_group_twice(
     assert resp.status_code == 409
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_update_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -303,6 +311,8 @@ async def test_update_entities_group(
     assert body["entities"]["dog"]["value"] == "updated-dog"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_update_indexed_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -330,6 +340,8 @@ async def test_update_indexed_entities_group(
     assert body["entities"]["dolphin"]["value"] == "updated-dolphin"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_update_entities_group_metadata(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -353,6 +365,8 @@ async def test_update_entities_group_metadata(
     assert body["color"] == "red"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_delete_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -368,6 +382,8 @@ async def test_delete_entities_group(
     assert resp.status_code == 404
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_delete_and_recreate_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -395,6 +411,8 @@ async def test_delete_and_recreate_entities_group(
     assert body["color"] == "white"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_entities_indexing(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,

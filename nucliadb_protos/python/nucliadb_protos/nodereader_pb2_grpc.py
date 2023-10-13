@@ -92,6 +92,16 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentItem.FromString,
                 )
+        self.GetShardFiles = channel.unary_unary(
+                '/nodereader.NodeReader/GetShardFiles',
+                request_serializer=nucliadb__protos_dot_nodereader__pb2.GetShardFilesRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.ShardFileList.FromString,
+                )
+        self.DownloadShardFile = channel.unary_stream(
+                '/nodereader.NodeReader/DownloadShardFile',
+                request_serializer=nucliadb__protos_dot_nodereader__pb2.DownloadShardFileRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.ShardFileChunk.FromString,
+                )
 
 
 class NodeReaderServicer(object):
@@ -190,6 +200,19 @@ class NodeReaderServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetShardFiles(self, request, context):
+        """Shard Download
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DownloadShardFile(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NodeReaderServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -267,6 +290,16 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.Documents,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentItem.SerializeToString,
+            ),
+            'GetShardFiles': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetShardFiles,
+                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.GetShardFilesRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.ShardFileList.SerializeToString,
+            ),
+            'DownloadShardFile': grpc.unary_stream_rpc_method_handler(
+                    servicer.DownloadShardFile,
+                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.DownloadShardFileRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.ShardFileChunk.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -532,5 +565,39 @@ class NodeReader(object):
         return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/Documents',
             nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.DocumentItem.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetShardFiles(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/GetShardFiles',
+            nucliadb__protos_dot_nodereader__pb2.GetShardFilesRequest.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.ShardFileList.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DownloadShardFile(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/DownloadShardFile',
+            nucliadb__protos_dot_nodereader__pb2.DownloadShardFileRequest.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.ShardFileChunk.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

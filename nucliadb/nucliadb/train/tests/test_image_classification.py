@@ -50,6 +50,7 @@ INVOICE_SELECTIONS_FILENAME = os.path.join(_testdata_dir, "invoice_selections.js
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generation_image_classification(
     train_rest_api: aiohttp.ClientSession,
     knowledgebox: str,

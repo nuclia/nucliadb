@@ -33,6 +33,21 @@ COSINE: VectorSimilarity.ValueType  # 0
 DOT: VectorSimilarity.ValueType  # 1
 global___VectorSimilarity = VectorSimilarity
 
+class _ReleaseChannel:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ReleaseChannelEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ReleaseChannel.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    STABLE: _ReleaseChannel.ValueType  # 0
+    EXPERIMENTAL: _ReleaseChannel.ValueType  # 1
+
+class ReleaseChannel(_ReleaseChannel, metaclass=_ReleaseChannelEnumTypeWrapper): ...
+
+STABLE: ReleaseChannel.ValueType  # 0
+EXPERIMENTAL: ReleaseChannel.ValueType  # 1
+global___ReleaseChannel = ReleaseChannel
+
 @typing_extensions.final
 class Relation(google.protobuf.message.Message):
     """Relations are connexions between nodes in the relation index.

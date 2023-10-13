@@ -173,7 +173,6 @@ fn get_num_dimensions(vectors_path: &Path) -> usize {
 
 fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
     println!("Opening vectors located at {:?}", dataset.vectors_path);
-    let _ = Merger::install_global().map(std::thread::spawn);
     let reader = Index::open(dataset.vectors_path.as_path()).unwrap();
     let mut results: Vec<(String, Vec<u128>)> = vec![];
 

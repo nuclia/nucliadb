@@ -5,13 +5,10 @@ parser.add_argument("--build", type=int, help="build number")
 parser.add_argument("--sem", type=str, help="Semantic version part")
 parser.add_argument("--minor", type=bool, help="Minor")
 parser.add_argument("--bug", type=bool, help="Bug")
-parser.add_argument(
-    "--version_file", type=str, help="Version file to update", default="VERSION"
-)
 
 
 def run(args):
-    with open(args.version_file, "r") as f:
+    with open("VERSION", "r") as f:
         version = f.read().strip()
 
     major, minor, bug = version.split(".")
@@ -33,22 +30,41 @@ def run(args):
         bug += 1
 
     version = f"{major}.{minor}.{bug}{version_post}"
-    with open(args.version_file, "w") as f:
+    with open("VERSION", "w") as f:
         f.write(version)
 
-    if args.version_file == "VERSION":
-        # replace node binding toml version as well
-        with open("nucliadb_node_binding/Cargo.toml", "r") as f:
-            cargo = f.read()
+    # replace node binding toml version as well
+    with open("nucliadb_node_binding/Cargo.toml", "r") as f:
+        cargo = f.read()
 
-        new_cargo = []
-        for line in cargo.splitlines():
-            if line.startswith("version ="):
-                line = f'version = "{version}"'
-            new_cargo.append(line)
+    new_cargo = []
+    for line in cargo.splitlines():
+        if line.startswith("version ="):
+            line = f'version = "{version}"'
+        new_cargo.append(line)
 
-        with open("nucliadb_node_binding/Cargo.toml", "w") as f:
-            f.write("\n".join(new_cargo))
+    with open("nucliadb_node_binding/Cargo.toml", "w") as f:
+        f.write("\n".join(new_cargo))
+
+    # go through each requirements.txt and update the version to the new bump
+    for req_filepath in (
+        "nucliadb/requirements.txt",
+        "nucliadb_utils/requirements.txt",
+        "nucliadb_sdk/requirements.txt",
+        "nucliadb_models/requirements.txt",
+        "nucliadb_dataset/requirements.txt",
+    ):
+        with open(req_filepath, "r") as f:
+            req_lines = []
+            for line in f.read().splitlines():
+                if line.startswith("nucliadb-") and (
+                    "=" not in line and ">" not in line and "~" not in line
+                ):
+                    line = f"{line}>={version}"
+                req_lines.append(line)
+
+        with open(req_filepath, "w") as f:
+            f.write("\n".join(req_lines))
 
 
 if __name__ == "__main__":

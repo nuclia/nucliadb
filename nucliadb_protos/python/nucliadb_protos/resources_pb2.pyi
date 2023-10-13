@@ -21,12 +21,15 @@ else:
 from nucliadb_protos.utils_pb2 import (
     COSINE as COSINE,
     DOT as DOT,
+    EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
+    ReleaseChannel as ReleaseChannel,
+    STABLE as STABLE,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
     UserVectors as UserVectors,
@@ -2112,7 +2115,7 @@ global___FieldID = FieldID
 
 @typing_extensions.final
 class AllFieldIDs(google.protobuf.message.Message):
-    """This message is used to store a list of all field ids of a particular 
+    """This message is used to store a list of all field ids of a particular
     resource. Note that title and summary fields are not included.
     """
 

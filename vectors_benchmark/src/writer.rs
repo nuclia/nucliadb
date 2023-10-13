@@ -46,6 +46,10 @@ pub fn write_benchmark<Eng, QIter, Plot>(
             vbatch = vec![];
             println!("Written {x}");
         }
+        if batch_num % 10 == 0 {
+            engine.merge();
+            println!("Merge was performed");
+        }
     }
     if !vbatch.is_empty() {
         engine.add_batch(batch_id, kbatch, vbatch);

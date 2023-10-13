@@ -50,10 +50,10 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
         trainset.batch_size = 50
 
     if trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
-        if len(trainset.filter.labels) != 1:
+        if len(trainset.filter.labels) > 1:
             raise HTTPException(
                 status_code=422,
-                detail="Paragraph Classification should be of 1 labelset",
+                detail="Paragraph Classification should be of not more than 1 labelset",
             )
 
         async for paragraph_data in generate_paragraph_classification_payloads(

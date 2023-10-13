@@ -110,3 +110,8 @@ enum VectorSimilarity {
     COSINE = 0;
     DOT = 1;
 }
+
+enum ReleaseChannel {
+  STABLE = 0;
+  EXPERIMENTAL = 1;
+}

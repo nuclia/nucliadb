@@ -43,7 +43,7 @@ class PGFileStorageManager(FileStorageManager):
             async with conn.transaction():
                 dl = PostgresFileDataLayer(conn)
                 if path is not None:
-                    await self.delete_upload(kbid, path)
+                    await dl.delete_file(kbid, path)
 
                 await dl.create_file(
                     kb_id=bucket,

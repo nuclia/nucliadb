@@ -41,6 +41,7 @@ async def test_list_sentences(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_list_sentences_shows_ners_with_positions(
     train_client: TrainStub, knowledgebox: str, test_pagination_resources
 ) -> None:

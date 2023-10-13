@@ -19,12 +19,15 @@ else:
 from nucliadb_protos.utils_pb2 import (
     COSINE as COSINE,
     DOT as DOT,
+    EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
+    ReleaseChannel as ReleaseChannel,
+    STABLE as STABLE,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
     UserVectors as UserVectors,
@@ -115,6 +118,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
     MIGRATION_VERSION_FIELD_NUMBER: builtins.int
+    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     @property
@@ -124,6 +128,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     slug: builtins.str
     disable_vectors: builtins.bool
     migration_version: builtins.int
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
@@ -134,8 +139,9 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         slug: builtins.str = ...,
         disable_vectors: builtins.bool = ...,
         migration_version: builtins.int = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "slug", b"slug", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 
@@ -151,6 +157,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     SIMILARITY_FIELD_NUMBER: builtins.int
     VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
     DEFAULT_MIN_SCORE_FIELD_NUMBER: builtins.int
+    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     slug: builtins.str
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
@@ -158,6 +165,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     vector_dimension: builtins.int
     default_min_score: builtins.float
+    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     def __init__(
         self,
         *,
@@ -167,9 +175,10 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         vector_dimension: builtins.int | None = ...,
         default_min_score: builtins.float | None = ...,
+        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "vector_dimension", b"vector_dimension"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "forceuuid", b"forceuuid", "similarity", b"similarity", "slug", b"slug", "vector_dimension", b"vector_dimension"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "forceuuid", b"forceuuid", "release_channel", b"release_channel", "similarity", b"similarity", "slug", b"slug", "vector_dimension", b"vector_dimension"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_default_min_score", b"_default_min_score"]) -> typing_extensions.Literal["default_min_score"] | None: ...
     @typing.overload

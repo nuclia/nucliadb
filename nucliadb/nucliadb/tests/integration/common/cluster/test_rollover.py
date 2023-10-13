@@ -34,6 +34,7 @@ async def app_context(natsd, gcs_storage, nucliadb):
     await ctx.finalize()
 
 
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_rollover_shards(
     app_context,
     knowledgebox,

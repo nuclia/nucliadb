@@ -1,6 +1,8 @@
 httpx
 requests
-nucliadb-models>=2.25.0
 urllib3<1.27,>=1.21.1
 orjson
 pydantic>=1.10.9,<2.0
+
+# automatically bumped during release
+nucliadb-models

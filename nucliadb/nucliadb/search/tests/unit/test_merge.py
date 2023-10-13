@@ -17,7 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_telemetry import metrics
+from unittest.mock import patch
 
-merge_observer = metrics.Observer("merge_results", labels={"type": ""})
-node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})
+from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs_results
+
+
+async def test_str_model():
+    # make sure __str__ works as advertised
+    res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False)
+    assert str(res) == res.json()
+
+
+async def test_str_model_fallback():
+    with patch.object(ResourceSearchResults, "json", side_effect=Exception("ERROR")):
+        res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False)
+        assert "sentences=None" in str(res)
