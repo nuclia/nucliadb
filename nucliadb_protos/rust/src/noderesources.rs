@@ -241,6 +241,8 @@ pub mod resource {
 pub struct ShardMetadata {
     #[prost(string, tag="1")]
     pub kbid: ::prost::alloc::string::String,
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="2")]
+    pub release_channel: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NodeMetadata {

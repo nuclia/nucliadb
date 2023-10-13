@@ -32,10 +32,13 @@ pub struct KnowledgeBoxConfig {
     pub enabled_insights: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag="5")]
     pub slug: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(bool, tag="6")]
     pub disable_vectors: bool,
     #[prost(int64, tag="7")]
     pub migration_version: i64,
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="8")]
+    pub release_channel: i32,
 }
 // NEW
 
@@ -53,6 +56,8 @@ pub struct KnowledgeBoxNew {
     pub vector_dimension: ::core::option::Option<i32>,
     #[prost(float, optional, tag="6")]
     pub default_min_score: ::core::option::Option<f32>,
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="7")]
+    pub release_channel: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewKnowledgeBoxResponse {

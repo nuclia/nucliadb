@@ -19,7 +19,7 @@
 #
 
 import asyncio
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from nucliadb_protos.nodesidecar_pb2 import Counter
@@ -97,10 +97,10 @@ async def test_handle_message_create_new_shard(
         action=Notification.Action.INDEXED,
     )
     await shard_creator_handler.handle_message(notif.SerializeToString())
-
     await asyncio.sleep(0.06)
-
-    shard_manager.maybe_create_new_shard.assert_called_with("kbid", ANY)
+    shard_manager.maybe_create_new_shard.assert_called_with(
+        "kbid", settings.max_shard_paragraphs + 1, 0, 0
+    )
 
 
 async def test_handle_message_do_not_create(

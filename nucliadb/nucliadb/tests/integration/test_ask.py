@@ -32,6 +32,7 @@ def feature_disabled():
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_document(
     nucliadb_writer,
     nucliadb_reader,
@@ -59,6 +60,7 @@ async def test_ask_document(
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_document_disabled(
     nucliadb_writer,
     nucliadb_reader,

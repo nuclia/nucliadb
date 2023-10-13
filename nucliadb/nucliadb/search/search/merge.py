@@ -70,7 +70,7 @@ from nucliadb_telemetry import errors
 
 from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
-from .paragraphs import get_paragraph_text, get_text_sentence
+from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentence
 
 Bm25Score = Tuple[int, int]
 TimestampScore = datetime.datetime
@@ -202,6 +202,7 @@ async def merge_suggest_paragraph_results(
         sort_results_by_score(raw_paragraph_list)
 
     result_paragraph_list: List[Paragraph] = []
+    etcache = ExtractedTextCache()
     for result in raw_paragraph_list[:10]:
         _, field_type, field = result.field.split("/")
         text = await get_paragraph_text(
@@ -214,6 +215,7 @@ async def merge_suggest_paragraph_results(
             highlight=highlight,
             ematches=ematches,  # type: ignore
             matches=result.matches,  # type: ignore
+            extracted_text_cache=etcache,
         )
         labels = await get_labels_paragraph(result, kbid)
         new_paragraph = Paragraph(
@@ -242,7 +244,7 @@ async def merge_suggest_paragraph_results(
                 new_paragraph.start_seconds = seconds_positions[0]
                 new_paragraph.end_seconds = seconds_positions[1]
         result_paragraph_list.append(new_paragraph)
-
+    etcache.clear()
     return Paragraphs(results=result_paragraph_list, query=query)
 
 
@@ -371,6 +373,7 @@ async def merge_paragraph_results(
         next_page = True
 
     result_paragraph_list: List[Paragraph] = []
+    etcache = ExtractedTextCache()
     for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
         _, field_type, field = result.field.split("/")
         text = await get_paragraph_text(
@@ -383,6 +386,7 @@ async def merge_paragraph_results(
             highlight=highlight,
             ematches=ematches,
             matches=result.matches,  # type: ignore
+            extracted_text_cache=etcache,
         )
         labels = await get_labels_paragraph(result, kbid)
         new_paragraph = Paragraph(
@@ -414,7 +418,7 @@ async def merge_paragraph_results(
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)
-
+    etcache.clear()
     return Paragraphs(
         results=result_paragraph_list,
         facets=facets,

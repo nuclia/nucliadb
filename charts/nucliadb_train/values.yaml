@@ -69,7 +69,17 @@ vs:
 
 zone:
 
-
 # extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65

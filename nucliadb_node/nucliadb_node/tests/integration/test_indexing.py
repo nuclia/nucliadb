@@ -37,18 +37,9 @@ from nucliadb_utils.utilities import get_pubsub, get_storage
 TEST_PARTITION = "111"
 
 
-# not using request.getfixturevalue and parametrize here because the fixtures are async
 @pytest.mark.asyncio
+@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_indexing(worker, shard: str, reader):
-    return await _test_indexing(worker, shard, reader)
-
-
-@pytest.mark.asyncio
-async def test_indexing_exp(worker, experimental_shard: str, reader):
-    return await _test_indexing(worker, experimental_shard, reader)
-
-
-async def _test_indexing(worker, shard: str, reader):
     node = settings.force_host_id
 
     resource = resource_payload(shard)
@@ -98,6 +89,7 @@ async def test_indexing_not_found(worker, reader):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
     node_id = settings.force_host_id
     assert node_id

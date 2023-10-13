@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import time
 from typing import List, Optional
 
@@ -80,67 +79,6 @@ gc_observer = metrics.Observer(
 )
 
 
-class ShardManager:
-    schedule_delay_seconds = 30.0
-
-    def __init__(self, shard_id: str, writer: Writer, gc_lock: asyncio.Semaphore):
-        self.lock = asyncio.Lock()  # write lock for this shard
-        self.target_gc_resources = settings.max_resources_before_gc
-
-        self._shard_id = shard_id
-        self._writer = writer
-
-        self._gc_lock = gc_lock  # global lock so we only gc one shard at a time
-        self._change_count = 0
-        self._gc_schedule_timer: Optional[asyncio.TimerHandle] = None
-        self._gc_task: Optional[asyncio.Task] = None
-
-    def shard_changed_event(self, delay: Optional[float] = None) -> None:
-        """
-        Signal shard has changed and should be garbage collected at some point
-        """
-        if self._gc_task is not None and not self._gc_task.done():
-            # already running or scheduled
-            return
-
-        self._change_count += 1
-        if (
-            self._gc_schedule_timer is not None
-            and not self._gc_schedule_timer.cancelled()
-        ):
-            self._gc_schedule_timer.cancel()
-
-        if self._change_count >= self.target_gc_resources:
-            # need to force running it now
-            self._schedule_gc()
-        else:
-            # run it soon
-            if delay is None:
-                delay = self.schedule_delay_seconds
-            self._gc_schedule_timer = asyncio.get_event_loop().call_later(
-                delay, self._schedule_gc
-            )
-
-    def _schedule_gc(self) -> None:
-        self._gc_task = asyncio.create_task(self.gc())
-
-    async def gc(self):
-        async with self._gc_lock, self.lock:
-            logger.info("Running garbage collection", extra={"shard": self._shard_id})
-            self._change_count = 0
-            try:
-                with gc_observer():
-                    # NOTE: garbage collector may not run if the shard is busy. We currently don't do anything to retry.
-                    await self._writer.garbage_collector(self._shard_id)
-                    logger.info(
-                        "Garbage collection finished", extra={"shard": self._shard_id}
-                    )
-            except Exception:
-                logger.exception(
-                    "Could not garbage collect", extra={"shard": self._shard_id}
-                )
-
-
 class Worker:
     subscriptions: List[Subscription]
     storage: Storage
@@ -159,16 +97,10 @@ class Worker:
         self.load_seqid()
         self.brain: Optional[Resource] = None
 
-        self.shard_managers: dict[str, ShardManager] = {}
-        # right now, only allow one gc at a time but
-        # can be expanded to allow multiple if we want with a semaphore
-        self.gc_lock = asyncio.Semaphore(1)
-
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         await self.publisher.initialize()
         await self.subscriber_initialize()
-        await self.garbage_collect_all()
 
     async def finalize(self):
         await self.publisher.finalize()
@@ -232,21 +164,6 @@ class Worker:
             # AttributeError: can be thrown by nats-py when handling shutdown
             pass
 
-    def get_shard_manager(self, shard_id: str) -> ShardManager:
-        if shard_id not in self.shard_managers:
-            self.shard_managers[shard_id] = ShardManager(
-                shard_id, self.writer, self.gc_lock
-            )
-        return self.shard_managers[shard_id]
-
-    async def garbage_collect_all(self) -> None:
-        """
-        Schedule garbage collection for all shards on startup
-        """
-        for idx, shard in enumerate((await self.writer.shards()).ids):
-            sm = self.get_shard_manager(shard.id)
-            sm.shard_changed_event(idx * 0.01)
-
     def store_seqid(self, seqid: int):
         if settings.data_path is None:
             raise Exception("We need a DATA_PATH env")
@@ -309,11 +226,10 @@ class Worker:
         )
 
         status: Optional[OpStatus] = None
-        sm = self.get_shard_manager(pb.shard)
         start = time.time()
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
-        ), sm.lock:
+        ):
             try:
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
@@ -321,7 +237,6 @@ class Worker:
                     status = await self.delete_resource(pb)
                 if status:
                     self.reader.update(pb.shard, status)
-                sm.shard_changed_event()
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exist {pb.shard}")

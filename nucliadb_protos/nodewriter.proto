@@ -49,15 +49,10 @@ message DeleteGraphNodes {
 }
 
 
-enum ReleaseChannel {
-  STABLE = 0;
-  EXPERIMENTAL = 1;
-}
-
 message NewShardRequest {
     utils.VectorSimilarity similarity = 1;
     string kbid = 2;
-    ReleaseChannel release_channel = 3;
+    utils.ReleaseChannel release_channel = 3;
 }
 
 message NewVectorSetRequest {

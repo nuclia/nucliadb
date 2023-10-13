@@ -572,6 +572,8 @@ pub struct Shards {
     pub similarity: i32,
     #[prost(message, optional, tag="5")]
     pub model: ::core::option::Option<super::knowledgebox::SemanticModelMetadata>,
+    #[prost(enumeration="super::utils::ReleaseChannel", tag="6")]
+    pub release_channel: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResourceFieldId {

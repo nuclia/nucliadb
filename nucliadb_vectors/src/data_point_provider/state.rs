@@ -209,17 +209,18 @@ impl State {
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
-            data_point
-                .search(
-                    &delete_log,
-                    query,
-                    filter,
-                    with_duplicates,
-                    no_results,
-                    similarity,
-                    min_score,
-                )
-                .for_each(|candidate| ffsv.add(candidate));
+            let partial_solution = data_point.search(
+                &delete_log,
+                query,
+                filter,
+                with_duplicates,
+                no_results,
+                similarity,
+                min_score,
+            );
+            for candidate in partial_solution {
+                ffsv.add(candidate);
+            }
         }
         Ok(ffsv.into())
     }
@@ -379,7 +380,7 @@ mod test {
         let no_nodes = DataPointProducer::new(dir.path())
             .take(5)
             .map(|dp| {
-                let journal = dp.meta();
+                let journal = dp.journal();
                 let no_nodes = journal.no_nodes();
                 state.add(journal);
                 no_nodes
@@ -396,7 +397,7 @@ mod test {
         let new =
             DataPoint::merge(dir.path(), &work, Similarity::Cosine, Channel::EXPERIMENTAL).unwrap();
         std::mem::drop(work);
-        state.replace_work_unit(new.meta());
+        state.replace_work_unit(new.journal());
         assert!(state.current_work_unit().is_none());
         assert_eq!(state.work_stack.len(), 0);
         assert_eq!(state.current.size(), 1);

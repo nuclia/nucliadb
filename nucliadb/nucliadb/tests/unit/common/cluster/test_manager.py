@@ -17,28 +17,32 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-from unittest.mock import MagicMock
-
 import pytest
-from nucliadb_protos.nodesidecar_pb2 import Counter
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings
-from nucliadb_protos import writer_pb2
 
 
 def test_should_create_new_shard():
     sm = manager.KBShardManager()
-    low_para_counter = Counter(paragraphs=settings.max_shard_paragraphs - 1)
-    high_para_counter = Counter(paragraphs=settings.max_shard_paragraphs + 1)
-    assert sm.should_create_new_shard(low_para_counter) is False
-    assert sm.should_create_new_shard(high_para_counter) is True
+    low_para_counter = {
+        "num_paragraphs": settings.max_shard_paragraphs - 1,
+        "num_fields": 0,
+    }
+    high_para_counter = {
+        "num_paragraphs": settings.max_shard_paragraphs + 1,
+        "num_fields": 0,
+    }
+    assert sm.should_create_new_shard(**low_para_counter) is False
+    assert sm.should_create_new_shard(**high_para_counter) is True
 
-    low_fields_counter = Counter(fields=settings.max_shard_fields - 1)
-    high_fields_counter = Counter(fields=settings.max_shard_fields + 1)
-    assert sm.should_create_new_shard(low_fields_counter) is False
-    assert sm.should_create_new_shard(high_fields_counter) is True
+    low_fields_counter = {"num_fields": settings.max_shard_fields, "num_paragraphs": 0}
+    high_fields_counter = {
+        "num_fields": settings.max_shard_fields + 1,
+        "num_paragraphs": 0,
+    }
+    assert sm.should_create_new_shard(**low_fields_counter) is False
+    assert sm.should_create_new_shard(**high_fields_counter) is True
 
 
 @pytest.fixture(scope="function")
@@ -51,27 +55,3 @@ async def fake_node():
         dummy=True,
     )
     manager.INDEX_NODES.clear()
-
-
-async def test_standalone_node_garbage_collects(fake_node):
-    mng = manager.StandaloneKBShardManager()
-
-    mng.max_ops_before_checks = 0
-
-    await mng.add_resource(
-        writer_pb2.ShardObject(
-            shard="123",
-            replicas=[
-                writer_pb2.ShardReplica(
-                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
-                )
-            ],
-        ),
-        resource=MagicMock(),
-        txid=-1,
-        partition=0,
-        kb="kb",
-    )
-
-    await asyncio.sleep(0.05)
-    assert len(fake_node.writer.calls["GC"]) == 1

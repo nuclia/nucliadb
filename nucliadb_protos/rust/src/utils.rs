@@ -159,3 +159,9 @@ pub enum VectorSimilarity {
     Cosine = 0,
     Dot = 1,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum ReleaseChannel {
+    Stable = 0,
+    Experimental = 1,
+}
