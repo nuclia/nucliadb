@@ -10,6 +10,7 @@ env:
   cluster_discovery_kubernetes_namespace: nucliadb
   cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
   DEBUG: "1"
+  NUCLIADB_DISABLE_TELEMETRY: "True"
 
 replicas: 2
 
