@@ -51,25 +51,25 @@ from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
-ENTITY_TAG_ID = "/e/"
-LABEL_TAG_ID = "/l/"
+ENTITY_FILTER_PREFIX = "/e/"
+LABEL_FILTER_PREFIX = "/l/"
 
 
-def record_filters_counter(tags: list[str], counter: Counter) -> None:
+def record_filters_counter(filters: list[str], counter: Counter) -> None:
     counter.inc({"type": "filters"})
-    tags.sort()
-    e_prefix = False
-    l_prefix = False
-    for tag in tags:
-        if e_prefix and l_prefix:
+    filters.sort()
+    entity_found = False
+    label_found = False
+    for fltr in filters:
+        if entity_found and label_found:
             break
-        if tag[0] != "/":
+        if fltr[0] != "/":
             break
-        if tag.startswith(ENTITY_TAG_ID):
-            e_prefix = True
+        if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
+            entity_found = True
             counter.inc({"type": "filters_entities"})
-        elif tag.startswith(LABEL_TAG_ID):
-            l_prefix = True
+        elif not label_found and fltr.startswith(LABEL_FILTER_PREFIX):
+            label_found = True
             counter.inc({"type": "filters_labels"})
 
 
