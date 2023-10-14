@@ -55,13 +55,13 @@ spec:
           periodSeconds: 20
           timeoutSeconds: 5
           failureThreshold: 3
-        # livenessProbe:
-        #   exec:
-        #     command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-        #   initialDelaySeconds: 10
-        #   periodSeconds: 60
-        #   timeoutSeconds: 5
-        #   failureThreshold: 3
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          initialDelaySeconds: 30
+          periodSeconds: 120
+          timeoutSeconds: 5
+          failureThreshold: 5
         command: [
           "nucliadb-ingest-processed-consumer"
         ]
