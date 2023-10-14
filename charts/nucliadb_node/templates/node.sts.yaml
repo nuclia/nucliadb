@@ -72,7 +72,10 @@ spec:
         livenessProbe:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_sidecar }}"]
-          initialDelaySeconds: 2
+          initialDelaySeconds: 10
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 3
         command: ["node_sidecar"]
         envFrom:
         - configMapRef:
