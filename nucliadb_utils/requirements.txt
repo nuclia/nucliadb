@@ -7,7 +7,6 @@ nats-py[nkeys]==2.2.0
 pyjwt>=2.4.0
 memorylru>=1.1.2
 mrflagly
-urllib3<1.27,>=1.21.1
 
 # automatically bumped during release
 nucliadb-protos
