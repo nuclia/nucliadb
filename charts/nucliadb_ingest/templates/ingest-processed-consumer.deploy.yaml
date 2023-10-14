@@ -59,7 +59,7 @@ spec:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
           initialDelaySeconds: 10
-          periodSeconds: 20
+          periodSeconds: 60
           timeoutSeconds: 5
           failureThreshold: 3
         command: [
