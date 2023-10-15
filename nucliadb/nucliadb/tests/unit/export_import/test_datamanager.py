@@ -17,7 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.export_import.datamanager import iter_and_add_size, iter_in_chunk_size
+from unittest.mock import AsyncMock, Mock
+
+from nucliadb.export_import.datamanager import (
+    ExportImportDataManager,
+    iter_and_add_size,
+    iter_in_chunk_size,
+)
 from nucliadb_protos import resources_pb2
 
 
@@ -47,3 +53,18 @@ async def test_iter_in_chunk_size():
 
     chunks = [chunk async for chunk in iter_in_chunk_size(iterable(0), chunk_size=4)]
     assert len(chunks) == 0
+
+
+async def test_try_delete_from_storage():
+    driver = Mock()
+    storage = Mock()
+
+    dm = ExportImportDataManager(driver, storage)
+    dm.delete_export = AsyncMock(side_effect=ValueError())  # type: ignore
+    dm.delete_import = AsyncMock(side_effect=ValueError())  # type: ignore
+
+    await dm.try_delete_from_storage("export", "kbid", "foo")
+    await dm.try_delete_from_storage("import", "kbid", "foo")
+
+    dm.delete_export.assert_called()
+    dm.delete_import.assert_called()

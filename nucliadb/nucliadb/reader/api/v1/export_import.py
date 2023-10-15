@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterable, Union
+from typing import AsyncGenerator, AsyncIterable, Union
 
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
@@ -87,7 +87,15 @@ async def download_export_from_blob_storage(
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata("export", kbid, export_id)
     export_exceptions.raise_for_task_status(metadata.task.status)
-    return dm.download_export(kbid, export_id)
+    return download_export_and_delete(dm, kbid, export_id)
+
+
+async def download_export_and_delete(
+    dm: ExportImportDataManager, kbid: str, export_id: str
+) -> AsyncGenerator[bytes, None]:
+    async for chunk in dm.download_export(kbid, export_id):
+        yield chunk
+    await dm.try_delete_from_storage("export", kbid, export_id)
 
 
 @api.get(

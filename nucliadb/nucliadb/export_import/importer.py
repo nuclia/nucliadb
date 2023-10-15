@@ -115,3 +115,5 @@ async def import_kb_from_blob_storage(
         await import_kb(context, kbid, stream, metadata)
 
     await import_kb_retried(context, kbid, stream, metadata)  # type: ignore
+
+    await dm.try_delete_from_storage("import", kbid, import_id)
