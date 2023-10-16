@@ -25,7 +25,7 @@ from typing import Optional
 import pytest
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
 
 from nucliadb_node import SERVICE_NAME
@@ -39,12 +39,12 @@ TEST_PARTITION = "111"
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_indexing(worker, shard: str, reader):
+async def test_indexing(processor_worker, shard: str, reader):
     node = settings.force_host_id
 
     resource = resource_payload(shard)
     index = await create_indexing_message(resource, "kb", shard, node)  # type: ignore
-    await send_indexing_message(worker, index, node)  # type: ignore
+    await send_indexing_message(processor_worker, index, node)  # type: ignore
 
     sipb = ShardId()
     sipb.id = shard
@@ -73,7 +73,7 @@ async def test_indexing(worker, shard: str, reader):
 
 
 @pytest.mark.asyncio
-async def test_indexing_not_found(worker, reader):
+async def test_indexing_not_found(processor_worker, reader):
     node = settings.force_host_id
     shard = "fake-shard"
 
@@ -82,7 +82,7 @@ async def test_indexing_not_found(worker, reader):
 
     resource = resource_payload(shard)
     index = await create_indexing_message(resource, "kb", shard, node)
-    await send_indexing_message(worker, index, node)  # type: ignore
+    await send_indexing_message(processor_worker, index, node)  # type: ignore
 
     # Make sure message is consumed even if the shard doesn't exist
     await wait_for_indexed_message("kb")
@@ -90,7 +90,9 @@ async def test_indexing_not_found(worker, reader):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
+async def test_indexing_publishes_to_sidecar_index_stream(
+    processor_worker, shard: str, natsd
+):
     node_id = settings.force_host_id
     assert node_id
 
@@ -101,7 +103,7 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
     waiting_task = asyncio.create_task(wait_for_indexed_message("kb"))
     await asyncio.sleep(0.1)
 
-    await send_indexing_message(worker, indexpb, node_id)  # type: ignore
+    await send_indexing_message(processor_worker, indexpb, node_id)  # type: ignore
 
     msg = await waiting_task
     assert msg is not None, "Message has not been received"
@@ -147,14 +149,25 @@ def delete_indexing_message(uuid: str, shard: str, node_id: str):
 
 
 async def create_indexing_message(
-    resource: Resource, kb: str, shard: str, node: str
+    resource: Resource,
+    kb: str,
+    shard: str,
+    node: str,
+    source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
 ) -> IndexMessage:
     storage = await get_storage(service_name=SERVICE_NAME)
-    index: IndexMessage = await storage.indexing(
+    storage_key = await storage.indexing(
         resource, txid=1, partition=TEST_PARTITION, kb=kb, logical_shard=shard
     )
+    index = IndexMessage()
+    index.txid = 1
+    index.typemessage = TypeMessage.CREATION
+    index.storage_key = storage_key
+    index.kbid = kb
+    index.partition = TEST_PARTITION
     index.node = node
     index.shard = shard
+    index.source = source
     return index
 
 

@@ -20,11 +20,12 @@
 
 import asyncio
 import uuid
+from typing import Optional
 
 import pkg_resources
 
 from nucliadb_node import SERVICE_NAME, logger
-from nucliadb_node.pull import Worker
+from nucliadb_node.pull import ProcessorWorker, Worker, WriterWorker
 from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import settings
@@ -36,7 +37,7 @@ from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
 
 
-async def start_worker(writer: Writer, reader: Reader) -> Worker:
+async def identify_node() -> Optional[str]:
     if settings.force_host_id is None:  # pragma: no cover
         node = None
         i = 0
@@ -52,34 +53,56 @@ async def start_worker(writer: Writer, reader: Reader) -> Worker:
                 await asyncio.sleep(2)
     else:
         node = settings.force_host_id
+    return node
 
-    if node is None:
-        raise Exception("No Key defined")
 
-    worker = Worker(writer=writer, reader=reader, node=node)
+async def start_processor_worker(
+    node: str, writer: Writer, reader: Reader
+) -> ProcessorWorker:
+    worker = ProcessorWorker(writer=writer, reader=reader, node=node)
     await worker.initialize()
-
     return worker
 
 
+async def start_writer_worker(
+    node: str, writer: Writer, reader: Reader
+) -> WriterWorker:
+    worker = WriterWorker(writer=writer, reader=reader, node=node)
+    await worker.initialize()
+    return worker
+
+
+async def start_workers(node: str, writer: Writer, reader: Reader) -> list[Worker]:
+    workers = [
+        WriterWorker(writer=writer, reader=reader, node=node),
+        ProcessorWorker(writer=writer, reader=reader, node=node),
+    ]
+    for worker in workers:
+        await worker.initialize()
+    return workers
+
+
 async def main():
+    node = await identify_node()
+    if node is None:
+        raise Exception("Cannot identify current node: no Key defined")
+    logger.info(f"Node ID: {node}")
+
     writer = Writer(settings.writer_listen_address)
     reader = Reader(settings.reader_listen_address)
-    worker = await start_worker(writer, reader)
+    workers = await start_workers(node, writer, reader)
 
     await setup_telemetry(SERVICE_NAME)
 
-    logger.info(f"Node ID : {worker.node}")
-
     grpc_finalizer = await start_grpc(writer=writer, reader=reader)
 
-    logger.info(f"======= Node sidecar started ======")
+    logger.info("======= Node sidecar started ======")
 
     metrics_server = await serve_metrics()
 
     finalizers = [
         grpc_finalizer,
-        worker.finalize,
+        *[worker.finalize for worker in workers],
         metrics_server.shutdown,
         writer.close,
         reader.close,

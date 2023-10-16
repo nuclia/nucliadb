@@ -19,6 +19,7 @@
 
 import asyncio
 import time
+from abc import ABC
 from typing import List, Optional
 
 import nats
@@ -28,10 +29,16 @@ from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import (
+    IndexMessage,
+    IndexMessageSource,
+    OpStatus,
+    TypeMessage,
+)
 from nucliadb_protos.writer_pb2 import Notification
 
 from nucliadb_node import SERVICE_NAME, logger
+from nucliadb_node.coordination import Priority, PriorityLock, ShardIndexingCoordinator
 from nucliadb_node.reader import Reader
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
@@ -78,6 +85,8 @@ gc_observer = metrics.Observer(
         float("inf"),
     ],
 )
+
+SHARD_INDEX_COORDINATOR = ShardIndexingCoordinator(PriorityLock)
 
 
 class ShardManager:
@@ -141,9 +150,20 @@ class ShardManager:
                 )
 
 
-class Worker:
+class Worker(ABC):
+    """A `Worker` pulls index messages from a nats queue and index them to the
+    corresponding nodes
+
+    """
+
     subscriptions: List[Subscription]
     storage: Storage
+
+    worker_name = "base"
+    sources = {
+        IndexMessageSource.PROCESSOR: Priority.LOW,
+        IndexMessageSource.WRITER: Priority.HIGH,
+    }
 
     def __init__(
         self,
@@ -177,12 +197,12 @@ class Worker:
         await self.storage.finalize()
 
     async def disconnected_cb(self):
-        logger.info("Got disconnected from NATS!")
+        logger.info(f"[worker:{self.worker_name}] Got disconnected from NATS!")
 
     async def reconnected_cb(self):
         # See who we are connected to on reconnect
         logger.warning(
-            f"Got reconnected to NATS {self.nc.connected_url}. Attempting reconnect"
+            f"[worker:{self.worker_name}] Got reconnected to NATS {self.nc.connected_url}. Attempting reconnect"
         )
         await self.drain_subscriptions()
         await self.subscribe()
@@ -190,12 +210,12 @@ class Worker:
     async def error_cb(self, e):
         errors.capture_exception(e)
         logger.error(
-            "There was an error on the worker, check sentry: {}".format(e),
+            f"[worker:{self.worker_name}] There was an error on the worker, check sentry: {e}",
             exc_info=True,
         )
 
     async def closed_cb(self):
-        logger.info("Connection is closed on NATS")
+        logger.info(f"[worker:{self.worker_name}] Connection is closed on NATS")
 
     async def subscriber_initialize(self):
         options = {
@@ -212,7 +232,9 @@ class Worker:
 
         self.nc = await nats.connect(**options)
         self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
-        logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
+        logger.info(
+            f"[worker:{self.worker_name}] Nats: Connected to {indexing_settings.index_jetstream_servers}"
+        )
         await self.subscribe()
 
     async def drain_subscriptions(self) -> None:
@@ -268,19 +290,20 @@ class Worker:
         self.brain = await self.storage.get_indexing(pb)
         self.brain.shard_id = self.brain.resource.shard_id = pb.shard
         logger.info(
-            f"Added {self.brain.resource.uuid} at {self.brain.shard_id} otx:{pb.txid}"
+            f"[worker:{self.worker_name}] Added {self.brain.resource.uuid} at "
+            f"{self.brain.shard_id} otx:{pb.txid}"
         )
         status = await self.writer.set_resource(self.brain)
-        logger.info(f"...done")
+        logger.info(f"[worker:{self.worker_name}] ...done")
         del self.brain
         self.brain = None
         return status
 
     async def delete_resource(self, pb: IndexMessage) -> OpStatus:
-        logger.info(f"Deleting {pb.resource} otx:{pb.txid}")
+        logger.info(f"[worker:{self.worker_name}] Deleting {pb.resource} otx:{pb.txid}")
         rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
         status = await self.writer.delete_resource(rid)
-        logger.info(f"...done")
+        logger.info(f"[worker:{self.worker_name}] ...done")
         return status
 
     @subscriber_observer.wrap()
@@ -290,15 +313,30 @@ class Worker:
         seqid = int(msg.reply.split(".")[5])
         if self.last_seqid and self.last_seqid >= seqid:
             logger.warning(
-                f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
+                f"[worker:{self.worker_name}] Skipping already processed message. "
+                f"Msg seqid {seqid} vs Last seqid {self.last_seqid}"
             )
             await msg.ack()
             return
 
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
+        if not self.interested_source(pb.source):
+            await msg.ack()
+            logger.debug(
+                f"[worker:{self.worker_name}] skipping not relevant message",
+                extra={
+                    "shard": pb.shard,
+                    "subject": subject,
+                    "reply": reply,
+                    "seqid": seqid,
+                    "storage_key": pb.storage_key,
+                },
+            )
+            return
+
         logger.info(
-            "Message received",
+            f"[worker:{self.worker_name}] Message received",
             extra={
                 "shard": pb.shard,
                 "subject": subject,
@@ -315,6 +353,11 @@ class Worker:
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), sm.lock:
             try:
+                await SHARD_INDEX_COORDINATOR.request_shard(
+                    pb.shard, priority=self.source_priority(pb.source)
+                )
+                indexing_start = time.time()
+
                 if pb.typemessage == TypeMessage.CREATION:
                     status = await self.set_resource(pb)
                 elif pb.typemessage == TypeMessage.DELETION:
@@ -324,11 +367,14 @@ class Worker:
                 sm.shard_changed_event()
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
-                    logger.error(f"Shard does not exist {pb.shard}")
+                    logger.error(
+                        f"[worker:{self.worker_name}] Shard does not exist {pb.shard}"
+                    )
                 else:
                     event_id = errors.capture_exception(grpc_error)
                     logger.error(
-                        f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
+                        f"[worker:{self.worker_name}] An error on subscription_worker. Check sentry for "
+                        f"more details. Event id: {event_id}"
                     )
                     if (
                         pb.typemessage == TypeMessage.CREATION
@@ -344,15 +390,19 @@ class Worker:
                 # Remove this block in the future once we're confident it's not needed.
                 errors.capture_exception(storage_error)
                 logger.warning(
-                    "Error retrieving the indexing payload we do not block as that means its already deleted!"
+                    f"[worker:{self.worker_name}] Error retrieving the indexing payload we do not "
+                    "block as that means its already deleted!"
                 )
             except Exception as e:
                 event_id = errors.capture_exception(e)
                 logger.error(
-                    f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
+                    f"[worker:{self.worker_name}] An error on subscription_worker. Check sentry for "
+                    f"more details. Event id: {event_id}"
                 )
                 await msg.nak()
                 raise e
+            finally:
+                await SHARD_INDEX_COORDINATOR.release_shard(pb.shard)
 
         try:
             await msg.ack()
@@ -362,25 +412,27 @@ class Worker:
             await msg.nak()
             errors.capture_exception(e)
             logger.error(
-                f"An error on subscription_worker. Check sentry for more details."
+                f"[worker:{self.worker_name}] An error on subscription_worker. Check sentry for more details."
             )
             raise e
         else:
+            now = time.time()
             logger.info(
-                "Message finished",
+                f"[worker:{self.worker_name}] Message finished",
                 extra={
                     "shard": pb.shard,
                     "storage_key": pb.storage_key,
-                    "time": time.time() - start,
+                    "time": now - start,
+                    "indexing_time": now - indexing_start,
                 },
             )
 
     async def subscribe(self):
-        logger.info(f"Last seqid {self.last_seqid}")
+        logger.info(f"[worker:{self.worker_name}] Last seqid {self.last_seqid}")
         try:
             await self.js.stream_info(const.Streams.INDEX.name)
         except StreamNotFoundError:
-            logger.info("Creating stream")
+            logger.info(f"[worker:{self.worker_name}] Creating stream")
             res = await self.js.add_stream(
                 name=const.Streams.INDEX.name,
                 subjects=[
@@ -392,7 +444,9 @@ class Worker:
         subject = const.Streams.INDEX.subject.format(node=self.node)
         res = await self.js.subscribe(
             subject=subject,
-            queue=const.Streams.INDEX.group.format(node=self.node),
+            queue=const.Streams.INDEX.group.format(
+                node=self.node, worker=self.worker_name
+            ),
             stream=const.Streams.INDEX.name,
             flow_control=True,
             cb=self.subscription_worker,
@@ -407,7 +461,39 @@ class Worker:
             ),
         )
         self.subscriptions.append(res)
-        logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
+        logger.info(
+            f"[worker:{self.worker_name}] Subscribed to {subject} on stream {const.Streams.INDEX.name}"
+        )
+
+    @classmethod
+    def interested_source(cls, source: IndexMessageSource.ValueType) -> bool:
+        return source in cls.sources
+
+    @classmethod
+    def source_priority(cls, source: IndexMessageSource.ValueType) -> Priority:
+        return cls.sources[source]
+
+
+class ProcessorWorker(Worker):
+    """
+    Pull worker for messages coming from the processor
+    """
+
+    worker_name = "processor"
+    sources = {
+        IndexMessageSource.PROCESSOR: Priority.LOW,
+    }
+
+
+class WriterWorker(Worker):
+    """
+    Pull worker for messages coming from the writer
+    """
+
+    worker_name = "writer"
+    sources = {
+        IndexMessageSource.WRITER: Priority.HIGH,
+    }
 
 
 class IndexedPublisher:
@@ -422,7 +508,7 @@ class IndexedPublisher:
 
     async def indexed(self, indexpb: IndexMessage):
         if not indexpb.HasField("partition"):
-            logger.warning(f"Could not publish message without partition")
+            logger.warning("Could not publish message without partition")
             return
 
         message = Notification(

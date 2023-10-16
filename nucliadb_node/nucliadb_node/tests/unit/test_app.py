@@ -22,12 +22,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from nucliadb_node import app
+from nucliadb_node.settings import settings
 
-pytestmark = pytest.mark.asyncio
+
+@pytest.fixture
+def node_id():
+    original = settings.force_host_id
+    node_id = "test-node-id"
+    settings.force_host_id = node_id
+    yield node_id
+    settings.force_host_id = original
 
 
-async def test_main():
-    with patch("nucliadb_node.app.start_worker", AsyncMock()) as start_worker, patch(
+@pytest.mark.asyncio
+async def test_main(node_id: str):
+    with patch("nucliadb_node.app.start_workers", AsyncMock()) as start_workers, patch(
         "nucliadb_node.app.start_grpc", AsyncMock()
     ) as start_grpc, patch(
         "nucliadb_node.app.serve_metrics", AsyncMock()
@@ -43,7 +52,7 @@ async def test_main():
         run_until_exit.assert_awaited_once_with(
             [
                 start_grpc.return_value,
-                start_worker.return_value.finalize,
+                *[worker.finalize for worker in start_workers.return_value],
                 serve_metrics.return_value.shutdown,
                 writer.return_value.close,
                 reader.return_value.close,

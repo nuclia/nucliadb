@@ -49,7 +49,7 @@ class Streams:
 
         name = "node"
         subject = "node.{node}"
-        group = "node-{node}"
+        group = "node-{node}-{worker}"
 
     class KB_EXPORTS:
         """

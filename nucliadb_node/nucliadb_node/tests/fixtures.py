@@ -35,8 +35,8 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_node.app import start_worker
-from nucliadb_node.pull import Worker
+from nucliadb_node.app import start_processor_worker, start_writer_worker
+from nucliadb_node.pull import ProcessorWorker, WriterWorker
 from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
@@ -201,34 +201,47 @@ async def grpc_server(reader, writer):
 
 
 @pytest.fixture(scope="function")
-async def worker(
+async def _worker(
     node_single,
     writer_stub: NodeWriterStub,
     gcs_storage,
     natsd,
     data_path: str,
-    reader,
-    writer,
     grpc_server,
-) -> AsyncIterable[Worker]:
+):
     settings.force_host_id = "node1"
     settings.data_path = data_path
     indexing_settings.index_jetstream_servers = [natsd]
     cache_settings.cache_pubsub_nats_url = [natsd]
 
-    worker = await start_worker(writer, reader)
-    yield worker
+    yield
 
     # Cleanup all shards to be ready for following tests
     shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
     for shard in shards.ids:  # pragma: no cover
         await writer_stub.DeleteShard(shard)  # type: ignore
 
+
+@pytest.fixture(scope="function")
+async def processor_worker(_worker, reader, writer) -> AsyncIterable[ProcessorWorker]:
+    worker = await start_processor_worker(
+        settings.force_host_id or "test-node", writer, reader
+    )
+    yield worker
     await worker.finalize()
 
 
 @pytest.fixture(scope="function")
-async def sidecar_stub(worker):
+async def writer_worker(_worker, reader, writer) -> AsyncIterable[WriterWorker]:
+    worker = await start_writer_worker(
+        settings.force_host_id or "test-node", writer, reader
+    )
+    yield worker
+    await worker.finalize()
+
+
+@pytest.fixture(scope="function")
+async def sidecar_stub(processor_worker, writer_worker):
     channel = aio.insecure_channel(settings.sidecar_listen_address)
     stub = NodeSidecarStub(channel)
     yield stub
