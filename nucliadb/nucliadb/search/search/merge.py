@@ -508,33 +508,34 @@ async def merge_results(
 
     rcache = get_resource_cache(clear=True)
 
-    resources: List[str] = list()
-    api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, sort
-    )
+    try:
+        resources: List[str] = list()
+        api_results.fulltext = await merge_documents_results(
+            documents, resources, count, page, kbid, sort
+        )
 
-    api_results.paragraphs = await merge_paragraph_results(
-        paragraphs,
-        resources,
-        kbid,
-        count,
-        page,
-        highlight,
-        sort,
-    )
+        api_results.paragraphs = await merge_paragraph_results(
+            paragraphs,
+            resources,
+            kbid,
+            count,
+            page,
+            highlight,
+            sort,
+        )
 
-    api_results.sentences = await merge_vectors_results(
-        vectors, resources, kbid, count, page, min_score=min_score
-    )
+        api_results.sentences = await merge_vectors_results(
+            vectors, resources, kbid, count, page, min_score=min_score
+        )
 
-    api_results.relations = merge_relations_results(relations, requested_relations)
+        api_results.relations = merge_relations_results(relations, requested_relations)
 
-    api_results.resources = await fetch_resources(
-        resources, kbid, show, field_type_filter, extracted
-    )
-
-    rcache.clear()
-    return api_results
+        api_results.resources = await fetch_resources(
+            resources, kbid, show, field_type_filter, extracted
+        )
+        return api_results
+    finally:
+        rcache.clear()
 
 
 async def merge_paragraphs_results(
@@ -554,23 +555,24 @@ async def merge_paragraphs_results(
     api_results = ResourceSearchResults()
 
     rcache = get_resource_cache(clear=True)
-
-    resources: List[str] = list()
-    api_results.paragraphs = await merge_paragraph_results(
-        paragraphs,
-        resources,
-        kbid,
-        count,
-        page,
-        highlight=highlight_split,
-        sort=SortOptions(
-            field=SortField.SCORE,
-            order=SortOrder.DESC,
-            limit=None,
-        ),
-    )
-    rcache.clear()
-    return api_results
+    try:
+        resources: List[str] = list()
+        api_results.paragraphs = await merge_paragraph_results(
+            paragraphs,
+            resources,
+            kbid,
+            count,
+            page,
+            highlight=highlight_split,
+            sort=SortOptions(
+                field=SortField.SCORE,
+                order=SortOrder.DESC,
+                limit=None,
+            ),
+        )
+        return api_results
+    finally:
+        rcache.clear()
 
 
 async def merge_suggest_entities_results(
