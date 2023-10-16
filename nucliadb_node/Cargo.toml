@@ -87,6 +87,7 @@ sentry-tracing = "0.27.0"
 crossbeam = "0.8.2"
 lazy_static = "1.4.0"
 tracing-core = "0.1.31"
+clap = { version = "4.4.6", features = ["derive"] }
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }
 
