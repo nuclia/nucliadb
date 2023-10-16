@@ -553,6 +553,8 @@ async def merge_paragraphs_results(
 
     api_results = ResourceSearchResults()
 
+    rcache = get_resource_cache(clear=True)
+
     resources: List[str] = list()
     api_results.paragraphs = await merge_paragraph_results(
         paragraphs,
@@ -567,6 +569,7 @@ async def merge_paragraphs_results(
             limit=None,
         ),
     )
+    rcache.clear()
     return api_results
 
 
