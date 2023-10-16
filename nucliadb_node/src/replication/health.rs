@@ -61,15 +61,15 @@ impl ReplicationHealthManager {
 
     pub fn healthy(&self) -> bool {
         if !Path::new(&self.health_filepath()).exists() {
-            return false;
+            false;
         }
         let metaddata = Path::new(&self.health_filepath()).metadata();
         if metaddata.is_err() {
-            return false;
+            false;
         }
         let metadata = metaddata.unwrap();
-        return metadata.modified().unwrap()
+        metadata.modified().unwrap()
             > (std::time::SystemTime::now())
-                - std::time::Duration::from_secs(self.settings.replication_delay_seconds() * 3);
+                - std::time::Duration::from_secs(self.settings.replication_delay_seconds() * 3)
     }
 }

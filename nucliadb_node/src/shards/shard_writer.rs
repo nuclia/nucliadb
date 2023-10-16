@@ -558,7 +558,7 @@ impl ShardWriter {
         if !filepath.exists() {
             return self.new_generation_id();
         }
-        return std::fs::read_to_string(filepath).unwrap();
+        std::fs::read_to_string(filepath).unwrap()
     }
 
     #[tracing::instrument(skip_all)]
@@ -613,15 +613,15 @@ impl ShardWriter {
 
         files.push(
             paragraph_read(&self.paragraph_writer)
-                .get_index_files(&ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?,
+                .get_index_files(ignored_segement_ids.get("paragraph").unwrap_or(&Vec::new()))?,
         );
         files.push(
             text_read(&self.text_writer)
-                .get_index_files(&ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?,
+                .get_index_files(ignored_segement_ids.get("text").unwrap_or(&Vec::new()))?,
         );
         files.push(
             vector_read(&self.vector_writer)
-                .get_index_files(&ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
+                .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
         );
 
         Ok(files)

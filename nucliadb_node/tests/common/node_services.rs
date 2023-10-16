@@ -121,11 +121,11 @@ impl NodeFixture {
             .data_path(secondary_tempdir.path())
             .reader_listen_address(secondary_reader_addr.to_string())
             .primary_address(writer_addr.to_string())
-            .replication_delay_seconds(1 as u64)
+            .replication_delay_seconds(1_u64)
             .build()
             .expect("Error while building test settings");
 
-        for _setting in vec![&settings, &secondary_settings] {
+        for _setting in [&settings, &secondary_settings] {
             let data_path = _setting.data_path();
             if !data_path.exists() {
                 std::fs::create_dir(&data_path).expect("Cannot create data directory");
@@ -294,17 +294,17 @@ impl NodeFixture {
 
 impl Drop for NodeFixture {
     fn drop(&mut self) {
-        self.reader_server_task.take().map(|task| {
+        if let Some(task) = self.reader_server_task.take() {
             task.abort();
-        });
-        self.writer_server_task.take().map(|task| {
+        }
+        if let Some(task) = self.writer_server_task.take() {
             task.abort();
-        });
-        self.secondary_reader_server_task.take().map(|task| {
+        };
+        if let Some(task) = self.secondary_reader_server_task.take() {
             task.abort();
-        });
-        self.secondary_writer_server_task.take().map(|task| {
+        };
+        if let Some(task) = self.secondary_writer_server_task.take() {
             task.abort();
-        });
+        };
     }
 }

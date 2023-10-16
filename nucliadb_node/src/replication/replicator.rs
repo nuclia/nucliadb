@@ -59,7 +59,7 @@ pub async fn replicate_shard(
     let mut stream = client
         .replicate_shard(Request::new(replication::ReplicateShardRequest {
             shard_id: shard_state.shard_id.clone(),
-            chunk_size: 1024 * 1024 * 1,
+            chunk_size: 1024 * 1024 * 2,
             existing_segment_ids,
         }))
         .await?
@@ -78,19 +78,19 @@ pub async fn replicate_shard(
     let mut file = tokio::fs::File::create(temp_filepath.clone()).await?;
     let mut start = std::time::SystemTime::now();
     while let Some(resp) = stream.message().await? {
-        if generation_id == None {
+        if generation_id.is_none() {
             generation_id = Some(resp.generation_id.clone());
             // write generation id to shard
             shard.set_generation_id(resp.generation_id);
         }
-        if filepath != None && Some(resp.filepath.clone()) != filepath {
+        if filepath.is_some() && Some(resp.filepath.clone()) != filepath {
             std::fs::remove_file(temp_filepath)?;
             return Err(Error::new(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "We should have finished previous file before starting a new one",
             )));
         }
-        if filepath == None {
+        if filepath.is_none() {
             filepath = Some(resp.filepath.clone());
         }
 
@@ -195,7 +195,7 @@ pub async fn connect_to_primary_and_replicate(
             .check_replication_state(Request::new(
                 replication::SecondaryCheckReplicationStateRequest {
                     secondary_id: secondary_id.clone(),
-                    shard_states: shard_states,
+                    shard_states,
                 },
             ))
             .await?

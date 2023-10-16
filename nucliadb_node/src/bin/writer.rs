@@ -56,7 +56,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?.into());
+    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?);
 
     let _guard = init_telemetry(&settings)?;
     let metrics = metrics::get_metrics();

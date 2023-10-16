@@ -371,7 +371,7 @@ impl WriterChild for VectorWriterService {
         }
 
         let vectorsets = self.list_vectorsets()?;
-        if vectorsets.len() > 0 {
+        if !vectorsets.is_empty() {
             meta_files.insert(
                 "vectorset/state.bincode".to_string(),
                 fs::read(self.config.vectorset.join("state.bincode"))?,
@@ -396,7 +396,7 @@ impl WriterChild for VectorWriterService {
             }
         }
 
-        if files.len() == 0 {
+        if files.is_empty() {
             // exit with no changes
             return Ok(IndexFiles {
                 metadata_files: HashMap::new(),

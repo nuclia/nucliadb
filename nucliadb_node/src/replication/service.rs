@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::cmp::min;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use nucliadb_core::tracing::{info, warn};
@@ -41,10 +41,10 @@ pub struct ReplicationServiceGRPCDriver {
 
 impl ReplicationServiceGRPCDriver {
     pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
-        return Self {
+        Self {
             settings,
             shards: shard_cache,
-        };
+        }
     }
 
     /// This function must be called before using this service
@@ -57,9 +57,9 @@ impl ReplicationServiceGRPCDriver {
 
 async fn stream_file(
     chunk_size: u64,
-    shard_path: &PathBuf,
-    generation_id: &String,
-    rel_filepath: &PathBuf,
+    shard_path: &Path,
+    generation_id: &str,
+    rel_filepath: &Path,
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) -> NodeResult<()> {
     let filepath = shard_path.join(rel_filepath);
@@ -84,10 +84,10 @@ async fn stream_file(
         let mut buf = vec![0; vec_size as usize];
         file.read_exact(buf.as_mut_slice()).await?;
         let reply = replication::ReplicateShardResponse {
-            generation_id: generation_id.clone(),
+            generation_id: generation_id.to_string(),
             filepath: rel_filepath.to_string_lossy().into(),
             data: buf,
-            chunk: chunk,
+            chunk,
             read_position: total,
             total_size: filesize,
         };
@@ -100,9 +100,9 @@ async fn stream_file(
 }
 
 async fn stream_data(
-    shard_path: &PathBuf,
-    generation_id: &String,
-    rel_filepath: &PathBuf,
+    shard_path: &Path,
+    generation_id: &str,
+    rel_filepath: &Path,
     data: Vec<u8>,
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
 ) {
@@ -111,9 +111,9 @@ async fn stream_data(
     info!("Streaming file {} {}", filepath.to_string_lossy(), filesize);
 
     let reply = replication::ReplicateShardResponse {
-        generation_id: generation_id.clone(),
+        generation_id: generation_id.to_string(),
         filepath: rel_filepath.to_string_lossy().into(),
-        data: data,
+        data,
         chunk: 1,
         read_position: filesize as u64,
         total_size: filesize as u64,
@@ -243,7 +243,7 @@ impl replication::replication_service_server::ReplicationService for Replication
             }
 
             // top level additional files
-            for filename in vec!["metadata.json", "versions.json"] {
+            for filename in ["metadata.json", "versions.json"] {
                 stream_file(
                     chunk_size,
                     &shard_path,

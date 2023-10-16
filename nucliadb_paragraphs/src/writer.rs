@@ -190,7 +190,7 @@ impl WriterChild for ParagraphWriterService {
             }
         }
 
-        if files.len() == 0 {
+        if files.is_empty() {
             // exit with no changes
             return Ok(IndexFiles {
                 metadata_files: HashMap::new(),

@@ -48,7 +48,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?.into());
+    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?);
 
     if !settings.data_path().exists() {
         return Err(node_error!("Data directory missing"));
