@@ -139,6 +139,25 @@ async def suggest(
         return res, time.time() - start
 
 
+async def get_prom_data():
+    url = "http://localhost:3031"
+    client = httpx.AsyncClient(base_url=url)
+    resp = await client.get("/metrics")
+    resp.raise_for_status()
+    data = resp.text
+    metrics = {}
+    for line in [
+        line.split(" ")
+        for line in data.split("\n")
+        if line.strip() != "" and line[0] != "#"
+    ]:
+        if len(line) != 2:
+            continue
+        metrics[line[0]] = float(line[1])
+
+    return metrics
+
+
 async def user_session(channel, prepared_queries, features):
     num_docs = random.randint(2, 10)
     shard_id = random.choice(shard_ids)
@@ -212,13 +231,20 @@ if __name__ == "__main__":
         aio.init_grpc_aio()
 
         burst_factor = 60
+        breath_factor = 10
         for i in range(100):
             burst_size = (i + 1) * burst_factor
             print(f"Burst {i} of size {burst_size}")
             res = await burst(prepared_queries, features=features, size=burst_size)
+            prom = await get_prom_data()
+            print(
+                f"nucliadb_node_idle_blocking_threads_count: {prom['nucliadb_node_idle_blocking_threads_count']}"
+            )
             avg = sum(res) / len(res)
             assert avg < 10.0
             print(f"Average {avg} sec")
-            await asyncio.sleep(1)
+            breath = breath_factor / (i + 1)
+            print(f"Breath for {breath} s")
+            await asyncio.sleep(breath)
 
     asyncio.run(test())
