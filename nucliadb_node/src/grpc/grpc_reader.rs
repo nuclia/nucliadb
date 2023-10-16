@@ -214,6 +214,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = vector_request.id.clone();
         let shard = self.obtain_shard(shard_id).await?;
         let info = info_span!(parent: &span, "vector search");
+        println!("Here");
         let task = || run_with_telemetry(info, move || shard.vector_search(vector_request));
         let response = tokio::task::spawn_blocking(task).await.map_err(|error| {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))

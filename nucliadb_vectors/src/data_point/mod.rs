@@ -448,6 +448,7 @@ impl DataPoint {
         similarity: Similarity,
         min_score: f32,
     ) -> impl Iterator<Item = Neighbour> + '_ {
+        println!("encoding vectors");
         let encoded_query = vector::encode_vector(query);
         let tracker = Retriever::new(
             &encoded_query,
@@ -458,6 +459,7 @@ impl DataPoint {
         );
 
         let no_nodes = key_value::get_no_elems(&self.nodes);
+        println!("prep formula");
 
         let filter = FormulaFilter::new(
             filter,
@@ -465,6 +467,8 @@ impl DataPoint {
             self.label_index.as_ref(),
             no_nodes,
         );
+
+        println!("search hnswop");
 
         let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(
@@ -474,6 +478,7 @@ impl DataPoint {
             filter,
             with_duplicates,
         );
+
         neighbours
             .into_iter()
             .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))

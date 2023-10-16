@@ -397,6 +397,7 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+        println!("Here 2");
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
 
@@ -461,8 +462,11 @@ impl ShardReader {
             min_score: search_request.min_score,
             ..Default::default()
         };
+        println!("Here 3");
+
         let vector_reader_service = self.vector_reader.clone();
         let vector_task = move || Some(vector_reader_service.search(&vector_request));
+        println!("Here 4");
 
         let relation_request = RelationSearchRequest {
             shard_id: search_request.shard.clone(),
