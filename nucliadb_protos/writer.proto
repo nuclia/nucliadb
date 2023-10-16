@@ -119,6 +119,8 @@ message BrokerMessage {
     bool reindex = 36;
 
     resources.Extra extra = 37;
+
+    repeated resources.FieldQuestionAnswerWrapper question_answers = 38;
 }
 
 message BrokerMessageBlobReference {

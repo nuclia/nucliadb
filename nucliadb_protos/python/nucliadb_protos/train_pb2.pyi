@@ -75,6 +75,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldLayout as FieldLayout,
     FieldLink as FieldLink,
     FieldMetadata as FieldMetadata,
+    FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
     FieldText as FieldText,
     FieldType as FieldType,
     FileExtractedData as FileExtractedData,
