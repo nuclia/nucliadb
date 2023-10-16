@@ -72,7 +72,7 @@ from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
 from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentence
 
-Bm25Score = Tuple[int, int]
+Bm25Score = Tuple[float, float]
 TimestampScore = datetime.datetime
 TitleScore = str
 Score = Union[Bm25Score, TimestampScore, TitleScore]
@@ -92,8 +92,10 @@ async def text_score(
     specific case, return None.
 
     """
-    score: Any = None
+    if sort_field == SortField.SCORE:
+        return (item.score.bm25, item.score.booster)
 
+    score: Any = None
     resource = await get_resource_from_cache(kbid, item.uuid)
     if resource is None:
         return score
@@ -101,9 +103,7 @@ async def text_score(
     if basic is None:
         return score
 
-    if sort_field == SortField.SCORE:
-        score = (item.score.bm25, item.score.booster)
-    elif sort_field == SortField.CREATED:
+    if sort_field == SortField.CREATED:
         score = basic.created.ToDatetime()
     elif sort_field == SortField.MODIFIED:
         score = basic.modified.ToDatetime()
