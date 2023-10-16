@@ -376,8 +376,9 @@ class Processor:
             await kb.set_resource_shard_id(uuid, shard.shard)
 
         if shard is not None:
+            brain = resource.indexer.brain
             await self.shard_manager.add_resource(
-                shard, resource.indexer.brain, seqid, partition=partition, kb=kbid
+                shard, brain, seqid, partition=partition, kb=kbid
             )
         else:
             raise AttributeError("Shard is not available")
