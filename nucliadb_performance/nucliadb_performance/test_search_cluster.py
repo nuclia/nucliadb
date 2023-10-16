@@ -1,3 +1,6 @@
+import asyncio
+import random
+
 from faker import Faker
 from molotov import global_setup, scenario
 
@@ -32,7 +35,7 @@ async def test_suggest(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/suggest",
+        f"/v1/kb/{kbid}/suggest",
         params={"query": get_fake_word()},
     )
 
@@ -43,7 +46,7 @@ async def test_catalog(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/catalog",
+        f"/v1/kb/{kbid}/catalog",
     )
 
 
@@ -51,12 +54,16 @@ async def test_catalog(session):
 async def test_chat(session):
     client = get_search_client(session)
     kbid = get_random_kb()
+    # To avoid calling the LLM in the performance test, we simulate the
+    # chat intraction as a find (the retrieval phase) plus some synthetic
+    # sleep time (the LLM answer generation streaming time)
     await client.make_request(
         "POST",
-        f"/kb/{kbid}/chat",
+        f"/v1/kb/{kbid}/find",
         json={"query": fake.sentence()},
-        headers={"X-Synchronous": "true"},
     )
+    sleep_time = abs(random.gauss(2, 1))
+    await asyncio.sleep(sleep_time)
 
 
 @scenario(weight=FIND_WEIGHT)
@@ -65,7 +72,7 @@ async def test_find(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/find",
+        f"/v1/kb/{kbid}/find",
         params={"query": fake.sentence()},
     )
 
@@ -76,6 +83,6 @@ async def test_search(session):
     kbid = get_random_kb()
     await client.make_request(
         "GET",
-        f"/kb/{kbid}/search",
+        f"/v1/kb/{kbid}/search",
         params={"query": fake.sentence()},
     )
