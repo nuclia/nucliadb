@@ -267,12 +267,16 @@ message QuestionAnswer {
   string question_language = 2;
   string answer = 3;
   string answer_language = 4;
-  repeated int64 paragraph_ids = 5;
+  repeated string paragraph_ids = 5;
+}
+
+message QuestionAnswers {
+  repeated QuestionAnswer question_answer = 1;
 }
 
 message FieldQuestionAnswerWrapper {
     oneof file_or_data {
-        QuestionAnswer question_answer = 1;
+        QuestionAnswers question_answers = 1;
         CloudFile file = 2;
     }
     FieldID field = 3;
