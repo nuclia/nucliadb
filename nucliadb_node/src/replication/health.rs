@@ -61,11 +61,11 @@ impl ReplicationHealthManager {
 
     pub fn healthy(&self) -> bool {
         if !Path::new(&self.health_filepath()).exists() {
-            false
+            false;
         }
         let metaddata = Path::new(&self.health_filepath()).metadata();
         if metaddata.is_err() {
-            false
+            false;
         }
         let metadata = metaddata.unwrap();
         metadata.modified().unwrap()
