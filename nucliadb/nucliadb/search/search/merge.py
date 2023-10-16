@@ -506,7 +506,7 @@ async def merge_results(
 
     api_results = KnowledgeboxSearchResults()
 
-    get_resource_cache(clear=True)
+    rcache = get_resource_cache(clear=True)
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
@@ -532,6 +532,8 @@ async def merge_results(
     api_results.resources = await fetch_resources(
         resources, kbid, show, field_type_filter, extracted
     )
+
+    rcache.clear()
     return api_results
 
 

@@ -391,7 +391,7 @@ async def find_merge_results(
 
         relations.append(response.relation)
 
-    get_resource_cache(clear=True)
+    rcache = get_resource_cache(clear=True)
 
     result_paragraphs, merged_next_page = merge_paragraphs_vectors(
         paragraphs, vectors, count, page, min_score
@@ -422,4 +422,5 @@ async def find_merge_results(
     api_results.relations = merge_relations_results(relations, requested_relations)
 
     await abort_transaction()
+    rcache.clear()
     return api_results
