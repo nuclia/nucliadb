@@ -59,6 +59,12 @@ impl AsyncUnboundedShardWriterCache {
     }
 }
 
+impl Drop for AsyncUnboundedShardWriterCache {
+    fn drop(&mut self) {
+        self.scheduler_permits.close();
+    }
+}
+
 #[async_trait]
 impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
