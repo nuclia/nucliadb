@@ -173,7 +173,7 @@ impl WriterChild for ParagraphWriterService {
             .collect())
     }
 
-    fn get_index_files(&self, ignored_segment_ids: &Vec<String>) -> NodeResult<IndexFiles> {
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
         let mut meta_files = HashMap::new();
         let path = self.config.path.join("meta.json");

@@ -21,7 +21,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use nucliadb_core::metrics::metric::replication as replication_metrics;
+use nucliadb_core::metrics::replication as replication_metrics;
 use nucliadb_core::tracing::{error, info, warn};
 use nucliadb_core::{metrics, Error, NodeResult};
 use nucliadb_protos::replication;

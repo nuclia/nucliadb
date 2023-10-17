@@ -338,16 +338,16 @@ impl WriterChild for VectorWriterService {
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
-        let mut seg_ids = self._get_segment_ids(&self.index.location)?;
+        let mut seg_ids = self.get_segment_ids_for_vectorset(&self.index.location)?;
         let vectorsets = self.list_vectorsets()?;
         for vs in vectorsets {
-            let vs_seg_ids = self._get_segment_ids(&self.config.vectorset.join(vs))?;
+            let vs_seg_ids = self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs))?;
             seg_ids.extend(vs_seg_ids);
         }
         Ok(seg_ids)
     }
 
-    fn get_index_files(&self, ignored_segment_ids: &Vec<String>) -> NodeResult<IndexFiles> {
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
         let mut meta_files = HashMap::new();
         meta_files.insert(
@@ -361,7 +361,7 @@ impl WriterChild for VectorWriterService {
 
         let mut files = Vec::new();
 
-        for segment_id in self._get_segment_ids(&self.index.location)? {
+        for segment_id in self.get_segment_ids_for_vectorset(&self.index.location)? {
             if ignored_segment_ids.contains(&segment_id) {
                 continue;
             }
@@ -377,7 +377,9 @@ impl WriterChild for VectorWriterService {
                 fs::read(self.config.vectorset.join("state.bincode"))?,
             );
             for vs in vectorsets {
-                for segment_id in self._get_segment_ids(&self.config.vectorset.join(vs.clone()))? {
+                for segment_id in
+                    self.get_segment_ids_for_vectorset(&self.config.vectorset.join(vs.clone()))?
+                {
                     if ignored_segment_ids.contains(&segment_id) {
                         continue;
                     }
@@ -480,7 +482,7 @@ impl VectorWriterService {
         }
     }
 
-    fn _get_segment_ids(&self, location: &PathBuf) -> NodeResult<Vec<String>> {
+    fn get_segment_ids_for_vectorset(&self, location: &PathBuf) -> NodeResult<Vec<String>> {
         let mut ids = Vec::new();
         for dir_entry in std::fs::read_dir(location)? {
             let entry = dir_entry?;

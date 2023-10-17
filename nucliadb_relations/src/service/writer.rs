@@ -235,7 +235,7 @@ impl WriterChild for RelationsWriterService {
         Ok(Vec::new())
     }
 
-    fn get_index_files(&self, _ignored_segment_ids: &Vec<String>) -> NodeResult<IndexFiles> {
+    fn get_index_files(&self, _ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // not implemented, not supported right now
         Ok(IndexFiles {
             metadata_files: HashMap::new(),

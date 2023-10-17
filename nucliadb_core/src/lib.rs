@@ -51,10 +51,8 @@ pub mod prelude {
     };
 }
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
 use nucliadb_protos::noderesources::{Resource, ResourceId};
@@ -145,7 +143,7 @@ pub trait WriterChild: std::fmt::Debug + Send + Sync {
     fn merge(&mut self) -> NodeResult<()>;
     fn count(&self) -> NodeResult<usize>;
     fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
-    fn get_index_files(&self, ignored_segment_ids: &Vec<String>) -> NodeResult<IndexFiles>;
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
 }
 
 pub trait ReaderChild: std::fmt::Debug + Send + Sync {

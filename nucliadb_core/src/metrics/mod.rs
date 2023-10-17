@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 mod meters;
-pub mod metric;
+mod metric;
 mod task_monitor;
 
-pub use metric::{grpc_ops, request_time};
+pub use metric::{grpc_ops, replication, request_time};
 
 #[cfg(test)]
 mod tests;

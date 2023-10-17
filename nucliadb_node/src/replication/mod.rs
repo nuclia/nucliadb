@@ -21,7 +21,7 @@ pub mod health;
 pub mod replicator;
 pub mod service;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub enum NodeRole {
     Primary,
     Secondary,
