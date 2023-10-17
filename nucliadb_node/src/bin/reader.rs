@@ -37,7 +37,6 @@ use nucliadb_node::settings::Settings;
 use nucliadb_node::telemetry::init_telemetry;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
-use tokio::sync::Mutex;
 use tonic::transport::Server;
 use tonic_health::server::HealthReporter;
 
@@ -93,33 +92,21 @@ async fn wait_for_sigkill() -> NodeResult<()> {
 }
 
 async fn health_checker(
-    health_reporter: Arc<Mutex<HealthReporter>>,
+    mut health_reporter: HealthReporter,
     settings: Arc<Settings>,
 ) -> NodeResult<()> {
     if settings.node_role() == NodeRole::Primary {
         // cut out early, this check is for secondaries only right now
-        health_reporter
-            .lock()
-            .await
-            .set_serving::<GrpcServer>()
-            .await;
+        health_reporter.set_serving::<GrpcServer>().await;
         return Ok(());
     }
 
     let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&settings));
     loop {
         if repl_health_mng.healthy() {
-            health_reporter
-                .lock()
-                .await
-                .set_serving::<GrpcServer>()
-                .await;
+            health_reporter.set_serving::<GrpcServer>().await;
         } else {
-            health_reporter
-                .lock()
-                .await
-                .set_not_serving::<GrpcServer>()
-                .await;
+            health_reporter.set_not_serving::<GrpcServer>().await;
         }
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     }
@@ -137,10 +124,7 @@ pub async fn start_grpc_service(settings: Arc<Settings>) -> NodeResult<()> {
     let metrics_middleware = GrpcTasksMetricsLayer;
 
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
-    tokio::spawn(health_checker(
-        Arc::new(Mutex::new(health_reporter)),
-        settings.clone(),
-    ));
+    tokio::spawn(health_checker(health_reporter, settings.clone()));
 
     let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
     grpc_driver.initialize().await?;
