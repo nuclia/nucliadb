@@ -29,7 +29,7 @@ use crate::shards::shard_writer::ShardWriter;
 // Every three hours a merge is triggered
 const MERGE_INTERVAL_SECS: u64 = 10800;
 // Everyday a shard is garbage collected
-const GC_INTERVAL_SECS: u64 = 10800;
+const GC_INTERVAL_SECS: u64 = 86400;
 
 async fn schedule<'a>(
     interval: &mut Interval,
