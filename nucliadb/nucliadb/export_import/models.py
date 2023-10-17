@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -55,6 +56,8 @@ class Metadata(BaseModel):
     task: TaskMetadata = TaskMetadata(status=Status.SCHEDULED)
     total: int = 0
     processed: int = 0
+    created: datetime = datetime.utcnow()
+    modified: datetime = datetime.utcnow()
 
 
 class ExportMetadata(Metadata):

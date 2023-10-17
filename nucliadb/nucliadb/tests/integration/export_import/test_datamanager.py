@@ -60,6 +60,11 @@ async def test_export_upload_and_download(datamanager, kbid_with_bucket):
 
     assert downloaded == EXPORT
 
+    await datamanager.delete_export(kbid, export_id)
+
+    async for chunk in datamanager.download_export(kbid, export_id):
+        assert chunk is None
+
 
 async def test_import_upload_and_download(datamanager, kbid_with_bucket):
     kbid = kbid_with_bucket
@@ -75,3 +80,8 @@ async def test_import_upload_and_download(datamanager, kbid_with_bucket):
         downloaded += chunk
 
     assert downloaded == IMPORT
+
+    await datamanager.delete_import(kbid, import_id)
+
+    async for chunk in datamanager.download_import(kbid, import_id):
+        assert chunk is None

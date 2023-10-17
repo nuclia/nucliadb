@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 from typing import AsyncGenerator, Union
 
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.export_import import logger
 from nucliadb.export_import.exceptions import MetadataNotFound
 from nucliadb.export_import.models import ExportMetadata, ImportMetadata
 from nucliadb_protos import resources_pb2
+from nucliadb_telemetry import errors
 from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages.storage import Storage, StorageField
 
@@ -67,6 +70,7 @@ class ExportImportDataManager:
         type: str,
         metadata: Metadata,
     ):
+        metadata.modified = datetime.utcnow()
         key = self._get_maindb_metadata_key(type, metadata.kbid, metadata.id)
         data = metadata.json().encode("utf-8")
         async with self.driver.transaction() as txn:
@@ -129,6 +133,28 @@ class ExportImportDataManager:
         return self.storage.field_klass(
             storage=self.storage, bucket=bucket, fullkey=key, field=cf
         )
+
+    async def delete_import(self, kbid: str, import_id: str):
+        key = STORAGE_IMPORT_KEY.format(import_id=import_id)
+        bucket = self.storage.get_bucket_name(kbid)
+        await self.storage.delete_upload(key, bucket_name=bucket)
+
+    async def delete_export(self, kbid: str, export_id: str):
+        key = STORAGE_EXPORT_KEY.format(export_id=export_id)
+        bucket = self.storage.get_bucket_name(kbid)
+        await self.storage.delete_upload(key, bucket_name=bucket)
+
+    async def try_delete_from_storage(self, type: str, kbid: str, id: str):
+        if type not in ("export", "import"):
+            raise ValueError(f"Invalid type: {type}")
+        func = self.delete_export if type == "export" else self.delete_import
+        try:
+            await func(kbid, id)
+        except Exception as ex:
+            errors.capture_exception(ex)
+            logger.exception(
+                f"Could not delete {type} {id} from storage", extra={"kbid": kbid}
+            )
 
 
 async def iter_and_add_size(
