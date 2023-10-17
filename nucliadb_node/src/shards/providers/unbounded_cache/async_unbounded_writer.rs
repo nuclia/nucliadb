@@ -31,6 +31,7 @@ use uuid::Uuid;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::scheduler::scheduler_task;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
@@ -90,7 +91,10 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         .context("Blocking task panicked")??;
 
         let shard = Arc::new(shard);
-        cache.insert(shard_key, Arc::clone(&shard));
+        let cache_shard = Arc::clone(&shard);
+        let scheduler_shard = Arc::clone(&shard);
+        cache.insert(shard_key, cache_shard);
+        tokio::task::spawn(scheduler_task(scheduler_shard));
         Ok(shard)
     }
 
