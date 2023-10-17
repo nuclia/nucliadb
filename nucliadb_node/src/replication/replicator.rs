@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fs;
-use std::path::Path;
 use std::sync::Arc;
 
 use nucliadb_core::metrics::replication as replication_metrics;
@@ -66,14 +65,14 @@ pub async fn replicate_shard(
         .into_inner();
 
     let shard_path = shard.path.clone();
-    let replicate_work_path = format!("{}/replication", shard_path.to_string_lossy());
+    let replicate_work_path = shard_path.join("replication");
     // create replication work path if not exists
-    if !std::path::Path::new(&replicate_work_path).exists() {
+    if !replicate_work_path.exists() {
         std::fs::create_dir_all(&replicate_work_path)?;
     }
     let mut generation_id = None;
     let mut filepath = None;
-    let mut temp_filepath = format!("{}/{}", replicate_work_path.clone(), uuid::Uuid::new_v4());
+    let mut temp_filepath = replicate_work_path.join(uuid::Uuid::new_v4().to_string());
     let mut current_read_bytes = 0;
     let mut file = tokio::fs::File::create(temp_filepath.clone()).await?;
     let mut start = std::time::SystemTime::now();
@@ -110,17 +109,13 @@ pub async fn replicate_shard(
             // close file
             drop(file);
 
-            let dest_filepath = format!(
-                "{}/{}",
-                shard_path.to_string_lossy(),
-                filepath.clone().unwrap()
-            );
+            let dest_filepath = shard_path.join(filepath.clone().unwrap());
             // check if path exists
-            if std::path::Path::new(&dest_filepath).exists() {
+            if dest_filepath.exists() {
                 std::fs::remove_file(dest_filepath.clone())?;
             }
             // mkdirs directory if not exists
-            if let Some(parent) = Path::new(&dest_filepath).parent() {
+            if let Some(parent) = dest_filepath.parent() {
                 fs::create_dir_all(parent)?;
             }
 
@@ -128,7 +123,7 @@ pub async fn replicate_shard(
 
             filepath = None;
             current_read_bytes = 0;
-            temp_filepath = format!("{}/{}", replicate_work_path.clone(), uuid::Uuid::new_v4());
+            temp_filepath = replicate_work_path.join(uuid::Uuid::new_v4().to_string());
             file = tokio::fs::File::create(temp_filepath.clone()).await?;
         }
 
