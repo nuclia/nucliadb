@@ -26,6 +26,7 @@ use async_trait::async_trait;
 use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
+use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 use crate::shards::errors::ShardNotFoundError;
@@ -36,7 +37,10 @@ use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
+const SCHEDULER_PERMITS: usize = 10;
+
 pub struct AsyncUnboundedShardWriterCache {
+    scheduler_permits: Arc<Semaphore>,
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
 }
@@ -50,6 +54,7 @@ impl AsyncUnboundedShardWriterCache {
             // consideration a resize blocking is not performance critical while
             // writting.
             cache: RwLock::new(HashMap::new()),
+            scheduler_permits: Arc::new(Semaphore::new(SCHEDULER_PERMITS)),
         }
     }
 }
@@ -93,8 +98,9 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         let shard = Arc::new(shard);
         let cache_shard = Arc::clone(&shard);
         let scheduler_shard = Arc::clone(&shard);
+        let scheduler_permits = Arc::clone(&self.scheduler_permits);
         cache.insert(shard_key, cache_shard);
-        tokio::task::spawn(scheduler_task(scheduler_shard));
+        tokio::task::spawn(scheduler_task(scheduler_shard, scheduler_permits));
         Ok(shard)
     }
 

@@ -20,8 +20,9 @@
 use std::sync::Arc;
 
 use nucliadb_core::tracing::error;
-use tokio::time;
-use tokio::time::Duration;
+use nucliadb_core::NodeResult;
+use tokio::sync::{Semaphore, SemaphorePermit};
+use tokio::time::{self, Duration, Interval};
 
 use crate::shards::shard_writer::ShardWriter;
 
@@ -30,24 +31,38 @@ const MERGE_INTERVAL_SECS: u64 = 10800;
 // Everyday a shard is garbage collected
 const GC_INTERVAL_SECS: u64 = 10800;
 
-pub async fn scheduler_task(shard: Arc<ShardWriter>) {
+async fn schedule<'a>(
+    interval: &mut Interval,
+    permits: &'a Semaphore,
+) -> NodeResult<SemaphorePermit<'a>> {
+    interval.tick().await;
+    let permit = permits.acquire().await?;
+    Ok(permit)
+}
+
+pub async fn scheduler_task(shard: Arc<ShardWriter>, permits: Arc<Semaphore>) {
     let mut merge_interval = time::interval(Duration::from_secs(MERGE_INTERVAL_SECS));
     let mut gc_interval = time::interval(Duration::from_secs(GC_INTERVAL_SECS));
     loop {
-        let performed = tokio::select! {
-            _ = merge_interval.tick() => {
+        let (handler, permit) = tokio::select! {
+            permit = schedule(&mut merge_interval, &permits) => {
+                let Ok(permit) = permit else { break; };
                 let event_shard = Arc::clone(&shard);
-                tokio::task::spawn_blocking(move || event_shard.merge())
+                let handler = tokio::task::spawn_blocking(move || event_shard.merge());
+                (handler, permit)
             }
-            _ = gc_interval.tick() => {
+            permit = schedule(&mut gc_interval, &permits) => {
+                let Ok(permit) = permit else { break; };
                 let event_shard = Arc::clone(&shard);
-                tokio::task::spawn_blocking(move || event_shard.gc())
+                let handler = tokio::task::spawn_blocking(move || event_shard.gc());
+                (handler, permit)
             }
         };
-        match performed.await {
+        match handler.await {
             Ok(Ok(_)) => (),
             Ok(Err(err)) => error!("Scheduler operation failed: {err:?}"),
             Err(error) => error!("Task panicked: {error:?}"),
         }
+        std::mem::drop(permit)
     }
 }
