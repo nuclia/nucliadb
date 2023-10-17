@@ -145,7 +145,8 @@ class ExportImportDataManager:
         await self.storage.delete_upload(key, bucket_name=bucket)
 
     async def try_delete_from_storage(self, type: str, kbid: str, id: str):
-        assert type in ("export", "import")
+        if type not in ("export", "import"):
+            raise ValueError(f"Invalid type: {type}")
         func = self.delete_export if type == "export" else self.delete_import
         try:
             await func(kbid, id)
