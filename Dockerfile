@@ -36,6 +36,7 @@ COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
+COPY nucliadb_performance /usr/src/app/nucliadb_performance
 
 RUN pip install -r nucliadb/requirements-sources.txt && \
     pip install -e /usr/src/app/nucliadb
