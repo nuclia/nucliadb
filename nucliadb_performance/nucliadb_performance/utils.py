@@ -3,17 +3,10 @@ from typing import Optional
 
 from faker import Faker
 
+from nucliadb_performance.settings import get_reader_api_url, get_search_api_url
 from nucliadb_sdk import NucliaDB
 
 fake = Faker()
-
-
-def get_base_url():
-    return "http://search.nucliadb.svc.cluster.local:8080/api/v1"
-
-
-def get_url(path):
-    return get_base_url() + path
 
 
 _DATA = {}
@@ -38,11 +31,19 @@ class Client:
 
 def get_kbs():
     ndb = NucliaDB(
-        url="http://reader.nucliadb.svc.cluster.local:8080/api",
+        url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     resp = ndb.list_knowledge_boxes()
     return [kb.uuid for kb in resp.kbs]
+
+
+def get_kb(kbid):
+    ndb = NucliaDB(
+        url=get_reader_api_url(),
+        headers={"X-NUCLIADB-ROLES": "READER"},
+    )
+    return ndb.get_knowledge_box(kbid=kbid)
 
 
 def load_kbs():
@@ -50,29 +51,17 @@ def load_kbs():
     _DATA["kbs"] = kbs
 
 
-def get_entities(kbs):
-    ent = {}
-    for kb in kbs:
-        entities = get_kb_entities(kb)
-        ent[kb] = entities
-    return ent
-
-
-def get_kb_entities(kbid):
-    ndb = NucliaDB(
-        url="http://reader.nucliadb.svc.cluster.local:8080/api",
-        headers={"X-NUCLIADB-ROLES": "READER"},
-    )
-    entities = ndb.get_entitygroups(kbid=kbid, query_params={"show_entities": True})
-    return [
-        f"{group_id}/{entity_id}"
-        for group_id, group in entities.groups.items()
-        for entity_id in group.entities.keys()
-    ]
+def load_kb(kbid: str):
+    kb = get_kb(kbid)
+    _DATA["kb"] = kb
 
 
 def get_random_kb() -> str:
     return random.choice(_DATA["kbs"])
+
+
+def get_loaded_kb():
+    return _DATA["kb"].uuid
 
 
 def get_fake_word():
@@ -83,4 +72,4 @@ def get_fake_word():
 
 
 def get_search_client(session):
-    return Client(session, get_base_url(), headers={"X-NUCLIADB-ROLES": "READER"})
+    return Client(session, get_search_api_url(), headers={"X-NUCLIADB-ROLES": "READER"})

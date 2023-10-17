@@ -345,8 +345,6 @@ pub struct Paragraph {
     /// Optional, as a computed value
     #[prost(string, tag="9")]
     pub text: ::prost::alloc::string::String,
-    #[prost(message, repeated, tag="14")]
-    pub question_answer: ::prost::alloc::vec::Vec<QuestionAnswer>,
 }
 /// Nested message and enum types in `Paragraph`.
 pub mod paragraph {
@@ -374,17 +372,6 @@ pub struct Positions {
     pub position: ::prost::alloc::vec::Vec<Position>,
     #[prost(string, tag="2")]
     pub entity: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QuestionAnswer {
-    #[prost(string, tag="1")]
-    pub question: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub question_language: ::prost::alloc::string::String,
-    #[prost(string, tag="3")]
-    pub answer: ::prost::alloc::string::String,
-    #[prost(string, tag="4")]
-    pub answer_language: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldMetadata {
@@ -416,6 +403,36 @@ pub struct FieldMetadata {
     pub positions: ::std::collections::HashMap<::prost::alloc::string::String, Positions>,
     #[prost(message, repeated, tag="13")]
     pub relations: ::prost::alloc::vec::Vec<Relations>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QuestionAnswer {
+    #[prost(string, tag="1")]
+    pub question: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub question_language: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub answer: ::prost::alloc::string::String,
+    #[prost(string, tag="4")]
+    pub answer_language: ::prost::alloc::string::String,
+    #[prost(int64, repeated, tag="5")]
+    pub paragraph_ids: ::prost::alloc::vec::Vec<i64>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldQuestionAnswerWrapper {
+    #[prost(message, optional, tag="3")]
+    pub field: ::core::option::Option<FieldId>,
+    #[prost(oneof="field_question_answer_wrapper::FileOrData", tags="1, 2")]
+    pub file_or_data: ::core::option::Option<field_question_answer_wrapper::FileOrData>,
+}
+/// Nested message and enum types in `FieldQuestionAnswerWrapper`.
+pub mod field_question_answer_wrapper {
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum FileOrData {
+        #[prost(message, tag="1")]
+        QuestionAnswer(super::QuestionAnswer),
+        #[prost(message, tag="2")]
+        File(super::CloudFile),
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldComputedMetadata {

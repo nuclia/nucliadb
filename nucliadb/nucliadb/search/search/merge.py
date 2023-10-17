@@ -72,7 +72,7 @@ from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
 from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentence
 
-Bm25Score = Tuple[int, int]
+Bm25Score = Tuple[float, float]
 TimestampScore = datetime.datetime
 TitleScore = str
 Score = Union[Bm25Score, TimestampScore, TitleScore]
@@ -92,8 +92,10 @@ async def text_score(
     specific case, return None.
 
     """
-    score: Any = None
+    if sort_field == SortField.SCORE:
+        return (item.score.bm25, item.score.booster)
 
+    score: Any = None
     resource = await get_resource_from_cache(kbid, item.uuid)
     if resource is None:
         return score
@@ -101,9 +103,7 @@ async def text_score(
     if basic is None:
         return score
 
-    if sort_field == SortField.SCORE:
-        score = (item.score.bm25, item.score.booster)
-    elif sort_field == SortField.CREATED:
+    if sort_field == SortField.CREATED:
         score = basic.created.ToDatetime()
     elif sort_field == SortField.MODIFIED:
         score = basic.modified.ToDatetime()
@@ -506,33 +506,36 @@ async def merge_results(
 
     api_results = KnowledgeboxSearchResults()
 
-    get_resource_cache(clear=True)
+    rcache = get_resource_cache(clear=True)
 
-    resources: List[str] = list()
-    api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, sort
-    )
+    try:
+        resources: List[str] = list()
+        api_results.fulltext = await merge_documents_results(
+            documents, resources, count, page, kbid, sort
+        )
 
-    api_results.paragraphs = await merge_paragraph_results(
-        paragraphs,
-        resources,
-        kbid,
-        count,
-        page,
-        highlight,
-        sort,
-    )
+        api_results.paragraphs = await merge_paragraph_results(
+            paragraphs,
+            resources,
+            kbid,
+            count,
+            page,
+            highlight,
+            sort,
+        )
 
-    api_results.sentences = await merge_vectors_results(
-        vectors, resources, kbid, count, page, min_score=min_score
-    )
+        api_results.sentences = await merge_vectors_results(
+            vectors, resources, kbid, count, page, min_score=min_score
+        )
 
-    api_results.relations = merge_relations_results(relations, requested_relations)
+        api_results.relations = merge_relations_results(relations, requested_relations)
 
-    api_results.resources = await fetch_resources(
-        resources, kbid, show, field_type_filter, extracted
-    )
-    return api_results
+        api_results.resources = await fetch_resources(
+            resources, kbid, show, field_type_filter, extracted
+        )
+        return api_results
+    finally:
+        rcache.clear()
 
 
 async def merge_paragraphs_results(
@@ -551,21 +554,25 @@ async def merge_paragraphs_results(
 
     api_results = ResourceSearchResults()
 
-    resources: List[str] = list()
-    api_results.paragraphs = await merge_paragraph_results(
-        paragraphs,
-        resources,
-        kbid,
-        count,
-        page,
-        highlight=highlight_split,
-        sort=SortOptions(
-            field=SortField.SCORE,
-            order=SortOrder.DESC,
-            limit=None,
-        ),
-    )
-    return api_results
+    rcache = get_resource_cache(clear=True)
+    try:
+        resources: List[str] = list()
+        api_results.paragraphs = await merge_paragraph_results(
+            paragraphs,
+            resources,
+            kbid,
+            count,
+            page,
+            highlight=highlight_split,
+            sort=SortOptions(
+                field=SortField.SCORE,
+                order=SortOrder.DESC,
+                limit=None,
+            ),
+        )
+        return api_results
+    finally:
+        rcache.clear()
 
 
 async def merge_suggest_entities_results(
