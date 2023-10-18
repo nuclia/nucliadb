@@ -1,18 +1,19 @@
+{{- range $i := untilInt .Values.replicaCount }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: node
+  name: node-replica-{{ $i }}
   labels:
-    app: node
+    app: node-replica-{{ $i }}
     appType: node
-    app.kubernetes.io/name: node
+    app.kubernetes.io/name: node-replica-{{ $i }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
 spec:
   selector:
-    app: node
+    app: node-replica-{{ $i }}
     chart: "{{ .Chart.Name }}"
   clusterIP: None
   ports:
@@ -24,7 +25,4 @@ spec:
     port: {{ .Values.serving.grpc_writer }}
     protocol: TCP
     appProtocol: grpc
-  - name: grpc-sidecar
-    port: {{ .Values.serving.grpc_sidecar }}
-    protocol: TCP
-    appProtocol: grpc
+{{- end }}

@@ -1,109 +1,63 @@
-kind: StatefulSet
+{{- range $i := untilInt .Values.replicaCount }}
+kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: node
+  name: node-replica-{{ $i }}
   labels:
-    app: node
+    app: node-replica-{{ $i }}
     appType: node
-    app.kubernetes.io/name: node
+    app.kubernetes.io/name: node-replica-{{ $i }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.readReplicas.count }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
-  podManagementPolicy: OrderedReady
-  updateStrategy:
-    type: RollingUpdate
   serviceName: node
   selector:
     matchLabels:
-      app: node
-      app.kubernetes.io/name: node
+      app: node-replica-{{ $i }}
+      app.kubernetes.io/name: node-replica-{{ $i }}
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/managed-by: {{ .Release.Service }}
   template:
     metadata:
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.nats.port }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }},3031,3032"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/node.cm.yaml") . | sha256sum }}
         {{- if hasKey .Values "extra_pod_annotations" }}
 {{ toYaml .Values.extra_pod_annotations | indent 8 }}
         {{- end }}
-      name: node
+      name: node-replica-{{ $i }}
       labels:
-        app: node
+        app: node-replica-{{ $i }}
         appType: node
-        app.kubernetes.io/name: node
+        app.kubernetes.io/name: node-replica-{{ $i }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/managed-by: {{ .Release.Service }}
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
     spec:
       nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
+{{ toYaml .Values.readReplicas.nodeSelector | indent 8 }}
       topologySpreadConstraints:
-{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+{{ toYaml .Values.readReplicas.topologySpreadConstraints | indent 8 }}
       affinity:
-{{ toYaml .Values.affinity | indent 8 }}
+{{ toYaml .Values.readReplicas.affinity | indent 8 }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+{{ toYaml .Values.readReplicas.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-{{- if .Values.nats.secretName }}
       volumes:
+      - name: data-dir
+        emptyDir:
+          sizeLimit: {{ mul .Values.disk.numLocalDisks .Values.disk.localDiskSize .Values.disk.reservationPercentage | round 0 | int }}Gi
+{{- if .Values.nats.secretName }}
       - name: nats-creds
         secret:
           secretName: {{ .Values.nats.secretName }}
 {{- end }}
       containers:
-      - name: sidecar
-        image: "{{ .Values.containerRegistry }}/{{ .Values.image_sidecar }}"
-        imagePullPolicy: {{ .Values.imagePullPolicy }}
-        readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_sidecar }}"]
-          initialDelaySeconds: 2
-        livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_sidecar }}"]
-          initialDelaySeconds: 10
-          periodSeconds: 60
-          timeoutSeconds: 5
-          failureThreshold: 3
-        command: ["node_sidecar"]
-        envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
-        env:
-          - name: VERSION
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.labels['version']
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
-        ports:
-        - name: grpc-sidecar
-          containerPort: {{ .Values.serving.grpc_sidecar }}
-          protocol: TCP
-        - name: metrics
-          containerPort: {{ .Values.serving.metricsPort }}
-        resources:
-{{ toYaml .Values.resources.sidecar | indent 10 }}
-        volumeMounts:
-        - name: node-pv
-          mountPath: {{ .Values.config.data_path }}
-{{- if .Values.nats.secretName }}
-        - name: nats-creds
-          readOnly: true
-          mountPath: /appsecrets
-{{- end }}
       - name: writer
         securityContext:
           privileged: true
@@ -134,9 +88,9 @@ spec:
         - name: metrics
           containerPort: 3032
         resources:
-{{ toYaml .Values.resources.writer | indent 10 }}
+{{ toYaml .Values.readReplicas.resources.writer | indent 10 }}
         volumeMounts:
-        - name: node-pv
+        - name: data-dir
           mountPath: {{ .Values.config.data_path }}
       - name: reader
         securityContext:
@@ -173,9 +127,9 @@ spec:
         - name: metrics
           containerPort: 3031
         resources:
-{{ toYaml .Values.resources.reader | indent 10 }}
+{{ toYaml .Values.readReplicas.resources.reader | indent 10 }}
         volumeMounts:
-        - name: node-pv
+        - name: data-dir
           mountPath: {{ .Values.config.data_path }}
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent
@@ -210,3 +164,4 @@ spec:
       resources:
         requests:
           storage: {{ .Values.storage.size }}
+{{- end }}
