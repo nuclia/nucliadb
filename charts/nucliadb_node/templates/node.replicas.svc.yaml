@@ -1,19 +1,19 @@
-{{- range $i := until .Values.replicaCount }}
+{{- range $i, $e := until .Values.replicaCount }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: node-replica-{{ $i }}
+  name: node-replicas-{{ $i }}
   labels:
-    app: node-replica-{{ $i }}
+    app: node-replicas-{{ $i }}
     appType: node
-    app.kubernetes.io/name: node-replica-{{ $i }}
+    app.kubernetes.io/name: node-replicas-{{ $i }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
 spec:
   selector:
-    app: node-replica-{{ $i }}
+    app: node-replicas-{{ $i }}
     chart: "{{ .Chart.Name }}"
   clusterIP: None
   ports:

@@ -1,12 +1,12 @@
-{{- range $i := until .Values.replicaCount }}
+{{- range $i, $e := until .Values.replicaCount }}
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: node-replica-{{ $i }}
+  name: node-replicas-{{ $i }}
   labels:
-    app: node-replica-{{ $i }}
+    app: node-replicas-{{ $i }}
     appType: node
-    app.kubernetes.io/name: node-replica-{{ $i }}
+    app.kubernetes.io/name: node-replicas-{{ $i }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     version: "{{ .Chart.Version | replace "+" "_" }}"
@@ -17,8 +17,8 @@ spec:
   serviceName: node
   selector:
     matchLabels:
-      app: node-replica-{{ $i }}
-      app.kubernetes.io/name: node-replica-{{ $i }}
+      app: node-replicas-{{ $i }}
+      app.kubernetes.io/name: node-replicas-{{ $i }}
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/managed-by: {{ .Release.Service }}
   template:
@@ -29,11 +29,11 @@ spec:
         {{- if hasKey .Values "extra_pod_annotations" }}
 {{ toYaml .Values.extra_pod_annotations | indent 8 }}
         {{- end }}
-      name: node-replica-{{ $i }}
+      name: node-replicas-{{ $i }}
       labels:
-        app: node-replica-{{ $i }}
+        app: node-replicas-{{ $i }}
         appType: node
-        app.kubernetes.io/name: node-replica-{{ $i }}
+        app.kubernetes.io/name: node-replicas-{{ $i }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/managed-by: {{ .Release.Service }}
         version: "{{ .Chart.Version | replace "+" "_" }}"
