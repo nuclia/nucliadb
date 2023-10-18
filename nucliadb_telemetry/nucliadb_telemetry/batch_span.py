@@ -110,7 +110,7 @@ class BatchSpanProcessor(SpanProcessor):
             if not self._spans_dropped:
                 logger.warning("Queue is full, likely spans will be dropped.")
                 self._spans_dropped = True
-                return
+            return
 
         try:
             self.queue.put_nowait(span)  # type: ignore
@@ -118,7 +118,7 @@ class BatchSpanProcessor(SpanProcessor):
             if not self._spans_dropped:
                 logger.warning(f"Queue is full. Queue size : {self.queue.qsize()}")
                 self._spans_dropped = True
-                return
+            return
         except Exception as e:
             logger.exception(e)
 
