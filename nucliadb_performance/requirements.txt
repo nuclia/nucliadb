@@ -1,3 +1,4 @@
 molotov
 nucliadb-sdk
 certifi
+faker

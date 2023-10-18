@@ -8,7 +8,13 @@ from nucliadb_sdk import NucliaDB
 
 fake = Faker()
 
-
+EXCLUDE_KBIDS = [
+    # These are old kbs that are excluded because they
+    # are in an inconsistent state and all requests to them fail.
+    "058efdc1-59dd-4d22-81a1-4a5c733dad71",
+    "1ae07102-3abc-4ded-a861-eb56a089dfea",
+    "3c60921c-b6e6-41f5-a1d6-68b406904635",
+]
 _DATA = {}
 
 
@@ -26,7 +32,25 @@ class Client:
         kwargs_headers.update(base_headers)
         kwargs["headers"] = kwargs_headers
         async with func(url, *args, **kwargs) as resp:
-            assert resp.status == 200, resp.status
+            if resp.status == 200:
+                return
+            await self.handle_search_error(resp)
+
+    async def handle_search_error(self, resp):
+        content = None
+        text = None
+        try:
+            content = await resp.json()
+        except Exception:
+            text = await resp.text()
+        raise RequestError(resp.status, content=content, text=text)
+
+
+class RequestError(Exception):
+    def __init__(self, status, content=None, text=None):
+        self.status = status
+        self.content = content
+        self.text = text
 
 
 def get_kbs():
@@ -35,7 +59,7 @@ def get_kbs():
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     resp = ndb.list_knowledge_boxes()
-    return [kb.uuid for kb in resp.kbs]
+    return [kb.uuid for kb in resp.kbs if kb.uuid not in EXCLUDE_KBIDS]
 
 
 def get_kb(kbid):
@@ -48,7 +72,9 @@ def get_kb(kbid):
 
 def load_kbs():
     kbs = get_kbs()
+    random.shuffle(kbs)
     _DATA["kbs"] = kbs
+    return kbs
 
 
 def load_kb(kbid: str):
@@ -56,8 +82,10 @@ def load_kb(kbid: str):
     _DATA["kb"] = kb
 
 
-def get_random_kb() -> str:
-    return random.choice(_DATA["kbs"])
+def pick_kb(worker_id) -> str:
+    kbs = _DATA["kbs"]
+    index = worker_id % len(kbs)
+    return kbs[index]
 
 
 def get_loaded_kb():
