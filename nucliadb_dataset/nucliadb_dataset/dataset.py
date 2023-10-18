@@ -214,8 +214,8 @@ class NucliaDBDataset(NucliaDataset):
         )
 
     def _configure_field_classification(self):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to have only one labelset filter to train")
+        if len(self.trainset.filter.labels) > 1:
+            raise Exception("Needs to have at most one labelset filter to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         computed_labelset = False
@@ -268,8 +268,8 @@ class NucliaDBDataset(NucliaDataset):
         self._set_schema(schema)
 
     def _configure_paragraph_classification(self):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to have only one labelset filter to train")
+        if len(self.trainset.filter.labels) > 1:
+            raise Exception("Needs to have at most one labelset filter to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
 
