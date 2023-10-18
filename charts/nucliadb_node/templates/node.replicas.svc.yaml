@@ -28,4 +28,5 @@ spec:
     port: {{ $values.serving.grpc_writer }}
     protocol: TCP
     appProtocol: grpc
+---
 {{- end }}

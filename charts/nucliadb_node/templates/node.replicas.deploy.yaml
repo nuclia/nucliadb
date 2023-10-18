@@ -166,4 +166,5 @@ spec:
       resources:
         requests:
           storage: {{ $values.storage.size }}
+---
 {{- end }}
