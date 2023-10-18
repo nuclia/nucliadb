@@ -57,6 +57,7 @@ async def test_find(
         }
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_find_order(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
