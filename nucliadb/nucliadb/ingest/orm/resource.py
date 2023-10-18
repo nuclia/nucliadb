@@ -38,6 +38,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
+    FieldQuestionAnswerWrapper,
     FieldText,
     FieldType,
     FileExtractedData,
@@ -152,6 +153,7 @@ class Resource:
         self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: list[FieldID] = []
+        self._modified_question_answers: list[FieldID] = []
 
         self.txn = txn
         self.storage = storage
@@ -801,6 +803,9 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
+        for question_answers in message.question_answers:
+            await self._apply_question_answers(question_answers)
+
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
 
@@ -851,6 +856,15 @@ class Resource:
         self._modified_extracted_text.append(
             extracted_text.field,
         )
+
+    async def _apply_question_answers(
+        self, question_answers: FieldQuestionAnswerWrapper
+    ):
+        field = question_answers.field
+        field_obj = await self.get_field(field.field, field.field_type, load=False)
+        await field_obj.set_question_answers(question_answers)
+        # TODO: what is this used for
+        self._modified_question_answers.append(field)
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None

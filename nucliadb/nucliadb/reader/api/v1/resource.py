@@ -157,6 +157,7 @@ async def get_resource_by_uuid(
             ExtractedDataTypeName.METADATA,
             ExtractedDataTypeName.LINK,
             ExtractedDataTypeName.FILE,
+            ExtractedDataTypeName.QA,
         ]
     ),
     x_nucliadb_user: str = Header(""),
@@ -197,6 +198,7 @@ async def get_resource_by_slug(
             ExtractedDataTypeName.METADATA,
             ExtractedDataTypeName.LINK,
             ExtractedDataTypeName.FILE,
+            ExtractedDataTypeName.QA,
         ]
     ),
     x_nucliadb_user: str = Header(""),
@@ -269,6 +271,7 @@ async def get_resource_field_rslug_prefix(
             ExtractedDataTypeName.METADATA,
             ExtractedDataTypeName.LINK,
             ExtractedDataTypeName.FILE,
+            ExtractedDataTypeName.QA,
         ]
     ),
     # not working with latest pydantic/fastapi
@@ -353,6 +356,7 @@ async def _get_resource_field(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
     resource = ORMResource(txn, storage, kb, rid)
+
     field = await resource.get_field(field_id, pb_field_id, load=True)
     if field is None:
         await txn.abort()

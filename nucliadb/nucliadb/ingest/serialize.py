@@ -77,6 +77,7 @@ async def set_resource_field_extracted_data(
     shortened_metadata_wanted = (
         ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
     )
+
     if metadata_wanted or shortened_metadata_wanted:
         data_fcm = await field.get_field_metadata()
 
@@ -101,6 +102,11 @@ async def set_resource_field_extracted_data(
         user_data_vec = await field.get_user_vectors()
         if user_data_vec is not None:
             field_data.uservectors = UserVectorSet.from_message(user_data_vec)
+
+    if ExtractedDataTypeName.QA in wanted_extracted_data:
+        qa = await field.get_question_answers()
+        if qa is not None:
+            field_data.question_answers = models.QuestionAnswers.from_message(qa)
 
     if (
         isinstance(field, File)
@@ -141,6 +147,8 @@ async def serialize(
         return None
 
     resource = Resource(id=orm_resource.uuid)
+
+    # check in extracted if QA, and add it here
 
     include_values = ResourceProperties.VALUES in show
 
@@ -218,6 +226,7 @@ async def serialize(
     if field_type_filter and (include_values or include_extracted_data):
         await orm_resource.get_fields()
         resource.data = ResourceData()
+
         for (field_type, field_id), field in orm_resource.fields.items():
             field_type_name = FIELD_TYPES_MAP[field_type]
             if field_type_name not in field_type_filter:
@@ -432,6 +441,7 @@ async def serialize(
                             text=resource.data.generics[field.id].value
                         )
                     )
+
     asyncio.create_task(txn.abort())
     return resource
 
