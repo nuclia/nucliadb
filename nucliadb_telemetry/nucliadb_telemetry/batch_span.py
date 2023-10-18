@@ -110,11 +110,15 @@ class BatchSpanProcessor(SpanProcessor):
             if not self._spans_dropped:
                 logger.warning("Queue is full, likely spans will be dropped.")
                 self._spans_dropped = True
+            return
 
         try:
             self.queue.put_nowait(span)  # type: ignore
         except asyncio.QueueFull:
-            logger.warning(f"Queue is full. Queue size : {self.queue.qsize()}")
+            if not self._spans_dropped:
+                logger.warning(f"Queue is full. Queue size : {self.queue.qsize()}")
+                self._spans_dropped = True
+            return
         except Exception as e:
             logger.exception(e)
 
@@ -166,6 +170,8 @@ class BatchSpanProcessor(SpanProcessor):
                     if self.done:
                         # missing spans will be sent when calling flush
                         break
+
+                self._spans_dropped = False
 
             # subtract the duration of this export call to the next timeout
             start = _time_ns()
