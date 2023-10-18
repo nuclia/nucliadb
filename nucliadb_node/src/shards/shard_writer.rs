@@ -33,6 +33,9 @@ use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+const MERGE_THRESHOLD: usize = 15;
 
 #[derive(Debug)]
 pub struct ShardWriter {
@@ -47,6 +50,8 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
+    merging_available: AtomicBool,
+    writes_without_merge: AtomicUsize,
 }
 
 impl PartialOrd for ShardWriter {
@@ -126,6 +131,8 @@ impl ShardWriter {
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
             relation_service_version: versions.version_relations() as i32,
+            merging_available: AtomicBool::new(true),
+            writes_without_merge: AtomicUsize::new(0),
         })
     }
 
@@ -308,6 +315,8 @@ impl ShardWriter {
             s.spawn(|_| relation_result = relation_task());
         });
 
+        self.writes_without_merge.fetch_add(1, Ordering::SeqCst);
+
         text_result?;
         paragraph_result?;
         vector_result?;
@@ -364,6 +373,8 @@ impl ShardWriter {
             s.spawn(|_| vector_result = vector_task());
             s.spawn(|_| relation_result = relation_task());
         });
+
+        self.writes_without_merge.fetch_add(1, Ordering::SeqCst);
 
         text_result?;
         paragraph_result?;
@@ -471,7 +482,27 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<()> {
-        // TODO: add relations merge when it becomes a Tantivy only index.
+        if !self.merging_available.swap(false, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        // Critical section, only one merge at a time
+
+        let current_writes = self.writes_without_merge.swap(0, Ordering::SeqCst);
+        let merge_result = if current_writes >= MERGE_THRESHOLD {
+            self.inner_merge()
+        } else {
+            self.writes_without_merge
+                .fetch_add(current_writes, Ordering::SeqCst);
+            Ok(())
+        };
+
+        // Merging is available again
+        self.merging_available.store(true, Ordering::SeqCst);
+        merge_result
+    }
+
+    fn inner_merge(&self) -> NodeResult<()> {
         paragraph_write(&self.paragraph_writer).merge()?;
         text_write(&self.text_writer).merge()?;
         vector_write(&self.vector_writer).merge()?;
