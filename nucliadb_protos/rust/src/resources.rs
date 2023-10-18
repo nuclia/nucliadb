@@ -414,13 +414,8 @@ pub struct QuestionAnswer {
     pub answer: ::prost::alloc::string::String,
     #[prost(string, tag="4")]
     pub answer_language: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag="5")]
-    pub paragraph_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QuestionAnswers {
-    #[prost(message, repeated, tag="1")]
-    pub question_answer: ::prost::alloc::vec::Vec<QuestionAnswer>,
+    #[prost(int64, repeated, tag="5")]
+    pub paragraph_ids: ::prost::alloc::vec::Vec<i64>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldQuestionAnswerWrapper {
@@ -434,7 +429,7 @@ pub mod field_question_answer_wrapper {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum FileOrData {
         #[prost(message, tag="1")]
-        QuestionAnswers(super::QuestionAnswers),
+        QuestionAnswer(super::QuestionAnswer),
         #[prost(message, tag="2")]
         File(super::CloudFile),
     }
