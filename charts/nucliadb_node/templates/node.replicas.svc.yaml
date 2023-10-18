@@ -1,4 +1,7 @@
-{{- range $i, $e := until .Values.replicaCount }}
+{{- $release := .Release }}
+{{- $values := .Values }}
+{{- $chart := .Chart }}
+{{- range $i, $e := until (int .Values.replicaCount) }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,22 +10,22 @@ metadata:
     app: node-replicas-{{ $i }}
     appType: node
     app.kubernetes.io/name: node-replicas-{{ $i }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    version: "{{ .Chart.Version | replace "+" "_" }}"
-    chart: "{{ .Chart.Name }}"
+    app.kubernetes.io/instance: {{ $release.Name }}
+    app.kubernetes.io/managed-by: {{ $release.Service }}
+    version: "{{ $chart.Version | replace "+" "_" }}"
+    chart: "{{ $chart.Name }}"
 spec:
   selector:
     app: node-replicas-{{ $i }}
-    chart: "{{ .Chart.Name }}"
+    chart: "{{ $chart.Name }}"
   clusterIP: None
   ports:
   - name: grpc-reader
-    port: {{ .Values.serving.grpc_reader }}
+    port: {{ $values.serving.grpc_reader }}
     protocol: TCP
     appProtocol: grpc
   - name: grpc-writer
-    port: {{ .Values.serving.grpc_writer }}
+    port: {{ $values.serving.grpc_writer }}
     protocol: TCP
     appProtocol: grpc
 {{- end }}
