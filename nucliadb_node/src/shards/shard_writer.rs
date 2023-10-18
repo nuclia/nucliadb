@@ -17,6 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -33,7 +34,6 @@ use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 const MERGE_THRESHOLD: usize = 15;
 
