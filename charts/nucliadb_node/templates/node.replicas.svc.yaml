@@ -1,4 +1,4 @@
-{{- range $i := untilInt .Values.replicaCount }}
+{{- range $i := until .Values.replicaCount }}
 apiVersion: v1
 kind: Service
 metadata:

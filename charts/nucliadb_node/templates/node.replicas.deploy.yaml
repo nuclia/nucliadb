@@ -1,4 +1,4 @@
-{{- range $i := untilInt .Values.replicaCount }}
+{{- range $i := until .Values.replicaCount }}
 kind: Deployment
 apiVersion: apps/v1
 metadata:
