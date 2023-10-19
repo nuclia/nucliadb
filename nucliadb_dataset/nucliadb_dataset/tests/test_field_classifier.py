@@ -37,7 +37,6 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
-    trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
 
     with tempfile.TemporaryDirectory() as tmpdirname:
