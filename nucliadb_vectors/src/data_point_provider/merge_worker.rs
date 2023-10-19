@@ -68,7 +68,7 @@ impl Worker {
         };
         let new_dp = DataPoint::merge(subscriber, &work, self.similarity, self.channel)?;
         let new_dp_id = new_dp.get_id();
-        if self.sender.send(new_dp.meta()).is_err() {
+        if self.sender.send(new_dp.journal()).is_err() {
             // If the sender has been deallocated this data point becomes garbage,
             // therefore is removed.
             DataPoint::delete(subscriber, new_dp.get_id())?;
