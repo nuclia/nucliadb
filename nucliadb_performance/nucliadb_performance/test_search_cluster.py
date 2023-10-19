@@ -24,7 +24,7 @@ FIND_WEIGHT = 5.3
 SEARCH_WEIGHT = 5.6
 
 
-def get_kb(session):
+def get_kb_for_worker(session):
     worker_id = get_context(session).worker_id
     kbid = pick_kb(worker_id)
     return kbid
@@ -39,7 +39,7 @@ def init_test(args):
 
 @scenario(weight=SUGGEST_WEIGHT)
 async def test_suggest(session):
-    kbid = get_kb(session)
+    kbid = get_kb_for_worker(session)
     await make_kbid_request(
         session,
         kbid,
@@ -51,7 +51,7 @@ async def test_suggest(session):
 
 @scenario(weight=CATALOG_WEIGHT)
 async def test_catalog(session):
-    kbid = get_kb(session)
+    kbid = get_kb_for_worker(session)
     await make_kbid_request(
         session,
         kbid,
@@ -62,7 +62,7 @@ async def test_catalog(session):
 
 @scenario(weight=CHAT_WEIGHT)
 async def test_chat(session):
-    kbid = get_kb(session)
+    kbid = get_kb_for_worker(session)
     # To avoid calling the LLM in the performance test, we simulate the
     # chat intraction as a find (the retrieval phase) plus some synthetic
     # sleep time (the LLM answer generation streaming time)
@@ -79,7 +79,7 @@ async def test_chat(session):
 
 @scenario(weight=FIND_WEIGHT)
 async def test_find(session):
-    kbid = get_kb(session)
+    kbid = get_kb_for_worker(session)
     await make_kbid_request(
         session,
         kbid,
@@ -91,7 +91,7 @@ async def test_find(session):
 
 @scenario(weight=SEARCH_WEIGHT)
 async def test_search(session):
-    kbid = get_kb(session)
+    kbid = get_kb_for_worker(session)
     await make_kbid_request(
         session,
         kbid,

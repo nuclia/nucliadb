@@ -120,11 +120,14 @@ def print_cluster_stats(kbs, paragraphs):
 
 
 def get_kb(kbid):
+    print("Loading kb data...")
     ndb = NucliaDB(
         url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
-    return ndb.get_knowledge_box(kbid=kbid)
+    kbid = ndb.get_knowledge_box(kbid=kbid).uuid
+    paragraphs = get_kb_paragraphs(kbid)
+    print(f"Starting search kb test on {kbid} with {paragraphs} paragraphs")
 
 
 class CountersError(Exception):

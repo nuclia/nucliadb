@@ -27,6 +27,7 @@ def get_kb_to_test() -> str:
             "Enter the kbid to test with or choose a default one [tiny, small, medium, big]: "
         )
     try:
+        # Check if it´s one of the pre-defined ones
         kbid = {"tiny": TINY_KB, "small": SMALL_KB, "medium": MEDIUM_KB, "big": BIG_KB}[
             kbid.lower()
         ]
@@ -41,7 +42,6 @@ def get_kb_to_test() -> str:
 def init_test(args):
     kbid = get_kb_to_test()
     get_kb(kbid)
-    print(f"Starting search kb test on: {kbid}")
 
 
 @scenario(weight=1)
