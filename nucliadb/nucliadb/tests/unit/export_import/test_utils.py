@@ -166,7 +166,7 @@ async def test_export_stream():
         await stream.read(1)
 
 
-class TestRequest(Request):
+class DummyTestRequest(Request):
     def __init__(self, data: bytes, receive_chunk_size: int = 10):
         super().__init__(
             scope={
@@ -189,7 +189,7 @@ class TestRequest(Request):
 
 
 async def test_iterator_export_stream():
-    request = TestRequest(data=b"01234XYZ", receive_chunk_size=2)
+    request = DummyTestRequest(data=b"01234XYZ", receive_chunk_size=2)
 
     iterator = request.stream().__aiter__()
     export_stream = IteratorExportStream(iterator)
@@ -209,7 +209,7 @@ async def test_iterator_export_stream():
     with pytest.raises(ExportStreamExhausted):
         await export_stream.read(0)
 
-    request = TestRequest(data=b"foobar", receive_chunk_size=2)
+    request = DummyTestRequest(data=b"foobar", receive_chunk_size=2)
     iterator = request.stream().__aiter__()
     export_stream = IteratorExportStream(iterator)
     assert await export_stream.read(50) == b"foobar"

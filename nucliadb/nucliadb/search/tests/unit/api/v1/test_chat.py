@@ -31,7 +31,7 @@ from nucliadb_utils.exceptions import LimitsExceededError
 pytestmark = pytest.mark.asyncio
 
 
-class TestRequest(Request):
+class DummyTestRequest(Request):
     @property
     def auth(self):
         return Mock(scopes=["READER"])
@@ -76,7 +76,7 @@ async def test_chat_endpoint_handles_errors(
     create_chat_response_mock, predict_error, http_error_response
 ):
     create_chat_response_mock.side_effect = predict_error
-    request = TestRequest(
+    request = DummyTestRequest(
         scope={
             "type": "http",
             "http_version": "1.1",

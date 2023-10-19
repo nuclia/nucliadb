@@ -29,7 +29,7 @@ from nucliadb.standalone.settings import Settings
 pytestmark = pytest.mark.asyncio
 
 
-class TestRequest(Request):
+class DummyTestRequest(Request):
     @property
     def auth(self):
         return Mock(scopes=["READER"])
@@ -45,7 +45,7 @@ class TestRequest(Request):
 
 @pytest.fixture
 def http_request():
-    request = TestRequest(
+    request = DummyTestRequest(
         scope={
             "type": "http",
             "http_version": "1.1",
