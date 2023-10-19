@@ -131,7 +131,8 @@ async def get_find_results(
 ) -> KnowledgeboxFindResults:
     find_request = FindRequest()
     find_request.resource_filters = chat_request.resource_filters
-    find_request.features = [SearchOptions.VECTOR]
+    if ChatOptions.VECTORS in chat_request.features:
+        find_request.features = [SearchOptions.VECTOR]
     if ChatOptions.PARAGRAPHS in chat_request.features:
         find_request.features.append(SearchOptions.PARAGRAPH)
     find_request.query = query
