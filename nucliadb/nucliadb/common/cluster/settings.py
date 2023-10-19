@@ -65,6 +65,11 @@ class Settings(BaseSettings):
         title="Max node replicas",
         description="Maximum number of shard replicas a single node will manage",
     )
+    max_resource_paragraphs: int = Field(
+        default=10_000,
+        title="Max paragraphs per resource",
+        description="Maximum number of paragraphs allowed on a single resource",
+    )
 
     local_reader_threads: int = 5
     local_writer_threads: int = 5

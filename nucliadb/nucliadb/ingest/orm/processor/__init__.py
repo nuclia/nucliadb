@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Tuple
 
 import aiohttp.client_exceptions
 
+from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
@@ -31,13 +32,20 @@ from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     KnowledgeBoxConflict,
+    ResourceNotIndexable,
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import (
+    knowledgebox_pb2,
+    noderesources_pb2,
+    resources_pb2,
+    utils_pb2,
+    writer_pb2,
+)
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -45,6 +53,18 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
+
+
+def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
+    num_paragraphs = 0
+    for _, fparagraph in resource.paragraphs.items():
+        num_paragraphs += len(fparagraph.paragraphs)
+
+    if num_paragraphs > cluster_settings.max_resource_paragraphs:
+        raise ResourceNotIndexable(
+            "Resource has too many paragraphs. "
+            f"Supported: {cluster_settings.max_resource_paragraphs} , Number: {num_paragraphs}"
+        )
 
 
 class Processor:
@@ -269,7 +289,11 @@ class Processor:
             # Unhandled exceptions here that should bubble and hard fail
             # XXX We swallow too many exceptions here!
             await self.notify_abort(
-                partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
+                partition=partition,
+                seqid=seqid,
+                multi=multi,
+                kbid=kbid,
+                rid=uuid,
             )
             raise
         except Exception as exc:
@@ -293,6 +317,8 @@ class Processor:
             if seqid == -1:
                 raise handled_exception
             else:
+                if resource is not None:
+                    await self._mark_resource_error(kb, resource, partition, seqid)
                 raise DeadletteredError() from handled_exception
 
         return None
@@ -308,6 +334,8 @@ class Processor:
         partition: str,
         kb: KnowledgeBox,
     ) -> None:
+        validate_indexable_resource(resource.indexer.brain)
+
         shard_id = await kb.get_resource_shard_id(uuid)
 
         shard = None
@@ -482,6 +510,42 @@ class Processor:
     async def notify(self, channel, payload: bytes):
         if self.pubsub is not None:
             await self.pubsub.publish(channel, payload)
+
+    async def _mark_resource_error(
+        self, kb: KnowledgeBox, resource: Optional[Resource], partition: str, seqid: int
+    ) -> None:
+        """
+        Unhandled error processing, try to mark resource as error
+        """
+        if resource is None or resource.basic is None:
+            logger.info(
+                f"Skip when resource does not even have basic metadata: {resource}"
+            )
+            return
+        try:
+            async with self.driver.transaction() as txn:
+                kb.txn = resource.txn = txn
+
+                shard_id = await kb.get_resource_shard_id(resource.uuid)
+                shard = None
+                if shard_id is not None:
+                    shard = await kb.get_resource_shard(shard_id)
+                if shard is None:
+                    logger.warning(
+                        "Unable to mark resource as error, shard is None. "
+                        "This should not happen so you did something special to get here."
+                    )
+                    return
+
+                resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
+                await resource.set_basic(resource.basic)
+                await txn.commit()
+
+            await self.shard_manager.add_resource(
+                shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
+            )
+        except Exception:
+            logger.warning("Error while marking resource as error", exc_info=True)
 
     # KB tools
     # XXX: Why are these utility functions here?
