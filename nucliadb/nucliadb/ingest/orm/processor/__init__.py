@@ -556,11 +556,9 @@ class Processor:
                 await resource.set_basic(resource.basic)
                 await txn.commit()
 
-            breakpoint()
             resource.indexer.set_processing_status(
                 basic=resource.basic, previous_status=resource._previous_status
             )
-            breakpoint()
             await self.shard_manager.add_resource(
                 shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
             )
