@@ -103,11 +103,11 @@ def get_kbs():
             result.append(kbid)
             paragraphs.append(pars)
 
-    print_kb_stats(result, paragraphs)
+    print_cluster_stats(result, paragraphs)
     return result
 
 
-def print_kb_stats(kbs, paragraphs):
+def print_cluster_stats(kbs, paragraphs):
     print(f"Found KBs: {len(kbs)}")
     print(f"Paragraph stats in cluster:")
     print(f" - Total: {sum(paragraphs)}")
