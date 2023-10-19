@@ -613,7 +613,7 @@ async def test_ingest_processor_handles_missing_kb(
 
 @pytest.mark.asyncio
 async def test_ingest_autocommit_deadletter_marks_resource(
-    kbid: str, processor: Processor, txn, gcs_storage, cache
+    kbid: str, processor: Processor, gcs_storage, maindb_driver
 ):
     rid = str(uuid.uuid4())
     message = make_message(kbid, rid)
@@ -625,8 +625,9 @@ async def test_ingest_autocommit_deadletter_marks_resource(
         mock_notify.side_effect = Exception("test")
         await processor.process(message=message, seqid=1)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
-    resource = await kb_obj.get(message.uuid)
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        resource = await kb_obj.get(message.uuid)
 
     mock_notify.assert_called_once()
     assert resource.basic.metadata.status == PBMetadata.Status.ERROR  # type: ignore

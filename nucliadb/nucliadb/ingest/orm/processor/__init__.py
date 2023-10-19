@@ -56,8 +56,20 @@ logger = logging.getLogger(__name__)
 
 
 def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
+    """
+    It would be more optimal to move this to another layer but it'd also make the code
+    more difficult to grok and test because we'd need to move processable check and throw
+    an exception in the middle of a bunch of processing logic.
+
+    As it is implemented right now, we just do the check if a resource is indexable right
+    before we actually try to index it and not buried it somewhere else in the code base.
+
+    This is still an edge case.
+    """
     num_paragraphs = 0
     for _, fparagraph in resource.paragraphs.items():
+        # this count should not be very expensive to do since we don't have
+        # a lot of different fields and we just do a count on a dict
         num_paragraphs += len(fparagraph.paragraphs)
 
     if num_paragraphs > cluster_settings.max_resource_paragraphs:
@@ -410,6 +422,9 @@ class Processor:
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
     ) -> Optional[Tuple[Resource, bool]]:
+        """
+        Convert a broker message into a resource object, and apply it to the database
+        """
         created = False
 
         if resource is None:
@@ -541,6 +556,11 @@ class Processor:
                 await resource.set_basic(resource.basic)
                 await txn.commit()
 
+            breakpoint()
+            resource.indexer.set_processing_status(
+                basic=resource.basic, previous_status=resource._previous_status
+            )
+            breakpoint()
             await self.shard_manager.add_resource(
                 shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
             )
