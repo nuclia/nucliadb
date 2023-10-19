@@ -3,7 +3,7 @@ import os
 from faker import Faker
 from molotov import global_setup, global_teardown, scenario
 
-from nucliadb_performance.utils import ERRORS, get_kb, make_kbid_request
+from nucliadb_performance.utils import get_kb, make_kbid_request, print_errors
 
 fake = Faker()
 
@@ -60,5 +60,4 @@ async def test_find_entity_filter(session):
 @global_teardown()
 def end_test():
     print("This is the end of the test.")
-    for error in ERRORS:
-        print(error)
+    print_errors()

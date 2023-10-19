@@ -188,3 +188,8 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
         )
         ERRORS.append(error)
         raise
+
+
+def print_errors():
+    for error in ERRORS:
+        print(error)

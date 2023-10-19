@@ -5,11 +5,11 @@ from faker import Faker
 from molotov import get_context, global_setup, global_teardown, scenario
 
 from nucliadb_performance.utils import (
-    ERRORS,
     get_fake_word,
     load_kbs,
     make_kbid_request,
     pick_kb,
+    print_errors,
 )
 
 fake = Faker()
@@ -104,5 +104,4 @@ async def test_search(session):
 @global_teardown()
 def end_test():
     print("This is the end of the test.")
-    for error in ERRORS:
-        print(error)
+    print_errors()
