@@ -41,8 +41,6 @@ lazy_static::lazy_static! {
     static ref REGEX: Regex = Regex::new(r"\\[a-zA-Z1-9]").unwrap();
 }
 
-const MERGE_THRESHOLD: usize = 5;
-
 pub struct ParagraphWriterService {
     pub index: Index,
     pub schema: ParagraphSchema,
@@ -143,24 +141,9 @@ impl WriterChild for ParagraphWriterService {
         Ok(())
     }
 
-    #[measure(actor = "paragraphs", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
-        self.writer.garbage_collect_files()?;
         Ok(())
-    }
-
-    #[measure(actor = "paragraphs", metric = "merge")]
-    #[tracing::instrument(skip_all)]
-    fn merge(&mut self) -> NodeResult<()> {
-        let mut ids = self.index.searchable_segment_ids()?;
-        if ids.len() <= MERGE_THRESHOLD {
-            Ok(())
-        } else {
-            ids.truncate(MERGE_THRESHOLD);
-            self.writer.merge(&ids)?;
-            Ok(())
-        }
     }
 }
 

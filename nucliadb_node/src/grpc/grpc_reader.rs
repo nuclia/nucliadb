@@ -28,7 +28,6 @@ use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
 use crate::settings::Settings;
-use crate::shards::errors::ShardNotFoundError;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardReaderCache;
 use crate::shards::providers::AsyncShardReaderProvider;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};
@@ -58,17 +57,19 @@ impl NodeReaderGRPCDriver {
 
     async fn obtain_shard(&self, id: impl Into<String>) -> Result<Arc<ShardReader>, tonic::Status> {
         let id = id.into();
-        if let Some(shard) = self.shards.get(id.clone()).await {
-            return Ok(shard);
-        }
-        let shard = self.shards.load(id.clone()).await.map_err(|error| {
-            if error.is::<ShardNotFoundError>() {
-                tonic::Status::not_found(error.to_string())
-            } else {
-                tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
-            }
+
+        // Always try to load a shard as, for example, new shards created by the
+        // writer won't be loaded automatically
+        self.shards.load(id.clone()).await.map_err(|error| {
+            tonic::Status::internal(format!("Error lazy loading shard {id}: {error:?}"))
         })?;
-        Ok(shard)
+
+        match self.shards.get(id.clone()).await {
+            Some(shard) => Ok(shard),
+            None => Err(tonic::Status::not_found(format!(
+                "Error loading shard {id}: shard not found"
+            ))),
+        }
     }
 }
 

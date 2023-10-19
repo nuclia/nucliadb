@@ -54,13 +54,12 @@ impl AsyncUnboundedShardReaderCache {
 
 #[async_trait]
 impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
-    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>> {
+    async fn load(&self, id: ShardId) -> NodeResult<()> {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
-        let mut cache_writer = self.cache.write().await;
 
-        if let Some(shard) = cache_writer.get(&id) {
+        if self.cache.read().await.contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
-            return Ok(Arc::clone(shard));
+            return Ok(());
         }
 
         // Avoid blocking while interacting with the file system (reads and
@@ -77,9 +76,8 @@ impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
         .await
         .context("Blocking task panicked")??;
 
-        let shard = Arc::new(shard);
-        cache_writer.insert(id_, Arc::clone(&shard));
-        Ok(shard)
+        self.cache.write().await.insert(id_, Arc::new(shard));
+        Ok(())
     }
 
     async fn load_all(&self) -> NodeResult<()> {

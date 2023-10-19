@@ -226,9 +226,6 @@ impl WriterChild for RelationsWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         Ok(())
     }
-    fn merge(&mut self) -> NodeResult<()> {
-        Ok(())
-    }
 }
 
 impl RelationsWriterService {

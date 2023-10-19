@@ -33,7 +33,9 @@ pub struct ParagraphConfig {
 pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
 impl ParagraphIterator {
     pub fn new<I>(inner: I) -> ParagraphIterator
-    where I: Iterator<Item = ParagraphItem> + Send + 'static {
+    where
+        I: Iterator<Item = ParagraphItem> + Send + 'static,
+    {
         ParagraphIterator(Box::new(inner))
     }
 }

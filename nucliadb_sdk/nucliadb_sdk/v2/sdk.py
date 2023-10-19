@@ -661,7 +661,7 @@ class NucliaDB(_NucliaDBBase):
         api_key: Optional[str] = None,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[float] = 60.0 * 5,
+        timeout: Optional[float] = 60.0,
     ):
         """
         Create a new instance of the NucliaDB client

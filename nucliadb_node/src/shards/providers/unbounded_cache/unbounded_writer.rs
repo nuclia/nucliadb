@@ -33,6 +33,7 @@ use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 use crate::{disk_structure, env};
 
+#[derive(Default)]
 pub struct UnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
@@ -41,21 +42,17 @@ pub struct UnboundedShardWriterCache {
 impl UnboundedShardWriterCache {
     pub fn new(shards_path: PathBuf) -> Self {
         Self {
-            shards_path,
             cache: RwLock::new(HashMap::new()),
+            shards_path,
         }
     }
 
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardWriter>>> {
-        self.cache
-            .read()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.read().expect("Poisoned lock while reading")
     }
 
     fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardWriter>>> {
-        self.cache
-            .write()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.write().expect("Poisoned lock while reading")
     }
 }
 
@@ -67,13 +64,12 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         Ok(new_shard)
     }
 
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
+    fn load(&self, id: ShardId) -> NodeResult<()> {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
-        let mut cache_writer = self.write();
 
-        if let Some(shard) = cache_writer.get(&id) {
+        if self.read().contains_key(&id) {
             debug!("Shard {shard_path:?} is already on memory");
-            return Ok(Arc::clone(shard));
+            return Ok(());
         }
 
         // Avoid blocking while interacting with the file system
@@ -86,9 +82,9 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
             node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
         })?;
 
-        let shard = Arc::new(shard);
-        cache_writer.insert(id, Arc::clone(&shard));
-        Ok(shard)
+        self.write().insert(id, Arc::new(shard));
+
+        Ok(())
     }
 
     fn load_all(&self) -> NodeResult<()> {

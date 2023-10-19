@@ -29,7 +29,7 @@ use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 
 pub trait ShardReaderProvider: Send + Sync {
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>>;
+    fn load(&self, id: ShardId) -> NodeResult<()>;
     fn load_all(&self) -> NodeResult<()>;
 
     fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
@@ -37,14 +37,14 @@ pub trait ShardReaderProvider: Send + Sync {
 
 #[async_trait]
 pub trait AsyncShardReaderProvider: Send + Sync {
-    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>>;
+    async fn load(&self, id: ShardId) -> NodeResult<()>;
     async fn load_all(&self) -> NodeResult<()>;
 
     async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
 }
 
 pub trait ShardWriterProvider {
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
+    fn load(&self, id: ShardId) -> NodeResult<()>;
     fn load_all(&self) -> NodeResult<()>;
 
     fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;
@@ -56,7 +56,7 @@ pub trait ShardWriterProvider {
 
 #[async_trait]
 pub trait AsyncShardWriterProvider {
-    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
+    async fn load(&self, id: ShardId) -> NodeResult<()>;
     async fn load_all(&self) -> NodeResult<()>;
 
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;

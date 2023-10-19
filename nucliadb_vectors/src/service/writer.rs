@@ -321,16 +321,14 @@ impl WriterChild for VectorWriterService {
     #[measure(actor = "vectors", metric = "garbage_collection")]
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
-        let lock = self.index.get_elock()?;
-        self.index.collect_garbage(&lock)?;
-        Ok(())
-    }
+        let time = SystemTime::now();
 
-    #[measure(actor = "vectors", metric = "merge")]
-    #[tracing::instrument(skip_all)]
-    fn merge(&mut self) -> NodeResult<()> {
-        let lock = self.index.get_slock()?;
-        self.index.merge(&lock)?;
+        let lock = self.index.try_elock()?;
+        self.index.collect_garbage(&lock)?;
+
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        debug!("Garbage collection {took} ms");
+
         Ok(())
     }
 }

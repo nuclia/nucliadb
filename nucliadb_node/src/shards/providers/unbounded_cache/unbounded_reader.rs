@@ -44,39 +44,32 @@ impl UnboundedShardReaderCache {
     }
 
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardReader>>> {
-        self.cache
-            .read()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.read().expect("Poisoned lock while reading")
     }
 
     fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardReader>>> {
-        self.cache
-            .write()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.write().expect("Poisoned lock while reading")
     }
 }
 
 impl ShardReaderProvider for UnboundedShardReaderCache {
-    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>> {
+    fn load(&self, id: ShardId) -> NodeResult<()> {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
-        let mut cache_writer = self.write();
 
-        if let Some(shard) = cache_writer.get(&id) {
-            return Ok(Arc::clone(shard));
+        if self.read().contains_key(&id) {
+            debug!("Shard {shard_path:?} is already on memory");
+            return Ok(());
         }
 
         if !shard_path.is_dir() {
             return Err(node_error!("Shard {shard_path:?} is not on disk"));
         }
-
         let shard = ShardReader::new(id.clone(), &shard_path).map_err(|error| {
             node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
         })?;
 
-        let shard = Arc::new(shard);
-        cache_writer.insert(id, Arc::clone(&shard));
-
-        Ok(shard)
+        self.write().insert(id, Arc::new(shard));
+        Ok(())
     }
 
     fn load_all(&self) -> NodeResult<()> {
