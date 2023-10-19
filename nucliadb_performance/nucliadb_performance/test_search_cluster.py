@@ -33,6 +33,7 @@ def get_kb(session):
 @global_setup()
 def init_test(args):
     kbs = load_kbs()
+
     print(f"Running cluster test. {len(kbs)} found")
 
 

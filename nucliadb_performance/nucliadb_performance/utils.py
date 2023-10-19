@@ -1,4 +1,6 @@
 import random
+import shelve
+import statistics
 from dataclasses import dataclass
 from typing import Optional
 
@@ -37,6 +39,20 @@ class RequestError(Exception):
 ERRORS: list[Error] = []
 
 
+def cache_to_disk(func):
+    def new_func(*args, **kwargs):
+        d = shelve.open("cache.data")
+        try:
+            cache_key = f"{func.__name__}::{args}::{tuple(sorted(kwargs.items()))}"
+            if cache_key not in d:
+                d[cache_key] = func(*args, **kwargs)
+            return d[cache_key]
+        finally:
+            d.close()
+
+    return new_func
+
+
 class Client:
     def __init__(self, session, base_url, headers: Optional[dict[str, str]] = None):
         self.session = session
@@ -66,12 +82,41 @@ class Client:
 
 
 def get_kbs():
+    print(f"Loading data from cluster...")
+
     ndb = NucliaDB(
         url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     resp = ndb.list_knowledge_boxes()
-    return [kb.uuid for kb in resp.kbs if kb.uuid not in EXCLUDE_KBIDS]
+
+    kbids = [kb.uuid for kb in resp.kbs if kb.uuid not in EXCLUDE_KBIDS]
+    paragraphs = []
+    result = []
+    for kbid in kbids:
+        try:
+            pars = get_kb_paragraphs(kbid)
+        except CountersError:
+            print(f"Error getting counters for {kbid}")
+            continue
+        if pars > 0:
+            result.append(kbid)
+            paragraphs.append(pars)
+
+    print_kb_stats(result, paragraphs)
+    return result
+
+
+def print_kb_stats(kbs, paragraphs):
+    print(f"Found KBs: {len(kbs)}")
+    print(f"Paragraph stats in cluster:")
+    print(f" - Total: {sum(paragraphs)}")
+    print(
+        f" - Avg: {int(statistics.mean(paragraphs))} +/- {int(statistics.stdev(paragraphs))}"
+    )
+    print(f" - Median: {int(statistics.median(paragraphs))}")
+    print(f" - Quantiles (n=10): {statistics.quantiles(paragraphs, n=10)}")
+    print(f" - Max: {max(paragraphs)}")
 
 
 def get_kb(kbid):
@@ -80,6 +125,22 @@ def get_kb(kbid):
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
     return ndb.get_knowledge_box(kbid=kbid)
+
+
+class CountersError(Exception):
+    ...
+
+
+@cache_to_disk
+def get_kb_paragraphs(kbid):
+    ndb = NucliaDB(
+        url=get_search_api_url(),
+        headers={"X-NUCLIADB-ROLES": "READER"},
+    )
+    resp = ndb.session.get(url=f"/v1/kb/{kbid}/counters")
+    if resp.status_code != 200:
+        raise CountersError()
+    return resp.json()["paragraphs"]
 
 
 def load_kbs():
