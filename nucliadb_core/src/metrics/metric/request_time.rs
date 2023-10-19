@@ -18,9 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
+use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
+
+use super::prometheus_metric_observer::PrometheusMetricObserver;
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct RequestTimeKey {
+    actor: RequestActor,
+    request: String,
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelValue)]
 enum RequestActor {
@@ -31,13 +40,14 @@ enum RequestActor {
     Relations,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-pub struct RequestTimeKey {
-    actor: RequestActor,
-    request: String,
-}
-
 pub type RequestTimeValue = f64;
+
+type RequestCount = Family<RequestTimeKey, Counter>;
+type RequestDuration = Family<RequestTimeKey, Histogram>;
+
+const BUCKETS: [f64; 12] = [
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 2.5, 5.0, 10.0, 30.0, 60.0,
+];
 
 impl RequestTimeKey {
     fn new(actor: RequestActor, request: String) -> RequestTimeKey {
@@ -60,18 +70,23 @@ impl RequestTimeKey {
     }
 }
 
-pub type RequestTimeMetric = Family<RequestTimeKey, Histogram>;
-const BUCKETS: [f64; 12] = [
-    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 2.5, 5.0, 10.0, 30.0, 60.0,
-];
-
-pub fn register_request_time(registry: &mut Registry) -> RequestTimeMetric {
-    let constructor = || Histogram::new(BUCKETS.iter().copied());
-    let metric = RequestTimeMetric::new_with_constructor(constructor);
+pub fn register_request_time(registry: &mut Registry) -> PrometheusMetricObserver<RequestTimeKey> {
+    let count_metric = RequestCount::default();
     registry.register(
-        "node_requests",
-        "Time an actor took to process the given request",
-        metric.clone(),
+        "request_count",
+        "Number of times an actor executed the given request",
+        count_metric.clone(),
     );
-    metric
+
+    let constructor = || Histogram::new(BUCKETS.iter().copied());
+    let duration_metric = RequestDuration::new_with_constructor(constructor);
+    registry.register(
+        "request_duration",
+        "Time an actor took to process the given request",
+        duration_metric.clone(),
+    );
+
+    let observer = PrometheusMetricObserver::new(count_metric, duration_metric);
+
+    observer
 }
