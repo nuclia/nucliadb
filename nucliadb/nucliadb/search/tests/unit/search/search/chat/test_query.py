@@ -21,11 +21,17 @@ from unittest import mock
 import pytest
 
 from nucliadb.search.predict import AnswerStatusCode
-from nucliadb.search.search.chat.query import _parse_answer_status_code, chat
+from nucliadb.search.search.chat.query import (
+    _parse_answer_status_code,
+    chat,
+    get_find_results,
+)
 from nucliadb_models.search import (
+    ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    SearchOptions,
 )
 
 
@@ -79,3 +85,61 @@ def test_parse_status_code(chunk, status_code, error):
             _parse_answer_status_code(chunk)
     else:
         assert _parse_answer_status_code(chunk) == status_code
+
+
+@pytest.mark.parametrize(
+    "chat_features,find_features",
+    [
+        (
+            None,  # default value will be used
+            [SearchOptions.VECTOR, SearchOptions.PARAGRAPH, SearchOptions.RELATIONS],
+        ),
+        (
+            [ChatOptions.PARAGRAPHS, ChatOptions.VECTORS, ChatOptions.RELATIONS],
+            [SearchOptions.PARAGRAPH, SearchOptions.VECTOR, SearchOptions.RELATIONS],
+        ),
+        (
+            [ChatOptions.PARAGRAPHS, ChatOptions.VECTORS],
+            [
+                SearchOptions.PARAGRAPH,
+                SearchOptions.VECTOR,
+            ],
+        ),
+        (
+            [ChatOptions.VECTORS],
+            [
+                SearchOptions.VECTOR,
+            ],
+        ),
+        (
+            [ChatOptions.PARAGRAPHS],
+            [
+                SearchOptions.PARAGRAPH,
+            ],
+        ),
+    ],
+)
+async def test_get_find_results_vector_search_is_optional(
+    predict, chat_features, find_features
+):
+    find_results = KnowledgeboxFindResults(
+        total=0, min_score=0.7, resources={}, facets=[]
+    )
+
+    chat_request = ChatRequest(query="query")
+    if chat_features is not None:
+        chat_request.features = chat_features
+
+    with mock.patch(
+        "nucliadb.search.search.chat.query.find", return_value=(find_results, False)
+    ) as find_mock:
+        await get_find_results(
+            kbid="kbid",
+            query="query",
+            chat_request=chat_request,
+            ndb_client=NucliaDBClientType.API,
+            user="user_id",
+            origin="origin",
+        )
+        find_request = find_mock.call_args[0][1]
+        assert set(find_request.features) == set(find_features)
