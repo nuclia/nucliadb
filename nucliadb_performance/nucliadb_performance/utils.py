@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from typing import Optional
 
 from faker import Faker
@@ -16,6 +17,24 @@ EXCLUDE_KBIDS = [
     "3c60921c-b6e6-41f5-a1d6-68b406904635",
 ]
 _DATA = {}
+
+
+@dataclass
+class Error:
+    kbid: str
+    endpoint: str
+    status_code: int
+    error: str
+
+
+class RequestError(Exception):
+    def __init__(self, status, content=None, text=None):
+        self.status = status
+        self.content = content
+        self.text = text
+
+
+ERRORS: list[Error] = []
 
 
 class Client:
@@ -46,13 +65,6 @@ class Client:
         raise RequestError(resp.status, content=content, text=text)
 
 
-class RequestError(Exception):
-    def __init__(self, status, content=None, text=None):
-        self.status = status
-        self.content = content
-        self.text = text
-
-
 def get_kbs():
     ndb = NucliaDB(
         url=get_reader_api_url(),
@@ -77,19 +89,10 @@ def load_kbs():
     return kbs
 
 
-def load_kb(kbid: str):
-    kb = get_kb(kbid)
-    _DATA["kb"] = kb
-
-
 def pick_kb(worker_id) -> str:
     kbs = _DATA["kbs"]
     index = worker_id % len(kbs)
     return kbs[index]
-
-
-def get_loaded_kb():
-    return _DATA["kb"].uuid
 
 
 def get_fake_word():
@@ -101,3 +104,23 @@ def get_fake_word():
 
 def get_search_client(session):
     return Client(session, get_search_api_url(), headers={"X-NUCLIADB-ROLES": "READER"})
+
+
+async def make_kbid_request(session, kbid, method, path, params=None, json=None):
+    global ERRORS
+    try:
+        client = get_search_client(session)
+        await client.make_request(method, path, params=params, json=json)
+    except RequestError as err:
+        # Store error info so we can inspect after the script runs
+        detail = (
+            err.content and err.content.get("detail", None) if err.content else err.text
+        )
+        error = Error(
+            kbid=kbid,
+            endpoint=path.split("/")[-1],
+            status_code=err.status,
+            error=detail,
+        )
+        ERRORS.append(error)
+        raise
