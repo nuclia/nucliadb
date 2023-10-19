@@ -64,7 +64,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield payload
 
     if trainset.type == TaskType.FIELD_CLASSIFICATION:
-        if len(trainset.filter.labels) >= 1:
+        if len(trainset.filter.labels) > 1:
             raise HTTPException(
                 status_code=422,
                 detail="Field Classification should not be of more than 1 labelset",
