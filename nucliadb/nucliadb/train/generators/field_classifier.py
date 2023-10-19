@@ -65,19 +65,21 @@ async def generate_field_classification_payloads(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncIterator[FieldClassificationBatch]:
-    labelset = f"/l/{trainset.filter.labels[0]}"
-
     # Query how many resources has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-    request.filter.tags.append(labelset)
-    total = 0
 
+    labelset = None
+    if len(trainset.filter.labels) > 0:
+        labelset = f"/l/{trainset.filter.labels[0]}"
+        request.filter.tags.append(labelset)
+
+    total = 0
     batch = FieldClassificationBatch()
     async for document_item in node.stream_get_fields(request):
         text_labels = []
         for label in document_item.labels:
-            if label.startswith(labelset):
+            if labelset is None or label.startswith(labelset):
                 text_labels.append(label)
 
         field_id = f"{document_item.uuid}{document_item.field}"
