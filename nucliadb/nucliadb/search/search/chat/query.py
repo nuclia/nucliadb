@@ -131,6 +131,7 @@ async def get_find_results(
 ) -> KnowledgeboxFindResults:
     find_request = FindRequest()
     find_request.resource_filters = chat_request.resource_filters
+    # Vectors search is required to produce meaningful answers
     find_request.features = [SearchOptions.VECTOR]
     if ChatOptions.PARAGRAPHS in chat_request.features:
         find_request.features.append(SearchOptions.PARAGRAPH)

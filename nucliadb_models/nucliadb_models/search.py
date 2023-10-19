@@ -70,6 +70,7 @@ class SearchOptions(str, Enum):
 
 
 class ChatOptions(str, Enum):
+    VECTORS = "vectors"
     PARAGRAPHS = "paragraphs"
     RELATIONS = "relations"
 
@@ -535,9 +536,9 @@ class SearchParamDefaults:
     )
 
     chat_features = ParamDefault(
-        default=[ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
+        default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
         title="Chat features",
-        description="Features enabled for the chat endpoint. If `paragraphs` is included, the paragraphs from which the answer is generated are returned. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+        description="Features enabled for the chat endpoint. Semantic search is always done, even if `vectors` is omitted. If `paragraphs` is included, the paragraphs from which the answer is generated are returned. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
     )
     suggest_features = ParamDefault(
         default=[
