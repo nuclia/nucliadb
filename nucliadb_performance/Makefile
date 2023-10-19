@@ -5,6 +5,8 @@ max_workers=100
 duration_s=600
 ramp_up=500
 sizing=--sizing
+kbid=
+
 
 RED=\033[0;31m
 NC=\033[0m
@@ -67,6 +69,7 @@ test-search-cluster: # Stress test search on a cluster.
 .PHONY: test-search-kb
 test-search-kb: export SEARCH_API=$(search_api)
 test-search-kb: export READER_API=$(reader_api)
+test-search-kb: export KBID=$(kbid)
 test-search-kb: # Stress test search on a KB
 	echo " *  Test Started at: $$(date -u)"
 

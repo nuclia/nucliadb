@@ -1,4 +1,7 @@
 import random
+import shelve
+import statistics
+from dataclasses import dataclass
 from typing import Optional
 
 from faker import Faker
@@ -16,6 +19,38 @@ EXCLUDE_KBIDS = [
     "3c60921c-b6e6-41f5-a1d6-68b406904635",
 ]
 _DATA = {}
+
+
+@dataclass
+class Error:
+    kbid: str
+    endpoint: str
+    status_code: int
+    error: str
+
+
+class RequestError(Exception):
+    def __init__(self, status, content=None, text=None):
+        self.status = status
+        self.content = content
+        self.text = text
+
+
+ERRORS: list[Error] = []
+
+
+def cache_to_disk(func):
+    def new_func(*args, **kwargs):
+        d = shelve.open("cache.data")
+        try:
+            cache_key = f"{func.__name__}::{args}::{tuple(sorted(kwargs.items()))}"
+            if cache_key not in d:
+                d[cache_key] = func(*args, **kwargs)
+            return d[cache_key]
+        finally:
+            d.close()
+
+    return new_func
 
 
 class Client:
@@ -46,28 +81,69 @@ class Client:
         raise RequestError(resp.status, content=content, text=text)
 
 
-class RequestError(Exception):
-    def __init__(self, status, content=None, text=None):
-        self.status = status
-        self.content = content
-        self.text = text
-
-
 def get_kbs():
+    print(f"Loading data from cluster...")
+
     ndb = NucliaDB(
         url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     resp = ndb.list_knowledge_boxes()
-    return [kb.uuid for kb in resp.kbs if kb.uuid not in EXCLUDE_KBIDS]
+
+    kbids = [kb.uuid for kb in resp.kbs if kb.uuid not in EXCLUDE_KBIDS]
+    paragraphs = []
+    result = []
+    for kbid in kbids:
+        try:
+            pars = get_kb_paragraphs(kbid)
+        except CountersError:
+            print(f"Error getting counters for {kbid}")
+            continue
+        if pars > 0:
+            result.append(kbid)
+            paragraphs.append(pars)
+
+    print_cluster_stats(result, paragraphs)
+    return result
+
+
+def print_cluster_stats(kbs, paragraphs):
+    print(f"Found KBs: {len(kbs)}")
+    print(f"Paragraph stats in cluster:")
+    print(f" - Total: {sum(paragraphs)}")
+    print(
+        f" - Avg: {int(statistics.mean(paragraphs))} +/- {int(statistics.stdev(paragraphs))}"
+    )
+    print(f" - Median: {int(statistics.median(paragraphs))}")
+    print(f" - Quantiles (n=10): {statistics.quantiles(paragraphs, n=10)}")
+    print(f" - Max: {max(paragraphs)}")
 
 
 def get_kb(kbid):
+    print("Loading kb data...")
     ndb = NucliaDB(
         url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
-    return ndb.get_knowledge_box(kbid=kbid)
+    kbid = ndb.get_knowledge_box(kbid=kbid).uuid
+    paragraphs = get_kb_paragraphs(kbid)
+    print(f"Starting search kb test on {kbid} with {paragraphs} paragraphs")
+
+
+class CountersError(Exception):
+    ...
+
+
+@cache_to_disk
+def get_kb_paragraphs(kbid):
+    ndb = NucliaDB(
+        url=get_search_api_url(),
+        headers={"X-NUCLIADB-ROLES": "READER"},
+    )
+    resp = ndb.session.get(url=f"/v1/kb/{kbid}/counters")
+    if resp.status_code != 200:
+        raise CountersError()
+    return resp.json()["paragraphs"]
 
 
 def load_kbs():
@@ -77,19 +153,10 @@ def load_kbs():
     return kbs
 
 
-def load_kb(kbid: str):
-    kb = get_kb(kbid)
-    _DATA["kb"] = kb
-
-
 def pick_kb(worker_id) -> str:
     kbs = _DATA["kbs"]
     index = worker_id % len(kbs)
     return kbs[index]
-
-
-def get_loaded_kb():
-    return _DATA["kb"].uuid
 
 
 def get_fake_word():
@@ -101,3 +168,28 @@ def get_fake_word():
 
 def get_search_client(session):
     return Client(session, get_search_api_url(), headers={"X-NUCLIADB-ROLES": "READER"})
+
+
+async def make_kbid_request(session, kbid, method, path, params=None, json=None):
+    global ERRORS
+    try:
+        client = get_search_client(session)
+        await client.make_request(method, path, params=params, json=json)
+    except RequestError as err:
+        # Store error info so we can inspect after the script runs
+        detail = (
+            err.content and err.content.get("detail", None) if err.content else err.text
+        )
+        error = Error(
+            kbid=kbid,
+            endpoint=path.split("/")[-1],
+            status_code=err.status,
+            error=detail,
+        )
+        ERRORS.append(error)
+        raise
+
+
+def print_errors():
+    for error in ERRORS:
+        print(error)
