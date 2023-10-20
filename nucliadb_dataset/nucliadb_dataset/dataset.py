@@ -280,10 +280,10 @@ class NucliaDBDataset(NucliaDataset):
         if len(self.trainset.filter.labels) == 1:
             labelset = self.trainset.filter.labels[0]
 
-            if labelset not in self.labels.labelsets:
-                raise Exception("Labelset is not valid")
-
         self.labels = self.client.get_labels()
+
+        if labelset is not None and labelset not in self.labels.labelsets:
+            raise Exception("Labelset is not valid")
 
         if (
             labelset is not None
