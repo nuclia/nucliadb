@@ -80,3 +80,22 @@ def test_paragraph_classification_invalid_label_type(
 
     with pytest.raises(Exception):
         export_dataset(knowledgebox, trainset)
+
+
+def test_paragraph_classification_populates_field_ids(
+    knowledgebox: KnowledgeBox, upload_data_paragraph_classification
+):
+    trainset = TrainSet()
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
+    trainset.batch_size = 2
+
+    partitions = export_dataset(knowledgebox, trainset)
+    assert len(partitions) == 1
+
+    loaded_array = partitions[0]
+    assert len(loaded_array) == 3
+
+    for paragraph_id in loaded_array["paragraph_id"]:
+        # only title is indexed, for field content the processor is needed and
+        # we are not mocking it
+        assert "/a/title/" in str(paragraph_id)
