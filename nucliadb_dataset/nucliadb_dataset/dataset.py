@@ -237,20 +237,19 @@ class NucliaDBDataset(NucliaDataset):
         ):
             raise Exception("Labelset not defined for Field Classification")
 
+        schema = pa.schema(
+            [
+                pa.field("text", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(FieldClassificationBatch),
-                batch_to_text_classification_arrow,
+                batch_to_text_classification_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("text", pa.string()),
-                    pa.field("labels", pa.list_(pa.string())),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _configure_token_classification(self):
         self.entities = self.client.get_entities()
@@ -291,20 +290,19 @@ class NucliaDBDataset(NucliaDataset):
         ):
             raise Exception("Labelset not defined for Paragraphs Classification")
 
+        schema = pa.schema(
+            [
+                pa.field("text", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(ParagraphClassificationBatch),
-                batch_to_text_classification_arrow,
+                batch_to_text_classification_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("text", pa.string()),
-                    pa.field("labels", pa.list_(pa.string())),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _configure_image_classification(self):
         self._set_mappings(
