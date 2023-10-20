@@ -37,7 +37,7 @@ pub trait ShardReaderProvider: Send + Sync {
 
 #[async_trait]
 pub trait AsyncShardReaderProvider: Send + Sync {
-    async fn load(&self, id: ShardId) -> NodeResult<()>;
+    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>>;
     async fn load_all(&self) -> NodeResult<()>;
 
     async fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
@@ -56,7 +56,7 @@ pub trait ShardWriterProvider {
 
 #[async_trait]
 pub trait AsyncShardWriterProvider {
-    async fn load(&self, id: ShardId) -> NodeResult<()>;
+    async fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
     async fn load_all(&self) -> NodeResult<()>;
 
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;
