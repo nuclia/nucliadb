@@ -57,7 +57,7 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(response.paragraph.unwrap().results.len(), 2);
     assert_eq!(response.vector.unwrap().documents.len(), 0);
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&fixture.secondary_settings));
     let healthy = repl_health_mng.healthy();
@@ -74,9 +74,17 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     query.vectorset = "test_vector_set".to_string();
     query.vector = vec![1.0, 2.0, 3.0];
 
-    let response = run_search(&mut secondary_reader, query).await;
+    let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());
     assert_eq!(response.vector.unwrap().documents.len(), 1);
+
+    delete_shard(&mut writer, shard.id).await;
+
+    // wait for the shard to be deleted
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    let err_search_result = secondary_reader.search(query).await;
+    assert!(err_search_result.is_err());
 
     Ok(())
 }
@@ -109,6 +117,16 @@ async fn create_shard(writer: &mut TestNodeWriter) -> ShardDetails {
     ShardDetails {
         id: shard_id.to_owned(),
     }
+}
+
+async fn delete_shard(writer: &mut TestNodeWriter, shard_id: String) {
+    let request = Request::new(ShardId {
+        id: shard_id.clone(),
+    });
+    writer
+        .delete_shard(request)
+        .await
+        .expect("Unable to delete shard");
 }
 
 async fn create_test_resources(

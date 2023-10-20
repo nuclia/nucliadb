@@ -26,6 +26,7 @@ message SecondaryCheckReplicationStateRequest {
 
 message PrimaryCheckReplicationStateResponse {
     repeated PrimaryShardReplicationState shard_states = 1;
+    repeated string shards_to_remove = 2;
 }
 
 message SegmentIds {
