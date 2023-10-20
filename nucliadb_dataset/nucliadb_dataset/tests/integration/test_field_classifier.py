@@ -91,7 +91,7 @@ def test_field_classification_populates_field_ids(
     for field_id in loaded_array["field_id"]:
         if str(field_id).endswith("title"):
             titles += 1
-        if str(field_id).endswith("texts"):
+        if str(field_id).endswith("text"):
             texts += 1
     assert titles == 2
     assert texts == 2
