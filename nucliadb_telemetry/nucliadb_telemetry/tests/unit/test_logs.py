@@ -45,6 +45,25 @@ def test_setup_logging(monkeypatch):
         )
 
 
+def test_setup_logging_plain(monkeypatch):
+    with patch("nucliadb_telemetry.logs.logging") as logging:
+        logs.setup_logging(
+            settings=logs.LogSettings(
+                log_format_type=logs.LogFormatType.PLAIN,
+                logger_levels={"foo": "WARNING"},
+            )
+        )
+
+        logging.getLogger.assert_any_call("foo")
+        assert len(logging.getLogger().addHandler.mock_calls) == 5
+
+        logger = logging.getLogger()
+        handler = logger.addHandler.mock_calls[0].args[0]
+        assert isinstance(
+            handler.setFormatter.mock_calls[0].args[0], logs.ExtraFormatter
+        )
+
+
 class _TestLogMessage(pydantic.BaseModel):
     message: str
     foo: str
@@ -117,6 +136,30 @@ def test_logger_with_access_formatter(caplog):
         "remoteIp": "client_addr",
         "protocol": "http_version",
     }
+
+
+def test_logger_with_extra_formatter(caplog):
+    logger = logging.getLogger("test.logger.extra")
+    formatter = logs.ExtraFormatter("%(message)s%(extra_formatted)s")
+
+    outputted_records = []
+
+    class Handler(logging.Handler):
+        def emit(self, record):
+            outputted_records.append(self.format(record))
+
+    handler = Handler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    logger.setLevel(logging.ERROR)
+    logger.propagate = False
+
+    logger.error("Something wrong", extra={"foo": "bar"})
+
+    assert len(outputted_records) == 1
+
+    assert outputted_records[0] == "Something wrong -- foo=bar"
 
 
 def test_logger_with_formatter_and_active_span(caplog):
