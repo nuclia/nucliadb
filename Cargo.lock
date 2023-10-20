@@ -1954,6 +1954,7 @@ dependencies = [
  "nucliadb_core",
  "nucliadb_paragraphs",
  "nucliadb_procs",
+ "nucliadb_protos",
  "nucliadb_relations",
  "nucliadb_telemetry",
  "nucliadb_texts",

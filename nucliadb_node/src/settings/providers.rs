@@ -32,7 +32,7 @@ pub mod env {
 
     use crate::settings::providers::SettingsProvider;
     use crate::settings::Settings;
-    use crate::utils::parse_log_levels;
+    use crate::utils::{parse_log_levels, parse_node_role};
 
     /// Provide a settings configuration using environment variables. If an env
     /// var is missing, it defaults to `Settings` defaults.
@@ -102,6 +102,20 @@ pub mod env {
 
             if let Ok(Ok(port)) = std::env::var("METRICS_PORT").map(|v| v.parse::<u16>()) {
                 builder.metrics_port(port);
+            }
+
+            if let Ok(node_role) = std::env::var("NODE_ROLE") {
+                builder.node_role(parse_node_role(node_role.as_str()));
+            }
+
+            if let Ok(primary_address) = std::env::var("PRIMARY_ADDRESS") {
+                builder.primary_address(primary_address);
+            }
+
+            if let Ok(Ok(replication_delay_seconds)) =
+                std::env::var("REPLICATION_DELAY_SECONDS").map(|v| v.parse::<u64>())
+            {
+                builder.replication_delay_seconds(replication_delay_seconds);
             }
 
             let settings = builder.build()?;

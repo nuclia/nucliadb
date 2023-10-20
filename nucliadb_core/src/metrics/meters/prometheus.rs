@@ -25,7 +25,7 @@ use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpMetric, GrpcOpValue};
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeMetric, RequestTimeValue};
 use crate::metrics::metric::tokio_runtime::TokioRuntimeObserver;
 use crate::metrics::metric::tokio_tasks::TokioTasksObserver;
-use crate::metrics::metric::{grpc_ops, request_time};
+use crate::metrics::metric::{grpc_ops, replication, request_time};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::tracing::{debug, error};
 use crate::NodeResult;
@@ -36,6 +36,8 @@ pub struct PrometheusMeter {
     grpc_op_metric: GrpcOpMetric,
     tokio_tasks_observer: TokioTasksObserver,
     tokio_runtime_observer: TokioRuntimeObserver,
+    replicated_bytes_metric: replication::ReplicatedBytesMetric,
+    replication_ops_metric: replication::ShardOpsMetric,
 }
 
 impl Default for PrometheusMeter {
@@ -71,6 +73,15 @@ impl Meter for PrometheusMeter {
     fn task_monitor(&self, task_id: TaskId) -> Option<Monitor> {
         Some(self.tokio_tasks_observer.get_monitor(task_id))
     }
+
+    fn record_replicated_bytes(&self, value: replication::ReplicatedBytesValue) {
+        self.replicated_bytes_metric
+            .get_or_create(&replication::ReplicatedBytesKey {})
+            .observe(value);
+    }
+    fn record_replication_op(&self, key: replication::ShardOpsKey) {
+        self.replication_ops_metric.get_or_create(&key).inc();
+    }
 }
 
 impl PrometheusMeter {
@@ -79,6 +90,8 @@ impl PrometheusMeter {
 
         let request_time_metric = request_time::register_request_time(&mut registry);
         let grpc_op_metric = grpc_ops::register_grpc_ops(&mut registry);
+        let replicated_bytes_metric = replication::register_replicated_bytes_ops(&mut registry);
+        let replication_ops_metric = replication::register_replication_operations(&mut registry);
 
         let prefixed_subregistry = registry.sub_registry_with_prefix("nucliadb_node");
         let tokio_tasks_observer = TokioTasksObserver::new(prefixed_subregistry);
@@ -90,6 +103,8 @@ impl PrometheusMeter {
             grpc_op_metric,
             tokio_tasks_observer,
             tokio_runtime_observer,
+            replicated_bytes_metric,
+            replication_ops_metric,
         }
     }
 }

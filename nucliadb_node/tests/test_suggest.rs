@@ -22,7 +22,7 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{node_reader, node_writer, resources, TestNodeReader, TestNodeWriter};
+use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use itertools::Itertools;
 use nucliadb_core::protos::{
     op_status, Filter, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
@@ -31,8 +31,10 @@ use tonic::Request;
 
 #[tokio::test]
 async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let shard = create_suggest_shard(&mut writer).await;
 
@@ -130,8 +132,10 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_suggest_entities() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let shard = create_suggest_shard(&mut writer).await;
 
@@ -198,8 +202,10 @@ async fn test_suggest_features() -> Result<(), Box<dyn std::error::Error>> {
     // "an" should match entities starting with this prefix and the "and" word
     // from the little prince text
 
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let shard = create_suggest_shard(&mut writer).await;
 

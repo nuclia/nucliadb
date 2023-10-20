@@ -21,10 +21,10 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
+use nucliadb_core::{prelude::*, IndexFiles};
 use nucliadb_procs::measure;
 
 use super::utils::*;
@@ -228,6 +228,19 @@ impl WriterChild for RelationsWriterService {
     }
     fn merge(&mut self) -> NodeResult<()> {
         Ok(())
+    }
+
+    fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
+        // not implemented, not supported right now
+        Ok(Vec::new())
+    }
+
+    fn get_index_files(&self, _ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
+        // not implemented, not supported right now
+        Ok(IndexFiles {
+            metadata_files: HashMap::new(),
+            files: Vec::new(),
+        })
     }
 }
 

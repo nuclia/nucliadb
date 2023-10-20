@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -30,12 +29,16 @@ use nucliadb_node::grpc::middleware::{
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::http_server::{run_http_server, ServerOptions};
 use nucliadb_node::lifecycle;
+use nucliadb_node::replication::health::ReplicationHealthManager;
+use nucliadb_node::replication::NodeRole;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
+use nucliadb_node::settings::Settings;
 use nucliadb_node::telemetry::init_telemetry;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
+use tonic_health::server::HealthReporter;
 
 type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 
@@ -44,7 +47,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings = Arc::new(EnvSettingsProvider::generate_settings()?);
+    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?);
 
     if !settings.data_path().exists() {
         return Err(node_error!("Data directory missing"));
@@ -55,15 +58,9 @@ async fn main() -> NodeResult<()> {
 
     let _guard = init_telemetry(&settings)?;
 
-    let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
-    grpc_driver.initialize().await?;
-
     nucliadb_telemetry::sync::start_telemetry_loop();
 
-    let _grpc_task = tokio::spawn(start_grpc_service(
-        grpc_driver,
-        settings.reader_listen_address(),
-    ));
+    let grpc_task = tokio::spawn(start_grpc_service(settings.clone()));
     let metrics_task = tokio::spawn(run_http_server(ServerOptions {
         default_http_port: 3031,
     }));
@@ -73,8 +70,10 @@ async fn main() -> NodeResult<()> {
 
     wait_for_sigkill().await?;
     info!("Shutting down NucliaDB Reader Node...");
+    grpc_task.abort();
     metrics_task.abort();
     let _ = metrics_task.await;
+    let _ = grpc_task.await;
 
     Ok(())
 }
@@ -92,8 +91,30 @@ async fn wait_for_sigkill() -> NodeResult<()> {
     Ok(())
 }
 
-pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver, listen_address: SocketAddr) {
-    info!(
+async fn health_checker(
+    mut health_reporter: HealthReporter,
+    settings: Arc<Settings>,
+) -> NodeResult<()> {
+    if settings.node_role() == NodeRole::Primary {
+        // cut out early, this check is for secondaries only right now
+        health_reporter.set_serving::<GrpcServer>().await;
+        return Ok(());
+    }
+
+    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&settings));
+    loop {
+        if repl_health_mng.healthy() {
+            health_reporter.set_serving::<GrpcServer>().await;
+        } else {
+            health_reporter.set_not_serving::<GrpcServer>().await;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    }
+}
+
+pub async fn start_grpc_service(settings: Arc<Settings>) -> NodeResult<()> {
+    let listen_address = settings.reader_listen_address();
+    eprintln!(
         "Reader listening for gRPC requests at: {:?}",
         listen_address
     );
@@ -102,8 +123,11 @@ pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver, listen_addres
     let debug_logs_middleware = GrpcDebugLogsLayer;
     let metrics_middleware = GrpcTasksMetricsLayer;
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter.set_serving::<GrpcServer>().await;
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    tokio::spawn(health_checker(health_reporter, settings.clone()));
+
+    let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
+    grpc_driver.initialize().await?;
 
     Server::builder()
         .layer(tracing_middleware)
@@ -114,4 +138,6 @@ pub async fn start_grpc_service(grpc_driver: NodeReaderGRPCDriver, listen_addres
         .serve(listen_address)
         .await
         .expect("Error starting gRPC reader");
+
+    Ok(())
 }

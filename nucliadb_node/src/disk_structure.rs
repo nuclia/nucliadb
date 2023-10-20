@@ -36,6 +36,7 @@ use std::path::{Path, PathBuf};
 
 pub const VERSION_FILE: &str = "versions.json";
 pub const METADATA_FILE: &str = "metadata.json";
+pub const GENERATION_FILE: &str = "generation";
 
 pub const SHARDS_DIR: &str = "shards";
 

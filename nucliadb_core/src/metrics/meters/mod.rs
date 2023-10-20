@@ -24,6 +24,7 @@ pub use noop::NoOpMeter;
 pub use prometheus::PrometheusMeter;
 
 use crate::metrics::metric::grpc_ops::{GrpcOpKey, GrpcOpValue};
+use crate::metrics::metric::replication;
 use crate::metrics::metric::request_time::{RequestTimeKey, RequestTimeValue};
 use crate::metrics::task_monitor::{Monitor, TaskId};
 use crate::NodeResult;
@@ -37,4 +38,6 @@ pub trait Meter: Send + Sync {
     fn task_monitor(&self, _task_id: TaskId) -> Option<Monitor> {
         None
     }
+    fn record_replicated_bytes(&self, value: replication::ReplicatedBytesValue);
+    fn record_replication_op(&self, key: replication::ShardOpsKey);
 }

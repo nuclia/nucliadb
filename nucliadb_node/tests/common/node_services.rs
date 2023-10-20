@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -28,100 +28,20 @@ use nucliadb_core::protos::node_writer_client::NodeWriterClient;
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
 use nucliadb_node::grpc::writer::NodeWriterGRPCDriver;
+use nucliadb_node::lifecycle;
+use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
+use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
 use nucliadb_node::settings::Settings;
-use nucliadb_node::{env, lifecycle};
-use once_cell::sync::{Lazy, OnceCell};
+use nucliadb_node::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
+use nucliadb_node::utils::read_or_create_host_key;
+use nucliadb_protos::replication;
 use tempfile::TempDir;
-use tokio::sync::Mutex;
 use tonic::transport::{Channel, Server};
 
-use crate::common::{READER_ADDR, SERVER_STARTUP_TIMEOUT, WRITER_ADDR};
+pub const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub type TestNodeReader = NodeReaderClient<Channel>;
 pub type TestNodeWriter = NodeWriterClient<Channel>;
-
-static READER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::new(false)));
-static WRITER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::new(false)));
-
-static TEST_DATA_PATH: OnceCell<TempDir> = OnceCell::new();
-
-// Use global settings for now, change it when more test flexibility is desired
-static SETTINGS: Lazy<Arc<Settings>> = Lazy::new(|| {
-    // REVIEW: temporary directory is not being deleted at the end of the tests.
-    // In fact, tests create a different test directory per test file...
-    let tempdir = TEST_DATA_PATH.get_or_init(|| {
-        let tempdir = TempDir::new().expect("Unable to create temporary data directory");
-        println!("Using data path directory: {}", tempdir.path().display());
-        tempdir
-    });
-
-    let settings = Settings::builder()
-        .data_path(tempdir.path())
-        .build()
-        .expect("Error while building test settings");
-    Arc::new(settings)
-});
-
-async fn start_reader(addr: SocketAddr) {
-    let mut initialized_lock = READER_SERVER_INITIALIZED.lock().await;
-    if *initialized_lock {
-        return;
-    }
-    tokio::spawn(async move {
-        lifecycle::initialize_reader();
-        let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&SETTINGS));
-        grpc_driver
-            .initialize()
-            .await
-            .expect("Unable to initialize reader gRPC");
-        let reader_server = NodeReaderServer::new(grpc_driver);
-        Server::builder()
-            .add_service(reader_server)
-            .serve(addr)
-            .await
-            .map_or_else(
-                |err| {
-                    panic!("Error starting gRPC server: {err:?}");
-                },
-                |_| {
-                    *initialized_lock = true;
-                },
-            );
-    });
-}
-
-async fn start_writer(addr: SocketAddr) {
-    let mut initialized_lock = WRITER_SERVER_INITIALIZED.lock().await;
-    if *initialized_lock {
-        return;
-    }
-    let data_path = SETTINGS.data_path();
-    let shards_path = SETTINGS.shards_path();
-    if !data_path.exists() {
-        std::fs::create_dir(&data_path).expect("Can not create data directory");
-    }
-
-    tokio::spawn(async move {
-        let settings = SETTINGS.clone();
-        lifecycle::initialize_writer(&data_path, &shards_path)
-            .expect("Writer initialization has failed");
-        let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(settings));
-        Server::builder()
-            .add_service(writer_server)
-            .serve(addr)
-            .await
-            .map_or_else(
-                |err| {
-                    panic!("Error starting gRPC server: {err:?}");
-                },
-                |_| {
-                    *initialized_lock = true;
-                },
-            );
-    });
-}
 
 async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::Result<()> {
     let server_uri = tonic::transport::Uri::builder()
@@ -152,54 +72,239 @@ async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::
     Ok(())
 }
 
-fn initialize_file_system() {
-    let data_path = env::data_path();
-    if !data_path.exists() {
-        std::fs::create_dir(&data_path).expect("Cannot create data directory");
-    }
-
-    let shards_path = env::shards_path();
-    if !shards_path.exists() {
-        std::fs::create_dir(&shards_path).expect("Cannot create shards directory");
+fn find_open_port() -> u16 {
+    loop {
+        let port = rand::random::<u16>() % 10000 + 10000;
+        let listener = TcpListener::bind(("127.0.0.1", port));
+        if listener.is_ok() {
+            return port;
+        }
     }
 }
 
-async fn node_reader_server() -> anyhow::Result<()> {
-    start_reader(*READER_ADDR).await;
-    wait_for_service_ready(*READER_ADDR, SERVER_STARTUP_TIMEOUT).await?;
-    Ok(())
+pub struct NodeFixture {
+    settings: Arc<Settings>,
+    secondary_settings: Arc<Settings>,
+    reader_client: Option<TestNodeReader>,
+    writer_client: Option<TestNodeWriter>,
+    secondary_reader_client: Option<TestNodeReader>,
+    reader_addr: SocketAddr,
+    writer_addr: SocketAddr,
+    secondary_reader_addr: SocketAddr,
+    reader_server_task: Option<tokio::task::JoinHandle<()>>,
+    writer_server_task: Option<tokio::task::JoinHandle<()>>,
+    secondary_reader_server_task: Option<tokio::task::JoinHandle<()>>,
+    secondary_writer_server_task: Option<tokio::task::JoinHandle<()>>,
+    tempdir: TempDir,
+    secondary_tempdir: TempDir,
 }
 
-async fn node_writer_server() -> anyhow::Result<()> {
-    start_writer(*WRITER_ADDR).await;
-    wait_for_service_ready(*WRITER_ADDR, SERVER_STARTUP_TIMEOUT).await?;
-    Ok(())
+impl NodeFixture {
+    pub fn new() -> Self {
+        let tempdir = TempDir::new().expect("Unable to create temporary data directory");
+        let secondary_tempdir = TempDir::new().expect("Unable to create temporary data directory");
+
+        let reader_addr =
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
+        let writer_addr =
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
+        let secondary_reader_addr =
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
+
+        let settings = Settings::builder()
+            .data_path(tempdir.path())
+            .reader_listen_address(reader_addr.to_string())
+            .writer_listen_address(writer_addr.to_string())
+            .build()
+            .expect("Error while building test settings");
+        let secondary_settings = Settings::builder()
+            .data_path(secondary_tempdir.path())
+            .reader_listen_address(secondary_reader_addr.to_string())
+            .primary_address(writer_addr.to_string())
+            .replication_delay_seconds(1_u64)
+            .build()
+            .expect("Error while building test settings");
+
+        for _setting in [&settings, &secondary_settings] {
+            let data_path = _setting.data_path();
+            if !data_path.exists() {
+                std::fs::create_dir(&data_path).expect("Cannot create data directory");
+            }
+
+            let shards_path = _setting.shards_path();
+            if !shards_path.exists() {
+                std::fs::create_dir(&shards_path).expect("Cannot create shards directory");
+            }
+        }
+
+        Self {
+            settings: Arc::new(settings),
+            secondary_settings: Arc::new(secondary_settings),
+            reader_client: None,
+            writer_client: None,
+            secondary_reader_client: None,
+            reader_addr,
+            writer_addr,
+            secondary_reader_addr,
+            reader_server_task: None,
+            writer_server_task: None,
+            secondary_reader_server_task: None,
+            secondary_writer_server_task: None,
+            tempdir,
+            secondary_tempdir,
+        }
+    }
+
+    pub async fn with_writer(&mut self) -> anyhow::Result<&mut Self> {
+        let settings = self.settings.clone();
+        let addr = self.writer_addr;
+        self.writer_server_task = Some(tokio::spawn(async move {
+            lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
+                .expect("Writer initialization has failed");
+            let shards_cache =
+                Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+            let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(
+                settings.clone(),
+                shards_cache.clone(),
+            ));
+            let replication_server =
+                replication::replication_service_server::ReplicationServiceServer::new(
+                    ReplicationServiceGRPCDriver::new(settings.clone(), shards_cache.clone()),
+                );
+            Server::builder()
+                .add_service(writer_server)
+                .add_service(replication_server)
+                .serve(addr)
+                .await
+                .unwrap();
+        }));
+
+        wait_for_service_ready(self.writer_addr, SERVER_STARTUP_TIMEOUT).await?;
+
+        let endpoint = format!("http://{}", addr);
+        self.writer_client = Some(NodeWriterClient::connect(endpoint).await?);
+
+        Ok(self)
+    }
+
+    pub async fn with_secondary_writer(&mut self) -> anyhow::Result<&mut Self> {
+        let settings = self.secondary_settings.clone();
+        let host_key_path = settings.host_key_path();
+        let node_id = read_or_create_host_key(host_key_path)?;
+        self.secondary_writer_server_task = Some(tokio::spawn(async move {
+            lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
+                .expect("Writer initialization has failed");
+            let shards_cache =
+                Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+            connect_to_primary_and_replicate(
+                settings.clone(),
+                shards_cache.clone(),
+                node_id.to_string(),
+            )
+            .await
+            .unwrap();
+        }));
+
+        Ok(self)
+    }
+
+    pub async fn with_reader(&mut self) -> anyhow::Result<&mut Self> {
+        if self.writer_client.is_none() {
+            self.with_writer().await?;
+        }
+
+        let settings = self.settings.clone();
+        let addr = self.reader_addr;
+
+        self.reader_server_task = Some(tokio::spawn(async move {
+            lifecycle::initialize_reader();
+            let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
+            grpc_driver
+                .initialize()
+                .await
+                .expect("Unable to initialize reader gRPC");
+            let reader_server = NodeReaderServer::new(grpc_driver);
+            Server::builder()
+                .add_service(reader_server)
+                .serve(addr)
+                .await
+                .unwrap();
+        }));
+
+        wait_for_service_ready(self.reader_addr, SERVER_STARTUP_TIMEOUT).await?;
+
+        let endpoint = format!("http://{}", addr);
+        self.reader_client = Some(NodeReaderClient::connect(endpoint).await?);
+
+        Ok(self)
+    }
+
+    pub async fn with_secondary_reader(&mut self) -> anyhow::Result<&mut Self> {
+        if self.secondary_writer_server_task.is_none() {
+            self.with_secondary_writer().await?;
+        }
+
+        let settings = self.secondary_settings.clone();
+        let addr = self.secondary_reader_addr;
+
+        self.reader_server_task = Some(tokio::spawn(async move {
+            lifecycle::initialize_reader();
+            let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
+            grpc_driver
+                .initialize()
+                .await
+                .expect("Unable to initialize reader gRPC");
+            let reader_server = NodeReaderServer::new(grpc_driver);
+            Server::builder()
+                .add_service(reader_server)
+                .serve(addr)
+                .await
+                .unwrap();
+        }));
+
+        wait_for_service_ready(self.reader_addr, SERVER_STARTUP_TIMEOUT).await?;
+
+        let endpoint = format!("http://{}", addr);
+        self.secondary_reader_client = Some(NodeReaderClient::connect(endpoint).await?);
+
+        Ok(self)
+    }
+
+    pub fn reader_client(&self) -> TestNodeReader {
+        self.reader_client
+            .as_ref()
+            .expect("Reader client not initialized")
+            .clone()
+    }
+
+    pub fn secondary_reader_client(&self) -> TestNodeReader {
+        self.secondary_reader_client
+            .as_ref()
+            .expect("Reader client not initialized")
+            .clone()
+    }
+
+    pub fn writer_client(&self) -> TestNodeWriter {
+        self.writer_client
+            .as_ref()
+            .expect("Writer client not initialized")
+            .clone()
+    }
 }
 
-async fn node_reader_client() -> TestNodeReader {
-    let endpoint = format!("http://{}", *READER_ADDR);
-    NodeReaderClient::connect(endpoint)
-        .await
-        .expect("Error creating gRPC reader client")
-}
-
-async fn node_writer_client() -> TestNodeWriter {
-    let endpoint = format!("http://{}", *WRITER_ADDR);
-    NodeWriterClient::connect(endpoint)
-        .await
-        .expect("Error creating gRPC reader client")
-}
-
-pub async fn node_reader() -> TestNodeReader {
-    node_reader_server()
-        .await
-        .expect("Error starting node reader");
-    node_reader_client().await
-}
-
-pub async fn node_writer() -> TestNodeWriter {
-    node_writer_server()
-        .await
-        .expect("Error starting node writer");
-    node_writer_client().await
+impl Drop for NodeFixture {
+    fn drop(&mut self) {
+        if let Some(task) = self.reader_server_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.writer_server_task.take() {
+            task.abort();
+        };
+        if let Some(task) = self.secondary_reader_server_task.take() {
+            task.abort();
+        };
+        if let Some(task) = self.secondary_writer_server_task.take() {
+            task.abort();
+        };
+    }
 }

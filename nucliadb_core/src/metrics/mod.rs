@@ -21,7 +21,7 @@ mod meters;
 mod metric;
 mod task_monitor;
 
-pub use metric::{grpc_ops, request_time};
+pub use metric::{grpc_ops, replication, request_time};
 
 #[cfg(test)]
 mod tests;

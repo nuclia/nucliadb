@@ -20,14 +20,16 @@
 
 mod common;
 
-use common::{node_reader, node_writer, TestNodeReader, TestNodeWriter};
+use common::{NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{EmptyQuery, GetShardRequest, NewShardRequest, ShardId};
 use tonic::Request;
 
 #[tokio::test]
 async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     let new_shard_response = writer
         .new_shard(Request::new(NewShardRequest::default()))
@@ -50,8 +52,10 @@ async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
-    let mut reader = node_reader().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
+    let mut reader = fixture.reader_client();
 
     async fn create_shard_with_metadata(
         writer: &mut TestNodeWriter,
@@ -108,7 +112,9 @@ async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
 
     let current = writer
         .list_shards(Request::new(EmptyQuery {}))
@@ -144,7 +150,9 @@ async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_delete_shards() -> anyhow::Result<()> {
-    let mut writer = node_writer().await;
+    let mut fixture = NodeFixture::new();
+    fixture.with_writer().await?.with_reader().await?;
+    let mut writer = fixture.writer_client();
 
     let current = writer
         .list_shards(Request::new(EmptyQuery {}))

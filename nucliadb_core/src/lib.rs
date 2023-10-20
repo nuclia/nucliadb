@@ -51,6 +51,7 @@ pub mod prelude {
     };
 }
 
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
@@ -130,12 +131,19 @@ pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
     Arc::new(RwLock::new(writer))
 }
 
+pub struct IndexFiles {
+    pub metadata_files: HashMap<String, Vec<u8>>,
+    pub files: Vec<String>,
+}
+
 pub trait WriterChild: std::fmt::Debug + Send + Sync {
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
     fn merge(&mut self) -> NodeResult<()>;
     fn count(&self) -> NodeResult<usize>;
+    fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
+    fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;
 }
 
 pub trait ReaderChild: std::fmt::Debug + Send + Sync {
