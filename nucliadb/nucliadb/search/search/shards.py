@@ -35,7 +35,7 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_telemetry import metrics
 
-node_observer = metrics.Observer("node_client", labels={"type": ""})
+node_observer = metrics.Observer("node_client", labels={"type": "", "node_id": ""})
 
 
 async def query_shard(
@@ -44,7 +44,7 @@ async def query_shard(
     req = SearchRequest()
     req.CopyFrom(query)
     req.shard = shard
-    with node_observer({"type": "search"}):
+    with node_observer({"type": "search", "node_id": node.id}):
         return await node.reader.Search(req)  # type: ignore
 
 
@@ -55,7 +55,7 @@ async def get_shard(
     req.shard_id.id = shard_id
     if vectorset is not None:
         req.vectorset = vectorset
-    with node_observer({"type": "get_shard"}):
+    with node_observer({"type": "get_shard", "node_id": node.id}):
         return await node.reader.GetShard(req)  # type: ignore
 
 
@@ -65,7 +65,7 @@ async def query_paragraph_shard(
     req = ParagraphSearchRequest()
     req.CopyFrom(query)
     req.id = shard
-    with node_observer({"type": "paragraph_search"}):
+    with node_observer({"type": "paragraph_search", "node_id": node.id}):
         return await node.reader.ParagraphSearch(req)  # type: ignore
 
 
@@ -75,7 +75,7 @@ async def suggest_shard(
     req = SuggestRequest()
     req.CopyFrom(query)
     req.shard = shard
-    with node_observer({"type": "suggest"}):
+    with node_observer({"type": "suggest", "node_id": node.id}):
         return await node.reader.Suggest(req)  # type: ignore
 
 
@@ -85,5 +85,5 @@ async def relations_shard(
     req = RelationSearchRequest()
     req.CopyFrom(query)
     req.shard_id = shard
-    with node_observer({"type": "relation_search"}):
+    with node_observer({"type": "relation_search", "node_id": node.id}):
         return await node.reader.RelationSearch(req)  # type: ignore
