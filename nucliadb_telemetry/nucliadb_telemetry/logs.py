@@ -45,37 +45,39 @@ try:
 except ImportError:  # pragma: no cover
     AccessFormatter = logging.Formatter
 
-_BUILTIN_ATTRS = (
-    # list of all possible args
-    "args",
-    "asctime",
-    "created",
-    "exc_info",
-    "exc_text",
-    "filename",
-    "funcName",
-    "levelname",
-    "levelno",
-    "lineno",
-    "module",
-    "msecs",
-    "message",
-    "msg",
-    "name",
-    "pathname",
-    "process",
-    "processName",
-    "relativeCreated",
-    "stack_info",
-    "thread",
-    "threadName",
+_BUILTIN_ATTRS = set(
+    [
+        # list of all possible args
+        "args",
+        "asctime",
+        "created",
+        "exc_info",
+        "exc_text",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "lineno",
+        "module",
+        "msecs",
+        "message",
+        "msg",
+        "name",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "stack_info",
+        "thread",
+        "threadName",
+    ]
 )
 
 
 def extra_from_record(record) -> dict[str, Any]:
     return {
         attr_name: record.__dict__[attr_name]
-        for attr_name in set(record.__dict__) - set(_BUILTIN_ATTRS)
+        for attr_name in set(record.__dict__) - _BUILTIN_ATTRS
     }
 
 
