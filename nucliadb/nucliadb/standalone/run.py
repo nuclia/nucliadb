@@ -19,23 +19,27 @@
 #
 import logging
 import os
+import sys
 
 import pkg_resources
 import pydantic_argparse
 import uvicorn  # type: ignore
 from fastapi import FastAPI
 
+from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.settings import LogSettings
+from nucliadb_utils.settings import nuclia_settings, storage_settings
 
 logger = logging.getLogger(__name__)
 
 
 def setup() -> Settings:
-    setup_logging()
     errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
     parser = pydantic_argparse.ArgumentParser(
         model=Settings,
@@ -43,6 +47,14 @@ def setup() -> Settings:
         description="NucliaDB Starting script",
     )
     nucliadb_args = parser.parse_typed_args()
+
+    log_settings = LogSettings(
+        # change default settings for standalone
+        log_output_type=nucliadb_args.log_output_type,
+        log_format_type=nucliadb_args.log_format_type,
+        log_level=nucliadb_args.log_level,
+    )
+    setup_logging(settings=log_settings)
 
     config_nucliadb(nucliadb_args)
 
@@ -55,7 +67,7 @@ def get_server(settings: Settings) -> tuple[FastAPI, uvicorn.Server]:
     application = application_factory(settings)
 
     config = uvicorn.Config(
-        application, host="0.0.0.0", port=settings.http_port, log_config=None
+        application, host=settings.http_host, port=settings.http_port, log_config=None
     )
     server = uvicorn.Server(config)
     config.load()
@@ -72,11 +84,40 @@ def run():
     if settings.fork:  # pragma: no cover
         pid = os.fork()
         if pid != 0:
-            logger.warning(f"Server forked and running on pid {pid}.")
+            sys.stdout.write(f"Server forked and running on pid {pid}.")
             return
 
-    logger.warning(
-        f"======= Starting server on http://0.0.0.0:{settings.http_port}/ ======"
+    settings_to_output = {
+        "API": f"http://{settings.http_host}:{settings.http_port}/api",
+        "Contributor/management UI": f"http://{settings.http_host}:{settings.http_port}/contributor",
+        "Key-value backend": ingest_settings.driver,
+        "Blog storage backend": storage_settings.file_backend,
+        "Cluster discovery mode": cluster_settings.cluster_discovery_mode,
+        "Node replicas": cluster_settings.node_replicas,
+        "Index data path": cluster_settings.data_path,
+        "Node port": cluster_settings.standalone_node_port,
+        "Log output type": settings.log_output_type,
+    }
+    if nuclia_settings.nuclia_service_account:
+        settings_to_output["NUA API key"] = "Configured ✔"
+        settings_to_output["NUA API zone"] = nuclia_settings.nuclia_zone
+
+    settings_to_output_fmted = "\n".join(
+        [
+            f"||      - {k}:{' ' * (27 - len(k))}{v}"
+            for k, v in settings_to_output.items()
+        ]
+    )
+
+    sys.stdout.write(
+        f"""=================================================
+||
+||   NucliaDB Standalone Server Running!
+||
+||   Configuration:
+{settings_to_output_fmted}
+=================================================
+"""
     )
     server.run()
 

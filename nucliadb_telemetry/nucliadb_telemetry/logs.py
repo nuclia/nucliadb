@@ -19,9 +19,11 @@
 
 # inspired from datadog integrations like https://pypi.org/project/JSON-log-formatter/
 import logging
+import os
 from copy import copy
 from datetime import datetime
-from typing import Any
+from logging.handlers import RotatingFileHandler
+from typing import Any, Optional
 
 import orjson
 import pydantic
@@ -29,7 +31,12 @@ from opentelemetry import trace
 from opentelemetry.trace import format_span_id, format_trace_id
 from opentelemetry.trace.span import INVALID_SPAN
 
-from nucliadb_telemetry.settings import LogLevel, LogSettings
+from nucliadb_telemetry.settings import (
+    LogFormatType,
+    LogLevel,
+    LogOutputType,
+    LogSettings,
+)
 
 from . import context
 
@@ -65,6 +72,13 @@ _BUILTIN_ATTRS = (
 )
 
 
+def extra_from_record(record) -> dict[str, Any]:
+    return {
+        attr_name: record.__dict__[attr_name]
+        for attr_name in set(record.__dict__) - set(_BUILTIN_ATTRS)
+    }
+
+
 class JSONFormatter(logging.Formatter):
     """
     Formatter base json-log-formatter with pydantic support
@@ -78,7 +92,7 @@ class JSONFormatter(logging.Formatter):
             extra = record.msg.dict()
         else:
             extra = {"message": record.getMessage()}
-        extra.update(self.extra_from_record(record))
+        extra.update(extra_from_record(record))
 
         self.fill_log_data(extra, record)
 
@@ -120,12 +134,16 @@ class JSONFormatter(logging.Formatter):
         else:  # pragma: no cover
             data["stack_info"] = None
 
-    def extra_from_record(self, record):
-        return {
-            attr_name: record.__dict__[attr_name]
-            for attr_name in record.__dict__
-            if attr_name not in _BUILTIN_ATTRS
-        }
+
+class ExtraFormatter(logging.Formatter):
+    def format(self, record):
+        if not hasattr(record, "extra_formatted"):
+            # format all extra fields as a comma separated list
+            extra_fmted = ", ".join(
+                [f"{k}={v}" for k, v in extra_from_record(record).items()]
+            )
+            setattr(record, "extra_formatted", extra_fmted)
+        return super().format(record)
 
 
 class UvicornAccessFormatter(JSONFormatter):
@@ -161,13 +179,40 @@ _default_logger_levels = {
     # some are too chatty
     "uvicorn.error": LogLevel.WARNING,
     "nucliadb_utils.utilities": LogLevel.WARNING,
-    # needed always for access logs
-    _ACCESS_LOGGER_NAME: LogLevel.INFO,
 }
 
 
-def setup_logging() -> None:
-    settings = LogSettings()
+def _maybe_create_file_directory(path: str) -> None:
+    directory = os.path.dirname(path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+def setup_access_logging(settings: LogSettings) -> None:
+    # setup access logger uniquely
+    access_logger = logging.getLogger(_ACCESS_LOGGER_NAME)
+    access_logger.handlers = []
+    access_logger.propagate = False
+    access_logger.setLevel(logging.INFO)
+
+    if settings.log_output_type == LogOutputType.FILE:
+        _maybe_create_file_directory(settings.access_log)
+        access_handler = RotatingFileHandler(
+            settings.access_log, maxBytes=settings.max_log_file_size, backupCount=5
+        )
+    else:
+        access_handler = logging.StreamHandler()
+    access_logger.addHandler(access_handler)
+    if not settings.debug and settings.log_format_type == LogFormatType.STRUCTURED:
+        access_handler.setFormatter(UvicornAccessFormatter())
+    else:
+        # regular stream access logs
+        access_handler.setFormatter(AccessFormatter())  # not json based
+
+
+def setup_logging(*, settings: Optional[LogSettings] = None) -> None:
+    if settings is None:
+        settings = LogSettings()
 
     if settings.logger_levels is None:
         settings.logger_levels = {}
@@ -176,40 +221,50 @@ def setup_logging() -> None:
         if logger_name not in settings.logger_levels:
             settings.logger_levels[logger_name] = level
 
-    formatter = JSONFormatter()
-    json_handler = logging.StreamHandler()
-    json_handler.setFormatter(formatter)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(
-        logging.Formatter(
-            "[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s"
+    if settings.log_output_type == LogOutputType.FILE:
+        _maybe_create_file_directory(settings.info_log)
+        _maybe_create_file_directory(settings.error_log)
+        log_handler = RotatingFileHandler(
+            settings.info_log, maxBytes=settings.max_log_file_size, backupCount=5
         )
-    )
+        error_log_handler = RotatingFileHandler(
+            settings.error_log, maxBytes=settings.max_log_file_size, backupCount=5
+        )
+    else:
+        log_handler = error_log_handler = logging.StreamHandler()
+
+    error_log_handler.setLevel(logging.ERROR)
+
+    if not settings.debug and settings.log_format_type == LogFormatType.STRUCTURED:
+        log_handler.setFormatter(JSONFormatter())
+        error_log_handler.setFormatter(JSONFormatter())
+    else:
+        log_handler.setFormatter(
+            ExtraFormatter(
+                "[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s %(extra_formatted)s)"
+            )
+        )
+        error_log_handler.setFormatter(
+            ExtraFormatter(
+                "[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s %(extra_formatted)s)"
+            )
+        )
 
     root_logger = logging.getLogger()
-    access_logger = logging.getLogger(_ACCESS_LOGGER_NAME)
-    access_logger.handlers = []
-    if not settings.debug:
-        root_logger.addHandler(json_handler)
-        access_handler = logging.StreamHandler()
-        access_handler.setFormatter(UvicornAccessFormatter())
-        access_logger.addHandler(access_handler)
-    else:
-        root_logger.addHandler(stream_handler)
-        # regular stream access logs
-        access_handler = logging.StreamHandler()
-        access_handler.setFormatter(AccessFormatter())  # not json based
-        access_logger.addHandler(access_handler)
-
     root_logger.setLevel(getattr(logging, settings.log_level.value))
+    root_logger.addHandler(log_handler)
+    if settings.log_output_type == LogOutputType.FILE:
+        # error log handler is only use for file output
+        root_logger.addHandler(error_log_handler)
 
+    setup_access_logging(settings)
+
+    # customized log levels
     for logger_name, level in settings.logger_levels.items():
         log = logging.getLogger(logger_name)
-        if logger_name != _ACCESS_LOGGER_NAME:
-            if not settings.debug:
-                log.addHandler(json_handler)
-            else:
-                root_logger.addHandler(stream_handler)
+        log.addHandler(log_handler)
+        if settings.log_output_type == LogOutputType.FILE:
+            log.addHandler(error_log_handler)
 
         log.propagate = False
         log.setLevel(getattr(logging, level.value))

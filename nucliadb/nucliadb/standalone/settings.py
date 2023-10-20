@@ -24,6 +24,7 @@ import pydantic
 
 from nucliadb.ingest.settings import DriverSettings
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
 from nucliadb_utils.settings import StorageSettings
 
 
@@ -32,12 +33,6 @@ class StandaloneDiscoveryMode(str, Enum):
     MANUAL = "manual"
     KUBERNETES = "kubernetes"
     SINGLE_NODE = "single_node"
-
-
-class LogLevel(str, Enum):
-    INFO = "INFO"
-    ERROR = "ERROR"
-    DEBUG = "DEBUG"
 
 
 class AuthPolicy(str, Enum):
@@ -60,13 +55,16 @@ class Settings(DriverSettings, StorageSettings):
         description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key"  # noqa
     )
     zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
-    http_port: int = pydantic.Field(8080, description="HTTP Port")
-    ingest_grpc_port: int = pydantic.Field(8030, description="Ingest GRPC Port")
-    train_grpc_port: int = pydantic.Field(8031, description="Train GRPC Port")
-    standalone_node_port: int = pydantic.Field(10009, description="Node GRPC Port")
+    http_host: str = pydantic.Field(default="0.0.0.0", description="HTTP Port")
+    http_port: int = pydantic.Field(default=8080, description="HTTP Port")
+    ingest_grpc_port: int = pydantic.Field(default=8030, description="Ingest GRPC Port")
+    train_grpc_port: int = pydantic.Field(default=8031, description="Train GRPC Port")
+    standalone_node_port: int = pydantic.Field(
+        default=10009, description="Node GRPC Port"
+    )
 
     auth_policy: AuthPolicy = pydantic.Field(
-        AuthPolicy.UPSTREAM_NAIVE,
+        default=AuthPolicy.UPSTREAM_NAIVE,
         description="""Auth policy to use for http requests.
 - `upstream_naive` will assume `X-NUCLIADB-ROLES` and `X-NUCLIADB-USER` http headers are
    set by a trusted upstream proxy. This can also be used for testing locally with no auth
@@ -78,22 +76,23 @@ class Settings(DriverSettings, StorageSettings):
 """,
     )
     auth_policy_user_header: str = pydantic.Field(
-        "X-NUCLIADB-USER",
+        default="X-NUCLIADB-USER",
         description="Header to read user id from. Only used for \
                     `upstream_naive` and `upstream_auth_header` auth policy.",
     )
     auth_policy_roles_header: str = pydantic.Field(
-        "X-NUCLIADB-ROLES", description="Only used for `upstream_naive` auth policy."
+        default="X-NUCLIADB-ROLES",
+        description="Only used for `upstream_naive` auth policy.",
     )
     auth_policy_user_default_roles: list[NucliaDBRoles] = pydantic.Field(
-        [NucliaDBRoles.READER, NucliaDBRoles.WRITER, NucliaDBRoles.MANAGER],
+        default=[NucliaDBRoles.READER, NucliaDBRoles.WRITER, NucliaDBRoles.MANAGER],
         description="Default role to assign to user that is authenticated \
                     upstream. Not used with `upstream_naive` auth policy.",
     )
     auth_policy_role_mapping: Optional[
         dict[str, dict[str, list[NucliaDBRoles]]]
     ] = pydantic.Field(
-        None,
+        default=None,
         description="""
 Role mapping for `upstream_auth_header`, `upstream_oauth2` and `upstream_basicauth` auth policies.
 Allows mapping different properties from the auth request to a role.
@@ -107,9 +106,21 @@ Examples:
     )
 
     jwk_key: Optional[str] = pydantic.Field(
-        None, description="JWK key used for temporary token generation and validation."
+        default=None,
+        description="JWK key used for temporary token generation and validation.",
     )
 
     cluster_discovery_mode: StandaloneDiscoveryMode = StandaloneDiscoveryMode.DEFAULT
 
     fork: bool = pydantic.Field(default=False, description="Fork process on startup")
+
+    # Standalone logging settings
+    # Running NucliaDB standalone usually means that you are less interested in
+    # stdout and structure logging like you would get in a kubernetes deployment.
+    # This is why we overrides defaults to:
+    # - File outputted logs
+    # - Plain text readable logs
+    # - INFO level
+    log_output_type: LogOutputType = LogOutputType.FILE
+    log_format_type: LogFormatType = LogFormatType.PLAIN
+    log_level: LogLevel = LogLevel.INFO
