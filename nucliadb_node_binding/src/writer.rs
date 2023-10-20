@@ -148,9 +148,6 @@ impl NodeWriter {
 
         match status {
             Ok(mut status) => {
-                if let Err(err) = shard.merge() {
-                    tracing::info!("A merge was attempted, but failed: {err:?}")
-                }
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
@@ -182,9 +179,6 @@ impl NodeWriter {
             .and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
-                if let Err(err) = shard.merge() {
-                    tracing::info!("A merge was attempted, but failed: {err:?}")
-                }
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
