@@ -198,20 +198,20 @@ class NucliaDBDataset(NucliaDataset):
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
+
+        schema = pa.schema(
+            [
+                pa.field("text", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(SentenceClassificationBatch),
-                batch_to_text_classification_normalized_arrow,
+                batch_to_text_classification_normalized_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("text", pa.string()),
-                    pa.field("labels", pa.list_(pa.string())),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _configure_field_classification(self):
         if len(self.trainset.filter.labels) > 1:
@@ -305,20 +305,19 @@ class NucliaDBDataset(NucliaDataset):
         self._set_schema(schema)
 
     def _configure_image_classification(self):
+        schema = pa.schema(
+            [
+                pa.field("image", pa.string()),
+                pa.field("selection", pa.string()),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(ImageClassificationBatch),
-                batch_to_image_classification_arrow,
+                batch_to_image_classification_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("image", pa.string()),
-                    pa.field("selection", pa.string()),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _map(self, batch: Any):
         for func in self.mappings:
