@@ -38,6 +38,7 @@ message Label {
 message TextLabel {
     string text = 1;
     repeated Label labels = 2;
+    string id = 3;
 }
 
 message MultipleTextSameLabels {

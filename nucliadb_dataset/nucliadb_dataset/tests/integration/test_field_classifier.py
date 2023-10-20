@@ -73,6 +73,30 @@ def test_field_classification_without_labels(
         assert len(loaded_array) == expected
 
 
+def test_field_classification_populates_field_ids(
+    knowledgebox: KnowledgeBox, upload_data_field_classification
+):
+    trainset = TrainSet()
+    trainset.type = TaskType.FIELD_CLASSIFICATION
+    trainset.batch_size = 2
+
+    partitions = export_dataset(knowledgebox, trainset)
+    assert len(partitions) == 1
+
+    loaded_array = partitions[0]
+    assert len(loaded_array) == 4
+
+    titles = 0
+    texts = 0
+    for field_id in loaded_array["field_id"]:
+        if str(field_id).endswith("title"):
+            titles += 1
+        if str(field_id).endswith("text"):
+            texts += 1
+    assert titles == 2
+    assert texts == 2
+
+
 def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
     knowledgebox.upload(
         text="I'm Ramon",
