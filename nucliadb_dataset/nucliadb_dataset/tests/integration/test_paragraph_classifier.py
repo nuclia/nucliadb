@@ -17,26 +17,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pyarrow as pa  # type: ignore
+import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-from nucliadb_dataset.dataset import download_all_partitions
 from nucliadb_dataset.tests.integration.utils import export_dataset
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
-def test_field_classification_with_labels(
-    knowledgebox: KnowledgeBox, upload_data_field_classification
+def test_paragraph_classification_with_labels(
+    knowledgebox: KnowledgeBox, upload_data_paragraph_classification
 ):
     trainset = TrainSet()
-    trainset.type = TaskType.FIELD_CLASSIFICATION
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
 
-    # We multiply by two due to auto-generated title field
     tests = [
-        ([], 2 * 2),
-        (["labelset1"], 2 * 2),
-        (["labelset2"], 1 * 2),
+        ([], 3),
+        (["labelset1"], 3),
+        (["labelset2"], 1),
     ]
     for labels, expected in tests:
         trainset.filter.ClearField("labels")
@@ -49,16 +47,15 @@ def test_field_classification_with_labels(
         assert len(loaded_array) == expected
 
 
-def test_field_classification_without_labels(
-    knowledgebox: KnowledgeBox, upload_data_field_classification_unlabeled
+def test_paragraph_classification_without_labels(
+    knowledgebox: KnowledgeBox, upload_data_paragraph_classification_unlabeled
 ):
     trainset = TrainSet()
-    trainset.type = TaskType.FIELD_CLASSIFICATION
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
 
-    # We multiply by two due to auto-generated title field
     tests = [
-        ([], 2 * 2),
+        ([], 3),
         (["labelset1"], 0),
         (["labelset2"], 0),
     ]
@@ -73,31 +70,13 @@ def test_field_classification_without_labels(
         assert len(loaded_array) == expected
 
 
-def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
-    knowledgebox.upload(
-        text="I'm Ramon",
-        labels=["labelset/positive"],
-    )
+def test_paragraph_classification_invalid_label_type(
+    knowledgebox: KnowledgeBox, upload_data_field_classification
+):
+    trainset = TrainSet()
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
+    trainset.filter.labels.append("labelset1")
+    trainset.batch_size = 2
 
-    knowledgebox.upload(
-        text="I'm not Ramon",
-        labels=["labelset/negative"],
-    )
-
-    knowledgebox.upload(
-        text="I'm Aleix",
-        labels=["labelset/smart"],
-    )
-
-    arrow_filenames = download_all_partitions(
-        task="FIELD_CLASSIFICATION",
-        knowledgebox=knowledgebox,
-        path=temp_folder,
-        labels=["labelset"],
-    )
-
-    for filename in arrow_filenames:
-        with pa.memory_map(filename, "rb") as source:
-            loaded_array = pa.ipc.open_stream(source).read_all()
-            # We multiply by two due to auto-generated title field
-            assert len(loaded_array) == 3 * 2
+    with pytest.raises(Exception):
+        export_dataset(knowledgebox, trainset)

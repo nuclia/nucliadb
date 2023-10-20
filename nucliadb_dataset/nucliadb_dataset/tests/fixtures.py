@@ -41,7 +41,31 @@ DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS els
 
 @pytest.fixture(scope="function")
 def upload_data_field_classification(knowledgebox: KnowledgeBox):
-    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.RESOURCES)
+    knowledgebox.set_labels("labelset1", ["A", "B"], LabelType.RESOURCES)
+    knowledgebox.set_labels("labelset2", ["C"], LabelType.RESOURCES)
+    knowledgebox.upload("doc1", text="This is my lovely text", labels=["labelset1/A"])
+    knowledgebox.upload(
+        "doc2",
+        text="This is my lovely text2",
+        labels=["labelset1/B", "labelset2/C"],
+    )
+
+
+@pytest.fixture(scope="function")
+def upload_data_field_classification_unlabeled(knowledgebox: KnowledgeBox):
+    knowledgebox.set_labels("labelset1", ["A", "B"], LabelType.RESOURCES)
+    knowledgebox.set_labels("labelset2", ["C"], LabelType.RESOURCES)
+    knowledgebox.upload("doc1", text="This is my lovely text")
+    knowledgebox.upload(
+        "doc2",
+        text="This is my lovely text2",
+    )
+
+
+@pytest.fixture(scope="function")
+async def upload_data_paragraph_classification(knowledgebox: KnowledgeBox):
+    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.PARAGRAPHS)
+    knowledgebox.set_labels("labelset2", ["label1", "label2"], LabelType.PARAGRAPHS)
     knowledgebox.upload(
         "doc1", text="This is my lovely text", labels=["labelset1/label1"]
     )
@@ -49,6 +73,29 @@ def upload_data_field_classification(knowledgebox: KnowledgeBox):
         "doc2",
         text="This is my lovely text2",
         labels=["labelset1/label1", "labelset1/label2"],
+    )
+    knowledgebox.upload(
+        "doc3",
+        text="Yet another lovely text",
+        labels=["labelset1/label2", "labelset2/label1"],
+    )
+
+
+@pytest.fixture(scope="function")
+def upload_data_paragraph_classification_unlabeled(knowledgebox: KnowledgeBox):
+    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.PARAGRAPHS)
+    knowledgebox.set_labels("labelset2", ["label1", "label2"], LabelType.PARAGRAPHS)
+    knowledgebox.upload(
+        "doc1",
+        text="Testing without labels is important",
+    )
+    knowledgebox.upload(
+        "doc2",
+        text="So we can be sure unlabeled resources work",
+    )
+    knowledgebox.upload(
+        "doc3",
+        text="And we can export all kind of data",
     )
 
 
