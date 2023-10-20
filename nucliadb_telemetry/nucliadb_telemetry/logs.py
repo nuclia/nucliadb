@@ -139,7 +139,7 @@ class ExtraFormatter(logging.Formatter):
     def format(self, record):
         if not hasattr(record, "extra_formatted"):
             # format all extra fields as a comma separated list
-            extra_fmted = ", ".join(
+            extra_fmted = " -- " + ", ".join(
                 [f"{k}={v}" for k, v in extra_from_record(record).items()]
             )
             setattr(record, "extra_formatted", extra_fmted)
@@ -239,16 +239,11 @@ def setup_logging(*, settings: Optional[LogSettings] = None) -> None:
         log_handler.setFormatter(JSONFormatter())
         error_log_handler.setFormatter(JSONFormatter())
     else:
-        log_handler.setFormatter(
-            ExtraFormatter(
-                "[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s %(extra_formatted)s)"
-            )
+        formatter = ExtraFormatter(
+            "[%(asctime)s.%(msecs)02d][%(levelname)s][%(name)s] - %(message)s%(extra_formatted)s"
         )
-        error_log_handler.setFormatter(
-            ExtraFormatter(
-                "[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s %(extra_formatted)s)"
-            )
-        )
+        log_handler.setFormatter(formatter)
+        error_log_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, settings.log_level.value))
