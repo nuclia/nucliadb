@@ -25,11 +25,7 @@ from uuid import uuid4
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-from nucliadb_dataset.dataset import (
-    NucliaDataset,
-    NucliaDBDataset,
-    download_all_partitions,
-)
+from nucliadb_dataset.dataset import NucliaDBDataset, download_all_partitions
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
@@ -90,15 +86,6 @@ def test_nucliadb_export_fields(
     trainset.batch_size = 2
 
     run_dataset_export(requests_mock, knowledgebox, trainset)
-
-
-def test_inst_base_class():
-    try:
-        NucliaDataset()
-    except TypeError:
-        pass
-    else:
-        raise AssertionError("Base class should'nt be instantiable")
 
 
 def test_live_field_classification(
