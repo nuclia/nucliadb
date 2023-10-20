@@ -1,6 +1,7 @@
 reader_api=http://reader.nucliadb.svc.cluster.local:8080/api
 search_api=http://search.nucliadb.svc.cluster.local:8080/api
 
+error_tolerance=10
 max_workers=100
 duration_s=600
 ramp_up=500
@@ -61,7 +62,7 @@ test-search-cluster: export READER_API=$(reader_api)
 test-search-cluster: # Stress test search on a cluster.
 	echo " *  Test Started at: $$(date -u)"
 
-	molotov ./nucliadb_performance/test_search_cluster.py $(sizing) --sizing-tolerance=10 -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+	molotov ./nucliadb_performance/test_search_cluster.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
 
@@ -73,6 +74,22 @@ test-search-kb: export KBID=$(kbid)
 test-search-kb: # Stress test search on a KB
 	echo " *  Test Started at: $$(date -u)"
 
-	molotov ./nucliadb_performance/test_search_kb.py $(sizing) --sizing-tolerance 10 --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+	molotov ./nucliadb_performance/test_search_kb.py $(sizing) --sizing-tolerance=$(error_tolerance) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
+
+
+pod=''
+start-agent: # Start a 
+	echo "Installing agent on ${pod}"
+
+	kubectl cp -n nucliadb nucliadb_performance ${pod}:/usr/src/app/nucliadb_performance
+	kubectl exec -qit -n nucliadb ${pod} -- make -C nucliadb_performance install
+
+	echo "Starting traffic"
+	kubectl exec -qit -n nucliadb ${pod} -- make -C nucliadb_performance test-search-cluster sizing= max_workers=20 ramp_up=30 duration_s=3600 &
+
+
+stop-agent:
+	echo "Stopping ${pod}"
+	kubectl exec -qit -n nucliadb ${pod} -- apt-get install psmisc && killall -s 9 molotov

@@ -20,6 +20,7 @@ EXCLUDE_KBIDS = [
 ]
 _DATA = {}
 
+MIN_KB_PARAGRAPHS = 5_000
 
 @dataclass
 class Error:
@@ -99,7 +100,8 @@ def get_kbs():
         except CountersError:
             print(f"Error getting counters for {kbid}")
             continue
-        if pars > 0:
+        if pars > MIN_KB_PARAGRAPHS:
+            # Ignore KBs with not a considerable amount of data
             result.append(kbid)
             paragraphs.append(pars)
 
