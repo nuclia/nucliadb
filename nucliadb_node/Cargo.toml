@@ -10,9 +10,6 @@ homepage = "https://nuclia.com"
 documentation = "https://nuclia.com"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[[bin]]
-name = "payload_test"
-path = "src/bin/payload_test.rs"
 
 [[bin]]
 name = "node_reader"

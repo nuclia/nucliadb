@@ -29,7 +29,7 @@ use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
 
 pub trait ShardReaderProvider: Send + Sync {
-    fn load(&self, id: ShardId) -> NodeResult<()>;
+    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardReader>>;
     fn load_all(&self) -> NodeResult<()>;
 
     fn get(&self, id: ShardId) -> Option<Arc<ShardReader>>;
@@ -44,7 +44,7 @@ pub trait AsyncShardReaderProvider: Send + Sync {
 }
 
 pub trait ShardWriterProvider {
-    fn load(&self, id: ShardId) -> NodeResult<()>;
+    fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
     fn load_all(&self) -> NodeResult<()>;
 
     fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;

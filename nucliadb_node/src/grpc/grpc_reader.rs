@@ -20,7 +20,6 @@
 
 use std::sync::Arc;
 
-use crate::shards::errors::ShardNotFoundError;
 use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
 use nucliadb_core::protos::node_reader_server::NodeReader;
 use nucliadb_core::protos::*;
@@ -29,6 +28,7 @@ use nucliadb_core::NodeResult;
 use Shard as ShardPB;
 
 use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardReaderCache;
 use crate::shards::providers::AsyncShardReaderProvider;
 use crate::shards::reader::{ShardFileChunkIterator, ShardReader};

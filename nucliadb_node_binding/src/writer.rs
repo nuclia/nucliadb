@@ -22,6 +22,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
+use nucliadb_core::tracing;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
@@ -34,30 +35,24 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-use crate::errors::{IndexNodeException, LoadShardError, ShardNotFound};
+use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
 
 #[pyclass]
-#[derive(Default)]
 pub struct NodeWriter {
     shards: UnboundedShardWriterCache,
 }
 
 impl NodeWriter {
     fn obtain_shard(&self, shard_id: String) -> Result<Arc<ShardWriter>, PyErr> {
-        let loaded = self.shards.load(shard_id.clone());
-        if let Err(error) = loaded {
-            return Err(LoadShardError::new_err(format!(
+        if let Some(shard) = self.shards.get(shard_id.clone()) {
+            return Ok(shard);
+        }
+        match self.shards.load(shard_id.clone()) {
+            Ok(shard) => Ok(shard),
+            Err(error) => Err(LoadShardError::new_err(format!(
                 "Error loading shard {}: {}",
                 shard_id, error
-            )));
-        }
-
-        match self.shards.get(shard_id.clone()) {
-            Some(shard) => Ok(shard),
-            None => Err(ShardNotFound::new_err(format!(
-                "Shard {} not found",
-                shard_id
             ))),
         }
     }
@@ -67,13 +62,13 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        if let Err(error) = lifecycle::initialize_writer(&env::data_path(), &env::shards_path()) {
-            return Err(IndexNodeException::new_err(format!(
-                "Unable to initialize writer: {error}"
-            )));
-        };
+        let data_path = env::data_path();
+        let shards_path = env::shards_path();
+        lifecycle::initialize_writer(&data_path, &shards_path)
+            .map_err(|error| format!("Unable to initialize writer: {error}"))
+            .map_err(IndexNodeException::new_err)?;
         Ok(Self {
-            shards: UnboundedShardWriterCache::new(env::shards_path()),
+            shards: UnboundedShardWriterCache::new(shards_path),
         })
     }
 
@@ -150,8 +145,12 @@ impl NodeWriter {
         let status = shard
             .set_resource(&resource)
             .and_then(|()| shard.get_opstatus());
+
         match status {
             Ok(mut status) => {
+                if let Err(err) = shard.merge() {
+                    tracing::info!("A merge was attempted, but failed: {err:?}")
+                }
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
@@ -183,6 +182,9 @@ impl NodeWriter {
             .and_then(|()| shard.get_opstatus());
         match status {
             Ok(mut status) => {
+                if let Err(err) = shard.merge() {
+                    tracing::info!("A merge was attempted, but failed: {err:?}")
+                }
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
