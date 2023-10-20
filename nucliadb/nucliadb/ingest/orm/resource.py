@@ -1086,6 +1086,7 @@ class Resource:
 
     def clean(self):
         self._indexer = None
+        self.txn = None
 
     async def iterate_sentences(
         self, enabled_metadata: EnabledMetadata

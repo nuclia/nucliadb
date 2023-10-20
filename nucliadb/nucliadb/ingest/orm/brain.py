@@ -299,6 +299,13 @@ class ResourceBrain:
     def set_processing_status(
         self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]
     ):
+        """
+        We purposefully overwrite what we index as a status and DO NOT reflect
+        actual status with what we index.
+
+        This seems to be is on purpose so the frontend of the product can operate
+        on 2 statuses only -- PENDING and PROCESSED.
+        """
         # The value of brain.status will either be PROCESSED or PENDING
         status = basic.metadata.status
         if previous_status is not None and previous_status != Metadata.Status.PENDING:
