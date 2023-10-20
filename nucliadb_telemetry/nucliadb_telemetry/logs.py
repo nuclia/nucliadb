@@ -197,6 +197,7 @@ def setup_access_logging(settings: LogSettings) -> None:
     access_logger.propagate = False
     access_logger.setLevel(logging.INFO)
 
+    access_handler: logging.Handler
     if settings.log_output_type == LogOutputType.FILE:
         _maybe_create_file_directory(settings.access_log)
         access_handler = RotatingFileHandler(
@@ -223,6 +224,8 @@ def setup_logging(*, settings: Optional[LogSettings] = None) -> None:
         if logger_name not in settings.logger_levels:
             settings.logger_levels[logger_name] = level
 
+    log_handler: logging.Handler
+    error_log_handler: logging.Handler
     if settings.log_output_type == LogOutputType.FILE:
         _maybe_create_file_directory(settings.info_log)
         _maybe_create_file_directory(settings.error_log)
