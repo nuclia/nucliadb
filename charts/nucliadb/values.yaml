@@ -15,7 +15,8 @@ env:
   cluster_discovery_mode: kubernetes
   cluster_discovery_kubernetes_namespace: nucliadb
   cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
-  # when we're k8s, we want structured logs to stdout
+  # when we're k8s, we want structured logs to stdout because we don't have
+  # so they can be scraped by log exporters
   log_output_type: stdout
   log_format_type: structured
 

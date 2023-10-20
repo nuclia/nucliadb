@@ -96,6 +96,7 @@ def run():
         "Node replicas": cluster_settings.node_replicas,
         "Index data path": cluster_settings.data_path,
         "Node port": cluster_settings.standalone_node_port,
+        "Auth policy": settings.auth_policy,
         "Log output type": settings.log_output_type,
     }
     if nuclia_settings.nuclia_service_account:
