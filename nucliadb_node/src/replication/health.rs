@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use filetime::FileTime;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::sync::Arc;
@@ -56,7 +57,10 @@ impl ReplicationHealthManager {
             .is_err()
         {
             error!("Error updating replication health status");
+            return;
         }
+        // Update the modified time of the file
+        filetime::set_file_mtime(self.health_filepath(), FileTime::now()).unwrap();
     }
 
     pub fn healthy(&self) -> bool {
@@ -69,7 +73,7 @@ impl ReplicationHealthManager {
         }
         let metadata = metaddata.unwrap();
         metadata.modified().unwrap()
-            > (std::time::SystemTime::now())
+            > std::time::SystemTime::now()
                 - std::time::Duration::from_secs(self.settings.replication_delay_seconds() * 3)
     }
 }

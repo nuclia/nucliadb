@@ -20,13 +20,14 @@
 
 mod common;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
     op_status, NewShardRequest, NewVectorSetRequest, SearchRequest, SearchResponse, ShardId,
     UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
+use nucliadb_node::replication::health::ReplicationHealthManager;
 use tonic::Request;
 
 #[tokio::test]
@@ -56,6 +57,10 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(response.vector.unwrap().documents.len(), 0);
 
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&fixture.secondary_settings));
+    let healthy = repl_health_mng.healthy();
+    assert!(healthy);
 
     let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());

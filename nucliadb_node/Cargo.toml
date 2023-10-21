@@ -89,6 +89,8 @@ crossbeam = "0.8.2"
 lazy_static = "1.4.0"
 tracing-core = "0.1.31"
 
+filetime = "0.2"
+
 # indra
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }
 
