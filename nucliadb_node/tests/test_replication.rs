@@ -20,7 +20,8 @@
 
 mod common;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{

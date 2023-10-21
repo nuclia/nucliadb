@@ -231,12 +231,10 @@ pub async fn connect_to_primary_and_replicate(
             });
         }
 
-        /*
-        Healthy check and delays for manage replication.
-
-        1. If we're healthy, we'll sleep for a while and check again.
-        2. If backed up replicating, we'll try replicating again immediately and check again.
-        */
+        // Healthy check and delays for manage replication.
+        //
+        // 1. If we're healthy, we'll sleep for a while and check again.
+        // 2. If backed up replicating, we'll try replicating again immediately and check again.
         let elapsed = start
             .elapsed()
             .map(|elapsed| elapsed.as_secs_f64())
