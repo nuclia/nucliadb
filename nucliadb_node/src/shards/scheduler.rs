@@ -17,10 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
 use std::env;
-use lazy_static::lazy_static;
+use std::sync::Arc;
 
+use lazy_static::lazy_static;
 use nucliadb_core::tracing::error;
 use nucliadb_core::NodeResult;
 use tokio::sync::{Semaphore, SemaphorePermit};
