@@ -3,7 +3,13 @@ import os
 from faker import Faker
 from molotov import global_setup, global_teardown, scenario
 
-from nucliadb_performance.utils import get_kb, make_kbid_request, print_errors
+from nucliadb_performance.utils import (
+    convert_sentence_to_vector,
+    get_kb,
+    get_kb_request,
+    make_kbid_request,
+    print_errors,
+)
 
 fake = Faker()
 
@@ -45,15 +51,26 @@ def init_test(args):
 
 
 @scenario(weight=1)
-async def test_find_entity_filter(session):
+async def test_find_with_filter(session):
     kbid = get_kb_to_test()
-    filters = [f"/e/COUNTRY/{fake.country()}"]
+
+    request = get_kb_request(kbid)
+    query = request.query
+    vector = await convert_sentence_to_vector(kbid, query)
+    data = {"query": query, "filters": request.filters, "vector": vector}
+    if request.features is None:
+        data["features"] = ["paragraph", "vector"]
+    else:
+        data["features"] = request.features
+    if request.min_score is not None:
+        data["min_score"] = request.min_score
+
     await make_kbid_request(
         session,
         kbid,
-        "GET",
+        "POST",
         f"/v1/kb/{kbid}/find",
-        params={"query": fake.sentence(), "filters": filters},
+        json=data,
     )
 
 
