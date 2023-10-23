@@ -63,7 +63,9 @@ def record_filters_counter(filters: list[str], counter: Counter) -> None:
     for fltr in filters:
         if entity_found and label_found:
             break
-        if fltr == "" or fltr[0] != "/":
+        if fltr == "":
+            continue
+        if fltr[0] != "/":
             break
         if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
             entity_found = True
