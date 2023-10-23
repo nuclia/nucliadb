@@ -44,7 +44,9 @@ class Observer:
         self,
         name: str,
         *,
-        error_mappings: Optional[dict[str, Type[Exception]]] = None,
+        error_mappings: Optional[
+            dict[str, Union[Type[Exception], Type[BaseException]]]
+        ] = None,
         labels: Optional[dict[str, str]] = None,
         buckets: Optional[list[float]] = None,
     ):
@@ -147,8 +149,8 @@ class ObserverRecorder:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[Exception]],
-        exc_value: Optional[Exception],
+        exc_type: Optional[Union[Type[Exception], Type[BaseException]]],
+        exc_value: Optional[Union[Exception, BaseException]],
         traceback: Optional[StackSummary],
     ):
         if exc_type is not None:

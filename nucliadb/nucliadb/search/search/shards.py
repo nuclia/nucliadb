@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from typing import Optional
 
 from nucliadb_protos.nodereader_pb2 import (
@@ -35,7 +36,13 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_telemetry import metrics
 
-node_observer = metrics.Observer("node_client", labels={"type": "", "node_id": ""})
+node_observer = metrics.Observer(
+    "node_client",
+    labels={"type": "", "node_id": ""},
+    error_mappings={
+        "timeout": asyncio.CancelledError,
+    },
+)
 
 
 async def query_shard(
