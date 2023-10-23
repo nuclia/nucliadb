@@ -144,7 +144,7 @@ async def test_get_kb_model_default_min_score_backward_compatible(has_feature, k
 def test_record_filters_counter():
     counter = Mock()
 
-    record_filters_counter(["/l/ls/l1", "/e/ORG/Nuclia"], counter)
+    record_filters_counter(["", "/l/ls/l1", "/e/ORG/Nuclia"], counter)
 
     counter.inc.assert_has_calls(
         [
