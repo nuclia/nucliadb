@@ -1,15 +1,24 @@
+import inspect
+import json
 import random
 import shelve
 import statistics
 from dataclasses import dataclass
+from functools import cache
 from typing import Optional
 
+import httpx
 from faker import Faker
 
-from nucliadb_performance.settings import get_reader_api_url, get_search_api_url
+from nucliadb_performance.settings import (
+    get_predict_api_url,
+    get_reader_api_url,
+    get_search_api_url,
+)
 from nucliadb_sdk import NucliaDB
 
 fake = Faker()
+
 
 EXCLUDE_KBIDS = [
     # These are old kbs that are excluded because they
@@ -21,6 +30,8 @@ EXCLUDE_KBIDS = [
 _DATA = {}
 
 MIN_KB_PARAGRAPHS = 5_000
+KB_REQUESTS_FILE = "kb_requests.json"
+
 
 @dataclass
 class Error:
@@ -51,7 +62,20 @@ def cache_to_disk(func):
         finally:
             d.close()
 
-    return new_func
+    async def new_coro(*args, **kwargs):
+        d = shelve.open("cache.data")
+        try:
+            cache_key = f"{func.__name__}::{args}::{tuple(sorted(kwargs.items()))}"
+            if cache_key not in d:
+                d[cache_key] = await func(*args, **kwargs)
+            return d[cache_key]
+        finally:
+            d.close()
+
+    if inspect.iscoroutinefunction(func):
+        return new_coro
+    else:
+        return new_func
 
 
 class Client:
@@ -195,3 +219,45 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
 def print_errors():
     for error in ERRORS:
         print(error)
+
+
+@dataclass
+class SearchRequest:
+    query: str
+    filters: str
+    features: Optional[list[str]] = None
+    min_score: Optional[float] = None
+
+
+@cache
+def load_kb_requests(kbid) -> list[SearchRequest]:
+    try:
+        with open(KB_REQUESTS_FILE, "r") as f:
+            requests = json.loads(f.read())
+        kb_reqs = requests[kbid]
+        return [SearchRequest(**req) for req in kb_reqs]
+    except (FileNotFoundError, KeyError):
+        return []
+
+
+def get_kb_request(kbid):
+    requests = load_kb_requests(kbid)
+    if len(requests) == 0:
+        return SearchRequest(
+            query=fake.sentence(),
+            filters=[],
+        )
+    return random.choice(requests)
+
+
+@cache_to_disk
+async def convert_sentence_to_vector(kbid: str, sentence: str):
+    client = httpx.AsyncClient(base_url=get_predict_api_url())
+    resp = await client.get(
+        "/sentence",
+        headers={"X-STF-KBID": kbid},
+        params={"text": sentence},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data["data"]
