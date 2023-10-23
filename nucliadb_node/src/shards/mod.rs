@@ -22,6 +22,7 @@
 pub mod errors;
 pub mod metadata;
 pub mod providers;
+pub mod scheduler;
 pub mod shard_reader;
 pub mod shard_writer;
 pub mod versions;
