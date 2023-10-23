@@ -4,6 +4,7 @@ metadata:
   name: node
   labels:
     app: node
+    appType: node
     app.kubernetes.io/name: node
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}

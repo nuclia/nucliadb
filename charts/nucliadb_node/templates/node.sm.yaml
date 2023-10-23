@@ -15,7 +15,9 @@ spec:
     - "{{ .Release.Namespace }}"
   selector:
     matchLabels:
-      app: node
+      # pull metrics for all pods that are node type
+      # this is to include read replicas
+      appType: node
   endpoints:
   # node sidecar metrics
   - targetPort: {{ .Values.serving.metricsPort }}

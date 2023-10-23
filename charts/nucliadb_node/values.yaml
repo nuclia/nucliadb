@@ -76,14 +76,35 @@ tracing:
 ##   .Values.cache.cache_pubsub_nats_auth
 nats:
   secretName: nats-creds
-  regionalSecretName: regional-nats-creds
   port: 4222
 
 indexing:
   index_jetstream_auth:
   index_jetstream_servers:
     - nats1
-
 # extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
+
+readReplicas:
+  count: 0 # number of read replicas to deploy per node, by default, no read replicas
+  affinity: {}
+  nodeSelector: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  disk:
+    numLocalDisks: 1
+    localDiskSize: 375
+    reservationPercentage: 0.1
+    type: ephemeral
+  resources:
+    reader: {}
+    #  limits:
+    #    memory: "600Mi"
+    #  requests:
+    #    cpu: "200m"
+    writer: {}
+    #  limits:
+    #    memory: "300Mi"
+    #  requests:
+    #    cpu: "100m"

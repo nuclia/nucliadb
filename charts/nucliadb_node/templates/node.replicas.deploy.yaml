@@ -1,0 +1,176 @@
+{{- $release := .Release }}
+{{- $values := .Values }}
+{{- $chart := .Chart }}
+{{- range $i, $e := until (int .Values.replicaCount) }}
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: node-replicas-{{ $i }}
+  labels:
+    app: node-replicas-{{ $i }}
+    appType: node
+    app.kubernetes.io/name: node-replicas-{{ $i }}
+    app.kubernetes.io/instance: "{{ $release.Name }}"
+    app.kubernetes.io/managed-by: {{ $release.Service }}
+    version: "{{ $chart.Version | replace "+" "_" }}"
+    chart: "{{ $chart.Name }}"
+spec:
+  replicas: {{ $values.readReplicas.count }}
+  revisionHistoryLimit: {{ $values.revisionHistoryLimit }}
+  serviceName: node
+  selector:
+    matchLabels:
+      app: node-replicas-{{ $i }}
+      app.kubernetes.io/name: node-replicas-{{ $i }}
+      app.kubernetes.io/instance: "{{ $release.Name }}"
+      app.kubernetes.io/managed-by: {{ $release.Service }}
+  template:
+    metadata:
+      annotations:
+        # do not have access to dependency chart cm this component references
+        {{- if hasKey $values "extra_pod_annotations" }}
+{{ toYaml $values.extra_pod_annotations | indent 8 }}
+        {{- end }}
+      name: node-replicas-{{ $i }}
+      labels:
+        app: node-replicas-{{ $i }}
+        appType: node
+        app.kubernetes.io/name: node-replicas-{{ $i }}
+        app.kubernetes.io/instance: "{{ $release.Name }}"
+        app.kubernetes.io/managed-by: {{ $release.Service }}
+        version: "{{ $chart.Version | replace "+" "_" }}"
+        chart: "{{ $chart.Name }}"
+    spec:
+      nodeSelector:
+{{ toYaml $values.readReplicas.nodeSelector | indent 8 }}
+      topologySpreadConstraints:
+{{ toYaml $values.readReplicas.topologySpreadConstraints | indent 8 }}
+      affinity:
+{{ toYaml $values.readReplicas.affinity | indent 8 }}
+      tolerations:
+{{ toYaml $values.readReplicas.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+      volumes:
+      - name: data-dir
+        emptyDir:
+          sizeLimit: {{ mul $values.readReplicas.disk.numLocalDisks $values.readReplicas.disk.localDiskSize $values.readReplicas.disk.reservationPercentage | int }}Gi
+{{- if $values.nats.secretName }}
+      - name: nats-creds
+        secret:
+          secretName: {{ $values.nats.secretName }}
+{{- end }}
+      containers:
+      - name: writer
+        securityContext:
+          privileged: true
+        image: "{{ $values.containerRegistry }}/{{ $values.image }}"
+        imagePullPolicy: {{ $values.imagePullPolicy }}
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ $values.serving.grpc_writer }}", "-service=nodewriter.NodeWriter", "-connect-timeout=2000ms", "-rpc-timeout=2000ms"]
+          initialDelaySeconds: 10
+          periodSeconds: 60
+        command: ["node_writer"]
+        envFrom:
+        - configMapRef:
+            name: node-config
+        - configMapRef:
+            name: nucliadb-config
+        env:
+          - name: NODE_ROLE
+            value: secondary
+          - name: PRIMARY_ADDRESS
+            value: "node-{{ $i }}:{{ $values.serving.grpc_writer }}"
+          - name: METRICS_HTTP_PORT
+            value: "3032"
+          {{- range $key, $value := $values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+          {{- end }}
+        ports:
+        - name: grpc-writer
+          containerPort: {{ $values.serving.grpc_writer }}
+          protocol: TCP
+        - name: metrics
+          containerPort: 3032
+        resources:
+{{ toYaml $values.readReplicas.resources.writer | indent 10 }}
+        volumeMounts:
+        - name: data-dir
+          mountPath: {{ $values.config.data_path }}
+      - name: reader
+        securityContext:
+          privileged: true
+        image: "{{ $values.containerRegistry }}/{{ $values.image }}"
+        imagePullPolicy: {{ $values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ $values.serving.grpc_reader }}", "-service=nodereader.NodeReader"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 10
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ $values.serving.grpc_reader }}", "-service=nodereader.NodeReader"]
+          initialDelaySeconds: 2
+        command: ["node_reader"]
+        envFrom:
+        - configMapRef:
+            name: node-config
+        - configMapRef:
+            name: nucliadb-config
+        env:
+          - name: NODE_ROLE
+            value: secondary
+          - name: METRICS_HTTP_PORT
+            value: "3031"
+        {{- range $key, $value := $values.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+        {{- end }}
+        ports:
+        - name: grpc-reader
+          containerPort: {{ $values.serving.grpc_reader }}
+          protocol: TCP
+        - name: metrics
+          containerPort: 3031
+        resources:
+{{ toYaml $values.readReplicas.resources.reader | indent 10 }}
+        volumeMounts:
+        - name: data-dir
+          mountPath: {{ $values.config.data_path }}
+{{- if $values.tracing.enabled }}
+      - name: jaeger-agent
+        image: "jaegertracing/jaeger-agent:{{ $values.tracing.jaegerAgentTag }}"
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 5775
+            name: zk-compact-trft
+            protocol: UDP
+          - containerPort: 5778
+            name: config-rest
+            protocol: TCP
+          - containerPort: 6831
+            name: jg-compact-trft
+            protocol: UDP
+          - containerPort: 6832
+            name: jg-binary-trft
+            protocol: UDP
+          - containerPort: 14271
+            name: admin-http
+            protocol: TCP
+        args:
+          - --reporter.grpc.host-port=dns:///{{ $values.tracing.jaegerCollectorHost }}:{{ $values.tracing.jaegerCollectorGrpcPort }}
+          - --reporter.type=grpc
+{{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: node-pv
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ $values.storage.class }}
+      resources:
+        requests:
+          storage: {{ $values.storage.size }}
+---
+{{- end }}
