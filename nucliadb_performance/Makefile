@@ -76,21 +76,3 @@ test-search-kb: # Stress test search on a KB
 	molotov ./nucliadb_performance/test_search_kb.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
-
-
-pod=''
-install-agent:  # Installs the nucliadb_performance package in a pod
-	echo "Installing agent on ${pod}"
-
-	kubectl cp -n nucliadb nucliadb_performance ${pod}:/usr/src/app/nucliadb_performance
-	kubectl exec -qit -n nucliadb ${pod} -- make -C nucliadb_performance install
-
-
-start-agent:  # Starts a test in an agent
-	echo "Starting traffic"
-	kubectl exec -qit -n nucliadb ${pod} -- make -C nucliadb_performance $(test) kbid=$(kbid) sizing=$(sizing) error_tolerance=$(error_tolerance) max_workers=$(max_workers) ramp_up=$(ramp_up) duration_s=$(duration_s) &
-
-
-stop-agent:  # Stops a running test in an agent
-	echo "Stopping ${pod}"
-	kubectl exec -qit -n nucliadb ${pod} -- apt-get install psmisc && killall -s 9 molotov
