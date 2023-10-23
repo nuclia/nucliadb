@@ -56,6 +56,11 @@ async fn schedule<'a>(
 pub async fn scheduler_task(shard: Arc<ShardWriter>, permits: Arc<Semaphore>) {
     let mut merge_interval = time::interval(Duration::from_secs(*MERGE_INTERVAL_SECS));
     let mut gc_interval = time::interval(Duration::from_secs(*GC_INTERVAL_SECS));
+
+    // First instants return immediately
+    merge_interval.tick().await;
+    merge_interval.tick().await;
+
     loop {
         let (handler, permit) = tokio::select! {
             permit = schedule(&mut merge_interval, &permits) => {
