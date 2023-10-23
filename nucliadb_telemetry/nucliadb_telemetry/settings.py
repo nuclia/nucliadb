@@ -20,6 +20,8 @@
 import enum
 from typing import Optional
 
+import pydantic
+
 try:
     from pydantic import BaseSettings
 except ImportError:  # pragma: no cover
@@ -46,7 +48,36 @@ class LogLevel(enum.Enum):
     CRITICAL = "CRITICAL"
 
 
+class LogOutputType(str, enum.Enum):
+    STDOUT = "stdout"
+    FILE = "file"
+
+
+class LogFormatType(str, enum.Enum):
+    PLAIN = "plain"
+    STRUCTURED = "structured"
+
+
 class LogSettings(BaseSettings):
     debug: bool = False
     log_level: LogLevel = LogLevel.WARNING
     logger_levels: Optional[dict[str, LogLevel]] = None
+    log_output_type: LogOutputType = LogOutputType.STDOUT
+    log_format_type: LogFormatType = LogFormatType.STRUCTURED
+
+    access_log: str = pydantic.Field(
+        default="logs/access.log",
+        description="If using file log output, this is the path to the access log file.",
+    )
+    info_log: str = pydantic.Field(
+        default="logs/info.log",
+        description="If using file log output, this is the path to all logs that are not error or access logs.",
+    )
+    error_log: str = pydantic.Field(
+        default="logs/error.log",
+        description="If using file log output, this is the path to the error log file.",
+    )
+    max_log_file_size: int = pydantic.Field(
+        default=1024 * 1024 * 50,
+        description="Max file size in bytes before rotating log file.",
+    )
