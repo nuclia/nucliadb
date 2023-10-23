@@ -93,32 +93,25 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
-        let shard = Arc::new(
-            tokio::task::spawn_blocking(move || {
-                if !shard_path.is_dir() {
-                    return Err(node_error!(ShardNotFoundError(
-                        "Shard {shard_path:?} is not on disk"
-                    )));
-                }
-                ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
-                    node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
-                })
+        let shard = tokio::task::spawn_blocking(move || {
+            if !shard_path.is_dir() {
+                return Err(node_error!(ShardNotFoundError(
+                    "Shard {shard_path:?} is not on disk"
+                )));
+            }
+            ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
+                node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
             })
-            .await
-            .context("Blocking task panicked")??,
-        );
+        })
+        .await
+        .context("Blocking task panicked")??;
 
-<<<<<<< HEAD
-        cache.insert(shard_key, Arc::clone(&shard));
-
-=======
         let shard = Arc::new(shard);
         let cache_shard = Arc::clone(&shard);
         let scheduler_shard = Arc::clone(&shard);
         let scheduler_permits = Arc::clone(&self.scheduler_permits);
         cache.insert(shard_key, cache_shard);
         tokio::task::spawn(scheduler_task(scheduler_shard, scheduler_permits));
->>>>>>> e406709c (rebase)
         Ok(shard)
     }
 

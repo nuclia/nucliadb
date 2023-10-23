@@ -18,6 +18,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
