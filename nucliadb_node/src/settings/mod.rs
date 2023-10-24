@@ -211,7 +211,7 @@ impl Settings {
     }
 
     pub fn node_role(&self) -> NodeRole {
-        self.node_role.clone()
+        self.node_role
     }
     pub fn replication_delay_seconds(&self) -> u64 {
         self.replication_delay_seconds

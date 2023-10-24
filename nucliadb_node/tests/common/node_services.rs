@@ -83,8 +83,8 @@ fn find_open_port() -> u16 {
 }
 
 pub struct NodeFixture {
-    settings: Arc<Settings>,
-    secondary_settings: Arc<Settings>,
+    pub settings: Arc<Settings>,
+    pub secondary_settings: Arc<Settings>,
     reader_client: Option<TestNodeReader>,
     writer_client: Option<TestNodeWriter>,
     secondary_reader_client: Option<TestNodeReader>,

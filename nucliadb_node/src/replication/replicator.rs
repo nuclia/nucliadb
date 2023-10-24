@@ -202,6 +202,7 @@ pub async fn connect_to_primary_and_replicate(
         });
         info!("Got replication state: {:?}", replication_state.clone());
 
+        let start = std::time::SystemTime::now();
         for shard_state in replication_state.shard_states {
             let shard_id = shard_state.shard_id.clone();
             info!("Replicating shard: {:?}", shard_id);
@@ -230,12 +231,27 @@ pub async fn connect_to_primary_and_replicate(
                 operation: "shard_replicated".to_string(),
             });
         }
-        repl_health_mng.healthy();
-        // sleep for some time
-        tokio::time::sleep(std::time::Duration::from_secs(
-            settings.replication_delay_seconds(),
-        ))
-        .await;
+
+        // Healthy check and delays for manage replication.
+        //
+        // 1. If we're healthy, we'll sleep for a while and check again.
+        // 2. If backed up replicating, we'll try replicating again immediately and check again.
+        let elapsed = start
+            .elapsed()
+            .map(|elapsed| elapsed.as_secs_f64())
+            .expect("Error getting elapsed time");
+        if elapsed < settings.replication_delay_seconds() as f64 {
+            // only update healthy marker if we're up-to-date in a short
+            // amount of time
+            repl_health_mng.update_healthy();
+
+            // and only sleep if replication was successful under this time
+            // otherwise, check again for changes
+            tokio::time::sleep(std::time::Duration::from_secs(
+                settings.replication_delay_seconds(),
+            ))
+            .await;
+        }
     }
 }
 
