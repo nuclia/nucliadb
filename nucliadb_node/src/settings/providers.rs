@@ -79,6 +79,10 @@ pub mod env {
             if let Ok(levels) = std::env::var("RUST_LOG") {
                 builder.log_levels(parse_log_levels(&levels));
             }
+            // support more standard LOG_LEVELS env var
+            if let Ok(levels) = std::env::var("LOG_LEVELS") {
+                builder.log_levels(parse_log_levels(&levels));
+            }
 
             if let Ok(Ok(true)) = std::env::var("JAEGER_ENABLED").map(|v| v.parse::<bool>()) {
                 builder.with_jaeger_enabled();
@@ -116,6 +120,12 @@ pub mod env {
                 std::env::var("REPLICATION_DELAY_SECONDS").map(|v| v.parse::<u64>())
             {
                 builder.replication_delay_seconds(replication_delay_seconds);
+            }
+
+            if let Ok(Ok(replication_max_concurrency)) =
+                std::env::var("REPLICATION_MAX_CONCURRENCY").map(|v| v.parse::<u64>())
+            {
+                builder.replication_max_concurrency(replication_max_concurrency);
             }
 
             let settings = builder.build()?;

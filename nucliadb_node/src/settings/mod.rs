@@ -73,7 +73,7 @@ pub struct Settings {
     sentry_env: &'static str,
 
     // Logs and traces
-    #[builder(default = "parse_log_levels(\"nucliadb_node=WARN\")")]
+    #[builder(default = "parse_log_levels(\"nucliadb_*=INFO\")")]
     log_levels: Vec<(String, Level)>,
     #[rustfmt::skip]
     #[builder(
@@ -108,6 +108,8 @@ pub struct Settings {
     node_role: NodeRole,
     #[builder(default = "3")]
     replication_delay_seconds: u64,
+    #[builder(default = "10")]
+    replication_max_concurrency: u64,
 }
 
 impl Settings {
@@ -215,6 +217,9 @@ impl Settings {
     }
     pub fn replication_delay_seconds(&self) -> u64 {
         self.replication_delay_seconds
+    }
+    pub fn replication_max_concurrency(&self) -> u64 {
+        self.replication_max_concurrency
     }
 }
 
