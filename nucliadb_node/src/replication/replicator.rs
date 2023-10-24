@@ -77,11 +77,7 @@ pub async fn replicate_shard(
     let mut file = tokio::fs::File::create(temp_filepath.clone()).await?;
     let mut start = std::time::SystemTime::now();
     while let Some(resp) = stream.message().await? {
-        if generation_id.is_none() {
-            generation_id = Some(resp.generation_id.clone());
-            // write generation id to shard
-            shard.set_generation_id(resp.generation_id);
-        }
+        generation_id = Some(resp.generation_id);
         if filepath.is_some() && Some(resp.filepath.clone()) != filepath {
             std::fs::remove_file(temp_filepath)?;
             return Err(Error::new(std::io::Error::new(
@@ -130,6 +126,11 @@ pub async fn replicate_shard(
         start = std::time::SystemTime::now();
     }
     drop(file);
+
+    if generation_id.is_none() {
+        // After successful sync, set the generation id
+        shard.set_generation_id(generation_id.unwrap());
+    }
 
     // cleanup leftovers
     if std::path::Path::new(&temp_filepath).exists() {
