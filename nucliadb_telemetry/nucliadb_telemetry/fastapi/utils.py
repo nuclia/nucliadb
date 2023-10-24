@@ -16,7 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from typing import NamedTuple, Optional, Tuple
+from typing import List, NamedTuple, Optional, Tuple
 
 from starlette.applications import Starlette
 from starlette.datastructures import URL
@@ -43,7 +43,7 @@ def get_path_template(scope: Scope) -> FoundPathTemplate:
 
 
 def find_route(
-    scope: Scope, routes: list[Route]
+    scope: Scope, routes: List[Route]
 ) -> Tuple[Optional[str], Optional[Scope]]:
     # we mutate scope, so we need a copy
     scope = scope.copy()  # type:ignore
