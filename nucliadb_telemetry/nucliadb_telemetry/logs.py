@@ -23,7 +23,7 @@ import os
 from copy import copy
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import orjson
 import pydantic
@@ -74,7 +74,7 @@ _BUILTIN_ATTRS = set(
 )
 
 
-def extra_from_record(record) -> dict[str, Any]:
+def extra_from_record(record) -> Dict[str, Any]:
     return {
         attr_name: record.__dict__[attr_name]
         for attr_name in set(record.__dict__) - _BUILTIN_ATTRS
@@ -87,7 +87,7 @@ class JSONFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        extra: dict[str, Any]
+        extra: Dict[str, Any]
         if isinstance(record.msg, dict):
             extra = record.msg
         elif isinstance(record.msg, pydantic.BaseModel):
@@ -100,7 +100,7 @@ class JSONFormatter(logging.Formatter):
 
         return orjson.dumps(extra, default=repr).decode("utf-8", errors="ignore")
 
-    def fill_log_data(self, data: dict[str, Any], record: logging.LogRecord) -> None:
+    def fill_log_data(self, data: Dict[str, Any], record: logging.LogRecord) -> None:
         if "time" not in data:
             data["time"] = datetime.utcnow()
 

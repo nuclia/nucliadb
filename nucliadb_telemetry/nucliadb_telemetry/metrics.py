@@ -21,7 +21,7 @@ import os
 import time
 from functools import wraps
 from inspect import isasyncgenfunction, isgeneratorfunction
-from typing import TYPE_CHECKING, Optional, Type, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, Union
 
 import prometheus_client
 
@@ -45,10 +45,10 @@ class Observer:
         name: str,
         *,
         error_mappings: Optional[
-            dict[str, Union[Type[Exception], Type[BaseException]]]
+            Dict[str, Union[Type[Exception], Type[BaseException]]]
         ] = None,
-        labels: Optional[dict[str, str]] = None,
-        buckets: Optional[list[float]] = None,
+        labels: Optional[Dict[str, str]] = None,
+        buckets: Optional[List[float]] = None,
     ):
         self.error_mappings = error_mappings or {}
         self.labels = labels or {}
@@ -77,7 +77,7 @@ class Observer:
             **hist_kwargs,  # type: ignore
         )
 
-    def wrap(self, labels: Optional[dict[str, str]] = None):
+    def wrap(self, labels: Optional[Dict[str, str]] = None):
         def decorator(func):
             if asyncio.iscoroutinefunction(func):
 
@@ -113,12 +113,12 @@ class Observer:
 
         return decorator
 
-    def __call__(self, labels: Optional[dict[str, str]] = None):
+    def __call__(self, labels: Optional[Dict[str, str]] = None):
         return ObserverRecorder(self, labels or {})
 
 
 class ObserverRecorder:
-    def __init__(self, observer: Observer, label_overrides: dict[str, str]):
+    def __init__(self, observer: Observer, label_overrides: Dict[str, str]):
         self.observer = observer
         if len(label_overrides) > 0:
             self.labels = observer.labels.copy()
@@ -165,7 +165,7 @@ class ObserverRecorder:
 
 
 class Gauge:
-    def __init__(self, name: str, *, labels: Optional[dict[str, str]] = None):
+    def __init__(self, name: str, *, labels: Optional[Dict[str, str]] = None):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
@@ -174,7 +174,7 @@ class Gauge:
             name, f"Gauge for {name}.", labelnames=tuple(self.labels.keys())
         )
 
-    def set(self, value: Union[float, int], labels: Optional[dict[str, str]] = None):
+    def set(self, value: Union[float, int], labels: Optional[Dict[str, str]] = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
@@ -183,12 +183,12 @@ class Gauge:
         else:
             self.gauge.set(value)
 
-    def remove(self, labels: dict[str, str]):
+    def remove(self, labels: Dict[str, str]):
         self.gauge.remove(*[labels[k] for k in self.labels.keys()])
 
 
 class Counter:
-    def __init__(self, name: str, *, labels: Optional[dict[str, str]] = None):
+    def __init__(self, name: str, *, labels: Optional[Dict[str, str]] = None):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
             self.labels[_VERSION_METRIC] = os.environ[_VERSION_ENV_VAR_NAME]
@@ -197,7 +197,7 @@ class Counter:
             name, f"Counter for {name}.", labelnames=tuple(self.labels.keys())
         )
 
-    def inc(self, labels: Optional[dict[str, str]] = None):
+    def inc(self, labels: Optional[Dict[str, str]] = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
@@ -212,8 +212,8 @@ class Histogram:
         self,
         name: str,
         *,
-        labels: Optional[dict[str, str]] = None,
-        buckets: Optional[list[float]] = None,
+        labels: Optional[Dict[str, str]] = None,
+        buckets: Optional[List[float]] = None,
     ):
         self.labels = labels or {}
         if _VERSION_ENV_VAR_NAME in os.environ:
@@ -226,7 +226,7 @@ class Histogram:
             name, f"Counter for {name}.", labelnames=tuple(self.labels.keys()), **kwargs  # type: ignore
         )
 
-    def observe(self, value: float, labels: Optional[dict[str, str]] = None):
+    def observe(self, value: float, labels: Optional[Dict[str, str]] = None):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
         if len(merged_labels) > 0:

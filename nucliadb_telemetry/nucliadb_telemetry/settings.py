@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import enum
-from typing import Optional
+from typing import Dict, Optional
 
 import pydantic
 
@@ -61,7 +61,7 @@ class LogFormatType(str, enum.Enum):
 class LogSettings(BaseSettings):
     debug: bool = False
     log_level: LogLevel = LogLevel.WARNING
-    logger_levels: Optional[dict[str, LogLevel]] = None
+    logger_levels: Optional[Dict[str, LogLevel]] = None
     log_output_type: LogOutputType = LogOutputType.STDOUT
     log_format_type: LogFormatType = LogFormatType.STRUCTURED
 
