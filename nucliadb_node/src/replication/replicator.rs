@@ -232,6 +232,21 @@ pub async fn connect_to_primary_and_replicate(
             });
         }
 
+        for shard_id in replication_state.shards_to_remove {
+            info!("Removing shard: {:?}", shard_id);
+            if !existing_shards.contains(&shard_id) {
+                continue;
+            }
+            let shard_lookup = shard_cache.delete(shard_id.clone()).await;
+            if shard_lookup.is_err() {
+                warn!("Failed to delete shard: {:?}", shard_lookup);
+                continue;
+            }
+            metrics.record_replication_op(replication_metrics::ShardOpsKey {
+                operation: "shard_removed".to_string(),
+            });
+        }
+
         // Healthy check and delays for manage replication.
         //
         // 1. If we're healthy, we'll sleep for a while and check again.

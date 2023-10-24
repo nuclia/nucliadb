@@ -140,6 +140,12 @@ impl replication::replication_service_server::ReplicationService for Replication
         let mut resp_shard_states = Vec::new();
         let request_shard_states = request.shard_states;
         let shard_ids = list_shards(self.settings.shards_path()).await;
+        let shards_to_remove = request_shard_states
+            .iter()
+            .filter(|s| !shard_ids.contains(&s.shard_id))
+            .map(|s| s.shard_id.clone())
+            .collect();
+
         for shard_id in shard_ids {
             let mut shard = self.shards.get(shard_id.clone()).await;
             if shard.is_none() {
@@ -175,6 +181,7 @@ impl replication::replication_service_server::ReplicationService for Replication
 
         let response = replication::PrimaryCheckReplicationStateResponse {
             shard_states: resp_shard_states,
+            shards_to_remove,
         };
         Ok(Response::new(response))
     }
