@@ -21,7 +21,7 @@ use std::fs;
 use std::io::Cursor;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing;
@@ -40,21 +40,26 @@ use pyo3::types::PyList;
 use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
 
-fn load_merge_interval() -> u64 {
+fn load_merge_interval_secs() -> u64 {
     let val = std::env::var("MERGE_INTERVAL_SECS").ok();
     val.and_then(|value| value.parse().ok()).unwrap_or(10800)
 }
 
-fn load_gc_interval() -> u64 {
+fn load_gc_interval_secs() -> u64 {
     let val = std::env::var("GC_INTERVAL_SECS").ok();
     val.and_then(|value| value.parse().ok()).unwrap_or(86400)
 }
 
-fn load_update_interval() -> u64 {
+fn load_update_interval_secs() -> u64 {
     60
 }
 
+fn scheduler_frequency_secs() -> u64 {
+    5
+}
+
 struct Scheduler {
+    frequency: Duration,
     update_interval: u64,
     merge_interval: u64,
     gc_interval: u64,
@@ -118,9 +123,10 @@ impl Scheduler {
     pub fn new(receiver: Receiver<Arc<ShardWriter>>) -> Scheduler {
         Scheduler {
             receiver,
-            merge_interval: load_merge_interval(),
-            gc_interval: load_gc_interval(),
-            update_interval: load_update_interval(),
+            frequency: Duration::from_secs(scheduler_frequency_secs()),
+            merge_interval: load_merge_interval_secs(),
+            gc_interval: load_gc_interval_secs(),
+            update_interval: load_update_interval_secs(),
             update_timer: SystemTime::now(),
             merge_timer: SystemTime::now(),
             gc_timer: SystemTime::now(),
@@ -129,6 +135,8 @@ impl Scheduler {
     }
     pub fn run(mut self) {
         loop {
+            std::thread::sleep(self.frequency);
+
             if self.should_update() {
                 self.update_workload();
                 self.update_timer = SystemTime::now();
