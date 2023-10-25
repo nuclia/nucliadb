@@ -394,19 +394,18 @@ impl ShardReader {
         Ok(response)
     }
 
-    #[measure(actor = "shard", metric = "request/parallel_search")]
+    #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
-    #[allow(clippy::too_many_arguments)]
-    pub fn parallel_search(
-        &self,
-        search_request: SearchRequest,
-        search_id: String,
-        skip_fields: bool,
-        skip_paragraphs: bool,
-        skip_vectors: bool,
-        skip_relations: bool,
-        span: &Span,
-    ) -> NodeResult<SearchResponse> {
+    pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+        let search_id = uuid::Uuid::new_v4().to_string();
+        let span = tracing::Span::current();
+
+        let skip_paragraphs = !search_request.paragraph;
+        let skip_fields = !search_request.document;
+        let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
+        let skip_relations =
+            search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
+
         let field_request = DocumentSearchRequest {
             id: search_id.clone(),
             body: search_request.body.clone(),
@@ -474,13 +473,13 @@ impl ShardReader {
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || Some(relation_reader_service.search(&relation_request));
 
-        let info = info_span!(parent: span, "text search");
+        let info = info_span!(parent: &span, "text search");
         let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: span, "paragraph search");
+        let info = info_span!(parent: &span, "paragraph search");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: span, "vector search");
+        let info = info_span!(parent: &span, "vector search");
         let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: span, "relations search");
+        let info = info_span!(parent: &span, "relations search");
         let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut rtext = None;
@@ -510,183 +509,6 @@ impl ShardReader {
             vector: rvector.transpose()?,
             relation: rrelation.transpose()?,
         })
-    }
-
-    #[measure(actor = "shard", metric = "request/piped_search")]
-    #[tracing::instrument(skip_all)]
-    #[allow(clippy::too_many_arguments)]
-    pub fn piped_search(
-        &self,
-        mut search_request: SearchRequest,
-        search_id: String,
-        skip_fields: bool,
-        skip_paragraphs: bool,
-        skip_vectors: bool,
-        skip_relations: bool,
-        span: &Span,
-    ) -> NodeResult<SearchResponse> {
-        let field_request = DocumentSearchRequest {
-            id: search_id.clone(),
-            body: search_request.body.clone(),
-            fields: search_request.fields.clone(),
-            filter: search_request.filter.clone(),
-            order: search_request.order.clone(),
-            faceted: search_request.faceted.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            timestamps: search_request.timestamps.clone(),
-            only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
-            with_status: search_request.with_status,
-            ..Default::default()
-        };
-        let text_reader_service = self.text_reader.clone();
-        let text_task = move || Some(text_reader_service.search(&field_request));
-        let info = info_span!(parent: span, "text search");
-        let text_task = || run_with_telemetry(info, text_task);
-
-        let rtext = text_task().transpose()?;
-
-        if let Some(rtext1) = rtext.clone() {
-            rtext1
-                .results
-                .into_iter()
-                .for_each(|result| search_request.key_filters.push(result.field.clone()))
-        }
-
-        let paragraph_request = ParagraphSearchRequest {
-            id: search_id.clone(),
-            uuid: "".to_string(),
-            with_duplicates: search_request.with_duplicates,
-            body: search_request.body.clone(),
-            fields: search_request.fields.clone(),
-            filter: search_request.filter.clone(),
-            order: search_request.order.clone(),
-            faceted: search_request.faceted.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            timestamps: search_request.timestamps.clone(),
-            only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
-            key_filters: search_request.key_filters.clone(),
-            ..Default::default()
-        };
-        let paragraph_reader_service = self.paragraph_reader.clone();
-        let paragraph_task = move || Some(paragraph_reader_service.search(&paragraph_request));
-
-        let vector_request = VectorSearchRequest {
-            id: search_id.clone(),
-            vector_set: search_request.vectorset.clone(),
-            vector: search_request.vector.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            with_duplicates: search_request.with_duplicates,
-            key_filters: search_request.key_filters.clone(),
-            tags: search_request
-                .filter
-                .iter()
-                .flat_map(|f| f.tags.iter().cloned())
-                .chain(search_request.fields.iter().cloned())
-                .collect(),
-            min_score: search_request.min_score,
-            ..Default::default()
-        };
-        let vector_reader_service = self.vector_reader.clone();
-        let vector_task = move || Some(vector_reader_service.search(&vector_request));
-
-        let relation_request = RelationSearchRequest {
-            shard_id: search_request.shard.clone(),
-            prefix: search_request.relation_prefix.clone(),
-            subgraph: search_request.relation_subgraph,
-            ..Default::default()
-        };
-        let relation_reader_service = self.relation_reader.clone();
-        let relation_task = move || Some(relation_reader_service.search(&relation_request));
-
-        let info = info_span!(parent: span, "paragraph search");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: span, "vector search");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: span, "relations search");
-        let relation_task = || run_with_telemetry(info, relation_task);
-
-        let mut rparagraph = None;
-        let mut rvector = None;
-        let mut rrelation = None;
-
-        crossbeam_thread::scope(|s| {
-            if !skip_paragraphs {
-                s.spawn(|_| rparagraph = paragraph_task());
-            }
-            if !skip_vectors {
-                s.spawn(|_| rvector = vector_task());
-            }
-            if !skip_relations {
-                s.spawn(|_| rrelation = relation_task());
-            }
-        })
-        .expect("Failed to join threads");
-
-        let mut rdocument = rtext;
-        if skip_fields {
-            rdocument = None;
-        }
-        Ok(SearchResponse {
-            document: rdocument,
-            paragraph: rparagraph.transpose()?,
-            vector: rvector.transpose()?,
-            relation: rrelation.transpose()?,
-        })
-    }
-
-    #[measure(actor = "shard", metric = "request/search")]
-    #[tracing::instrument(skip_all)]
-    pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let search_id = uuid::Uuid::new_v4().to_string();
-        let span = tracing::Span::current();
-
-        let skip_paragraphs = !search_request.paragraph;
-        let skip_fields = !search_request.document;
-        let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
-        let skip_relations =
-            search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
-        let skip_all = skip_fields && skip_paragraphs && skip_vectors && skip_relations;
-
-        if skip_all {
-            return Ok(SearchResponse {
-                document: None,
-                paragraph: None,
-                vector: None,
-                relation: None,
-            });
-        }
-
-        let has_filters = search_request.filter.is_some()
-            && !search_request.filter.clone().unwrap().tags.is_empty();
-        let has_key_filters = !search_request.key_filters.is_empty();
-        let needs_pre_filtering = has_filters || has_key_filters;
-
-        if needs_pre_filtering {
-            self.piped_search(
-                search_request,
-                search_id,
-                skip_fields,
-                skip_paragraphs,
-                skip_vectors,
-                skip_relations,
-                &span,
-            )
-        } else {
-            self.parallel_search(
-                search_request,
-                search_id,
-                skip_fields,
-                skip_paragraphs,
-                skip_vectors,
-                skip_relations,
-                &span,
-            )
-        }
     }
 
     #[tracing::instrument(skip_all)]
