@@ -42,17 +42,6 @@ use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::list_shards;
 
-fn create_merge_task(shard: Arc<ShardWriter>) -> impl FnOnce() + Send + 'static {
-    let span = Span::current();
-    let info = info_span!(parent: &span, "merge task");
-    let merge_task = move || {
-        if let Err(err) = shard.merge() {
-            info!("A merge was attempted, but failed: {err:?}")
-        }
-    };
-    move || run_with_telemetry(info, merge_task)
-}
-
 pub struct NodeWriterGRPCDriver {
     shards: Arc<AsyncUnboundedShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
@@ -188,7 +177,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(&shard_id).await?;
         let info = info_span!(parent: &span, "set resource");
-        let merge_task = create_merge_task(Arc::clone(&shard));
         let write_task = || {
             run_with_telemetry(info, move || {
                 shard
@@ -203,7 +191,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
             })?;
         match status {
             Ok(mut status) => {
-                tokio::task::spawn_blocking(merge_task);
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
@@ -230,7 +217,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = resource.shard_id.clone();
         let shard = self.obtain_shard(&shard_id).await?;
         let info = info_span!(parent: &span, "remove resource");
-        let merge_task = create_merge_task(shard.clone());
         let write_task = || {
             run_with_telemetry(info, move || {
                 shard
@@ -245,7 +231,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
             })?;
         match status {
             Ok(mut status) => {
-                tokio::task::spawn_blocking(merge_task);
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
