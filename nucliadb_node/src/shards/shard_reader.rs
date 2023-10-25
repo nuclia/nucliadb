@@ -396,7 +396,7 @@ impl ShardReader {
 
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
-    pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+    pub fn search(&self, mut search_request: SearchRequest) -> NodeResult<SearchResponse> {
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
 
@@ -405,6 +405,57 @@ impl ShardReader {
         let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
         let skip_relations =
             search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
+
+        let skip_all = skip_fields && skip_paragraphs && skip_vectors && skip_relations;
+
+        if skip_all {
+            return Ok(SearchResponse {
+                document: None,
+                paragraph: None,
+                vector: None,
+                relation: None,
+            });
+        }
+
+        let has_filters = search_request.filter.is_some()
+            && !search_request.filter.clone().unwrap().tags.is_empty();
+        let has_key_filters = !search_request.key_filters.is_empty();
+        let needs_pre_filtering = has_filters || has_key_filters;
+
+        let mut rtext = None;
+
+        let field_request = DocumentSearchRequest {
+            id: search_id.clone(),
+            body: search_request.body.clone(),
+            fields: search_request.fields.clone(),
+            filter: search_request.filter.clone(),
+            order: search_request.order.clone(),
+            faceted: search_request.faceted.clone(),
+            page_number: search_request.page_number,
+            result_per_page: search_request.result_per_page,
+            timestamps: search_request.timestamps.clone(),
+            only_faceted: search_request.only_faceted,
+            advanced_query: search_request.advanced_query.clone(),
+            with_status: search_request.with_status,
+            ..Default::default()
+        };
+        let text_reader_service = self.text_reader.clone();
+        let text_task = move || Some(text_reader_service.search(&field_request));
+        let info = info_span!(parent: &span, "text search");
+        let text_task = || run_with_telemetry(info, text_task);
+
+        if needs_pre_filtering {
+            rtext = text_task();
+            match &rtext {
+                Some(Ok(rtext)) => {
+                    rtext
+                        .results
+                        .iter()
+                        .for_each(|result| search_request.key_filters.push(result.field.clone()));
+                }
+                _ => {}
+            }
+        }
 
         let field_request = DocumentSearchRequest {
             id: search_id.clone(),
@@ -482,13 +533,12 @@ impl ShardReader {
         let info = info_span!(parent: &span, "relations search");
         let relation_task = || run_with_telemetry(info, relation_task);
 
-        let mut rtext = None;
         let mut rparagraph = None;
         let mut rvector = None;
         let mut rrelation = None;
 
         crossbeam_thread::scope(|s| {
-            if !skip_fields {
+            if !skip_fields && !needs_pre_filtering {
                 s.spawn(|_| rtext = text_task());
             }
             if !skip_paragraphs {
@@ -503,12 +553,18 @@ impl ShardReader {
         })
         .expect("Failed to join threads");
 
-        Ok(SearchResponse {
-            document: rtext.transpose()?,
+        let mut response = SearchResponse {
+            document: None,
             paragraph: rparagraph.transpose()?,
             vector: rvector.transpose()?,
             relation: rrelation.transpose()?,
-        })
+        };
+
+        if !skip_fields {
+            response.document = rtext.transpose()?;
+        }
+
+        Ok(response)
     }
 
     #[tracing::instrument(skip_all)]
