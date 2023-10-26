@@ -19,6 +19,7 @@
 //
 
 #![allow(clippy::derive_partial_eq_without_eq)]
+#![allow(clippy::large_enum_variant)]
 
 pub mod fdbwriter;
 pub mod knowledgebox;
