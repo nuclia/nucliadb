@@ -368,6 +368,13 @@ impl WriterChild for VectorWriterService {
             files.push(format!("vectors/{}/index.hnsw", segment_id));
             files.push(format!("vectors/{}/journal.json", segment_id));
             files.push(format!("vectors/{}/nodes.kv", segment_id));
+
+            let fst_path = self.index.location.join(format!("{}/fst", segment_id));
+            if fst_path.exists() {
+                files.push(format!("vectors/{}/fst/keys.fst", segment_id));
+                files.push(format!("vectors/{}/fst/labels.fst", segment_id));
+                files.push(format!("vectors/{}/fst/labels.idx", segment_id));
+            }
         }
 
         let vectorsets = self.list_vectorsets()?;
@@ -386,6 +393,13 @@ impl WriterChild for VectorWriterService {
                     files.push(format!("vectorset/{}/{}/index.hnsw", vs, segment_id));
                     files.push(format!("vectorset/{}/{}/journal.json", vs, segment_id));
                     files.push(format!("vectorset/{}/{}/nodes.kv", vs, segment_id));
+
+                    let fst_path = self.config.vectorset.join(format!("{}/fst", segment_id));
+                    if fst_path.exists() {
+                        files.push(format!("vectors/{}/fst/keys.fst", segment_id));
+                        files.push(format!("vectors/{}/fst/labels.fst", segment_id));
+                        files.push(format!("vectors/{}/fst/labels.idx", segment_id));
+                    }
                 }
                 meta_files.insert(
                     format!("vectorset/{}/state.bincode", vs),
@@ -666,5 +680,83 @@ mod tests {
         assert!(res.is_ok());
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_get_segments() {
+        let dir = TempDir::new().unwrap();
+        let vsc = VectorConfig {
+            similarity: Some(VectorSimilarity::Cosine),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorset"),
+            channel: Channel::EXPERIMENTAL,
+        };
+        let resource_id = ResourceId {
+            shard_id: "DOC".to_string(),
+            uuid: "DOC/KEY".to_string(),
+        };
+
+        let mut sentences = HashMap::new();
+        sentences.insert(
+            "DOC/KEY/1/1".to_string(),
+            VectorSentence {
+                vector: vec![1.0, 3.0, 4.0],
+                ..Default::default()
+            },
+        );
+
+        let paragraph = IndexParagraph {
+            start: 0,
+            end: 0,
+            sentences,
+            field: "".to_string(),
+            labels: vec!["1".to_string(), "2".to_string(), "3".to_string()],
+            index: 3,
+            split: "".to_string(),
+            repeated_in_field: false,
+            metadata: None,
+        };
+        let paragraphs = IndexParagraphs {
+            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+        };
+        let resource = Resource {
+            resource: Some(resource_id.clone()),
+            metadata: None,
+            texts: HashMap::with_capacity(0),
+            status: ResourceStatus::Processed as i32,
+            labels: vec!["FULL".to_string()],
+            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs_to_delete: vec![],
+            sentences_to_delete: vec![],
+            relations_to_delete: vec![],
+            relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
+            shard_id: "DOC".to_string(),
+        };
+        // insert - delete - insert sequence
+        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let res = writer.set_resource(&resource);
+        assert!(res.is_ok());
+        let res = writer.delete_resource(&resource_id);
+        assert!(res.is_ok());
+        let res = writer.set_resource(&resource);
+        assert!(res.is_ok());
+
+        let segments = writer.get_segment_ids().unwrap();
+        assert_eq!(segments.len(), 2);
+        let existing_segs: Vec<String> = Vec::new();
+        let index_files = writer.get_index_files(&existing_segs).unwrap();
+        let mut expected_files = Vec::new();
+        for segment in segments {
+            expected_files.push(format!("vectors/{}/index.hnsw", segment));
+            expected_files.push(format!("vectors/{}/journal.json", segment));
+            expected_files.push(format!("vectors/{}/nodes.kv", segment));
+            expected_files.push(format!("vectors/{}/fst/keys.fst", segment));
+            expected_files.push(format!("vectors/{}/fst/labels.fst", segment));
+            expected_files.push(format!("vectors/{}/fst/labels.idx", segment));
+        }
+        assert_eq!(index_files.files, expected_files);
+        assert_eq!(index_files.metadata_files.len(), 2);
     }
 }
