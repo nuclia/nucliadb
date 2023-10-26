@@ -48,7 +48,7 @@ nucliadb-models
 nucliadb-contributor-assets~=1.0.0
 
 asyncpg>=0.27.0
-tikv-client>=0.0.3
+tikv-client @ git+https://github.com/nuclia/tikv-client-py@master
 
 # improve dependency resolution
 multidict>=6.0.4
