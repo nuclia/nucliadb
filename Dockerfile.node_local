@@ -118,6 +118,9 @@ RUN apt-get -y update \
     libssl1.1 \
     lmdb-utils \
     libdw-dev \
+    linux-perf \
+    linux-base \
+    && cp /usr/bin/perf_5.10 /usr/bin/perf_5.15 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=base /bin/grpc_health_probe /bin/grpc_health_probe
