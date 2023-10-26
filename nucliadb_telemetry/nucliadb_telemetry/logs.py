@@ -186,8 +186,7 @@ _default_logger_levels = {
 
 def _maybe_create_file_directory(path: str) -> None:
     directory = os.path.dirname(path)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    os.makedirs(directory, exist_ok=True)
 
 
 def setup_access_logging(settings: LogSettings) -> None:
