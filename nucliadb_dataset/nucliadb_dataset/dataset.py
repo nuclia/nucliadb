@@ -216,23 +216,18 @@ class NucliaDBDataset(NucliaDataset):
     def _configure_field_classification(self):
         if len(self.trainset.filter.labels) > 1:
             raise Exception("Needs to have at most one labelset filter to train")
-
-        labelset = None
-        if len(self.trainset.filter.labels) == 1:
-            labelset = self.trainset.filter.labels[0]
-
         self.labels = self.client.get_labels()
-
+        labelset = self.trainset.filter.labels[0]
         computed_labelset = False
-        if labelset is not None and labelset not in self.labels.labelsets:
+
+        if labelset not in self.labels.labelsets:
             if labelset in self.knowledgebox.get_uploaded_labels():
                 computed_labelset = True
             else:
                 raise Exception("Labelset is not valid")
 
         if (
-            labelset is not None
-            and computed_labelset is False
+            computed_labelset is False
             and "RESOURCES" not in self.labels.labelsets[labelset].kind
         ):
             raise Exception("Labelset not defined for Field Classification")
@@ -275,20 +270,13 @@ class NucliaDBDataset(NucliaDataset):
     def _configure_paragraph_classification(self):
         if len(self.trainset.filter.labels) > 1:
             raise Exception("Needs to have at most one labelset filter to train")
-
-        labelset = None
-        if len(self.trainset.filter.labels) == 1:
-            labelset = self.trainset.filter.labels[0]
-
-            if labelset not in self.labels.labelsets:
-                raise Exception("Labelset is not valid")
-
         self.labels = self.client.get_labels()
+        labelset = self.trainset.filter.labels[0]
 
-        if (
-            labelset is not None
-            and "PARAGRAPHS" not in self.labels.labelsets[labelset].kind
-        ):
+        if labelset not in self.labels.labelsets:
+            raise Exception("Labelset is not valid")
+
+        if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")
 
         self._set_mappings(
