@@ -72,11 +72,10 @@ from nucliadb_models.search import (
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,
-    UpdateResourcePayload,
     ResourceCreated,
-    ResourceUpdated,
     ResourceFieldAdded,
-
+    ResourceUpdated,
+    UpdateResourcePayload,
 )
 from nucliadb_sdk.v2 import docstrings, exceptions
 
