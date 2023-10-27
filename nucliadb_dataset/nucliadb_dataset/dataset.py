@@ -198,24 +198,25 @@ class NucliaDBDataset(NucliaDataset):
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
+
+        schema = pa.schema(
+            [
+                pa.field("text", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(SentenceClassificationBatch),
-                batch_to_text_classification_normalized_arrow,
+                batch_to_text_classification_normalized_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("text", pa.string()),
-                    pa.field("labels", pa.list_(pa.string())),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _configure_field_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
+
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         computed_labelset = False
@@ -232,20 +233,19 @@ class NucliaDBDataset(NucliaDataset):
         ):
             raise Exception("Labelset not defined for Field Classification")
 
+        schema = pa.schema(
+            [
+                pa.field("text", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(FieldClassificationBatch),
-                batch_to_text_classification_arrow,
+                batch_to_text_classification_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("text", pa.string()),
-                    pa.field("labels", pa.list_(pa.string())),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _configure_token_classification(self):
         self.entities = self.client.get_entities()
@@ -270,6 +270,7 @@ class NucliaDBDataset(NucliaDataset):
     def _configure_paragraph_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
+
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
 
@@ -279,36 +280,34 @@ class NucliaDBDataset(NucliaDataset):
         if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")
 
+        schema = pa.schema(
+            [
+                pa.field("text", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(ParagraphClassificationBatch),
-                batch_to_text_classification_arrow,
+                batch_to_text_classification_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("text", pa.string()),
-                    pa.field("labels", pa.list_(pa.string())),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _configure_image_classification(self):
+        schema = pa.schema(
+            [
+                pa.field("image", pa.string()),
+                pa.field("selection", pa.string()),
+            ]
+        )
         self._set_mappings(
             [
                 bytes_to_batch(ImageClassificationBatch),
-                batch_to_image_classification_arrow,
+                batch_to_image_classification_arrow(schema),
             ]
         )
-        self._set_schema(
-            pa.schema(
-                [
-                    pa.field("image", pa.string()),
-                    pa.field("selection", pa.string()),
-                ]
-            )
-        )
+        self._set_schema(schema)
 
     def _map(self, batch: Any):
         for func in self.mappings:

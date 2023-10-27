@@ -41,19 +41,24 @@ def bytes_to_batch(klass: Any):
     return func
 
 
-def batch_to_text_classification_arrow(batch: BatchType):
-    X = []
-    Y = []
-    for data in batch.data:
-        if data.text:
-            X.append(data.text)
-            Y.append([f"{label.labelset}/{label.label}" for label in data.labels])
-    if len(X):
-        pa_data = [pa.array(X), pa.array(Y)]
-        output_batch = pa.record_batch(pa_data, names=["text", "labels"])
-    else:
-        output_batch = None
-    return output_batch
+def batch_to_text_classification_arrow(schema: pa.schema):
+    def func(batch: BatchType):
+        TEXT = []
+        LABELS = []
+        for data in batch.data:
+            if data.text:
+                TEXT.append(data.text)
+                LABELS.append(
+                    [f"{label.labelset}/{label.label}" for label in data.labels]
+                )
+        if len(TEXT):
+            pa_data = [pa.array(TEXT), pa.array(LABELS)]
+            output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
 
 
 def batch_to_token_classification_arrow(schema: pa.schema):
@@ -73,32 +78,38 @@ def batch_to_token_classification_arrow(schema: pa.schema):
     return func
 
 
-def batch_to_text_classification_normalized_arrow(batch: SentenceClassificationBatch):
-    TEXT = []
-    LABELS = []
-    for data in batch.data:
-        batch_labels = [f"{label.labelset}/{label.label}" for label in data.labels]
-        for sentence in data.text:
-            TEXT.append(sentence)
-            LABELS.append(batch_labels)
-    if len(TEXT):
-        pa_data = [pa.array(TEXT), pa.array(LABELS)]
-        output_batch = pa.record_batch(pa_data, names=["text", "labels"])
-    else:
-        output_batch = None
-    return output_batch
+def batch_to_text_classification_normalized_arrow(schema: pa.schema):
+    def func(batch: SentenceClassificationBatch):
+        TEXT = []
+        LABELS = []
+        for data in batch.data:
+            batch_labels = [f"{label.labelset}/{label.label}" for label in data.labels]
+            for sentence in data.text:
+                TEXT.append(sentence)
+                LABELS.append(batch_labels)
+        if len(TEXT):
+            pa_data = [pa.array(TEXT), pa.array(LABELS)]
+            output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
 
 
-def batch_to_image_classification_arrow(batch: ImageClassificationBatch):
-    IMAGE = []
-    SELECTION = []
-    for data in batch.data:
-        IMAGE.append(data.page_uri)
-        SELECTION.append(data.selections)
+def batch_to_image_classification_arrow(schema: pa.schema):
+    def func(batch: ImageClassificationBatch):
+        IMAGE = []
+        SELECTION = []
+        for data in batch.data:
+            IMAGE.append(data.page_uri)
+            SELECTION.append(data.selections)
 
-    if len(IMAGE):
-        pa_data = [pa.array(IMAGE), pa.array(SELECTION)]
-        output_batch = pa.record_batch(pa_data, names=["image", "selection"])
-    else:
-        output_batch = None
-    return output_batch
+        if len(IMAGE):
+            pa_data = [pa.array(IMAGE), pa.array(SELECTION)]
+            output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func

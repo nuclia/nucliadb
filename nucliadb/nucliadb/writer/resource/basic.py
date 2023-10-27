@@ -152,7 +152,7 @@ def parse_basic_modify(
         # indexes differently so this is not required
         bm.reindex = True
 
-        # protobuferrs repeated fields don't support assignment
+        # protobufers repeated fields don't support assignment
         # will allways be a clean basic
         bm.basic.usermetadata.classifications.extend(
             [

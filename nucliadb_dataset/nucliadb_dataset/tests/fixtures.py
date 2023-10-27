@@ -41,7 +41,20 @@ DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS els
 
 @pytest.fixture(scope="function")
 def upload_data_field_classification(knowledgebox: KnowledgeBox):
-    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.RESOURCES)
+    knowledgebox.set_labels("labelset1", ["A", "B"], LabelType.RESOURCES)
+    knowledgebox.set_labels("labelset2", ["C"], LabelType.RESOURCES)
+    knowledgebox.upload("doc1", text="This is my lovely text", labels=["labelset1/A"])
+    knowledgebox.upload(
+        "doc2",
+        text="This is my lovely text2",
+        labels=["labelset1/B", "labelset2/C"],
+    )
+
+
+@pytest.fixture(scope="function")
+async def upload_data_paragraph_classification(knowledgebox: KnowledgeBox):
+    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.PARAGRAPHS)
+    knowledgebox.set_labels("labelset2", ["label1", "label2"], LabelType.PARAGRAPHS)
     knowledgebox.upload(
         "doc1", text="This is my lovely text", labels=["labelset1/label1"]
     )
@@ -49,6 +62,11 @@ def upload_data_field_classification(knowledgebox: KnowledgeBox):
         "doc2",
         text="This is my lovely text2",
         labels=["labelset1/label1", "labelset1/label2"],
+    )
+    knowledgebox.upload(
+        "doc3",
+        text="Yet another lovely text",
+        labels=["labelset1/label2", "labelset2/label1"],
     )
 
 
