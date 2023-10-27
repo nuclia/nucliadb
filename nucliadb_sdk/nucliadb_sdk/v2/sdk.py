@@ -73,11 +73,9 @@ from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_models.writer import (
     CreateResourcePayload,
     UpdateResourcePayload,
-    UpdateResourceBySlugPayload,
     ResourceCreated,
     ResourceUpdated,
     ResourceFieldAdded,
-    ResourceBySlugUpdated, 
 
 )
 from nucliadb_sdk.v2 import docstrings, exceptions
