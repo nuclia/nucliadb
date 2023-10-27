@@ -170,32 +170,6 @@ class UpdateResourcePayload(BaseModel):
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
 
 
-class UpdateResourceBySlugPayload(BaseModel):
-    title: Optional[str] = FieldDefaults.title
-    summary: Optional[str] = FieldDefaults.summary
-    slug: Optional[str]  = FieldDefaults.slug
-    thumbnail: Optional[str] = None
-    layout: Optional[str] = None
-    metadata: Optional[InputMetadata] = None
-    usermetadata: Optional[UserMetadata] = None
-    uservectors: Optional[UserVectorsWrapper] = None
-    fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[Origin] = None
-    extra: Optional[Extra] = None
-    files: Dict[FieldIdString, FileField] = FieldDefaults.files
-    links: Dict[FieldIdString, LinkField] = FieldDefaults.links
-    texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
-    layouts: Dict[FieldIdString, InputLayoutField] = FieldDefaults.layouts
-    conversations: Dict[
-        FieldIdString, InputConversationField
-    ] = FieldDefaults.conversations
-    keywordsets: Dict[FieldIdString, FieldKeywordset] = FieldDefaults.keywordsets
-    datetimes: Dict[FieldIdString, FieldDatetime] = FieldDefaults.datetimes
-
-    # Processing options
-    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
-
-
 class ResourceCreated(BaseModel):
     uuid: str
     elapsed: Optional[float] = None
@@ -203,10 +177,6 @@ class ResourceCreated(BaseModel):
 
 
 class ResourceUpdated(BaseModel):
-    seqid: Optional[int] = None
-
-
-class ResourceBySlugUpdated(BaseModel):
     seqid: Optional[int] = None
 
 
