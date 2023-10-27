@@ -121,19 +121,16 @@ class TextLabel(google.protobuf.message.Message):
 
     TEXT_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
-    ID_FIELD_NUMBER: builtins.int
     text: builtins.str
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Label]: ...
-    id: builtins.str
     def __init__(
         self,
         *,
         text: builtins.str = ...,
         labels: collections.abc.Iterable[global___Label] | None = ...,
-        id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "labels", b"labels", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "text", b"text"]) -> None: ...
 
 global___TextLabel = TextLabel
 

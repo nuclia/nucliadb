@@ -239,7 +239,6 @@ class NucliaDBDataset(NucliaDataset):
 
         schema = pa.schema(
             [
-                pa.field("field_id", pa.string()),
                 pa.field("text", pa.string()),
                 pa.field("labels", pa.list_(pa.string())),
             ]
@@ -293,7 +292,6 @@ class NucliaDBDataset(NucliaDataset):
 
         schema = pa.schema(
             [
-                pa.field("paragraph_id", pa.string()),
                 pa.field("text", pa.string()),
                 pa.field("labels", pa.list_(pa.string())),
             ]

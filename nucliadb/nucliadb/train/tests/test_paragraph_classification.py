@@ -364,37 +364,3 @@ async def test_generator_paragraph_classification_iterates_all_paragraphs(
             batches.append(batch)
             assert len(batch.data) == 2
         assert len(batches) == 2
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
-async def test_generator_paragraph_classification_populates_paragraph_ids(
-    train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
-):
-    await inject_resource_without_labels(knowledgebox, nucliadb_grpc)
-    await asyncio.sleep(0.1)
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
-    ) as partitions:
-        assert partitions.status == 200
-        data = await partitions.json()
-        assert len(data["partitions"]) == 1
-        partition_id = data["partitions"][0]
-
-    trainset = TrainSet()
-    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
-    trainset.batch_size = 2
-
-    async with train_rest_api.post(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
-        data=trainset.SerializeToString(),
-    ) as response:
-        assert response.status == 200
-        batches = []
-        async for batch in get_paragraph_classification_batch_from_response(response):
-            batches.append(batch)
-            assert len(batch.data) == 2
-            for data in batch.data:
-                paragraph_id = data.id
-                assert "/t/text/" in paragraph_id
-        assert len(batches) == 2

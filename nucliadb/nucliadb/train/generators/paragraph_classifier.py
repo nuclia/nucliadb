@@ -95,8 +95,8 @@ async def generate_paragraph_classification_payloads(
                 text_labels.append(label)
 
         tl = TextLabel()
-        tl.id = paragraph_item.id
         paragraph_text = await get_paragraph(kbid, paragraph_item.id)
+
         tl.text = paragraph_text
         for label in text_labels:
             _, _, label_labelset, label_title = label.split("/")

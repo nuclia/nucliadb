@@ -86,7 +86,6 @@ async def generate_field_classification_payloads(
         total += 1
 
         tl = TextLabel()
-        tl.id = field_id
         rid, field_type, field = field_id.split("/")
         tl.text = await get_field_text(kbid, rid, field, field_type)
 
