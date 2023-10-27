@@ -79,7 +79,7 @@ UPDATE_RESOURCE_BY_SLUG = Docstring(
             description="You can update any of the resource attributes with this method",
             code=""">>> from nucliadb_sdk import *
 >>> sdk = NucliaDBSDK(api_key="api-key")
->>> resp = sdk.update_resoure_by_slug(kbid="mykbid", slug="data_log_56", title="My new title")
+>>> resp = sdk.update_resoure_by_slug(kbid="mykbid", rslug="data_log_56", title="My new title")
 """,
         ),
     ],
