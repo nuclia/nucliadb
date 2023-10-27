@@ -373,9 +373,9 @@ class _NucliaDBBase:
     )
     update_resource_by_slug = _request_builder(
         name="update_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}",
+        path_template="/v1/kb/{kbid}/slug/{rslug}",
         method="PATCH",
-        path_params=("kbid", "slug"),
+        path_params=("kbid", "rslug"),
         request_type=UpdateResourcePayload,
         response_type=ResourceUpdated,
         docstring=docstrings.UPDATE_RESOURCE_BY_SLUG,
