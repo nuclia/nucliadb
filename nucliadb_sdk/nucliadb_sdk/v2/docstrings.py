@@ -72,6 +72,19 @@ UPDATE_RESOURCE = Docstring(
     ],
 )
 
+UPDATE_RESOURCE_BY_SLUG = Docstring(
+    doc="""Update a Resource from your Knowledge Box by Slug""",
+    examples=[
+        Example(
+            description="You can update any of the resource attributes with this method",
+            code=""">>> from nucliadb_sdk import *
+>>> sdk = NucliaDBSDK(api_key="api-key")
+>>> resp = sdk.update_resoure_by_slug(kbid="mykbid", rslug="data_log_56", title="My new title")
+""",
+        ),
+    ],
+)
+
 GET_RESOURCE_BY_ID = Docstring(
     doc="""Get Resource by id""",
     examples=[
