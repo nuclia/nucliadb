@@ -405,17 +405,29 @@ pub struct FieldMetadata {
     pub relations: ::prost::alloc::vec::Vec<Relations>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Question {
+    #[prost(string, tag="1")]
+    pub text: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub language: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="3")]
+    pub ids_paragraphs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Answers {
+    #[prost(string, tag="1")]
+    pub text: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub language: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="3")]
+    pub ids_paragraphs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QuestionAnswer {
     #[prost(string, tag="1")]
     pub question: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub question_language: ::prost::alloc::string::String,
-    #[prost(string, tag="3")]
-    pub answer: ::prost::alloc::string::String,
-    #[prost(string, tag="4")]
-    pub answer_language: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag="5")]
-    pub paragraph_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="2")]
+    pub answer: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QuestionAnswers {

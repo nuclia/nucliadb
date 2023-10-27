@@ -41,6 +41,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from nucliadb_protos.resources_pb2 import (
     AllFieldIDs as AllFieldIDs,
+    Answers as Answers,
     Basic as Basic,
     Block as Block,
     CONVERSATION as CONVERSATION,
@@ -95,6 +96,7 @@ from nucliadb_protos.resources_pb2 import (
     ParagraphAnnotation as ParagraphAnnotation,
     Position as Position,
     Positions as Positions,
+    Question as Question,
     QuestionAnswer as QuestionAnswer,
     QuestionAnswers as QuestionAnswers,
     Relations as Relations,

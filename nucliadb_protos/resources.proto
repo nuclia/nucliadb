@@ -262,16 +262,25 @@ message FieldMetadata {
     repeated Relations relations = 13;
 }
 
+message Question {
+    string text = 1;
+    string language = 2;
+    repeated string ids_paragraphs = 3;
+}
+
+message Answers {
+    string text = 1;
+    string language = 2;
+    repeated string ids_paragraphs = 3;
+}
+
 message QuestionAnswer {
-  string question = 1;
-  string question_language = 2;
-  string answer = 3;
-  string answer_language = 4;
-  repeated string paragraph_ids = 5;
+    string Question = 1;
+    repeated string Answer = 2;
 }
 
 message QuestionAnswers {
-  repeated QuestionAnswer question_answer = 1;
+    repeated QuestionAnswer question_answer = 1;
 }
 
 message FieldQuestionAnswerWrapper {
