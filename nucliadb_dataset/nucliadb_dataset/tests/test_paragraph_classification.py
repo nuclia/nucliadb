@@ -17,26 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import tempfile
 
 import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import TrainSet
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-from nucliadb_dataset.dataset import NucliaDBDataset
+from nucliadb_dataset.export import FileSystemExport
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
-def export_dataset(knowledgebox: KnowledgeBox, trainset: TrainSet) -> list[pa.Table]:
+def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification):
+    trainset = TrainSet()
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
+    trainset.batch_size = 2
+
     with tempfile.TemporaryDirectory() as tmpdirname:
-        dataset = NucliaDBDataset(
-            client=knowledgebox.client,
+        fse = FileSystemExport(
+            knowledgebox.client,
             trainset=trainset,
-            base_path=tmpdirname,
+            store_path=tmpdirname,
         )
-        arrays = []
-        for filename in dataset.read_all_partitions():
-            with pa.memory_map(filename, "rb") as source:
+        fse.export()
+        files = os.listdir(tmpdirname)
+        for filename in files:
+            with pa.memory_map(f"{tmpdirname}/{filename}", "rb") as source:
                 loaded_array = pa.ipc.open_stream(source).read_all()
-                # We multiply by two due to auto-generated title field
-                arrays.append(loaded_array)
-        return arrays
+                assert len(loaded_array) == 2

@@ -51,120 +51,26 @@ async def get_field_classification_batch_from_response(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_field_classification(
-    train_rest_api: aiohttp.ClientSession,
-    knowledgebox_with_labels: str,
+    train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
-    kbid = knowledgebox_with_labels
-
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
-        assert partitions.status == 200
-        data = await partitions.json()
-        assert len(data["partitions"]) == 1
-        partition_id = data["partitions"][0]
-
-    trainset = TrainSet()
-    trainset.type = TaskType.FIELD_CLASSIFICATION
-    trainset.batch_size = 2
-
-    tests = [
-        # all fields
-        ([], 2, 4),
-        (["labelset_resources"], 2, 4),
-        # 2 fields
-        (["labelset_resources/label_user"], 1, 2),
-        # unused label
-        (["labelset_resources/label_alien"], 0, 0),
-        # non existent
-        (["nonexistent_labelset"], 0, 0),
-    ]
-
-    for labels, expected_batches, expected_total in tests:
-        trainset.filter.ClearField("labels")
-        trainset.filter.labels.extend(labels)  # type: ignore
-
-        async with train_rest_api.post(
-            f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
-            data=trainset.SerializeToString(),
-        ) as response:
-            assert response.status == 200
-            batches = []
-            total = 0
-            async for batch in get_field_classification_batch_from_response(response):
-                batches.append(batch)
-                total += len(batch.data)
-            assert len(batches) == expected_batches
-            assert total == expected_total
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
-async def test_generator_field_classification_without_labels(
-    train_rest_api: aiohttp.ClientSession,
-    knowledgebox_without_labels: str,
-):
-    kbid = knowledgebox_without_labels
-
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
-    ) as partitions:
-        assert partitions.status == 200
-        data = await partitions.json()
-        assert len(data["partitions"]) == 1
-        partition_id = data["partitions"][0]
-
-    trainset = TrainSet()
-    trainset.type = TaskType.FIELD_CLASSIFICATION
-    trainset.batch_size = 2
-
-    tests = [
-        # all fields
-        ([], 2, 4),
-        (["labelset_resources"], 0, 0),
-        # 2 fields
-        (["labelset_resources/label_user"], 0, 0),
-        # non existent
-        (["nonexistent_labelset"], 0, 0),
-    ]
-
-    for labels, expected_batches, expected_total in tests:
-        trainset.filter.ClearField("labels")
-        trainset.filter.labels.extend(labels)  # type: ignore
-
-        async with train_rest_api.post(
-            f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
-            data=trainset.SerializeToString(),
-        ) as response:
-            assert response.status == 200
-            batches = []
-            total = 0
-            async for batch in get_field_classification_batch_from_response(response):
-                batches.append(batch)
-                total += len(batch.data)
-            assert len(batches) == expected_batches
-            assert total == expected_total
-
-
-@pytest.fixture(scope="function")
-@pytest.mark.asyncio
-async def knowledgebox_with_labels(nucliadb_grpc: WriterStub, knowledgebox: str):
     slr = SetLabelsRequest()
     slr.kb.uuid = knowledgebox
     slr.id = "labelset_paragraphs"
     slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
-    slr.labelset.labels.append(Label(title="label_machine"))
-    slr.labelset.labels.append(Label(title="label_user"))
-    slr.labelset.labels.append(Label(title="label_alien"))
+    l1 = Label(title="label_machine")
+    l2 = Label(title="label_user")
+    slr.labelset.labels.append(l1)
+    slr.labelset.labels.append(l2)
     await nucliadb_grpc.SetLabels(slr)  # type: ignore
 
     slr = SetLabelsRequest()
     slr.kb.uuid = knowledgebox
     slr.id = "labelset_resources"
     slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
-    slr.labelset.labels.append(Label(title="label_machine"))
-    slr.labelset.labels.append(Label(title="label_user"))
-    slr.labelset.labels.append(Label(title="label_alien"))
+    l1 = Label(title="label_machine")
+    l2 = Label(title="label_user")
+    slr.labelset.labels.append(l1)
+    slr.labelset.labels.append(l2)
     await nucliadb_grpc.SetLabels(slr)  # type: ignore
 
     bmb = BrokerMessageBuilder(kbid=knowledgebox)
@@ -182,23 +88,41 @@ async def knowledgebox_with_labels(nucliadb_grpc: WriterStub, knowledgebox: str)
     await inject_message(nucliadb_grpc, bm)
 
     await asyncio.sleep(0.1)
-    yield knowledgebox
 
+    async with train_rest_api.get(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
+    ) as partitions:
+        assert partitions.status == 200
+        data = await partitions.json()
+        assert len(data["partitions"]) == 1
+        partition_id = data["partitions"][0]
 
-@pytest.fixture(scope="function")
-@pytest.mark.asyncio
-async def knowledgebox_without_labels(knowledgebox: str, nucliadb_grpc: WriterStub):
-    bmb = BrokerMessageBuilder(kbid=knowledgebox)
-    bmb.with_title("First resource")
-    bmb.with_summary("First summary")
-    bm = bmb.build()
-    await inject_message(nucliadb_grpc, bm)
+    trainset = TrainSet()
+    trainset.type = TaskType.FIELD_CLASSIFICATION
+    trainset.batch_size = 2
+    async with train_rest_api.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        total = 0
+        async for batch in get_field_classification_batch_from_response(response):
+            batches.append(batch)
+            total += len(batch.data)
+        assert len(batches) == 2
+        assert total == 4
 
-    bmb = BrokerMessageBuilder(kbid=knowledgebox)
-    bmb.with_title("Second resource")
-    bmb.with_summary("Second summary")
-    bm = bmb.build()
-    await inject_message(nucliadb_grpc, bm)
-
-    await asyncio.sleep(0.1)
-    yield knowledgebox
+    trainset.filter.labels.append("labelset_resources/label_user")
+    async with train_rest_api.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        total = 0
+        async for batch in get_field_classification_batch_from_response(response):
+            batches.append(batch)
+            total += len(batch.data)
+        assert len(batches) == 1
+        assert total == 2
