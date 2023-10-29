@@ -455,7 +455,7 @@ async def _tus_patch(
     """
     Upload all bytes in the requests and append them in the specifyied offset
     """
-    if rslug:
+    if rslug is not None:
         rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
     dm = get_dm()
@@ -662,7 +662,7 @@ async def _upload(
     x_md5: Optional[List[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
-    if rslug:
+    if rslug is not None:
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
