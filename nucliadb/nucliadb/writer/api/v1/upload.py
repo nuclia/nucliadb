@@ -112,7 +112,7 @@ TUS_HEADERS = {
     openapi_extra={"x-operation-order": 4},
 )
 @version(1)
-async def options_single(
+def tus_options(
     request: Request,
     kbid: str,
     rid: Optional[str] = None,
@@ -120,6 +120,10 @@ async def options_single(
     upload_id: Optional[str] = None,
     field: Optional[str] = None,
 ) -> Response:
+    return _tus_options()
+
+
+def _tus_options() -> Response:
     """
     Gather information about the Server’s current configuration such as enabled extensions, version...
     """
@@ -135,14 +139,14 @@ async def options_single(
 )
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
-async def post_rslug_prefix(
+async def tus_post_rslug_prefix(
     request: Request,
     kbid: str,
+    rslug: str,
+    field: str,
     item: Optional[CreateResourcePayload] = None,
-    rslug: Optional[str] = None,
-    field: Optional[str] = None,
 ) -> Response:
-    return await _post(request, kbid, item=item, rslug=rslug, field=field)
+    return await _tus_post(request, kbid, item=item, rslug=rslug, field=field)
 
 
 @api.post(
@@ -153,14 +157,14 @@ async def post_rslug_prefix(
 )
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
-async def post_rid_prefix(
+async def tus_post_rid_prefix(
     request: Request,
     kbid: str,
+    path_rid: str,
+    field: str,
     item: Optional[CreateResourcePayload] = None,
-    path_rid: Optional[str] = None,
-    field: Optional[str] = None,
 ) -> Response:
-    return await _post(request, kbid, item=item, path_rid=path_rid, field=field)
+    return await _tus_post(request, kbid, item=item, path_rid=path_rid, field=field)
 
 
 @api.post(
@@ -171,16 +175,16 @@ async def post_rid_prefix(
 )
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
-async def post(
+async def tus_post(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
 ) -> Response:
-    return await _post(request, kbid, item=item)
+    return await _tus_post(request, kbid, item=item)
 
 
 # called by one the three POST above - there are defined distinctly to produce clean API doc
-async def _post(
+async def _tus_post(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
@@ -307,6 +311,18 @@ async def _post(
     openapi_extra={"x-operation-order": 3},
     name="Upload information",
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def tus_head_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field: str,
+    upload_id: str,
+) -> Response:
+    return await _tus_head(upload_id)
+
+
 @api.head(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Resource field TUS uploads"],
@@ -314,6 +330,18 @@ async def _post(
     openapi_extra={"x-operation-order": 3},
     name="Upload information",
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def tus_head_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field: str,
+    upload_id: str,
+) -> Response:
+    return await _tus_head(upload_id)
+
+
 @api.head(
     f"/{KB_PREFIX}/{{kbid}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Knowledge Box TUS uploads"],
@@ -325,26 +353,31 @@ async def _post(
 @version(1)
 async def head(
     request: Request,
+    kbid: str,
     upload_id: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
-    field: Optional[str] = None,
+) -> Response:
+    return await _tus_head(upload_id)
+
+
+# called by one the three HEAD above - there are defined distinctly to produce clean API doc
+async def _tus_head(
+    upload_id: str,
 ) -> Response:
     """
     Get information about a current download (completed upload size)
     """
     dm = get_dm()
     await dm.load(upload_id)
-    head_response = {
+    tus_head_response = {
         "Upload-Offset": str(dm.offset),
         "Tus-Resumable": "1.0.0",
         "Access-Control-Expose-Headers": "Upload-Offset,Tus-Resumable,Upload-Length",
     }
     if dm.get("size"):
-        head_response["Upload-Length"] = str(dm.get("size"))
+        tus_head_response["Upload-Length"] = str(dm.get("size"))
     else:
-        head_response["Upload-Length"] = "0"
-    return Response(headers=head_response)
+        tus_head_response["Upload-Length"] = "0"
+    return Response(headers=tus_head_response)
 
 
 @api.patch(
@@ -354,6 +387,21 @@ async def head(
     name="Upload data on a Resource (by slug)",
     openapi_extra={"x-operation-order": 2},
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def tus_patch_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field: str,
+    upload_id: str,
+    x_synchronous: bool = Header(False),  # type: ignore
+) -> Response:
+    return await _tus_patch(
+        request, kbid, upload_id, rslug=rslug, field=field, x_synchronous=x_synchronous
+    )
+
+
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Resource field TUS uploads"],
@@ -361,6 +409,21 @@ async def head(
     name="Upload data on a Resource (by id)",
     openapi_extra={"x-operation-order": 2},
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def tus_patch_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field: str,
+    upload_id: str,
+    x_synchronous: bool = Header(False),  # type: ignore
+) -> Response:
+    return await _tus_patch(
+        request, kbid, upload_id, rid=rid, field=field, x_synchronous=x_synchronous
+    )
+
+
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Knowledge Box TUS uploads"],
@@ -371,6 +434,16 @@ async def head(
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
 async def patch(
+    request: Request,
+    kbid: str,
+    upload_id: str,
+    x_synchronous: bool = Header(False),  # type: ignore
+) -> Response:
+    return await _tus_patch(request, kbid, upload_id, x_synchronous=x_synchronous)
+
+
+# called by one the three PATCH above - there are defined distinctly to produce clean API doc
+async def _tus_patch(
     request: Request,
     kbid: str,
     upload_id: str,
@@ -488,6 +561,32 @@ async def patch(
     name="Upload binary file on a Resource (by slug)",
     description="Upload a file as a field on an existing resource, if the field exists will return a conflict (419)",
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def upload_rslug_prefix(
+    request: StarletteRequest,
+    kbid: str,
+    rslug: str,
+    field: str,
+    x_filename: Optional[List[str]] = Header(None),  # type: ignore
+    x_password: Optional[List[str]] = Header(None),  # type: ignore
+    x_language: Optional[List[str]] = Header(None),  # type: ignore
+    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_synchronous: bool = Header(False),  # type: ignore
+) -> ResourceFileUploaded:
+    return await _upload(
+        request,
+        kbid,
+        rslug=rslug,
+        field=field,
+        x_filename=x_filename,
+        x_password=x_password,
+        x_language=x_language,
+        x_md5=x_md5,
+        x_synchronous=x_synchronous,
+    )
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{path_rid}}/file/{{field}}/{UPLOAD}",
     status_code=201,
@@ -495,6 +594,32 @@ async def patch(
     name="Upload binary file on a Resource (by id)",
     description="Upload a file as a field on an existing resource, if the field exists will return a conflict (419)",
 )
+@requires_one([NucliaDBRoles.WRITER])
+@version(1)
+async def upload_rid_prefix(
+    request: StarletteRequest,
+    kbid: str,
+    path_rid: str,
+    field: str,
+    x_filename: Optional[List[str]] = Header(None),  # type: ignore
+    x_password: Optional[List[str]] = Header(None),  # type: ignore
+    x_language: Optional[List[str]] = Header(None),  # type: ignore
+    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_synchronous: bool = Header(False),  # type: ignore
+) -> ResourceFileUploaded:
+    return await _upload(
+        request,
+        kbid,
+        path_rid=path_rid,
+        field=field,
+        x_filename=x_filename,
+        x_password=x_password,
+        x_language=x_language,
+        x_md5=x_md5,
+        x_synchronous=x_synchronous,
+    )
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{UPLOAD}",
     status_code=201,
@@ -505,6 +630,27 @@ async def patch(
 @requires_one([NucliaDBRoles.WRITER])
 @version(1)
 async def upload(
+    request: StarletteRequest,
+    kbid: str,
+    x_filename: Optional[List[str]] = Header(None),  # type: ignore
+    x_password: Optional[List[str]] = Header(None),  # type: ignore
+    x_language: Optional[List[str]] = Header(None),  # type: ignore
+    x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_synchronous: bool = Header(False),  # type: ignore
+) -> ResourceFileUploaded:
+    return await _upload(
+        request,
+        kbid,
+        x_filename=x_filename,
+        x_password=x_password,
+        x_language=x_language,
+        x_md5=x_md5,
+        x_synchronous=x_synchronous,
+    )
+
+
+# called by one the three POST above - there are defined distinctly to produce clean API doc
+async def _upload(
     request: StarletteRequest,
     kbid: str,
     path_rid: Optional[str] = None,
