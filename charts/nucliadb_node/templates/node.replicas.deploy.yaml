@@ -80,7 +80,7 @@ spec:
           - name: NODE_ROLE
             value: secondary
           - name: PRIMARY_ADDRESS
-            value: "node-{{ $i }}:{{ $values.serving.grpc_writer }}"
+            value: "node-{{ $i }}.node:{{ $values.serving.grpc_writer }}"
           - name: METRICS_HTTP_PORT
             value: "3032"
           {{- range $key, $value := $values.env }}
