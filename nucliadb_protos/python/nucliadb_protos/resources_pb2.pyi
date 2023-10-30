@@ -1121,17 +1121,19 @@ class QuestionAnswer(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     QUESTION_FIELD_NUMBER: builtins.int
-    ANSWER_FIELD_NUMBER: builtins.int
-    Question: builtins.str
+    ANSWERS_FIELD_NUMBER: builtins.int
     @property
-    def Answer(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def question(self) -> global___Question: ...
+    @property
+    def answers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Answers]: ...
     def __init__(
         self,
         *,
-        Question: builtins.str = ...,
-        Answer: collections.abc.Iterable[builtins.str] | None = ...,
+        question: global___Question | None = ...,
+        answers: collections.abc.Iterable[global___Answers] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["Answer", b"Answer", "Question", b"Question"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["question", b"question"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["answers", b"answers", "question", b"question"]) -> None: ...
 
 global___QuestionAnswer = QuestionAnswer
 

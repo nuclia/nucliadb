@@ -424,10 +424,10 @@ pub struct Answers {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QuestionAnswer {
-    #[prost(string, tag="1")]
-    pub question: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag="2")]
-    pub answer: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag="1")]
+    pub question: ::core::option::Option<Question>,
+    #[prost(message, repeated, tag="2")]
+    pub answers: ::prost::alloc::vec::Vec<Answers>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QuestionAnswers {
