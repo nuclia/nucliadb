@@ -282,3 +282,32 @@ async def _check_kb(nucliadb_reader, kbid):
     assert len(labelsets) == 1
     labelset = labelsets["foo"]
     assert len(labelset["labels"]) == 1
+
+
+async def test_max_running_exports(
+    hosted_nucliadb,
+    nucliadb_writer,
+    nucliadb_reader,
+    src_kb,
+    dst_kb,
+    imports_consumer,
+    exports_consumer,
+):
+    # Create an export
+    resp = await nucliadb_writer.post(f"/kb/{src_kb}/export")
+    assert resp.status_code == 200
+    export_id_1 = resp.json()["export_id"]
+
+    # Creating another one should not be possible
+    resp = await nucliadb_writer.post(f"/kb/{src_kb}/export")
+    assert resp.status_code == 429
+
+    # Check for export to finish
+    await wait_for(nucliadb_reader, "export", src_kb, export_id_1)
+
+    # Now that the first two have finished, we can start a third one
+    resp = await nucliadb_writer.post(f"/kb/{src_kb}/export")
+    assert resp.status_code == 200
+    export_id_2 = resp.json()["export_id"]
+
+    await wait_for(nucliadb_reader, "export", src_kb, export_id_2)

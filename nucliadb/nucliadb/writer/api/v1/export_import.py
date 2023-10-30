@@ -28,6 +28,7 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
+from nucliadb.export_import.exceptions import MaxRunningExportsReached
 from nucliadb.export_import.models import (
     ExportMetadata,
     ImportMetadata,
@@ -46,6 +47,8 @@ from nucliadb_models.export_import import (
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
+
+MAX_KB_RUNNING_EXPORTS = 1
 
 
 @api.post(
@@ -68,8 +71,14 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
         # We simply return an export_id to keep the API consistent with hosted nucliadb.
         return CreateExportResponse(export_id=export_id)
     else:
-        await start_export_task(context, kbid, export_id)
-        return CreateExportResponse(export_id=export_id)
+        try:
+            await start_export_task(context, kbid, export_id)
+            return CreateExportResponse(export_id=export_id)
+        except MaxRunningExportsReached:
+            return HTTPClientError(
+                status_code=429,
+                detail=f"Max number of concurrent exports reached: {MAX_KB_RUNNING_EXPORTS}.",
+            )
 
 
 @api.post(
@@ -122,6 +131,11 @@ async def upload_import_to_blob_storage(
 
 async def start_export_task(context: ApplicationContext, kbid: str, export_id: str):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
+
+    running = await dm.get_running_exports(kbid)
+    if running >= MAX_KB_RUNNING_EXPORTS:
+        raise MaxRunningExportsReached()
+
     metadata = ExportMetadata(kbid=kbid, id=export_id)
     metadata.task.status = Status.SCHEDULED
     await dm.set_metadata("export", metadata)
@@ -136,6 +150,8 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
         errors.capture_exception(e)
         await dm.delete_metadata("export", metadata)
         raise
+    else:
+        await dm.inc_running_exports(kbid)
 
 
 async def start_import_task(context: ApplicationContext, kbid: str, import_id: str):

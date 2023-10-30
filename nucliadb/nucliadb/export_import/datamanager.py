@@ -31,8 +31,11 @@ from nucliadb_utils.storages.storage import Storage, StorageField
 
 MAINDB_EXPORT_KEY = "/kbs/{kbid}/exports/{id}"
 MAINDB_IMPORT_KY = "/kbs/{kbid}/imports/{id}"
+MAINDB_RUNNING_EXPORTS_KEY = "/kbs/{kbid}/running_exports"
+
 STORAGE_EXPORT_KEY = "exports/{export_id}"
 STORAGE_IMPORT_KEY = "imports/{import_id}"
+
 
 Metadata = Union[ExportMetadata, ImportMetadata]
 
@@ -155,6 +158,33 @@ class ExportImportDataManager:
             logger.exception(
                 f"Could not delete {type} {id} from storage", extra={"kbid": kbid}
             )
+
+    async def get_running_exports(self, kbid: str) -> int:
+        async with self.driver.transaction() as txn:
+            return await self._get_running_exports(txn, kbid)
+
+    async def _get_running_exports(self, txn, kbid: str) -> int:
+        key = MAINDB_RUNNING_EXPORTS_KEY.format(kbid=kbid)
+        data = await txn.get(key)
+        if data is None or data == b"":
+            return 0
+        return int(data)
+
+    async def inc_running_exports(self, kbid: str):
+        key = MAINDB_RUNNING_EXPORTS_KEY.format(kbid=kbid)
+        async with self.driver.transaction() as txn:
+            running = await self._get_running_exports(txn, kbid)
+            running += 1
+            await txn.set(key, str(running).encode())
+            await txn.commit()
+
+    async def dec_running_exports(self, kbid: str):
+        key = MAINDB_RUNNING_EXPORTS_KEY.format(kbid=kbid)
+        async with self.driver.transaction() as txn:
+            running = await self._get_running_exports(txn, kbid)
+            running -= 1
+            await txn.set(key, str(running).encode())
+            await txn.commit()
 
 
 async def iter_and_add_size(

@@ -37,6 +37,7 @@ from nucliadb.export_import.utils import (
     get_labels,
     iter_kb_resource_uuids,
 )
+from nucliadb_models.export_import import Status
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
 
@@ -85,6 +86,9 @@ async def export_kb_to_blob_storage(
 
     await upload_export_retried(iterator, kbid, export_id)
 
+    if retry_handler.metadata.task.status in (Status.FINISHED, Status.ERRORED):
+        await dm.dec_running_exports(kbid)
+
 
 async def export_resources(
     context: ApplicationContext,
@@ -105,9 +109,11 @@ async def export_resources_resumable(
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
 
     kbid = metadata.kbid
+    export_id = metadata.id
+
     if len(metadata.resources_to_export) == 0:
-        # Starting an export from scratch
         metadata.exported_resources = []
+        metadata.processed = 0
         async for rid in iter_kb_resource_uuids(context, kbid):
             metadata.resources_to_export.append(rid)
         metadata.resources_to_export.sort()
@@ -131,11 +137,12 @@ async def export_resources_resumable(
     except Exception as e:
         errors.capture_exception(e)
         logger.error(f"Error exporting resource {rid}: {e}")
-        # Start from scracth next time.
-        # TODO: try to resume from the last resource
+        # Export will be retried from scratch
         metadata.exported_resources = []
         metadata.processed = 0
         await dm.set_metadata("export", metadata)
+        # Cleanup blob storage
+        await dm.delete_export(kbid, export_id)
         raise
 
 

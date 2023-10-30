@@ -85,3 +85,15 @@ async def test_import_upload_and_download(datamanager, kbid_with_bucket):
 
     async for chunk in datamanager.download_import(kbid, import_id):
         assert chunk is None
+
+
+async def test_kb_running_exports(datamanager: ExportImportDataManager):
+    kbid = uuid.uuid4().hex
+
+    assert await datamanager.get_running_exports(kbid) == 0
+    await datamanager.inc_running_exports(kbid)
+    await datamanager.inc_running_exports(kbid)
+    assert await datamanager.get_running_exports(kbid) == 2
+    await datamanager.dec_running_exports(kbid)
+    await datamanager.dec_running_exports(kbid)
+    assert await datamanager.get_running_exports(kbid) == 0

@@ -70,3 +70,11 @@ class WrongExportStreamFormat(Exception):
     """
 
     pass
+
+
+class MaxRunningExportsReached(Exception):
+    """
+    Raised when there are too many exports ongoing for a KB
+    """
+
+    pass
