@@ -10,11 +10,6 @@ metadata:
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
 data:
-{{- if .Values.debug }}
-  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs=DEBUG,nucliadb_vectors=DEBUG,nucliadb_texts=DEBUG,nucliadb_relations=DEBUG"
-{{- else }}
-  RUST_LOG: "nucliadb_node=WARN"
-{{- end }}
   RUST_LIB_BACKTRACE: "1"
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
   SENTRY_URL: {{ .Values.running.sentry_url }}

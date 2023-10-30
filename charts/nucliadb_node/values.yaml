@@ -29,7 +29,6 @@ tolerations: []
 topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
-debug: False
 resources:
   reader: {}
   #  limits:
