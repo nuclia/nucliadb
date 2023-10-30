@@ -24,8 +24,7 @@ from typing import AsyncIterator
 import aiohttp
 import pytest
 from nucliadb_protos.dataset_pb2 import ParagraphClassificationBatch, TaskType, TrainSet
-from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
-from nucliadb_protos.writer_pb2 import BrokerMessage, SetLabelsRequest
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import inject_message
@@ -53,9 +52,13 @@ async def get_paragraph_classification_batch_from_response(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_paragraph_classification(
-    train_rest_api: aiohttp.ClientSession, knowledgebox_with_labels: str
+    train_rest_api: aiohttp.ClientSession,
+    nucliadb_grpc: WriterStub,
+    knowledgebox_with_labels: str,
 ):
     kbid = knowledgebox_with_labels
+
+    await inject_resource_with_paragraph_classification(kbid, nucliadb_grpc)
 
     async with train_rest_api.get(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
@@ -82,35 +85,11 @@ async def test_generator_paragraph_classification(
         assert len(batches) == 2
 
 
-@pytest.fixture(scope="function")
-@pytest.mark.asyncio
-async def knowledgebox_with_labels(nucliadb_grpc: WriterStub, knowledgebox: str):
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_paragraphs"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
-    l1 = Label(title="label_machine")
-    l2 = Label(title="label_user")
-    slr.labelset.labels.append(l1)
-    slr.labelset.labels.append(l2)
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
-
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_resources"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
-    l1 = Label(title="label_machine")
-    l2 = Label(title="label_user")
-    slr.labelset.labels.append(l1)
-    slr.labelset.labels.append(l2)
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
-
+async def inject_resource_with_paragraph_classification(knowledgebox, writer):
     bm = broker_resource(knowledgebox)
-    await inject_message(nucliadb_grpc, bm)
-
+    await inject_message(writer, bm)
     await asyncio.sleep(0.1)
-
-    yield knowledgebox
+    return bm.uuid
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -122,8 +101,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
 
     file_field = FieldBuilder("file", rpb.FieldType.FILE)
     file_field.with_extracted_text(
-        "My own text Ramon. This is great to be here. \n Where is my beer? "
-        "Do you want to go shooping? This is a test!"
+        "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"  # noqa
     )
 
     labelset = "labelset_paragraphs"

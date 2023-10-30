@@ -25,7 +25,7 @@ import aiohttp
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TokenClassificationBatch, TrainSet
 from nucliadb_protos.resources_pb2 import Position
-from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import inject_message
@@ -48,6 +48,66 @@ async def get_token_classification_batch_from_response(
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
+async def test_generator_token_classification(
+    train_rest_api: aiohttp.ClientSession,
+    knowledgebox_with_entities: str,
+    nucliadb_grpc: WriterStub,
+):
+    kbid = knowledgebox_with_entities
+
+    await inject_resource_with_token_classification(kbid, nucliadb_grpc)
+
+    async with train_rest_api.get(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset"
+    ) as partitions:
+        assert partitions.status == 200
+        data = await partitions.json()
+        assert len(data["partitions"]) == 1
+        partition_id = data["partitions"][0]
+
+    trainset = TrainSet()
+    trainset.type = TaskType.TOKEN_CLASSIFICATION
+    trainset.batch_size = 2
+    trainset.filter.labels.append("PERSON")
+    trainset.filter.labels.append("ORG")
+    async with train_rest_api.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches: List[TokenClassificationBatch] = []
+        async for batch in get_token_classification_batch_from_response(response):
+            batches.append(batch)
+
+    for batch in batches:
+        if batch.data[0].token == "Eudald":
+            assert batch.data[0].label == "B-PERSON"
+            assert batch.data[1].label == "I-PERSON"
+            assert batch.data[2].label == "O"
+        if batch.data[0].token == "This":
+            assert batch.data[4].label == "B-PERSON"
+            assert batch.data[5].label == "I-PERSON"
+        if batch.data[0].token == "Where":
+            assert batch.data[3].label == "B-ORG"
+            assert batch.data[4].label == "I-ORG"
+            assert batch.data[5].label == "I-ORG"
+        if batch.data[0].token == "Summary":
+            assert batch.data[2].label == "B-ORG"
+            assert batch.data[4].label == "B-ORG"
+        if batch.data[0].token == "My":
+            assert batch.data[3].label == "B-PERSON"
+            assert batch.data[12].label == "B-ORG"
+
+
+async def inject_resource_with_token_classification(knowledgebox, writer):
+    bm = broker_resource(knowledgebox)
+    await inject_message(writer, bm)
+    await asyncio.sleep(0.1)
+    return bm.uuid
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -91,78 +151,3 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
 
     return bm
-
-
-async def inject_resource_with_token_classification(knowledgebox, writer):
-    bm = broker_resource(knowledgebox)
-    await inject_message(writer, bm)
-    return bm.uuid
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
-async def test_generator_token_classification(
-    train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
-):
-    # Create Entities
-    ser = SetEntitiesRequest()
-    ser.kb.uuid = knowledgebox
-    ser.group = "PERSON"
-    ser.entities.title = "PERSON"
-    ser.entities.entities["Ramon"].value = "Ramon"
-    ser.entities.entities["Eudald Camprubi"].value = "Eudald Camprubi"
-    ser.entities.entities["Carmen Iniesta"].value = "Carmen Iniesta"
-    ser.entities.entities["el Super Fran"].value = "el Super Fran"
-    await nucliadb_grpc.SetEntities(ser)  # type: ignore
-
-    ser = SetEntitiesRequest()
-    ser.kb.uuid = knowledgebox
-    ser.group = "ORG"
-    ser.entities.title = "ORG"
-    ser.entities.entities["Nuclia"].value = "Nuclia"
-    ser.entities.entities["Debian"].value = "Debian"
-    ser.entities.entities["Generalitat de Catalunya"].value = "Generalitat de Catalunya"
-    await nucliadb_grpc.SetEntities(ser)  # type: ignore
-
-    await inject_resource_with_token_classification(knowledgebox, nucliadb_grpc)
-    await asyncio.sleep(0.1)
-    async with train_rest_api.get(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
-    ) as partitions:
-        assert partitions.status == 200
-        data = await partitions.json()
-        assert len(data["partitions"]) == 1
-        partition_id = data["partitions"][0]
-
-    trainset = TrainSet()
-    trainset.type = TaskType.TOKEN_CLASSIFICATION
-    trainset.batch_size = 2
-    trainset.filter.labels.append("PERSON")
-    trainset.filter.labels.append("ORG")
-    async with train_rest_api.post(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
-        data=trainset.SerializeToString(),
-    ) as response:
-        assert response.status == 200
-        batches: List[TokenClassificationBatch] = []
-        async for batch in get_token_classification_batch_from_response(response):
-            batches.append(batch)
-
-    for batch in batches:
-        if batch.data[0].token == "Eudald":
-            assert batch.data[0].label == "B-PERSON"
-            assert batch.data[1].label == "I-PERSON"
-            assert batch.data[2].label == "O"
-        if batch.data[0].token == "This":
-            assert batch.data[4].label == "B-PERSON"
-            assert batch.data[5].label == "I-PERSON"
-        if batch.data[0].token == "Where":
-            assert batch.data[3].label == "B-ORG"
-            assert batch.data[4].label == "I-ORG"
-            assert batch.data[5].label == "I-ORG"
-        if batch.data[0].token == "Summary":
-            assert batch.data[2].label == "B-ORG"
-            assert batch.data[4].label == "B-ORG"
-        if batch.data[0].token == "My":
-            assert batch.data[3].label == "B-PERSON"
-            assert batch.data[12].label == "B-ORG"

@@ -34,7 +34,12 @@ from nucliadb_protos.resources_pb2 import (
     Position,
     Sentence,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    SetEntitiesRequest,
+    SetLabelsRequest,
+)
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -62,6 +67,55 @@ async def writer_rest_api(nucliadb: Settings):  # type: ignore
         base_url=f"http://localhost:{nucliadb.http_port}",
     ) as client:
         yield client
+
+
+@pytest.fixture(scope="function")
+async def knowledgebox_with_labels(nucliadb_grpc: WriterStub, knowledgebox: str):
+    slr = SetLabelsRequest()
+    slr.kb.uuid = knowledgebox
+    slr.id = "labelset_paragraphs"
+    slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
+    l1 = Label(title="label_machine")
+    l2 = Label(title="label_user")
+    slr.labelset.labels.append(l1)
+    slr.labelset.labels.append(l2)
+    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+
+    slr = SetLabelsRequest()
+    slr.kb.uuid = knowledgebox
+    slr.id = "labelset_resources"
+    slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
+    l1 = Label(title="label_machine")
+    l2 = Label(title="label_user")
+    slr.labelset.labels.append(l1)
+    slr.labelset.labels.append(l2)
+    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+
+    yield knowledgebox
+
+
+@pytest.fixture(scope="function")
+async def knowledgebox_with_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
+    ser = SetEntitiesRequest()
+    ser.kb.uuid = knowledgebox
+    ser.group = "PERSON"
+    ser.entities.title = "PERSON"
+    ser.entities.entities["Ramon"].value = "Ramon"
+    ser.entities.entities["Eudald Camprubi"].value = "Eudald Camprubi"
+    ser.entities.entities["Carmen Iniesta"].value = "Carmen Iniesta"
+    ser.entities.entities["el Super Fran"].value = "el Super Fran"
+    await nucliadb_grpc.SetEntities(ser)  # type: ignore
+
+    ser = SetEntitiesRequest()
+    ser.kb.uuid = knowledgebox
+    ser.group = "ORG"
+    ser.entities.title = "ORG"
+    ser.entities.entities["Nuclia"].value = "Nuclia"
+    ser.entities.entities["Debian"].value = "Debian"
+    ser.entities.entities["Generalitat de Catalunya"].value = "Generalitat de Catalunya"
+    await nucliadb_grpc.SetEntities(ser)  # type: ignore
+
+    yield knowledgebox
 
 
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
