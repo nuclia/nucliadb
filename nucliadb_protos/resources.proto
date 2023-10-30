@@ -275,8 +275,8 @@ message Answers {
 }
 
 message QuestionAnswer {
-    string Question = 1;
-    repeated string Answer = 2;
+    Question question = 1;
+    repeated Answers answers = 2;
 }
 
 message QuestionAnswers {
