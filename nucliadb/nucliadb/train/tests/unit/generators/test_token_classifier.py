@@ -23,6 +23,33 @@ from collections import OrderedDict
 from nucliadb.train.generators.token_classifier import process_entities
 
 
+def test_process_entities_simple():
+    split_text = {"__main__": "This is a bird, its a plane, no, its el Super Fran"}
+    split_ners = {"__main__": OrderedDict([((37, 50), ("PERSON", "el Super Fran"))])}
+    split_paragaphs = {"__main__": []}
+    entities = list(
+        process_entities(
+            split_text["__main__"], split_ners["__main__"], split_paragaphs["__main__"]
+        )
+    )
+    assert entities == [
+        [
+            ("This", "O"),
+            ("is", "O"),
+            ("a", "O"),
+            ("bird,", "O"),
+            ("its", "O"),
+            ("a", "O"),
+            ("plane,", "O"),
+            ("no,", "O"),
+            ("its", "O"),
+            ("el", "B-PERSON"),
+            ("Super", "I-PERSON"),
+            ("Fran", "I-PERSON"),
+        ]
+    ]
+
+
 def test_process_entities():
     paragraphs = [
         "The Legend of Zelda is a video game franchise created by Japanese video game"

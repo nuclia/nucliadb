@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from collections import OrderedDict
 from typing import AsyncIterator, List
 
 import aiohttp
@@ -36,7 +35,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb.tests.utils import inject_message
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb.train.generators.token_classifier import process_entities
 
 
 async def get_token_classification_batch_from_response(
@@ -272,30 +270,3 @@ async def test_generator_token_classification(
         if batch.data[0].token == "My":
             assert batch.data[3].label == "B-PERSON"
             assert batch.data[12].label == "B-ORG"
-
-
-def test_process_entities():
-    split_text = {"__main__": "This is a bird, its a plane, no, its el Super Fran"}
-    split_ners = {"__main__": OrderedDict([((37, 50), ("PERSON", "el Super Fran"))])}
-    split_paragaphs = {"__main__": []}
-    entities = list(
-        process_entities(
-            split_text["__main__"], split_ners["__main__"], split_paragaphs["__main__"]
-        )
-    )
-    assert entities == [
-        [
-            ("This", "O"),
-            ("is", "O"),
-            ("a", "O"),
-            ("bird,", "O"),
-            ("its", "O"),
-            ("a", "O"),
-            ("plane,", "O"),
-            ("no,", "O"),
-            ("its", "O"),
-            ("el", "B-PERSON"),
-            ("Super", "I-PERSON"),
-            ("Fran", "I-PERSON"),
-        ]
-    ]
