@@ -18,23 +18,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from datetime import datetime
 from typing import AsyncIterator, List
 
 import aiohttp
 import pytest
 from nucliadb_protos.dataset_pb2 import TaskType, TokenClassificationBatch, TrainSet
-from nucliadb_protos.resources_pb2 import (
-    Metadata,
-    Position,
-    TokenSplit,
-    UserFieldMetadata,
-)
+from nucliadb_protos.resources_pb2 import Position
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import inject_message
+from nucliadb.tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb_protos import resources_pb2 as rpb
 
 
 async def get_token_classification_batch_from_response(
@@ -53,147 +51,45 @@ async def get_token_classification_batch_from_response(
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    import uuid
-    from datetime import datetime
+    bmb = BrokerMessageBuilder(kbid=knowledgebox)
 
-    from nucliadb_protos import resources_pb2 as rpb
-
-    rid = str(uuid.uuid4())
-    slug = f"{rid}slug1"
-
-    bm: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox,
-        uuid=rid,
-        slug=slug,
-        type=BrokerMessage.AUTOCOMMIT,
+    bmb.with_title("This is a bird, its a plane, no, its el Super Fran")
+    title_field = bmb.field_builder("title", rpb.FieldType.GENERIC)
+    title_field.with_extracted_entity(
+        "PERSON", "el Super Fran", positions=[Position(start=37, end=50)]
     )
 
-    bm.basic.icon = "text/plain"
-    bm.basic.title = "This is a bird, its a plane, no, its el Super Fran"
-    bm.basic.summary = "Summary of Nuclia using Debian"
-    bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
-    bm.basic.metadata.useful = True
-    bm.basic.metadata.status = Metadata.Status.PROCESSED
-    bm.basic.metadata.language = "es"
-    bm.basic.created.FromDatetime(datetime.now())
-    bm.basic.modified.FromDatetime(datetime.now())
-    bm.origin.source = rpb.Origin.Source.WEB
+    bmb.with_summary("Summary of Nuclia using Debian")
+    summary_field = bmb.field_builder("summary", rpb.FieldType.GENERIC)
+    summary_field.with_extracted_entity(
+        "ORG", "Nuclia", positions=[Position(start=11, end=17)]
+    )
+    summary_field.with_extracted_entity(
+        "ORG", "Debian", positions=[Position(start=24, end=30)]
+    )
 
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon. This is great to be at Nuclia. \n Where is the Generalitat de Catalunya? Eudald Camprubi, do you want to go shooping? This is a test Carmen Iniesta!"  # noqa
-    etw.field.field = "file"
-    etw.field.field_type = rpb.FieldType.FILE
-    bm.extracted_text.append(etw)
+    file_field = FieldBuilder("file", rpb.FieldType.FILE)
+    file_field.with_extracted_text(
+        "My own text Ramon. This is great to be at Nuclia. \n Where is the Generalitat de Catalunya? Eudald Camprubi, do you want to go shooping? This is a test Carmen Iniesta!"  # noqa
+    )
+    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=0, end=49))
+    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=50, end=90))
+    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=91, end=135))
+    file_field.with_extracted_paragraph_metadata(rpb.Paragraph(start=136, end=166))
 
-    ufm = UserFieldMetadata()
+    file_field.with_user_entity("PERSON", "Ramon", start=12, end=17)
+    file_field.with_user_entity("ORG", "Nuclia", start=42, end=48)
+    file_field.with_user_entity("ORG", "Generalitat de Catalunya", start=65, end=89)
+    file_field.with_user_entity("PERSON", "Eudald", start=91, end=106)
+    file_field.with_user_entity("PERSON", "Carmen Iniesta", start=151, end=165)
 
-    ts = TokenSplit()
-    ts.token = "Ramon"
-    ts.klass = "PERSON"
-    ts.start = 12
-    ts.end = 17
-    ufm.token.append(ts)
+    bmb.add_field_builder(file_field)
 
-    ts = TokenSplit()
-    ts.token = "Nuclia"
-    ts.klass = "ORG"
-    ts.start = 42
-    ts.end = 48
-    ufm.token.append(ts)
-
-    ts = TokenSplit()
-    ts.token = "Generalitat de Catalunya"
-    ts.klass = "ORG"
-    ts.start = 65
-    ts.end = 89
-    ufm.token.append(ts)
-
-    ts = TokenSplit()
-    ts.token = "Eudald Camprubi"
-    ts.klass = "PERSON"
-    ts.start = 91
-    ts.end = 106
-    ufm.token.append(ts)
-
-    ts = TokenSplit()
-    ts.token = "Carmen Iniesta"
-    ts.klass = "PERSON"
-    ts.start = 151
-    ts.end = 165
-    ufm.token.append(ts)
-
-    ufm.field.field = "file"
-    ufm.field.field_type = rpb.FieldType.FILE
-    bm.basic.fieldmetadata.append(ufm)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Summary of Nuclia using Debian"
-    etw.field.field = "summary"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "This is a bird, its a plane, no, its el Super Fran"
-    etw.field.field = "title"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
+    bm = bmb.build()
 
     bm.files["file"].added.FromDatetime(datetime.now())
     bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
 
-    fcm = rpb.FieldComputedMetadataWrapper()
-    fcm.field.field = "file"
-    fcm.field.field_type = rpb.FieldType.FILE
-    p1 = rpb.Paragraph(
-        start=0,
-        end=49,
-    )
-    p2 = rpb.Paragraph(
-        start=50,
-        end=90,
-    )
-
-    p3 = rpb.Paragraph(
-        start=91,
-        end=135,
-    )
-
-    p4 = rpb.Paragraph(
-        start=136,
-        end=166,
-    )
-
-    fcm.metadata.metadata.paragraphs.append(p1)
-    fcm.metadata.metadata.paragraphs.append(p2)
-    fcm.metadata.metadata.paragraphs.append(p3)
-    fcm.metadata.metadata.paragraphs.append(p4)
-    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
-    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
-    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-
-    bm.field_metadata.append(fcm)
-
-    fcm = rpb.FieldComputedMetadataWrapper()
-    fcm.field.field = "title"
-    fcm.field.field_type = rpb.FieldType.GENERIC
-    fcm.metadata.metadata.positions["PERSON/el Super Fran"].entity = "el Super Fran"
-    pos = Position(start=37, end=50)
-    fcm.metadata.metadata.positions["PERSON/el Super Fran"].position.append(pos)
-    bm.field_metadata.append(fcm)
-
-    fcm = rpb.FieldComputedMetadataWrapper()
-    fcm.field.field = "summary"
-    fcm.field.field_type = rpb.FieldType.GENERIC
-    fcm.metadata.metadata.positions["ORG/Nuclia"].entity = "Nuclia"
-    pos = Position(start=11, end=17)
-    fcm.metadata.metadata.positions["ORG/Nuclia"].position.append(pos)
-    fcm.metadata.metadata.positions["ORG/Debian"].entity = "Debian"
-    pos = Position(start=24, end=30)
-    fcm.metadata.metadata.positions["ORG/Debian"].position.append(pos)
-    bm.field_metadata.append(fcm)
-
-    bm.source = BrokerMessage.MessageSource.WRITER
     return bm
 
 

@@ -174,7 +174,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
 
     file_field.with_extracted_labels("labelset_resources", ["label_machine"])
 
-    bmb.add_field(file_field.build())
+    bmb.add_field_builder(file_field)
 
     bm = bmb.build()
 
