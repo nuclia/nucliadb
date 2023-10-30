@@ -109,10 +109,13 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
           failureThreshold: 10
-        livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ $values.serving.grpc_reader }}", "-service=nodereader.NodeReader"]
-          initialDelaySeconds: 2
+        # Disable livenessProbe for now since
+        # we need a different livenessProbe than readinessProbe
+        # for a read replica
+        # livenessProbe:
+        #   exec:
+        #     command: ["/bin/grpc_health_probe", "-addr=:{{ $values.serving.grpc_reader }}", "-service=nodereader.NodeReader"]
+        #   initialDelaySeconds: 2
         command: ["node_reader"]
         envFrom:
         - configMapRef:
