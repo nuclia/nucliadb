@@ -204,6 +204,28 @@ async def create_resource(
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def modify_resource_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    item: UpdateResourcePayload,
+    x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
+):
+    return await _modify_resource(
+        request,
+        item,
+        kbid,
+        rslug=rslug,
+        x_skip_store=x_skip_store,
+        x_synchronous=x_synchronous,
+        x_nucliadb_user=x_nucliadb_user,
+    )
+
+
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
@@ -213,15 +235,35 @@ async def create_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def modify_resource(
+async def modify_resource_rid_prefix(
     request: Request,
-    item: UpdateResourcePayload,
     kbid: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    rid: str,
+    item: UpdateResourcePayload,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
+):
+    return await _modify_resource(
+        request,
+        item,
+        kbid,
+        rid=rid,
+        x_skip_store=x_skip_store,
+        x_synchronous=x_synchronous,
+        x_nucliadb_user=x_nucliadb_user,
+    )
+
+
+async def _modify_resource(
+    request: Request,
+    item: UpdateResourcePayload,
+    kbid: str,
+    x_skip_store: bool,
+    x_synchronous: bool,
+    x_nucliadb_user: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
 ):
     transaction = get_transaction_utility()
     processing = get_processing()
@@ -291,6 +333,17 @@ async def modify_resource(
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def reprocess_resource_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
+):
+    return await _reprocess_resource(kbid, rslug=rslug, x_nucliadb_user=x_nucliadb_user)
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reprocess",
     status_code=202,
@@ -300,12 +353,20 @@ async def modify_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def reprocess_resource(
+async def reprocess_resource_rid_prefix(
     request: Request,
     kbid: str,
+    rid: str,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
+):
+    return await _reprocess_resource(kbid, rid=rid, x_nucliadb_user=x_nucliadb_user)
+
+
+async def _reprocess_resource(
+    kbid: str,
+    x_nucliadb_user: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     transaction = get_transaction_utility()
     processing = get_processing()
@@ -368,6 +429,19 @@ async def reprocess_resource(
     name="Delete Resource (by slug)",
     tags=["Resources"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_resource_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    x_synchronous: bool = SYNC_CALL,
+):
+    return await _delete_resource(
+        request, kbid, rslug=rslug, x_synchronous=x_synchronous
+    )
+
+
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=204,
@@ -376,12 +450,21 @@ async def reprocess_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource(
+async def delete_resource_rid_prefix(
     request: Request,
     kbid: str,
+    rid: str,
+    x_synchronous: bool = SYNC_CALL,
+):
+    return await _delete_resource(request, kbid, rid=rid, x_synchronous=x_synchronous)
+
+
+async def _delete_resource(
+    request: Request,
+    kbid: str,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
@@ -409,6 +492,17 @@ async def delete_resource(
     name="Reindex Resource (by slug)",
     tags=["Resources"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def reindex_resource_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    reindex_vectors: bool = Query(False),
+):
+    return await _reindex_resource(kbid, rslug=rslug, reindex_vectors=reindex_vectors)
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reindex",
     status_code=204,
@@ -417,12 +511,20 @@ async def delete_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def reindex_resource(
+async def reindex_resource_rid_prefix(
     request: Request,
     kbid: str,
+    rid: str,
+    reindex_vectors: bool = Query(False),
+):
+    return await _reindex_resource(kbid, rid=rid, reindex_vectors=reindex_vectors)
+
+
+async def _reindex_resource(
+    kbid: str,
+    reindex_vectors: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    reindex_vectors: bool = Query(False),
 ):
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 

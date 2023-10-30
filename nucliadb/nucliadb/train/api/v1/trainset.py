@@ -37,6 +37,12 @@ from nucliadb_utils.authentication import requires_one
     name="Return Train call",
     response_model=TrainSetPartitions,
 )
+@requires_one([NucliaDBRoles.READER])
+@version(1)
+async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
+    return await get_partitions(kbid)
+
+
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/trainset/{{prefix}}",
     tags=["Train"],
@@ -46,8 +52,12 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def get_partitions(
-    request: Request, kbid: str, prefix: Optional[str] = None
+async def get_partitions_prefix(
+    request: Request, kbid: str, prefix: str
 ) -> TrainSetPartitions:
+    return await get_partitions(kbid, prefix=prefix)
+
+
+async def get_partitions(kbid: str, prefix: Optional[str] = None) -> TrainSetPartitions:
     all_keys = await get_kb_partitions(kbid, prefix)
     return TrainSetPartitions(partitions=all_keys)

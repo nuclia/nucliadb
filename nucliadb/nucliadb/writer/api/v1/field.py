@@ -129,6 +129,26 @@ async def finish_field_put(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_text_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.TextField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_text(
+        request,
+        kbid,
+        field_id,
+        field_payload,
+        x_synchronous,
+        rslug=rslug,
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/text/{{field_id}}",
     status_code=201,
@@ -138,14 +158,32 @@ async def finish_field_put(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_text(
+async def add_resource_field_text_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.TextField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_text(
+        request,
+        kbid,
+        field_id,
+        field_payload,
+        x_synchronous,
+        rid=rid,
+    )
+
+
+async def _add_resource_field_text(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.TextField,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -168,6 +206,21 @@ async def add_resource_field_text(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_link_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.LinkField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_link(
+        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/link/{{field_id}}",
     status_code=201,
@@ -177,14 +230,27 @@ async def add_resource_field_text(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_link(
+async def add_resource_field_link_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.LinkField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_link(
+        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+    )
+
+
+async def _add_resource_field_link(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.LinkField,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -207,6 +273,21 @@ async def add_resource_field_link(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_keywordset_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.FieldKeywordset,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_keywordset(
+        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/keywordset/{{field_id}}",
     status_code=201,
@@ -216,14 +297,27 @@ async def add_resource_field_link(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_keywordset(
+async def add_resource_field_keywordset_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.FieldKeywordset,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_keywordset(
+        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+    )
+
+
+async def _add_resource_field_keywordset(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.FieldKeywordset,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -246,6 +340,21 @@ async def add_resource_field_keywordset(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_datetime_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.FieldDatetime,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_datetime(
+        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/datetime/{{field_id}}",
     status_code=201,
@@ -255,14 +364,27 @@ async def add_resource_field_keywordset(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_datetime(
+async def add_resource_field_datetime_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.FieldDatetime,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_datetime(
+        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+    )
+
+
+async def _add_resource_field_datetime(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.FieldDatetime,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -285,6 +407,26 @@ async def add_resource_field_datetime(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_layout_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.InputLayoutField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_layout(
+        request,
+        kbid,
+        field_id,
+        field_payload,
+        x_synchronous,
+        rslug=rslug,
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}",
     status_code=201,
@@ -294,14 +436,27 @@ async def add_resource_field_datetime(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_layout(
+async def add_resource_field_layout_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.InputLayoutField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_layout(
+        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+    )
+
+
+async def _add_resource_field_layout(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.InputLayoutField,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -324,6 +479,21 @@ async def add_resource_field_layout(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_conversation_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.InputConversationField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_conversation(
+        request, kbid, field_id, field_payload, x_synchronous, rslug=rslug
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}",
     status_code=201,
@@ -333,14 +503,27 @@ async def add_resource_field_layout(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_conversation(
+async def add_resource_field_conversation_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.InputConversationField,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_conversation(
+        request, kbid, field_id, field_payload, x_synchronous, rid=rid
+    )
+
+
+async def _add_resource_field_conversation(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.InputConversationField,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -365,6 +548,28 @@ async def add_resource_field_conversation(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_file_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    field_payload: models.FileField,
+    x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_file(
+        request,
+        kbid,
+        field_id,
+        field_payload,
+        x_skip_store,
+        x_synchronous,
+        rslug=rslug,
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}",
     status_code=201,
@@ -374,15 +579,29 @@ async def add_resource_field_conversation(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_file(
+async def add_resource_field_file_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.FileField,
+    x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _add_resource_field_file(
+        request, kbid, field_id, field_payload, x_skip_store, x_synchronous, rid=rid
+    )
+
+
+async def _add_resource_field_file(
     request: Request,
     kbid: str,
     field_id: str,
     field_payload: models.FileField,
+    x_skip_store: bool,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
@@ -410,6 +629,21 @@ async def add_resource_field_file(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def append_messages_to_conversation_field_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    messages: List[models.InputMessage],
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _append_messages_to_conversation_field(
+        request, kbid, field_id, messages, x_synchronous, rslug=rslug
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages",
     status_code=200,
@@ -419,14 +653,27 @@ async def add_resource_field_file(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def append_messages_to_conversation_field(
+async def append_messages_to_conversation_field_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    messages: List[models.InputMessage],
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _append_messages_to_conversation_field(
+        request, kbid, field_id, messages, x_synchronous, rid=rid
+    )
+
+
+async def _append_messages_to_conversation_field(
     request: Request,
     kbid: str,
     field_id: str,
     messages: List[models.InputMessage],
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     transaction = get_transaction_utility()
     processing = get_processing()
@@ -478,6 +725,21 @@ async def append_messages_to_conversation_field(
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def append_blocks_to_layout_field_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: str,
+    blocks: Dict[str, models.InputBlock],
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _append_blocks_to_layout_field(
+        request, kbid, field_id, blocks, x_synchronous, rslug=rslug
+    )
+
+
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/blocks",
     status_code=200,
@@ -487,14 +749,27 @@ async def append_messages_to_conversation_field(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def append_blocks_to_layout_field(
+async def append_blocks_to_layout_field_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    blocks: Dict[str, models.InputBlock],
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    return await _append_blocks_to_layout_field(
+        request, kbid, field_id, blocks, x_synchronous, rid=rid
+    )
+
+
+async def _append_blocks_to_layout_field(
     request: Request,
     kbid: str,
     field_id: str,
     blocks: Dict[str, models.InputBlock],
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     transaction = get_transaction_utility()
     processing = get_processing()
@@ -545,6 +820,26 @@ async def append_blocks_to_layout_field(
     response_model_exclude_unset=True,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_resource_field_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_type: models.FieldTypeName,
+    field_id: str,
+    x_synchronous: bool = SYNC_CALL,
+):
+    return await _delete_resource_field(
+        request,
+        kbid,
+        field_type,
+        field_id,
+        x_synchronous,
+        rslug=rslug,
+    )
+
+
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=204,
@@ -554,14 +849,27 @@ async def append_blocks_to_layout_field(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource_field(
+async def delete_resource_field_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_type: models.FieldTypeName,
+    field_id: str,
+    x_synchronous: bool = SYNC_CALL,
+):
+    return await _delete_resource_field(
+        request, kbid, field_type, field_id, x_synchronous, rid=rid
+    )
+
+
+async def _delete_resource_field(
     request: Request,
     kbid: str,
     field_type: models.FieldTypeName,
     field_id: str,
+    x_synchronous: bool,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
@@ -593,6 +901,8 @@ async def delete_resource_field(
     response_model=models.writer.ResourceUpdated,
     tags=["Resource fields"],
 )
+@requires(NucliaDBRoles.WRITER)
+@version(1)
 async def reprocess_file_field(
     request: Request,
     kbid: str,

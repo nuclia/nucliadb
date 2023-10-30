@@ -254,23 +254,14 @@ async def _get_resource(
     response_model_exclude_unset=True,
     tags=["Resource fields"],
 )
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
-    status_code=200,
-    name="Get Resource field (by id)",
-    response_model=ResourceField,
-    response_model_exclude_unset=True,
-    tags=["Resource fields"],
-)
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_resource_field(
+async def get_resource_field_rslug_prefix(
     request: Request,
     kbid: str,
+    rslug: str,
     field_type: FieldTypeName,
     field_id: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
     show: List[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
     extracted: List[ExtractedDataTypeName] = Query(
         [
@@ -283,6 +274,67 @@ async def get_resource_field(
     # not working with latest pydantic/fastapi
     # page: Union[Literal["last", "first"], int] = Query("last"),
     page: Union[str, int] = Query("last"),
+) -> Response:
+    return await _get_resource_field(
+        kbid,
+        rslug=rslug,
+        field_type=field_type,
+        field_id=field_id,
+        show=show,
+        extracted=extracted,
+        page=page,
+    )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
+    status_code=200,
+    name="Get Resource field (by id)",
+    response_model=ResourceField,
+    response_model_exclude_unset=True,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_resource_field_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_type: FieldTypeName,
+    field_id: str,
+    show: List[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
+    extracted: List[ExtractedDataTypeName] = Query(
+        [
+            ExtractedDataTypeName.TEXT,
+            ExtractedDataTypeName.METADATA,
+            ExtractedDataTypeName.LINK,
+            ExtractedDataTypeName.FILE,
+        ]
+    ),
+    # not working with latest pydantic/fastapi
+    # page: Union[Literal["last", "first"], int] = Query("last"),
+    page: Union[str, int] = Query("last"),
+) -> Response:
+    return await _get_resource_field(
+        kbid,
+        rid=rid,
+        field_type=field_type,
+        field_id=field_id,
+        show=show,
+        extracted=extracted,
+        page=page,
+    )
+
+
+async def _get_resource_field(
+    kbid: str,
+    field_type: FieldTypeName,
+    field_id: str,
+    show: List[ResourceFieldProperties],
+    extracted: List[ExtractedDataTypeName],
+    page: Union[str, int],
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
