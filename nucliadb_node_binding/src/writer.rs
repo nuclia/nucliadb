@@ -19,12 +19,9 @@
 
 use std::fs;
 use std::io::Cursor;
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
 
 use nucliadb_core::protos::*;
-use nucliadb_core::tracing;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
@@ -40,128 +37,9 @@ use pyo3::types::PyList;
 use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
 
-fn load_merge_interval_secs() -> u64 {
-    let val = std::env::var("MERGE_INTERVAL_SECS").ok();
-    val.and_then(|value| value.parse().ok()).unwrap_or(10800)
-}
-
-fn load_gc_interval_secs() -> u64 {
-    let val = std::env::var("GC_INTERVAL_SECS").ok();
-    val.and_then(|value| value.parse().ok()).unwrap_or(86400)
-}
-
-fn load_update_interval_secs() -> u64 {
-    60
-}
-
-fn scheduler_frequency_secs() -> u64 {
-    5
-}
-
-struct Scheduler {
-    frequency: Duration,
-    update_interval: u64,
-    merge_interval: u64,
-    gc_interval: u64,
-    update_timer: SystemTime,
-    merge_timer: SystemTime,
-    gc_timer: SystemTime,
-    receiver: Receiver<Arc<ShardWriter>>,
-    workload: Vec<Arc<ShardWriter>>,
-}
-impl Scheduler {
-    fn writer_is_alive(&mut self) -> bool {
-        match self.receiver.try_recv() {
-            Err(TryRecvError::Disconnected) => false,
-            Err(TryRecvError::Empty) => true,
-            Ok(shard) => {
-                self.workload.push(shard);
-                true
-            }
-        }
-    }
-
-    fn update_workload(&mut self) {
-        while let Ok(work) = self.receiver.try_recv() {
-            self.workload.push(work);
-        }
-    }
-
-    fn perform_merge(&self) {
-        for work in &self.workload {
-            let Err(error) = work.merge() else {
-                continue;
-            };
-            tracing::info!("merge error: {error}");
-        }
-    }
-
-    fn perform_gc(&self) {
-        for work in &self.workload {
-            let Err(error) = work.gc() else {
-                continue;
-            };
-            tracing::info!("merge error: {error}");
-        }
-    }
-
-    fn should_update(&mut self) -> bool {
-        let elapsed = self.update_timer.elapsed().unwrap_or_default();
-        elapsed.as_secs() >= self.update_interval
-    }
-
-    fn should_merge(&mut self) -> bool {
-        let elapsed = self.merge_timer.elapsed().unwrap_or_default();
-        elapsed.as_secs() >= self.merge_interval
-    }
-
-    fn should_gc(&mut self) -> bool {
-        let elapsed = self.gc_timer.elapsed().unwrap_or_default();
-        elapsed.as_secs() >= self.gc_interval
-    }
-
-    pub fn new(receiver: Receiver<Arc<ShardWriter>>) -> Scheduler {
-        Scheduler {
-            receiver,
-            frequency: Duration::from_secs(scheduler_frequency_secs()),
-            merge_interval: load_merge_interval_secs(),
-            gc_interval: load_gc_interval_secs(),
-            update_interval: load_update_interval_secs(),
-            update_timer: SystemTime::now(),
-            merge_timer: SystemTime::now(),
-            gc_timer: SystemTime::now(),
-            workload: vec![],
-        }
-    }
-    pub fn run(mut self) {
-        loop {
-            std::thread::sleep(self.frequency);
-
-            if self.should_update() {
-                self.update_workload();
-                self.update_timer = SystemTime::now();
-            }
-
-            if self.should_merge() {
-                self.perform_merge();
-                self.merge_timer = SystemTime::now();
-            }
-
-            if self.should_gc() {
-                self.perform_gc();
-                self.gc_timer = SystemTime::now();
-            }
-
-            if !self.writer_is_alive() {
-                break;
-            }
-        }
-    }
-}
-
 #[pyclass]
+#[derive(Default)]
 pub struct NodeWriter {
-    scheduler_sender: Sender<Arc<ShardWriter>>,
     shards: UnboundedShardWriterCache,
 }
 
@@ -171,11 +49,7 @@ impl NodeWriter {
             return Ok(shard);
         }
         match self.shards.load(shard_id.clone()) {
-            Ok(shard) => {
-                let scheduler_shard = Arc::clone(&shard);
-                let _ = self.scheduler_sender.send(scheduler_shard);
-                Ok(shard)
-            }
+            Ok(shard) => Ok(shard),
             Err(error) => Err(LoadShardError::new_err(format!(
                 "Error loading shard {}: {}",
                 shard_id, error
@@ -188,19 +62,13 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        let data_path = env::data_path();
-        let shards_path = env::shards_path();
-        let (scheduler_sender, scheduler_receiver) = mpsc::channel();
-        let scheduler = Scheduler::new(scheduler_receiver);
-
-        lifecycle::initialize_writer(&data_path, &shards_path)
-            .map_err(|error| format!("Unable to initialize writer: {error}"))
-            .map_err(IndexNodeException::new_err)?;
-        std::thread::spawn(|| scheduler.run());
-
+        if let Err(error) = lifecycle::initialize_writer(&env::data_path(), &env::shards_path()) {
+            return Err(IndexNodeException::new_err(format!(
+                "Unable to initialize writer: {error}"
+            )));
+        };
         Ok(Self {
-            scheduler_sender,
-            shards: UnboundedShardWriterCache::new(shards_path),
+            shards: UnboundedShardWriterCache::new(env::shards_path()),
         })
     }
 
@@ -219,7 +87,7 @@ impl NodeWriter {
                     paragraph_service: new_shard.paragraph_version() as i32,
                     vector_service: new_shard.vector_version() as i32,
                     relation_service: new_shard.relation_version() as i32,
-                    id: new_shard.id,
+                    id: new_shard.id.clone(),
                 }
                 .encode_to_vec(),
             )),
@@ -277,7 +145,6 @@ impl NodeWriter {
         let status = shard
             .set_resource(&resource)
             .and_then(|()| shard.get_opstatus());
-
         match status {
             Ok(mut status) => {
                 status.status = 0;

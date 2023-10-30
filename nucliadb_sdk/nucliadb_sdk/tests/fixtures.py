@@ -45,7 +45,6 @@ images.settings["nucliadb"] = {
         "max_receive_message_length": "40",
         "TEST_SENTENCE_ENCODER": "multilingual-2023-02-21",
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
-        "LOG_LEVEL": "DEBUG",
         "DEBUG": "True",
     },
 }
@@ -150,15 +149,13 @@ async def init_fixture(
     kb_obj = sdk.create_knowledge_box(slug=slug)
     kbid = kb_obj.uuid
 
-    import_resp = requests.get(dataset_location)
-    assert (
-        import_resp.status_code == 200
-    ), f"Error pulling dataset {dataset_location}:{import_resp.status_code}"
-    import_data = import_resp.content
+    def dataset_generator():
+        with requests.get(dataset_location, stream=True) as resp:
+            for chunk in resp.iter_content(chunk_size=CHUNK_SIZE):
+                yield chunk
 
-    import_id = sdk.start_import(kbid=kbid, content=import_data).import_id
+    import_id = sdk.start_import(kbid=kbid, content=dataset_generator()).import_id
     assert sdk.import_status(kbid=kbid, import_id=import_id).status.value == "finished"
-
     return kbid
 
 

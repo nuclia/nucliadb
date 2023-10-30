@@ -64,7 +64,7 @@ fn test_two_simultaneous_writers() {
     };
 
     let _writer = TextWriterService::start(&config).unwrap();
-    let _another_writer = TextWriterService::open(&config).unwrap();
+    let _another_writer = TextWriterService::open(&config);
 }
 
 #[test]

@@ -292,7 +292,6 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         min_score=0.70,
         page_number=0,
         page_size=20,
-        with_duplicates=True,
     )
     assert len(results.sentences.results) == 20
 

@@ -53,28 +53,6 @@ pub struct ShardWriter {
     write_lock: Mutex<()>, // be able to lock writes on the shard
 }
 
-impl PartialOrd for ShardWriter {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-impl PartialEq for ShardWriter {
-    fn eq(&self, other: &Self) -> bool {
-        self.id.eq(&other.id)
-    }
-}
-impl Ord for ShardWriter {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-impl Eq for ShardWriter {}
-impl std::hash::Hash for ShardWriter {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
-}
-
 impl ShardWriter {
     #[tracing::instrument(skip_all)]
     fn initialize(
@@ -320,7 +298,6 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
-
         self.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
         Ok(())
     }
@@ -491,21 +468,8 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn merge(&self) -> NodeResult<()> {
-        // TODO: add relations merge when it becomes a Tantivy only index.
-        paragraph_write(&self.paragraph_writer).merge()?;
-        text_write(&self.text_writer).merge()?;
-        vector_write(&self.vector_writer).merge()?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
-        // TODO: add relations gc when it becomes a Tantivy only index.
-        paragraph_write(&self.paragraph_writer).garbage_collection()?;
-        text_write(&self.text_writer).garbage_collection()?;
-        vector_write(&self.vector_writer).garbage_collection()?;
-        Ok(())
+        vector_write(&self.vector_writer).garbage_collection()
     }
 
     #[tracing::instrument(skip_all)]

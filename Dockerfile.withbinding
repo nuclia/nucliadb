@@ -54,6 +54,8 @@ RUN ARCH="$(uname -m)"; \
     esac;
 
 RUN mkdir -p /usr/src/app
+COPY --from=python_rust /nucliadb/target/wheels/ /wheels/
+RUN pip install /wheels/*.whl
 
 WORKDIR /usr/src/app
 
@@ -87,10 +89,6 @@ WORKDIR /usr/src/app
 
 RUN pip install -r nucliadb/requirements-sources.txt
 RUN pip install -e /usr/src/app/nucliadb
-
-# make sure to install the built wheel after so it is installed no matter what
-COPY --from=python_rust /nucliadb/target/wheels/ /wheels/
-RUN pip install /wheels/*.whl --force
 
 RUN mkdir -p /data
 

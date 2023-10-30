@@ -76,7 +76,7 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
 
     let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());
-    assert_eq!(response.vector.unwrap().documents.len(), 1);
+    assert_eq!(response.vector.unwrap().documents.len(), 2);
 
     delete_shard(&mut writer, shard.id).await;
 
