@@ -305,7 +305,7 @@ async def test_max_running_exports(
     # Check for export to finish
     await wait_for(nucliadb_reader, "export", src_kb, export_id_1)
 
-    # Now that the first two have finished, we can start a third one
+    # Now that the first has finished, we can start another one
     resp = await nucliadb_writer.post(f"/kb/{src_kb}/export")
     assert resp.status_code == 200
     export_id_2 = resp.json()["export_id"]
