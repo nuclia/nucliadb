@@ -25,7 +25,7 @@ from uuid import uuid4
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 
-from .fields import Field, FieldBuilder
+from .fields import FieldBuilder
 from .helpers import labels_to_classifications
 
 
@@ -44,6 +44,8 @@ class BrokerMessageBuilder:
         slug: Optional[str] = None,
     ):
         self.bm = wpb.BrokerMessage()
+        self.fields: dict[tuple[str, rpb.FieldType.ValueType], FieldBuilder] = {}
+
         self.bm.kbid = kbid
         self.bm.type = wpb.BrokerMessage.AUTOCOMMIT
 
@@ -62,36 +64,22 @@ class BrokerMessageBuilder:
         self._default_origin()
 
     def build(self) -> wpb.BrokerMessage:
+        self._apply_fields()
         return self.bm
 
-    def add_field(self, field: Field):
-        def replace_if_exists(mut_iterable, field_id: rpb.FieldID, item):
-            for obj in mut_iterable:
-                if obj.field == field_id:
-                    obj.Clear()
-                    obj.CopyFrom(item)
-                    break
-            else:
-                mut_iterable.append(item)
+    def add_field_builder(self, field: FieldBuilder):
+        self.fields[(field.id.field, field.id.field_type)] = field
 
-        if field.user.metadata is not None:
-            replace_if_exists(
-                self.bm.basic.fieldmetadata, field.id, field.user.metadata
-            )
-
-        if field.extracted.metadata is not None:
-            replace_if_exists(
-                self.bm.field_metadata, field.id, field.extracted.metadata
-            )
-
-        if field.extracted.text is not None:
-            replace_if_exists(self.bm.extracted_text, field.id, field.extracted.text)
+    def field_builder(
+        self, field_id: str, field_type: rpb.FieldType.ValueType
+    ) -> FieldBuilder:
+        return self.fields[(field_id, field_type)]
 
     def with_title(self, title: str):
-        title_field = FieldBuilder("title", rpb.FieldType.GENERIC)
-        title_field.with_extracted_text(title)
+        title_builder = FieldBuilder("title", rpb.FieldType.GENERIC)
+        title_builder.with_extracted_text(title)
         # we do this to writer BMs in write resource API endpoint
-        title_field.with_extracted_paragraph_metadata(
+        title_builder.with_extracted_paragraph_metadata(
             rpb.Paragraph(
                 start=0,
                 end=len(title),
@@ -99,13 +87,13 @@ class BrokerMessageBuilder:
             )
         )
         self.bm.basic.title = title
-        self.add_field(title_field.build())
+        self.add_field_builder(title_builder)
 
     def with_summary(self, summary: str):
-        summary_field = FieldBuilder("summary", rpb.FieldType.GENERIC)
-        summary_field.with_extracted_text(summary)
+        summary_builder = FieldBuilder("summary", rpb.FieldType.GENERIC)
+        summary_builder.with_extracted_text(summary)
         # we do this to writer BMs in write resource API endpoint
-        summary_field.with_extracted_paragraph_metadata(
+        summary_builder.with_extracted_paragraph_metadata(
             rpb.Paragraph(
                 start=0,
                 end=len(summary),
@@ -113,7 +101,7 @@ class BrokerMessageBuilder:
             )
         )
         self.bm.basic.summary = summary
-        self.add_field(summary_field.build())
+        self.add_field_builder(summary_builder)
 
     def with_resource_labels(self, labelset: str, labels: list[str]):
         classifications = labels_to_classifications(labelset, labels)
@@ -138,3 +126,28 @@ class BrokerMessageBuilder:
         self.bm.origin.source_id = "My Source"
         self.bm.origin.created.FromDatetime(datetime.now())
         self.bm.origin.modified.FromDatetime(datetime.now())
+
+    def _apply_fields(self):
+        def replace_if_exists(mut_iterable, field_id: rpb.FieldID, item):
+            for obj in mut_iterable:
+                if obj.field == field_id:
+                    obj.Clear()
+                    obj.CopyFrom(item)
+                    break
+            else:
+                mut_iterable.append(item)
+
+        for field_builder in self.fields.values():
+            field = field_builder.build()
+            if field.user.metadata is not None:
+                replace_if_exists(
+                    self.bm.basic.fieldmetadata, field.id, field.user.metadata
+                )
+            if field.extracted.metadata is not None:
+                replace_if_exists(
+                    self.bm.field_metadata, field.id, field.extracted.metadata
+                )
+            if field.extracted.text is not None:
+                replace_if_exists(
+                    self.bm.extracted_text, field.id, field.extracted.text
+                )

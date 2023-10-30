@@ -22,49 +22,45 @@ import dataclasses
 from datetime import datetime
 from typing import Optional
 
-from nucliadb_protos.resources_pb2 import (
-    ExtractedTextWrapper,
-    FieldComputedMetadataWrapper,
-    FieldID,
-    FieldType,
-    Paragraph,
-    ParagraphAnnotation,
-    UserFieldMetadata,
-)
+from nucliadb_protos import resources_pb2 as rpb
 
 from .helpers import labels_to_classifications
 
 
 @dataclasses.dataclass
 class FieldUser:
-    metadata: Optional[UserFieldMetadata] = None
+    metadata: Optional[rpb.UserFieldMetadata] = None
 
 
 @dataclasses.dataclass
 class FieldExtracted:
-    metadata: Optional[FieldComputedMetadataWrapper] = None
-    text: Optional[ExtractedTextWrapper] = None
+    metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
+    text: Optional[rpb.ExtractedTextWrapper] = None
 
 
 @dataclasses.dataclass
 class Field:
-    id: FieldID
+    id: rpb.FieldID
     user: FieldUser = dataclasses.field(default_factory=FieldUser)
     extracted: FieldExtracted = dataclasses.field(default_factory=FieldExtracted)
 
 
 class FieldBuilder:
-    def __init__(self, field: str, field_type: FieldType.ValueType):
-        self._field_id = FieldID(field=field, field_type=field_type)
-        self.__extracted_metadata: Optional[FieldComputedMetadataWrapper] = None
-        self.__extracted_text: Optional[ExtractedTextWrapper] = None
-        self.__user_metadata: Optional[UserFieldMetadata] = None
+    def __init__(self, field: str, field_type: rpb.FieldType.ValueType):
+        self._field_id = rpb.FieldID(field=field, field_type=field_type)
+        self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
+        self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
+        self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
 
     @property
-    def _extracted_metadata(self) -> FieldComputedMetadataWrapper:
+    def id(self) -> rpb.FieldID:
+        return self._field_id
+
+    @property
+    def _extracted_metadata(self) -> rpb.FieldComputedMetadataWrapper:
         if self.__extracted_metadata is None:
             now = datetime.now()
-            self.__extracted_metadata = FieldComputedMetadataWrapper(
+            self.__extracted_metadata = rpb.FieldComputedMetadataWrapper(
                 field=self._field_id,
             )
             self.__extracted_metadata.metadata.metadata.last_index.FromDatetime(now)
@@ -75,30 +71,30 @@ class FieldBuilder:
         return self.__extracted_metadata
 
     @property
-    def _extracted_text(self) -> ExtractedTextWrapper:
+    def _extracted_text(self) -> rpb.ExtractedTextWrapper:
         if self.__extracted_text is None:
-            self.__extracted_text = ExtractedTextWrapper(field=self._field_id)
+            self.__extracted_text = rpb.ExtractedTextWrapper(field=self._field_id)
         return self.__extracted_text
 
     @property
-    def _user_metadata(self) -> UserFieldMetadata:
+    def _user_metadata(self) -> rpb.UserFieldMetadata:
         if self.__user_metadata is None:
-            self.__user_metadata = UserFieldMetadata(field=self._field_id)
+            self.__user_metadata = rpb.UserFieldMetadata(field=self._field_id)
         return self.__user_metadata
 
     def build(self) -> Field:
         field = Field(id=self._field_id)
 
         if self.__extracted_metadata is not None:
-            field.extracted.metadata = FieldComputedMetadataWrapper()
+            field.extracted.metadata = rpb.FieldComputedMetadataWrapper()
             field.extracted.metadata.CopyFrom(self.__extracted_metadata)
 
         if self.__extracted_text is not None:
-            field.extracted.text = ExtractedTextWrapper()
+            field.extracted.text = rpb.ExtractedTextWrapper()
             field.extracted.text.CopyFrom(self.__extracted_text)
 
         if self.__user_metadata is not None:
-            field.user.metadata = UserFieldMetadata()
+            field.user.metadata = rpb.UserFieldMetadata()
             field.user.metadata.CopyFrom(self.__user_metadata)
 
         return field
@@ -112,12 +108,28 @@ class FieldBuilder:
     def with_extracted_text(self, text: str):
         self._extracted_text.body.text = text
 
-    def with_extracted_paragraph_metadata(self, paragraph: Paragraph):
+    def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
         self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
+
+    def with_user_entity(self, klass: str, name: str, *, start: int, end: int):
+        entity = rpb.TokenSplit(
+            klass=klass,
+            token=name,
+            start=start,
+            end=end,
+        )
+        self._user_metadata.token.append(entity)
+
+    def with_extracted_entity(
+        self, klass: str, name: str, *, positions: list[rpb.Position]
+    ):
+        entity = self._extracted_metadata.metadata.metadata.positions[f"{klass}/{name}"]
+        entity.entity = name
+        entity.position.extend(positions)
 
     def with_user_paragraph_labels(self, key: str, labelset: str, labels: list[str]):
         classifications = labels_to_classifications(labelset, labels)
-        pa = ParagraphAnnotation()
+        pa = rpb.ParagraphAnnotation()
         pa.key = key
         pa.classifications.extend(classifications)
         self._user_metadata.paragraphs.append(pa)
