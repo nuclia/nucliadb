@@ -43,18 +43,16 @@ def bytes_to_batch(klass: Any):
 
 def batch_to_text_classification_arrow(schema: pa.schema):
     def func(batch: BatchType):
-        ID = []
         TEXT = []
         LABELS = []
         for data in batch.data:
             if data.text:
-                ID.append(data.id)
                 TEXT.append(data.text)
                 LABELS.append(
                     [f"{label.labelset}/{label.label}" for label in data.labels]
                 )
         if len(TEXT):
-            pa_data = [pa.array(ID), pa.array(TEXT), pa.array(LABELS)]
+            pa_data = [pa.array(TEXT), pa.array(LABELS)]
             output_batch = pa.record_batch(pa_data, schema=schema)
         else:
             output_batch = None

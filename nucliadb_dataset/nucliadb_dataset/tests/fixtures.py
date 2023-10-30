@@ -52,17 +52,6 @@ def upload_data_field_classification(knowledgebox: KnowledgeBox):
 
 
 @pytest.fixture(scope="function")
-def upload_data_field_classification_unlabeled(knowledgebox: KnowledgeBox):
-    knowledgebox.set_labels("labelset1", ["A", "B"], LabelType.RESOURCES)
-    knowledgebox.set_labels("labelset2", ["C"], LabelType.RESOURCES)
-    knowledgebox.upload("doc1", text="This is my lovely text")
-    knowledgebox.upload(
-        "doc2",
-        text="This is my lovely text2",
-    )
-
-
-@pytest.fixture(scope="function")
 async def upload_data_paragraph_classification(knowledgebox: KnowledgeBox):
     knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.PARAGRAPHS)
     knowledgebox.set_labels("labelset2", ["label1", "label2"], LabelType.PARAGRAPHS)
@@ -78,24 +67,6 @@ async def upload_data_paragraph_classification(knowledgebox: KnowledgeBox):
         "doc3",
         text="Yet another lovely text",
         labels=["labelset1/label2", "labelset2/label1"],
-    )
-
-
-@pytest.fixture(scope="function")
-def upload_data_paragraph_classification_unlabeled(knowledgebox: KnowledgeBox):
-    knowledgebox.set_labels("labelset1", ["label1", "label2"], LabelType.PARAGRAPHS)
-    knowledgebox.set_labels("labelset2", ["label1", "label2"], LabelType.PARAGRAPHS)
-    knowledgebox.upload(
-        "doc1",
-        text="Testing without labels is important",
-    )
-    knowledgebox.upload(
-        "doc2",
-        text="So we can be sure unlabeled resources work",
-    )
-    knowledgebox.upload(
-        "doc3",
-        text="And we can export all kind of data",
     )
 
 

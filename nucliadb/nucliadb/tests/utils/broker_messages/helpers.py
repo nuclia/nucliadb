@@ -16,3 +16,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+from nucliadb_protos.resources_pb2 import Classification
+
+
+def labels_to_classifications(labelset: str, labels: list[str]) -> list[Classification]:
+    classifications = [
+        Classification(
+            labelset=labelset,
+            label=label,
+            cancelled_by_user=False,
+        )
+        for label in labels
+    ]
+    return classifications

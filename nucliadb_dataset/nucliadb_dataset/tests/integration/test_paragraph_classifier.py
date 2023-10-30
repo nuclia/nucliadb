@@ -32,32 +32,8 @@ def test_paragraph_classification_with_labels(
     trainset.batch_size = 2
 
     tests = [
-        ([], 3),
         (["labelset1"], 3),
         (["labelset2"], 1),
-    ]
-    for labels, expected in tests:
-        trainset.filter.ClearField("labels")
-        trainset.filter.labels.extend(labels)  # type: ignore
-
-        partitions = export_dataset(knowledgebox, trainset)
-        assert len(partitions) == 1
-
-        loaded_array = partitions[0]
-        assert len(loaded_array) == expected
-
-
-def test_paragraph_classification_without_labels(
-    knowledgebox: KnowledgeBox, upload_data_paragraph_classification_unlabeled
-):
-    trainset = TrainSet()
-    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
-    trainset.batch_size = 2
-
-    tests = [
-        ([], 3),
-        (["labelset1"], 0),
-        (["labelset2"], 0),
     ]
     for labels, expected in tests:
         trainset.filter.ClearField("labels")
@@ -80,22 +56,3 @@ def test_paragraph_classification_invalid_label_type(
 
     with pytest.raises(Exception):
         export_dataset(knowledgebox, trainset)
-
-
-def test_paragraph_classification_populates_field_ids(
-    knowledgebox: KnowledgeBox, upload_data_paragraph_classification
-):
-    trainset = TrainSet()
-    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
-    trainset.batch_size = 2
-
-    partitions = export_dataset(knowledgebox, trainset)
-    assert len(partitions) == 1
-
-    loaded_array = partitions[0]
-    assert len(loaded_array) == 3
-
-    for paragraph_id in loaded_array["paragraph_id"]:
-        # only title is indexed, for field content the processor is needed and
-        # we are not mocking it
-        assert "/a/title/" in str(paragraph_id)

@@ -214,32 +214,27 @@ class NucliaDBDataset(NucliaDataset):
         self._set_schema(schema)
 
     def _configure_field_classification(self):
-        if len(self.trainset.filter.labels) > 1:
-            raise Exception("Needs to have at most one labelset filter to train")
-
-        labelset = None
-        if len(self.trainset.filter.labels) == 1:
-            labelset = self.trainset.filter.labels[0]
+        if len(self.trainset.filter.labels) != 1:
+            raise Exception("Needs to have only one labelset filter to train")
 
         self.labels = self.client.get_labels()
-
+        labelset = self.trainset.filter.labels[0]
         computed_labelset = False
-        if labelset is not None and labelset not in self.labels.labelsets:
+
+        if labelset not in self.labels.labelsets:
             if labelset in self.knowledgebox.get_uploaded_labels():
                 computed_labelset = True
             else:
                 raise Exception("Labelset is not valid")
 
         if (
-            labelset is not None
-            and computed_labelset is False
+            computed_labelset is False
             and "RESOURCES" not in self.labels.labelsets[labelset].kind
         ):
             raise Exception("Labelset not defined for Field Classification")
 
         schema = pa.schema(
             [
-                pa.field("field_id", pa.string()),
                 pa.field("text", pa.string()),
                 pa.field("labels", pa.list_(pa.string())),
             ]
@@ -273,27 +268,20 @@ class NucliaDBDataset(NucliaDataset):
         self._set_schema(schema)
 
     def _configure_paragraph_classification(self):
-        if len(self.trainset.filter.labels) > 1:
-            raise Exception("Needs to have at most one labelset filter to train")
-
-        labelset = None
-        if len(self.trainset.filter.labels) == 1:
-            labelset = self.trainset.filter.labels[0]
+        if len(self.trainset.filter.labels) != 1:
+            raise Exception("Needs to have only one labelset filter to train")
 
         self.labels = self.client.get_labels()
+        labelset = self.trainset.filter.labels[0]
 
-        if labelset is not None and labelset not in self.labels.labelsets:
+        if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
 
-        if (
-            labelset is not None
-            and "PARAGRAPHS" not in self.labels.labelsets[labelset].kind
-        ):
+        if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")
 
         schema = pa.schema(
             [
-                pa.field("paragraph_id", pa.string()),
                 pa.field("text", pa.string()),
                 pa.field("labels", pa.list_(pa.string())),
             ]

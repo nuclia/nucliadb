@@ -76,27 +76,23 @@ async def generate_paragraph_classification_payloads(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncIterator[ParagraphClassificationBatch]:
+    labelset = f"/l/{trainset.filter.labels[0]}"
+
     # Query how many paragraphs has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-
-    labelset = None
-    if len(trainset.filter.labels) > 0:
-        labelset = f"/l/{trainset.filter.labels[0]}"
-        request.filter.tags.append(labelset)
-
+    request.filter.tags.append(labelset)
     batch = ParagraphClassificationBatch()
 
     async for paragraph_item in node.stream_get_paragraphs(request):
         text_labels = []
-
         for label in paragraph_item.labels:
-            if labelset is None or label.startswith(labelset):
+            if label.startswith(labelset):
                 text_labels.append(label)
 
         tl = TextLabel()
-        tl.id = paragraph_item.id
         paragraph_text = await get_paragraph(kbid, paragraph_item.id)
+
         tl.text = paragraph_text
         for label in text_labels:
             _, _, label_labelset, label_title = label.split("/")

@@ -35,6 +35,7 @@ def test_filesystem_export(
 ):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
+    trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -55,9 +56,11 @@ def test_filesystem_export(
 def test_datasets_export(
     mocked_datasets_url: str,
     knowledgebox: KnowledgeBox,
+    upload_data_field_classification,
 ):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
+    trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
 
     with tempfile.TemporaryDirectory() as tmpdirname:
