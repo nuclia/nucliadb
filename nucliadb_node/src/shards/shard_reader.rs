@@ -520,8 +520,6 @@ impl ShardReader {
 
         let info = info_span!(parent: &span, "text search");
         let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "text search");
-        let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph search");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
         let info = info_span!(parent: &span, "vector search");
@@ -550,18 +548,12 @@ impl ShardReader {
         })
         .expect("Failed to join threads");
 
-        let mut response = SearchResponse {
-            document: None,
+        Ok(SearchResponse {
+            document: rtext.transpose()?,
             paragraph: rparagraph.transpose()?,
             vector: rvector.transpose()?,
             relation: rrelation.transpose()?,
-        };
-
-        if !skip_fields {
-            response.document = rtext.transpose()?;
-        }
-
-        Ok(response)
+        })
     }
 
     #[tracing::instrument(skip_all)]
