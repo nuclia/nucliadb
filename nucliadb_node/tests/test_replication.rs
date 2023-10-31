@@ -28,9 +28,8 @@ use nucliadb_core::protos::{
     op_status, NewShardRequest, NewVectorSetRequest, SearchRequest, SearchResponse, ShardId,
     UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
-use nucliadb_node::{
-    replication::health::ReplicationHealthManager, shards::providers::AsyncShardWriterProvider,
-};
+use nucliadb_node::replication::health::ReplicationHealthManager;
+use nucliadb_node::shards::providers::AsyncShardWriterProvider;
 use tonic::Request;
 
 #[tokio::test]
