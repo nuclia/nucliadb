@@ -19,7 +19,6 @@
 
 import asyncio
 import uuid
-from datetime import datetime
 from typing import AsyncIterator
 
 import aiohttp
@@ -153,8 +152,5 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bmb.add_field_builder(file_field)
 
     bm = bmb.build()
-
-    bm.files["file"].added.FromDatetime(datetime.now())
-    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
 
     return bm
