@@ -82,7 +82,7 @@ pub async fn replicate_shard(
             std::fs::remove_file(temp_filepath)?;
             return Err(Error::new(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                "We should have finished previous file before starting a new one",
+                "We should have finished previous file before starting a new one.",
             )));
         }
         if filepath.is_none() {
