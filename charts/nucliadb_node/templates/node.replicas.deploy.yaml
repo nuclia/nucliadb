@@ -62,11 +62,10 @@ spec:
       dnsPolicy: ClusterFirst
       volumes:
       - name: data-dir
-        emptyDir: {}
+        emptyDir:
       - name: nats-creds
         secret:
           secretName: {{ $values.nats.secretName }}
-{{- end }}
       containers:
       - name: writer
         securityContext:
