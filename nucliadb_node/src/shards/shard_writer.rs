@@ -29,7 +29,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
 
 use crate::disk_structure::*;
 use crate::shards::metadata::{ShardMetadata, Similarity};

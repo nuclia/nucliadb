@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::tracing::{debug, info, warn};
+use nucliadb_core::tracing::{debug, warn};
 use nucliadb_core::NodeResult;
 use nucliadb_protos::replication;
 use tokio::fs::File;
