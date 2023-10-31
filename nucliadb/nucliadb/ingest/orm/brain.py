@@ -328,10 +328,10 @@ class ResourceBrain:
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
         if basic.HasField("created"):
             self.brain.metadata.created.CopyFrom(basic.created)
-
         if basic.HasField("modified"):
             self.brain.metadata.modified.CopyFrom(basic.modified)
         elif basic.HasField("created"):
+            # if no modified field, use created field
             self.brain.metadata.modified.CopyFrom(basic.created)
 
         relationnodedocument = RelationNode(
@@ -360,6 +360,12 @@ class ResourceBrain:
                         to=relationnodeuser,
                     )
                 )
+
+            # overwrite created/modified if provided on origin
+            if origin.HasField("created") and origin.created.seconds > 0:
+                self.brain.metadata.created.CopyFrom(origin.created)
+            if origin.HasField("modified") and origin.modified.seconds > 0:
+                self.brain.metadata.modified.CopyFrom(origin.modified)
 
         # icon
         self.tags["n"].append(f"i/{basic.icon}")
