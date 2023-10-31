@@ -14,6 +14,8 @@ metadata:
     app.kubernetes.io/managed-by: {{ $release.Service }}
     version: "{{ $chart.Version | replace "+" "_" }}"
     chart: "{{ $chart.Name }}"
+  annotations:
+    sidecar.istio.io/inject: "false"
 spec:
   replicas: {{ $values.readReplicas.count }}
   revisionHistoryLimit: {{ $values.revisionHistoryLimit }}
@@ -27,6 +29,7 @@ spec:
   template:
     metadata:
       annotations:
+        sidecar.istio.io/inject: "false"
         # do not have access to dependency chart cm this component references
         {{- if hasKey $values "extra_pod_annotations" }}
 {{ toYaml $values.extra_pod_annotations | indent 8 }}
