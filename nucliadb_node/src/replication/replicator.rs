@@ -87,6 +87,7 @@ pub async fn replicate_shard(
         }
         if filepath.is_none() {
             filepath = Some(resp.filepath.clone());
+            info!("Replicating file: {:?}", resp.filepath.clone());
         }
 
         file.write_all(&resp.data).await?;
@@ -127,7 +128,7 @@ pub async fn replicate_shard(
     }
     drop(file);
 
-    if generation_id.is_none() {
+    if generation_id.is_some() {
         // After successful sync, set the generation id
         shard.set_generation_id(generation_id.unwrap());
     }
@@ -200,12 +201,10 @@ pub async fn connect_to_primary_and_replicate(
         metrics.record_replication_op(replication_metrics::ShardOpsKey {
             operation: "check_replication_state".to_string(),
         });
-        info!("Got replication state: {:?}", replication_state.clone());
 
         let start = std::time::SystemTime::now();
         for shard_state in replication_state.shard_states {
             let shard_id = shard_state.shard_id.clone();
-            info!("Replicating shard: {:?}", shard_id);
             let shard_lookup;
             if existing_shards.contains(&shard_id) {
                 shard_lookup = shard_cache.load(shard_id.clone()).await;
@@ -225,8 +224,23 @@ pub async fn connect_to_primary_and_replicate(
                 }
                 shard_lookup = shard_create;
             }
+            let shard = shard_lookup?;
 
-            replicate_shard(shard_state, client.clone(), shard_lookup?).await?;
+            info!(
+                "Replicating shard: {:?}, Primary generation: {:?}, Current generation: {:?}",
+                shard_id,
+                shard_state.generation_id,
+                shard.get_generation_id()
+            );
+
+            let replicate_work_path = shard.path.join("replication");
+            if replicate_work_path.exists() {
+                // clear out replication directory before we start in case there is anything
+                // left behind from a former failed sync
+                std::fs::remove_dir_all(replicate_work_path)?;
+            }
+
+            replicate_shard(shard_state, client.clone(), shard).await?;
             metrics.record_replication_op(replication_metrics::ShardOpsKey {
                 operation: "shard_replicated".to_string(),
             });
