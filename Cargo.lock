@@ -3391,8 +3391,7 @@ dependencies = [
 [[package]]
 name = "tantivy"
 version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "264c2549892aa83975386a924ef8d0b8e909674c837d37ea58b4bd8739495c6e"
+source = "git+https://github.com/nuclia/tantivy.git?rev=2183120aaa565b14fde05aa35342e5c5a3306d3b#2183120aaa565b14fde05aa35342e5c5a3306d3b"
 dependencies = [
  "async-trait",
  "base64 0.13.1",
