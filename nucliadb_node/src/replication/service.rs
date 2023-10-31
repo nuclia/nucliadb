@@ -215,9 +215,13 @@ impl replication::replication_service_server::ReplicationService for Replication
             .collect();
 
         tokio::spawn(async move {
+            // do not allow garbage collection while streaming out shard
+            let _gc_lock = shard.gc_lock.lock().await;
+
             // getting shard files can block during an active write
+            let sshard = Arc::clone(&shard); // moved shard reference into blocking task
             let shard_files = tokio::task::spawn_blocking(move || {
-                shard.get_shard_files(&ignored_segement_ids).unwrap()
+                sshard.get_shard_files(&ignored_segement_ids).unwrap()
             })
             .await
             .map_err(|error| {

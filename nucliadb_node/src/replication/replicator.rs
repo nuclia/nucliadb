@@ -42,6 +42,9 @@ pub async fn replicate_shard(
     >,
     shard: Arc<ShardWriter>,
 ) -> NodeResult<()> {
+    // do not allow gc while replicating
+    let _gc_lock = shard.gc_lock.lock().await;
+
     let metrics = metrics::get_metrics();
     let existing_segment_ids = shard
         .get_shard_segments()?
@@ -139,7 +142,8 @@ pub async fn replicate_shard(
     }
 
     // gc after replication to clean up old segments
-    tokio::task::spawn_blocking(move || shard.gc())
+    let sshard = Arc::clone(&shard); // moved shard for gc
+    tokio::task::spawn_blocking(move || sshard.gc())
         .await?
         .expect("GC failed");
 
