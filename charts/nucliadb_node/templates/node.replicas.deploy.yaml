@@ -19,7 +19,6 @@ metadata:
 spec:
   replicas: {{ $values.readReplicas.count }}
   revisionHistoryLimit: {{ $values.revisionHistoryLimit }}
-  serviceName: node
   selector:
     matchLabels:
       app: node-replicas-{{ $i }}
@@ -44,20 +43,26 @@ spec:
         version: "{{ $chart.Version | replace "+" "_" }}"
         chart: "{{ $chart.Name }}"
     spec:
+{{- if $values.readReplicas.nodeSelector }}
       nodeSelector:
 {{ toYaml $values.readReplicas.nodeSelector | indent 8 }}
+{{- end }}
+{{- if $values.readReplicas.topologySpreadConstraints }}
       topologySpreadConstraints:
 {{ toYaml $values.readReplicas.topologySpreadConstraints | indent 8 }}
+{{- end }}
+{{- if $values.readReplicas.affinity }}
       affinity:
 {{ toYaml $values.readReplicas.affinity | indent 8 }}
+{{- end }}
+{{- if $values.readReplicas.tolerations }}
       tolerations:
 {{ toYaml $values.readReplicas.tolerations | indent 8 }}
+{{- end }}
       dnsPolicy: ClusterFirst
       volumes:
       - name: data-dir
-        emptyDir:
-          sizeLimit: {{ mul $values.readReplicas.disk.numLocalDisks $values.readReplicas.disk.localDiskSize $values.readReplicas.disk.reservationPercentage | int }}Gi
-{{- if $values.nats.secretName }}
+        emptyDir: {}
       - name: nats-creds
         secret:
           secretName: {{ $values.nats.secretName }}
@@ -169,14 +174,5 @@ spec:
           - --reporter.grpc.host-port=dns:///{{ $values.tracing.jaegerCollectorHost }}:{{ $values.tracing.jaegerCollectorGrpcPort }}
           - --reporter.type=grpc
 {{- end }}
-  volumeClaimTemplates:
-  - metadata:
-      name: node-pv
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: {{ $values.storage.class }}
-      resources:
-        requests:
-          storage: {{ $values.storage.size }}
 ---
 {{- end }}
