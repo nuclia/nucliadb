@@ -100,7 +100,7 @@ pub async fn replicate_shard(
             .unwrap_or(f64::NAN);
         current_read_bytes += resp.data.len() as u64;
 
-        metrics.record_replicated_bytes(took / resp.data.len() as f64);
+        metrics.record_replicated_bytes(resp.data.len() as f64 / took);
 
         if current_read_bytes == resp.total_size {
             // finish copying file
