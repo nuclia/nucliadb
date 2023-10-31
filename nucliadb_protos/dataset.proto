@@ -11,6 +11,7 @@ enum TaskType {
     SENTENCE_CLASSIFICATION = 2;
     TOKEN_CLASSIFICATION = 3;
     IMAGE_CLASSIFICATION = 4;
+    PARAGRAPH_STREAMING = 5;
 }
 
 message TrainSet {
@@ -74,4 +75,14 @@ message ImageClassification {
 
 message ImageClassificationBatch {
     repeated ImageClassification data = 1;
+}
+
+
+message ParagraphStreamItem {
+    string id = 1;
+    string text = 2;
+}
+
+message ParagraphStreamingBatch {
+    repeated ParagraphStreamItem data = 1;
 }

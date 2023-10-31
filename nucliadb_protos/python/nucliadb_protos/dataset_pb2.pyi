@@ -29,6 +29,7 @@ class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumT
     SENTENCE_CLASSIFICATION: _TaskType.ValueType  # 2
     TOKEN_CLASSIFICATION: _TaskType.ValueType  # 3
     IMAGE_CLASSIFICATION: _TaskType.ValueType  # 4
+    PARAGRAPH_STREAMING: _TaskType.ValueType  # 5
 
 class TaskType(_TaskType, metaclass=_TaskTypeEnumTypeWrapper):
     """Train API V2"""
@@ -38,6 +39,7 @@ PARAGRAPH_CLASSIFICATION: TaskType.ValueType  # 1
 SENTENCE_CLASSIFICATION: TaskType.ValueType  # 2
 TOKEN_CLASSIFICATION: TaskType.ValueType  # 3
 IMAGE_CLASSIFICATION: TaskType.ValueType  # 4
+PARAGRAPH_STREAMING: TaskType.ValueType  # 5
 global___TaskType = TaskType
 
 class _LabelFrom:
@@ -271,3 +273,37 @@ class ImageClassificationBatch(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
 
 global___ImageClassificationBatch = ImageClassificationBatch
+
+@typing_extensions.final
+class ParagraphStreamItem(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    text: builtins.str
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        text: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "text", b"text"]) -> None: ...
+
+global___ParagraphStreamItem = ParagraphStreamItem
+
+@typing_extensions.final
+class ParagraphStreamingBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphStreamItem]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___ParagraphStreamItem] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
+
+global___ParagraphStreamingBatch = ParagraphStreamingBatch
