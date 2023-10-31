@@ -384,6 +384,7 @@ class StandaloneKBShardManager(KBShardManager):
                 shard_info.fields,
                 shard_info.metadata.release_channel,
             )
+            await index_node.writer.GC(noderesources_pb2.ShardId(id=shard_id))  # type: ignore
 
     async def delete_resource(
         self,
