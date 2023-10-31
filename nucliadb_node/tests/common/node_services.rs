@@ -93,8 +93,10 @@ pub struct NodeFixture {
     secondary_reader_addr: SocketAddr,
     reader_server_task: Option<tokio::task::JoinHandle<()>>,
     writer_server_task: Option<tokio::task::JoinHandle<()>>,
+    primary_shard_cache: Option<Arc<AsyncUnboundedShardWriterCache>>,
     secondary_reader_server_task: Option<tokio::task::JoinHandle<()>>,
     secondary_writer_server_task: Option<tokio::task::JoinHandle<()>>,
+    secondary_shard_cache: Option<Arc<AsyncUnboundedShardWriterCache>>,
     tempdir: TempDir,
     secondary_tempdir: TempDir,
 }
@@ -148,8 +150,10 @@ impl NodeFixture {
             secondary_reader_addr,
             reader_server_task: None,
             writer_server_task: None,
+            primary_shard_cache: None,
             secondary_reader_server_task: None,
             secondary_writer_server_task: None,
+            secondary_shard_cache: None,
             tempdir,
             secondary_tempdir,
         }
@@ -158,11 +162,11 @@ impl NodeFixture {
     pub async fn with_writer(&mut self) -> anyhow::Result<&mut Self> {
         let settings = self.settings.clone();
         let addr = self.writer_addr;
+        let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+        self.primary_shard_cache = Some(shards_cache.clone());
         self.writer_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
                 .expect("Writer initialization has failed");
-            let shards_cache =
-                Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
             let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(
                 settings.clone(),
                 shards_cache.clone(),
@@ -191,11 +195,11 @@ impl NodeFixture {
         let settings = self.secondary_settings.clone();
         let host_key_path = settings.host_key_path();
         let node_id = read_or_create_host_key(host_key_path)?;
+        let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+        self.secondary_shard_cache = Some(shards_cache.clone());
         self.secondary_writer_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
                 .expect("Writer initialization has failed");
-            let shards_cache =
-                Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
             connect_to_primary_and_replicate(
                 settings.clone(),
                 shards_cache.clone(),
@@ -288,6 +292,20 @@ impl NodeFixture {
         self.writer_client
             .as_ref()
             .expect("Writer client not initialized")
+            .clone()
+    }
+
+    pub fn primary_shard_cache(&self) -> Arc<AsyncUnboundedShardWriterCache> {
+        self.primary_shard_cache
+            .as_ref()
+            .expect("Shard cache not initialized")
+            .clone()
+    }
+
+    pub fn secondary_shard_cache(&self) -> Arc<AsyncUnboundedShardWriterCache> {
+        self.secondary_shard_cache
+            .as_ref()
+            .expect("Shard cache not initialized")
             .clone()
     }
 }
