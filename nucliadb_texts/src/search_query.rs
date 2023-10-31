@@ -153,6 +153,19 @@ pub(crate) fn create_filter_fields_query(
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
 
+    // Add key filters
+    request.key_filters.iter().for_each(|uuid| {
+        let term = Term::from_field_text(schema.uuid, uuid);
+        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+        queries.push((Occur::Must, Box::new(term_query)));
+    });
+
+    request.key_filters.iter().for_each(|uuid| {
+        let term = Term::from_field_text(schema.uuid, uuid);
+        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+        queries.push((Occur::Must, Box::new(term_query)));
+    });
+
     Box::new(BooleanQuery::new(queries))
 }
 
