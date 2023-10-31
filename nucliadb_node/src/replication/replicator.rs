@@ -97,7 +97,7 @@ pub async fn replicate_shard(
             .unwrap_or(f64::NAN);
         current_read_bytes += resp.data.len() as u64;
 
-        metrics.record_replicated_bytes(took / resp.data.len() as f64);
+        metrics.record_replicated_bytes(resp.data.len() as f64 / took);
 
         if current_read_bytes == resp.total_size {
             // finish copying file
@@ -174,7 +174,11 @@ pub async fn connect_to_primary_and_replicate(
             if shard.is_none() {
                 let loaded = shard_cache.load(shard_id.clone()).await;
                 if loaded.is_err() {
-                    warn!("Failed to load shard: {:?}", loaded);
+                    warn!(
+                        "Failed to load shard: {:?}, Error: {:?}",
+                        shard_id.clone(),
+                        loaded
+                    );
                     continue;
                 }
                 shard = Some(loaded?);

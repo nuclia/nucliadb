@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::tracing::{info, warn};
+use nucliadb_core::tracing::{debug, warn};
 use nucliadb_core::NodeResult;
 use nucliadb_protos::replication;
 use tokio::fs::File;
@@ -65,14 +65,14 @@ async fn stream_file(
     let filepath = shard_path.join(rel_filepath);
 
     if !filepath.exists() {
-        info!(
+        debug!(
             "File not found when index thought it should be: {}",
             filepath.to_string_lossy(),
         );
         return Ok(());
     }
 
-    info!("Streaming file {}", filepath.to_string_lossy());
+    debug!("Streaming file {}", filepath.to_string_lossy());
     let mut total = 0;
     let mut chunk = 1;
     let mut file = File::open(filepath.clone()).await?;
@@ -108,7 +108,7 @@ async fn stream_data(
 ) {
     let filepath = shard_path.join(rel_filepath);
     let filesize = data.len();
-    info!("Streaming file {} {}", filepath.to_string_lossy(), filesize);
+    debug!("Streaming file {} {}", filepath.to_string_lossy(), filesize);
 
     let reply = replication::ReplicateShardResponse {
         generation_id: generation_id.to_string(),
@@ -151,7 +151,7 @@ impl replication::replication_service_server::ReplicationService for Replication
             if shard.is_none() {
                 let loaded = self.shards.load(shard_id.clone()).await;
                 if loaded.is_err() {
-                    warn!("Failed to load shard: {:?}", shard_id);
+                    warn!("Failed to load shard: {:?}, Error: {:?}", shard_id, loaded);
                     continue;
                 }
                 shard = Some(loaded.unwrap());
