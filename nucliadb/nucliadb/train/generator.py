@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import AsyncIterator, Union
 
 from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -39,12 +40,23 @@ from nucliadb.train.generators.token_classifier import (
 )
 from nucliadb.train.generators.utils import get_transaction
 from nucliadb.train.utils import get_shard_manager
+from nucliadb_protos import dataset_pb2 as dpb
 
 
 async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     # Get the data structure to generate data
     shard_manager = get_shard_manager()
     node, shard_replica_id = await shard_manager.get_reader(kbid, shard)
+
+    payloads_generator: AsyncIterator[
+        Union[
+            dpb.ParagraphClassificationBatch,
+            dpb.FieldClassificationBatch,
+            dpb.SentenceClassificationBatch,
+            dpb.TokenClassificationBatch,
+            dpb.ImageClassificationBatch,
+        ]
+    ] = None
 
     if trainset.batch_size == 0:
         trainset.batch_size = 50
@@ -56,54 +68,45 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
                 detail="Paragraph Classification should be of 1 labelset",
             )
 
-        async for paragraph_data in generate_paragraph_classification_payloads(
+        payloads_generator = generate_paragraph_classification_payloads(
             kbid, trainset, node, shard_replica_id
-        ):
-            payload = paragraph_data.SerializeToString()
-            yield len(payload).to_bytes(4, byteorder="big", signed=False)
-            yield payload
+        )
 
-    if trainset.type == TaskType.FIELD_CLASSIFICATION:
+    elif trainset.type == TaskType.FIELD_CLASSIFICATION:
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
                 status_code=422,
                 detail="Field Classification should be of 1 labelset",
             )
 
-        async for field_data in generate_field_classification_payloads(
+        payloads_generator = generate_field_classification_payloads(
             kbid, trainset, node, shard_replica_id
-        ):
-            payload = field_data.SerializeToString()
-            yield len(payload).to_bytes(4, byteorder="big", signed=False)
-            yield payload
+        )
 
-    if trainset.type == TaskType.TOKEN_CLASSIFICATION:
-        async for token_data in generate_token_classification_payloads(
+    elif trainset.type == TaskType.TOKEN_CLASSIFICATION:
+        payloads_generator = generate_token_classification_payloads(
             kbid, trainset, node, shard_replica_id
-        ):
-            payload = token_data.SerializeToString()
-            yield len(payload).to_bytes(4, byteorder="big", signed=False)
-            yield payload
+        )
 
-    if trainset.type == TaskType.SENTENCE_CLASSIFICATION:
+    elif trainset.type == TaskType.SENTENCE_CLASSIFICATION:
         if len(trainset.filter.labels) == 0:
             raise HTTPException(
                 status_code=422,
                 detail="Sentence Classification should be at least of 1 labelset",
             )
 
-        async for sentence_data in generate_sentence_classification_payloads(
+        payloads_generator = generate_sentence_classification_payloads(
             kbid, trainset, node, shard_replica_id
-        ):
-            payload = sentence_data.SerializeToString()
-            yield len(payload).to_bytes(4, byteorder="big", signed=False)
-            yield payload
+        )
 
-    if trainset.type == TaskType.IMAGE_CLASSIFICATION:
-        async for image_data in generate_image_classification_payloads(
+    elif trainset.type == TaskType.IMAGE_CLASSIFICATION:
+        payloads_generator = generate_image_classification_payloads(
             kbid, trainset, node, shard_replica_id
-        ):
-            payload = image_data.SerializeToString()
+        )
+
+    if payloads_generator is not None:
+        async for item in payloads_generator:
+            payload = item.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
