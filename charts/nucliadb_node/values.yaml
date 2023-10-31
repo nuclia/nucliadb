@@ -91,11 +91,6 @@ readReplicas:
   nodeSelector: {}
   tolerations: []
   topologySpreadConstraints: []
-  disk:
-    numLocalDisks: 1
-    localDiskSize: 375
-    reservationPercentage: 0.1
-    type: ephemeral
   resources:
     reader: {}
     #  limits:
