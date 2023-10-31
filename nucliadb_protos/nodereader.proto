@@ -81,6 +81,7 @@ message DocumentSearchRequest {
     optional noderesources.Resource.ResourceStatus with_status = 16;
     optional string advanced_query = 17;
 
+    repeated ResourceField resource_field_filters = 18;
 }
 
 
@@ -109,6 +110,8 @@ message ParagraphSearchRequest {
     bool only_faceted = 15;
     optional string advanced_query = 16;
     repeated string key_filters = 17;
+
+    repeated ResourceField resource_field_filters = 18;
 }
 
 message ResultScore {
@@ -204,6 +207,8 @@ message VectorSearchRequest {
     repeated string key_filters = 16;
 
     float min_score = 17;
+
+    repeated ResourceField resource_field_filters = 18;
 }
 
 message DocumentVectorIdentifier {

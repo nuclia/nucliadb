@@ -423,8 +423,14 @@ impl ShardReader {
         let has_key_filters = !search_request.key_filters.is_empty();
         let has_field_filters = !search_request.fields.is_empty();
         let needs_pre_filtering = has_filters || has_key_filters || has_field_filters;
+        // TODO: integrate with feature flag system
+        let prefilter_feature_enabled = false;
+        // TODO: Check if the current shard has a flag file indicating that the shard has the
+        // labels propagated upwards to the field, and therefore we can use pre-filtering safely.
+        // For old shards, this will be true after a shard rollover.
+        let shard_has_new_label_format = false;
 
-        if needs_pre_filtering {
+        if prefilter_feature_enabled && needs_pre_filtering && shard_has_new_label_format {
             let text_reader_service = self.text_reader.clone();
             let mut filters = vec![];
             search_request
@@ -467,7 +473,6 @@ impl ShardReader {
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
-            // TODO: add key_filters here
             ..Default::default()
         };
 

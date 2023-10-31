@@ -102,6 +102,8 @@ pub struct DocumentSearchRequest {
     pub with_status: ::core::option::Option<i32>,
     #[prost(string, optional, tag="17")]
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(message, repeated, tag="18")]
+    pub resource_field_filters: ::prost::alloc::vec::Vec<ResourceField>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchRequest {
@@ -138,6 +140,8 @@ pub struct ParagraphSearchRequest {
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="17")]
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, repeated, tag="18")]
+    pub resource_field_filters: ::prost::alloc::vec::Vec<ResourceField>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -265,6 +269,8 @@ pub struct VectorSearchRequest {
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="17")]
     pub min_score: f32,
+    #[prost(message, repeated, tag="18")]
+    pub resource_field_filters: ::prost::alloc::vec::Vec<ResourceField>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentVectorIdentifier {

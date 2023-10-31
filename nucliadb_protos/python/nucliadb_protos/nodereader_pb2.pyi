@@ -273,6 +273,7 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     ONLY_FACETED_FIELD_NUMBER: builtins.int
     WITH_STATUS_FIELD_NUMBER: builtins.int
     ADVANCED_QUERY_FIELD_NUMBER: builtins.int
+    RESOURCE_FIELD_FILTERS_FIELD_NUMBER: builtins.int
     id: builtins.str
     body: builtins.str
     @property
@@ -291,6 +292,8 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     only_faceted: builtins.bool
     with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
     advanced_query: builtins.str
+    @property
+    def resource_field_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ResourceField]: ...
     def __init__(
         self,
         *,
@@ -307,9 +310,10 @@ class DocumentSearchRequest(google.protobuf.message.Message):
         only_faceted: builtins.bool = ...,
         with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
         advanced_query: builtins.str | None = ...,
+        resource_field_filters: collections.abc.Iterable[global___ResourceField] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "with_status", b"with_status"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "resource_field_filters", b"resource_field_filters", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "with_status", b"with_status"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
     @typing.overload
@@ -336,6 +340,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     ONLY_FACETED_FIELD_NUMBER: builtins.int
     ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     KEY_FILTERS_FIELD_NUMBER: builtins.int
+    RESOURCE_FIELD_FILTERS_FIELD_NUMBER: builtins.int
     id: builtins.str
     uuid: builtins.str
     @property
@@ -359,6 +364,8 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     advanced_query: builtins.str
     @property
     def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def resource_field_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ResourceField]: ...
     def __init__(
         self,
         *,
@@ -377,9 +384,10 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
         only_faceted: builtins.bool = ...,
         advanced_query: builtins.str | None = ...,
         key_filters: collections.abc.Iterable[builtins.str] | None = ...,
+        resource_field_filters: collections.abc.Iterable[global___ResourceField] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "key_filters", b"key_filters", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "uuid", b"uuid", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "key_filters", b"key_filters", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "resource_field_filters", b"resource_field_filters", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "uuid", b"uuid", "with_duplicates", b"with_duplicates"]) -> None: ...
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
 
 global___ParagraphSearchRequest = ParagraphSearchRequest
@@ -624,6 +632,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
     VECTOR_SET_FIELD_NUMBER: builtins.int
     KEY_FILTERS_FIELD_NUMBER: builtins.int
     MIN_SCORE_FIELD_NUMBER: builtins.int
+    RESOURCE_FIELD_FILTERS_FIELD_NUMBER: builtins.int
     id: builtins.str
     """Shard ID"""
     @property
@@ -645,6 +654,8 @@ class VectorSearchRequest(google.protobuf.message.Message):
     @property
     def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     min_score: builtins.float
+    @property
+    def resource_field_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ResourceField]: ...
     def __init__(
         self,
         *,
@@ -658,8 +669,9 @@ class VectorSearchRequest(google.protobuf.message.Message):
         vector_set: builtins.str = ...,
         key_filters: collections.abc.Iterable[builtins.str] | None = ...,
         min_score: builtins.float = ...,
+        resource_field_filters: collections.abc.Iterable[global___ResourceField] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "reload", b"reload", "resource_field_filters", b"resource_field_filters", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 

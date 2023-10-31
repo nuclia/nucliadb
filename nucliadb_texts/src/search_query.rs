@@ -93,6 +93,21 @@ pub fn create_query(
         queries.push((Occur::Must, query));
     }
 
+    // Resource field filters
+    search
+        .resource_field_filters
+        .iter()
+        .for_each(|field_filter| {
+            let value = format!("/{}", field_filter.field);
+            let facet = Facet::from_text(value.as_str()).unwrap();
+            let term = Term::from_facet(schema.field, &facet);
+            let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+            queries.push((Occur::Must, Box::new(term_query)));
+            let term = Term::from_field_text(schema.uuid, &field_filter.uuid);
+            let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+            queries.push((Occur::Must, Box::new(term_query)));
+        });
+
     if queries.len() == 1 && queries[0].1.is::<AllQuery>() {
         queries.pop().unwrap().1
     } else {
