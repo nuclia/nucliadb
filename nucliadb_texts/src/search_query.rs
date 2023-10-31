@@ -22,6 +22,7 @@
 
 use nucliadb_core::protos::stream_filter::Conjunction;
 use nucliadb_core::protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
+use nucliadb_core::texts::DocumentFilterRequest;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
@@ -121,6 +122,38 @@ fn create_stream_filter_queries(
         });
 
     queries
+}
+
+pub(crate) fn create_filter_fields_query(
+    request: &DocumentFilterRequest,
+    schema: &TextSchema,
+) -> Box<dyn Query> {
+    let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
+
+    // Fields
+    request
+        .fields
+        .iter()
+        .map(|value| format!("/{}", value))
+        .flat_map(|facet_key| Facet::from_text(facet_key.as_str()).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.field, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            queries.push((Occur::Must, Box::new(facet_term_query)));
+        });
+
+    // Add filters
+    request
+        .filter
+        .iter()
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            queries.push((Occur::Must, Box::new(facet_term_query)));
+        });
+
+    Box::new(BooleanQuery::new(queries))
 }
 
 trait IntoOccur {

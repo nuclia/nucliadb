@@ -420,40 +420,32 @@ impl ShardReader {
         let has_filters = search_request.filter.is_some()
             && !search_request.filter.clone().unwrap().tags.is_empty();
         let has_key_filters = !search_request.key_filters.is_empty();
-        let needs_pre_filtering = has_filters || has_key_filters;
-
-        let mut rtext = None;
-
-        let field_request = DocumentSearchRequest {
-            id: search_id.clone(),
-            body: search_request.body.clone(),
-            fields: search_request.fields.clone(),
-            filter: search_request.filter.clone(),
-            order: search_request.order.clone(),
-            faceted: search_request.faceted.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            timestamps: search_request.timestamps.clone(),
-            only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
-            with_status: search_request.with_status,
-            ..Default::default()
-        };
-        let text_reader_service = self.text_reader.clone();
-        let text_task = move || Some(text_reader_service.search(&field_request));
-        let info = info_span!(parent: &span, "text search");
-        let text_task = || run_with_telemetry(info, text_task);
+        let has_field_filters = !search_request.fields.is_empty();
+        let needs_pre_filtering = has_filters || has_key_filters || has_field_filters;
 
         if needs_pre_filtering {
-            rtext = text_task();
-            match &rtext {
-                Some(Ok(rtext)) => {
-                    rtext
-                        .results
-                        .iter()
-                        .for_each(|result| search_request.key_filters.push(result.field.clone()));
-                }
-                _ => {}
+            let text_reader_service = self.text_reader.clone();
+            let mut filters = vec![];
+            search_request
+                .filter
+                .iter()
+                .flat_map(|f| f.tags.iter())
+                .for_each(|tag| {
+                    filters.push(tag.clone());
+                });
+            let filter_request = DocumentFilterRequest {
+                fields: search_request.fields.clone(),
+                filter: filters,
+                key_filters: search_request.key_filters.clone(),
+            };
+            let prefilter_task = move || Some(text_reader_service.filter_fields(filter_request));
+            let info = info_span!(parent: &span, "pre-filter step");
+            let prefilter_task = || run_with_telemetry(info, prefilter_task);
+            let prefilter_result = prefilter_task();
+            if let Some(result) = &prefilter_result {
+                result
+                    .iter()
+                    .for_each(|field_id| search_request.key_filters.push(field_id.clone()));
             }
         }
 
@@ -470,8 +462,10 @@ impl ShardReader {
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
+            // TODO: add key_filters here
             ..Default::default()
         };
+
         let text_reader_service = self.text_reader.clone();
         let text_task = move || Some(text_reader_service.search(&field_request));
 
@@ -526,6 +520,8 @@ impl ShardReader {
 
         let info = info_span!(parent: &span, "text search");
         let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "text search");
+        let text_task = || run_with_telemetry(info, text_task);
         let info = info_span!(parent: &span, "paragraph search");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
         let info = info_span!(parent: &span, "vector search");
@@ -533,12 +529,13 @@ impl ShardReader {
         let info = info_span!(parent: &span, "relations search");
         let relation_task = || run_with_telemetry(info, relation_task);
 
+        let mut rtext = None;
         let mut rparagraph = None;
         let mut rvector = None;
         let mut rrelation = None;
 
         crossbeam_thread::scope(|s| {
-            if !skip_fields && !needs_pre_filtering {
+            if !skip_fields {
                 s.spawn(|_| rtext = text_task());
             }
             if !skip_paragraphs {

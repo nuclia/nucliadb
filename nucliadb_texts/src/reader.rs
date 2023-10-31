@@ -111,6 +111,59 @@ impl FieldReader for TextReaderService {
         }
         Ok(count)
     }
+
+    #[measure(actor = "texts", metric = "filter_fields")]
+    #[tracing::instrument(skip_all)]
+    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<String> {
+        let mut results = vec![];
+        let mut page = 0;
+        let mut more_results = true;
+        while more_results {
+            let aux = self.filter_fields_page(&request, page);
+            aux.field_ids
+                .iter()
+                .for_each(|field_id| results.push(field_id.clone()));
+            more_results = aux.more_results;
+            page += 1;
+        }
+        results
+    }
+
+    #[measure(actor = "texts", metric = "filter_fields_page")]
+    #[tracing::instrument(skip_all)]
+    fn filter_fields_page(&self, request: &DocumentFilterRequest, page: u32) -> FilterResponsePage {
+        use crate::search_query::create_filter_fields_query;
+
+        let page_size = 50000;
+        let offset = page_size * page as usize;
+        let query = create_filter_fields_query(request, &self.schema);
+
+        let topdocs_collector = TopDocs::with_limit(page_size).and_offset(offset);
+        let multicollector = &(topdocs_collector, Count);
+        let searcher = self.reader.searcher();
+        // TODO: convert this to ?
+        let (top_docs, total) = searcher.search(&query, multicollector).unwrap();
+        let retrieved_results = offset + page_size;
+        let mut field_ids = Vec::with_capacity(top_docs.len());
+        for (_, (_, doc_address)) in top_docs.into_iter().enumerate() {
+            match searcher.doc(doc_address) {
+                Ok(doc) => {
+                    let field = doc
+                        .get_first(self.schema.field)
+                        .expect("document doesn't appear to have field.")
+                        .as_facet()
+                        .unwrap()
+                        .to_path_string();
+                    field_ids.push(field);
+                }
+                Err(e) => error!("Error retrieving document from index: {}", e),
+            }
+        }
+        FilterResponsePage {
+            field_ids,
+            more_results: (total > retrieved_results),
+        }
+    }
 }
 
 impl ReaderChild for TextReaderService {

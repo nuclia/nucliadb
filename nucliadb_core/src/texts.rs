@@ -31,12 +31,23 @@ pub struct TextConfig {
     pub path: PathBuf,
 }
 
+#[derive(Clone)]
+pub struct DocumentFilterRequest {
+    pub fields: Vec<String>,
+    pub filter: Vec<String>,
+    pub key_filters: Vec<String>,
+}
+
+#[derive(Clone)]
+pub struct FilterResponsePage {
+    pub field_ids: Vec<String>,
+    pub more_results: bool,
+}
+
 pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
 impl DocumentIterator {
     pub fn new<I>(inner: I) -> DocumentIterator
-    where
-        I: Iterator<Item = DocumentItem> + Send + 'static,
-    {
+    where I: Iterator<Item = DocumentItem> + Send + 'static {
         DocumentIterator(Box::new(inner))
     }
 }
@@ -52,6 +63,8 @@ pub trait FieldReader:
 {
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
+    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<String>;
+    fn filter_fields_page(&self, request: &DocumentFilterRequest, page: u32) -> FilterResponsePage;
 }
 
 pub trait FieldWriter: WriterChild {}
