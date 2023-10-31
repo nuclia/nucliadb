@@ -29,7 +29,4 @@ impl VectorEngine for NoEngine {
     fn search(&self, _: usize, _: &[f32]) {
         println!("Im no engine, I cant do that");
     }
-    fn merge(&mut self) {
-        println!("Im no engine, I cant do that");
-    }
 }

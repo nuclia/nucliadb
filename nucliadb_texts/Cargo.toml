@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tempfile = "3"
-tantivy = { git = "https://github.com/nuclia/tantivy.git", version = "0.17.0" }
+tantivy = "0.17.0"
 itertools = "0.10.5"
 
 nucliadb_core = { path = "../nucliadb_core" }

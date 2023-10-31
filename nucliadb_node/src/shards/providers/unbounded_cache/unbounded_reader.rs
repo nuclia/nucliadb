@@ -44,15 +44,11 @@ impl UnboundedShardReaderCache {
     }
 
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardReader>>> {
-        self.cache
-            .read()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.read().expect("Poisoned lock while reading")
     }
 
     fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardReader>>> {
-        self.cache
-            .write()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.write().expect("Poisoned lock while reading")
     }
 }
 
