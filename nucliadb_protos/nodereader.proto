@@ -303,6 +303,17 @@ message RelationSearchResponse {
 }
 
 
+message ResourceField {
+    string uuid = 1;
+    string field = 2;
+}
+
+
+message FieldFilters {
+    repeated ResourceField fields = 1;
+}
+
+
 message SearchRequest {
     string shard = 1;
 
@@ -344,7 +355,10 @@ message SearchRequest {
     repeated string key_filters = 22;
 
     float min_score = 23;
+
+    repeated ResourceField resource_field_filters = 24;
 }
+
 
 enum SuggestFeatures {
     ENTITIES = 0;

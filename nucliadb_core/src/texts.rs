@@ -40,7 +40,7 @@ pub struct DocumentFilterRequest {
 
 #[derive(Clone)]
 pub struct FilterResponsePage {
-    pub field_ids: Vec<String>,
+    pub field_ids: Vec<(String, String)>,
     pub more_results: bool,
 }
 
@@ -63,7 +63,7 @@ pub trait FieldReader:
 {
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
-    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<String>;
+    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<(String, String)>;
     fn filter_fields_page(&self, request: &DocumentFilterRequest, page: u32) -> FilterResponsePage;
 }
 

@@ -114,7 +114,7 @@ impl FieldReader for TextReaderService {
 
     #[measure(actor = "texts", metric = "filter_fields")]
     #[tracing::instrument(skip_all)]
-    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<String> {
+    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<(String, String)> {
         let mut results = vec![];
         let mut page = 0;
         let mut more_results = true;
@@ -154,7 +154,13 @@ impl FieldReader for TextReaderService {
                         .as_facet()
                         .unwrap()
                         .to_path_string();
-                    field_ids.push(field);
+                    let uuid = doc
+                        .get_first(self.schema.uuid)
+                        .expect("document doesn't appear to have uuid.")
+                        .as_facet()
+                        .unwrap()
+                        .to_path_string();
+                    field_ids.push((uuid, field));
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),
             }

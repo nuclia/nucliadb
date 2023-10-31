@@ -382,6 +382,18 @@ pub struct RelationSearchResponse {
     pub subgraph: ::core::option::Option<EntitiesSubgraphResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ResourceField {
+    #[prost(string, tag="1")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub field: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldFilters {
+    #[prost(message, repeated, tag="1")]
+    pub fields: ::prost::alloc::vec::Vec<ResourceField>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchRequest {
     #[prost(string, tag="1")]
     pub shard: ::prost::alloc::string::String,
@@ -436,6 +448,8 @@ pub struct SearchRequest {
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag="23")]
     pub min_score: f32,
+    #[prost(message, repeated, tag="24")]
+    pub resource_field_filters: ::prost::alloc::vec::Vec<ResourceField>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

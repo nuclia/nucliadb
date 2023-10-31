@@ -35,6 +35,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
+use nucliadb_protos::prelude::ResourceField;
 
 use crate::disk_structure::*;
 use crate::shards::metadata::ShardMetadata;
@@ -443,9 +444,13 @@ impl ShardReader {
             let prefilter_task = || run_with_telemetry(info, prefilter_task);
             let prefilter_result = prefilter_task();
             if let Some(result) = &prefilter_result {
-                result
-                    .iter()
-                    .for_each(|field_id| search_request.key_filters.push(field_id.clone()));
+                result.iter().for_each(|(uuid, field_id)| {
+                    let field = ResourceField {
+                        uuid: uuid.clone(),
+                        field: field_id.clone(),
+                    };
+                    search_request.resource_field_filters.push(field);
+                });
             }
         }
 
