@@ -265,6 +265,9 @@ pub async fn connect_to_primary_and_replicate(
             operation: "check_replication_state".to_string(),
         });
 
+        let no_shards_to_sync = replication_state.shard_states.is_empty();
+        let no_shards_to_remove = replication_state.shards_to_remove.is_empty();
+
         let start = std::time::SystemTime::now();
         for shard_state in replication_state.shard_states {
             let shard_id = shard_state.shard_id.clone();
@@ -336,13 +339,14 @@ pub async fn connect_to_primary_and_replicate(
             .elapsed()
             .map(|elapsed| elapsed.as_secs_f64())
             .expect("Error getting elapsed time");
-        if elapsed < settings.replication_delay_seconds() as f64 {
-            // only update healthy marker if we're up-to-date in a short
-            // amount of time
+        if elapsed < settings.replication_healthy_delay() as f64 {
+            // only update healthy marker if we're up-to-date in the configured healthy time
             repl_health_mng.update_healthy();
+        }
 
-            // and only sleep if replication was successful under this time
-            // otherwise, check again for changes
+        if no_shards_to_sync && no_shards_to_remove {
+            // if we have any changes, check again immediately
+            // otherwise, wait for a bit
             tokio::time::sleep(std::time::Duration::from_secs(
                 settings.replication_delay_seconds(),
             ))

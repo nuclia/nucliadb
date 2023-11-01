@@ -110,6 +110,11 @@ pub struct Settings {
     replication_delay_seconds: u64,
     #[builder(default = "3")]
     replication_max_concurrency: u64,
+
+    // number of seconds since last replication for
+    // node to be considered healthy
+    #[builder(default = "30")]
+    replication_healthy_delay: u64,
 }
 
 impl Settings {
@@ -218,8 +223,14 @@ impl Settings {
     pub fn replication_delay_seconds(&self) -> u64 {
         self.replication_delay_seconds
     }
+<<<<<<< HEAD
     pub fn replication_max_concurrency(&self) -> u64 {
         self.replication_max_concurrency
+=======
+
+    pub fn replication_healthy_delay(&self) -> u64 {
+        self.replication_healthy_delay
+>>>>>>> 7d2fb335 (better replication healthy check)
     }
 }
 
