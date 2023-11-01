@@ -102,6 +102,11 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.DownloadShardFileRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.ShardFileChunk.FromString,
                 )
+        self.GetMetadata = channel.unary_unary(
+                '/nodereader.NodeReader/GetMetadata',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_noderesources__pb2.NodeMetadata.FromString,
+                )
 
 
 class NodeReaderServicer(object):
@@ -213,6 +218,12 @@ class NodeReaderServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetMetadata(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NodeReaderServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -300,6 +311,11 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.DownloadShardFile,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.DownloadShardFileRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.ShardFileChunk.SerializeToString,
+            ),
+            'GetMetadata': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMetadata,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
+                    response_serializer=nucliadb__protos_dot_noderesources__pb2.NodeMetadata.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -599,5 +615,22 @@ class NodeReader(object):
         return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/DownloadShardFile',
             nucliadb__protos_dot_nodereader__pb2.DownloadShardFileRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.ShardFileChunk.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetMetadata(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/GetMetadata',
+            nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.NodeMetadata.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

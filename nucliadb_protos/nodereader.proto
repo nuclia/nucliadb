@@ -482,4 +482,6 @@ service NodeReader {
     // Shard Download
     rpc GetShardFiles(GetShardFilesRequest) returns (ShardFileList) {};
     rpc DownloadShardFile(DownloadShardFileRequest) returns (stream ShardFileChunk) {};
+
+    rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }

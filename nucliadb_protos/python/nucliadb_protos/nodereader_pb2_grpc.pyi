@@ -126,6 +126,10 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
         nucliadb_protos.nodereader_pb2.ShardFileChunk,
     ]
+    GetMetadata: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.EmptyQuery,
+        nucliadb_protos.noderesources_pb2.NodeMetadata,
+    ]
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
     """Implemented at nucliadb_object_storage"""
@@ -234,5 +238,11 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.DownloadShardFileRequest,
         context: grpc.ServicerContext,
     ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ShardFileChunk]: ...
+    @abc.abstractmethod
+    def GetMetadata(
+        self,
+        request: nucliadb_protos.noderesources_pb2.EmptyQuery,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.NodeMetadata: ...
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

@@ -421,4 +421,15 @@ impl NodeReader for NodeReaderGRPCDriver {
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
+
+    async fn get_metadata(
+        &self,
+        _request: tonic::Request<EmptyQuery>,
+    ) -> Result<tonic::Response<NodeMetadata>, tonic::Status> {
+        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        match metadata {
+            Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
+    }
 }
