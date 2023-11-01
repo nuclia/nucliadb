@@ -167,7 +167,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
@@ -254,7 +256,7 @@ pub async fn connect_to_primary_and_replicate(
             .await?
             .into_inner();
 
-        metrics.record_replication_op(replication_metrics::ShardOpsKey {
+        metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
             operation: "check_replication_state".to_string(),
         });
 
@@ -302,7 +304,7 @@ pub async fn connect_to_primary_and_replicate(
             worker_pool
                 .add(replicate_shard(shard_state, client.clone(), shard))
                 .await?;
-            metrics.record_replication_op(replication_metrics::ShardOpsKey {
+            metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
                 operation: "shard_replicated".to_string(),
             });
         }
@@ -317,7 +319,7 @@ pub async fn connect_to_primary_and_replicate(
                 warn!("Failed to delete shard: {:?}", shard_lookup);
                 continue;
             }
-            metrics.record_replication_op(replication_metrics::ShardOpsKey {
+            metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
                 operation: "shard_removed".to_string(),
             });
         }
