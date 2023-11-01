@@ -39,5 +39,5 @@ pub trait Meter: Send + Sync {
         None
     }
     fn record_replicated_bytes(&self, value: u64);
-    fn record_replication_op(&self, key: replication::ShardOpsKey);
+    fn record_replication_op(&self, key: replication::ReplicationOpsKey);
 }
