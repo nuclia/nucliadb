@@ -107,7 +107,7 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
 }
 
 pub fn set_primary_node_id(primary_id: String) -> NodeResult<()> {
-    let filepath = PathBuf::from(env::data_path()).join("primary_id");
+    let filepath = env::data_path().join("primary_id");
 
     fs::write(filepath.clone(), primary_id)
         .with_context(|| format!("Failed to write primary ID to '{}'", filepath.display()))?;
@@ -116,7 +116,7 @@ pub fn set_primary_node_id(primary_id: String) -> NodeResult<()> {
 }
 
 pub fn get_primary_node_id() -> Option<String> {
-    let filepath = PathBuf::from(env::data_path()).join("primary_id");
+    let filepath = env::data_path().join("primary_id");
     let read_result = fs::read(filepath.clone());
     if read_result.is_err() {
         return None;
