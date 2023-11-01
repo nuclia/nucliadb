@@ -425,10 +425,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
-
         let span = Span::current();
         let info = info_span!(parent: &span, "list vector sets");
-
         let task = || run_with_telemetry(info, move || shard.gc());
         let result = tokio::task::spawn_blocking(task).await.map_err(|error| {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
