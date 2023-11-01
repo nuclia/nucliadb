@@ -114,7 +114,7 @@ impl FieldReader for TextReaderService {
 
     #[measure(actor = "texts", metric = "filter_fields")]
     #[tracing::instrument(skip_all)]
-    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<(String, String)> {
+    fn filter_fields(&self, request: PreFilterRequest) -> Vec<(String, String)> {
         let mut results = vec![];
         let mut page = 0;
         let mut more_results = true;
@@ -131,12 +131,12 @@ impl FieldReader for TextReaderService {
 
     #[measure(actor = "texts", metric = "filter_fields_page")]
     #[tracing::instrument(skip_all)]
-    fn filter_fields_page(&self, request: &DocumentFilterRequest, page: u32) -> FilterResponsePage {
-        use crate::search_query::create_filter_fields_query;
+    fn filter_fields_page(&self, request: &PreFilterRequest, page: u32) -> FilterResponsePage {
+        use crate::search_query::prefilter_query;
 
         let page_size = 50000;
         let offset = page_size * page as usize;
-        let query = create_filter_fields_query(request, &self.schema);
+        let query = prefilter_query(request, &self.schema);
 
         let topdocs_collector = TopDocs::with_limit(page_size).and_offset(offset);
         let multicollector = &(topdocs_collector, Count);

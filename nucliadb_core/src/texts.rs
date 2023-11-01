@@ -32,10 +32,10 @@ pub struct TextConfig {
 }
 
 #[derive(Clone)]
-pub struct DocumentFilterRequest {
+pub struct PreFilterRequest {
     pub fields: Vec<String>,
-    pub filter: Vec<String>,
-    pub key_filters: Vec<String>,
+    pub faceted: Vec<String>,
+    pub keys: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -63,8 +63,8 @@ pub trait FieldReader:
 {
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
-    fn filter_fields(&self, request: DocumentFilterRequest) -> Vec<(String, String)>;
-    fn filter_fields_page(&self, request: &DocumentFilterRequest, page: u32) -> FilterResponsePage;
+    fn filter_fields(&self, request: PreFilterRequest) -> Vec<(String, String)>;
+    fn filter_fields_page(&self, request: &PreFilterRequest, page: u32) -> FilterResponsePage;
 }
 
 pub trait FieldWriter: WriterChild {}

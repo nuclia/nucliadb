@@ -22,7 +22,7 @@
 
 use nucliadb_core::protos::stream_filter::Conjunction;
 use nucliadb_core::protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
-use nucliadb_core::texts::DocumentFilterRequest;
+use nucliadb_core::texts::PreFilterRequest;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
@@ -139,13 +139,10 @@ fn create_stream_filter_queries(
     queries
 }
 
-pub(crate) fn create_filter_fields_query(
-    request: &DocumentFilterRequest,
-    schema: &TextSchema,
-) -> Box<dyn Query> {
+pub(crate) fn prefilter_query(request: &PreFilterRequest, schema: &TextSchema) -> Box<dyn Query> {
     let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
 
-    // Fields
+    // Add field filters
     request
         .fields
         .iter()
@@ -157,9 +154,9 @@ pub(crate) fn create_filter_fields_query(
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    // Add filters
+    // Add faceted filters
     request
-        .filter
+        .faceted
         .iter()
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
@@ -169,13 +166,7 @@ pub(crate) fn create_filter_fields_query(
         });
 
     // Add key filters
-    request.key_filters.iter().for_each(|uuid| {
-        let term = Term::from_field_text(schema.uuid, uuid);
-        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        queries.push((Occur::Must, Box::new(term_query)));
-    });
-
-    request.key_filters.iter().for_each(|uuid| {
+    request.keys.iter().for_each(|uuid| {
         let term = Term::from_field_text(schema.uuid, uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         queries.push((Occur::Must, Box::new(term_query)));

@@ -419,46 +419,43 @@ impl ShardReader {
             });
         }
 
-        let has_filters = search_request.filter.is_some()
+        let has_faceted_filters = search_request.filter.is_some()
             && !search_request.filter.clone().unwrap().tags.is_empty();
         let has_key_filters = !search_request.key_filters.is_empty();
         let has_field_filters = !search_request.fields.is_empty();
-        let needs_pre_filtering = has_filters || has_key_filters || has_field_filters;
+        let needs_pre_filtering = has_faceted_filters || has_key_filters || has_field_filters;
 
-        // TODO: Check if the current shard has a flag file indicating that the shard has the
-        // labels propagated upwards to the field, and therefore we can use pre-filtering safely.
-        // For old shards, this will be true after a shard rollover.
-        let shard_has_new_label_format = false;
+        // TODO: Before this lands on stable channel, find a way
+        // to have old classif label filtering work before we roll-over all shards.
 
-        let shard_release_channel = self.metadata.channel.unwrap_or_default();
-        let experimental_channel = shard_release_channel == Channel::EXPERIMENTAL;
+        let experimental_channel =
+            self.metadata.channel.unwrap_or_default() == Channel::EXPERIMENTAL;
 
-        if experimental_channel && needs_pre_filtering && shard_has_new_label_format {
-            let text_reader_service = self.text_reader.clone();
-            let mut filters = vec![];
+        if experimental_channel && needs_pre_filtering {
+            // TODO: Put this in a separate function
+            let mut prefilter_request = PreFilterRequest {
+                fields: search_request.fields.clone(),
+                faceted: vec![],
+                keys: search_request.key_filters.clone(),
+            };
             search_request
                 .filter
                 .iter()
                 .flat_map(|f| f.tags.iter())
                 .for_each(|tag| {
-                    filters.push(tag.clone());
+                    prefilter_request.faceted.push(tag.clone());
                 });
-            let filter_request = DocumentFilterRequest {
-                fields: search_request.fields.clone(),
-                filter: filters,
-                key_filters: search_request.key_filters.clone(),
-            };
-            let prefilter_task = move || Some(text_reader_service.filter_fields(filter_request));
-            let info = info_span!(parent: &span, "pre-filter step");
+            let text_reader_service = self.text_reader.clone();
+            let prefilter_task = move || Some(text_reader_service.filter_fields(prefilter_request));
+            let info = info_span!(parent: &span, "prefilter search");
             let prefilter_task = || run_with_telemetry(info, prefilter_task);
             let prefilter_result = prefilter_task();
             if let Some(result) = &prefilter_result {
                 result.iter().for_each(|(uuid, field_id)| {
-                    let field = ResourceField {
+                    search_request.resource_field_filters.push(ResourceField {
                         uuid: uuid.clone(),
                         field: field_id.clone(),
-                    };
-                    search_request.resource_field_filters.push(field);
+                    });
                 });
             }
         }
@@ -476,6 +473,8 @@ impl ShardReader {
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
+            // TODO: avoid cloning resource_field_filters
+            resource_field_filters: search_request.resource_field_filters.clone(),
             ..Default::default()
         };
 
@@ -497,6 +496,8 @@ impl ShardReader {
             only_faceted: search_request.only_faceted,
             advanced_query: search_request.advanced_query.clone(),
             key_filters: search_request.key_filters.clone(),
+            // TODO: avoid cloning resource_field_filters
+            resource_field_filters: search_request.resource_field_filters.clone(),
             ..Default::default()
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
@@ -517,6 +518,8 @@ impl ShardReader {
                 .chain(search_request.fields.iter().cloned())
                 .collect(),
             min_score: search_request.min_score,
+            // TODO: avoid cloning resource_field_filters
+            resource_field_filters: search_request.resource_field_filters.clone(),
             ..Default::default()
         };
         let vector_reader_service = self.vector_reader.clone();
