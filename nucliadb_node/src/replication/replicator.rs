@@ -179,7 +179,11 @@ pub async fn connect_to_primary_and_replicate(
             if shard.is_none() {
                 let loaded = shard_cache.load(shard_id.clone()).await;
                 if loaded.is_err() {
-                    warn!("Failed to load shard: {:?}", loaded);
+                    warn!(
+                        "Failed to load shard: {:?}, Error: {:?}",
+                        shard_id.clone(),
+                        loaded
+                    );
                     continue;
                 }
                 shard = Some(loaded?);

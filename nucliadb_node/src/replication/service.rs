@@ -151,7 +151,7 @@ impl replication::replication_service_server::ReplicationService for Replication
             if shard.is_none() {
                 let loaded = self.shards.load(shard_id.clone()).await;
                 if loaded.is_err() {
-                    warn!("Failed to load shard: {:?}", shard_id);
+                    warn!("Failed to load shard: {:?}, Error: {:?}", shard_id, loaded);
                     continue;
                 }
                 shard = Some(loaded.unwrap());
