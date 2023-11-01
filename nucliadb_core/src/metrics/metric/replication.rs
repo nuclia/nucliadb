@@ -20,35 +20,21 @@
 use prometheus_client::encoding::EncodeLabelSet;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 pub struct ReplicatedBytesKey {}
-pub type ReplicatedBytesValue = f64;
 
-pub type ReplicatedBytesMetric = Family<ReplicatedBytesKey, Histogram>;
-
-const BUCKETS: [f64; 8] = [
-    0.0,
-    1024.0,
-    1024.0 * 1024.0,
-    1024.0 * 1024.0 * 5.0,
-    1024.0 * 1024.0 * 10.0,
-    1024.0 * 1024.0 * 100.0,
-    1024.0 * 1024.0 * 512.0,
-    1024.0 * 1024.0 * 1024.0,
-];
+pub type ReplicatedBytesMetric = Family<ReplicatedBytesKey, Counter>;
 
 pub fn register_replicated_bytes_ops(registry: &mut Registry) -> ReplicatedBytesMetric {
-    let constructor = || Histogram::new(BUCKETS.iter().copied());
-    let metric = ReplicatedBytesMetric::new_with_constructor(constructor);
+    let bytes_count = ReplicatedBytesMetric::default();
     registry.register(
-        "nucliadb_replication_replicated_bytes",
-        "Replicated bytes per second",
-        metric.clone(),
+        "nucliadb_replication_replicated_bytes_processed",
+        "Replicated bytes",
+        bytes_count.clone(),
     );
-    metric
+    bytes_count
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]

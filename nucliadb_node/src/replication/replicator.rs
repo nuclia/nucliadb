@@ -81,7 +81,6 @@ pub async fn replicate_shard(
     let mut temp_filepath = replicate_work_path.join(uuid::Uuid::new_v4().to_string());
     let mut current_read_bytes = 0;
     let mut file = tokio::fs::File::create(temp_filepath.clone()).await?;
-    let mut start = std::time::SystemTime::now();
     while let Some(resp) = stream.message().await? {
         generation_id = Some(resp.generation_id);
         if filepath.is_some() && Some(resp.filepath.clone()) != filepath {
@@ -97,13 +96,9 @@ pub async fn replicate_shard(
         }
 
         file.write_all(&resp.data).await?;
-        let took = start
-            .elapsed()
-            .map(|elapsed| elapsed.as_secs_f64())
-            .unwrap_or(f64::NAN);
         current_read_bytes += resp.data.len() as u64;
 
-        metrics.record_replicated_bytes(resp.data.len() as f64 / took);
+        metrics.record_replicated_bytes(resp.data.len() as u64);
 
         if current_read_bytes == resp.total_size {
             // finish copying file
@@ -133,8 +128,6 @@ pub async fn replicate_shard(
             temp_filepath = replicate_work_path.join(uuid::Uuid::new_v4().to_string());
             file = tokio::fs::File::create(temp_filepath.clone()).await?;
         }
-
-        start = std::time::SystemTime::now();
     }
     drop(file);
     drop(_gc_lock);
