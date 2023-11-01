@@ -42,7 +42,6 @@ class AbstractIndexNode(metaclass=ABCMeta):
         address: str,
         shard_count: int,
         dummy: bool = False,
-        read_only: bool = False,
     ):
         self.id = id
         self.address = address
