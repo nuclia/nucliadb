@@ -9,7 +9,7 @@ replicas: 2
 
 # app settings
 env:
-  NUCLIA_ZONE: "europe-1"
+  NUCLIA_ZONE: "provider-region-ordinal"
   CORS_ORIGINS: '["http://localhost:8080"]'
   #NUA_API_KEY: "..."
   cluster_discovery_mode: kubernetes
