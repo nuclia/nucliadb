@@ -20,11 +20,14 @@
 use std::fs;
 use std::sync::Arc;
 
+use futures::Future;
 use nucliadb_core::metrics::replication as replication_metrics;
 use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::{metrics, Error, NodeResult};
 use nucliadb_protos::replication;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::Semaphore;
+use tokio::time::Duration; // Import the Future trait
 use tonic::Request;
 
 use crate::replication::health::ReplicationHealthManager;
@@ -58,7 +61,7 @@ pub async fn replicate_shard(
     let mut stream = client
         .replicate_shard(Request::new(replication::ReplicateShardRequest {
             shard_id: shard_state.shard_id.clone(),
-            chunk_size: 1024 * 1024 * 2,
+            chunk_size: 1024 * 1024 * 3,
             existing_segment_ids,
         }))
         .await?
@@ -117,6 +120,10 @@ pub async fn replicate_shard(
             }
 
             std::fs::rename(temp_filepath.clone(), dest_filepath.clone())?;
+            debug!(
+                "Finished replicating file: {:?} to shard {:?}",
+                resp.filepath, shard_state.shard_id
+            );
 
             filepath = None;
             current_read_bytes = 0;
@@ -138,12 +145,51 @@ pub async fn replicate_shard(
         std::fs::remove_file(temp_filepath.clone())?;
     }
 
+    debug!("Finished replicating shard: {:?}", shard_state.shard_id);
+
     // gc after replication to clean up old segments
     tokio::task::spawn_blocking(move || shard.gc())
         .await?
         .expect("GC failed");
 
     Ok(())
+}
+
+struct ReplicateWorkerPool {
+    work_lock: Arc<Semaphore>,
+    max_size: usize,
+}
+
+impl ReplicateWorkerPool {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            work_lock: Arc::new(Semaphore::new(max_size)),
+            max_size,
+        }
+    }
+
+    pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
+    where F: Future<Output = NodeResult<()>> + Send + 'static {
+        let work_lock = Arc::clone(&self.work_lock);
+        let permit = work_lock.acquire_owned().await.unwrap();
+
+        tokio::spawn(async move {
+            let result = worker.await;
+            drop(permit);
+            if result.is_err() {
+                error!("Error replicating shard: {:?}", result);
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn wait_for_workers(self) -> NodeResult<()> {
+        self.work_lock.close();
+        while self.work_lock.available_permits() != self.max_size {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        Ok(())
+    }
 }
 
 pub async fn connect_to_primary_and_replicate(
@@ -169,16 +215,24 @@ pub async fn connect_to_primary_and_replicate(
     loop {
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
+        let mut worker_pool =
+            ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
         for shard_id in existing_shards.clone() {
             let mut shard = shard_cache.get(shard_id.clone()).await;
             if shard.is_none() {
                 let loaded = shard_cache.load(shard_id.clone()).await;
                 if loaded.is_err() {
                     warn!(
-                        "Failed to load shard: {:?}, Error: {:?}",
+                        "Failed to load shard from disk, deleting shard in case of corruption and \
+                         retrying: {:?}, Error: {:?}",
                         shard_id.clone(),
                         loaded
                     );
+                    // delete directory
+                    let shard_path = settings.shards_path().join(shard_id.clone());
+                    if shard_path.exists() {
+                        std::fs::remove_dir_all(shard_path)?;
+                    }
                     continue;
                 }
                 shard = Some(loaded?);
@@ -244,7 +298,9 @@ pub async fn connect_to_primary_and_replicate(
                 std::fs::remove_dir_all(replicate_work_path)?;
             }
 
-            replicate_shard(shard_state, client.clone(), shard).await?;
+            worker_pool
+                .add(replicate_shard(shard_state, client.clone(), shard))
+                .await?;
             metrics.record_replication_op(replication_metrics::ShardOpsKey {
                 operation: "shard_replicated".to_string(),
             });
@@ -264,6 +320,8 @@ pub async fn connect_to_primary_and_replicate(
                 operation: "shard_removed".to_string(),
             });
         }
+
+        worker_pool.wait_for_workers().await?;
 
         // Healthy check and delays for manage replication.
         //
