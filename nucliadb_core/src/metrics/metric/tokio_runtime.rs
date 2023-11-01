@@ -38,16 +38,7 @@ pub struct TokioRuntimeObserver {
 
 impl TokioRuntimeObserver {
     pub fn new(registry: &mut Registry) -> Self {
-        let runtime = Handle::try_current();
-        if runtime.is_err() {
-            info!("Cannot export tokio runtime metrics, no runtime available");
-            Self {
-                runtime: None,
-                intervals: None,
-                metrics: TokioRuntimeMetrics::new(registry),
-            }
-        } else {
-            let runtime = runtime.unwrap();
+        if let Ok(runtime) = Handle::try_current() {
             let monitor = RuntimeMonitor::new(&runtime);
             // We need to store RuntimeIntervals iterator instead of RuntimeMonitor to
             // get incremental values. We need a Mutex to be Send and Sync (for our
@@ -58,18 +49,23 @@ impl TokioRuntimeObserver {
                 intervals: Some(intervals),
                 metrics: TokioRuntimeMetrics::new(registry),
             }
+        } else {
+            info!("Cannot export tokio runtime metrics, no runtime available");
+            Self {
+                runtime: None,
+                intervals: None,
+                metrics: TokioRuntimeMetrics::new(registry),
+            }
         }
     }
 
     pub fn observe(&self) -> NodeResult<()> {
-        if self.runtime.is_none() {
-            return Ok(());
+        if let Some(runtime) = self.runtime.as_ref() {
+            let interval = self.next_interval()?;
+            let raw_metrics = runtime.metrics();
+
+            self.metrics.update(raw_metrics, interval);
         }
-
-        let interval = self.next_interval()?;
-        let raw_metrics = self.runtime.as_ref().unwrap().metrics();
-
-        self.metrics.update(raw_metrics, interval);
 
         Ok(())
     }
@@ -85,13 +81,18 @@ impl TokioRuntimeObserver {
     }
 
     fn unpoisoned_intervals(&self) -> NodeResult<MutexGuard<'_, RuntimeIntervals>> {
-        let intvals = self.intervals.as_ref().unwrap();
-        match intvals.try_lock() {
-            Ok(intervals) => Ok(intervals),
-            Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
-            Err(TryLockError::WouldBlock) => Err(node_error!(
-                "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
-            )),
+        if let Some(intervals) = self.intervals.as_ref() {
+            match intervals.try_lock() {
+                Ok(intervals) => Ok(intervals),
+                Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
+                Err(TryLockError::WouldBlock) => Err(node_error!(
+                    "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
+                )),
+            }
+        } else {
+            Err(node_error!(
+                "Cannot export tokio runtime metrics, no runtime available"
+            ))
         }
     }
 }
