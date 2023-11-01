@@ -47,7 +47,6 @@ class AbstractIndexNode(metaclass=ABCMeta):
         self.address = address
         self.shard_count = shard_count
         self.dummy = dummy
-        self.read_only = read_only
 
     def __str__(self):
         return f"{self.__class__.__name__}({self.id}, {self.address})"
