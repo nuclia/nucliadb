@@ -223,14 +223,13 @@ impl Settings {
     pub fn replication_delay_seconds(&self) -> u64 {
         self.replication_delay_seconds
     }
-<<<<<<< HEAD
+
     pub fn replication_max_concurrency(&self) -> u64 {
         self.replication_max_concurrency
-=======
+    }
 
     pub fn replication_healthy_delay(&self) -> u64 {
         self.replication_healthy_delay
->>>>>>> 7d2fb335 (better replication healthy check)
     }
 }
 
