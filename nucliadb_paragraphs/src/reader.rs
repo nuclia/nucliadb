@@ -748,6 +748,19 @@ mod tests {
             to_created: Some(timestamp),
         };
 
+        let empty_modified = Timestamps {
+            from_modified: None,
+            to_modified: Some(Timestamp::default()),
+            from_created: None,
+            to_created: None,
+        };
+        let empty_created = Timestamps {
+            from_modified: None,
+            to_modified: None,
+            from_created: None,
+            to_created: Some(Timestamp::default()),
+        };
+
         let order = OrderBy {
             sort_by: OrderField::Created as i32,
             r#type: 0,
@@ -962,6 +975,42 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
+
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: "".to_string(),
+            body: "this is the".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None, // Some(order),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(empty_modified),
+            with_duplicates: false,
+            only_faceted: false,
+            ..Default::default()
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 0);
+
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: "".to_string(),
+            body: "this is the".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None, // Some(order),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(empty_created),
+            with_duplicates: false,
+            only_faceted: false,
+            ..Default::default()
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 0);
 
         // Search typo on all paragraph
         let search = ParagraphSearchRequest {
