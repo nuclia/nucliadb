@@ -37,13 +37,19 @@ use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {
     settings: Arc<Settings>,
     shards: Arc<AsyncUnboundedShardWriterCache>,
+    node_id: String,
 }
 
 impl ReplicationServiceGRPCDriver {
-    pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
+    pub fn new(
+        settings: Arc<Settings>,
+        shard_cache: Arc<AsyncUnboundedShardWriterCache>,
+        node_id: String,
+    ) -> Self {
         Self {
             settings,
             shards: shard_cache,
+            node_id,
         }
     }
 
@@ -182,6 +188,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         let response = replication::PrimaryCheckReplicationStateResponse {
             shard_states: resp_shard_states,
             shards_to_remove,
+            primary_id: self.node_id.clone(),
         };
         Ok(Response::new(response))
     }

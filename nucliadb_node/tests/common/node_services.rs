@@ -173,7 +173,11 @@ impl NodeFixture {
             ));
             let replication_server =
                 replication::replication_service_server::ReplicationServiceServer::new(
-                    ReplicationServiceGRPCDriver::new(settings.clone(), shards_cache.clone()),
+                    ReplicationServiceGRPCDriver::new(
+                        settings.clone(),
+                        shards_cache.clone(),
+                        "primary_id".to_string(),
+                    ),
                 );
             Server::builder()
                 .add_service(writer_server)

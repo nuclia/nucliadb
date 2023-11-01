@@ -89,17 +89,20 @@ class PrimaryCheckReplicationStateResponse(google.protobuf.message.Message):
 
     SHARD_STATES_FIELD_NUMBER: builtins.int
     SHARDS_TO_REMOVE_FIELD_NUMBER: builtins.int
+    PRIMARY_ID_FIELD_NUMBER: builtins.int
     @property
     def shard_states(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PrimaryShardReplicationState]: ...
     @property
     def shards_to_remove(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    primary_id: builtins.str
     def __init__(
         self,
         *,
         shard_states: collections.abc.Iterable[global___PrimaryShardReplicationState] | None = ...,
         shards_to_remove: collections.abc.Iterable[builtins.str] | None = ...,
+        primary_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["shard_states", b"shard_states", "shards_to_remove", b"shards_to_remove"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["primary_id", b"primary_id", "shard_states", b"shard_states", "shards_to_remove", b"shards_to_remove"]) -> None: ...
 
 global___PrimaryCheckReplicationStateResponse = PrimaryCheckReplicationStateResponse
 

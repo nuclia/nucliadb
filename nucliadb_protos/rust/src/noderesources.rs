@@ -255,6 +255,8 @@ pub struct NodeMetadata {
     pub shards: ::std::collections::HashMap<::prost::alloc::string::String, node_metadata::ShardMetadata>,
     #[prost(string, tag="4")]
     pub node_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag="5")]
+    pub primary_node_id: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `NodeMetadata`.
 pub mod node_metadata {

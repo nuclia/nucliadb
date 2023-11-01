@@ -33,6 +33,8 @@ pub struct PrimaryCheckReplicationStateResponse {
     pub shard_states: ::prost::alloc::vec::Vec<PrimaryShardReplicationState>,
     #[prost(string, repeated, tag="2")]
     pub shards_to_remove: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag="3")]
+    pub primary_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SegmentIds {
