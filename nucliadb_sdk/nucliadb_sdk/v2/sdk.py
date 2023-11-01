@@ -416,6 +416,44 @@ class _NucliaDBBase:
         docstring=docstrings.LIST_RESOURCES,
     )
 
+    # reindex/reprocess
+    reindex_resource = _request_builder(
+        name="reindex_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REINDEX_RESOURCE,
+    )
+    reindex_resource_by_slug = _request_builder(
+        name="reindex_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/reindex",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REINDEX_RESOURCE_BY_SLUG,
+    )
+    reprocess_resource = _request_builder(
+        name="reprocess_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/reprocess",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REPROCESS_RESOURCE,
+    )
+    reprocess_resource_by_slug = _request_builder(
+        name="reprocess_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/reprocess",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REPROCESS_RESOURCE_BY_SLUG,
+    )
+
     # Conversation endpoints
     add_conversation_message = _request_builder(
         name="add_conversation_message",
