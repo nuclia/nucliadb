@@ -130,6 +130,7 @@ pub async fn replicate_shard(
         start = std::time::SystemTime::now();
     }
     drop(file);
+    drop(_gc_lock);
 
     if generation_id.is_some() {
         // After successful sync, set the generation id

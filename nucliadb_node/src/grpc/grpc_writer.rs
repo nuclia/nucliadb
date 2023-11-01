@@ -425,14 +425,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
-        // could be replicating and we want to wait for replication to finish before gc
-        let _gc_lock = shard.gc_lock.lock().await;
 
         let span = Span::current();
         let info = info_span!(parent: &span, "list vector sets");
 
-        let sshard = Arc::clone(&shard);
-        let task = || run_with_telemetry(info, move || sshard.gc());
+        let task = || run_with_telemetry(info, move || shard.gc());
         let result = tokio::task::spawn_blocking(task).await.map_err(|error| {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;

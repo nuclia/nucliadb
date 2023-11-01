@@ -469,6 +469,7 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
+        let _lock = self.gc_lock.blocking_lock();
         vector_write(&self.vector_writer).garbage_collection()
     }
 
