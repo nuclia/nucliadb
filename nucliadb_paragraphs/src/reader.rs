@@ -727,40 +727,6 @@ mod tests {
             ],
         };
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
-        let old_timestamp = Timestamp {
-            seconds: 0_i64,
-            nanos: 0,
-        };
-
-        let timestamps = Timestamps {
-            from_modified: Some(old_timestamp.clone()),
-            to_modified: Some(timestamp.clone()),
-            from_created: Some(old_timestamp),
-            to_created: Some(timestamp),
-        };
-
-        let empty_modified = Timestamps {
-            from_modified: None,
-            to_modified: Some(Timestamp::default()),
-            from_created: None,
-            to_created: None,
-        };
-        let empty_created = Timestamps {
-            from_modified: None,
-            to_modified: None,
-            from_created: None,
-            to_created: Some(Timestamp::default()),
-        };
-
         let order = OrderBy {
             sort_by: OrderField::Created as i32,
             r#type: 0,
@@ -951,7 +917,7 @@ mod tests {
             order: Some(order),
             page_number: 0,
             result_per_page: 20,
-            timestamps: Some(timestamps.clone()),
+            timestamps: None,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
@@ -968,49 +934,13 @@ mod tests {
             order: None, // Some(order),
             page_number: 0,
             result_per_page: 20,
-            timestamps: Some(timestamps),
+            timestamps: None,
             with_duplicates: false,
             only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
-
-        let search = ParagraphSearchRequest {
-            id: "shard1".to_string(),
-            uuid: "".to_string(),
-            body: "this is the".to_string(),
-            fields: vec![],
-            filter: None,
-            faceted: None,
-            order: None, // Some(order),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(empty_modified),
-            with_duplicates: false,
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
-
-        let search = ParagraphSearchRequest {
-            id: "shard1".to_string(),
-            uuid: "".to_string(),
-            body: "this is the".to_string(),
-            fields: vec![],
-            filter: None,
-            faceted: None,
-            order: None, // Some(order),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(empty_created),
-            with_duplicates: false,
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
 
         // Search typo on all paragraph
         let search = ParagraphSearchRequest {
@@ -1039,6 +969,197 @@ mod tests {
         let iter = paragraph_reader_service.iterator(&request).unwrap();
         let count = iter.count();
         assert_eq!(count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_search_paragraph_with_timestamps() -> NodeResult<()> {
+        let dir = TempDir::new().unwrap();
+        let psc = ParagraphConfig {
+            path: dir.path().join("paragraphs"),
+        };
+        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
+        let resource1 = create_resource("shard1".to_string());
+        let _ = paragraph_writer_service.set_resource(&resource1);
+
+        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
+
+        let reader = paragraph_writer_service.index.reader()?;
+        let searcher = reader.searcher();
+
+        let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
+        assert_eq!(count, 4);
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+
+        fn do_search(
+            paragraph_reader_service: &ParagraphReaderService,
+            timestamps: Timestamps,
+        ) -> i32 {
+            let search = ParagraphSearchRequest {
+                id: "shard1".to_string(),
+                uuid: "".to_string(),
+                body: "this is the".to_string(),
+                fields: vec![],
+                filter: None,
+                faceted: None,
+                order: None, // Some(order),
+                page_number: 0,
+                result_per_page: 20,
+                timestamps: Some(timestamps),
+                with_duplicates: false,
+                only_faceted: false,
+                ..Default::default()
+            };
+            let result = paragraph_reader_service.search(&search).unwrap();
+            result.total
+        }
+
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: Some(Timestamp {
+                    seconds: (now.as_secs() - 1) as i64,
+                    nanos: 0,
+                }),
+                to_modified: Some(Timestamp {
+                    seconds: (now.as_secs() + 1) as i64,
+                    nanos: 0,
+                }),
+                from_created: Some(Timestamp {
+                    seconds: (now.as_secs() - 1) as i64,
+                    nanos: 0,
+                }),
+                to_created: Some(Timestamp {
+                    seconds: (now.as_secs() + 1) as i64,
+                    nanos: 0,
+                }),
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only from modified before, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: Some(Timestamp {
+                    seconds: (now.as_secs() - 1) as i64,
+                    nanos: 0,
+                }),
+                to_modified: None,
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only from modified after, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: Some(Timestamp {
+                    seconds: (now.as_secs() + 1) as i64,
+                    nanos: 0,
+                }),
+                to_modified: None,
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 0);
+
+        // only to modified after, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: Some(Timestamp {
+                    seconds: (now.as_secs() + 1) as i64,
+                    nanos: 0,
+                }),
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only to modified before, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: Some(Timestamp {
+                    seconds: (now.as_secs() - 1) as i64,
+                    nanos: 0,
+                }),
+                from_created: None,
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 0);
+
+        // only from created before, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: Some(Timestamp {
+                    seconds: (now.as_secs() - 1) as i64,
+                    nanos: 0,
+                }),
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only from created after, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: Some(Timestamp {
+                    seconds: (now.as_secs() + 1) as i64,
+                    nanos: 0,
+                }),
+                to_created: None,
+            },
+        );
+        assert_eq!(total, 0);
+
+        // only to created after, all matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: None,
+                to_created: Some(Timestamp {
+                    seconds: (now.as_secs() + 1) as i64,
+                    nanos: 0,
+                }),
+            },
+        );
+        assert_eq!(total, 3);
+
+        // only to created before, no matches
+        let total = do_search(
+            &paragraph_reader_service,
+            Timestamps {
+                from_modified: None,
+                to_modified: None,
+                from_created: None,
+                to_created: Some(Timestamp {
+                    seconds: (now.as_secs() - 1) as i64,
+                    nanos: 0,
+                }),
+            },
+        );
+        assert_eq!(total, 0);
+
         Ok(())
     }
 }

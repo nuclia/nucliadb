@@ -19,41 +19,53 @@
 
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
+use crate::tracing::info;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
+use tokio;
 use tokio::runtime::Handle;
 use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
 
 use crate::{node_error, NodeResult};
 
 pub struct TokioRuntimeObserver {
-    runtime: Handle,
-    intervals: Mutex<RuntimeIntervals>,
+    runtime: Option<Handle>,
+    intervals: Option<Mutex<RuntimeIntervals>>,
     metrics: TokioRuntimeMetrics,
 }
 
 impl TokioRuntimeObserver {
     pub fn new(registry: &mut Registry) -> Self {
-        let runtime = Handle::current();
-        let monitor = RuntimeMonitor::new(&runtime);
-        // We need to store RuntimeIntervals iterator instead of RuntimeMonitor to
-        // get incremental values. We need a Mutex to be Send and Sync (for our
-        // Meter users)
-        let intervals = Mutex::new(monitor.intervals());
-        Self {
-            runtime,
-            intervals,
-            metrics: TokioRuntimeMetrics::new(registry),
+        if let Ok(runtime) = Handle::try_current() {
+            let monitor = RuntimeMonitor::new(&runtime);
+            // We need to store RuntimeIntervals iterator instead of RuntimeMonitor to
+            // get incremental values. We need a Mutex to be Send and Sync (for our
+            // Meter users)
+            let intervals = Mutex::new(monitor.intervals());
+            Self {
+                runtime: Some(runtime),
+                intervals: Some(intervals),
+                metrics: TokioRuntimeMetrics::new(registry),
+            }
+        } else {
+            info!("Cannot export tokio runtime metrics, no runtime available");
+            Self {
+                runtime: None,
+                intervals: None,
+                metrics: TokioRuntimeMetrics::new(registry),
+            }
         }
     }
 
     pub fn observe(&self) -> NodeResult<()> {
-        let interval = self.next_interval()?;
-        let raw_metrics = self.runtime.metrics();
+        if let Some(runtime) = self.runtime.as_ref() {
+            let interval = self.next_interval()?;
+            let raw_metrics = runtime.metrics();
 
-        self.metrics.update(raw_metrics, interval);
+            self.metrics.update(raw_metrics, interval);
+        }
 
         Ok(())
     }
@@ -69,12 +81,18 @@ impl TokioRuntimeObserver {
     }
 
     fn unpoisoned_intervals(&self) -> NodeResult<MutexGuard<'_, RuntimeIntervals>> {
-        match self.intervals.try_lock() {
-            Ok(intervals) => Ok(intervals),
-            Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
-            Err(TryLockError::WouldBlock) => Err(node_error!(
-                "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
-            )),
+        if let Some(intervals) = self.intervals.as_ref() {
+            match intervals.try_lock() {
+                Ok(intervals) => Ok(intervals),
+                Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
+                Err(TryLockError::WouldBlock) => Err(node_error!(
+                    "Cannot acquire runtime metrics lock. There's a concurrent export going on?"
+                )),
+            }
+        } else {
+            Err(node_error!(
+                "Cannot export tokio runtime metrics, no runtime available"
+            ))
         }
     }
 }
