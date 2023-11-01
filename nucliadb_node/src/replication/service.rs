@@ -183,7 +183,6 @@ impl replication::replication_service_server::ReplicationService for Replication
                 warn!("Shard {} not found", shard_id);
             }
         }
-        // let shard = self.shards.get_shard(request.).await?;
 
         let response = replication::PrimaryCheckReplicationStateResponse {
             shard_states: resp_shard_states,
