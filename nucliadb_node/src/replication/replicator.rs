@@ -81,7 +81,6 @@ pub async fn replicate_shard(
     let mut temp_filepath = replicate_work_path.join(uuid::Uuid::new_v4().to_string());
     let mut current_read_bytes = 0;
     let mut file = tokio::fs::File::create(temp_filepath.clone()).await?;
-    let mut start = std::time::SystemTime::now();
     while let Some(resp) = stream.message().await? {
         generation_id = Some(resp.generation_id);
         if filepath.is_some() && Some(resp.filepath.clone()) != filepath {
@@ -129,8 +128,6 @@ pub async fn replicate_shard(
             temp_filepath = replicate_work_path.join(uuid::Uuid::new_v4().to_string());
             file = tokio::fs::File::create(temp_filepath.clone()).await?;
         }
-
-        start = std::time::SystemTime::now();
     }
     drop(file);
     drop(_gc_lock);
@@ -170,7 +167,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
