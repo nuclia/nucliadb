@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package replication;
 
+import public "nucliadb_protos/noderesources.proto";
+
 
 message PrimaryShardReplicationState {
     string shard_id = 1;
@@ -53,4 +55,6 @@ service ReplicationService {
     // Shard replication RPCs
     rpc CheckReplicationState(SecondaryCheckReplicationStateRequest) returns (PrimaryCheckReplicationStateResponse) {}
     rpc ReplicateShard(ReplicateShardRequest) returns (stream ReplicateShardResponse) {}
+
+    rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }

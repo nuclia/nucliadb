@@ -5,7 +5,31 @@ isort:skip_file
 import abc
 import collections.abc
 import grpc
+import nucliadb_protos.noderesources_pb2
 import nucliadb_protos.replication_pb2
+from nucliadb_protos.noderesources_pb2 import (
+    EmptyQuery as EmptyQuery,
+    EmptyResponse as EmptyResponse,
+    IndexMetadata as IndexMetadata,
+    IndexParagraph as IndexParagraph,
+    IndexParagraphs as IndexParagraphs,
+    NodeMetadata as NodeMetadata,
+    ParagraphMetadata as ParagraphMetadata,
+    Position as Position,
+    Resource as Resource,
+    ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
+    Shard as Shard,
+    ShardCleaned as ShardCleaned,
+    ShardCreated as ShardCreated,
+    ShardId as ShardId,
+    ShardIds as ShardIds,
+    ShardMetadata as ShardMetadata,
+    TextInformation as TextInformation,
+    VectorSentence as VectorSentence,
+    VectorSetID as VectorSetID,
+    VectorSetList as VectorSetList,
+)
 
 class ReplicationServiceStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
@@ -17,6 +41,10 @@ class ReplicationServiceStub:
     ReplicateShard: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.replication_pb2.ReplicateShardRequest,
         nucliadb_protos.replication_pb2.ReplicateShardResponse,
+    ]
+    GetMetadata: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.EmptyQuery,
+        nucliadb_protos.noderesources_pb2.NodeMetadata,
     ]
 
 class ReplicationServiceServicer(metaclass=abc.ABCMeta):
@@ -33,5 +61,11 @@ class ReplicationServiceServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.replication_pb2.ReplicateShardRequest,
         context: grpc.ServicerContext,
     ) -> collections.abc.Iterator[nucliadb_protos.replication_pb2.ReplicateShardResponse]: ...
+    @abc.abstractmethod
+    def GetMetadata(
+        self,
+        request: nucliadb_protos.noderesources_pb2.EmptyQuery,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.NodeMetadata: ...
 
 def add_ReplicationServiceServicer_to_server(servicer: ReplicationServiceServicer, server: grpc.Server) -> None: ...

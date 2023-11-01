@@ -177,6 +177,28 @@ pub mod replication_service_client {
             );
             self.inner.server_streaming(request.into_request(), path, codec).await
         }
+        pub async fn get_metadata(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::NodeMetadata>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/replication.ReplicationService/GetMetadata",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -204,6 +226,13 @@ pub mod replication_service_server {
             &self,
             request: tonic::Request<super::ReplicateShardRequest>,
         ) -> Result<tonic::Response<Self::ReplicateShardStream>, tonic::Status>;
+        async fn get_metadata(
+            &self,
+            request: tonic::Request<super::super::noderesources::EmptyQuery>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::NodeMetadata>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct ReplicationServiceServer<T: ReplicationService> {
@@ -332,6 +361,49 @@ pub mod replication_service_server {
                                 send_compression_encodings,
                             );
                         let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/replication.ReplicationService/GetMetadata" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetMetadataSvc<T: ReplicationService>(pub Arc<T>);
+                    impl<
+                        T: ReplicationService,
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::EmptyQuery,
+                    > for GetMetadataSvc<T> {
+                        type Response = super::super::noderesources::NodeMetadata;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<
+                                super::super::noderesources::EmptyQuery,
+                            >,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).get_metadata(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetMetadataSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)

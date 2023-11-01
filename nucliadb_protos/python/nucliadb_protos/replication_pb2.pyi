@@ -13,6 +13,29 @@ if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
+from nucliadb_protos.noderesources_pb2 import (
+    EmptyQuery as EmptyQuery,
+    EmptyResponse as EmptyResponse,
+    IndexMetadata as IndexMetadata,
+    IndexParagraph as IndexParagraph,
+    IndexParagraphs as IndexParagraphs,
+    NodeMetadata as NodeMetadata,
+    ParagraphMetadata as ParagraphMetadata,
+    Position as Position,
+    Resource as Resource,
+    ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
+    Shard as Shard,
+    ShardCleaned as ShardCleaned,
+    ShardCreated as ShardCreated,
+    ShardId as ShardId,
+    ShardIds as ShardIds,
+    ShardMetadata as ShardMetadata,
+    TextInformation as TextInformation,
+    VectorSentence as VectorSentence,
+    VectorSetID as VectorSetID,
+    VectorSetList as VectorSetList,
+)
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
