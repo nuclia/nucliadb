@@ -21,7 +21,6 @@ from abc import ABCMeta, abstractmethod
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
-from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2 import (
     NewShardRequest,
     NewVectorSetRequest,
@@ -42,11 +41,13 @@ class AbstractIndexNode(metaclass=ABCMeta):
         address: str,
         shard_count: int,
         dummy: bool = False,
+        primary_id: Optional[str] = None,
     ):
         self.id = id
         self.address = address
         self.shard_count = shard_count
         self.dummy = dummy
+        self.primary_id = primary_id
 
     def __str__(self):
         return f"{self.__class__.__name__}({self.id}, {self.address})"
@@ -62,11 +63,6 @@ class AbstractIndexNode(metaclass=ABCMeta):
     @property
     @abstractmethod
     def writer(self) -> NodeWriterStub:  # pragma: no cover
-        pass
-
-    @property
-    @abstractmethod
-    def sidecar(self) -> NodeSidecarStub:  # pragma: no cover
         pass
 
     async def stream_get_fields(

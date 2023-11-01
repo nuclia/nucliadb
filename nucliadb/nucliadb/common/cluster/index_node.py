@@ -21,13 +21,11 @@ from typing import Optional
 
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
-from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
 from nucliadb.common.cluster.base import AbstractIndexNode  # type: ignore
 from nucliadb.common.cluster.grpc_node_dummy import (  # type: ignore
     DummyReaderStub,
-    DummySidecarStub,
     DummyWriterStub,
 )
 from nucliadb.ingest import SERVICE_NAME
@@ -37,13 +35,11 @@ from .settings import settings
 
 READ_CONNECTIONS = LRU(50)  # type: ignore
 WRITE_CONNECTIONS = LRU(50)  # type: ignore
-SIDECAR_CONNECTIONS = LRU(50)  # type: ignore
 
 
 class IndexNode(AbstractIndexNode):
     _writer: Optional[NodeWriterStub] = None
     _reader: Optional[NodeReaderStub] = None
-    _sidecar: Optional[NodeSidecarStub] = None
 
     def _get_service_address(
         self, port_map: dict[str, int], port: Optional[int]
@@ -56,22 +52,6 @@ class IndexNode(AbstractIndexNode):
         else:
             grpc_address = f"{hostname}:{port}"
         return grpc_address
-
-    @property
-    def sidecar(self) -> NodeSidecarStub:
-        if self._sidecar is None or self.address not in SIDECAR_CONNECTIONS:
-            if not self.dummy:
-                grpc_address = self._get_service_address(
-                    settings.sidecar_port_map, settings.node_sidecar_port
-                )
-                channel = get_traced_grpc_channel(
-                    grpc_address, SERVICE_NAME, variant="_sidecar"
-                )
-                SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)  # type: ignore
-            else:
-                SIDECAR_CONNECTIONS[self.address] = DummySidecarStub()
-            self._sidecar = SIDECAR_CONNECTIONS[self.address]
-        return self._sidecar  # type: ignore
 
     @property
     def writer(self) -> NodeWriterStub:

@@ -92,7 +92,6 @@ async def resource_search(
     ),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
-    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> ResourceSearchResults:
     # We need to query all nodes
     pb_query = await paragraph_query_to_pb(
@@ -113,7 +112,7 @@ async def resource_search(
     )
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.PARAGRAPH, pb_query, shards
+        kbid, Method.PARAGRAPH, pb_query
     )
 
     # We need to merge

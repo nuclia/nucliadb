@@ -20,7 +20,7 @@
 import os
 import tempfile
 import time
-from typing import AsyncIterable
+from typing import AsyncIterable, Optional
 
 import docker  # type: ignore
 import pytest
@@ -28,7 +28,6 @@ from grpc import aio, insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
-from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2 import NewShardRequest
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import ReleaseChannel
@@ -37,10 +36,10 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_node.app import start_worker
 from nucliadb_node.pull import Worker
-from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
+from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
 from nucliadb_utils.cache.settings import settings as cache_settings
 
 images.settings["nucliadb_node_reader"] = {
@@ -61,6 +60,7 @@ images.settings["nucliadb_node_reader"] = {
         ],
         "mem_limit": "2g",
         "ports": {"4445": None},
+        "mem_limit": "2g",  # default is 1g, need to override
     },
 }
 
@@ -81,6 +81,7 @@ images.settings["nucliadb_node_writer"] = {
         ],
         "mem_limit": "2g",
         "ports": {"4446": None},
+        "mem_limit": "2g",  # default is 1g, need to override
     },
 }
 
@@ -186,6 +187,27 @@ async def writer_stub(node_single):
 
 
 @pytest.fixture(scope="function")
+async def writer(node_single) -> AsyncIterable[Writer]:
+    writer = Writer(settings.writer_listen_address)
+    yield writer
+    await writer.close()
+
+
+class Reader:
+    def __init__(self, grpc_reader_address: str):
+        self.channel = aio.insecure_channel(grpc_reader_address)
+        self.stub = nodereader_pb2_grpc.NodeReaderStub(self.channel)  # type: ignore
+
+    async def get_shard(self, pb: ShardId) -> Optional[noderesources_pb2.Shard]:
+        req = nodereader_pb2.GetShardRequest()
+        req.shard_id.id = pb.id
+        return await self.stub.GetShard(req)  # type: ignore
+
+    async def close(self):
+        await self.channel.close()
+
+
+@pytest.fixture(scope="function")
 async def reader(node_single) -> AsyncIterable[Reader]:
     reader = Reader(settings.reader_listen_address)
     yield reader
@@ -193,15 +215,8 @@ async def reader(node_single) -> AsyncIterable[Reader]:
 
 
 @pytest.fixture(scope="function")
-async def writer(node_single) -> AsyncIterable[Writer]:
-    writer = Writer(settings.writer_listen_address)
-    yield writer
-    await writer.close()
-
-
-@pytest.fixture(scope="function")
-async def grpc_server(reader, writer):
-    grpc_finalizer = await start_grpc(writer=writer, reader=reader)
+async def grpc_server(writer):
+    grpc_finalizer = await start_grpc(writer=writer)
     yield
     await grpc_finalizer()
 
@@ -213,8 +228,8 @@ async def worker(
     gcs_storage,
     natsd,
     data_path: str,
-    reader,
     writer,
+    reader,
     grpc_server,
 ) -> AsyncIterable[Worker]:
     settings.force_host_id = "node1"
@@ -222,22 +237,18 @@ async def worker(
     indexing_settings.index_jetstream_servers = [natsd]
     cache_settings.cache_pubsub_nats_url = [natsd]
 
-    worker = await start_worker(writer, reader)
+    worker = await start_worker(writer)
     yield worker
 
     # Cleanup all shards to be ready for following tests
-    shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
-    for shard in shards.ids:  # pragma: no cover
-        await writer_stub.DeleteShard(shard)  # type: ignore
+    try:
+        shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
+        for shard in shards.ids:  # pragma: no cover
+            await writer_stub.DeleteShard(shard)  # type: ignore
+    except Exception:  # pragma: no cover
+        pass
 
     await worker.finalize()
-
-
-@pytest.fixture(scope="function")
-async def sidecar_stub(worker):
-    channel = aio.insecure_channel(settings.sidecar_listen_address)
-    stub = NodeSidecarStub(channel)
-    yield stub
 
 
 @pytest.fixture(scope="function")

@@ -418,11 +418,6 @@ class SearchParamDefaults:
         title="Query",
         description="The query to get a generative answer for",
     )
-    shards = ParamDefault(
-        default=[],
-        title="Shards",
-        description="The list of shard replicas to search in. If empty, random replicas will be selected.",
-    )
     page_number = ParamDefault(
         default=0,
         title="Page number",
@@ -588,7 +583,6 @@ class BaseSearchRequest(BaseModel):
     extracted: List[
         ExtractedDataTypeName
     ] = SearchParamDefaults.extracted.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
@@ -705,7 +699,6 @@ class ChatRequest(BaseModel):
     extracted: List[
         ExtractedDataTypeName
     ] = SearchParamDefaults.extracted.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
     context: Optional[
         List[ChatContextMessage]
     ] = SearchParamDefaults.chat_context.to_pydantic_field()

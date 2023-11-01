@@ -32,7 +32,6 @@ from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
 
 from nucliadb_node import SERVICE_NAME, logger
-from nucliadb_node.reader import Reader
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
@@ -145,14 +144,8 @@ class Worker:
     subscriptions: List[Subscription]
     storage: Storage
 
-    def __init__(
-        self,
-        writer: Writer,
-        reader: Reader,
-        node: str,
-    ):
+    def __init__(self, writer: Writer, node: str):
         self.writer = writer
-        self.reader = reader
         self.subscriptions = []
         self.node = node
         self.publisher = IndexedPublisher()
@@ -308,7 +301,6 @@ class Worker:
             },
         )
 
-        status: Optional[OpStatus] = None
         sm = self.get_shard_manager(pb.shard)
         start = time.time()
         async with MessageProgressUpdater(
@@ -316,11 +308,9 @@ class Worker:
         ), sm.lock:
             try:
                 if pb.typemessage == TypeMessage.CREATION:
-                    status = await self.set_resource(pb)
+                    await self.set_resource(pb)
                 elif pb.typemessage == TypeMessage.DELETION:
-                    status = await self.delete_resource(pb)
-                if status:
-                    self.reader.update(pb.shard, status)
+                    await self.delete_resource(pb)
                 sm.shard_changed_event()
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:

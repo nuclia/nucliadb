@@ -322,14 +322,9 @@ class _NodeRunner:
             self.data["writer1_internal_host"]: self.data["reader1"]["port"],
             self.data["writer2_internal_host"]: self.data["reader2"]["port"],
         }
-        cluster_settings.sidecar_port_map = {
-            self.data["writer1_internal_host"]: self.data["sidecar1"]["port"],
-            self.data["writer2_internal_host"]: self.data["sidecar2"]["port"],
-        }
 
         cluster_settings.node_writer_port = None  # type: ignore
         cluster_settings.node_reader_port = None  # type: ignore
-        cluster_settings.node_sidecar_port = None  # type: ignore
 
         cluster_settings.cluster_discovery_mode = "manual"
         cluster_settings.cluster_discovery_manual_addresses = [

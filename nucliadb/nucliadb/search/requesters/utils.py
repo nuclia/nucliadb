@@ -49,6 +49,8 @@ from nucliadb.search.search.shards import (
 )
 from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
@@ -80,50 +82,37 @@ T = TypeVar(
 
 @overload  # type: ignore
 async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: SuggestRequest,
-    shards: Optional[List[str]] = None,
+    kbid: str, method: Method, pb_query: SuggestRequest, read_only: bool = True
 ) -> Tuple[List[SuggestResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 @overload
 async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: ParagraphSearchRequest,
-    shards: Optional[List[str]] = None,
+    kbid: str, method: Method, pb_query: ParagraphSearchRequest, read_only: bool = True
 ) -> Tuple[List[ParagraphSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 @overload
 async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: SearchRequest,
-    shards: Optional[List[str]] = None,
+    kbid: str, method: Method, pb_query: SearchRequest, read_only: bool = True
 ) -> Tuple[List[SearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 @overload
 async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: RelationSearchRequest,
-    shards: Optional[List[str]] = None,
+    kbid: str, method: Method, pb_query: RelationSearchRequest, read_only: bool = True
 ) -> Tuple[List[RelationSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: REQUEST_TYPE,
-    shards: Optional[List[str]] = None,
+    kbid: str, method: Method, pb_query: REQUEST_TYPE, read_only: bool = True
 ) -> Tuple[List[T], bool, List[Tuple[str, str, str]], List[str]]:
+    read_only = read_only and has_feature(const.Features.READ_REPLICA_SEARCHES)
+
     shard_manager = get_shard_manager()
 
     try:
@@ -142,7 +131,7 @@ async def node_query(
     for shard_obj in shard_groups:
         try:
             node, shard_id, node_id = cluster_manager.choose_node(
-                shard_obj, target_replicas=shards
+                shard_obj, read_only=read_only
             )
         except KeyError:
             incomplete_results = True

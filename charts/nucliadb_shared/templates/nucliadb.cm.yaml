@@ -54,7 +54,6 @@ data:
   NUCLIADB_INGEST: {{ .Values.nucliadb.ingest }}
   NODE_WRITER_PORT: {{ .Values.nucliadb.node_writer_port | quote }}
   NODE_READER_PORT: {{ .Values.nucliadb.node_reader_port | quote }}
-  NODE_SIDECAR_PORT: {{ .Values.nucliadb.node_sidecar_port | quote }}
   CACHE_PUBSUB_NATS_URL: {{ toJson .Values.cache.cache_pubsub_nats_url |quote }}
   CACHE_PUBSUB_NATS_AUTH: {{ .Values.cache.cache_pubsub_nats_auth }}
   TRANSACTION_JETSTREAM_AUTH: {{ .Values.transaction.transaction_jetstream_auth }}

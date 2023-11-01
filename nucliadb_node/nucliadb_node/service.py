@@ -22,29 +22,22 @@ from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
 
 from nucliadb_node import SERVICE_NAME
-from nucliadb_node.reader import Reader  # type: ignore
-from nucliadb_node.servicer import SidecarServicer
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
-from nucliadb_protos import nodesidecar_pb2_grpc
 from nucliadb_utils.grpc import get_traced_grpc_server
 
 
-async def start_grpc(writer: Writer, reader: Reader):
+async def start_grpc(writer: Writer):
     aio.init_grpc_aio()  # type: ignore
 
     server = get_traced_grpc_server(SERVICE_NAME)
-    servicer = SidecarServicer(reader=reader, writer=writer)
-    await servicer.initialize()
     health_servicer = health.aio.HealthServicer()  # type: ignore
     server.add_insecure_port(settings.sidecar_listen_address)
 
-    nodesidecar_pb2_grpc.add_NodeSidecarServicer_to_server(servicer, server)
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     await server.start()
 
     async def finalizer():
-        await servicer.finalize()
         await server.stop(grace=False)
 
     return finalizer
