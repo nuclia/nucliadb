@@ -20,21 +20,21 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 
-use crate::payload::{TelemetryEvent, TelemetryPayload};
-use crate::sender::is_telemetry_enabled;
-use crate::sink::BlockingHttpClient;
+use crate::analytics::payload::{AnalyticsEvent, AnalyticsPayload};
+use crate::analytics::sender::is_analytics_enabled;
+use crate::analytics::sink::BlockingHttpClient;
 
-struct SyncTelemetryLoop {
+struct SyncAnalyticsLoop {
     client: BlockingHttpClient,
-    rtxn: Receiver<TelemetryEvent>,
+    rtxn: Receiver<AnalyticsEvent>,
 }
 
-impl SyncTelemetryLoop {
-    pub fn new(rtxn: Receiver<TelemetryEvent>) -> Option<SyncTelemetryLoop> {
+impl SyncAnalyticsLoop {
+    pub fn new(rtxn: Receiver<AnalyticsEvent>) -> Option<SyncAnalyticsLoop> {
         let Some(client) = BlockingHttpClient::try_new() else {
             return None;
         };
-        Some(SyncTelemetryLoop { rtxn, client })
+        Some(SyncAnalyticsLoop { rtxn, client })
     }
     pub fn run(self) {
         loop {
@@ -42,18 +42,18 @@ impl SyncTelemetryLoop {
                 Err(err) => tracing::info!("channel error {}", err),
                 Ok(event) => self
                     .client
-                    .blocking_send(TelemetryPayload::from_single_event(event)),
+                    .blocking_send(AnalyticsPayload::from_single_event(event)),
             }
         }
     }
 }
 
 lazy_static::lazy_static! {
-    static ref SYNC_TELEMETRY: Option<Mutex<Sender<TelemetryEvent>>> = {
-        if is_telemetry_enabled() {
+    static ref SYNC_ANALYTICS: Option<Mutex<Sender<AnalyticsEvent>>> = {
+        if is_analytics_enabled() {
             let (stxn, rtxn) = channel();
-            let Some(telemtry_loop) = SyncTelemetryLoop::new(rtxn) else { return None };
-            std::thread::spawn(move || telemtry_loop.run());
+            let Some(analytics_loop) = SyncAnalyticsLoop::new(rtxn) else { return None };
+            std::thread::spawn(move || analytics_loop.run());
             Some(Mutex::new(stxn))
         } else {
             None
@@ -61,12 +61,12 @@ lazy_static::lazy_static! {
     };
 }
 
-pub fn send_telemetry_event(event: TelemetryEvent) {
-    if let Some(sender) = SYNC_TELEMETRY.as_ref() {
+pub fn send_analytics_event(event: AnalyticsEvent) {
+    if let Some(sender) = SYNC_ANALYTICS.as_ref() {
         // We swallow the error in case of failure
         let sender = sender.lock().unwrap_or_else(|er| er.into_inner());
         if let Err(err) = sender.send(event) {
-            tracing::error!("Error sending telemetry event: {err:?}");
+            tracing::error!("Error sending analytics event: {err:?}");
         }
     }
 }

@@ -27,4 +27,4 @@ pub mod blocking;
 pub mod sync;
 
 /// This environment variable can be set to disable sending telemetry events.
-pub const DISABLE_TELEMETRY_ENV_KEY: &str = "NUCLIADB_DISABLE_TELEMETRY";
+pub const DISABLE_ANALYTICS_ENV_KEY: &str = "NUCLIADB_DISABLE_ANALYTICS";

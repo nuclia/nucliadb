@@ -39,7 +39,7 @@ images.settings["nucliadb"] = {
     "version": "latest",
     "env": {
         "DRIVER": "local",
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "dummy_predict": "True",
         "dummy_processing": "True",
         "max_receive_message_length": "40",

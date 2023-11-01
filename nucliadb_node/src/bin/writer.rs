@@ -74,7 +74,7 @@ async fn main() -> NodeResult<()> {
     let host_key_path = settings.host_key_path();
     let node_id = utils::read_or_create_host_key(host_key_path)?;
 
-    nucliadb_telemetry::sync::start_telemetry_loop();
+    nucliadb_node::analytics::sync::start_analytics_loop();
 
     let grpc_task = tokio::spawn(start_grpc_service(
         settings.clone(),

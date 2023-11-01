@@ -48,7 +48,7 @@ images.settings["nucliadb_node_reader"] = {
     "version": "main",
     "command": "bash -c 'node_reader & node_writer'",
     "env": {
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
@@ -70,7 +70,7 @@ images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
     "version": "main",
     "env": {
-        "NUCLIADB_DISABLE_TELEMETRY": "True",
+        "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "RUST_BACKTRACE": "full",

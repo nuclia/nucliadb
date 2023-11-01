@@ -1,5 +1,5 @@
 ---
-title: Telemetry
+title: Analytics
 position: 5
 ---
 
@@ -7,23 +7,11 @@ Nuclia Inc. collects anonymous data regarding general usage to help us drive our
 
 ## Disabling data collection
 
-Data collection are opt-out. To disable them, just set the environment variable `NUCLIADB_DISABLE_TELEMETRY` to whatever value.
+Data collection are opt-out. To disable them, just set the environment variable `NUCLIADB_DISABLE_ANALYTICS` to whatever value.
 
 ```bash
-export NUCLIADB_DISABLE_TELEMETRY=1
+export NUCLIADB_DISABLE_ANALYTICS=1
 ```
-
-Look at `nucliadb help` command output to check whether telemetry is enabled or not:
-
-```bash
-nucliadb help
-nucliadb 0.1.0
-nucliadb, Inc. <info@nuclia.com>
-Indexing your large dataset on object storage & making it searchable from the command line.
-Telemetry enabled
-```
-
-The line `Telemetry enabled` disappears when you disable it.
 
 ## Which data is collected?
 

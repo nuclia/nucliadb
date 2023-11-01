@@ -20,6 +20,8 @@
 
 use std::sync::Arc;
 
+use crate::analytics::payload::AnalyticsEvent;
+use crate::analytics::sync::send_analytics_event;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest,
@@ -28,8 +30,6 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::NodeResult;
-use nucliadb_telemetry::payload::TelemetryEvent;
-use nucliadb_telemetry::sync::send_telemetry_event;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
@@ -108,7 +108,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         request: Request<NewShardRequest>,
     ) -> Result<Response<ShardCreated>, Status> {
-        send_telemetry_event(TelemetryEvent::Create).await;
+        send_analytics_event(AnalyticsEvent::Create).await;
         let request = request.into_inner();
         let metadata = ShardMetadata::from(request);
         let new_shard = self.shards.create(metadata).await;
@@ -128,7 +128,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
-        send_telemetry_event(TelemetryEvent::Delete).await;
+        send_analytics_event(AnalyticsEvent::Delete).await;
         // Deletion does not require for the shard to be loaded.
         let shard_id = request.into_inner();
         let deleted = self.shards.delete(shard_id.id.clone()).await;
@@ -422,7 +422,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
-        send_telemetry_event(TelemetryEvent::GarbageCollect).await;
+        send_analytics_event(AnalyticsEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
         let span = Span::current();

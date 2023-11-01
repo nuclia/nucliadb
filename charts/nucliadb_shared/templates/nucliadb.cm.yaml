@@ -81,7 +81,7 @@ data:
   OTEL_EXPORTER_JAEGER_AGENT_SPLIT_OVERSIZED_BATCHES: "1"
 
 {{- if not .Values.telemetry.enabled }}
-  NUCLIADB_DISABLE_TELEMETRY: "True"
+  NUCLIADB_DISABLE_ANALYTICS: "True"
 {{- end }}
 
 {{- if .Values.flag_settings_url }}

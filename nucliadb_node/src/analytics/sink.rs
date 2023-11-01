@@ -25,22 +25,22 @@ use reqwest::redirect::Policy;
 use reqwest::Client;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::payload::TelemetryPayload;
+use crate::analytics::payload::AnalyticsPayload;
 
-/// Telemetry push API URL
-const DEFAULT_TELEMETRY_PUSH_API_URL: &str = "https://telemetry.nuclia.cloud/";
+/// Analytics push API URL
+const DEFAULT_ANALYTICS_PUSH_API_URL: &str = "https://telemetry.nuclia.cloud/";
 
-fn telemetry_push_api_url() -> String {
-    if let Some(push_api_url) = std::env::var_os("TELEMETRY_PUSH_API") {
+fn analytics_push_api_url() -> String {
+    if let Some(push_api_url) = std::env::var_os("ANALYTICS_PUSH_API") {
         push_api_url.to_string_lossy().to_string()
     } else {
-        DEFAULT_TELEMETRY_PUSH_API_URL.to_string()
+        DEFAULT_ANALYTICS_PUSH_API_URL.to_string()
     }
 }
 
 #[async_trait]
 pub trait Sink: Send + Sync + 'static {
-    async fn send_payload(&self, payload: TelemetryPayload);
+    async fn send_payload(&self, payload: AnalyticsPayload);
 }
 pub struct HttpClient {
     client: Client,
@@ -56,7 +56,7 @@ impl HttpClient {
             .ok()?;
         Some(HttpClient {
             client,
-            endpoint: telemetry_push_api_url(),
+            endpoint: analytics_push_api_url(),
         })
     }
 
@@ -66,15 +66,15 @@ impl HttpClient {
 }
 
 #[async_trait]
-impl Sink for UnboundedSender<TelemetryPayload> {
-    async fn send_payload(&self, payload: TelemetryPayload) {
+impl Sink for UnboundedSender<AnalyticsPayload> {
+    async fn send_payload(&self, payload: AnalyticsPayload) {
         let _ = self.send(payload);
     }
 }
 
 #[async_trait]
 impl Sink for HttpClient {
-    async fn send_payload(&self, payload: TelemetryPayload) {
+    async fn send_payload(&self, payload: AnalyticsPayload) {
         // Note that we swallow the error if any
         let _ = self.client.post(&self.endpoint).json(&payload).send().await;
     }
@@ -93,14 +93,14 @@ impl BlockingHttpClient {
             .ok()?;
         Some(BlockingHttpClient {
             client,
-            endpoint: telemetry_push_api_url(),
+            endpoint: analytics_push_api_url(),
         })
     }
 
-    pub fn blocking_send(&self, payload: TelemetryPayload) {
+    pub fn blocking_send(&self, payload: AnalyticsPayload) {
         // Note that we swallow the error if any
         if let Err(err) = self.client.post(&self.endpoint).json(&payload).send() {
-            tracing::error!("Error sending telemetry event: {err:?}");
+            tracing::error!("Error sending analytics event: {err:?}");
         }
     }
 }
