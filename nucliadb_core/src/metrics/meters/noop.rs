@@ -33,5 +33,5 @@ impl Meter for NoOpMeter {
         Ok(Default::default())
     }
     fn record_replicated_bytes(&self, _value: u64) {}
-    fn record_replication_op(&self, _key: replication::ShardOpsKey) {}
+    fn record_replication_op(&self, _key: replication::ReplicationOpsKey) {}
 }
