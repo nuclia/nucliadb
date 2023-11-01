@@ -21,7 +21,7 @@ use std::fs;
 use std::sync::Arc;
 
 use nucliadb_core::metrics::replication as replication_metrics;
-use nucliadb_core::tracing::{error, info, warn};
+use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::{metrics, Error, NodeResult};
 use nucliadb_protos::replication;
 use tokio::io::AsyncWriteExt;
@@ -87,7 +87,7 @@ pub async fn replicate_shard(
         }
         if filepath.is_none() {
             filepath = Some(resp.filepath.clone());
-            info!("Replicating file: {:?}", resp.filepath.clone());
+            debug!("Replicating file: {:?}", resp.filepath.clone());
         }
 
         file.write_all(&resp.data).await?;
@@ -190,7 +190,7 @@ pub async fn connect_to_primary_and_replicate(
                 generation_id: gen_id,
             });
         }
-        info!("Sending shard states: {:?}", shard_states.clone());
+        debug!("Sending shard states: {:?}", shard_states.clone());
 
         let replication_state: replication::PrimaryCheckReplicationStateResponse = client
             .check_replication_state(Request::new(
