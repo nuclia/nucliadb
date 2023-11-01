@@ -20,8 +20,6 @@
 
 use std::sync::Arc;
 
-use crate::analytics::payload::AnalyticsEvent;
-use crate::analytics::sync::send_analytics_event;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest,
@@ -33,6 +31,8 @@ use nucliadb_core::NodeResult;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
+use crate::analytics::payload::AnalyticsEvent;
+use crate::analytics::sync::send_analytics_event;
 use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;

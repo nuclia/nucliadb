@@ -1945,17 +1945,18 @@ dependencies = [
  "futures",
  "futures-core",
  "futures-util",
+ "hostname",
  "http",
  "hyper",
  "itertools",
  "lazy_static",
  "log",
+ "md5",
  "nucliadb_core",
  "nucliadb_paragraphs",
  "nucliadb_procs",
  "nucliadb_protos",
  "nucliadb_relations",
- "nucliadb_telemetry",
  "nucliadb_texts",
  "nucliadb_vectors",
  "num_cpus",
@@ -1986,6 +1987,7 @@ dependencies = [
  "tracing-log",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "username",
  "uuid 1.4.1",
 ]
 
@@ -1998,7 +2000,6 @@ dependencies = [
  "log",
  "nucliadb_core",
  "nucliadb_node",
- "nucliadb_telemetry",
  "openssl",
  "prost",
  "prost-types",
@@ -2068,23 +2069,6 @@ dependencies = [
  "tantivy",
  "tempfile",
  "thiserror",
- "uuid 1.4.1",
-]
-
-[[package]]
-name = "nucliadb_telemetry"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "hostname",
- "lazy_static",
- "md5",
- "once_cell",
- "reqwest",
- "serde",
- "tokio",
- "tracing",
- "username",
  "uuid 1.4.1",
 ]
 
