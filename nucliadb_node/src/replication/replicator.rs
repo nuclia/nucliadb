@@ -97,13 +97,9 @@ pub async fn replicate_shard(
         }
 
         file.write_all(&resp.data).await?;
-        let took = start
-            .elapsed()
-            .map(|elapsed| elapsed.as_secs_f64())
-            .unwrap_or(f64::NAN);
         current_read_bytes += resp.data.len() as u64;
 
-        metrics.record_replicated_bytes(resp.data.len() as f64 / took);
+        metrics.record_replicated_bytes(resp.data.len() as u64);
 
         if current_read_bytes == resp.total_size {
             // finish copying file
@@ -174,7 +170,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 

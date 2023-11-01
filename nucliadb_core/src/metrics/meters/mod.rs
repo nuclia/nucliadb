@@ -38,6 +38,6 @@ pub trait Meter: Send + Sync {
     fn task_monitor(&self, _task_id: TaskId) -> Option<Monitor> {
         None
     }
-    fn record_replicated_bytes(&self, value: replication::ReplicatedBytesValue);
+    fn record_replicated_bytes(&self, value: u64);
     fn record_replication_op(&self, key: replication::ShardOpsKey);
 }
