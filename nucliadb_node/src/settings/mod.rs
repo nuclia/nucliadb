@@ -108,7 +108,7 @@ pub struct Settings {
     node_role: NodeRole,
     #[builder(default = "3")]
     replication_delay_seconds: u64,
-    #[builder(default = "10")]
+    #[builder(default = "3")]
     replication_max_concurrency: u64,
 }
 

@@ -169,16 +169,12 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where
-        F: Future<Output = NodeResult<()>> + Send + 'static,
-    {
+    where F: Future<Output = NodeResult<()>> + Send + 'static {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
         tokio::spawn(async move {
-            debug!("Starting worker");
             let result = worker.await;
-            debug!("Finished worker");
             drop(permit);
             if result.is_err() {
                 error!("Error replicating shard: {:?}", result);
@@ -219,14 +215,16 @@ pub async fn connect_to_primary_and_replicate(
     loop {
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
-        let mut worker_pool = ReplicateWorkerPool::new(5);
+        let mut worker_pool =
+            ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
         for shard_id in existing_shards.clone() {
             let mut shard = shard_cache.get(shard_id.clone()).await;
             if shard.is_none() {
                 let loaded = shard_cache.load(shard_id.clone()).await;
                 if loaded.is_err() {
                     warn!(
-                        "Failed to load shard from disk, deleting shard in case of corruption and retrying: {:?}, Error: {:?}",
+                        "Failed to load shard from disk, deleting shard in case of corruption and \
+                         retrying: {:?}, Error: {:?}",
                         shard_id.clone(),
                         loaded
                     );
