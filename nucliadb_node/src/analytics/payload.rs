@@ -42,20 +42,20 @@ use std::time::UNIX_EPOCH;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Represents the payload of the request sent with telemetry requests.
+/// Represents the payload of the request sent with analytics requests.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TelemetryPayload {
+pub struct AnalyticsPayload {
     /// Client information. See details in `[ClientInformation]`.
     pub client_information: ClientInformation,
     pub events: Vec<EventWithTimestamp>,
     /// Represents the number of events that where drops due to the
-    /// combination of the `TELEMETRY_PUSH_COOLDOWN` and `MAX_EVENT_IN_QUEUE`.
+    /// combination of the `ANALYTICS_PUSH_COOLDOWN` and `MAX_EVENT_IN_QUEUE`.
     pub num_dropped_events: usize,
 }
 
-impl TelemetryPayload {
-    pub fn from_single_event(event: TelemetryEvent) -> TelemetryPayload {
-        TelemetryPayload {
+impl AnalyticsPayload {
+    pub fn from_single_event(event: AnalyticsEvent) -> AnalyticsPayload {
+        AnalyticsPayload {
             client_information: ClientInformation::default(),
             events: vec![EventWithTimestamp::from(event)],
             num_dropped_events: 0,
@@ -67,8 +67,8 @@ impl TelemetryPayload {
 pub struct EventWithTimestamp {
     /// Unix time in seconds.
     pub timestamp: u64,
-    /// Telemetry event.
-    pub r#type: TelemetryEvent,
+    /// Analytics event.
+    pub r#type: AnalyticsEvent,
 }
 
 /// Returns the number of seconds elapsed since UNIX_EPOCH.
@@ -81,8 +81,8 @@ fn unixtime() -> u64 {
     }
 }
 
-impl From<TelemetryEvent> for EventWithTimestamp {
-    fn from(event: TelemetryEvent) -> Self {
+impl From<AnalyticsEvent> for EventWithTimestamp {
+    fn from(event: AnalyticsEvent) -> Self {
         EventWithTimestamp {
             timestamp: unixtime(),
             r#type: event,
@@ -90,9 +90,9 @@ impl From<TelemetryEvent> for EventWithTimestamp {
     }
 }
 
-/// Represents a Telemetry Event send to nucliadb's server for usage information.
+/// Represents a Analytics Event send to nucliadb's server for usage information.
 #[derive(Debug, Serialize, Deserialize)]
-pub enum TelemetryEvent {
+pub enum AnalyticsEvent {
     /// Create command is called.
     Create,
     /// Delete command

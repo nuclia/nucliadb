@@ -12,7 +12,6 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.19.1", features = ["extension-module"] }
 nucliadb_node = { path = "../nucliadb_node" }
 nucliadb_core = { path = "../nucliadb_core" }
-nucliadb_telemetry = { path = "../nucliadb_telemetry" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 log = "0.4"

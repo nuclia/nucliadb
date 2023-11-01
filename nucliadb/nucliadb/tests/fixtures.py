@@ -71,10 +71,10 @@ async def dummy_processing():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def telemetry_disabled():
-    os.environ["NUCLIADB_DISABLE_TELEMETRY"] = "True"
+def analytics_disabled():
+    os.environ["NUCLIADB_DISABLE_ANALYTICS"] = "True"
     yield
-    os.environ.pop("NUCLIADB_DISABLE_TELEMETRY")
+    os.environ.pop("NUCLIADB_DISABLE_ANALYTICS")
 
 
 def reset_config():
@@ -115,7 +115,7 @@ def tmpdir():
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(dummy_processing, telemetry_disabled, driver_settings, tmpdir):
+async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir):
     from nucliadb.common.cluster import manager
 
     manager.INDEX_NODES.clear()

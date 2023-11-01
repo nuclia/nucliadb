@@ -58,7 +58,7 @@ async fn main() -> NodeResult<()> {
 
     let _guard = init_telemetry(&settings)?;
 
-    nucliadb_telemetry::sync::start_telemetry_loop();
+    nucliadb_node::analytics::sync::start_analytics_loop();
 
     let grpc_task = tokio::spawn(start_grpc_service(settings.clone()));
     let metrics_task = tokio::spawn(run_http_server(ServerOptions {

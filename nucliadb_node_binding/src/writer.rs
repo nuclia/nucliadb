@@ -22,13 +22,13 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
+use nucliadb_node::analytics::blocking::send_analytics_event;
+use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
 use nucliadb_node::shards::writer::ShardWriter;
 use nucliadb_node::{env, lifecycle};
-use nucliadb_telemetry::blocking::send_telemetry_event;
-use nucliadb_telemetry::payload::TelemetryEvent;
 use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -73,7 +73,7 @@ impl NodeWriter {
     }
 
     pub fn new_shard<'p>(&self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        send_telemetry_event(TelemetryEvent::Create);
+        send_analytics_event(AnalyticsEvent::Create);
 
         let request =
             NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
@@ -96,7 +96,7 @@ impl NodeWriter {
     }
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        send_telemetry_event(TelemetryEvent::Delete);
+        send_analytics_event(AnalyticsEvent::Delete);
         let shard_id =
             ShardId::decode(&mut Cursor::new(shard_id)).expect("Error decoding arguments");
         let deleted = self.shards.delete(shard_id.id.clone());
@@ -345,7 +345,7 @@ impl NodeWriter {
     }
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        send_telemetry_event(TelemetryEvent::GarbageCollect);
+        send_analytics_event(AnalyticsEvent::GarbageCollect);
         let shard_id =
             ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;
