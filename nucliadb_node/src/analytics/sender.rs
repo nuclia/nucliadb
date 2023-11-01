@@ -278,7 +278,7 @@ impl AnalyticsSender {
 
 /// Check to see if analytics is enabled.
 pub fn is_analytics_enabled() -> bool {
-    std::env::var_os(crate::DISABLE_ANALYTICS_ENV_KEY).is_none()
+    std::env::var_os(crate::analytics::DISABLE_ANALYTICS_ENV_KEY).is_none()
 }
 
 fn create_http_client() -> Option<HttpClient> {
@@ -299,7 +299,7 @@ fn create_http_client() -> Option<HttpClient> {
 impl Default for AnalyticsSender {
     fn default() -> Self {
         let http_client = create_http_client();
-        AnalyticsSender::new(http_client, Clock::periodical(TELEMETRY_PUSH_COOLDOWN))
+        AnalyticsSender::new(http_client, Clock::periodical(ANALYTICS_PUSH_COOLDOWN))
     }
 }
 
@@ -314,9 +314,9 @@ mod tests {
     #[tokio::test]
     async fn test_enabling_and_disabling_analytics() {
         // We group the two in a single test to ensure it happens on the same thread.
-        env::set_var(crate::DISABLE_ANALYTICS_ENV_KEY, "");
+        env::set_var(crate::analytics::DISABLE_ANALYTICS_ENV_KEY, "");
         assert_eq!(AnalyticsSender::default().inner.is_disabled(), true);
-        env::remove_var(crate::DISABLE_ANALYTICS_ENV_KEY);
+        env::remove_var(crate::analytics::DISABLE_ANALYTICS_ENV_KEY);
         assert_eq!(AnalyticsSender::default().inner.is_disabled(), false);
     }
 
