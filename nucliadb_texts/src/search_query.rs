@@ -20,13 +20,36 @@
 // use std::convert::TryFrom;
 // use std::time::SystemTime;
 
+use std::ops::Bound;
+
+use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
 use nucliadb_core::protos::stream_filter::Conjunction;
 use nucliadb_core::protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
 use tantivy::query::*;
-use tantivy::schema::{Facet, IndexRecordOption};
+use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::Term;
 
-use crate::schema::TextSchema;
+use crate::schema::{self, TextSchema};
+
+fn produce_date_range_query(
+    field: Field,
+    from: Option<ProstTimestamp>,
+    to: Option<ProstTimestamp>,
+) -> Option<RangeQuery> {
+    if from.is_none() && to.is_none() {
+        return None;
+    }
+
+    let left_date_time = from.map(|t| schema::timestamp_to_datetime_utc(&t));
+    let right_date_time = to.map(|t| schema::timestamp_to_datetime_utc(&t));
+    let left_term = left_date_time.map(|t| Term::from_field_date(field, &t));
+    let right_term = right_date_time.map(|t| Term::from_field_date(field, &t));
+    let left_bound = left_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+    let right_bound = right_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+    let xtype = tantivy::schema::Type::Date;
+    let query = RangeQuery::new_term_bounds(field, xtype, &left_bound, &right_bound);
+    Some(query)
+}
 
 pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> Box<dyn Query> {
     let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
@@ -86,6 +109,28 @@ pub fn create_query(
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         queries.push((Occur::Must, Box::new(term_query)));
     };
+
+    // Timestamp filters
+    if let Some(time_ranges) = search.timestamps.as_ref() {
+        let modified = produce_date_range_query(
+            schema.modified,
+            time_ranges.from_modified.clone(),
+            time_ranges.to_modified.clone(),
+        );
+        let created = produce_date_range_query(
+            schema.created,
+            time_ranges.from_created.clone(),
+            time_ranges.to_created.clone(),
+        );
+
+        if let Some(modified) = modified {
+            queries.push((Occur::Must, Box::new(modified)));
+        }
+
+        if let Some(created) = created {
+            queries.push((Occur::Must, Box::new(created)));
+        }
+    }
 
     // Advance query
     if let Some(query) = with_advance {

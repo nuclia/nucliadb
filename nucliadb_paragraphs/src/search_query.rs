@@ -19,16 +19,18 @@
 //
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::ops::Bound;
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
+use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
 use nucliadb_core::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use tantivy::query::*;
-use tantivy::schema::{Facet, IndexRecordOption};
+use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
-use crate::schema::ParagraphSchema;
+use crate::schema::{self, ParagraphSchema};
 use crate::stop_words::is_stop_word;
 
 type QueryP = (Occur, Box<dyn Query>);
@@ -292,6 +294,27 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         fuzzy_query,
     }
 }
+
+fn produce_date_range_query(
+    field: Field,
+    from: Option<ProstTimestamp>,
+    to: Option<ProstTimestamp>,
+) -> Option<RangeQuery> {
+    if from.is_none() && to.is_none() {
+        return None;
+    }
+
+    let left_date_time = from.map(|t| schema::timestamp_to_datetime_utc(&t));
+    let right_date_time = to.map(|t| schema::timestamp_to_datetime_utc(&t));
+    let left_term = left_date_time.map(|t| Term::from_field_date(field, &t));
+    let right_term = right_date_time.map(|t| Term::from_field_date(field, &t));
+    let left_bound = left_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+    let right_bound = right_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
+    let xtype = tantivy::schema::Type::Date;
+    let query = RangeQuery::new_term_bounds(field, xtype, &left_bound, &right_bound);
+    Some(query)
+}
+
 pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
@@ -381,6 +404,28 @@ pub fn search_query(
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         fuzzies.push((Occur::Must, Box::new(term_query.clone())));
         originals.push((Occur::Must, Box::new(term_query)))
+    }
+    if let Some(time_ranges) = search.timestamps.as_ref() {
+        let modified = produce_date_range_query(
+            schema.modified,
+            time_ranges.from_modified.clone(),
+            time_ranges.to_modified.clone(),
+        );
+        let created = produce_date_range_query(
+            schema.created,
+            time_ranges.from_created.clone(),
+            time_ranges.to_created.clone(),
+        );
+
+        if let Some(modified) = modified {
+            fuzzies.push((Occur::Must, Box::new(modified.clone())));
+            originals.push((Occur::Must, Box::new(modified)));
+        }
+
+        if let Some(created) = created {
+            fuzzies.push((Occur::Must, Box::new(created.clone())));
+            originals.push((Occur::Must, Box::new(created)));
+        }
     }
     // Fields
     let mut field_filter: Vec<(Occur, Box<dyn Query>)> = vec![];
