@@ -128,6 +128,12 @@ pub mod env {
                 builder.replication_max_concurrency(replication_max_concurrency);
             }
 
+            if let Ok(Ok(replication_healthy_delay)) =
+                std::env::var("REPLICATION_HEALTHY_DELAY").map(|v| v.parse::<u64>())
+            {
+                builder.replication_healthy_delay(replication_healthy_delay);
+            }
+
             let settings = builder.build()?;
             Ok(settings)
         }
