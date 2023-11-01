@@ -190,10 +190,12 @@ mod tests {
     fn test_set_primary_id() {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
         // set env variable
+        let original_data_path = std::env::var("DATA_PATH").unwrap_or_default();
         std::env::set_var("DATA_PATH", tempdir.path());
         let primary_id = "test_primary_id".to_string();
         set_primary_node_id(primary_id.clone()).unwrap();
         let read_primary_id = get_primary_node_id().unwrap();
+        std::env::set_var("DATA_PATH", original_data_path);
         assert_eq!(primary_id, read_primary_id);
     }
 }
