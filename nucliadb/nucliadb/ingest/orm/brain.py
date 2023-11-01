@@ -404,6 +404,7 @@ class ResourceBrain:
         relation_node_document: RelationNode,
         user_canceled_labels: List[str],
     ):
+        # Parse detected classification labels
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
@@ -420,8 +421,10 @@ class ResourceBrain:
                     )
                 )
 
+        # Parse detected entities
         for klass_entity, _ in metadata.positions.items():
             tags["e"].append(klass_entity)
+
             entity_array = klass_entity.split("/")
             if len(entity_array) == 1:
                 raise AttributeError(f"Entity should be with type {klass_entity}")
@@ -453,19 +456,24 @@ class ResourceBrain:
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
+        """
+        Parses field metadata and resource level metadata (UserMetadata and UserFieldMetadata).
+        Looks for detected entities and classification labels to convert to Index Node
+        tags/labels with which we can then filter the search.
+        """
+        tags: Dict[str, List[str]] = {"l": [], "e": []}
+
+        user_canceled_labels = []
         if basic_user_metadata is not None:
             user_canceled_labels = [
                 f"/l/{classification.labelset}/{classification.label}"
                 for classification in basic_user_metadata.classifications
                 if classification.cancelled_by_user
             ]
-        else:
-            user_canceled_labels = []
 
         relation_node_resource = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
-        tags: Dict[str, List[str]] = {"l": [], "e": []}
         if metadata is not None:
             for meta in metadata.split_metadata.values():
                 self.process_meta(
@@ -480,6 +488,7 @@ class ResourceBrain:
             )
 
         if basic_user_fieldmetadata is not None:
+            # Parse entities annotated by the user
             for token in basic_user_fieldmetadata.token:
                 if token.cancelled_by_user is False:
                     tags["e"].append(f"{token.klass}/{token.token}")
@@ -494,14 +503,21 @@ class ResourceBrain:
                         to=relation_node_entity,
                     )
                     self.brain.relations.append(rel)
+
+            # Parse classification labels annotated by the user
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:
-                        self.brain.paragraphs[field_key].paragraphs[
-                            paragraph_annotation.key
-                        ].labels.append(
+                        classification_tag = (
                             f"/l/{classification.labelset}/{classification.label}"
                         )
+                        self.brain.paragraphs[field_key].paragraphs[
+                            paragraph_annotation.key
+                        ].labels.append(classification_tag)
+                        # Propagete paragraph classification labels upwards to the
+                        # field too, so that pre-filtering by field labels work.
+                        tags["l"].append(classification_tag)
+
         self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
 
     def compute_tags(self):

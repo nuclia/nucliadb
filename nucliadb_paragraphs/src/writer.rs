@@ -23,7 +23,6 @@ use std::fs;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
-use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
@@ -310,16 +309,24 @@ impl ParagraphWriterService {
                     self.schema.repeated_in_field => p.repeated_in_field as u64,
                 );
 
-                if let Some(ref metadata) = p.metadata {
-                    doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
+                // TODO: read release channel value from shard metadata
+                let experimental_channel = false;
+                if experimental_channel {
+                    paragraph_labels
+                        .iter()
+                        .cloned()
+                        .for_each(|facet| doc.add_facet(self.schema.facets, facet));
+                } else {
+                    // Here is where resource and field labels are propagated down to the
+                    // paragraphs.
+                    resource_facets
+                        .iter()
+                        .chain(text_labels.iter())
+                        .chain(paragraph_labels.iter())
+                        .cloned()
+                        .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 }
 
-                resource_facets
-                    .iter()
-                    .chain(text_labels.iter())
-                    .chain(paragraph_labels.iter())
-                    .cloned()
-                    .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
                 doc.add_text(self.schema.text, &text);

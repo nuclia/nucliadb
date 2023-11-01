@@ -452,18 +452,18 @@ class Processor:
             )
             return None
 
-        if message.HasField("origin") and resource:
+        if resource is None:
+            return None
+
+        if message.HasField("origin") and message.origin.ByteSize() > 0:
             await resource.set_origin(message.origin)
 
-        if message.HasField("extra") and resource:
+        if message.HasField("extra") and message.extra.ByteSize() > 0:
             await resource.set_extra(message.extra)
 
-        if resource:
-            await resource.apply_fields(message)
-            await resource.apply_extracted(message)
-            return (resource, created)
-
-        return None
+        await resource.apply_fields(message)
+        await resource.apply_extracted(message)
+        return (resource, created)
 
     async def maybe_update_resource_basic(
         self, resource: Resource, message: writer_pb2.BrokerMessage
