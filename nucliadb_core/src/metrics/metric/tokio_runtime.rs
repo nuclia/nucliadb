@@ -19,39 +19,55 @@
 
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
+use crate::tracing::info;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
+use tokio;
 use tokio::runtime::Handle;
 use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
 
 use crate::{node_error, NodeResult};
 
 pub struct TokioRuntimeObserver {
-    runtime: Handle,
-    intervals: Mutex<RuntimeIntervals>,
+    runtime: Option<Handle>,
+    intervals: Option<Mutex<RuntimeIntervals>>,
     metrics: TokioRuntimeMetrics,
 }
 
 impl TokioRuntimeObserver {
     pub fn new(registry: &mut Registry) -> Self {
-        let runtime = Handle::current();
-        let monitor = RuntimeMonitor::new(&runtime);
-        // We need to store RuntimeIntervals iterator instead of RuntimeMonitor to
-        // get incremental values. We need a Mutex to be Send and Sync (for our
-        // Meter users)
-        let intervals = Mutex::new(monitor.intervals());
-        Self {
-            runtime,
-            intervals,
-            metrics: TokioRuntimeMetrics::new(registry),
+        let runtime = Handle::try_current();
+        if runtime.is_err() {
+            info!("Cannot export tokio runtime metrics, no runtime available");
+            Self {
+                runtime: None,
+                intervals: None,
+                metrics: TokioRuntimeMetrics::new(registry),
+            }
+        } else {
+            let runtime = runtime.unwrap();
+            let monitor = RuntimeMonitor::new(&runtime);
+            // We need to store RuntimeIntervals iterator instead of RuntimeMonitor to
+            // get incremental values. We need a Mutex to be Send and Sync (for our
+            // Meter users)
+            let intervals = Mutex::new(monitor.intervals());
+            Self {
+                runtime: Some(runtime),
+                intervals: Some(intervals),
+                metrics: TokioRuntimeMetrics::new(registry),
+            }
         }
     }
 
     pub fn observe(&self) -> NodeResult<()> {
+        if self.runtime.is_none() {
+            return Ok(());
+        }
+
         let interval = self.next_interval()?;
-        let raw_metrics = self.runtime.metrics();
+        let raw_metrics = self.runtime.as_ref().unwrap().metrics();
 
         self.metrics.update(raw_metrics, interval);
 
@@ -69,7 +85,8 @@ impl TokioRuntimeObserver {
     }
 
     fn unpoisoned_intervals(&self) -> NodeResult<MutexGuard<'_, RuntimeIntervals>> {
-        match self.intervals.try_lock() {
+        let intvals = self.intervals.as_ref().unwrap();
+        match intvals.try_lock() {
             Ok(intervals) => Ok(intervals),
             Err(TryLockError::Poisoned(inner)) => Ok(inner.into_inner()),
             Err(TryLockError::WouldBlock) => Err(node_error!(
