@@ -105,8 +105,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_models.resource import ReleaseChannel
-from nucliadb_protos import writer_pb2, writer_pb2_grpc
+from nucliadb_protos import utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
@@ -915,10 +914,10 @@ def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
     return model
 
 
-def get_release_channel(request: KnowledgeBoxNew) -> ReleaseChannel:
+def get_release_channel(request: KnowledgeBoxNew) -> utils_pb2.ReleaseChannel.ValueType:
     """
-    Set channel to Experimental if specified in the grpc or
-    if the requested slug has the experimental_kb feature enabled.
+    Set channel to Experimental if specified in the grpc request or if the requested
+    slug has the experimental_kb feature enabled in stage environment.
     """
     release_channel = request.release_channel
 
@@ -927,6 +926,5 @@ def get_release_channel(request: KnowledgeBoxNew) -> ReleaseChannel:
         const.Features.EXPERIMENTAL_KB, context={"slug": request.slug}
     )
     if stage_environment and enabled_for_slug:
-        release_channel = ReleaseChannel.EXPERIMENTAL
-
+        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
     return release_channel

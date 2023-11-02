@@ -30,8 +30,8 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.service.writer import (
     WriterServicer,
-    update_shards_with_updated_replica,
     get_release_channel,
+    update_shards_with_updated_replica,
 )
 from nucliadb_protos import writer_pb2
 
@@ -659,18 +659,40 @@ class TestWriterServicer:
 
             assert isinstance(resp, writer_pb2.IndexStatus)
 
-WRITER = "nucliadb.ingest.service.writer"
 
-@pytest.mark.parametrize("req,has_feature,environment,expected_channel", [
-    (KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.EXPERIMENTAL), False, "prod", ReleaseChannel.EXPERIMENTAL),
-    (KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE), True, "prod", ReleaseChannel.STABLE),
-    (KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE), True, "stage", ReleaseChannel.EXPERIMENTAL),
-])
+@pytest.mark.parametrize(
+    "req,has_feature,environment,expected_channel",
+    [
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.EXPERIMENTAL),
+            False,
+            "prod",
+            ReleaseChannel.EXPERIMENTAL,
+        ),
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
+            True,
+            "prod",
+            ReleaseChannel.STABLE,
+        ),
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
+            True,
+            "stage",
+            ReleaseChannel.EXPERIMENTAL,
+        ),
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
+            False,
+            "stage",
+            ReleaseChannel.STABLE,
+        ),
+    ],
+)
 def test_get_release_channel(req, has_feature, environment, expected_channel):
-    with mock.patch(
-        f"{WRITER}.has_feature", return_value=has_feature
-    ):
-        with mock.patch.object(
-            f"{WRITER}.running_settings", new=Mock(running_environment=environment)
+    module = "nucliadb.ingest.service.writer"
+    with mock.patch(f"{module}.has_feature", return_value=has_feature):
+        with mock.patch(
+            f"{module}.running_settings", new=Mock(running_environment=environment)
         ):
             assert get_release_channel(req) == expected_channel
