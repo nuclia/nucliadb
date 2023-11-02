@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from typing import AsyncIterator
 
 import aiohttp
 import pytest
@@ -31,21 +30,7 @@ from nucliadb.tests.utils import inject_message
 from nucliadb.tests.utils.broker_messages import BrokerMessageBuilder
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
-
-
-async def get_field_classification_batch_from_response(
-    response: aiohttp.ClientResponse,
-) -> AsyncIterator[FieldClassificationBatch]:
-    while True:
-        header = await response.content.read(4)
-        if header == b"":
-            break
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        pcb = FieldClassificationBatch()
-        pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
+from nucliadb.train.tests.utils import get_batches_from_train_response_stream
 
 
 @pytest.mark.asyncio
@@ -89,7 +74,9 @@ async def test_generator_field_classification(
             assert response.status == 200
             batches = []
             total = 0
-            async for batch in get_field_classification_batch_from_response(response):
+            async for batch in get_batches_from_train_response_stream(
+                response, FieldClassificationBatch
+            ):
                 batches.append(batch)
                 total += len(batch.data)
             assert len(batches) == expected_batches
