@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 from nucliadb_protos.dataset_pb2 import (
     ParagraphStreamingBatch,
@@ -38,7 +38,7 @@ def paragraph_streaming_batch_generator(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphStreamingBatch]:
+) -> AsyncGenerator[ParagraphStreamingBatch, None]:
     generator = generate_paragraph_streaming_payloads(
         kbid, trainset, node, shard_replica_id
     )
@@ -51,7 +51,7 @@ async def generate_paragraph_streaming_payloads(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphStreamItem]:
+) -> AsyncGenerator[ParagraphStreamItem, None]:
     """Streams paragraphs ordered as if they were read sequentially from each
     field.
 

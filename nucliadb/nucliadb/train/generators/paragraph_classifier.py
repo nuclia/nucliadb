@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import (
@@ -40,7 +40,7 @@ def paragraph_classification_batch_generator(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncGenerator[ParagraphClassificationBatch, None]:
     if len(trainset.filter.labels) != 1:
         raise HTTPException(
             status_code=422,
@@ -61,7 +61,7 @@ async def generate_paragraph_classification_payloads(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[TextLabel]:
+) -> AsyncGenerator[TextLabel, None]:
     labelset = f"/l/{trainset.filter.labels[0]}"
 
     # Query how many paragraphs has each label

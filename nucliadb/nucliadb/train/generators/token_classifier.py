@@ -19,7 +19,7 @@
 #
 
 from collections import OrderedDict
-from typing import AsyncIterator, Dict, List, Tuple, cast
+from typing import AsyncGenerator, Dict, List, Tuple, cast
 
 from nucliadb_protos.dataset_pb2 import (
     TokenClassificationBatch,
@@ -43,7 +43,7 @@ def token_classification_batch_generator(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[TokenClassificationBatch]:
+) -> AsyncGenerator[TokenClassificationBatch, None]:
     generator = generate_token_classification_payloads(
         kbid, trainset, node, shard_replica_id
     )
@@ -56,7 +56,7 @@ async def generate_token_classification_payloads(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[TokensClassification]:
+) -> AsyncGenerator[TokensClassification, None]:
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     for entitygroup in trainset.filter.labels:

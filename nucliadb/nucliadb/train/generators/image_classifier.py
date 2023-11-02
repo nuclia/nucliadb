@@ -19,7 +19,7 @@
 #
 
 import json
-from typing import Any, AsyncIterator, Dict, List, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Tuple
 
 from nucliadb_protos.dataset_pb2 import (
     ImageClassification,
@@ -46,7 +46,7 @@ def image_classification_batch_generator(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ImageClassificationBatch]:
+) -> AsyncGenerator[ImageClassificationBatch, None]:
     generator = generate_image_classification_payloads(
         kbid, trainset, node, shard_replica_id
     )
@@ -59,7 +59,7 @@ async def generate_image_classification_payloads(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ImageClassification]:
+) -> AsyncGenerator[ImageClassification, None]:
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     request.reload = True
