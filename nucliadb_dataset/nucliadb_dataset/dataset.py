@@ -43,6 +43,7 @@ from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
+    ParagraphStreamingBatch,
     SentenceClassificationBatch,
     TaskType,
     TokenClassificationBatch,
@@ -51,6 +52,7 @@ from nucliadb_protos.dataset_pb2 import (
 
 from nucliadb_dataset.mapping import (
     batch_to_image_classification_arrow,
+    batch_to_paragraph_streaming_arrow,
     batch_to_text_classification_arrow,
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
@@ -79,6 +81,7 @@ class Task(str, Enum):
     SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
     TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
     IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
+    # PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
 
 
 class NucliaDataset(object):
@@ -181,17 +184,25 @@ class NucliaDBDataset(NucliaDataset):
         if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
             self._configure_paragraph_classification()
 
-        if self.trainset.type == TaskType.FIELD_CLASSIFICATION:
+        elif self.trainset.type == TaskType.FIELD_CLASSIFICATION:
             self._configure_field_classification()
 
-        if self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
+        elif self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
             self._configure_token_classification()
 
-        if self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
+        elif self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
             self._configure_sentence_classification()
 
-        if self.trainset.type == TaskType.IMAGE_CLASSIFICATION:
+        elif self.trainset.type == TaskType.IMAGE_CLASSIFICATION:
             self._configure_image_classification()
+
+        elif self.trainset.type == TaskType.PARAGRAPH_STREAMING:
+            self._configure_paragraph_streaming()
+
+        else:
+            raise AttributeError(
+                f"Trainset task '{TaskType.Name(self.trainset.type)}' not supported"
+            )
 
     def _configure_sentence_classification(self):
         self.labels = self.client.get_labels()
@@ -305,6 +316,21 @@ class NucliaDBDataset(NucliaDataset):
             [
                 bytes_to_batch(ImageClassificationBatch),
                 batch_to_image_classification_arrow(schema),
+            ]
+        )
+        self._set_schema(schema)
+
+    def _configure_paragraph_streaming(self):
+        schema = pa.schema(
+            [
+                pa.field("paragraph_id", pa.string()),
+                pa.field("text", pa.string()),
+            ]
+        )
+        self._set_mappings(
+            [
+                bytes_to_batch(ParagraphStreamingBatch),
+                batch_to_paragraph_streaming_arrow(schema),
             ]
         )
         self._set_schema(schema)

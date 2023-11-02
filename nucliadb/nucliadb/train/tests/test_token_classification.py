@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from datetime import datetime
-from typing import AsyncIterator, List
+from typing import List
 
 import aiohttp
 import pytest
@@ -32,22 +31,8 @@ from nucliadb.tests.utils import inject_message
 from nucliadb.tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb.train.tests.utils import get_batches_from_train_response_stream
 from nucliadb_protos import resources_pb2 as rpb
-
-
-async def get_token_classification_batch_from_response(
-    response: aiohttp.ClientResponse,
-) -> AsyncIterator[TokenClassificationBatch]:
-    while True:
-        header = await response.content.read(4)
-        if header in [b"", None]:
-            break
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        pcb = TokenClassificationBatch()
-        pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
 
 
 @pytest.mark.asyncio
@@ -80,7 +65,9 @@ async def test_generator_token_classification(
     ) as response:
         assert response.status == 200
         batches: List[TokenClassificationBatch] = []
-        async for batch in get_token_classification_batch_from_response(response):
+        async for batch in get_batches_from_train_response_stream(
+            response, TokenClassificationBatch
+        ):
             batches.append(batch)
 
     for batch in batches:
@@ -146,8 +133,5 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bmb.add_field_builder(file_field)
 
     bm = bmb.build()
-
-    bm.files["file"].added.FromDatetime(datetime.now())
-    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
 
     return bm
