@@ -105,15 +105,19 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
+from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
 from nucliadb_utils.keys import KB_SHARDS
+from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_pubsub,
     get_storage,
     get_transaction_utility,
+    has_feature,
 )
 
 
@@ -205,7 +209,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 request.config,
                 parse_model_metadata(request),
                 forceuuid=request.forceuuid,
-                release_channel=request.release_channel,
+                release_channel=get_release_channel(request),
             )
         except KnowledgeBoxConflict:
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
@@ -909,3 +913,20 @@ def parse_model_metadata(request: KnowledgeBoxNew) -> SemanticModelMetadata:
     if request.HasField("default_min_score"):
         model.default_min_score = request.default_min_score
     return model
+
+
+def get_release_channel(request: KnowledgeBoxNew) -> ReleaseChannel:
+    """
+    Set channel to Experimental if specified in the grpc or
+    if the requested slug has the experimental_kb feature enabled.
+    """
+    release_channel = request.release_channel
+
+    stage_environment = running_settings.running_environment == "stage"
+    enabled_for_slug = has_feature(
+        const.Features.EXPERIMENTAL_KB, context={"slug": request.slug}
+    )
+    if stage_environment and enabled_for_slug:
+        release_channel = ReleaseChannel.EXPERIMENTAL
+
+    return release_channel

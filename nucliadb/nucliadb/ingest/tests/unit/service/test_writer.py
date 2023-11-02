@@ -17,10 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
@@ -30,6 +31,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.service.writer import (
     WriterServicer,
     update_shards_with_updated_replica,
+    get_release_channel,
 )
 from nucliadb_protos import writer_pb2
 
@@ -656,3 +658,19 @@ class TestWriterServicer:
             txn.commit.assert_called_once()
 
             assert isinstance(resp, writer_pb2.IndexStatus)
+
+WRITER = "nucliadb.ingest.service.writer"
+
+@pytest.mark.parametrize("req,has_feature,environment,expected_channel", [
+    (KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.EXPERIMENTAL), False, "prod", ReleaseChannel.EXPERIMENTAL),
+    (KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE), True, "prod", ReleaseChannel.STABLE),
+    (KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE), True, "stage", ReleaseChannel.EXPERIMENTAL),
+])
+def test_get_release_channel(req, has_feature, environment, expected_channel):
+    with mock.patch(
+        f"{WRITER}.has_feature", return_value=has_feature
+    ):
+        with mock.patch.object(
+            f"{WRITER}.running_settings", new=Mock(running_environment=environment)
+        ):
+            assert get_release_channel(req) == expected_channel
