@@ -94,8 +94,7 @@ pub mod basic {
         Shared = 1,
     }
 }
-// Block behaviors
-
+/// Block behaviors
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Origin {
     #[prost(enumeration="origin::Source", tag="1")]

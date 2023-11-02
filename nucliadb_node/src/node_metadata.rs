@@ -22,7 +22,8 @@ use nucliadb_core::NodeResult;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use crate::{env, utils};
+use crate::env;
+use crate::utils::{self, get_primary_node_id};
 
 async fn number_of_shards() -> NodeResult<usize> {
     let mut count = 0;
@@ -50,6 +51,7 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
             node_id: utils::read_host_key(env::host_key_path())
                 .unwrap()
                 .to_string(),
+            primary_node_id: get_primary_node_id(),
             ..Default::default()
         }
     }

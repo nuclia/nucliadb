@@ -24,6 +24,7 @@ use futures::Future;
 use nucliadb_core::metrics::replication as replication_metrics;
 use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::{metrics, Error, NodeResult};
+use nucliadb_protos::prelude::EmptyQuery;
 use nucliadb_protos::replication;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Semaphore;
@@ -36,7 +37,7 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
-use crate::utils::list_shards;
+use crate::utils::{list_shards, set_primary_node_id};
 
 pub async fn replicate_shard(
     shard_state: replication::PrimaryShardReplicationState,
@@ -209,6 +210,13 @@ pub async fn connect_to_primary_and_replicate(
 
     let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&settings));
     let metrics = metrics::get_metrics();
+
+    let primary_node_metadata = client
+        .get_metadata(Request::new(EmptyQuery {}))
+        .await?
+        .into_inner();
+
+    set_primary_node_id(primary_node_metadata.node_id)?;
 
     loop {
         let existing_shards = list_shards(settings.shards_path()).await;

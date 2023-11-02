@@ -158,7 +158,7 @@ pub async fn start_grpc_service(
         grpc_driver.initialize().await?;
         let replication_server =
             replication::replication_service_server::ReplicationServiceServer::new(
-                ReplicationServiceGRPCDriver::new(settings.clone(), shard_cache.clone()),
+                ReplicationServiceGRPCDriver::new(settings.clone(), shard_cache.clone(), node_id),
             );
         server_builder = server_builder
             .add_service(GrpcServer::new(grpc_driver))

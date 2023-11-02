@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use nucliadb_core::protos::{EmptyQuery, NodeMetadata};
 use nucliadb_core::tracing::{debug, warn};
 use nucliadb_core::NodeResult;
 use nucliadb_protos::replication;
@@ -37,13 +38,19 @@ use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {
     settings: Arc<Settings>,
     shards: Arc<AsyncUnboundedShardWriterCache>,
+    node_id: String,
 }
 
 impl ReplicationServiceGRPCDriver {
-    pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
+    pub fn new(
+        settings: Arc<Settings>,
+        shard_cache: Arc<AsyncUnboundedShardWriterCache>,
+        node_id: String,
+    ) -> Self {
         Self {
             settings,
             shards: shard_cache,
+            node_id,
         }
     }
 
@@ -177,11 +184,11 @@ impl replication::replication_service_server::ReplicationService for Replication
                 warn!("Shard {} not found", shard_id);
             }
         }
-        // let shard = self.shards.get_shard(request.).await?;
 
         let response = replication::PrimaryCheckReplicationStateResponse {
             shard_states: resp_shard_states,
             shards_to_remove,
+            primary_id: self.node_id.clone(),
         };
         Ok(Response::new(response))
     }
@@ -268,5 +275,16 @@ impl replication::replication_service_server::ReplicationService for Replication
         });
 
         Ok(Response::new(ReceiverStream::new(receiver.1)))
+    }
+
+    async fn get_metadata(
+        &self,
+        _request: tonic::Request<EmptyQuery>,
+    ) -> Result<tonic::Response<NodeMetadata>, tonic::Status> {
+        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        match metadata {
+            Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
     }
 }

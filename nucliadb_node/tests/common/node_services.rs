@@ -99,12 +99,16 @@ pub struct NodeFixture {
     secondary_shard_cache: Option<Arc<AsyncUnboundedShardWriterCache>>,
     tempdir: TempDir,
     secondary_tempdir: TempDir,
+    original_data_path: String,
 }
 
 impl NodeFixture {
     pub fn new() -> Self {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
         let secondary_tempdir = TempDir::new().expect("Unable to create temporary data directory");
+
+        let original_data_path = std::env::var("DATA_PATH").unwrap_or_default();
+        std::env::set_var("DATA_PATH", tempdir.path());
 
         let reader_addr =
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
@@ -156,6 +160,7 @@ impl NodeFixture {
             secondary_shard_cache: None,
             tempdir,
             secondary_tempdir,
+            original_data_path,
         }
     }
 
@@ -173,7 +178,11 @@ impl NodeFixture {
             ));
             let replication_server =
                 replication::replication_service_server::ReplicationServiceServer::new(
-                    ReplicationServiceGRPCDriver::new(settings.clone(), shards_cache.clone()),
+                    ReplicationServiceGRPCDriver::new(
+                        settings.clone(),
+                        shards_cache.clone(),
+                        "primary_id".to_string(),
+                    ),
                 );
             Server::builder()
                 .add_service(writer_server)
@@ -312,6 +321,7 @@ impl NodeFixture {
 
 impl Drop for NodeFixture {
     fn drop(&mut self) {
+        std::env::set_var("DATA_PATH", self.original_data_path.clone());
         if let Some(task) = self.reader_server_task.take() {
             task.abort();
         }
