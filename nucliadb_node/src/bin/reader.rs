@@ -37,6 +37,7 @@ use nucliadb_node::settings::Settings;
 use nucliadb_node::telemetry::init_telemetry;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
+use tokio::sync::oneshot;
 use tonic::transport::Server;
 use tonic_health::server::HealthReporter;
 
@@ -60,7 +61,9 @@ async fn main() -> NodeResult<()> {
 
     nucliadb_node::analytics::sync::start_analytics_loop();
 
-    let grpc_task = tokio::spawn(start_grpc_service(settings.clone()));
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
+    let grpc_task = tokio::spawn(start_grpc_service(settings.clone(), shutdown_rx));
     let metrics_task = tokio::spawn(run_http_server(ServerOptions {
         default_http_port: 3031,
     }));
@@ -68,17 +71,16 @@ async fn main() -> NodeResult<()> {
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    wait_for_sigkill().await?;
+    wait_for_sigkill(shutdown_tx).await?;
     info!("Shutting down NucliaDB Reader Node...");
-    grpc_task.abort();
     metrics_task.abort();
+    grpc_task.await??;
     let _ = metrics_task.await;
-    let _ = grpc_task.await;
 
     Ok(())
 }
 
-async fn wait_for_sigkill() -> NodeResult<()> {
+async fn wait_for_sigkill(shutdown_tx: oneshot::Sender<()>) -> NodeResult<()> {
     let mut sigterm = unix::signal(SignalKind::terminate())?;
     let mut sigquit = unix::signal(SignalKind::quit())?;
 
@@ -87,6 +89,8 @@ async fn wait_for_sigkill() -> NodeResult<()> {
         _ = sigquit.recv() => println!("Terminating on SIGQUIT"),
         _ = ctrl_c() => println!("Terminating on ctrl-c"),
     }
+
+    shutdown_tx.send(()).unwrap();
 
     Ok(())
 }
@@ -112,7 +116,10 @@ async fn health_checker(
     }
 }
 
-pub async fn start_grpc_service(settings: Arc<Settings>) -> NodeResult<()> {
+pub async fn start_grpc_service(
+    settings: Arc<Settings>,
+    shutdown_rx: oneshot::Receiver<()>,
+) -> NodeResult<()> {
     let listen_address = settings.reader_listen_address();
     eprintln!(
         "Reader listening for gRPC requests at: {:?}",
@@ -135,7 +142,9 @@ pub async fn start_grpc_service(settings: Arc<Settings>) -> NodeResult<()> {
         .layer(metrics_middleware)
         .add_service(health_service)
         .add_service(GrpcServer::new(grpc_driver))
-        .serve(listen_address)
+        .serve_with_shutdown(listen_address, async {
+            shutdown_rx.await.ok();
+        })
         .await
         .expect("Error starting gRPC reader");
 

@@ -42,6 +42,7 @@ use nucliadb_protos::replication;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot;
 use tonic::transport::Server;
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
 use nucliadb_node::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
@@ -76,10 +77,13 @@ async fn main() -> NodeResult<()> {
 
     nucliadb_node::analytics::sync::start_analytics_loop();
 
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
     let grpc_task = tokio::spawn(start_grpc_service(
         settings.clone(),
         metadata_sender.clone(),
         node_id.to_string(),
+        shutdown_rx,
     ));
 
     {
@@ -98,18 +102,17 @@ async fn main() -> NodeResult<()> {
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
 
-    wait_for_sigkill().await?;
+    wait_for_sigkill(shutdown_tx).await?;
 
     info!("Shutting down NucliaDB Writer Node...");
     metrics_task.abort();
-    grpc_task.abort();
+    grpc_task.await??; // wait for shutdown of server instead of aborting it
     let _ = metrics_task.await;
-    let _ = grpc_task.await;
 
     Ok(())
 }
 
-async fn wait_for_sigkill() -> NodeResult<()> {
+async fn wait_for_sigkill(shutdown_tx: oneshot::Sender<()>) -> NodeResult<()> {
     let mut sigterm = unix::signal(SignalKind::terminate())?;
     let mut sigquit = unix::signal(SignalKind::quit())?;
 
@@ -119,6 +122,8 @@ async fn wait_for_sigkill() -> NodeResult<()> {
         _ = ctrl_c() => println!("Terminating on ctrl-c"),
     }
 
+    shutdown_tx.send(()).unwrap();
+
     Ok(())
 }
 
@@ -126,6 +131,7 @@ pub async fn start_grpc_service(
     settings: Arc<Settings>,
     metadata_sender: UnboundedSender<NodeWriterEvent>,
     node_id: String,
+    shutdown_rx: oneshot::Receiver<()>,
 ) -> NodeResult<()> {
     let listen_address = settings.writer_listen_address();
 
@@ -167,7 +173,9 @@ pub async fn start_grpc_service(
 
     eprintln!("Listening for gRPC requests at: {:?}", listen_address);
     server_builder
-        .serve(listen_address)
+        .serve_with_shutdown(listen_address, async {
+            shutdown_rx.await.ok();
+        })
         .await
         .expect("Error starting gRPC service");
 
