@@ -99,6 +99,36 @@ def upload_data_token_classification(knowledgebox: KnowledgeBox):
 
 
 @pytest.fixture(scope="function")
+def text_editors_kb(knowledgebox: KnowledgeBox):
+    knowledgebox.upload(
+        "doc-emacs",
+        title="GNU Emacs",
+        summary="An extensible, customizable, free/libre text editor - and more",
+        text="Text won't appear as we are not mocking processing",
+    )
+    knowledgebox.upload(
+        "doc-vi",
+        title="vi",
+        summary="A screen-oriented text editor originally created for the Unix operating system",
+        text="Text won't appear as we are not mocking processing",
+    )
+    knowledgebox.upload(
+        "doc-vim",
+        title="VIM",
+        summary="Vi IMproved, a programmer's text editor",
+        text="Text won't appear as we are not mocking processing",
+    )
+    knowledgebox.upload(
+        "doc-ex",
+        title="ex",
+        summary="Line editor for Unix systems originally written by Bill Joy in 1976",
+        text="Text won't appear as we are not mocking processing",
+    )
+
+    yield knowledgebox
+
+
+@pytest.fixture(scope="function")
 def temp_folder():
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname

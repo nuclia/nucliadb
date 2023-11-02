@@ -25,6 +25,7 @@ from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
+    ParagraphStreamingBatch,
     SentenceClassificationBatch,
     TokenClassificationBatch,
 )
@@ -107,6 +108,24 @@ def batch_to_image_classification_arrow(schema: pa.schema):
 
         if len(IMAGE):
             pa_data = [pa.array(IMAGE), pa.array(SELECTION)]
+            output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
+
+
+def batch_to_paragraph_streaming_arrow(schema: pa.schema):
+    def func(batch: ParagraphStreamingBatch):
+        PARARGAPH_ID = []
+        TEXT = []
+        for data in batch.data:
+            PARARGAPH_ID.append(data.id)
+            TEXT.append(data.text)
+
+        if len(PARARGAPH_ID):
+            pa_data = [pa.array(PARARGAPH_ID), pa.array(TEXT)]
             output_batch = pa.record_batch(pa_data, schema=schema)
         else:
             output_batch = None
