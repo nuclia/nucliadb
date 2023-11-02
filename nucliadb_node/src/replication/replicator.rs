@@ -24,6 +24,7 @@ use futures::Future;
 use nucliadb_core::metrics::replication as replication_metrics;
 use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::{metrics, Error, NodeResult};
+use nucliadb_protos::prelude::EmptyQuery;
 use nucliadb_protos::replication;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Semaphore;
@@ -209,7 +210,15 @@ pub async fn connect_to_primary_and_replicate(
 
     let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&settings));
     let metrics = metrics::get_metrics();
-    let mut primary_id_set = false;
+
+    let primary_node_metadata = client
+        .get_metadata(Request::new(EmptyQuery {}))
+        .await?
+        .into_inner();
+
+    if let Some(primary_node_id) = primary_node_metadata.primary_node_id {
+        set_primary_node_id(primary_node_id)?;
+    }
 
     loop {
         let existing_shards = list_shards(settings.shards_path()).await;
@@ -261,11 +270,6 @@ pub async fn connect_to_primary_and_replicate(
 
         let no_shards_to_sync = replication_state.shard_states.is_empty();
         let no_shards_to_remove = replication_state.shards_to_remove.is_empty();
-
-        if !primary_id_set {
-            set_primary_node_id(replication_state.primary_id.clone())?;
-            primary_id_set = true;
-        }
 
         let start = std::time::SystemTime::now();
         for shard_state in replication_state.shard_states {
