@@ -383,7 +383,11 @@ pub async fn connect_to_primary_and_replicate_forever(
             Arc::clone(&shutdown_notified),
         )
         .await;
-        if result.is_err() {
+
+        if let Ok(_) = result {
+            // normal exit
+            return Ok(());
+        } else {
             error!(
                 "Error happened during replication. Will retry: {:?}",
                 result
@@ -392,9 +396,6 @@ pub async fn connect_to_primary_and_replicate_forever(
                 settings.replication_delay_seconds(),
             ))
             .await;
-        } else {
-            // normal exit
-            return Ok(());
         }
     }
 }

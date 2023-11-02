@@ -143,8 +143,8 @@ async fn main() -> NodeResult<()> {
     grpc_task.await??; // wait for shutdown of server instead of aborting it
     let _ = metrics_task.await;
 
-    if replication_task.is_some() {
-        replication_task.unwrap().await??;
+    if let Some(repl_task) = replication_task {
+        repl_task.await??;
     }
 
     Ok(())
