@@ -169,7 +169,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
@@ -384,10 +386,7 @@ pub async fn connect_to_primary_and_replicate_forever(
         )
         .await;
 
-        if let Ok(_) = result {
-            // normal exit
-            return Ok(());
-        } else {
+        if let Err(_) = result {
             error!(
                 "Error happened during replication. Will retry: {:?}",
                 result
@@ -396,6 +395,9 @@ pub async fn connect_to_primary_and_replicate_forever(
                 settings.replication_delay_seconds(),
             ))
             .await;
+        } else {
+            // normal exit
+            return Ok(());
         }
     }
 }
