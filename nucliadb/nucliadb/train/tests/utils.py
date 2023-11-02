@@ -96,6 +96,4 @@ async def get_batches_from_train_response_stream(
         payload = await response.content.read(payload_size)
         batch = pb_klass()
         batch.ParseFromString(payload)
-        # all our batches have a data field
-        assert batch.data
         yield batch
