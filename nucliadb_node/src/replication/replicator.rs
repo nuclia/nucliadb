@@ -254,7 +254,7 @@ pub async fn connect_to_primary_and_replicate(
             .await?
             .into_inner();
 
-        metrics.record_replication_op(replication_metrics::ShardOpsKey {
+        metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
             operation: "check_replication_state".to_string(),
         });
 
@@ -302,7 +302,7 @@ pub async fn connect_to_primary_and_replicate(
             worker_pool
                 .add(replicate_shard(shard_state, client.clone(), shard))
                 .await?;
-            metrics.record_replication_op(replication_metrics::ShardOpsKey {
+            metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
                 operation: "shard_replicated".to_string(),
             });
         }
@@ -317,7 +317,7 @@ pub async fn connect_to_primary_and_replicate(
                 warn!("Failed to delete shard: {:?}", shard_lookup);
                 continue;
             }
-            metrics.record_replication_op(replication_metrics::ShardOpsKey {
+            metrics.record_replication_op(replication_metrics::ReplicationOpsKey {
                 operation: "shard_removed".to_string(),
             });
         }

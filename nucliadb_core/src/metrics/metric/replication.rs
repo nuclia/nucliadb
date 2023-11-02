@@ -38,17 +38,17 @@ pub fn register_replicated_bytes_ops(registry: &mut Registry) -> ReplicatedBytes
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-pub struct ShardOpsKey {
+pub struct ReplicationOpsKey {
     pub operation: String,
 }
 
-pub type ShardOpsMetric = Family<ShardOpsKey, Counter>;
+pub type ReplicationOpsMetric = Family<ReplicationOpsKey, Counter>;
 
-pub fn register_replication_operations(registry: &mut Registry) -> ShardOpsMetric {
-    let operation_count = ShardOpsMetric::default();
+pub fn register_replication_operations(registry: &mut Registry) -> ReplicationOpsMetric {
+    let operation_count = ReplicationOpsMetric::default();
     registry.register(
-        "total_park_count",
-        "The number of times worker threads parked. [...]",
+        "replication_operations",
+        "Replication operations",
         operation_count.clone(),
     );
     operation_count
