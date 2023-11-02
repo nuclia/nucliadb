@@ -16,10 +16,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import asyncio
 import uuid
-from datetime import datetime
-from typing import AsyncIterator
 
 import aiohttp
 import pytest
@@ -31,22 +30,8 @@ from nucliadb.tests.utils import inject_message
 from nucliadb.tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb.train.tests.utils import get_batches_from_train_response_stream
 from nucliadb_protos import resources_pb2 as rpb
-
-
-async def get_paragraph_classification_batch_from_response(
-    response: aiohttp.ClientResponse,
-) -> AsyncIterator[ParagraphClassificationBatch]:
-    while True:
-        header = await response.content.read(4)
-        if header == b"":
-            break
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        pcb = ParagraphClassificationBatch()
-        pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
 
 
 @pytest.mark.asyncio
@@ -79,7 +64,9 @@ async def test_generator_paragraph_classification(
     ) as response:
         assert response.status == 200
         batches = []
-        async for batch in get_paragraph_classification_batch_from_response(response):
+        async for batch in get_batches_from_train_response_stream(
+            response, ParagraphClassificationBatch
+        ):
             batches.append(batch)
             assert len(batch.data) == 2
         assert len(batches) == 2
@@ -132,8 +119,5 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bmb.add_field_builder(file_field)
 
     bm = bmb.build()
-
-    bm.files["file"].added.FromDatetime(datetime.now())
-    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
 
     return bm

@@ -19,12 +19,13 @@
 #
 
 from contextvars import ContextVar
-from typing import Dict, Optional
+from typing import Any, AsyncIterator, Dict, Optional
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.train import SERVICE_NAME
+from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
@@ -53,3 +54,20 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
     else:
         orm_resource = resouce_cache.get(uuid)
     return orm_resource
+
+
+async def batchify(
+    producer: AsyncIterator[Any], size: int, batch_klass: TrainBatchType
+):
+    # NOTE: we are supposing all protobuffers have a data field
+    batch = []
+    async for item in producer:
+        batch.append(item)
+        if len(batch) == size:
+            batch_pb = batch_klass(data=batch)
+            yield batch_pb
+            batch = []
+
+    if len(batch):
+        batch_pb = batch_klass(data=batch)
+        yield batch_pb
