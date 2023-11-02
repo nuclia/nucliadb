@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncIterator, Union
+from typing import AsyncIterator, Optional, Union
 
 from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -32,6 +32,9 @@ from nucliadb.train.generators.image_classifier import (
 from nucliadb.train.generators.paragraph_classifier import (
     generate_paragraph_classification_payloads,
 )
+from nucliadb.train.generators.paragraph_streaming import (
+    generate_paragraph_streaming_payloads,
+)
 from nucliadb.train.generators.sentence_classifier import (
     generate_sentence_classification_payloads,
 )
@@ -42,21 +45,22 @@ from nucliadb.train.generators.utils import get_transaction
 from nucliadb.train.utils import get_shard_manager
 from nucliadb_protos import dataset_pb2 as dpb
 
+TrainBatch = Union[
+    dpb.ParagraphClassificationBatch,
+    dpb.FieldClassificationBatch,
+    dpb.SentenceClassificationBatch,
+    dpb.TokenClassificationBatch,
+    dpb.ImageClassificationBatch,
+    dpb.ParagraphStreamingBatch,
+]
+
 
 async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     # Get the data structure to generate data
     shard_manager = get_shard_manager()
     node, shard_replica_id = await shard_manager.get_reader(kbid, shard)
 
-    payloads_generator: AsyncIterator[
-        Union[
-            dpb.ParagraphClassificationBatch,
-            dpb.FieldClassificationBatch,
-            dpb.SentenceClassificationBatch,
-            dpb.TokenClassificationBatch,
-            dpb.ImageClassificationBatch,
-        ]
-    ] = None
+    payloads_generator: Optional[AsyncIterator[TrainBatch]] = None
 
     if trainset.batch_size == 0:
         trainset.batch_size = 50
@@ -101,6 +105,11 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
 
     elif trainset.type == TaskType.IMAGE_CLASSIFICATION:
         payloads_generator = generate_image_classification_payloads(
+            kbid, trainset, node, shard_replica_id
+        )
+
+    elif trainset.type == TaskType.PARAGRAPH_STREAMING:
+        payloads_generator = generate_paragraph_streaming_payloads(
             kbid, trainset, node, shard_replica_id
         )
 
