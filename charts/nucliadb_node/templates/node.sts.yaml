@@ -43,6 +43,7 @@ spec:
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
     spec:
+      terminationGracePeriodSeconds: 120
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:

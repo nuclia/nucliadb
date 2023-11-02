@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fs;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use futures::Future;
@@ -195,6 +196,7 @@ pub async fn connect_to_primary_and_replicate(
     settings: Arc<Settings>,
     shard_cache: Arc<AsyncUnboundedShardWriterCache>,
     secondary_id: String,
+    shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {
     let mut primary_address = settings.primary_address();
     if !primary_address.starts_with("http://") {
@@ -219,6 +221,10 @@ pub async fn connect_to_primary_and_replicate(
     set_primary_node_id(primary_node_metadata.node_id)?;
 
     loop {
+        if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
+            return Ok(());
+        }
+
         let existing_shards = list_shards(settings.shards_path()).await;
         let mut shard_states = Vec::new();
         let mut worker_pool =
@@ -271,6 +277,10 @@ pub async fn connect_to_primary_and_replicate(
 
         let start = std::time::SystemTime::now();
         for shard_state in replication_state.shard_states {
+            if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
+                return Ok(());
+            }
+
             let shard_id = shard_state.shard_id.clone();
             let shard_lookup;
             if existing_shards.contains(&shard_id) {
@@ -360,12 +370,17 @@ pub async fn connect_to_primary_and_replicate_forever(
     settings: Arc<Settings>,
     shard_cache: Arc<AsyncUnboundedShardWriterCache>,
     secondary_id: String,
+    shutdown_notified: Arc<AtomicBool>,
 ) -> NodeResult<()> {
     loop {
+        if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
+            return Ok(());
+        }
         let result = connect_to_primary_and_replicate(
-            settings.clone(),
-            shard_cache.clone(),
+            Arc::clone(&settings),
+            Arc::clone(&shard_cache),
             secondary_id.clone(),
+            Arc::clone(&shutdown_notified),
         )
         .await;
         if result.is_err() {

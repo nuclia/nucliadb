@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -42,14 +43,33 @@ use nucliadb_protos::replication;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot;
 use tonic::transport::Server;
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
 use nucliadb_node::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
+use tokio::sync::Notify;
 
 #[derive(Debug)]
 pub enum NodeUpdate {
     ShardCount(u64),
+}
+
+fn get_shutdown_notifier() -> (Arc<Notify>, Arc<AtomicBool>) {
+    // Returns a tuple with a shutdown notifier and a shutdown notified.
+    // This is useful when you want to notify a shutdown and wait for it to be notified
+    // but also need to be able to check if server is shutting down
+    //
+    let shutdown_notifier = Arc::new(Notify::new());
+    let shutdown_notified = Arc::new(AtomicBool::new(false));
+
+    let shutdown_notifier_clone = Arc::clone(&shutdown_notifier);
+    let shutdown_notified_clone = Arc::clone(&shutdown_notified);
+
+    tokio::spawn(async move {
+        shutdown_notifier_clone.notified().await;
+        shutdown_notified_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+    });
+
+    (shutdown_notifier, shutdown_notified)
 }
 
 #[tokio::main]
@@ -77,13 +97,27 @@ async fn main() -> NodeResult<()> {
 
     nucliadb_node::analytics::sync::start_analytics_loop();
 
-    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let (shutdown_notifier, shutdown_notified) = get_shutdown_notifier();
+    let shard_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+
+    let mut replication_task = None;
+    if settings.node_role() == NodeRole::Secondary {
+        // when it's a secondary server, do not even run the writer GRPC service
+        // because nothing should happen through that interface
+        replication_task = Some(tokio::spawn(connect_to_primary_and_replicate_forever(
+            Arc::clone(&settings),
+            Arc::clone(&shard_cache),
+            node_id.to_string(),
+            Arc::clone(&shutdown_notified),
+        )));
+    }
 
     let grpc_task = tokio::spawn(start_grpc_service(
-        settings.clone(),
+        Arc::clone(&settings),
+        Arc::clone(&shard_cache),
         metadata_sender.clone(),
         node_id.to_string(),
-        shutdown_rx,
+        Arc::clone(&shutdown_notifier),
     ));
 
     {
@@ -102,17 +136,21 @@ async fn main() -> NodeResult<()> {
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
 
-    wait_for_sigkill(shutdown_tx).await?;
+    wait_for_sigkill(Arc::clone(&shutdown_notifier)).await?;
 
     info!("Shutting down NucliaDB Writer Node...");
     metrics_task.abort();
     grpc_task.await??; // wait for shutdown of server instead of aborting it
     let _ = metrics_task.await;
 
+    if replication_task.is_some() {
+        replication_task.unwrap().await??;
+    }
+
     Ok(())
 }
 
-async fn wait_for_sigkill(shutdown_tx: oneshot::Sender<()>) -> NodeResult<()> {
+async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
     let mut sigterm = unix::signal(SignalKind::terminate())?;
     let mut sigquit = unix::signal(SignalKind::quit())?;
 
@@ -122,24 +160,23 @@ async fn wait_for_sigkill(shutdown_tx: oneshot::Sender<()>) -> NodeResult<()> {
         _ = ctrl_c() => println!("Terminating on ctrl-c"),
     }
 
-    shutdown_tx.send(()).unwrap();
+    shutdown_notifier.notify_waiters();
 
     Ok(())
 }
 
 pub async fn start_grpc_service(
     settings: Arc<Settings>,
+    shard_cache: Arc<AsyncUnboundedShardWriterCache>,
     metadata_sender: UnboundedSender<NodeWriterEvent>,
     node_id: String,
-    shutdown_rx: oneshot::Receiver<()>,
+    shutdown_notifier: Arc<Notify>,
 ) -> NodeResult<()> {
     let listen_address = settings.writer_listen_address();
 
     let tracing_middleware = GrpcInstrumentorLayer;
     let debug_logs_middleware = GrpcDebugLogsLayer;
     let metrics_middleware = GrpcTasksMetricsLayer;
-
-    let shard_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<GrpcServer>().await;
@@ -150,15 +187,7 @@ pub async fn start_grpc_service(
         .layer(metrics_middleware)
         .add_service(health_service);
 
-    if settings.node_role() == NodeRole::Secondary {
-        // when it's a secondary server, do not even run the writer GRPC service
-        // because nothing should happen through that interface
-        tokio::spawn(connect_to_primary_and_replicate_forever(
-            settings.clone(),
-            shard_cache.clone(),
-            node_id,
-        ));
-    } else {
+    if settings.node_role() == NodeRole::Primary {
         let grpc_driver = NodeWriterGRPCDriver::new(Arc::clone(&settings), shard_cache.clone())
             .with_sender(metadata_sender);
         grpc_driver.initialize().await?;
@@ -174,7 +203,7 @@ pub async fn start_grpc_service(
     eprintln!("Listening for gRPC requests at: {:?}", listen_address);
     server_builder
         .serve_with_shutdown(listen_address, async {
-            shutdown_rx.await.ok();
+            shutdown_notifier.notified().await;
         })
         .await
         .expect("Error starting gRPC service");
