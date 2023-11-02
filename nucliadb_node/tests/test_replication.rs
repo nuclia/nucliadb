@@ -46,6 +46,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     let mut reader = fixture.reader_client();
     let mut secondary_reader = fixture.secondary_reader_client();
 
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     let shard = create_shard(&mut writer).await;
 
     let mut query = create_search_request(&shard.id, "prince");

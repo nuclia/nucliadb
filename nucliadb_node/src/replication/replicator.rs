@@ -216,9 +216,7 @@ pub async fn connect_to_primary_and_replicate(
         .await?
         .into_inner();
 
-    if let Some(primary_node_id) = primary_node_metadata.primary_node_id {
-        set_primary_node_id(primary_node_id)?;
-    }
+    set_primary_node_id(primary_node_metadata.node_id)?;
 
     loop {
         let existing_shards = list_shards(settings.shards_path()).await;
