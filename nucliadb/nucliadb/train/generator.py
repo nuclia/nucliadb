@@ -18,41 +18,32 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import AsyncIterator, Optional, Union
+from typing import AsyncIterator, Optional
 
 from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb.train.generators.field_classifier import (
-    generate_field_classification_payloads,
+    field_classification_batch_generator,
 )
 from nucliadb.train.generators.image_classifier import (
-    generate_image_classification_payloads,
+    image_classification_batch_generator,
 )
 from nucliadb.train.generators.paragraph_classifier import (
-    generate_paragraph_classification_payloads,
+    paragraph_classification_batch_generator,
 )
 from nucliadb.train.generators.paragraph_streaming import (
-    generate_paragraph_streaming_payloads,
+    paragraph_streaming_batch_generator,
 )
 from nucliadb.train.generators.sentence_classifier import (
-    generate_sentence_classification_payloads,
+    sentence_classification_batch_generator,
 )
 from nucliadb.train.generators.token_classifier import (
-    generate_token_classification_payloads,
+    token_classification_batch_generator,
 )
 from nucliadb.train.generators.utils import get_transaction
+from nucliadb.train.types import TrainBatch
 from nucliadb.train.utils import get_shard_manager
-from nucliadb_protos import dataset_pb2 as dpb
-
-TrainBatch = Union[
-    dpb.ParagraphClassificationBatch,
-    dpb.FieldClassificationBatch,
-    dpb.SentenceClassificationBatch,
-    dpb.TokenClassificationBatch,
-    dpb.ImageClassificationBatch,
-    dpb.ParagraphStreamingBatch,
-]
 
 
 async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
@@ -60,64 +51,46 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     shard_manager = get_shard_manager()
     node, shard_replica_id = await shard_manager.get_reader(kbid, shard)
 
-    payloads_generator: Optional[AsyncIterator[TrainBatch]] = None
-
     if trainset.batch_size == 0:
         trainset.batch_size = 50
 
-    if trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
-        if len(trainset.filter.labels) != 1:
-            raise HTTPException(
-                status_code=422,
-                detail="Paragraph Classification should be of 1 labelset",
-            )
+    batch_generator: Optional[AsyncIterator[TrainBatch]] = None
 
-        payloads_generator = generate_paragraph_classification_payloads(
+    if trainset.type == TaskType.FIELD_CLASSIFICATION:
+        batch_generator = field_classification_batch_generator(
             kbid, trainset, node, shard_replica_id
         )
-
-    elif trainset.type == TaskType.FIELD_CLASSIFICATION:
-        if len(trainset.filter.labels) != 1:
-            raise HTTPException(
-                status_code=422,
-                detail="Field Classification should be of 1 labelset",
-            )
-
-        payloads_generator = generate_field_classification_payloads(
-            kbid, trainset, node, shard_replica_id
-        )
-
-    elif trainset.type == TaskType.TOKEN_CLASSIFICATION:
-        payloads_generator = generate_token_classification_payloads(
-            kbid, trainset, node, shard_replica_id
-        )
-
-    elif trainset.type == TaskType.SENTENCE_CLASSIFICATION:
-        if len(trainset.filter.labels) == 0:
-            raise HTTPException(
-                status_code=422,
-                detail="Sentence Classification should be at least of 1 labelset",
-            )
-
-        payloads_generator = generate_sentence_classification_payloads(
-            kbid, trainset, node, shard_replica_id
-        )
-
     elif trainset.type == TaskType.IMAGE_CLASSIFICATION:
-        payloads_generator = generate_image_classification_payloads(
+        batch_generator = image_classification_batch_generator(
             kbid, trainset, node, shard_replica_id
         )
-
+    elif trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
+        batch_generator = paragraph_classification_batch_generator(
+            kbid, trainset, node, shard_replica_id
+        )
+    elif trainset.type == TaskType.TOKEN_CLASSIFICATION:
+        batch_generator = token_classification_batch_generator(
+            kbid, trainset, node, shard_replica_id
+        )
+    elif trainset.type == TaskType.SENTENCE_CLASSIFICATION:
+        batch_generator = sentence_classification_batch_generator(
+            kbid, trainset, node, shard_replica_id
+        )
     elif trainset.type == TaskType.PARAGRAPH_STREAMING:
-        payloads_generator = generate_paragraph_streaming_payloads(
+        batch_generator = paragraph_streaming_batch_generator(
             kbid, trainset, node, shard_replica_id
         )
 
-    if payloads_generator is not None:
-        async for item in payloads_generator:
-            payload = item.SerializeToString()
-            yield len(payload).to_bytes(4, byteorder="big", signed=False)
-            yield payload
+    if batch_generator is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid train type '{TaskType.Name(trainset.type)}'",
+        )
+
+    async for item in batch_generator:
+        payload = item.SerializeToString()
+        yield len(payload).to_bytes(4, byteorder="big", signed=False)
+        yield payload
 
     txn = await get_transaction()
     await txn.abort()

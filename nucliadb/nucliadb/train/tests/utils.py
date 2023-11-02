@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncIterator, Union, overload
+from typing import AsyncGenerator, overload
 
 import aiohttp
 from nucliadb_protos.dataset_pb2 import (
@@ -29,23 +29,7 @@ from nucliadb_protos.dataset_pb2 import (
     TokenClassificationBatch,
 )
 
-TrainBatchType = Union[
-    type[FieldClassificationBatch],
-    type[ImageClassificationBatch],
-    type[ParagraphClassificationBatch],
-    type[ParagraphStreamingBatch],
-    type[SentenceClassificationBatch],
-    type[TokenClassificationBatch],
-]
-
-TrainBatch = Union[
-    FieldClassificationBatch,
-    ImageClassificationBatch,
-    ParagraphClassificationBatch,
-    ParagraphStreamingBatch,
-    SentenceClassificationBatch,
-    TokenClassificationBatch,
-]
+from nucliadb.train.types import TrainBatch, TrainBatchType
 
 # NOTE: we use def instead of async def to make mypy happy. Otherwise, it
 # considers the overloaded functions as corountines returning async iterators
@@ -56,7 +40,7 @@ TrainBatch = Union[
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[FieldClassificationBatch],
-) -> AsyncIterator[FieldClassificationBatch]:
+) -> AsyncGenerator[FieldClassificationBatch, None]:
     ...
 
 
@@ -64,7 +48,7 @@ def get_batches_from_train_response_stream(
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ImageClassificationBatch],
-) -> AsyncIterator[ImageClassificationBatch]:
+) -> AsyncGenerator[ImageClassificationBatch, None]:
     ...
 
 
@@ -72,7 +56,7 @@ def get_batches_from_train_response_stream(
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ParagraphClassificationBatch],
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncGenerator[ParagraphClassificationBatch, None]:
     ...
 
 
@@ -80,7 +64,7 @@ def get_batches_from_train_response_stream(
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ParagraphStreamingBatch],
-) -> AsyncIterator[ParagraphStreamingBatch]:
+) -> AsyncGenerator[ParagraphStreamingBatch, None]:
     ...
 
 
@@ -88,7 +72,7 @@ def get_batches_from_train_response_stream(
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[SentenceClassificationBatch],
-) -> AsyncIterator[SentenceClassificationBatch]:
+) -> AsyncGenerator[SentenceClassificationBatch, None]:
     ...
 
 
@@ -96,14 +80,14 @@ def get_batches_from_train_response_stream(
 def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[TokenClassificationBatch],
-) -> AsyncIterator[TokenClassificationBatch]:
+) -> AsyncGenerator[TokenClassificationBatch, None]:
     ...
 
 
 async def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: TrainBatchType,
-) -> AsyncIterator[TrainBatch]:
+) -> AsyncGenerator[TrainBatch, None]:
     while True:
         header = await response.content.read(4)
         if header == b"":

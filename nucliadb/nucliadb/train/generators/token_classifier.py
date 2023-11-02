@@ -31,11 +31,61 @@ from nucliadb_protos.nodereader_pb2 import StreamFilter, StreamRequest
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 
 NERS_DICT = Dict[str, Dict[str, List[Tuple[int, int]]]]
 POSITION_DICT = OrderedDict[Tuple[int, int], Tuple[str, str]]
 MAIN = "__main__"
+
+
+def token_classification_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[TokenClassificationBatch]:
+    generator = generate_token_classification_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(generator, trainset.batch_size, TokenClassificationBatch)
+    return batch_generator
+
+
+async def generate_token_classification_payloads(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[TokensClassification]:
+    request = StreamRequest()
+    request.shard_id.id = shard_replica_id
+    for entitygroup in trainset.filter.labels:
+        request.filter.tags.append(f"/e/{entitygroup}")
+        request.filter.conjunction = StreamFilter.Conjunction.OR
+    async for field_item in node.stream_get_fields(request):
+        _, field_type, field = field_item.field.split("/")
+        (
+            split_text,
+            ordered_positions,
+            split_paragaphs,
+        ) = await get_field_text(
+            kbid,
+            field_item.uuid,
+            field,
+            field_type,
+            cast(List[str], trainset.filter.labels),
+        )
+        for split, text in split_text.items():
+            ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
+            paragraphs = split_paragaphs.get(split, [])
+
+            for segments in process_entities(text, ners, paragraphs):
+                tc = TokensClassification()
+                for segment in segments:
+                    tc.token.append(segment[0])
+                    tc.label.append(segment[1])
+
+                yield tc
 
 
 async def get_field_text(
@@ -209,46 +259,3 @@ def process_entities(text: str, ners: POSITION_DICT, paragraphs: List[Tuple[int,
     else:
         segments = compute_segments(text, ners, 0, len(text))
         yield segments
-
-
-async def generate_token_classification_payloads(
-    kbid: str,
-    trainset: TrainSet,
-    node: AbstractIndexNode,
-    shard_replica_id: str,
-) -> AsyncIterator[TokenClassificationBatch]:
-    request = StreamRequest()
-    request.shard_id.id = shard_replica_id
-    for entitygroup in trainset.filter.labels:
-        request.filter.tags.append(f"/e/{entitygroup}")
-        request.filter.conjunction = StreamFilter.Conjunction.OR
-    batch = TokenClassificationBatch()
-    async for field_item in node.stream_get_fields(request):
-        _, field_type, field = field_item.field.split("/")
-        (
-            split_text,
-            ordered_positions,
-            split_paragaphs,
-        ) = await get_field_text(
-            kbid,
-            field_item.uuid,
-            field,
-            field_type,
-            cast(List[str], trainset.filter.labels),
-        )
-        for split, text in split_text.items():
-            ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
-            paragraphs = split_paragaphs.get(split, [])
-
-            for segments in process_entities(text, ners, paragraphs):
-                tc = TokensClassification()
-                for segment in segments:
-                    tc.token.append(segment[0])
-                    tc.label.append(segment[1])
-                batch.data.append(tc)
-                if len(batch.data) == trainset.batch_size:
-                    yield batch
-                    batch = TokenClassificationBatch()
-
-    if len(batch.data):
-        yield batch

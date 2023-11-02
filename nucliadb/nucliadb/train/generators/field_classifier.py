@@ -20,6 +20,7 @@
 
 from typing import AsyncIterator
 
+from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     Label,
@@ -31,7 +32,60 @@ from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+
+
+def field_classification_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[FieldClassificationBatch]:
+    if len(trainset.filter.labels) != 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Paragraph Classification should be of 1 labelset",
+        )
+
+    generator = generate_field_classification_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(generator, trainset.batch_size, FieldClassificationBatch)
+    return batch_generator
+
+
+async def generate_field_classification_payloads(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[TextLabel]:
+    labelset = f"/l/{trainset.filter.labels[0]}"
+
+    # Query how many resources has each label
+    request = StreamRequest()
+    request.shard_id.id = shard_replica_id
+    request.filter.tags.append(labelset)
+    total = 0
+
+    async for document_item in node.stream_get_fields(request):
+        text_labels = []
+        for label in document_item.labels:
+            if label.startswith(labelset):
+                text_labels.append(label)
+
+        field_id = f"{document_item.uuid}{document_item.field}"
+        total += 1
+
+        tl = TextLabel()
+        rid, field_type, field = field_id.split("/")
+        tl.text = await get_field_text(kbid, rid, field, field_type)
+
+        for label in text_labels:
+            _, _, labelset_title, label_title = label.split("/")
+            tl.labels.append(Label(labelset=labelset_title, label=label_title))
+
+        yield tl
 
 
 async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> str:
@@ -57,44 +111,3 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> st
     text += extracted_text.text
 
     return text
-
-
-async def generate_field_classification_payloads(
-    kbid: str,
-    trainset: TrainSet,
-    node: AbstractIndexNode,
-    shard_replica_id: str,
-) -> AsyncIterator[FieldClassificationBatch]:
-    labelset = f"/l/{trainset.filter.labels[0]}"
-
-    # Query how many resources has each label
-    request = StreamRequest()
-    request.shard_id.id = shard_replica_id
-    request.filter.tags.append(labelset)
-    total = 0
-
-    batch = FieldClassificationBatch()
-    async for document_item in node.stream_get_fields(request):
-        text_labels = []
-        for label in document_item.labels:
-            if label.startswith(labelset):
-                text_labels.append(label)
-
-        field_id = f"{document_item.uuid}{document_item.field}"
-        total += 1
-
-        tl = TextLabel()
-        rid, field_type, field = field_id.split("/")
-        tl.text = await get_field_text(kbid, rid, field, field_type)
-
-        for label in text_labels:
-            _, _, labelset_title, label_title = label.split("/")
-            tl.labels.append(Label(labelset=labelset_title, label=label_title))
-        batch.data.append(tl)
-
-        if len(batch.data) == trainset.batch_size:
-            yield batch
-            batch = FieldClassificationBatch()
-
-    if len(batch.data):
-        yield batch

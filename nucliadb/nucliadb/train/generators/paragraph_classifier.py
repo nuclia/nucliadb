@@ -20,6 +20,7 @@
 
 from typing import AsyncIterator
 
+from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import (
     Label,
     ParagraphClassificationBatch,
@@ -31,7 +32,58 @@ from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+
+
+def paragraph_classification_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[ParagraphClassificationBatch]:
+    if len(trainset.filter.labels) != 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Paragraph Classification should be of 1 labelset",
+        )
+
+    generator = generate_paragraph_classification_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(
+        generator, trainset.batch_size, ParagraphClassificationBatch
+    )
+    return batch_generator
+
+
+async def generate_paragraph_classification_payloads(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[TextLabel]:
+    labelset = f"/l/{trainset.filter.labels[0]}"
+
+    # Query how many paragraphs has each label
+    request = StreamRequest()
+    request.shard_id.id = shard_replica_id
+    request.filter.tags.append(labelset)
+
+    async for paragraph_item in node.stream_get_paragraphs(request):
+        text_labels = []
+        for label in paragraph_item.labels:
+            if label.startswith(labelset):
+                text_labels.append(label)
+
+        tl = TextLabel()
+        paragraph_text = await get_paragraph(kbid, paragraph_item.id)
+
+        tl.text = paragraph_text
+        for label in text_labels:
+            _, _, label_labelset, label_title = label.split("/")
+            tl.labels.append(Label(labelset=label_labelset, label=label_title))
+
+        yield tl
 
 
 async def get_paragraph(kbid: str, result: str) -> str:
@@ -68,40 +120,3 @@ async def get_paragraph(kbid: str, result: str) -> str:
         splitted_text = extracted_text.text[start:end]
 
     return splitted_text
-
-
-async def generate_paragraph_classification_payloads(
-    kbid: str,
-    trainset: TrainSet,
-    node: AbstractIndexNode,
-    shard_replica_id: str,
-) -> AsyncIterator[ParagraphClassificationBatch]:
-    labelset = f"/l/{trainset.filter.labels[0]}"
-
-    # Query how many paragraphs has each label
-    request = StreamRequest()
-    request.shard_id.id = shard_replica_id
-    request.filter.tags.append(labelset)
-    batch = ParagraphClassificationBatch()
-
-    async for paragraph_item in node.stream_get_paragraphs(request):
-        text_labels = []
-        for label in paragraph_item.labels:
-            if label.startswith(labelset):
-                text_labels.append(label)
-
-        tl = TextLabel()
-        paragraph_text = await get_paragraph(kbid, paragraph_item.id)
-
-        tl.text = paragraph_text
-        for label in text_labels:
-            _, _, label_labelset, label_title = label.split("/")
-            tl.labels.append(Label(labelset=label_labelset, label=label_title))
-        batch.data.append(tl)
-
-        if len(batch.data) == trainset.batch_size:
-            yield batch
-            batch = ParagraphClassificationBatch()
-
-    if len(batch.data):
-        yield batch

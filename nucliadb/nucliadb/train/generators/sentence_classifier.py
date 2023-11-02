@@ -20,6 +20,7 @@
 
 from typing import AsyncIterator, List
 
+from fastapi import HTTPException
 from nucliadb_protos.dataset_pb2 import (
     Label,
     MultipleTextSameLabels,
@@ -31,7 +32,65 @@ from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+
+
+def sentence_classification_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[SentenceClassificationBatch]:
+    if len(trainset.filter.labels) == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="Sentence Classification should be at least of 1 labelset",
+        )
+
+    generator = generate_sentence_classification_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(
+        generator, trainset.batch_size, SentenceClassificationBatch
+    )
+    return batch_generator
+
+
+async def generate_sentence_classification_payloads(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[MultipleTextSameLabels]:
+    labelsets = []
+    # Query how many paragraphs has each label
+    request = StreamRequest()
+    request.shard_id.id = shard_replica_id
+    for label in trainset.filter.labels:
+        labelset = f"/l/{trainset.filter.labels[0]}"
+        labelsets.append(labelset)
+        request.filter.tags.append(labelset)
+
+    async for paragraph_item in node.stream_get_paragraphs(request):
+        text_labels: List[str] = []
+        for label in paragraph_item.labels:
+            for labelset in labelsets:
+                if label.startswith(labelset):
+                    text_labels.append(label)
+
+        tl = MultipleTextSameLabels()
+        sentences_text = await get_sentences(kbid, paragraph_item.id)
+
+        if len(sentences_text) == 0:
+            continue
+        for sentence_text in sentences_text:
+            tl.text.append(sentence_text)
+        if len(tl.text):
+            for label in text_labels:
+                _, _, labelset, label_title = label.split("/")
+                tl.labels.append(Label(labelset=labelset, label=label_title))
+
+        yield tl
 
 
 async def get_sentences(kbid: str, result: str) -> List[str]:
@@ -83,49 +142,3 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
                     splitted_text = text[sentence.start : sentence.end]
                     splitted_texts.append(splitted_text)
     return splitted_texts
-
-
-async def generate_sentence_classification_payloads(
-    kbid: str,
-    trainset: TrainSet,
-    node: AbstractIndexNode,
-    shard_replica_id: str,
-) -> AsyncIterator[SentenceClassificationBatch]:
-    labelsets = []
-    # Query how many paragraphs has each label
-    request = StreamRequest()
-    request.shard_id.id = shard_replica_id
-    for label in trainset.filter.labels:
-        labelset = f"/l/{trainset.filter.labels[0]}"
-        labelsets.append(labelset)
-        request.filter.tags.append(labelset)
-    batch = SentenceClassificationBatch()
-
-    async for paragraph_item in node.stream_get_paragraphs(request):
-        text_labels: List[str] = []
-        for label in paragraph_item.labels:
-            for labelset in labelsets:
-                if label.startswith(labelset):
-                    text_labels.append(label)
-
-        tl = MultipleTextSameLabels()
-        sentences_text = await get_sentences(kbid, paragraph_item.id)
-
-        if len(sentences_text) == 0:
-            continue
-        for sentence_text in sentences_text:
-            tl.text.append(sentence_text)
-        if len(tl.text):
-            for label in text_labels:
-                _, _, labelset, label_title = label.split("/")
-                tl.labels.append(Label(labelset=labelset, label=label_title))
-        batch.data.append(tl)
-
-        if len(batch.data) % 10 == 0:
-            print(len(batch.data))
-        if len(batch.data) == trainset.batch_size:
-            yield batch
-            batch = SentenceClassificationBatch()
-
-    if len(batch.data):
-        yield batch

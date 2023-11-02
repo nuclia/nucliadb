@@ -30,7 +30,20 @@ from nucliadb_protos.nodereader_pb2 import StreamRequest
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+
+
+def paragraph_streaming_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncIterator[ParagraphStreamingBatch]:
+    generator = generate_paragraph_streaming_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(generator, trainset.batch_size, ParagraphStreamingBatch)
+    return batch_generator
 
 
 async def generate_paragraph_streaming_payloads(
@@ -38,7 +51,7 @@ async def generate_paragraph_streaming_payloads(
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphStreamingBatch]:
+) -> AsyncIterator[ParagraphStreamItem]:
     """Streams paragraphs ordered as if they were read sequentially from each
     field.
 
@@ -46,7 +59,6 @@ async def generate_paragraph_streaming_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
-    batch = ParagraphStreamingBatch()
     async for document_item in node.stream_get_fields(request):
         field_id = f"{document_item.uuid}{document_item.field}"
         rid, field_type, field = field_id.split("/")
@@ -70,10 +82,7 @@ async def generate_paragraph_streaming_payloads(
             item.id = f"{rid}/{field_type}/{field}/{paragraph.start}-{paragraph.end}"
             item.text = extracted_text.text[paragraph.start : paragraph.end]
 
-            batch.data.append(item)
-            if len(batch.data) == trainset.batch_size:
-                yield batch
-                batch = ParagraphStreamingBatch()
+            yield item
 
         for split, metadata in field_metadata.split_metadata.items():
             # REVIEW: do we have to care about ExtractedText.deleted_splits?
@@ -84,10 +93,4 @@ async def generate_paragraph_streaming_payloads(
                 item.id = f"{rid}/{field_type}/{field}/{split}/{paragraph.start}-{paragraph.end}"
                 item.text = split_text[paragraph.start : paragraph.end]
 
-                batch.data.append(item)
-                if len(batch.data) == trainset.batch_size:
-                    yield batch
-                    batch = ParagraphStreamingBatch()
-
-    if len(batch.data):
-        yield batch
+                yield item
