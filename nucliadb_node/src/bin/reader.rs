@@ -62,7 +62,7 @@ async fn main() -> NodeResult<()> {
     let shutdown_notifier = Arc::new(Notify::new());
 
     let grpc_task = tokio::spawn(start_grpc_service(
-        settings.clone(),
+        Arc::clone(&settings),
         Arc::clone(&shutdown_notifier),
     ));
     let metrics_task = tokio::spawn(run_http_server(ServerOptions {
