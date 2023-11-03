@@ -153,11 +153,13 @@ pub async fn list_shards(shards_path: PathBuf) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
     use tempfile::TempDir;
 
     use super::*;
 
     #[test]
+    #[serial]
     fn test_lookup_localhost() {
         let hosts = vec!["127.0.0.1", "localhost", "localhost:8080"];
         for host in hosts.into_iter() {
@@ -167,6 +169,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_parse_log_levels() {
         let levels = "nucliadb=INFO,node_*=DEBUG,*=TRACE";
         let res = parse_log_levels(levels);
@@ -181,12 +184,14 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_parse_node_role() {
         matches!(parse_node_role("primary"), NodeRole::Primary);
         matches!(parse_node_role("secondary"), NodeRole::Secondary);
     }
 
     #[test]
+    #[serial]
     fn test_set_primary_id() {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
         // set env variable

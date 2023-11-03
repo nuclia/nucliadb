@@ -150,28 +150,54 @@ pub mod env {
         #[test]
         #[serial]
         fn test_default_env_settings() {
-            // The system may have DATA_PATH set
+            // Safe current state of DATA_PATH
+            let data_path_copy = std::env::var("DATA_PATH");
+            // Remove DATA_PATH for the test
             std::env::remove_var("DATA_PATH");
+
             let settings = EnvSettingsProvider::generate_settings().unwrap();
+
+            if let Ok(value) = data_path_copy {
+                // The state needs to be restored
+                std::env::set_var("DATA_PATH", value);
+            }
+
             assert_eq!(settings.shards_path().to_str().unwrap(), "data/shards")
         }
 
         #[test]
         #[serial]
         fn test_env_settings_data_path() {
+            // Safe current state of DATA_PATH
+            let data_path_copy = std::env::var("DATA_PATH");
+            // set DATA_PATH for the test
             std::env::set_var("DATA_PATH", "mydata");
+
             let settings = EnvSettingsProvider::generate_settings().unwrap();
+
+            match data_path_copy {
+                Ok(value) => std::env::set_var("DATA_PATH", value),
+                Err(_) => std::env::remove_var("DATA_PATH"),
+            }
+
             assert_eq!(settings.shards_path().to_str().unwrap(), "mydata/shards");
-            std::env::remove_var("DATA_PATH");
         }
 
         #[test]
         #[serial]
         fn test_disable_sentry() {
+            // Safe current state of DISABLE_SENTRY
+            let disable_sentry_copy = std::env::var("DISABLE_SENTRY");
+            // set DISABLE_SENTRY for the test
             std::env::set_var("DISABLE_SENTRY", "true");
+
             let settings = EnvSettingsProvider::generate_settings().unwrap();
+            match disable_sentry_copy {
+                Ok(value) => std::env::set_var("DISABLE_SENTRY", value),
+                Err(_) => std::env::remove_var("DISABLE_SENTRY"),
+            }
+
             assert!(!settings.sentry_enabled);
-            std::env::remove_var("DISABLE_SENTRY");
         }
     }
 }
