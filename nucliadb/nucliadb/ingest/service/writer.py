@@ -203,12 +203,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: KnowledgeBoxNew, context=None
     ) -> NewKnowledgeBoxResponse:
         try:
+            release_channel = get_release_channel(request)
+            request.config.release_channel = release_channel
             kbid = await self.proc.create_kb(
                 request.slug,
                 request.config,
                 parse_model_metadata(request),
                 forceuuid=request.forceuuid,
-                release_channel=get_release_channel(request),
+                release_channel=release_channel,
             )
         except KnowledgeBoxConflict:
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
