@@ -77,7 +77,7 @@ async def get_kb_shards(txn, kbid) -> PBShards:
     return kb_shards
 
 
-async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig():
+async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig:
     key = KB_UUID.format(kbid=kbid)
     binary = await txn.get(key)
     assert binary, "Config object not found!"
