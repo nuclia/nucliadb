@@ -87,7 +87,7 @@ async def get_kb_config(txn, kbid) -> knowledgebox_pb2.KnowledgeBoxConfig():
 
 
 async def get_kb_similarity(txn, kbid) -> utils_pb2.VectorSimilarity.ValueType:
-    return await get_kb_shards(txn, kbid).similarity
+    return (await get_kb_shards(txn, kbid)).similarity
 
 
 @pytest.mark.asyncio
