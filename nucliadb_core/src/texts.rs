@@ -22,7 +22,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
-
+use crate::search::QueryPlan;
 pub type TextsReaderPointer = Arc<dyn FieldReader>;
 pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
 
@@ -34,9 +34,7 @@ pub struct TextConfig {
 pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
 impl DocumentIterator {
     pub fn new<I>(inner: I) -> DocumentIterator
-    where
-        I: Iterator<Item = DocumentItem> + Send + 'static,
-    {
+    where I: Iterator<Item = DocumentItem> + Send + 'static {
         DocumentIterator(Box::new(inner))
     }
 }
@@ -50,6 +48,7 @@ impl Iterator for DocumentIterator {
 pub trait FieldReader:
     ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
 {
+    fn apply_pre_filter(&self, query_plan: &mut QueryPlan) -> NodeResult<()>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
 }

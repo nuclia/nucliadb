@@ -32,12 +32,12 @@ use nucliadb_core::protos::{
     ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     TypeList, VectorSearchRequest, VectorSearchResponse,
 };
+use nucliadb_core::search::QueryPlan;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 
 use crate::disk_structure::*;
-use crate::query_planner::QueryPlan;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
@@ -398,10 +398,14 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let query_plan = QueryPlan::from(search_request);
+        let mut query_plan = QueryPlan::from(search_request);
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
 
+        // Apply pre-filtering to the query plan
+        self.text_reader.apply_pre_filter(&mut query_plan)?;
+
+        // Run the rest of the plan
         let text_task = query_plan.texts_request.map(|mut request| {
             request.id = search_id.clone();
             let text_reader_service = self.text_reader.clone();
