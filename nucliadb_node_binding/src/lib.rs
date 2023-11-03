@@ -21,10 +21,10 @@ mod errors;
 mod reader;
 mod writer;
 
+use std::env;
+
 use nucliadb_core::tracing::{error, Level};
-use nucliadb_node::settings::providers::env::EnvSettingsProvider;
-use nucliadb_node::settings::providers::SettingsProvider;
-use nucliadb_node::settings::Settings;
+use nucliadb_node::utils::parse_log_levels;
 use pyo3::prelude::*;
 use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
@@ -35,9 +35,10 @@ type RawProtos = Vec<u8>;
 
 #[pymodule]
 pub fn nucliadb_node_binding(py: Python, m: &PyModule) -> PyResult<()> {
-    let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
+    let log_levels =
+        parse_log_levels(&env::var("RUST_LOG").unwrap_or("nucliadb_node=WARN".to_string()));
 
-    setup_tracing(settings.log_levels().to_vec());
+    setup_tracing(log_levels);
 
     m.add_class::<reader::NodeReader>()?;
     m.add_class::<writer::NodeWriter>()?;
