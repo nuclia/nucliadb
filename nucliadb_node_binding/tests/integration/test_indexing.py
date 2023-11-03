@@ -27,13 +27,8 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 from nucliadb_protos.noderesources_pb2 import Resource
-from nucliadb_protos.nodewriter_pb2 import (
-    NewShardRequest,
-    OpStatus,
-    ReleaseChannel,
-    ShardCreated,
-)
-from nucliadb_protos.utils_pb2 import VectorSimilarity
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus, ShardCreated
+from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 
 from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
 

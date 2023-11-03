@@ -76,3 +76,4 @@ class Features:
     ROLLOVER_SHARDS = "nuclaidb_rollover_shards"
     ASK_YOUR_DOCUMENTS = "nucliadb_ask_your_documents"
     EXPORT_IMPORT_TASKS = "nucliadb_export_import_tasks"
+    EXPERIMENTAL_KB = "nucliadb_experimental_kb"
