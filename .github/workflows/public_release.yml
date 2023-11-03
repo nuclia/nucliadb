@@ -149,3 +149,4 @@ jobs:
   trigger-doc-build:
     needs: docs
     uses: nuclia/docs/.github/workflows/spec-merge.yaml@main
+    secrets: inherit
