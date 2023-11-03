@@ -21,8 +21,8 @@
 pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
+pub mod query_planner;
 pub mod relations;
-pub mod search;
 pub mod texts;
 pub mod vectors;
 

@@ -28,7 +28,7 @@ use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
-use nucliadb_core::search::QueryPlan;
+use nucliadb_core::query_planner::{PreFilterRequest, PreFilterResponse};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
@@ -88,11 +88,9 @@ impl Debug for TextReaderService {
 
 impl FieldReader for TextReaderService {
     #[tracing::instrument(skip_all)]
-    fn apply_pre_filter(&self, query_plan: &mut QueryPlan) -> NodeResult<()> {
-        if let Some(_) = std::mem::take(&mut query_plan.pre_filter) {
-            // When implemented, this will modify the plan according to the pre-filtering
-        }
-        Ok(())
+    fn pre_filter(&self, _request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+        // Right now it returns an empty response
+        Ok(PreFilterResponse::default())
     }
 
     #[tracing::instrument(skip_all)]

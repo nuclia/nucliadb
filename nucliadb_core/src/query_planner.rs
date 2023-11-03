@@ -38,20 +38,53 @@ pub struct TimestampFilter {
 }
 
 #[derive(Debug, Clone)]
-pub struct PreFilter {
+pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ValidField {
+    pub resource_id: String,
+    pub field_id: String,
+}
+
 #[derive(Debug, Default, Clone)]
-pub struct QueryPlan {
-    pub pre_filter: Option<PreFilter>,
+pub struct PreFilterResponse {
+    pub valid_fields: Vec<ValidField>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct IndexQueries {
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
     pub relations_request: Option<RelationSearchRequest>,
 }
 
-fn compute_pre_filters(_: &SearchRequest) -> Option<PreFilter> {
+impl IndexQueries {
+    pub fn apply_pre_filter(&mut self, _pre_filtered: PreFilterResponse) {
+        // Right now there is no logic to add
+    }
+}
+
+pub struct QueryPlan {
+    pub pre_filter: Option<PreFilterRequest>,
+    pub index_queries: IndexQueries,
+}
+
+pub fn trace_query_plan(search_request: SearchRequest) -> QueryPlan {
+    QueryPlan {
+        pre_filter: compute_pre_filters(&search_request),
+        index_queries: IndexQueries {
+            vectors_request: compute_vectors_request(&search_request),
+            paragraphs_request: compute_paragraphs_request(&search_request),
+            texts_request: compute_texts_request(&search_request),
+            relations_request: compute_relations_request(&search_request),
+        },
+    }
+}
+
+fn compute_pre_filters(_: &SearchRequest) -> Option<PreFilterRequest> {
     None
 }
 
@@ -130,16 +163,4 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
         subgraph: search_request.relation_subgraph.clone(),
         ..Default::default()
     })
-}
-
-impl From<SearchRequest> for QueryPlan {
-    fn from(search_request: SearchRequest) -> Self {
-        QueryPlan {
-            pre_filter: compute_pre_filters(&search_request),
-            vectors_request: compute_vectors_request(&search_request),
-            paragraphs_request: compute_paragraphs_request(&search_request),
-            texts_request: compute_texts_request(&search_request),
-            relations_request: compute_relations_request(&search_request),
-        }
-    }
 }

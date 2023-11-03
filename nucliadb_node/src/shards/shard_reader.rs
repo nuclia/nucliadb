@@ -32,7 +32,7 @@ use nucliadb_core::protos::{
     ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_core::search::QueryPlan;
+use nucliadb_core::query_planner;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -398,15 +398,21 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let mut query_plan = QueryPlan::from(search_request);
+        let query_plan = query_planner::trace_query_plan(search_request);
+
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
+        let pre_filter = query_plan.pre_filter;
+        let mut index_queries = query_plan.index_queries;
 
         // Apply pre-filtering to the query plan
-        self.text_reader.apply_pre_filter(&mut query_plan)?;
+        if let Some(pre_filter) = pre_filter {
+            let pre_filtered = self.text_reader.pre_filter(&pre_filter)?;
+            index_queries.apply_pre_filter(pre_filtered);
+        }
 
         // Run the rest of the plan
-        let text_task = query_plan.texts_request.map(|mut request| {
+        let text_task = index_queries.texts_request.map(|mut request| {
             request.id = search_id.clone();
             let text_reader_service = self.text_reader.clone();
             let info = info_span!(parent: &span, "text search");
@@ -414,7 +420,7 @@ impl ShardReader {
             || run_with_telemetry(info, task)
         });
 
-        let paragraph_task = query_plan.paragraphs_request.map(|mut request| {
+        let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
             request.id = search_id.clone();
             let paragraph_reader_service = self.paragraph_reader.clone();
             let info = info_span!(parent: &span, "paragraph search");
@@ -422,7 +428,7 @@ impl ShardReader {
             || run_with_telemetry(info, task)
         });
 
-        let vector_task = query_plan.vectors_request.map(|mut request| {
+        let vector_task = index_queries.vectors_request.map(|mut request| {
             request.id = search_id.clone();
             let vector_reader_service = self.vector_reader.clone();
             let info = info_span!(parent: &span, "vector search");
@@ -430,7 +436,7 @@ impl ShardReader {
             || run_with_telemetry(info, task)
         });
 
-        let relation_task = query_plan.relations_request.map(|request| {
+        let relation_task = index_queries.relations_request.map(|request| {
             let relation_reader_service = self.relation_reader.clone();
             let info = info_span!(parent: &span, "relations search");
             let task = move || relation_reader_service.search(&request);
