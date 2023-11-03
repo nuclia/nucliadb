@@ -1,10 +1,10 @@
-version: "3.9"
+version: '3.9'
 
 services:
   nucliadb:
     image: nuclia/nucliadb:latest
     environment:
-      # - NUA_API_KEY=
+      - NUA_API_KEY=NUA_API_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6Im51YSJ9.eyJpc3MiOiJodHRwczovL251Y2xpYS5jbG91ZC8iLCJleHAiOjI1MzM3MDc2NDgwMCwiaWF0IjoxNjc3NjAxOTk4LCJzdWIiOiI0ODUwOWRkZi1iOGJmLTQ4ZGQtODY1Mi0wZDY3MDViZDZmMjciLCJqdGkiOiI1YTRjYmI2Yi0xODU5LTRlOWYtOTI0NS00ZDFkZjVlZjg1ZjEiLCJrZXkiOiI0MDFkMjcxMC0zMGI1LTQ5YzgtODNmNC03MWI0ODY1YWY4NjcifQ.W4k1dApLV_jGHxohkHQ1Qa5Vt8bnUAPRM7mlaq67ls2HHEmQPJ7r2wrsaFoVn7F_RtnV2ljgvtYKCtf1i7LPgynssv_NGc9OL-prIHVeDL-Z11F3onWScL-6ECLgwCN9yzjil-2ppLddNjWPZHGDO-LqokCNMU7d0q74OaTn2is8FYjxWYDYd0z77PRKmDr7ggAmdHJ6ETnAa02aET08Dsi9moaV1EnpF5wIAuXSYM83g3ZrIpSPNhYNgkppAqwQCnPapnr3eqBRnjTcPIbikLkbPSOVj3rkgigUjq5reIYVN7aO_2Ix9ca5eCUrCQ4-1EuH6YV_6Up8yEFhyvJHRlW5BW7qrcLWBORjaGD31vNQE7g-2Mqu7A3-imMtxaL8fdDnfKOk6f-8YqQUXdtNxKBNzD6f_ATMK0WqmQ-xasjUoJtxL8oH0ZjUtKtA6OkJ_BzcMrWg4T8cNZKRvY3-IZEpjEO4CLJlnbrbBDn0-7OjqRcy8nyQA0mgI46WZM77Mfjh_N2xxl8Jl2JSKFJfbRnDVn3kftb0fCUkfroCZ6gjmQbud-w5G1i4uFlYzSewIFgWD_h6IiTI2YWHIOLrmT6pv6_uW4TQUrtk1KlvIMu0qNlxlL8iMRXmY8b6Duac0_q-9HkLcoa2fuyUSTgDynEq-P73EMoOKy4PAm7zhy4
       - NUCLIA_ZONE=europe-1
       - CORS_ORIGINS=["http://localhost:8080"]
       - DRIVER=PG
@@ -23,9 +23,9 @@ services:
       - RUST_BACKTRACE=1
       - RUST_LOG=nucliadb_node=ERROR,nucliadb_paragraphs_tantivy=ERROR,nucliadb_fields_tantivy=ERROR
     ports:
-      - "8080:8080"
-      - "8060:8060"
-      - "8040:8040"
+      - '8080:8080'
+      - '8060:8060'
+      - '8040:8040'
     volumes:
       - nucliadb-data:/data
     depends_on:
@@ -35,7 +35,7 @@ services:
   postgres:
     image: postgres:latest
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       - POSTGRES_USER=nucliadb
       - POSTGRES_PASSWORD=nucliadb
@@ -46,12 +46,12 @@ services:
   redis:
     image: redis:latest
     ports:
-      - "6379:6379"
+      - '6379:6379'
 
   auth-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy
     ports:
-      - "4180:4180"
+      - '4180:4180'
     environment:
       - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
       - OAUTH2_PROXY_UPSTREAMS=http://nucliadb:8080/
