@@ -13,8 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  API_VERSION: 1
-  COMPONENT: nucliadb-reader
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: reader
 
@@ -24,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ['3.9', '3.10', '3.11']
 
     steps:
       - name: Checkout the repository
@@ -34,7 +32,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: 'pip'
 
       - name: Install package
         run: make -C nucliadb/ install-dev
@@ -48,7 +46,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ['3.11']
 
     steps:
       - name: Checkout the repository
@@ -58,7 +56,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: 'pip'
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
@@ -73,15 +71,6 @@ jobs:
           file: ./coverage.xml
           flags: reader
 
-      - name: Extract docs
-        run: |
-          mkdir -p /tmp/openapi
-          nucliadb-extract-openapi-reader /tmp/openapi/$COMPONENT.json $API_VERSION $GITHUB_SHA
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: openapi-${{ env.COMPONENT }}-${{ github.sha }}
-          path: /tmp/openapi/${{ env.COMPONENT }}.json
 
   # PR workflows END here
   # PUSH workflows contine with deploy activities
@@ -107,10 +96,10 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
 
       - name: Configure Docker
         run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
@@ -180,27 +169,3 @@ jobs:
           repository: nuclia/nucliadb_deploy
           event-type: promote
           client-payload: '{"component": "nucliadb_reader", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
-
-  docs:
-    name: "Upload API specs to GCS"
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: github.event_name == 'push'
-
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: openapi-${{ env.COMPONENT }}-${{ github.sha }}
-          path: /tmp/openapi/
-
-      - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - name: Upload docs
-        run: |
-          gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/nucliadb/v$API_VERSION/$COMPONENT/spec.json
