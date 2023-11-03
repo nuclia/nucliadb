@@ -920,11 +920,8 @@ def get_release_channel(request: KnowledgeBoxNew) -> utils_pb2.ReleaseChannel.Va
     slug has the experimental_kb feature enabled in stage environment.
     """
     release_channel = request.release_channel
-
-    stage_environment = running_settings.running_environment == "stage"
-    enabled_for_slug = has_feature(
+    if running_settings.running_environment == "stage" and has_feature(
         const.Features.EXPERIMENTAL_KB, context={"slug": request.slug}
-    )
-    if stage_environment and enabled_for_slug:
+    ):
         release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
     return release_channel
