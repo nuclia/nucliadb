@@ -41,6 +41,7 @@ pub mod telemetry;
 pub mod utils;
 
 mod disk_structure;
+mod query_planner;
 
 // TODO: migrate missing functions and delete this module
 pub mod env;
