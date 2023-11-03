@@ -14,7 +14,7 @@ on:
     branches:
       - main
     paths:
-      - "VERSION"
+      - 'VERSION'
 jobs:
   release:
     name: Tag and release
@@ -122,7 +122,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.11'
           cache: 'pip'
 
       - name: Install the package
@@ -135,7 +135,7 @@ jobs:
 
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v1'
-      
+
       - name: Upload docs
         run: |
           mkdir -p /tmp/openapi
@@ -146,7 +146,9 @@ jobs:
           gsutil copy /tmp/openapi/nucliadb-writer.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
           gsutil copy /tmp/openapi/nucliadb-search.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
 
-  trigger-doc-build:
-    needs: docs
-    uses: nuclia/docs/.github/workflows/spec-merge.yaml@main
-    secrets: inherit
+      - name: Trigger doc update
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_CICD_PUBLIC }}
+          repository: nuclia/docs
+          event-type: merge
