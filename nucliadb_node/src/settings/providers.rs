@@ -150,6 +150,8 @@ pub mod env {
         #[test]
         #[serial]
         fn test_default_env_settings() {
+            // The system may have DATA_PATH set
+            std::env::remove_var("DATA_PATH");
             let settings = EnvSettingsProvider::generate_settings().unwrap();
             assert_eq!(settings.shards_path().to_str().unwrap(), "data/shards")
         }
