@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ['3.9', '3.10', '3.11']
 
     steps:
       - name: Checkout the repository
@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: 'pip'
 
       - name: Install package
         run: make -C nucliadb/ install-dev
@@ -48,7 +48,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ['3.11']
 
     steps:
       - name: Checkout the repository
@@ -58,7 +58,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: 'pip'
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
@@ -104,10 +104,10 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
 
       - name: Configure Docker
         run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
@@ -179,7 +179,7 @@ jobs:
           client-payload: '{"component": "nucliadb_writer", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
 
   docs:
-    name: "Upload API specs to GCS"
+    name: 'Upload API specs to GCS'
     runs-on: ubuntu-latest
     needs: deploy
     if: github.event_name == 'push'
@@ -193,11 +193,15 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
 
       - name: Upload docs
         run: |
           gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/nucliadb/v$API_VERSION/$COMPONENT/spec.json
+
+  trigger-doc-build:
+    needs: docs
+    uses: nuclia/docs/.github/workflows/spec-merge.yaml@main
