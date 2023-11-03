@@ -344,10 +344,10 @@ class GCloudFileStorageManager(FileStorageManager):
                 },
                 data="",
             ) as call:
-                text = await call.text()  # noqa
                 if call.status not in [200, 201, 308]:
+                    text = await call.text()  # noqa
                     logger.error(text)
-                return call
+                    raise GoogleCloudException(text)
         path = dm.get("path")
         await dm.finish()
         return path
