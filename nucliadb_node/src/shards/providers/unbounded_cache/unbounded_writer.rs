@@ -26,12 +26,13 @@ use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, NodeResult};
 use uuid::Uuid;
 
+use crate::disk_structure;
+use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
-use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct UnboundedShardWriterCache {
@@ -40,10 +41,10 @@ pub struct UnboundedShardWriterCache {
 }
 
 impl UnboundedShardWriterCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(settings: Arc<Settings>) -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
-            shards_path,
+            shards_path: settings.shards_path(),
         }
     }
 
@@ -93,8 +94,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
 
     fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
-        let shards_path = env::shards_path();
-        for entry in std::fs::read_dir(&shards_path)? {
+        for entry in std::fs::read_dir(&self.shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();

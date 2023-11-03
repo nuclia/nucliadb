@@ -414,7 +414,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<NodeMetadata>, Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        let metadata = crate::node_metadata::NodeMetadata::new(Arc::clone(&self.settings)).await;
         match metadata {
             Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

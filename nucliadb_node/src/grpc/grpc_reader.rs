@@ -42,7 +42,7 @@ pub struct NodeReaderGRPCDriver {
 impl NodeReaderGRPCDriver {
     pub fn new(settings: Arc<Settings>) -> Self {
         Self {
-            shards: AsyncUnboundedShardReaderCache::new(settings.shards_path()),
+            shards: AsyncUnboundedShardReaderCache::new(Arc::clone(&settings)),
             settings,
         }
     }

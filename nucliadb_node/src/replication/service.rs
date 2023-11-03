@@ -281,7 +281,7 @@ impl replication::replication_service_server::ReplicationService for Replication
         &self,
         _request: tonic::Request<EmptyQuery>,
     ) -> Result<tonic::Response<NodeMetadata>, tonic::Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        let metadata = crate::node_metadata::NodeMetadata::new(Arc::clone(&self.settings)).await;
         match metadata {
             Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

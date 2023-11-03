@@ -27,7 +27,7 @@ use nucliadb_node::grpc::middleware::{
     GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
 };
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
-use nucliadb_node::http_server::{run_http_server, ServerOptions};
+use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::lifecycle;
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use nucliadb_node::replication::NodeRole;
@@ -55,7 +55,8 @@ async fn main() -> NodeResult<()> {
     }
 
     // XXX it probably should be moved to a more clear abstraction
-    lifecycle::initialize_reader();
+    lifecycle::initialize_reader(Arc::clone(&settings));
+
     let _guard = init_telemetry(&settings)?;
     nucliadb_node::analytics::sync::start_analytics_loop();
 
@@ -65,9 +66,7 @@ async fn main() -> NodeResult<()> {
         Arc::clone(&settings),
         Arc::clone(&shutdown_notifier),
     ));
-    let metrics_task = tokio::spawn(run_http_server(ServerOptions {
-        default_http_port: 3031,
-    }));
+    let metrics_task = tokio::spawn(run_http_server(Arc::clone(&settings)));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");

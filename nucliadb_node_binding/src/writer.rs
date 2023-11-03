@@ -24,11 +24,14 @@ use std::sync::Arc;
 use nucliadb_core::protos::*;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
+use nucliadb_node::lifecycle;
+use nucliadb_node::settings::providers::env::EnvSettingsProvider;
+use nucliadb_node::settings::providers::SettingsProvider;
+use nucliadb_node::settings::Settings;
 use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
 use nucliadb_node::shards::writer::ShardWriter;
-use nucliadb_node::{env, lifecycle};
 use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -62,13 +65,15 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        if let Err(error) = lifecycle::initialize_writer(&env::data_path(), &env::shards_path()) {
+        let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings().unwrap());
+
+        if let Err(error) = lifecycle::initialize_writer(Arc::clone(&settings)) {
             return Err(IndexNodeException::new_err(format!(
                 "Unable to initialize writer: {error}"
             )));
         };
         Ok(Self {
-            shards: UnboundedShardWriterCache::new(env::shards_path()),
+            shards: UnboundedShardWriterCache::new(settings),
         })
     }
 

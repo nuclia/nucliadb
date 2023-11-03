@@ -32,7 +32,6 @@ use tracing_subscriber::layer::{Context as LayerContext, Filter, Layer, Subscrib
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Registry;
 
-use crate::env::is_debug;
 use crate::settings::Settings;
 use crate::utils::ALL_TARGETS;
 
@@ -151,7 +150,7 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
 
     let filter = LogLevelsFilter::new(log_levels);
 
-    if settings.plain_logs() || is_debug() {
+    if settings.plain_logs() || settings.debug() {
         layer
             .event_format(tracing_subscriber::fmt::format().compact())
             .with_filter(filter)

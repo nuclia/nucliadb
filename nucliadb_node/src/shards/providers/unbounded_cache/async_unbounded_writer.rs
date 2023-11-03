@@ -28,12 +28,13 @@ use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
 use uuid::Uuid;
 
+use crate::disk_structure;
+use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
-use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct AsyncUnboundedShardWriterCache {
@@ -42,14 +43,14 @@ pub struct AsyncUnboundedShardWriterCache {
 }
 
 impl AsyncUnboundedShardWriterCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(settings: Arc<Settings>) -> Self {
         Self {
             // NOTE: as it's not probable all shards will be written, we don't
             // assign any initial capacity to the HashMap under the
             // consideration a resize blocking is not performance critical while
             // writting.
             cache: RwLock::new(HashMap::new()),
-            shards_path,
+            shards_path: settings.shards_path(),
         }
     }
 }
@@ -102,7 +103,7 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     }
 
     async fn load_all(&self) -> NodeResult<()> {
-        let shards_path = env::shards_path();
+        let shards_path = self.shards_path.clone();
         let shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {

@@ -218,7 +218,7 @@ pub async fn connect_to_primary_and_replicate(
         .await?
         .into_inner();
 
-    set_primary_node_id(primary_node_metadata.node_id)?;
+    set_primary_node_id(settings.data_path(), primary_node_metadata.node_id)?;
 
     loop {
         if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {

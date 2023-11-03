@@ -43,9 +43,13 @@ use crate::disk_structure::{METADATA_FILE, SHARDS_DIR};
 use crate::replication::NodeRole;
 use crate::utils::{parse_log_levels, parse_node_role, reliable_lookup_host};
 
-#[derive(Builder)]
+#[derive(Builder, Debug)]
 #[builder(pattern = "mutable", setter(strip_option, into))]
 pub struct Settings {
+    // Debug
+    #[builder(default = "false", setter(custom))]
+    debug: bool,
+
     // Data storage and access
     #[builder(default = "\"data\".into()", setter(custom))]
     data_path: PathBuf,
@@ -115,11 +119,24 @@ pub struct Settings {
     // node to be considered healthy
     #[builder(default = "30")]
     replication_healthy_delay: u64,
+
+    // max number of replicas per node
+    #[builder(default = "800")]
+    max_node_replicas: u64,
+
+    // number of threads to use for rayon
+    #[builder(default = "10")]
+    num_global_rayon_threads: usize,
 }
 
 impl Settings {
     pub fn builder() -> SettingsBuilder {
         SettingsBuilder::default()
+    }
+
+    /// Path to main directory where all index node data is stored
+    pub fn debug(&self) -> bool {
+        self.debug
     }
 
     /// Path to main directory where all index node data is stored
@@ -231,12 +248,25 @@ impl Settings {
     pub fn replication_healthy_delay(&self) -> u64 {
         self.replication_healthy_delay
     }
+
+    pub fn max_node_replicas(&self) -> u64 {
+        self.max_node_replicas
+    }
+
+    pub fn num_global_rayon_threads(&self) -> usize {
+        self.num_global_rayon_threads
+    }
 }
 
 const SENTRY_PROD: &str = "prod";
 const SENTRY_DEV: &str = "stage";
 
 impl SettingsBuilder {
+    pub fn with_debug(&mut self) -> &mut Self {
+        self.debug = Some(true);
+        self
+    }
+
     pub fn data_path(&mut self, data_path: impl Into<PathBuf>) -> &mut Self {
         let data_path = data_path.into();
         self.metadata_path = Some(data_path.join(METADATA_FILE));

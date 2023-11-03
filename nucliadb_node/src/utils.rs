@@ -30,7 +30,6 @@ use tokio::fs as tfs;
 use tonic::transport::Endpoint;
 use uuid::Uuid;
 
-use crate::env;
 use crate::replication::NodeRole;
 
 pub static ALL_TARGETS: &str = "*";
@@ -106,8 +105,8 @@ pub fn read_or_create_host_key(hk_path: PathBuf) -> NodeResult<Uuid> {
     Ok(host_key)
 }
 
-pub fn set_primary_node_id(primary_id: String) -> NodeResult<()> {
-    let filepath = env::data_path().join("primary_id");
+pub fn set_primary_node_id(data_path: PathBuf, primary_id: String) -> NodeResult<()> {
+    let filepath = data_path.join("primary_id");
 
     fs::write(filepath.clone(), primary_id)
         .with_context(|| format!("Failed to write primary ID to '{}'", filepath.display()))?;
@@ -115,8 +114,8 @@ pub fn set_primary_node_id(primary_id: String) -> NodeResult<()> {
     Ok(())
 }
 
-pub fn get_primary_node_id() -> Option<String> {
-    let filepath = env::data_path().join("primary_id");
+pub fn get_primary_node_id(data_path: PathBuf) -> Option<String> {
+    let filepath = data_path.join("primary_id");
     let read_result = fs::read(filepath.clone());
     if read_result.is_err() {
         return None;
@@ -191,13 +190,11 @@ mod tests {
     #[serial]
     fn test_set_primary_id() {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
+        let tempdir_path = tempdir.into_path();
         // set env variable
-        let original_data_path = std::env::var("DATA_PATH").unwrap_or_default();
-        std::env::set_var("DATA_PATH", tempdir.path());
         let primary_id = "test_primary_id".to_string();
-        set_primary_node_id(primary_id.clone()).unwrap();
-        let read_primary_id = get_primary_node_id().unwrap();
-        std::env::set_var("DATA_PATH", original_data_path);
+        set_primary_node_id(tempdir_path.clone(), primary_id.clone()).unwrap();
+        let read_primary_id = get_primary_node_id(tempdir_path).unwrap();
         assert_eq!(primary_id, read_primary_id);
     }
 }

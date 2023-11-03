@@ -42,6 +42,12 @@ pub mod env {
         fn generate_settings() -> NodeResult<Settings> {
             let mut builder = Settings::builder();
 
+            if let Ok(debug) = std::env::var("DEBUG") {
+                if debug == "true" {
+                    builder.with_debug();
+                }
+            }
+
             if let Ok(data_path) = std::env::var("DATA_PATH") {
                 builder.data_path(data_path);
             }

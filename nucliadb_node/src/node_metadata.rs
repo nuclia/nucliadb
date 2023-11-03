@@ -18,49 +18,54 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::sync::Arc;
+
 use nucliadb_core::NodeResult;
-use serde::{Deserialize, Serialize};
-use tokio::fs;
 
-use crate::env;
-use crate::utils::{self, get_primary_node_id};
+use crate::settings::Settings;
+use crate::utils::{self, get_primary_node_id, list_shards};
 
-async fn number_of_shards() -> NodeResult<usize> {
-    let mut count = 0;
-    let mut entries = fs::read_dir(env::shards_path()).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let entry_path = entry.path();
-        if entry_path.is_dir() {
-            count += 1;
-        }
-    }
-
-    Ok(count)
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct NodeMetadata {
-    #[serde(default)]
     shard_count: u64,
+    settings: Arc<Settings>,
 }
 
 impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
     fn from(node_metadata: NodeMetadata) -> Self {
         nucliadb_core::protos::NodeMetadata {
             shard_count: node_metadata.shard_count,
-            node_id: utils::read_host_key(env::host_key_path())
+            node_id: utils::read_host_key(node_metadata.settings.host_key_path())
                 .unwrap()
                 .to_string(),
-            primary_node_id: get_primary_node_id(),
+            primary_node_id: get_primary_node_id(node_metadata.settings.data_path()),
             ..Default::default()
         }
     }
 }
 
+pub fn create_node_metadata_pb(
+    settings: Arc<Settings>,
+    node_metadata: NodeMetadata,
+) -> nucliadb_core::protos::NodeMetadata {
+    nucliadb_core::protos::NodeMetadata {
+        shard_count: node_metadata.shard_count,
+        node_id: utils::read_host_key(settings.host_key_path())
+            .unwrap()
+            .to_string(),
+        primary_node_id: get_primary_node_id(settings.data_path()),
+        ..Default::default()
+    }
+}
+
 impl NodeMetadata {
-    pub async fn new() -> NodeResult<Self> {
+    pub async fn new(settings: Arc<Settings>) -> NodeResult<Self> {
         Ok(Self {
-            shard_count: number_of_shards().await?.try_into().unwrap(),
+            settings: Arc::clone(&settings),
+            shard_count: list_shards(settings.shards_path())
+                .await
+                .len()
+                .try_into()
+                .unwrap(),
         })
     }
 
