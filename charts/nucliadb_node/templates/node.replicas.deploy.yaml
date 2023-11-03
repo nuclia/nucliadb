@@ -43,6 +43,7 @@ spec:
         version: "{{ $chart.Version | replace "+" "_" }}"
         chart: "{{ $chart.Name }}"
     spec:
+      terminationGracePeriodSeconds: 120
 {{- if $values.readReplicas.nodeSelector }}
       nodeSelector:
 {{ toYaml $values.readReplicas.nodeSelector | indent 8 }}

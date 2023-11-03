@@ -19,6 +19,7 @@
 //
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -36,6 +37,7 @@ use nucliadb_node::shards::providers::unbounded_cache::AsyncUnboundedShardWriter
 use nucliadb_node::utils::read_or_create_host_key;
 use nucliadb_protos::replication;
 use tempfile::TempDir;
+use tokio::sync::Notify;
 use tonic::transport::{Channel, Server};
 
 pub const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -100,6 +102,8 @@ pub struct NodeFixture {
     tempdir: TempDir,
     secondary_tempdir: TempDir,
     original_data_path: String,
+    shutdown_notifier: Arc<Notify>,
+    shutdown_notified: Arc<AtomicBool>,
 }
 
 impl NodeFixture {
@@ -143,6 +147,17 @@ impl NodeFixture {
             }
         }
 
+        let shutdown_notifier = Arc::new(Notify::new());
+        let shutdown_notified = Arc::new(AtomicBool::new(false));
+
+        let shutdown_notifier_clone = Arc::clone(&shutdown_notifier);
+        let shutdown_notified_clone = Arc::clone(&shutdown_notified);
+
+        tokio::spawn(async move {
+            shutdown_notifier_clone.notified().await;
+            shutdown_notified_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+
         Self {
             settings: Arc::new(settings),
             secondary_settings: Arc::new(secondary_settings),
@@ -161,33 +176,38 @@ impl NodeFixture {
             tempdir,
             secondary_tempdir,
             original_data_path,
+            shutdown_notifier,
+            shutdown_notified,
         }
     }
 
     pub async fn with_writer(&mut self) -> anyhow::Result<&mut Self> {
-        let settings = self.settings.clone();
+        let settings = Arc::clone(&self.settings);
         let addr = self.writer_addr;
         let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
-        self.primary_shard_cache = Some(shards_cache.clone());
+        self.primary_shard_cache = Some(Arc::clone(&shards_cache));
+        let notifier = Arc::clone(&self.shutdown_notifier);
         self.writer_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
                 .expect("Writer initialization has failed");
             let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(
-                settings.clone(),
-                shards_cache.clone(),
+                Arc::clone(&settings),
+                Arc::clone(&shards_cache),
             ));
             let replication_server =
                 replication::replication_service_server::ReplicationServiceServer::new(
                     ReplicationServiceGRPCDriver::new(
-                        settings.clone(),
-                        shards_cache.clone(),
+                        Arc::clone(&settings),
+                        Arc::clone(&shards_cache),
                         "primary_id".to_string(),
                     ),
                 );
             Server::builder()
                 .add_service(writer_server)
                 .add_service(replication_server)
-                .serve(addr)
+                .serve_with_shutdown(addr, async {
+                    notifier.notified().await;
+                })
                 .await
                 .unwrap();
         }));
@@ -206,16 +226,13 @@ impl NodeFixture {
         let node_id = read_or_create_host_key(host_key_path)?;
         let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
         self.secondary_shard_cache = Some(shards_cache.clone());
+        let notified = Arc::clone(&self.shutdown_notified);
         self.secondary_writer_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
                 .expect("Writer initialization has failed");
-            connect_to_primary_and_replicate(
-                settings.clone(),
-                shards_cache.clone(),
-                node_id.to_string(),
-            )
-            .await
-            .unwrap();
+            connect_to_primary_and_replicate(settings, shards_cache, node_id.to_string(), notified)
+                .await
+                .unwrap();
         }));
 
         Ok(self)
@@ -226,9 +243,10 @@ impl NodeFixture {
             self.with_writer().await?;
         }
 
-        let settings = self.settings.clone();
+        let settings = Arc::clone(&self.settings);
         let addr = self.reader_addr;
 
+        let notifier = Arc::clone(&self.shutdown_notifier);
         self.reader_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_reader();
             let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
@@ -239,7 +257,9 @@ impl NodeFixture {
             let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)
-                .serve(addr)
+                .serve_with_shutdown(addr, async {
+                    notifier.notified().await;
+                })
                 .await
                 .unwrap();
         }));
@@ -257,8 +277,9 @@ impl NodeFixture {
             self.with_secondary_writer().await?;
         }
 
-        let settings = self.secondary_settings.clone();
+        let settings = Arc::clone(&self.secondary_settings);
         let addr = self.secondary_reader_addr;
+        let notifier = Arc::clone(&self.shutdown_notifier);
 
         self.reader_server_task = Some(tokio::spawn(async move {
             lifecycle::initialize_reader();
@@ -270,7 +291,9 @@ impl NodeFixture {
             let reader_server = NodeReaderServer::new(grpc_driver);
             Server::builder()
                 .add_service(reader_server)
-                .serve(addr)
+                .serve_with_shutdown(addr, async {
+                    notifier.notified().await;
+                })
                 .await
                 .unwrap();
         }));
@@ -321,18 +344,7 @@ impl NodeFixture {
 
 impl Drop for NodeFixture {
     fn drop(&mut self) {
+        self.shutdown_notifier.notify_waiters();
         std::env::set_var("DATA_PATH", self.original_data_path.clone());
-        if let Some(task) = self.reader_server_task.take() {
-            task.abort();
-        }
-        if let Some(task) = self.writer_server_task.take() {
-            task.abort();
-        };
-        if let Some(task) = self.secondary_reader_server_task.take() {
-            task.abort();
-        };
-        if let Some(task) = self.secondary_writer_server_task.take() {
-            task.abort();
-        };
     }
 }
