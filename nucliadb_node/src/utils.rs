@@ -153,6 +153,7 @@ pub async fn list_shards(shards_path: PathBuf) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
     use tempfile::TempDir;
 
     use super::*;
@@ -187,6 +188,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_set_primary_id() {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
         // set env variable
