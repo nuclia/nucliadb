@@ -18,8 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import random
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 import pytest
 
@@ -29,6 +31,8 @@ from nucliadb_node.coordination import (
     PriorityLock,
     ShardIndexingCoordinator,
 )
+
+DEADLOCK_FIND_TESTS_DISABLE = False
 
 
 class LockStatus(Enum):
@@ -44,20 +48,22 @@ class When(Enum):
 @dataclass
 class Event:
     task: str
-    lock: LockStatus
     when: When
+    lock: LockStatus
+    priority: Optional[Priority] = None
 
 
 class EventRecorder:
     def __init__(self):
-        self._events = []
-
-    @property
-    def events(self):
-        return self._events
+        self.events = []
 
     def record(self, event: Event):
-        self._events.append(event)
+        # useful for debugging if a deadlock is found. It's recommended to add
+        # traces inside the tested queue lock too
+        if DEADLOCK_FIND_TESTS_DISABLE is False:
+            arrow = "--->" if event.when == When.BEFORE else "<---"
+            print(f"[{event.task}] {arrow} {event.lock} with {event.priority}")
+        self.events.append(event)
 
 
 def test_priority_ordering():
@@ -85,16 +91,16 @@ async def test_shard_indexing_coordinator_single_shard(lock_klass):
     async def task_1():
         nonlocal events, shard, sic
 
-        events.record(Event("1", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE))
         await sic.request_shard(shard)
-        events.record(Event("1", When.AFTER, LockStatus.ACQUIRE))
+        events.record(Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE))
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("1", When.BEFORE, LockStatus.RELEASE))
+        events.record(Event("1", when=When.BEFORE, lock=LockStatus.RELEASE))
         await sic.release_shard(shard)
-        events.record(Event("1", When.AFTER, LockStatus.RELEASE))
+        events.record(Event("1", when=When.AFTER, lock=LockStatus.RELEASE))
 
     async def task_2():
         nonlocal events, shard, sic
@@ -102,16 +108,16 @@ async def test_shard_indexing_coordinator_single_shard(lock_klass):
         # let's task 1 start the sequence
         await asyncio.sleep(0)
 
-        events.record(Event("2", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE))
         await sic.request_shard(shard)
-        events.record(Event("2", When.AFTER, LockStatus.ACQUIRE))
+        events.record(Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE))
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("2", When.BEFORE, LockStatus.RELEASE))
+        events.record(Event("2", when=When.BEFORE, lock=LockStatus.RELEASE))
         await sic.release_shard(shard)
-        events.record(Event("2", When.AFTER, LockStatus.RELEASE))
+        events.record(Event("2", when=When.AFTER, lock=LockStatus.RELEASE))
 
     async def task_3():
         nonlocal events, shard, sic
@@ -120,32 +126,32 @@ async def test_shard_indexing_coordinator_single_shard(lock_klass):
         await asyncio.sleep(0)
         await asyncio.sleep(0)
 
-        events.record(Event("3", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(Event("3", when=When.BEFORE, lock=LockStatus.ACQUIRE))
         await sic.request_shard(shard)
-        events.record(Event("3", When.AFTER, LockStatus.ACQUIRE))
+        events.record(Event("3", when=When.AFTER, lock=LockStatus.ACQUIRE))
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("3", When.BEFORE, LockStatus.RELEASE))
+        events.record(Event("3", when=When.BEFORE, lock=LockStatus.RELEASE))
         await sic.release_shard(shard)
-        events.record(Event("3", When.AFTER, LockStatus.RELEASE))
+        events.record(Event("3", when=When.AFTER, lock=LockStatus.RELEASE))
 
     await asyncio.gather(task_1(), task_2(), task_3())
 
     expected = [
-        Event("1", When.BEFORE, LockStatus.ACQUIRE),
-        Event("1", When.AFTER, LockStatus.ACQUIRE),
-        Event("2", When.BEFORE, LockStatus.ACQUIRE),
-        Event("3", When.BEFORE, LockStatus.ACQUIRE),
-        Event("1", When.BEFORE, LockStatus.RELEASE),
-        Event("1", When.AFTER, LockStatus.RELEASE),
-        Event("2", When.AFTER, LockStatus.ACQUIRE),
-        Event("2", When.BEFORE, LockStatus.RELEASE),
-        Event("2", When.AFTER, LockStatus.RELEASE),
-        Event("3", When.AFTER, LockStatus.ACQUIRE),
-        Event("3", When.BEFORE, LockStatus.RELEASE),
-        Event("3", When.AFTER, LockStatus.RELEASE),
+        Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("3", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("1", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("1", when=When.AFTER, lock=LockStatus.RELEASE),
+        Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("2", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("2", when=When.AFTER, lock=LockStatus.RELEASE),
+        Event("3", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("3", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("3", when=When.AFTER, lock=LockStatus.RELEASE),
     ]
     assert events.events == expected
 
@@ -168,16 +174,16 @@ async def test_shard_indexing_coordinator_multiple_shards(
     async def task_1():
         nonlocal events, sic
 
-        events.record(Event("1", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE))
         await sic.request_shard("shard-1")
-        events.record(Event("1", When.AFTER, LockStatus.ACQUIRE))
+        events.record(Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE))
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("1", When.BEFORE, LockStatus.RELEASE))
+        events.record(Event("1", when=When.BEFORE, lock=LockStatus.RELEASE))
         await sic.release_shard("shard-1")
-        events.record(Event("1", When.AFTER, LockStatus.RELEASE))
+        events.record(Event("1", when=When.AFTER, lock=LockStatus.RELEASE))
 
     async def task_2():
         nonlocal events, sic
@@ -185,28 +191,28 @@ async def test_shard_indexing_coordinator_multiple_shards(
         # let's task 1 start the sequence
         await asyncio.sleep(0)
 
-        events.record(Event("2", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE))
         await sic.request_shard("shard-2")
-        events.record(Event("2", When.AFTER, LockStatus.ACQUIRE))
+        events.record(Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE))
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("2", When.BEFORE, LockStatus.RELEASE))
+        events.record(Event("2", when=When.BEFORE, lock=LockStatus.RELEASE))
         await sic.release_shard("shard-2")
-        events.record(Event("2", When.AFTER, LockStatus.RELEASE))
+        events.record(Event("2", when=When.AFTER, lock=LockStatus.RELEASE))
 
     await asyncio.gather(task_1(), task_2())
 
     expected = [
-        Event("1", When.BEFORE, LockStatus.ACQUIRE),
-        Event("1", When.AFTER, LockStatus.ACQUIRE),
-        Event("2", When.BEFORE, LockStatus.ACQUIRE),
-        Event("2", When.AFTER, LockStatus.ACQUIRE),
-        Event("1", When.BEFORE, LockStatus.RELEASE),
-        Event("1", When.AFTER, LockStatus.RELEASE),
-        Event("2", When.BEFORE, LockStatus.RELEASE),
-        Event("2", When.AFTER, LockStatus.RELEASE),
+        Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("1", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("1", when=When.AFTER, lock=LockStatus.RELEASE),
+        Event("2", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("2", when=When.AFTER, lock=LockStatus.RELEASE),
     ]
     assert events.events == expected
 
@@ -228,16 +234,24 @@ async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass)
     async def task_1():
         nonlocal events, shard, sic
 
-        events.record(Event("1", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(
+            Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.LOW)
+        )
         await sic.request_shard(shard, Priority.LOW)
-        events.record(Event("1", When.AFTER, LockStatus.ACQUIRE))
+        events.record(
+            Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.LOW)
+        )
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("1", When.BEFORE, LockStatus.RELEASE))
+        events.record(
+            Event("1", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.LOW)
+        )
         await sic.release_shard(shard)
-        events.record(Event("1", When.AFTER, LockStatus.RELEASE))
+        events.record(
+            Event("1", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.LOW)
+        )
 
     async def task_2():
         nonlocal events, shard, sic
@@ -245,16 +259,24 @@ async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass)
         # let's task 1 start the sequence
         await asyncio.sleep(0)
 
-        events.record(Event("2", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(
+            Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.LOW)
+        )
         await sic.request_shard(shard, Priority.LOW)
-        events.record(Event("2", When.AFTER, LockStatus.ACQUIRE))
+        events.record(
+            Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.LOW)
+        )
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("2", When.BEFORE, LockStatus.RELEASE))
+        events.record(
+            Event("2", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.LOW)
+        )
         await sic.release_shard(shard)
-        events.record(Event("2", When.AFTER, LockStatus.RELEASE))
+        events.record(
+            Event("2", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.LOW)
+        )
 
     async def task_3():
         nonlocal events, shard, sic
@@ -263,32 +285,192 @@ async def test_shard_indexing_coordinator_single_shard_with_priority(lock_klass)
         await asyncio.sleep(0)
         await asyncio.sleep(0)
 
-        events.record(Event("3", When.BEFORE, LockStatus.ACQUIRE))
+        events.record(
+            Event(
+                "3", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.HIGH
+            )
+        )
         await sic.request_shard(shard, Priority.HIGH)
-        events.record(Event("3", When.AFTER, LockStatus.ACQUIRE))
+        events.record(
+            Event("3", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.HIGH)
+        )
 
         # simulate some async work
         await asyncio.sleep(0.010)
 
-        events.record(Event("3", When.BEFORE, LockStatus.RELEASE))
+        events.record(
+            Event(
+                "3", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.HIGH
+            )
+        )
         await sic.release_shard(shard)
-        events.record(Event("3", When.AFTER, LockStatus.RELEASE))
+        events.record(
+            Event("3", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.HIGH)
+        )
 
     await asyncio.gather(task_1(), task_2(), task_3())
 
     expected = [
-        Event("1", When.BEFORE, LockStatus.ACQUIRE),
-        Event("1", When.AFTER, LockStatus.ACQUIRE),
-        Event("2", When.BEFORE, LockStatus.ACQUIRE),
-        Event("3", When.BEFORE, LockStatus.ACQUIRE),
-        Event("1", When.BEFORE, LockStatus.RELEASE),
-        Event("1", When.AFTER, LockStatus.RELEASE),
+        Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("3", when=When.BEFORE, lock=LockStatus.ACQUIRE),
+        Event("1", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("1", when=When.AFTER, lock=LockStatus.RELEASE),
         # 3 has requested with priority, so it will go before 2
-        Event("3", When.AFTER, LockStatus.ACQUIRE),
-        Event("3", When.BEFORE, LockStatus.RELEASE),
-        Event("3", When.AFTER, LockStatus.RELEASE),
-        Event("2", When.AFTER, LockStatus.ACQUIRE),
-        Event("2", When.BEFORE, LockStatus.RELEASE),
-        Event("2", When.AFTER, LockStatus.RELEASE),
+        Event("3", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("3", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("3", when=When.AFTER, lock=LockStatus.RELEASE),
+        Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE),
+        Event("2", when=When.BEFORE, lock=LockStatus.RELEASE),
+        Event("2", when=When.AFTER, lock=LockStatus.RELEASE),
     ]
     assert events.events == expected
+
+
+@pytest.mark.parametrize("lock_klass", [PriorityLock])
+@pytest.mark.asyncio
+async def test_shard_indexing_coordinator_single_shard_with_priority_high_first(
+    lock_klass,
+):
+    """Test how coordination works with a priority queue lock and 2 tasks competing
+    for the same shard.
+
+    We expect tasks to synchronize and make progress one after the other in the
+    request shard order.
+
+    """
+    sic = ShardIndexingCoordinator(lock_klass)
+    shard = "my-shard"
+    events = EventRecorder()
+
+    async def task_1():
+        nonlocal events, shard, sic
+
+        events.record(
+            Event(
+                "1", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.HIGH
+            )
+        )
+        await sic.request_shard(shard, Priority.HIGH)
+        events.record(
+            Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.HIGH)
+        )
+
+        # simulate some async work
+        await asyncio.sleep(0.010)
+
+        events.record(
+            Event(
+                "1", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.HIGH
+            )
+        )
+        await sic.release_shard(shard)
+        events.record(
+            Event("1", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.HIGH)
+        )
+
+    async def task_2():
+        nonlocal events, shard, sic
+
+        # let's task 1 start the sequence
+        await asyncio.sleep(0)
+
+        events.record(
+            Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.LOW)
+        )
+        await sic.request_shard(shard, Priority.LOW)
+        events.record(
+            Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.LOW)
+        )
+
+        # simulate some async work
+        await asyncio.sleep(0.010)
+
+        events.record(
+            Event("2", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.LOW)
+        )
+        await sic.release_shard(shard)
+        events.record(
+            Event("2", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.LOW)
+        )
+
+    print()
+    await asyncio.gather(task_1(), task_2())
+
+    expected = [
+        Event("1", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.HIGH),
+        Event("1", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.HIGH),
+        Event("2", when=When.BEFORE, lock=LockStatus.ACQUIRE, priority=Priority.LOW),
+        Event("1", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.HIGH),
+        Event("1", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.HIGH),
+        Event("2", when=When.AFTER, lock=LockStatus.ACQUIRE, priority=Priority.LOW),
+        Event("2", when=When.BEFORE, lock=LockStatus.RELEASE, priority=Priority.LOW),
+        Event("2", when=When.AFTER, lock=LockStatus.RELEASE, priority=Priority.LOW),
+    ]
+    assert events.events == expected
+
+
+@pytest.mark.skipif(
+    DEADLOCK_FIND_TESTS_DISABLE, reason="Run when modifying risky logic"
+)
+@pytest.mark.parametrize("lock_klass", [PriorityLock])
+@pytest.mark.asyncio
+async def test_shard_indexing_coordinator_single_shard_with_priority_deadlock_finder(
+    lock_klass,
+):
+    sic = ShardIndexingCoordinator(lock_klass)
+    shard = "my-shard"
+    events = EventRecorder()
+
+    async def task(task_id: str, cycles: int):
+        nonlocal events, shard, sic
+
+        priorities = list(iter(Priority))
+
+        for _ in range(cycles):
+            idx = random.randint(0, len(priorities) - 1)
+            priority = priorities[idx]
+
+            events.record(
+                Event(
+                    task_id,
+                    when=When.BEFORE,
+                    lock=LockStatus.ACQUIRE,
+                    priority=priority,
+                )
+            )
+            await sic.request_shard(shard, priority)
+            events.record(
+                Event(
+                    task_id, when=When.AFTER, lock=LockStatus.ACQUIRE, priority=priority
+                )
+            )
+
+            # simulate some async work
+            await asyncio.sleep(random.randint(0, 5) * 0.0001)
+
+            events.record(
+                Event(
+                    task_id,
+                    when=When.BEFORE,
+                    lock=LockStatus.RELEASE,
+                    priority=priority,
+                )
+            )
+            await sic.release_shard(shard)
+            events.record(
+                Event(
+                    task_id, when=When.AFTER, lock=LockStatus.RELEASE, priority=priority
+                )
+            )
+
+    for _ in range(100):
+        for task_count in range(50):
+            cycles = 100
+            await asyncio.gather(
+                *[task(str(i), cycles) for i in range(1, task_count + 1)]
+            )
+
+            assert len(events.events) == cycles * task_count * 4
+            events.events.clear()

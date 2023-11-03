@@ -99,15 +99,29 @@ class PriorityLock(QueueLock):
             await cond.wait()
 
     async def release(self):
+        priorities = list(reversed(sorted(Priority)))
         async with self.lock:
-            for priority in reversed(sorted(Priority)):
-                waiting = self.counts[priority]
-                if waiting > 0:
-                    self.counts[priority] -= 1
-                    cond = self.conditions[priority]
+            for i, priority in enumerate(priorities):
+                if self.counts[priority] > 0:
+                    break
+
+            waiting = self.counts[priority] - 1
+            assert waiting >= 0, "we can't have a negative number of waiters!"
+
+            self.counts[priority] -= 1
+            cond = self.conditions[priority]
+            async with cond:
+                cond.notify()
+
+            if waiting == 0:
+                try:
+                    next_priority = priorities[i + 1]
+                except IndexError:
+                    pass
+                else:
+                    cond = self.conditions[next_priority]
                     async with cond:
                         cond.notify()
-                    return
 
     def locked(self, priority: Priority = Priority.LOW):
         return sum(self.counts.values())
@@ -123,6 +137,9 @@ class ShardIndexingCoordinator:
         async with self.lock:
             lock = self.shard_locks.setdefault(shard_id, self.lock_klass())
         await lock.acquire(priority)
+        from nucliadb_node import logger
+
+        logger.debug("Shard sucessfully requested")
 
     async def release_shard(self, shard_id: str):
         async with self.lock:
@@ -134,3 +151,6 @@ class ShardIndexingCoordinator:
                 self.shard_locks.pop(shard_id)
 
         await lock.release()
+        from nucliadb_node import logger
+
+        logger.debug("Shard sucessfully released")
