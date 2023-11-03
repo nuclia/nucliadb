@@ -920,8 +920,16 @@ def get_release_channel(request: KnowledgeBoxNew) -> utils_pb2.ReleaseChannel.Va
     slug has the experimental_kb feature enabled in stage environment.
     """
     release_channel = request.release_channel
-    if running_settings.running_environment == "stage" and has_feature(
-        const.Features.EXPERIMENTAL_KB, context={"slug": request.slug}
-    ):
-        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
+    if running_settings.running_environment == "stage":
+        slug = get_kb_user_defined_slug(request)
+        if has_feature(const.Features.EXPERIMENTAL_KB, context={"slug": slug}):
+            release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
     return release_channel
+
+
+def get_kb_user_defined_slug(request: KnowledgeBoxNew) -> str:
+    """
+    In on-prem nucliadb, slugs are always defined by users but for hosted
+    nucliadb, slugs have the following format: "<account-uuid>:<user-defined-slug>"
+    """
+    return request.slug.split(":")[-1]

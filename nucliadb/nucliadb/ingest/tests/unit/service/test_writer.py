@@ -30,6 +30,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.service.writer import (
     WriterServicer,
+    get_kb_user_defined_slug,
     get_release_channel,
     update_shards_with_updated_replica,
 )
@@ -696,3 +697,16 @@ def test_get_release_channel(req, has_feature, environment, expected_channel):
             f"{module}.running_settings", new=Mock(running_environment=environment)
         ):
             assert get_release_channel(req) == expected_channel
+
+
+@pytest.mark.parametrize(
+    "slug,user_slug",
+    [
+        ("nuclia-account-id:myslug", "myslug"),
+        ("my-onprem-slug", "my-onprem-slug"),
+        ("", ""),
+    ],
+)
+def test_get_kb_user_defined_slug(slug, user_slug):
+    request = Mock(slug=slug)
+    assert get_kb_user_defined_slug(request) == user_slug
