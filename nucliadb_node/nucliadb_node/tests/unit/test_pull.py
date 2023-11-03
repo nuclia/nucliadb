@@ -23,7 +23,6 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
-from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
 from nucliadb_node.pull import IndexedPublisher, ShardManager, Worker
@@ -162,23 +161,6 @@ class TestSubscriptionWorker:
             worker = Worker(writer, reader, "node")
             worker.store_seqid = Mock()
             yield worker
-
-    def get_msg(self, seqid):
-        client = AsyncMock()
-        reply = f"foo.bar.ba.blan.ca.{seqid}.bar"
-        msg = Msg(client, "subject", reply)
-        msg.ack = AsyncMock()
-        return msg
-
-    @pytest.mark.asyncio
-    async def test_discards_old_messages(self, worker):
-        worker.last_seqid = 10
-        msg = self.get_msg(seqid=9)
-        await worker.subscription_worker(msg)
-
-        # The message is acked and ignored
-        msg.ack.assert_awaited_once()
-        worker.store_seqid.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_reconnected_cb(self, worker: Worker):

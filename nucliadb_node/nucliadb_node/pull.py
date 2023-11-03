@@ -176,7 +176,6 @@ class Worker(ABC):
         self.subscriptions = []
         self.node = node
         self.publisher = IndexedPublisher()
-        self.load_seqid()
         self.brain: Optional[Resource] = None
 
         self.shard_managers: dict[str, ShardManager] = {}
@@ -269,23 +268,6 @@ class Worker(ABC):
             sm = self.get_shard_manager(shard.id)
             sm.shard_changed_event(idx * 0.01)
 
-    def store_seqid(self, seqid: int):
-        if settings.data_path is None:
-            raise Exception("We need a DATA_PATH env")
-        with open(f"{settings.data_path}/seqid", "w+") as seqfile:
-            seqfile.write(str(seqid))
-        self.last_seqid = seqid
-
-    def load_seqid(self):
-        if settings.data_path is None:
-            raise Exception("We need a DATA_PATH env")
-        try:
-            with open(f"{settings.data_path}/seqid", "r") as seqfile:
-                self.last_seqid = int(seqfile.read())
-        except FileNotFoundError:
-            # First time the consumer is started
-            self.last_seqid = None
-
     async def set_resource(self, pb: IndexMessage) -> OpStatus:
         self.brain = await self.storage.get_indexing(pb)
         self.brain.shard_id = self.brain.resource.shard_id = pb.shard
@@ -311,13 +293,6 @@ class Worker(ABC):
         subject = msg.subject
         reply = msg.reply
         seqid = int(msg.reply.split(".")[5])
-        if self.last_seqid and self.last_seqid >= seqid:
-            logger.warning(
-                f"[worker:{self.worker_name}] Skipping already processed message. "
-                f"Msg seqid {seqid} vs Last seqid {self.last_seqid}"
-            )
-            await msg.ack()
-            return
 
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
@@ -407,7 +382,6 @@ class Worker(ABC):
         try:
             await msg.ack()
             await self.publisher.indexed(pb)
-            self.store_seqid(seqid)
         except Exception as e:  # pragma: no cover
             await msg.nak()
             errors.capture_exception(e)
@@ -428,7 +402,6 @@ class Worker(ABC):
             )
 
     async def subscribe(self):
-        logger.info(f"[worker:{self.worker_name}] Last seqid {self.last_seqid}")
         try:
             await self.js.stream_info(const.Streams.INDEX.name)
         except StreamNotFoundError:
@@ -451,8 +424,7 @@ class Worker(ABC):
             flow_control=True,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
-                deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
-                opt_start_seq=self.last_seqid or 1,
+                deliver_policy=nats.js.api.DeliverPolicy.NEW,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
