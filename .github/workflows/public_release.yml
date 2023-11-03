@@ -7,6 +7,8 @@
 # and meant to be used as a mechanism to communicate sets of changes to the public.
 # Since we deploy in a CD way, the way we release and communicate differs internally from externally
 name: Tag and public artifact release
+env:
+  API_VERSION: 1
 on:
   push:
     branches:
@@ -110,3 +112,40 @@ jobs:
           docker pull nuclia/nucliadb:latest
           docker tag nuclia/nucliadb:latest nuclia/nucliadb:stable
           docker push nuclia/nucliadb:stable
+
+  docs:
+    name: 'Upload API specs'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install the package
+        run: make -C nucliadb/ install-dev
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
+      
+      - name: Upload docs
+        run: |
+          mkdir -p /tmp/openapi
+          nucliadb-extract-openapi-reader /tmp/openapi/nucliadb-reader.json $API_VERSION $GITHUB_SHA
+          nucliadb-extract-openapi-writer /tmp/openapi/nucliadb-writer.json $API_VERSION $GITHUB_SHA
+          nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA
+          gsutil copy /tmp/openapi/nucliadb-reader.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-reader/spec.json
+          gsutil copy /tmp/openapi/nucliadb-writer.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
+          gsutil copy /tmp/openapi/nucliadb-search.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
+
+  trigger-doc-build:
+    needs: docs
+    uses: nuclia/docs/.github/workflows/spec-merge.yaml@main
