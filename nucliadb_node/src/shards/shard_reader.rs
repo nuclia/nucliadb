@@ -32,7 +32,7 @@ use nucliadb_core::protos::{
     ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_core::query_planner;
+use nucliadb_core::query_planner::QueryPlan;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -398,7 +398,7 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        let query_plan = query_planner::trace_query_plan(search_request);
+        let query_plan = QueryPlan::from(search_request);
 
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();

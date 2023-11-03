@@ -24,35 +24,47 @@ use crate::protos::{
     VectorSearchRequest,
 };
 
+/// A field has two dates
 #[derive(Debug, Clone, Copy)]
-pub enum DateField {
+pub enum FieldDateType {
+    /// When the field was created
     Created,
+    /// When the field was modified
     Modified,
 }
 
+/// Used to define the time range of interest
 #[derive(Debug, Clone)]
 pub struct TimestampFilter {
-    pub applies_to: DateField,
+    pub applies_to: FieldDateType,
     pub from: ProtoTimestamp,
     pub to: ProtoTimestamp,
 }
 
+/// A query plan pre-filtering stage.
+/// It is useful for reducing the space of results
+/// for the rest of the plan.
 #[derive(Debug, Clone)]
 pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
 }
 
+/// Represents a field that has met all of the
+/// pre-filtering requirements.
 #[derive(Debug, Clone)]
 pub struct ValidField {
     pub resource_id: String,
     pub field_id: String,
 }
 
+/// Once a [`PreFilterRequest`] was successfully executed
+/// this type can be used to modify the rest of the query plan.
 #[derive(Debug, Default, Clone)]
 pub struct PreFilterResponse {
     pub valid_fields: Vec<ValidField>,
 }
 
+/// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Debug, Default, Clone)]
 pub struct IndexQueries {
     pub vectors_request: Option<VectorSearchRequest>,
@@ -62,25 +74,32 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
+    /// When a pre-filter is run, the result can be used to modify the queries
+    /// that the indexes must resolve.
     pub fn apply_pre_filter(&mut self, _pre_filtered: PreFilterResponse) {
         // Right now there is no logic to add
     }
 }
 
+/// A shard reader will use this plan to produce search results as efficiently as
+/// possible.
 pub struct QueryPlan {
     pub pre_filter: Option<PreFilterRequest>,
     pub index_queries: IndexQueries,
 }
 
-pub fn trace_query_plan(search_request: SearchRequest) -> QueryPlan {
-    QueryPlan {
-        pre_filter: compute_pre_filters(&search_request),
-        index_queries: IndexQueries {
-            vectors_request: compute_vectors_request(&search_request),
-            paragraphs_request: compute_paragraphs_request(&search_request),
-            texts_request: compute_texts_request(&search_request),
-            relations_request: compute_relations_request(&search_request),
-        },
+/// A [`QueryPlan`] can be traced from a [`SearchRequest`]
+impl From<SearchRequest> for QueryPlan {
+    fn from(search_request: SearchRequest) -> Self {
+        QueryPlan {
+            pre_filter: compute_pre_filters(&search_request),
+            index_queries: IndexQueries {
+                vectors_request: compute_vectors_request(&search_request),
+                paragraphs_request: compute_paragraphs_request(&search_request),
+                texts_request: compute_texts_request(&search_request),
+                relations_request: compute_relations_request(&search_request),
+            },
+        }
     }
 }
 
