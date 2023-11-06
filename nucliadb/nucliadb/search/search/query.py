@@ -87,7 +87,9 @@ def translate_label_filters(filters: List[str]) -> List[str]:
         parts = fltr.split("/")
         if parts[1] in LABEL_QUERY_ALIASES:
             parts = [""] + LABEL_QUERY_ALIASES[parts[1]] + parts[2:]
-        output.append("/".join(parts))
+            output.append("/".join(parts))
+        else:
+            output.append(fltr)
     return output
 
 
