@@ -62,6 +62,7 @@ images.settings["nucliadb_node_reader"] = {
         ],
         # Forces the plaform so the test works on Apple Silicon series
         "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
+        "mem_limit": "2g",
         "ports": {"4445": None},
     },
 }
@@ -83,6 +84,7 @@ images.settings["nucliadb_node_writer"] = {
         ],
         # Forces the plaform so the test works on Apple Silicon series
         "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
+        "mem_limit": "2g",
         "ports": {"4446": None},
     },
 }
