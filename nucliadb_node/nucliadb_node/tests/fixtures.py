@@ -61,7 +61,7 @@ images.settings["nucliadb_node_reader"] = {
             "/usr/local/bin/node_reader",
         ],
         # Forces the plaform so the test works on Apple Silicon series
-        "platform": "linux/amd64",
+        "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
         "ports": {"4445": None},
     },
 }
@@ -82,7 +82,7 @@ images.settings["nucliadb_node_writer"] = {
             "/usr/local/bin/node_writer",
         ],
         # Forces the plaform so the test works on Apple Silicon series
-        "platform": "linux/amd64",
+        "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
         "ports": {"4446": None},
     },
 }
