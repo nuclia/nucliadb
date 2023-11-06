@@ -46,7 +46,6 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
     "version": "main",
-    "command": "bash -c 'node_reader & node_writer'",
     "env": {
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
@@ -61,7 +60,7 @@ images.settings["nucliadb_node_reader"] = {
             "/usr/local/bin/node_reader",
         ],
         # Forces the plaform so the test works on Apple Silicon series
-        "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
+        # "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
         "mem_limit": "2g",
         "ports": {"4445": None},
     },
@@ -83,7 +82,7 @@ images.settings["nucliadb_node_writer"] = {
             "/usr/local/bin/node_writer",
         ],
         # Forces the plaform so the test works on Apple Silicon series
-        "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
+        # "platform": "linux/amd64",  # can be updated to remove this since we publish multi-arch images
         "mem_limit": "2g",
         "ports": {"4446": None},
     },
@@ -156,6 +155,15 @@ def node_single():
     settings.reader_listen_address = f"{reader1_host}:{reader1_port}"
 
     yield
+
+    print(
+        "Reader Container Logs: \n"
+        + nucliadb_node_reader.container_obj.logs().decode("utf-8")
+    )
+    print(
+        "Writer Container Logs: \n"
+        + nucliadb_node_reader.container_obj.logs().decode("utf-8")
+    )
 
     nucliadb_node_reader.stop()
     nucliadb_node_writer.stop()
