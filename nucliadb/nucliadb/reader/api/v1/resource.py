@@ -356,7 +356,6 @@ async def _get_resource_field(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
     resource = ORMResource(txn, storage, kb, rid)
-
     field = await resource.get_field(field_id, pb_field_id, load=True)
     if field is None:
         await txn.abort()
