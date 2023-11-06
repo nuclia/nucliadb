@@ -325,7 +325,7 @@ class ResourceBrain:
             return "EMPTY"
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
-    def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
+    def set_resource_metadata(self, basic: Basic, origin: Optional[Origin]):
         if basic.HasField("created"):
             self.brain.metadata.created.CopyFrom(basic.created)
         if basic.HasField("modified"):
@@ -334,22 +334,23 @@ class ResourceBrain:
             # if no modified field, use created field
             self.brain.metadata.modified.CopyFrom(basic.created)
 
+        if origin is not None:
+            # overwrite created/modified if provided on origin
+            if origin.HasField("created") and origin.created.seconds > 0:
+                self.brain.metadata.created.CopyFrom(origin.created)
+            if origin.HasField("modified") and origin.modified.seconds > 0:
+                self.brain.metadata.modified.CopyFrom(origin.modified)
+
+        self._set_resource_labels(basic, origin)
+        self._set_resource_relations(basic, origin)
+
+    def _set_resource_relations(self, basic: Basic, origin: Optional[Origin]):
         relationnodedocument = RelationNode(
-            value=uuid, ntype=RelationNode.NodeType.RESOURCE
+            value=self.rid, ntype=RelationNode.NodeType.RESOURCE
         )
         if origin is not None:
-            if origin.source_id:
-                self.tags["o"] = [origin.source_id]
-            # origin tags
-            for tag in origin.tags:
-                self.tags["t"].append(tag)
-            # origin source
-            if origin.source_id != "":
-                self.tags["u"].append(f"s/{origin.source_id}")
-
             # origin contributors
             for contrib in origin.colaborators:
-                self.tags["u"].append(f"o/{contrib}")
                 relationnodeuser = RelationNode(
                     value=contrib, ntype=RelationNode.NodeType.USER
                 )
@@ -361,30 +362,8 @@ class ResourceBrain:
                     )
                 )
 
-            # overwrite created/modified if provided on origin
-            if origin.HasField("created") and origin.created.seconds > 0:
-                self.brain.metadata.created.CopyFrom(origin.created)
-            if origin.HasField("modified") and origin.modified.seconds > 0:
-                self.brain.metadata.modified.CopyFrom(origin.modified)
-
-        # icon
-        self.tags["n"].append(f"i/{basic.icon}")
-
-        # processing status
-        status_tag = self.get_processing_status_tag(basic.metadata)
-        self.tags["n"].append(f"s/{status_tag}")
-
-        # main language
-        if basic.metadata.language != "":
-            self.tags["s"].append(f"p/{basic.metadata.language}")
-
-        # all language
-        for lang in basic.metadata.languages:
-            self.tags["s"].append(f"s/{lang}")
-
         # labels
         for classification in basic.usermetadata.classifications:
-            self.tags["l"].append(f"{classification.labelset}/{classification.label}")
             relation_node_label = RelationNode(
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
@@ -399,6 +378,43 @@ class ResourceBrain:
 
         # relations
         self.brain.relations.extend(basic.usermetadata.relations)
+
+    def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
+        if origin is not None:
+            if origin.source_id:
+                self.tags["o"] = [origin.source_id]
+            # origin tags
+            for tag in origin.tags:
+                self.tags["t"].append(tag)
+            # origin source
+            if origin.source_id != "":
+                self.tags["u"].append(f"s/{origin.source_id}")
+
+            # origin contributors
+            for contrib in origin.colaborators:
+                self.tags["u"].append(f"o/{contrib}")
+
+            for key, value in origin.metadata.items():
+                self.tags["m"].append(f"{key[:255]}/{value[:255]}")
+
+        # icon
+        self.tags["n"].append(f"i/{basic.icon}")
+
+        # processing status
+        status_tag = self.get_processing_status_tag(basic.metadata)
+        self.tags["n"].append(f"s/{status_tag}")
+
+        # main language
+        if basic.metadata.language:
+            self.tags["s"].append(f"p/{basic.metadata.language}")
+
+        # all language
+        for lang in basic.metadata.languages:
+            self.tags["s"].append(f"s/{lang}")
+
+        # labels
+        for classification in basic.usermetadata.classifications:
+            self.tags["l"].append(f"{classification.labelset}/{classification.label}")
 
         self.compute_tags()
 

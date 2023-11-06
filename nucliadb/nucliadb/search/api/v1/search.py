@@ -33,6 +33,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
 from nucliadb.search.search.utils import (
@@ -285,6 +286,8 @@ async def _search_endpoint(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
 
 async def search(

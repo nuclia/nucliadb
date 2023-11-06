@@ -24,9 +24,11 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.txn_utils import abort_transaction
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
 from nucliadb_models.common import FieldTypeName
@@ -95,22 +97,25 @@ async def resource_search(
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> ResourceSearchResults:
     # We need to query all nodes
-    pb_query = await paragraph_query_to_pb(
-        [SearchOptions.PARAGRAPH],
-        rid,
-        query,
-        fields,
-        filters,
-        faceted,
-        page_number,
-        page_size,
-        range_creation_start,
-        range_creation_end,
-        range_modification_start,
-        range_modification_end,
-        sort=sort.value if sort else None,
-        sort_ord=sort_order.value,
-    )
+    try:
+        pb_query = await paragraph_query_to_pb(
+            [SearchOptions.PARAGRAPH],
+            rid,
+            query,
+            fields,
+            filters,
+            faceted,
+            page_number,
+            page_size,
+            range_creation_start,
+            range_creation_end,
+            range_modification_start,
+            range_modification_end,
+            sort=sort.value if sort else None,
+            sort_ord=sort_order.value,
+        )
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.PARAGRAPH, pb_query, shards

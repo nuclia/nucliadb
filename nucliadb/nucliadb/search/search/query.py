@@ -51,8 +51,44 @@ from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
+from .exceptions import InvalidQueryError
+
 ENTITY_FILTER_PREFIX = "/e/"
 LABEL_FILTER_PREFIX = "/l/"
+
+LABEL_QUERY_ALIASES = {
+    # aliases to make querying labels easier
+    "tags": ["t"],
+    "labels": ["l"],
+    "entities": ["e"],
+    "icon": ["n", "i"],
+    "status": ["n", "s"],
+    "primary-language": ["s", "p"],
+    "secondary-languages": ["s", "s"],
+    "field": ["f"],
+    "field-values": ["fg"],
+    "metadata": ["m"],
+}
+
+
+def translate_label_filters(filters: List[str]) -> List[str]:
+    """
+    Translate friendly filter names to the shortened filter names.
+    """
+    output = []
+    for fltr in filters:
+        if fltr[0] != "/":
+            raise InvalidQueryError(
+                "filters", f"Invalid label filter. It must start with a `/`: {fltr}"
+            )
+        if len(fltr) == 0:
+            raise InvalidQueryError("filters", f"Invalid label filter: {fltr}")
+
+        parts = fltr.split("/")
+        if parts[1] in LABEL_QUERY_ALIASES:
+            parts = [""] + LABEL_QUERY_ALIASES[parts[1]] + parts[2:]
+        output.append("/".join(parts))
+    return output
 
 
 def record_filters_counter(filters: list[str], counter: Counter) -> None:
@@ -62,10 +98,6 @@ def record_filters_counter(filters: list[str], counter: Counter) -> None:
     label_found = False
     for fltr in filters:
         if entity_found and label_found:
-            break
-        if fltr == "":
-            continue
-        if fltr[0] != "/":
             break
         if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
             entity_found = True
@@ -115,10 +147,11 @@ async def global_query_to_pb(
     request.body = query
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
+        filters = translate_label_filters(filters)
         request.filter.tags.extend(filters)
         record_filters_counter(filters, node_features)
 
-    request.faceted.tags.extend(faceted)
+    request.faceted.tags.extend(translate_label_filters(faceted))
     request.fields.extend(fields)
 
     if key_filters is not None and len(key_filters) > 0:
@@ -266,6 +299,7 @@ def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(SuggestFeatures.PARAGRAPHS)
+        filters = translate_label_filters(filters)
         request.filter.tags.extend(filters)
         request.fields.extend(fields)
 
@@ -320,8 +354,8 @@ async def paragraph_query_to_pb(
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
-        request.filter.tags.extend(filters)
-        request.faceted.tags.extend(faceted)
+        request.filter.tags.extend(translate_label_filters(filters))
+        request.faceted.tags.extend(translate_label_filters(faceted))
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore

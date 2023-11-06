@@ -28,6 +28,7 @@ BASE_TAGS: Dict[str, List[str]] = {
     "u": [],  # contributors s (Source) o (Origin)
     "f": [],  # field keyword field (field/keyword)
     "fg": [],  # field keyword (keywords) flat
+    "m": [],  # origin metadata in the form of (key/value). Max key/value size is 255
 }
 
 

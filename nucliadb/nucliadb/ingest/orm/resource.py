@@ -363,7 +363,7 @@ class Resource:
         origin = await self.get_origin()
         basic = await self.get_basic()
         if basic is not None:
-            brain.set_global_tags(basic, self.uuid, origin)
+            brain.set_resource_metadata(basic, self.uuid, origin)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -1042,7 +1042,7 @@ class Resource:
             raise KeyError("Resource not found")
 
         brain.set_processing_status(basic=basic, previous_status=self._previous_status)
-        brain.set_global_tags(basic=basic, origin=origin, uuid=self.uuid)
+        brain.set_resource_metadata(basic=basic, origin=origin)
         for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)
             fieldid = FieldID(field_type=type, field=field)  # type: ignore
