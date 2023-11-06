@@ -153,7 +153,6 @@ class Resource:
         self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: list[FieldID] = []
-        self._modified_question_answers: list[FieldID] = []
 
         self.txn = txn
         self.storage = storage
@@ -863,8 +862,6 @@ class Resource:
         field = question_answers.field
         field_obj = await self.get_field(field.field, field.field_type, load=False)
         await field_obj.set_question_answers(question_answers)
-        # TODO: what is this used for
-        self._modified_question_answers.append(field)
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None
