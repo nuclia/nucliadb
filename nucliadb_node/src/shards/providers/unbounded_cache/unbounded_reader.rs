@@ -37,7 +37,7 @@ pub struct UnboundedShardReaderCache {
 }
 
 impl UnboundedShardReaderCache {
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
             shards_path: settings.shards_path(),

@@ -36,14 +36,14 @@ use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {
-    settings: Arc<Settings>,
+    settings: Settings,
     shards: Arc<AsyncUnboundedShardWriterCache>,
     node_id: String,
 }
 
 impl ReplicationServiceGRPCDriver {
     pub fn new(
-        settings: Arc<Settings>,
+        settings: Settings,
         shard_cache: Arc<AsyncUnboundedShardWriterCache>,
         node_id: String,
     ) -> Self {
@@ -281,7 +281,8 @@ impl replication::replication_service_server::ReplicationService for Replication
         &self,
         _request: tonic::Request<EmptyQuery>,
     ) -> Result<tonic::Response<NodeMetadata>, tonic::Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new(Arc::clone(&self.settings)).await;
+        let metadata_settings = self.settings.clone();
+        let metadata = crate::node_metadata::NodeMetadata::new(metadata_settings).await;
         match metadata {
             Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

@@ -20,8 +20,6 @@
 
 //! Application initialization and finalization utilities
 
-use std::sync::Arc;
-
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
@@ -30,7 +28,7 @@ use crate::settings::Settings;
 
 /// Initialize the index node writer. This function must be called before using
 /// a writer
-pub fn initialize_writer(settings: Arc<Settings>) -> NodeResult<()> {
+pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
     let data_path = settings.data_path();
     let shards_path = settings.shards_path();
     if !data_path.exists() {
@@ -55,7 +53,7 @@ pub fn initialize_writer(settings: Arc<Settings>) -> NodeResult<()> {
 
 /// Initialize the index node reader. This function must be called before using
 /// a reader
-pub fn initialize_reader(settings: Arc<Settings>) {
+pub fn initialize_reader(settings: Settings) {
     // We swallow the error if the threadpool was already initialized
     let _ = ThreadPoolBuilder::new()
         .num_threads(settings.num_global_rayon_threads())

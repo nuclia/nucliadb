@@ -193,7 +193,7 @@ impl ReplicateWorkerPool {
 }
 
 pub async fn connect_to_primary_and_replicate(
-    settings: Arc<Settings>,
+    settings: Settings,
     shard_cache: Arc<AsyncUnboundedShardWriterCache>,
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
@@ -210,7 +210,7 @@ pub async fn connect_to_primary_and_replicate(
     // .max_decoding_message_size(256 * 1024 * 1024)
     // .max_encoding_message_size(256 * 1024 * 1024);address);
 
-    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&settings));
+    let repl_health_mng = ReplicationHealthManager::new(settings.clone());
     let metrics = metrics::get_metrics();
 
     let primary_node_metadata = client
@@ -367,7 +367,7 @@ pub async fn connect_to_primary_and_replicate(
 }
 
 pub async fn connect_to_primary_and_replicate_forever(
-    settings: Arc<Settings>,
+    settings: Settings,
     shard_cache: Arc<AsyncUnboundedShardWriterCache>,
     secondary_id: String,
     shutdown_notified: Arc<AtomicBool>,
@@ -377,7 +377,7 @@ pub async fn connect_to_primary_and_replicate_forever(
             return Ok(());
         }
         let result = connect_to_primary_and_replicate(
-            Arc::clone(&settings),
+            settings.clone(),
             Arc::clone(&shard_cache),
             secondary_id.clone(),
             Arc::clone(&shutdown_notified),

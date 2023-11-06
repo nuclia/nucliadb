@@ -71,7 +71,7 @@ pub mod env {
             }
 
             if let Ok(Ok(true)) = std::env::var("DISABLE_SENTRY").map(|v| v.parse::<bool>()) {
-                builder.sentry_enabled = Some(false);
+                builder.without_sentry();
             }
 
             if let Ok(url) = std::env::var("SENTRY_URL") {
@@ -140,8 +140,7 @@ pub mod env {
                 builder.replication_healthy_delay(replication_healthy_delay);
             }
 
-            let settings = builder.build()?;
-            Ok(settings)
+            builder.build()
         }
     }
 
@@ -203,7 +202,7 @@ pub mod env {
                 Err(_) => std::env::remove_var("DISABLE_SENTRY"),
             }
 
-            assert!(!settings.sentry_enabled);
+            assert!(!settings.sentry_enabled());
         }
     }
 }

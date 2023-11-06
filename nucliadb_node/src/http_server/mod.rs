@@ -24,14 +24,13 @@ mod metrics_service;
 mod traces_service;
 
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use axum::routing::get;
 use axum::Router;
 
 use crate::settings::Settings;
 
-pub async fn run_http_server(settings: Arc<Settings>) {
+pub async fn run_http_server(settings: Settings) {
     // Add routes to services
     let addr = SocketAddr::from(([0, 0, 0, 0], settings.metrics_port()));
     let router = Router::new().route("/metrics", get(metrics_service::metrics_service));

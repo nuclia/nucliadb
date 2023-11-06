@@ -43,7 +43,7 @@ pub struct AsyncUnboundedShardWriterCache {
 }
 
 impl AsyncUnboundedShardWriterCache {
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
             // NOTE: as it's not probable all shards will be written, we don't
             // assign any initial capacity to the HashMap under the

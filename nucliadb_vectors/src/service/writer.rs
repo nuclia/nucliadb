@@ -23,12 +23,12 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use nucliadb_core::metrics::request_time;
+use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::{metrics, Channel};
-use nucliadb_core::{prelude::*, IndexFiles};
+use nucliadb_core::{metrics, Channel, IndexFiles};
 use nucliadb_procs::measure;
 
 use crate::data_point::{DataPoint, Elem, LabelDictionary};

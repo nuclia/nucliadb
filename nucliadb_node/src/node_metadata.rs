@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::Arc;
-
 use nucliadb_core::NodeResult;
 
 use crate::settings::Settings;
@@ -27,7 +25,7 @@ use crate::utils::{self, get_primary_node_id, list_shards};
 
 pub struct NodeMetadata {
     shard_count: u64,
-    settings: Arc<Settings>,
+    settings: Settings,
 }
 
 impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
@@ -44,7 +42,7 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
 }
 
 pub fn create_node_metadata_pb(
-    settings: Arc<Settings>,
+    settings: Settings,
     node_metadata: NodeMetadata,
 ) -> nucliadb_core::protos::NodeMetadata {
     nucliadb_core::protos::NodeMetadata {
@@ -58,9 +56,9 @@ pub fn create_node_metadata_pb(
 }
 
 impl NodeMetadata {
-    pub async fn new(settings: Arc<Settings>) -> NodeResult<Self> {
+    pub async fn new(settings: Settings) -> NodeResult<Self> {
         Ok(Self {
-            settings: Arc::clone(&settings),
+            settings: settings.clone(),
             shard_count: list_shards(settings.shards_path())
                 .await
                 .len()

@@ -92,8 +92,8 @@ impl NodeReader {
 impl NodeReader {
     #[new]
     pub fn new() -> Self {
-        let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings().unwrap());
-        lifecycle::initialize_reader(Arc::clone(&settings));
+        let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
+        lifecycle::initialize_reader(settings.clone());
         Self {
             shards: UnboundedShardReaderCache::new(settings),
         }

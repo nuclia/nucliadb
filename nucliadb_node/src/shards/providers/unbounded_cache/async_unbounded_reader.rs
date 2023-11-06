@@ -39,7 +39,7 @@ pub struct AsyncUnboundedShardReaderCache {
 }
 
 impl AsyncUnboundedShardReaderCache {
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
             // NOTE: we use max shards per node as initial capacity to avoid
             // hashmap resizing, as it would block the current thread while

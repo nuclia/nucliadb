@@ -36,14 +36,15 @@ use crate::telemetry::run_with_telemetry;
 
 pub struct NodeReaderGRPCDriver {
     shards: AsyncUnboundedShardReaderCache,
-    settings: Arc<Settings>,
+    settings: Settings,
 }
 
 impl NodeReaderGRPCDriver {
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Settings) -> Self {
+        let cache_settings = settings.clone();
         Self {
-            shards: AsyncUnboundedShardReaderCache::new(Arc::clone(&settings)),
             settings,
+            shards: AsyncUnboundedShardReaderCache::new(cache_settings),
         }
     }
 

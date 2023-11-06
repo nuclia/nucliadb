@@ -19,7 +19,6 @@
 
 use std::fs::OpenOptions;
 use std::path::Path;
-use std::sync::Arc;
 
 use filetime::FileTime;
 use nucliadb_core::tracing::error;
@@ -27,7 +26,7 @@ use nucliadb_core::tracing::error;
 use crate::settings::Settings;
 
 pub struct ReplicationHealthManager {
-    settings: Arc<Settings>,
+    settings: Settings,
 }
 
 const REPLICATION_HEALTH_FILE: &str = "replication_marker";
@@ -37,7 +36,7 @@ impl ReplicationHealthManager {
     /// 2 processes that share the same disk.
     /// We simply touch the file and see when it was last
     /// modified to decide if we're healthy and running up-to-date.
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self { settings }
     }
 

@@ -65,9 +65,9 @@ impl NodeWriter {
 impl NodeWriter {
     #[new]
     pub fn new() -> PyResult<Self> {
-        let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings().unwrap());
+        let settings: Settings = EnvSettingsProvider::generate_settings().unwrap();
 
-        if let Err(error) = lifecycle::initialize_writer(Arc::clone(&settings)) {
+        if let Err(error) = lifecycle::initialize_writer(settings.clone()) {
             return Err(IndexNodeException::new_err(format!(
                 "Unable to initialize writer: {error}"
             )));
