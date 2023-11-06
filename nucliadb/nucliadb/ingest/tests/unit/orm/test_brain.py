@@ -228,7 +228,7 @@ def test_set_resource_metadata_promotes_origin_dates():
     origin.created.seconds = 3
     origin.modified.seconds = 4
 
-    resource_brain.set_resource_metadata(basic, "rid", origin)
+    resource_brain.set_resource_metadata(basic, origin)
 
     assert resource_brain.brain.metadata.created.seconds == 3
     assert resource_brain.brain.metadata.modified.seconds == 4

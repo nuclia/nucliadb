@@ -19,7 +19,7 @@
 #
 from typing import Dict, List
 
-BASE_TAGS: Dict[str, List[str]] = {
+BASE_LABELS: Dict[str, List[str]] = {
     "t": [],  # doc tags
     "l": [],  # doc labels
     "n": [],  # type of element: i (Icon). s (Processing Status)
@@ -32,15 +32,9 @@ BASE_TAGS: Dict[str, List[str]] = {
 }
 
 
-def flat_resource_tags(tags_dict):
+def flatten_resource_labels(tags_dict: dict[str, list[str]]) -> List[str]:
     flat_tags = []
     for key, values in tags_dict.items():
-        if isinstance(values, dict):
-            for prefix, subvalues in values.items():
-                for value in subvalues:
-                    flat_tags.append(f"/{key}/{prefix}/{value}")
-
-        if isinstance(values, list):
-            for value in values:
-                flat_tags.append(f"/{key}/{value}")
+        for value in values:
+            flat_tags.append(f"/{key}/{value}")
     return flat_tags

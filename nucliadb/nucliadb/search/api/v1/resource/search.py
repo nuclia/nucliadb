@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -95,7 +95,7 @@ async def resource_search(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
-) -> ResourceSearchResults:
+) -> Union[ResourceSearchResults, HTTPClientError]:
     # We need to query all nodes
     try:
         pb_query = await paragraph_query_to_pb(

@@ -363,7 +363,7 @@ class Resource:
         origin = await self.get_origin()
         basic = await self.get_basic()
         if basic is not None:
-            brain.set_resource_metadata(basic, self.uuid, origin)
+            brain.set_resource_metadata(basic, origin)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -1056,7 +1056,7 @@ class Resource:
                 ):
                     valid_user_field_metadata = user_field_metadata
                     break
-            brain.apply_field_tags_globally(
+            brain.apply_field_labels(
                 fieldkey,
                 extracted_metadata,
                 self.uuid,
