@@ -32,6 +32,7 @@ use nucliadb_core::protos::{
     ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     TypeList, VectorSearchRequest, VectorSearchResponse,
 };
+use nucliadb_core::query_planner::QueryPlan;
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -397,90 +398,50 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+        let query_plan = QueryPlan::from(search_request);
+
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
+        let pre_filter = query_plan.pre_filter;
+        let mut index_queries = query_plan.index_queries;
 
-        let skip_paragraphs = !search_request.paragraph;
-        let skip_fields = !search_request.document;
-        let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
-        let skip_relations =
-            search_request.relation_prefix.is_none() && search_request.relation_subgraph.is_none();
+        // Apply pre-filtering to the query plan
+        if let Some(pre_filter) = pre_filter {
+            let pre_filtered = self.text_reader.pre_filter(&pre_filter)?;
+            index_queries.apply_pre_filter(pre_filtered);
+        }
 
-        let field_request = DocumentSearchRequest {
-            id: search_id.clone(),
-            body: search_request.body.clone(),
-            fields: search_request.fields.clone(),
-            filter: search_request.filter.clone(),
-            order: search_request.order.clone(),
-            faceted: search_request.faceted.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            timestamps: search_request.timestamps.clone(),
-            only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
-            with_status: search_request.with_status,
-            ..Default::default()
-        };
-        let text_reader_service = self.text_reader.clone();
-        let text_task = move || Some(text_reader_service.search(&field_request));
+        // Run the rest of the plan
+        let text_task = index_queries.texts_request.map(|mut request| {
+            request.id = search_id.clone();
+            let text_reader_service = self.text_reader.clone();
+            let info = info_span!(parent: &span, "text search");
+            let task = move || text_reader_service.search(&request);
+            || run_with_telemetry(info, task)
+        });
 
-        let paragraph_request = ParagraphSearchRequest {
-            id: search_id.clone(),
-            uuid: "".to_string(),
-            with_duplicates: search_request.with_duplicates,
-            body: search_request.body.clone(),
-            fields: search_request.fields.clone(),
-            filter: search_request.filter.clone(),
-            order: search_request.order.clone(),
-            faceted: search_request.faceted.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            timestamps: search_request.timestamps.clone(),
-            only_faceted: search_request.only_faceted,
-            advanced_query: search_request.advanced_query.clone(),
-            key_filters: search_request.key_filters.clone(),
-            ..Default::default()
-        };
-        let paragraph_reader_service = self.paragraph_reader.clone();
-        let paragraph_task = move || Some(paragraph_reader_service.search(&paragraph_request));
+        let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
+            request.id = search_id.clone();
+            let paragraph_reader_service = self.paragraph_reader.clone();
+            let info = info_span!(parent: &span, "paragraph search");
+            let task = move || paragraph_reader_service.search(&request);
+            || run_with_telemetry(info, task)
+        });
 
-        let vector_request = VectorSearchRequest {
-            id: search_id.clone(),
-            vector_set: search_request.vectorset.clone(),
-            vector: search_request.vector.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            with_duplicates: search_request.with_duplicates,
-            key_filters: search_request.key_filters.clone(),
-            tags: search_request
-                .filter
-                .iter()
-                .flat_map(|f| f.tags.iter().cloned())
-                .chain(search_request.fields.iter().cloned())
-                .collect(),
-            min_score: search_request.min_score,
-            ..Default::default()
-        };
-        let vector_reader_service = self.vector_reader.clone();
-        let vector_task = move || Some(vector_reader_service.search(&vector_request));
+        let vector_task = index_queries.vectors_request.map(|mut request| {
+            request.id = search_id.clone();
+            let vector_reader_service = self.vector_reader.clone();
+            let info = info_span!(parent: &span, "vector search");
+            let task = move || vector_reader_service.search(&request);
+            || run_with_telemetry(info, task)
+        });
 
-        let relation_request = RelationSearchRequest {
-            shard_id: search_request.shard.clone(),
-            prefix: search_request.relation_prefix.clone(),
-            subgraph: search_request.relation_subgraph,
-            ..Default::default()
-        };
-        let relation_reader_service = self.relation_reader.clone();
-        let relation_task = move || Some(relation_reader_service.search(&relation_request));
-
-        let info = info_span!(parent: &span, "text search");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph search");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector search");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relations search");
-        let relation_task = || run_with_telemetry(info, relation_task);
+        let relation_task = index_queries.relations_request.map(|request| {
+            let relation_reader_service = self.relation_reader.clone();
+            let info = info_span!(parent: &span, "relations search");
+            let task = move || relation_reader_service.search(&request);
+            || run_with_telemetry(info, task)
+        });
 
         let mut rtext = None;
         let mut rparagraph = None;
@@ -488,17 +449,17 @@ impl ShardReader {
         let mut rrelation = None;
 
         crossbeam_thread::scope(|s| {
-            if !skip_fields {
-                s.spawn(|_| rtext = text_task());
+            if let Some(task) = text_task {
+                s.spawn(|_| rtext = Some(task()));
             }
-            if !skip_paragraphs {
-                s.spawn(|_| rparagraph = paragraph_task());
+            if let Some(task) = paragraph_task {
+                s.spawn(|_| rparagraph = Some(task()));
             }
-            if !skip_vectors {
-                s.spawn(|_| rvector = vector_task());
+            if let Some(task) = vector_task {
+                s.spawn(|_| rvector = Some(task()));
             }
-            if !skip_relations {
-                s.spawn(|_| rrelation = relation_task());
+            if let Some(task) = relation_task {
+                s.spawn(|_| rrelation = Some(task()));
             }
         })
         .expect("Failed to join threads");
