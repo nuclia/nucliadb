@@ -47,25 +47,14 @@ from nucliadb_protos.utils_pb2 import (
 )
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
+from nucliadb.ingest.orm.labels import (
+    BASE_LABELS,
+    flatten_resource_labels,
+    get_label_index_providers,
+)
 from nucliadb.ingest.orm.utils import compute_paragraph_key
-from nucliadb_models.metadata import ResourceProcessingStatus
-
-if TYPE_CHECKING:  # pragma: no cover
-    StatusValue = Union[Metadata.Status.V, int]
-else:
-    StatusValue = int
 
 FilePagePositions = Dict[int, Tuple[int, int]]
-
-
-METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
-    Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
-    Metadata.Status.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
-    Metadata.Status.PENDING: ResourceProcessingStatus.PENDING.name,
-    Metadata.Status.BLOCKED: ResourceProcessingStatus.BLOCKED.name,
-    Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
-}
 
 
 class ResourceBrain:
@@ -73,7 +62,7 @@ class ResourceBrain:
         self.rid = rid
         ridobj = ResourceID(uuid=rid)
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
-        self.tags: Dict[str, List[str]] = deepcopy(BASE_TAGS)
+        self.labels: Dict[str, List[str]] = deepcopy(BASE_LABELS)
 
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
@@ -320,12 +309,7 @@ class ResourceBrain:
             # Means it has just been processed
             self.brain.status = PBBrainResource.PROCESSED
 
-    def get_processing_status_tag(self, metadata: Metadata) -> str:
-        if not metadata.useful:
-            return "EMPTY"
-        return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
-
-    def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
+    def set_global_labels(self, basic: Basic, uuid: str, origin: Optional[Origin]):
         if basic.HasField("created"):
             self.brain.metadata.created.CopyFrom(basic.created)
         if basic.HasField("modified"):
@@ -338,18 +322,8 @@ class ResourceBrain:
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
         if origin is not None:
-            if origin.source_id:
-                self.tags["o"] = [origin.source_id]
-            # origin tags
-            for tag in origin.tags:
-                self.tags["t"].append(tag)
-            # origin source
-            if origin.source_id != "":
-                self.tags["u"].append(f"s/{origin.source_id}")
-
             # origin contributors
             for contrib in origin.colaborators:
-                self.tags["u"].append(f"o/{contrib}")
                 relationnodeuser = RelationNode(
                     value=contrib, ntype=RelationNode.NodeType.USER
                 )
@@ -367,24 +341,8 @@ class ResourceBrain:
             if origin.HasField("modified") and origin.modified.seconds > 0:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
-        # icon
-        self.tags["n"].append(f"i/{basic.icon}")
-
-        # processing status
-        status_tag = self.get_processing_status_tag(basic.metadata)
-        self.tags["n"].append(f"s/{status_tag}")
-
-        # main language
-        if basic.metadata.language != "":
-            self.tags["s"].append(f"p/{basic.metadata.language}")
-
-        # all language
-        for lang in basic.metadata.languages:
-            self.tags["s"].append(f"s/{lang}")
-
         # labels
         for classification in basic.usermetadata.classifications:
-            self.tags["l"].append(f"{classification.labelset}/{classification.label}")
             relation_node_label = RelationNode(
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
@@ -400,20 +358,23 @@ class ResourceBrain:
         # relations
         self.brain.relations.extend(basic.usermetadata.relations)
 
+        for index_provider in get_label_index_providers():
+            self.labels[index_provider.short].extend(index_provider.func(basic, origin))
+
         self.compute_tags()
 
     def process_meta(
         self,
         field_key: str,
         metadata: FieldMetadata,
-        tags: Dict[str, List[str]],
+        labels: Dict[str, List[str]],
         relation_node_document: RelationNode,
         user_canceled_labels: List[str],
     ):
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
-                tags["l"].append(label)
+                labels["l"].append(label)
                 relation_node_label = RelationNode(
                     value=label,
                     ntype=RelationNode.NodeType.LABEL,
@@ -427,7 +388,7 @@ class ResourceBrain:
                 )
 
         for klass_entity, _ in metadata.positions.items():
-            tags["e"].append(klass_entity)
+            labels["e"].append(klass_entity)
             entity_array = klass_entity.split("/")
             if len(entity_array) == 1:
                 raise AttributeError(f"Entity should be with type {klass_entity}")
@@ -448,10 +409,10 @@ class ResourceBrain:
         # all field keywords
         if field:
             for keyword in field.keywords:
-                self.tags["f"].append(f"{field_key}/{keyword.value}")
-                self.tags["fg"].append(keyword.value)
+                self.labels["f"].append(f"{field_key}/{keyword.value}")
+                self.labels["fg"].append(keyword.value)
 
-    def apply_field_tags_globally(
+    def apply_field_labels(
         self,
         field_key: str,
         metadata: Optional[FieldComputedMetadata],
@@ -471,16 +432,20 @@ class ResourceBrain:
         relation_node_resource = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
-        tags: Dict[str, List[str]] = {"l": [], "e": []}
+        labels: Dict[str, List[str]] = {"l": [], "e": []}
         if metadata is not None:
             for meta in metadata.split_metadata.values():
                 self.process_meta(
-                    field_key, meta, tags, relation_node_resource, user_canceled_labels
+                    field_key,
+                    meta,
+                    labels,
+                    relation_node_resource,
+                    user_canceled_labels,
                 )
             self.process_meta(
                 field_key,
                 metadata.metadata,
-                tags,
+                labels,
                 relation_node_resource,
                 user_canceled_labels,
             )
@@ -488,7 +453,7 @@ class ResourceBrain:
         if basic_user_fieldmetadata is not None:
             for token in basic_user_fieldmetadata.token:
                 if token.cancelled_by_user is False:
-                    tags["e"].append(f"{token.klass}/{token.token}")
+                    labels["e"].append(f"{token.klass}/{token.token}")
                     relation_node_entity = RelationNode(
                         value=token.token,
                         ntype=RelationNode.NodeType.ENTITY,
@@ -508,10 +473,10 @@ class ResourceBrain:
                         ].labels.append(
                             f"/l/{classification.labelset}/{classification.label}"
                         )
-        self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
+        self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
 
     def compute_tags(self):
-        self.brain.labels.extend(flat_resource_tags(self.tags))
+        self.brain.labels.extend(flatten_resource_labels(self.labels))
 
 
 def get_paragraph_text(
