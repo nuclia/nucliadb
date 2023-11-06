@@ -817,11 +817,13 @@ async def test_question_answer(
         qa.question.language = "catalan"
         qa.question.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
 
-        answer = Answers()
-        answer.text = f"My answer {i}"
-        answer.language = "catalan"
-        answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
-        qa.answers.append(answer)
+        for x in range(2):
+            answer = Answers()
+            answer.text = f"My answer {i}{x}"
+            answer.language = "catalan"
+            answer.ids_paragraphs.extend([f"id1/{i}{x}", f"id2/{i}{x}"])
+            qa.answers.append(answer)
+
         qaw.question_answers.question_answer.append(qa)
 
     message.question_answers.append(qaw)
@@ -831,10 +833,8 @@ async def test_question_answer(
     async def iterate(value: BrokerMessage):
         yield value
 
-    # XXX stores in kbs/<kbid>/r/<rid>/e/f/qa/question_answers
     await nucliadb_grpc.ProcessMessage(iterate(message))  # type: ignore
 
-    # XXX try to read back in kbs/<kbid>/r/<rid>/e/t/text1/question_answers
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
         timeout=None,
@@ -852,9 +852,14 @@ async def test_question_answer(
         },
         "answers": [
             {
-                "text": "My answer 0",
+                "ids_paragraphs": ["id1/00", "id2/00"],
                 "language": "catalan",
-                "ids_paragraphs": ["id1/0", "id2/0"],
-            }
+                "text": "My answer 00",
+            },
+            {
+                "ids_paragraphs": ["id1/01", "id2/01"],
+                "language": "catalan",
+                "text": "My answer 01",
+            },
         ],
     }
