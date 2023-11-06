@@ -333,7 +333,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 raise AttributeError()
             # If there is been no size finish the upload
             content_range = "bytes {init}-{chunk}/{total}".format(
-                init=dm.offset, chunk=dm.offset, total=dm.offset
+                init=dm.offset, chunk=dm.offset, total=dm.size
             )
             resumable_uri = dm.get("resumable_uri")
             async with self.storage.session.put(
