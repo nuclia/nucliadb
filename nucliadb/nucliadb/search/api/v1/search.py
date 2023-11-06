@@ -64,7 +64,7 @@ SEARCH_EXAMPLES = {
         description="For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
         value={
             "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
+            "filters": ["/icon/application/pdf"],
             "features": [SearchOptions.DOCUMENT],
         },
     ),

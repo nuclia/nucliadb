@@ -297,14 +297,14 @@ async def test_search_with_filters(
 
     # Check that filtering by pdf icon returns it
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/pdf"
+        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/pdf"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
     # With a different icon should return no results
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/docx"
+        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/docx"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 0
@@ -412,7 +412,7 @@ async def test_catalog_can_filter_by_processing_status(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "filters": ["/n/s/PENDING"],
+            "filters": ["/status/PENDING"],
         },
     )
     assert resp.status_code == 200
