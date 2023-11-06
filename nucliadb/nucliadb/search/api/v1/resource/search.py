@@ -52,6 +52,7 @@ from nucliadb_utils.authentication import requires_one
     description="Search on a Resource",
     tags=["Search"],
     response_model_exclude_unset=True,
+    response_model=ResourceSearchResults,
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
