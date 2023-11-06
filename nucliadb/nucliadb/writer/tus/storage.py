@@ -29,7 +29,7 @@ from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataMangaer
 from nucliadb.writer.tus.exceptions import HTTPRangeNotSatisfiable
 
-CACHED_BUCKETS = LRU(50)
+CACHED_BUCKETS = LRU(50)  # type: ignore
 
 
 class BlobStore:

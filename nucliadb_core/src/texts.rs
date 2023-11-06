@@ -22,7 +22,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
-
+use crate::query_planner::{PreFilterRequest, PreFilterResponse};
 pub type TextsReaderPointer = Arc<dyn FieldReader>;
 pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
 
@@ -48,6 +48,7 @@ impl Iterator for DocumentIterator {
 pub trait FieldReader:
     ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
 {
+    fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse>;
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator>;
     fn count(&self) -> NodeResult<usize>;
 }

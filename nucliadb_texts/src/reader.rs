@@ -28,6 +28,7 @@ use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
+use nucliadb_core::query_planner::{PreFilterRequest, PreFilterResponse};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
@@ -86,6 +87,12 @@ impl Debug for TextReaderService {
 }
 
 impl FieldReader for TextReaderService {
+    #[tracing::instrument(skip_all)]
+    fn pre_filter(&self, _request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+        // Right now it returns an empty response
+        Ok(PreFilterResponse::default())
+    }
+
     #[tracing::instrument(skip_all)]
     fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator> {
         let producer = BatchProducer {

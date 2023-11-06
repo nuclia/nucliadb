@@ -51,10 +51,6 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["stage", "local"]},
     },
-    const.Features.EXPORT_IMPORT_TASKS: {
-        "rollout": 0,
-        "variants": {"environment": ["stage", "local"]},
-    },
     const.Features.EXPERIMENTAL_KB: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
