@@ -35,9 +35,9 @@ from nucliadb_utils.grpc import get_traced_grpc_channel
 
 from .settings import settings
 
-READ_CONNECTIONS = LRU(50)
-WRITE_CONNECTIONS = LRU(50)
-SIDECAR_CONNECTIONS = LRU(50)
+READ_CONNECTIONS = LRU(50)  # type: ignore
+WRITE_CONNECTIONS = LRU(50)  # type: ignore
+SIDECAR_CONNECTIONS = LRU(50)  # type: ignore
 
 
 class IndexNode(AbstractIndexNode):
