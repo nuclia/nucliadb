@@ -23,7 +23,6 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
-
 BASE_LABELS: dict[str, list[str]] = {
     "t": [],  # doc tags
     "l": [],  # doc labels
