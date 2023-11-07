@@ -56,7 +56,7 @@ LABEL_QUERY_ALIASES_REVERSED = {
 }
 
 
-def translate_label_alias_to_system_label(label: str) -> str:
+def translate_alias_to_system_label(label: str) -> str:
     parts = label.split("/")
     if parts[1] in LABEL_QUERY_ALIASES:
         parts = [""] + [LABEL_QUERY_ALIASES[parts[1]]] + parts[2:]
@@ -65,7 +65,7 @@ def translate_label_alias_to_system_label(label: str) -> str:
         return label
 
 
-def translate_system_label_to_label_alias(label: str) -> str:
+def translate_system_to_alias_label(label: str) -> str:
     parts = label.split("/")
     if parts[1] in LABEL_QUERY_ALIASES_REVERSED:
         parts = [""] + [LABEL_QUERY_ALIASES_REVERSED[parts[1]]] + parts[2:]

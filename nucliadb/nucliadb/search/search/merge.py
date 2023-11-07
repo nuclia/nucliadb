@@ -42,7 +42,7 @@ from nucliadb.search.search.fetch import (
     get_seconds_paragraph,
 )
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.labels import translate_system_label_to_label_alias
+from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
@@ -132,9 +132,9 @@ async def merge_documents_results(
             query = document_response.query
         if document_response.facets:
             for key, value in document_response.facets.items():
-                key = translate_system_label_to_label_alias(key)
+                key = translate_system_to_alias_label(key)
                 for facetresult in value.facetresults:
-                    facet_label = translate_system_label_to_label_alias(facetresult.tag)
+                    facet_label = translate_system_to_alias_label(facetresult.tag)
                     facets.setdefault(key, {}).setdefault(facet_label, 0)
                     facets[key][facet_label] += facetresult.total
 
@@ -361,9 +361,9 @@ async def merge_paragraph_results(
 
         if paragraph_response.facets:
             for key, value in paragraph_response.facets.items():
-                key = translate_system_label_to_label_alias(key)
+                key = translate_system_to_alias_label(key)
                 for facetresult in value.facetresults:
-                    facet_label = translate_system_label_to_label_alias(facetresult.tag)
+                    facet_label = translate_system_to_alias_label(facetresult.tag)
                     facets.setdefault(key, {}).setdefault(facet_label, 0)
                     facets[key][facet_label] += facetresult.total
         if paragraph_response.next_page:

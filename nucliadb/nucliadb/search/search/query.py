@@ -39,8 +39,8 @@ from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.labels import (
-    translate_label_alias_to_system_label,
-    translate_system_label_to_label_alias,
+    translate_alias_to_system_label,
+    translate_system_to_alias_label,
 )
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -74,7 +74,7 @@ def translate_label_filters(filters: List[str]) -> List[str]:
                 "filters", f"Invalid label. It must start with a `/`: {fltr}"
             )
 
-        output.append(translate_label_alias_to_system_label(fltr))
+        output.append(translate_alias_to_system_label(fltr))
     return output
 
 
@@ -205,7 +205,7 @@ async def global_query_to_pb(
         if autofilter:
             entity_filters = parse_entities_to_filters(request, detected_entities)
             autofilters.extend(
-                [translate_system_label_to_label_alias(e) for e in entity_filters]
+                [translate_system_to_alias_label(e) for e in entity_filters]
             )
 
     if with_synonyms:
