@@ -44,6 +44,7 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
+    UserPrompt,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_utils.helpers import async_gen_lookahead
@@ -218,12 +219,16 @@ async def chat(
         )
     else:
         query_context = await get_chat_prompt_context(kbid, find_results)
+        user_prompt = None
+        if chat_request.prompt is not None:
+            user_prompt = UserPrompt(prompt=chat_request.prompt)
         chat_model = ChatModel(
             user_id=user_id,
             query_context=query_context,
             chat_history=chat_history,
             question=chat_request.query,
             truncate=True,
+            user_prompt=user_prompt,
         )
         predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(
