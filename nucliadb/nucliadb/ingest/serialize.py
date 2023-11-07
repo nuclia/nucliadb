@@ -102,6 +102,11 @@ async def set_resource_field_extracted_data(
         if user_data_vec is not None:
             field_data.uservectors = UserVectorSet.from_message(user_data_vec)
 
+    if ExtractedDataTypeName.QA in wanted_extracted_data:
+        qa = await field.get_question_answers()
+        if qa is not None:
+            field_data.question_answers = models.QuestionAnswers.from_message(qa)
+
     if (
         isinstance(field, File)
         and isinstance(field_data, FileFieldExtractedData)

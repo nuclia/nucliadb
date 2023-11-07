@@ -23,13 +23,16 @@ import pytest
 from httpx import AsyncClient
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
+    Answers,
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
     FieldID,
+    FieldQuestionAnswerWrapper,
     FieldType,
     FileExtractedData,
     LinkExtractedData,
     Paragraph,
+    QuestionAnswer,
 )
 from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
@@ -778,3 +781,85 @@ async def test_story_7081(
     assert resp.status_code == 200
     data = resp.json()
     assert data["origin"]["metadata"]["some"] == "data"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_question_answer(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    # create a new resource
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+        },
+    )
+
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # send a broker message with the Q/A
+    message = BrokerMessage()
+    qaw = FieldQuestionAnswerWrapper()
+    qaw.field.field_type = FieldType.TEXT
+    qaw.field.field = "text1"
+
+    for i in range(10):
+        qa = QuestionAnswer()
+
+        qa.question.text = f"My question {i}"
+        qa.question.language = "catalan"
+        qa.question.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+
+        for x in range(2):
+            answer = Answers()
+            answer.text = f"My answer {i}{x}"
+            answer.language = "catalan"
+            answer.ids_paragraphs.extend([f"id1/{i}{x}", f"id2/{i}{x}"])
+            qa.answers.append(answer)
+
+        qaw.question_answers.question_answer.append(qa)
+
+    message.question_answers.append(qaw)
+    message.uuid = rid
+    message.kbid = knowledgebox
+
+    async def iterate(value: BrokerMessage):
+        yield value
+
+    await nucliadb_grpc.ProcessMessage(iterate(message))  # type: ignore
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"][
+        "question_answer"
+    ][0] == {
+        "question": {
+            "text": "My question 0",
+            "language": "catalan",
+            "ids_paragraphs": ["id1/0", "id2/0"],
+        },
+        "answers": [
+            {
+                "ids_paragraphs": ["id1/00", "id2/00"],
+                "language": "catalan",
+                "text": "My answer 00",
+            },
+            {
+                "ids_paragraphs": ["id1/01", "id2/01"],
+                "language": "catalan",
+                "text": "My answer 01",
+            },
+        ],
+    }

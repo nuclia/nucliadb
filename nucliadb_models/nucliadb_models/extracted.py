@@ -293,6 +293,37 @@ class FileExtractedData(BaseModel):
         )
 
 
+class Question(BaseModel):
+    text: str
+    language: str
+    ids_paragraphs: List[str]
+
+
+class Answer(BaseModel):
+    text: str
+    language: str
+    ids_paragraphs: List[str]
+
+
+class QuestionAnswer(BaseModel):
+    question: Question
+    answers: List[Answer]
+
+
+class QuestionAnswers(BaseModel):
+    question_answer: List[QuestionAnswer]
+
+    @classmethod
+    def from_message(cls: Type[_T], message: resources_pb2.QuestionAnswers) -> _T:
+        return cls(
+            **MessageToDict(
+                message,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
+
+
 def convert_fieldmetadata_pb_to_dict(
     message: resources_pb2.FieldMetadata,
 ) -> Dict[str, Any]:

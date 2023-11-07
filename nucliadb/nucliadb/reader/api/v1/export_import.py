@@ -36,8 +36,6 @@ from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb_models.export_import import Status, StatusResponse
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
-from nucliadb_utils.const import Features
-from nucliadb_utils.utilities import has_feature
 
 
 @api.get(
@@ -54,7 +52,7 @@ async def download_export_kb_endpoint(request: Request, kbid: str, export_id: st
     if not await exists_kb(context, kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
-    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
+    if in_standalone_mode():
         # In standalone mode, we stream the export as we generate it.
         return StreamingResponse(
             exporter.export_kb(context, kbid),
@@ -142,7 +140,7 @@ async def _get_status(
     if type not in ("export", "import"):
         raise ValueError(f"Incorrect type: {type}")
 
-    if in_standalone_mode() or not has_feature(Features.EXPORT_IMPORT_TASKS):
+    if in_standalone_mode():
         # In standalone mode exports/imports are not actually run in a background task.
         # We return always FINISHED status to keep the API compatible with the hosted mode.
         return StatusResponse(status=Status.FINISHED)

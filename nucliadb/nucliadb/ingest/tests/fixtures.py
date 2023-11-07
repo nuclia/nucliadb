@@ -691,6 +691,24 @@ async def create_resource(
     )
     await field_obj.set_user_vectors(user_vectors)
 
+    # Q/A
+    question_answers = rpb.FieldQuestionAnswerWrapper()
+    for i in range(10):
+        qa = rpb.QuestionAnswer()
+
+        qa.question.text = f"My question {i}"
+        qa.question.language = "catalan"
+        qa.question.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+
+        answer = rpb.Answers()
+        answer.text = f"My answer {i}"
+        answer.language = "catalan"
+        answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+        qa.answers.append(answer)
+        question_answers.question_answers.question_answer.append(qa)
+
+    await field_obj.set_question_answers(question_answers)
+
     await txn.commit()
     return test_resource
 

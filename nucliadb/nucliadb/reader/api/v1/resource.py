@@ -157,6 +157,7 @@ async def get_resource_by_uuid(
             ExtractedDataTypeName.METADATA,
             ExtractedDataTypeName.LINK,
             ExtractedDataTypeName.FILE,
+            ExtractedDataTypeName.QA,
         ]
     ),
     x_nucliadb_user: str = Header(""),
@@ -197,6 +198,7 @@ async def get_resource_by_slug(
             ExtractedDataTypeName.METADATA,
             ExtractedDataTypeName.LINK,
             ExtractedDataTypeName.FILE,
+            ExtractedDataTypeName.QA,
         ]
     ),
     x_nucliadb_user: str = Header(""),
@@ -269,6 +271,7 @@ async def get_resource_field_rslug_prefix(
             ExtractedDataTypeName.METADATA,
             ExtractedDataTypeName.LINK,
             ExtractedDataTypeName.FILE,
+            ExtractedDataTypeName.QA,
         ]
     ),
     # not working with latest pydantic/fastapi
