@@ -412,7 +412,7 @@ async def test_catalog_can_filter_by_processing_status(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "filters": ["/status/PENDING"],
+            "filters": ["/metadata.status/PENDING"],
         },
     )
     assert resp.status_code == 200

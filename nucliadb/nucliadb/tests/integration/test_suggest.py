@@ -130,7 +130,7 @@ async def test_suggest_paragraphs(
         f"/kb/{knowledgebox}/suggest",
         params={
             "query": "prince",
-            "filters": "/primary-language/en",
+            "filters": "/metadata.language/en",
         },
     )
     assert resp.status_code == 200
@@ -145,7 +145,7 @@ async def test_suggest_paragraphs(
         f"/kb/{knowledgebox}/suggest",
         params={
             "query": "prince",
-            "filters": "/primary-language/de",
+            "filters": "/metadata.language/de",
         },
     )
     assert resp.status_code == 200
