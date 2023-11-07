@@ -289,7 +289,7 @@ class PredictEngine:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
 
-        error = await resp.text()
+        error = (await resp.read()).decode()
         logger.error(f"Predict API error at {resp.url}: {error}")
         raise SendToPredictError(f"{resp.status}: {error}")
 

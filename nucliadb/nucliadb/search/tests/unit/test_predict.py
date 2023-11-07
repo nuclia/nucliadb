@@ -52,6 +52,8 @@ def get_mocked_session(
     if json is not None:
         response.json = AsyncMock(return_value=json)
     if read is not None:
+        if isinstance(read, str):
+            read = read.encode()
         response.read = AsyncMock(return_value=read)
     if context_manager:
         # For when async with self.session.post() as response: is called
