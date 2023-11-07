@@ -423,14 +423,14 @@ async def test_catalog_can_filter_by_processing_status(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "faceted": ["/n/s"],
+            "faceted": ["/metadata.status"],
         },
     )
     assert resp.status_code == 200
     resp_json = resp.json()
     facets = resp_json["fulltext"]["facets"]
     for status in valid_status:
-        assert facets["/n/s"][f"/n/s/{status}"] == 1
+        assert facets["/metadata.status"][f"/metadata.status/{status}"] == 1
 
 
 @pytest.mark.skip(reason="Needs sc-5626")
@@ -730,13 +730,13 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "faceted": ["/n/s"],
+            "faceted": ["/metadata.status"],
         },
     )
     assert resp.status_code == 200
     resp_json = resp.json()
     facets = resp_json["fulltext"]["facets"]
-    assert facets["/n/s"] == {"/n/s/PENDING": 1}
+    assert facets["/metadata.status"] == {"/metadata.status/PENDING": 1}
 
 
 @pytest.mark.asyncio
