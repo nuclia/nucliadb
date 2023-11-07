@@ -34,7 +34,7 @@ use io::{BufWriter, Write};
 use key_value::Slot;
 use memmap2::Mmap;
 use node::Node;
-use nucliadb_core::tracing::debug;
+use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::Channel;
 pub use ops_hnsw::DataRetriever;
 use ops_hnsw::HnswOps;
@@ -171,7 +171,7 @@ impl FormulaFilter<'_> {
         match FormulaFilter::try_new_with_fst(filter, key_index, label_index, total_nodes) {
             Ok(successful_fst) => successful_fst,
             Err(err) => {
-                debug!("No FST due to corrupted index files: {err:?}");
+                error!("No FST due to corrupted index files: {err:?}");
                 FormulaFilter {
                     filter,
                     total_nodes,
