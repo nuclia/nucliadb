@@ -550,6 +550,10 @@ async def test_qa(
 
     assert qaw.question_answers == res_qa
 
+    # delete op
+    message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
+    await stream_processor.process(message=message, seqid=2)
+
 
 @pytest.mark.asyncio
 async def test_ingest_audit_stream_mixed(

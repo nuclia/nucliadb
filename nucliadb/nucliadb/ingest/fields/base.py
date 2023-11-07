@@ -158,6 +158,14 @@ class Field:
         await self.delete_extracted_text()
         await self.delete_vectors()
         await self.delete_metadata()
+        await self.delete_question_answers()
+
+    async def delete_question_answers(self) -> None:
+        sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
+        try:
+            await self.storage.delete_upload(sf.key, sf.bucket)
+        except KeyError:
+            pass
 
     async def delete_extracted_text(self) -> None:
         sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
