@@ -29,7 +29,7 @@ use nucliadb_node::grpc::middleware::{
     GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
 };
 use nucliadb_node::grpc::writer::{NodeWriterEvent, NodeWriterGRPCDriver};
-use nucliadb_node::http_server::{run_http_server, ServerOptions};
+use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate_forever;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
@@ -77,7 +77,7 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?);
+    let settings: Settings = EnvSettingsProvider::generate_settings()?;
 
     let _guard = init_telemetry(&settings)?;
     let metrics = metrics::get_metrics();
@@ -88,8 +88,8 @@ async fn main() -> NodeResult<()> {
     }
 
     // XXX it probably should be moved to a more clear abstraction
-    lifecycle::initialize_writer(&data_path, &settings.shards_path())?;
-    let node_metadata = NodeMetadata::new().await?;
+    lifecycle::initialize_writer(settings.clone())?;
+    let node_metadata = NodeMetadata::new(settings.clone()).await?;
     let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
 
     let host_key_path = settings.host_key_path();
@@ -98,14 +98,14 @@ async fn main() -> NodeResult<()> {
     nucliadb_node::analytics::sync::start_analytics_loop();
 
     let (shutdown_notifier, shutdown_notified) = get_shutdown_notifier();
-    let shard_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+    let shard_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.clone()));
 
     let mut replication_task = None;
     if settings.node_role() == NodeRole::Secondary {
         // when it's a secondary server, do not even run the writer GRPC service
         // because nothing should happen through that interface
         replication_task = Some(tokio::spawn(connect_to_primary_and_replicate_forever(
-            Arc::clone(&settings),
+            settings.clone(),
             Arc::clone(&shard_cache),
             node_id.to_string(),
             Arc::clone(&shutdown_notified),
@@ -113,7 +113,7 @@ async fn main() -> NodeResult<()> {
     }
 
     let grpc_task = tokio::spawn(start_grpc_service(
-        Arc::clone(&settings),
+        settings.clone(),
         Arc::clone(&shard_cache),
         metadata_sender.clone(),
         node_id.to_string(),
@@ -130,9 +130,7 @@ async fn main() -> NodeResult<()> {
             None => tokio::spawn(task),
         };
     }
-    let metrics_task = tokio::spawn(run_http_server(ServerOptions {
-        default_http_port: 3032,
-    }));
+    let metrics_task = tokio::spawn(run_http_server(settings.clone()));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
 
@@ -166,7 +164,7 @@ async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
 }
 
 pub async fn start_grpc_service(
-    settings: Arc<Settings>,
+    settings: Settings,
     shard_cache: Arc<AsyncUnboundedShardWriterCache>,
     metadata_sender: UnboundedSender<NodeWriterEvent>,
     node_id: String,
@@ -188,7 +186,7 @@ pub async fn start_grpc_service(
         .add_service(health_service);
 
     if settings.node_role() == NodeRole::Primary {
-        let grpc_driver = NodeWriterGRPCDriver::new(Arc::clone(&settings), shard_cache.clone())
+        let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone())
             .with_sender(metadata_sender);
         grpc_driver.initialize().await?;
         let replication_server =

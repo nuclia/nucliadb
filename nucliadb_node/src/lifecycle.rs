@@ -20,17 +20,17 @@
 
 //! Application initialization and finalization utilities
 
-use std::path::Path;
-
 use nucliadb_core::prelude::*;
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 
-use crate::env;
+use crate::settings::Settings;
 
 /// Initialize the index node writer. This function must be called before using
 /// a writer
-pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()> {
+pub fn initialize_writer(settings: Settings) -> NodeResult<()> {
+    let data_path = settings.data_path();
+    let shards_path = settings.shards_path();
     if !data_path.exists() {
         return Err(node_error!(
             "Data directory ({:?}) should be already created",
@@ -44,7 +44,7 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
 
     // We shallow the error if the threadpools were already initialized
     let _ = ThreadPoolBuilder::new()
-        .num_threads(env::num_global_rayon_threads())
+        .num_threads(settings.num_global_rayon_threads())
         .build_global();
     let _ = VectorsMerger::install_global().map(std::thread::spawn);
 
@@ -53,9 +53,9 @@ pub fn initialize_writer(data_path: &Path, shards_path: &Path) -> NodeResult<()>
 
 /// Initialize the index node reader. This function must be called before using
 /// a reader
-pub fn initialize_reader() {
+pub fn initialize_reader(settings: Settings) {
     // We swallow the error if the threadpool was already initialized
     let _ = ThreadPoolBuilder::new()
-        .num_threads(env::num_global_rayon_threads())
+        .num_threads(settings.num_global_rayon_threads())
         .build_global();
 }

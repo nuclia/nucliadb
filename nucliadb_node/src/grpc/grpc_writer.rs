@@ -45,7 +45,7 @@ use crate::utils::list_shards;
 pub struct NodeWriterGRPCDriver {
     shards: Arc<AsyncUnboundedShardWriterCache>,
     sender: Option<UnboundedSender<NodeWriterEvent>>,
-    settings: Arc<Settings>,
+    settings: Settings,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +55,7 @@ pub enum NodeWriterEvent {
 }
 
 impl NodeWriterGRPCDriver {
-    pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
+    pub fn new(settings: Settings, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
         Self {
             settings,
             shards: shard_cache,
@@ -414,7 +414,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
         &self,
         _request: Request<EmptyQuery>,
     ) -> Result<Response<NodeMetadata>, Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        let metadata_settings = self.settings.clone();
+        let metadata = crate::node_metadata::NodeMetadata::new(metadata_settings).await;
         match metadata {
             Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

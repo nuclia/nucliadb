@@ -27,7 +27,7 @@ use nucliadb_node::grpc::middleware::{
     GrpcDebugLogsLayer, GrpcInstrumentorLayer, GrpcTasksMetricsLayer,
 };
 use nucliadb_node::grpc::reader::NodeReaderGRPCDriver;
-use nucliadb_node::http_server::{run_http_server, ServerOptions};
+use nucliadb_node::http_server::run_http_server;
 use nucliadb_node::lifecycle;
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use nucliadb_node::replication::NodeRole;
@@ -48,26 +48,25 @@ async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Reader Node starting...");
     let start_bootstrap = Instant::now();
 
-    let settings: Arc<Settings> = Arc::new(EnvSettingsProvider::generate_settings()?);
+    let settings: Settings = EnvSettingsProvider::generate_settings()?;
 
     if !settings.data_path().exists() {
         return Err(node_error!("Data directory missing"));
     }
 
     // XXX it probably should be moved to a more clear abstraction
-    lifecycle::initialize_reader();
+    lifecycle::initialize_reader(settings.clone());
+
     let _guard = init_telemetry(&settings)?;
     nucliadb_node::analytics::sync::start_analytics_loop();
 
     let shutdown_notifier = Arc::new(Notify::new());
 
     let grpc_task = tokio::spawn(start_grpc_service(
-        Arc::clone(&settings),
+        settings.clone(),
         Arc::clone(&shutdown_notifier),
     ));
-    let metrics_task = tokio::spawn(run_http_server(ServerOptions {
-        default_http_port: 3031,
-    }));
+    let metrics_task = tokio::spawn(run_http_server(settings.clone()));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
@@ -96,17 +95,14 @@ async fn wait_for_sigkill(shutdown_notifier: Arc<Notify>) -> NodeResult<()> {
     Ok(())
 }
 
-async fn health_checker(
-    mut health_reporter: HealthReporter,
-    settings: Arc<Settings>,
-) -> NodeResult<()> {
+async fn health_checker(mut health_reporter: HealthReporter, settings: Settings) -> NodeResult<()> {
     if settings.node_role() == NodeRole::Primary {
         // cut out early, this check is for secondaries only right now
         health_reporter.set_serving::<GrpcServer>().await;
         return Ok(());
     }
 
-    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&settings));
+    let repl_health_mng = ReplicationHealthManager::new(settings.clone());
     loop {
         if repl_health_mng.healthy() {
             health_reporter.set_serving::<GrpcServer>().await;
@@ -118,7 +114,7 @@ async fn health_checker(
 }
 
 pub async fn start_grpc_service(
-    settings: Arc<Settings>,
+    settings: Settings,
     shutdown_notifier: Arc<Notify>,
 ) -> NodeResult<()> {
     let listen_address = settings.reader_listen_address();
@@ -134,7 +130,7 @@ pub async fn start_grpc_service(
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
     tokio::spawn(health_checker(health_reporter, settings.clone()));
 
-    let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
+    let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
     grpc_driver.initialize().await?;
 
     Server::builder()

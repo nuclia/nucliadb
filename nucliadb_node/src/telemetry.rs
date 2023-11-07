@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use nucliadb_core::tracing::{Level, Metadata, Span};
 use nucliadb_core::{Context, NodeResult};
@@ -32,13 +31,12 @@ use tracing_subscriber::layer::{Context as LayerContext, Filter, Layer, Subscrib
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Registry;
 
-use crate::env::is_debug;
 use crate::settings::Settings;
 use crate::utils::ALL_TARGETS;
 
 const TRACE_ID: &str = "trace-id";
 
-pub fn init_telemetry(settings: &Arc<Settings>) -> NodeResult<Option<ClientInitGuard>> {
+pub fn init_telemetry(settings: &Settings) -> NodeResult<Option<ClientInitGuard>> {
     let mut layers = Vec::new();
 
     let stdout = stdout_layer(settings);
@@ -143,7 +141,7 @@ impl<S> Filter<S> for LogLevelsFilter {
 /// - exact match. e.g. `node_reader`
 /// - partial match. e.g. `node*` will match all targets starting with `node`
 /// - catch-all using `*`
-fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sync> {
+fn stdout_layer(settings: &Settings) -> Box<dyn Layer<Registry> + Send + Sync> {
     let log_levels = settings.log_levels().to_vec();
     let layer = tracing_subscriber::fmt::layer()
         .with_level(true)
@@ -151,20 +149,21 @@ fn stdout_layer(settings: &Arc<Settings>) -> Box<dyn Layer<Registry> + Send + Sy
 
     let filter = LogLevelsFilter::new(log_levels);
 
-    if settings.plain_logs() || is_debug() {
+    if settings.plain_logs() || settings.debug() {
         layer
             .event_format(tracing_subscriber::fmt::format().compact())
             .with_filter(filter)
             .boxed()
     } else {
         layer
-            .event_format(tracing_subscriber::fmt::format().json())
+            .event_format(tracing_subscriber::fmt::format::Format::default().json())
+            .fmt_fields(tracing_subscriber::fmt::format::JsonFields::new())
             .with_filter(filter)
             .boxed()
     }
 }
 
-fn jaeger_layer(settings: &Arc<Settings>) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
+fn jaeger_layer(settings: &Settings) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
     global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     let agent_endpoint = settings.jaeger_agent_address();

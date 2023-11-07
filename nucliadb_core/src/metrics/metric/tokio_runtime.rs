@@ -19,7 +19,6 @@
 
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
-use crate::tracing::info;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::metrics::histogram::Histogram;
@@ -28,6 +27,7 @@ use tokio;
 use tokio::runtime::Handle;
 use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
 
+use crate::tracing::info;
 use crate::{node_error, NodeResult};
 
 pub struct TokioRuntimeObserver {
