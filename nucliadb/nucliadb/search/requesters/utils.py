@@ -84,7 +84,7 @@ T = TypeVar(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: REQUEST_TYPE,
+    pb_query: SuggestRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
 ) -> Tuple[List[SuggestResponse], bool, List[Tuple[str, str, str]], List[str]]:
@@ -95,7 +95,7 @@ async def node_query(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: REQUEST_TYPE,
+    pb_query: ParagraphSearchRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
 ) -> Tuple[List[ParagraphSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
@@ -106,7 +106,7 @@ async def node_query(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: REQUEST_TYPE,
+    pb_query: SearchRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
 ) -> Tuple[List[SearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
@@ -117,7 +117,7 @@ async def node_query(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: REQUEST_TYPE,
+    pb_query: RelationSearchRequest,
     target_replicas: Optional[list[str]] = None,
     read_only: bool = True,
 ) -> Tuple[List[RelationSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
@@ -151,7 +151,7 @@ async def node_query(
     for shard_obj in shard_groups:
         try:
             node, shard_id, node_id = cluster_manager.choose_node(
-                shard_obj, target_replicas=target_replicas, read_only=read_only
+                shard_obj, read_only=read_only, target_replicas=target_replicas
             )
         except KeyError:
             incomplete_results = True

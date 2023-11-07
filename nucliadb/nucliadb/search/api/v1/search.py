@@ -235,7 +235,7 @@ async def catalog(
             kbid,
             Method.SEARCH,
             pb_query,
-            shards=shards,
+            target_replicas=shards,
             # Catalog should not go to read replicas because we want it to be
             # consistent and most up to date results
             read_only=False,
