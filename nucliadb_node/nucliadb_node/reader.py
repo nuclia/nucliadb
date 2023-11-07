@@ -33,7 +33,7 @@ from nucliadb_node import SERVICE_NAME  # type: ignore
 from nucliadb_utils.grpc import get_traced_grpc_channel
 
 logger = logging.getLogger(__name__)
-CACHE = LRU(128)
+CACHE = LRU(128)  # type: ignore
 
 
 class Reader:
