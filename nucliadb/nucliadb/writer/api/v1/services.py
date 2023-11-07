@@ -336,7 +336,7 @@ async def delete_custom_synonyms(request: Request, kbid: str):
         )
 
 
-@api.post(
+@api.patch(
     f"/{KB_PREFIX}/{{kbid}}/configuration",
     status_code=200,
     name="Set KB configuration for On Premise deployments",

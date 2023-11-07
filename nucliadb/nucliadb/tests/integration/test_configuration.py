@@ -33,7 +33,7 @@ async def test_kb_configuration(
 ):
     kbid = knowledgebox
 
-    resp = await nucliadb_writer.post(
+    resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/configuration",
         json={
             "semantic_model": "test1",
@@ -47,7 +47,7 @@ async def test_kb_configuration(
     assert len(body) == 1
     assert body.get("semantic_model") == "test1"
 
-    resp = await nucliadb_writer.post(
+    resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/configuration",
         json={
             "generative_model": "test1",
