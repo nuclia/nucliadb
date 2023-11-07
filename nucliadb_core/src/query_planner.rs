@@ -37,8 +37,8 @@ pub enum FieldDateType {
 #[derive(Debug, Clone)]
 pub struct TimestampFilter {
     pub applies_to: FieldDateType,
-    pub from: ProtoTimestamp,
-    pub to: ProtoTimestamp,
+    pub from: Option<ProtoTimestamp>,
+    pub to: Option<ProtoTimestamp>,
 }
 
 /// A query plan pre-filtering stage.
@@ -74,10 +74,21 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
+    fn apply_to_vectors(request: &mut VectorSearchRequest, pre_filtered: &PreFilterResponse) {
+        for valid_field in pre_filtered.valid_fields.iter() {
+            let resource_id = &valid_field.resource_id;
+            let field_id = &valid_field.field_id;
+            let as_vectors_key = format!("{resource_id}/f/{field_id}");
+            request.key_filters.push(as_vectors_key);
+        }
+    }
+
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
-    pub fn apply_pre_filter(&mut self, _pre_filtered: PreFilterResponse) {
-        // Right now there is no logic to add
+    pub fn apply_pre_filter(&mut self, pre_filtered: PreFilterResponse) {
+        if let Some(vectors_request) = self.vectors_request.as_mut() {
+            IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
+        };
     }
 }
 
@@ -103,8 +114,26 @@ impl From<SearchRequest> for QueryPlan {
     }
 }
 
-fn compute_pre_filters(_: &SearchRequest) -> Option<PreFilterRequest> {
-    None
+fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
+    let Some(timestamp_filters) = search_request.timestamps.as_ref() else {
+        return None;
+    };
+    let mut pre_filter_request = PreFilterRequest {
+        timestamp_filters: vec![],
+    };
+    let modified_filter = TimestampFilter {
+        applies_to: FieldDateType::Modified,
+        from: timestamp_filters.from_modified.clone(),
+        to: timestamp_filters.to_modified.clone(),
+    };
+    let created_filter = TimestampFilter {
+        applies_to: FieldDateType::Created,
+        from: timestamp_filters.from_created.clone(),
+        to: timestamp_filters.to_created.clone(),
+    };
+    pre_filter_request.timestamp_filters.push(modified_filter);
+    pre_filter_request.timestamp_filters.push(created_filter);
+    Some(pre_filter_request)
 }
 
 fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<ParagraphSearchRequest> {
