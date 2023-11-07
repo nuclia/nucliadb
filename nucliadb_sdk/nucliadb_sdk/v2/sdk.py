@@ -468,7 +468,7 @@ class _NucliaDBBase:
     set_configuration = _request_builder(
         name="set_configuration",
         path_template="/v1/kb/{kbid}/configuration",
-        method="PATCH",
+        method="POST",
         path_params=("kbid",),
         request_type=KBConfiguration,
         response_type=None,
