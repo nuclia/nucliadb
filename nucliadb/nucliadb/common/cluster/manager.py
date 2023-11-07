@@ -468,30 +468,37 @@ def choose_node(
     """
     Choose an arbitrary node storing `shard`.
     """
-    potential_nodes = []
+    preferred_nodes = []
+    backend_nodes = []
     for shardreplica in shard.replicas:
         node_id = shardreplica.node
         replica_id = shardreplica.shard.id
 
-        if target_replicas and replica_id not in target_replicas:
-            continue
-
         node = get_index_node(node_id)
         if node is not None:
-            potential_nodes.append((replica_id, node))
+            if target_replicas and replica_id not in target_replicas:
+                preferred_nodes.append((replica_id, node))
+            else:
+                backend_nodes.append((replica_id, node))
 
         if read_only:
             for read_replica_node_id in get_read_replica_node_ids(node_id):
                 read_replica_node = get_index_node(read_replica_node_id)
                 if read_replica_node is None:
                     continue
-                potential_nodes.append((replica_id, read_replica_node))
+                if target_replicas and replica_id not in target_replicas:
+                    preferred_nodes.append((replica_id, read_replica_node))
+                else:
+                    backend_nodes.append((replica_id, read_replica_node))
 
-    if len(potential_nodes) == 0:
+    if len(preferred_nodes) == 0 and len(backend_nodes) == 0:
         raise NoHealthyNodeAvailable("Could not find a node to query")
 
     selected_node: AbstractIndexNode
-    replica_id, selected_node = random.choice(potential_nodes)
+    if len(preferred_nodes) > 0:
+        replica_id, selected_node = random.choice(preferred_nodes)
+    else:
+        replica_id, selected_node = random.choice(backend_nodes)
     return selected_node, replica_id, selected_node.id
 
 
