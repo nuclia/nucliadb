@@ -82,34 +82,54 @@ T = TypeVar(
 
 @overload  # type: ignore
 async def node_query(
-    kbid: str, method: Method, pb_query: SuggestRequest, read_only: bool = True
+    kbid: str,
+    method: Method,
+    pb_query: REQUEST_TYPE,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = True,
 ) -> Tuple[List[SuggestResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 @overload
 async def node_query(
-    kbid: str, method: Method, pb_query: ParagraphSearchRequest, read_only: bool = True
+    kbid: str,
+    method: Method,
+    pb_query: REQUEST_TYPE,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = True,
 ) -> Tuple[List[ParagraphSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 @overload
 async def node_query(
-    kbid: str, method: Method, pb_query: SearchRequest, read_only: bool = True
+    kbid: str,
+    method: Method,
+    pb_query: REQUEST_TYPE,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = True,
 ) -> Tuple[List[SearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 @overload
 async def node_query(
-    kbid: str, method: Method, pb_query: RelationSearchRequest, read_only: bool = True
+    kbid: str,
+    method: Method,
+    pb_query: REQUEST_TYPE,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = True,
 ) -> Tuple[List[RelationSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
     ...
 
 
 async def node_query(
-    kbid: str, method: Method, pb_query: REQUEST_TYPE, read_only: bool = True
+    kbid: str,
+    method: Method,
+    pb_query: REQUEST_TYPE,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = True,
 ) -> Tuple[List[T], bool, List[Tuple[str, str, str]], List[str]]:
     read_only = read_only and has_feature(const.Features.READ_REPLICA_SEARCHES)
 
@@ -131,7 +151,7 @@ async def node_query(
     for shard_obj in shard_groups:
         try:
             node, shard_id, node_id = cluster_manager.choose_node(
-                shard_obj, read_only=read_only
+                shard_obj, target_replicas=target_replicas, read_only=read_only
             )
         except KeyError:
             incomplete_results = True

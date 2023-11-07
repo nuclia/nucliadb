@@ -62,10 +62,8 @@ async def test_multiple_fuzzy_search_resource_all(
         resp = await client.get(
             f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&page_number=0&page_size=20',
         )
-        if resp.status_code != 200:
-            print(resp.content)
 
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.content
         assert len(resp.json()["paragraphs"]["results"]) == 20
 
         # Expected results:
@@ -86,7 +84,6 @@ async def test_multiple_search_resource_all(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(5)  # lovely, 5 sec sleep again
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40",
         )
@@ -122,9 +119,7 @@ async def test_multiple_search_resource_all(
                 resp = await client.get(
                     f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
                 )
-                if resp.status_code != 200:
-                    print(resp.content)
-                assert resp.status_code == 200
+                assert resp.status_code == 200, resp.content
             else:
                 break
         assert len(resp.json()["paragraphs"]["results"]) == 20
@@ -217,7 +212,6 @@ async def test_search_resource_all(
     await txn.abort()
 
 
-@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_search_pagination(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -225,8 +219,6 @@ async def test_search_pagination(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(5)  # oi, this kind of sucks
-
         n_results_expected = 100
         page_size = 20
         expected_requests = math.ceil(n_results_expected / page_size)
@@ -242,10 +234,7 @@ async def test_search_pagination(
 
             resp = await client.get(url)
 
-            if resp.status_code != 200:
-                print(resp.content)
-
-            assert resp.status_code == 200
+            assert resp.status_code == 200, resp.content
 
             response = resp.json()
 

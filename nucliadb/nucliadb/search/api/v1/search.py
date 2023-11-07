@@ -133,6 +133,7 @@ async def search_knowledgebox(
     extracted: List[ExtractedDataTypeName] = fastapi_query(
         SearchParamDefaults.extracted
     ),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
@@ -164,6 +165,7 @@ async def search_knowledgebox(
             show=show,
             field_type_filter=field_type_filter,
             extracted=extracted,
+            shards=shards,
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
@@ -199,6 +201,7 @@ async def catalog(
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
     with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status
     ),
@@ -232,6 +235,7 @@ async def catalog(
             kbid,
             Method.SEARCH,
             pb_query,
+            shards=shards,
             # Catalog should not go to read replicas because we want it to be
             # consistent and most up to date results
             read_only=False,
@@ -352,7 +356,7 @@ async def search(
     )
 
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.SEARCH, pb_query
+        kbid, Method.SEARCH, pb_query, target_replicas=item.shards
     )
 
     incomplete_results = incomplete_results or query_incomplete_results

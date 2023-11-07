@@ -461,7 +461,9 @@ class StandaloneKBShardManager(KBShardManager):
 
 
 def choose_node(
-    shard: writer_pb2.ShardObject, read_only: bool = False
+    shard: writer_pb2.ShardObject,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = False,
 ) -> tuple[AbstractIndexNode, str, str]:
     """
     Choose an arbitrary node storing `shard`.
@@ -470,6 +472,10 @@ def choose_node(
     for shardreplica in shard.replicas:
         node_id = shardreplica.node
         replica_id = shardreplica.shard.id
+
+        if target_replicas and replica_id not in target_replicas:
+            continue
+
         node = get_index_node(node_id)
         if node is not None:
             potential_nodes.append((replica_id, node))

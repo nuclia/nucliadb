@@ -149,6 +149,7 @@ async def get_find_results(
     find_request.range_modification_end = chat_request.range_modification_end
     find_request.show = chat_request.show
     find_request.extracted = chat_request.extracted
+    find_request.shards = chat_request.shards
     find_request.autofilter = chat_request.autofilter
     find_request.highlight = chat_request.highlight
 
@@ -173,7 +174,9 @@ async def get_relations_results(
         _,
         _,
         _,
-    ) = await node_query(kbid, Method.RELATIONS, relation_request)
+    ) = await node_query(
+        kbid, Method.RELATIONS, relation_request, target_replicas=chat_request.shards
+    )
     return merge_relations_results(relations_results, relation_request.subgraph)
 
 
