@@ -47,8 +47,8 @@ from nucliadb_protos.utils_pb2 import (
 )
 
 from nucliadb.ingest import logger
-from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
 from nucliadb.ingest.orm.utils import compute_paragraph_key
+from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 
 if TYPE_CHECKING:  # pragma: no cover

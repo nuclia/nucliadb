@@ -314,3 +314,30 @@ async def test_search_handles_limits_exceeded_error(
         resp = await client.post(f"/{KB_PREFIX}/{kb}/search", json={})
         assert resp.status_code == 402
         assert resp.json() == {"detail": "over the quota"}
+
+
+@pytest.mark.asyncio
+async def test_search_with_facets(
+    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+) -> None:
+    kbid = multiple_search_resource
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        url = (
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
+        )
+
+        resp = await client.get(url)
+        data = resp.json()
+        assert (
+            data["fulltext"]["facets"]["/classification.labels"][
+                "/classification.labels/labelset1"
+            ]
+            == 100
+        )
+        assert (
+            data["paragraphs"]["facets"]["/classification.labels"][
+                "/classification.labels/labelset1"
+            ]
+            == 100
+        )

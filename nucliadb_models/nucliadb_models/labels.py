@@ -39,16 +39,16 @@ BASE_LABELS: dict[str, list[str]] = {
 
 LABEL_QUERY_ALIASES = {
     # aliases to make querying labels easier
-    "icon": ["n", "i"],
-    "metadata.status": ["n", "s"],
-    "metadata.language": ["s", "p"],
-    "metadata.languages": ["s", "s"],
-    "origin.tags": ["t"],
-    "origin.metadata": ["m"],
-    "classification.labels": ["l"],
-    "entities": ["e"],
-    "field": ["f"],
-    "field-values": ["fg"],
+    "icon": "n/i",
+    "metadata.status": "n/s",
+    "metadata.language": "s/p",
+    "metadata.languages": "s/s",
+    "origin.tags": "t",
+    "origin.metadata": "m",
+    "classification.labels": "l",
+    "entities": "e",
+    "field": "f",
+    "field-values": "fg",
 }
 
 LABEL_QUERY_ALIASES_REVERSED = {
@@ -59,19 +59,19 @@ LABEL_QUERY_ALIASES_REVERSED = {
 def translate_label_alias_to_system_label(label: str) -> str:
     parts = label.split("/")
     if parts[1] in LABEL_QUERY_ALIASES:
-        parts = [""] + LABEL_QUERY_ALIASES[parts[1]] + parts[2:]
+        parts = [""] + [LABEL_QUERY_ALIASES[parts[1]]] + parts[2:]
         return "/".join(parts)
     else:
-        label
+        return label
 
 
 def translate_system_label_to_label_alias(label: str) -> str:
     parts = label.split("/")
-    if parts[1:2] in LABEL_QUERY_ALIASES_REVERSED:
+    if parts[1] in LABEL_QUERY_ALIASES_REVERSED:
         parts = [""] + [LABEL_QUERY_ALIASES_REVERSED[parts[1]]] + parts[2:]
         return "/".join(parts)
-    if parts[1:3] in LABEL_QUERY_ALIASES_REVERSED:
-        parts = [""] + [LABEL_QUERY_ALIASES_REVERSED[parts[1:2]]] + parts[3:]
+    elif "/".join(parts[1:3]) in LABEL_QUERY_ALIASES_REVERSED:
+        parts = [""] + [LABEL_QUERY_ALIASES_REVERSED["/".join(parts[1:2])]] + parts[3:]
         return "/".join(parts)
     else:
         return label

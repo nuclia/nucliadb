@@ -65,5 +65,5 @@ async def test_autofilters_are_returned(
     )
     assert resp.status_code == 200
     autofilters = resp.json()["autofilters"]
-    assert "/e/scientist/Newton" in autofilters
-    assert "/e/poet/Becquer" in autofilters
+    assert "/entities/scientist/Newton" in autofilters
+    assert "/entities/poet/Becquer" in autofilters

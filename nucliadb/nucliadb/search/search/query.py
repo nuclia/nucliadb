@@ -38,6 +38,10 @@ from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.labels import (
+    translate_label_alias_to_system_label,
+    translate_system_label_to_label_alias,
+)
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
@@ -50,7 +54,6 @@ from nucliadb_models.search import (
 from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
-from nucliadb_models.labels import translate_label_alias_to_system_label
 
 from .exceptions import InvalidQueryError
 
@@ -201,7 +204,9 @@ async def global_query_to_pb(
             node_features.inc({"type": "relations"})
         if autofilter:
             entity_filters = parse_entities_to_filters(request, detected_entities)
-            autofilters.extend(entity_filters)
+            autofilters.extend(
+                [translate_system_label_to_label_alias(e) for e in entity_filters]
+            )
 
     if with_synonyms:
         if vector_search or relations_search:
