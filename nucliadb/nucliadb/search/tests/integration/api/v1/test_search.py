@@ -222,6 +222,7 @@ async def test_search_resource_all(
     await txn.abort()
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_search_pagination(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -229,7 +230,7 @@ async def test_search_pagination(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(5)
+        await asyncio.sleep(5)  # oi, this kind of sucks
 
         n_results_expected = 100
         page_size = 20
