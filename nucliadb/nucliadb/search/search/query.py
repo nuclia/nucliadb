@@ -77,12 +77,12 @@ def translate_label_filters(filters: List[str]) -> List[str]:
     """
     output = []
     for fltr in filters:
+        if len(fltr) == 0:
+            raise InvalidQueryError("filters", f"Invalid empty label")
         if fltr[0] != "/":
             raise InvalidQueryError(
-                "filters", f"Invalid label filter. It must start with a `/`: {fltr}"
+                "filters", f"Invalid label. It must start with a `/`: {fltr}"
             )
-        if len(fltr) == 0:
-            raise InvalidQueryError("filters", f"Invalid label filter: {fltr}")
 
         parts = fltr.split("/")
         if parts[1] in LABEL_QUERY_ALIASES:

@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Dict, List
 
-BASE_LABELS: Dict[str, List[str]] = {
+BASE_LABELS: dict[str, list[str]] = {
     "t": [],  # doc tags
     "l": [],  # doc labels
     "n": [],  # type of element: i (Icon). s (Processing Status)
@@ -32,7 +31,7 @@ BASE_LABELS: Dict[str, List[str]] = {
 }
 
 
-def flatten_resource_labels(tags_dict: dict[str, list[str]]) -> List[str]:
+def flatten_resource_labels(tags_dict: dict[str, list[str]]) -> list[str]:
     flat_tags = []
     for key, values in tags_dict.items():
         for value in values:
