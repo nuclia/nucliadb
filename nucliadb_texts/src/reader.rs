@@ -115,15 +115,15 @@ impl FieldReader for TextReaderService {
             };
             let resource_id = fulfilled_doc
                 .get_first(self.schema.uuid)
-                .expect("document doesn't appear to have uuid.")
+                .expect("documents must have a uuid.")
                 .as_text()
                 .expect("uuid field must be a text")
                 .to_string();
             let field_id = fulfilled_doc
                 .get_first(self.schema.field)
-                .expect("document doesn't appear to have field.")
+                .expect("documents must have a field.")
                 .as_facet()
-                .expect("field id must be a text")
+                .expect("field id must be a facet")
                 .to_path_string();
             let fulfilled_field = ValidField {
                 resource_id,
@@ -177,13 +177,13 @@ impl ReaderChild for TextReaderService {
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-            let Some(key) = searcher
+            let key = searcher
                 .doc(addr)?
                 .get_first(self.schema.uuid)
-                .and_then(|i| i.as_text().map(String::from))
-            else {
-                continue;
-            };
+                .expect("documents must have a uuid.")
+                .as_text()
+                .expect("uuid field must be a text")
+                .to_string();
             keys.push(key);
         }
 
