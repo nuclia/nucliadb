@@ -50,25 +50,12 @@ from nucliadb_models.search import (
 from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
+from nucliadb_models.labels import translate_label_alias_to_system_label
 
 from .exceptions import InvalidQueryError
 
 ENTITY_FILTER_PREFIX = "/e/"
 LABEL_FILTER_PREFIX = "/l/"
-
-LABEL_QUERY_ALIASES = {
-    # aliases to make querying labels easier
-    "tags": ["t"],
-    "labels": ["l"],
-    "entities": ["e"],
-    "icon": ["n", "i"],
-    "status": ["n", "s"],
-    "primary-language": ["s", "p"],
-    "secondary-languages": ["s", "s"],
-    "field": ["f"],
-    "field-values": ["fg"],
-    "metadata": ["m"],
-}
 
 
 def translate_label_filters(filters: List[str]) -> List[str]:
@@ -84,12 +71,7 @@ def translate_label_filters(filters: List[str]) -> List[str]:
                 "filters", f"Invalid label. It must start with a `/`: {fltr}"
             )
 
-        parts = fltr.split("/")
-        if parts[1] in LABEL_QUERY_ALIASES:
-            parts = [""] + LABEL_QUERY_ALIASES[parts[1]] + parts[2:]
-            output.append("/".join(parts))
-        else:
-            output.append(fltr)
+        output.append(translate_label_alias_to_system_label(fltr))
     return output
 
 
