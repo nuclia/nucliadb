@@ -117,6 +117,40 @@ pub struct FormulaFilter<'a> {
 }
 
 impl FormulaFilter<'_> {
+    fn try_new_with_fst<'a>(
+        filter: &'a Formula,
+        key_index: &'a KeyIndex,
+        label_index: &'a LabelIndex,
+        total_nodes: usize,
+    ) -> VectorR<FormulaFilter<'a>> {
+        debug!("Using FST index files");
+        let collector = filter.get_atoms();
+        let empty_formula = collector.labels.is_empty() && collector.key_prefixes.is_empty();
+
+        // preparing the list of matching nodes
+        let mut matching_labels = None;
+        let mut matching_keys = None;
+        if !collector.labels.is_empty() {
+            matching_labels = Some(label_index.get_nodes(&collector.labels)?);
+        }
+        if !collector.key_prefixes.is_empty() {
+            matching_keys = Some(key_index.get_nodes(&collector.key_prefixes)?);
+        }
+
+        let matching_nodes: HashSet<u64> = match (matching_keys, matching_labels) {
+            (None, labels) => labels.unwrap_or_default(),
+            (keys, None) => keys.unwrap_or_default(),
+            (Some(keys), Some(labels)) => keys.intersection(&labels).copied().collect(),
+        };
+
+        Ok(FormulaFilter {
+            matching_nodes,
+            empty_formula,
+            filter,
+            use_fst: true,
+            total_nodes,
+        })
+    }
     pub fn new<'a>(
         filter: &'a Formula,
         key_index: Option<&'a KeyIndex>,
@@ -134,28 +168,18 @@ impl FormulaFilter<'_> {
             };
         };
 
-        debug!("Using FST index files");
-        let collector = filter.get_atoms();
-        let empty_formula = collector.labels.is_empty() && collector.key_prefixes.is_empty();
-
-        // preparing the list of matching nodes
-        let matching_nodes: HashSet<u64> = if empty_formula {
-            HashSet::new()
-        } else {
-            // collecting all node ids from the labels and key prefixes
-            let results: HashSet<u64> = label_index.get_nodes(&collector.labels).unwrap();
-            results
-                .union(&key_index.get_nodes(&collector.key_prefixes).unwrap())
-                .cloned()
-                .collect()
-        };
-
-        FormulaFilter {
-            matching_nodes,
-            empty_formula,
-            filter,
-            use_fst: true,
-            total_nodes,
+        match FormulaFilter::try_new_with_fst(filter, key_index, label_index, total_nodes) {
+            Ok(successful_fst) => successful_fst,
+            Err(err) => {
+                debug!("No FST due to corrupted index files: {err:?}");
+                FormulaFilter {
+                    filter,
+                    total_nodes,
+                    matching_nodes: HashSet::new(),
+                    empty_formula: true,
+                    use_fst: false,
+                }
+            }
         }
     }
 
