@@ -141,7 +141,7 @@ async def test_service_lifecycle_labels(writer_api):
 @pytest.mark.asyncio
 async def test_service_lifecycle_configuration(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        resp = await client.patch(
+        resp = await client.post(
             f"/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
