@@ -476,7 +476,7 @@ def choose_node(
 
         node = get_index_node(node_id)
         if node is not None:
-            if target_replicas and replica_id not in target_replicas:
+            if target_replicas and replica_id in target_replicas:
                 preferred_nodes.append((replica_id, node))
             else:
                 backend_nodes.append((replica_id, node))
@@ -486,7 +486,7 @@ def choose_node(
                 read_replica_node = get_index_node(read_replica_node_id)
                 if read_replica_node is None:
                     continue
-                if target_replicas and replica_id not in target_replicas:
+                if target_replicas and replica_id in target_replicas:
                     preferred_nodes.append((replica_id, read_replica_node))
                 else:
                     backend_nodes.append((replica_id, read_replica_node))
