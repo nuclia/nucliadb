@@ -329,23 +329,33 @@ class KnowledgeBox:
         response: Dict[str, LabelSet] = {}
         if search_result.fulltext is None or search_result.fulltext.facets is None:
             return response
-        for labelset, count in search_result.fulltext.facets.get("/l", {}).items():
-            real_labelset = labelset[3:]  # removing /l/
+
+        label_facets = {}
+        facet_prefix = "/l/"
+        if "/l" in search_result.fulltext.facets:
+            label_facets = search_result.fulltext.facets.get("/l", {})
+        elif "/classification.labels" in search_result.fulltext.facets:
+            facet_prefix = "/classification.labels/"
+            label_facets = search_result.fulltext.facets.get(
+                "/classification.labels", {}
+            )
+
+        for labelset, count in label_facets.items():
+            real_labelset = labelset[len(facet_prefix) :]  # removing /l/
             response[real_labelset] = LabelSet(count=count)
 
         for labelset, labelset_obj in response.items():
-            base_label = f"/l/{labelset}"
-            base_label_new = f"/classification.labels/{labelset}/"
-            search_result = self.client.search(
+            base_label = f"{facet_prefix}{labelset}"
+            fsearch_result = self.client.search(
                 SearchRequest(features=["document"], faceted=[base_label], page_size=0)  # type: ignore
             )
-            if search_result.fulltext is None or search_result.fulltext.facets is None:
+            if (
+                fsearch_result.fulltext is None
+                or fsearch_result.fulltext.facets is None
+            ):
                 raise Exception("Search error")
 
-            if base_label_new in search_result.fulltext.facets:
-                base_label = base_label_new
-
-            for label, count in search_result.fulltext.facets.get(
+            for label, count in fsearch_result.fulltext.facets.get(
                 base_label, {}
             ).items():
                 labelset_obj.labels[label.replace(base_label + "/", "")] = count

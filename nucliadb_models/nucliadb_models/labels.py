@@ -50,9 +50,7 @@ LABEL_QUERY_ALIASES = {
     "field-values": "fg",
 }
 
-LABEL_QUERY_ALIASES_REVERSED = {
-    v: k for k, values in LABEL_QUERY_ALIASES.items() for v in values
-}
+LABEL_QUERY_ALIASES_REVERSED = {v: k for k, v in LABEL_QUERY_ALIASES.items()}
 
 
 def translate_alias_to_system_label(label: str) -> str:
@@ -70,7 +68,7 @@ def translate_system_to_alias_label(label: str) -> str:
         parts = [""] + [LABEL_QUERY_ALIASES_REVERSED[parts[1]]] + parts[2:]
         return "/".join(parts)
     elif "/".join(parts[1:3]) in LABEL_QUERY_ALIASES_REVERSED:
-        parts = [""] + [LABEL_QUERY_ALIASES_REVERSED["/".join(parts[1:2])]] + parts[3:]
+        parts = [""] + [LABEL_QUERY_ALIASES_REVERSED["/".join(parts[1:3])]] + parts[3:]
         return "/".join(parts)
     else:
         return label

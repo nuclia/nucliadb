@@ -341,3 +341,20 @@ async def test_search_with_facets(
             ]
             == 100
         )
+
+        # also just test short hand filter
+        url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/l"
+        resp = await client.get(url)
+        data = resp.json()
+        assert (
+            data["fulltext"]["facets"]["/classification.labels"][
+                "/classification.labels/labelset1"
+            ]
+            == 100
+        )
+        assert (
+            data["paragraphs"]["facets"]["/classification.labels"][
+                "/classification.labels/labelset1"
+            ]
+            == 100
+        )
