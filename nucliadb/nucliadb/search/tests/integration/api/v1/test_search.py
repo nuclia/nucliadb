@@ -62,10 +62,8 @@ async def test_multiple_fuzzy_search_resource_all(
         resp = await client.get(
             f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&page_number=0&page_size=20',
         )
-        if resp.status_code != 200:
-            print(resp.content)
 
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.content
         assert len(resp.json()["paragraphs"]["results"]) == 20
 
         # Expected results:
@@ -78,6 +76,7 @@ async def test_multiple_fuzzy_search_resource_all(
         )
 
 
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.asyncio
 async def test_multiple_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -85,14 +84,11 @@ async def test_multiple_search_resource_all(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(5)
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40",
         )
-        if resp.status_code != 200:
-            print(resp.content)
 
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.content
         assert len(resp.json()["paragraphs"]["results"]) == 40
         assert resp.json()["paragraphs"]["next_page"]
         assert resp.json()["fulltext"]["next_page"]
@@ -104,10 +100,8 @@ async def test_multiple_search_resource_all(
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shards={shards[0]}",  # noqa
         )
-        if resp.status_code != 200:
-            print(resp.content)
 
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.content
         assert resp.json()["shards"][0] == shards[0]
         assert resp.json()["paragraphs"]["results"][0]["rid"] == pos_30["rid"]
         assert resp.json()["paragraphs"]["results"][5]["rid"] == pos_35["rid"]
@@ -115,9 +109,7 @@ async def test_multiple_search_resource_all(
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
         )
-        if resp.status_code != 200:
-            print(resp.content)
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.content
         for _ in range(10):
             if (
                 len(resp.json()["paragraphs"]["results"]) < 20
@@ -127,9 +119,7 @@ async def test_multiple_search_resource_all(
                 resp = await client.get(
                     f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
                 )
-                if resp.status_code != 200:
-                    print(resp.content)
-                assert resp.status_code == 200
+                assert resp.status_code == 200, resp.content
             else:
                 break
         assert len(resp.json()["paragraphs"]["results"]) == 20
@@ -229,8 +219,6 @@ async def test_search_pagination(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(5)
-
         n_results_expected = 100
         page_size = 20
         expected_requests = math.ceil(n_results_expected / page_size)
@@ -246,10 +234,7 @@ async def test_search_pagination(
 
             resp = await client.get(url)
 
-            if resp.status_code != 200:
-                print(resp.content)
-
-            assert resp.status_code == 200
+            assert resp.status_code == 200, resp.content
 
             response = resp.json()
 

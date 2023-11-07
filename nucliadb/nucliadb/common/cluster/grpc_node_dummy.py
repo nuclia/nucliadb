@@ -34,7 +34,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardIds,
     VectorSetList,
 )
-from nucliadb_protos.nodesidecar_pb2 import Counter
 from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 from nucliadb_protos.utils_pb2 import Relation
 
@@ -120,11 +119,3 @@ class DummyReaderStub:  # pragma: no cover
         self.calls.setdefault("RelationTypes", []).append(data)
         result = TypeList()
         return result
-
-
-class DummySidecarStub:  # pragma: no cover
-    calls: Dict[str, List[Any]] = {}
-
-    async def GetCount(self, data):
-        self.calls.setdefault("GetCount", []).append(data)
-        return Counter(paragraphs=2, fields=2)

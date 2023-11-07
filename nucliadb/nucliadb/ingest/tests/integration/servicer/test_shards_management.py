@@ -21,7 +21,7 @@ from uuid import uuid4
 
 import pytest
 
-from nucliadb.common.cluster.manager import INDEX_NODES, KBShardManager
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
@@ -43,9 +43,3 @@ async def test_create_cleansup_on_error(grpc_servicer, fake_node):
     shards_object = await shard_manager.get_all_shards(txn, kbid)
     await txn.abort()
     assert shards_object
-
-    replica1 = shards_object.shards[0].replicas[0]
-
-    # Clear sidecar mock
-    node = INDEX_NODES[replica1.node]
-    node.sidecar.calls.clear()

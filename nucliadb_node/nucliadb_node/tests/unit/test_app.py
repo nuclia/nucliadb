@@ -35,9 +35,7 @@ async def test_main():
         "nucliadb_node.app.run_until_exit", AsyncMock()
     ) as run_until_exit, patch(
         "nucliadb_node.app.Writer", MagicMock()
-    ) as writer, patch(
-        "nucliadb_node.app.Reader", MagicMock()
-    ) as reader:
+    ) as writer:
         await app.main()
 
         run_until_exit.assert_awaited_once_with(
@@ -46,6 +44,5 @@ async def test_main():
                 start_worker.return_value.finalize,
                 serve_metrics.return_value.shutdown,
                 writer.return_value.close,
-                reader.return_value.close,
             ]
         )

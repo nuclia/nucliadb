@@ -106,7 +106,6 @@ async def find_knowledgebox(
     extracted: List[ExtractedDataTypeName] = fastapi_query(
         SearchParamDefaults.extracted
     ),
-    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
@@ -133,7 +132,6 @@ async def find_knowledgebox(
             show=show,
             field_type_filter=field_type_filter,
             extracted=extracted,
-            shards=shards,
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,

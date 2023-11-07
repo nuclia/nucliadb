@@ -26,7 +26,10 @@ from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, 
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.cluster.exceptions import ExhaustedNodesError
+from nucliadb.common.cluster.exceptions import (
+    ExhaustedNodesError,
+    NoHealthyNodeAvailable,
+)
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_utils.keys import KB_SHARDS
 
@@ -167,7 +170,7 @@ async def test_choose_node_raises_if_no_nodes(shards):
     shard.replicas[0].node = "foo"
     shard.replicas[1].node = "bar"
 
-    with pytest.raises(KeyError):
+    with pytest.raises(NoHealthyNodeAvailable):
         manager.choose_node(shard)
 
 

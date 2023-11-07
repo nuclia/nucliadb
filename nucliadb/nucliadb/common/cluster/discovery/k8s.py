@@ -63,10 +63,14 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         self.node_id_cache: dict[str, IndexNodeMetadata] = {}
         self.update_lock = asyncio.Lock()
 
-    async def get_node_metadata(self, sts_name: str, node_ip: str) -> IndexNodeMetadata:
+    async def get_node_metadata(
+        self, sts_name: str, node_ip: str, read_replica: bool
+    ) -> IndexNodeMetadata:
         async with self.update_lock:
             if sts_name not in self.node_id_cache:
-                self.node_id_cache[sts_name] = await self._query_node_metadata(node_ip)
+                self.node_id_cache[sts_name] = await self._query_node_metadata(
+                    node_ip, read_replica
+                )
             else:
                 self.node_id_cache[sts_name].address = node_ip
         return self.node_id_cache[sts_name]
@@ -93,14 +97,19 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 kubernetes_asyncio.client.models.v1_container_status.V1ContainerStatus
             ] = status.container_statuses
             for container_status in container_statuses:
-                if container_status.name not in ("reader", "writer", "sidecar"):
+                if container_status.name not in ("reader", "writer"):
                     continue
                 if not container_status.ready:
                     ready = False
                     break
 
-        sts_name = event_metadata.name
-        node_data = await self.get_node_metadata(sts_name, status.pod_ip)
+        pod_name = event_metadata.name
+        read_replica = event_metadata.labels.get("readReplica", "") == "true"
+        node_data = await self.get_node_metadata(
+            pod_name,
+            status.pod_ip,
+            read_replica=read_replica,
+        )
         if ready:
             node = manager.get_index_node(node_data.node_id)
             if node is None:
@@ -108,7 +117,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     "Adding node",
                     extra={
                         "node_id": node_data.node_id,
-                        "sts_name": sts_name,
+                        "pod_name": pod_name,
                         "address": node_data.address,
                     },
                 )
@@ -120,7 +129,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             else:
                 logger.debug(
                     "Update node",
-                    extra={"sts_name": sts_name, "node_id": node_data.node_id},
+                    extra={"pod_name": pod_name, "node_id": node_data.node_id},
                 )
                 node.address = node_data.address
                 node.shard_count = node_data.shard_count
@@ -131,11 +140,11 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     f"Remove node",
                     extra={
                         "node_id": node_data.node_id,
-                        "sts_name": sts_name,
+                        "pod_name": pod_name,
                         "address": node.address,
                     },
                 )
-                manager.remove_index_node(node_data.node_id)
+                manager.remove_index_node(node_data.node_id, node_data.primary_id)
 
         AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
@@ -184,12 +193,13 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         while True:
             await asyncio.sleep(self.cache_update_interval)
             try:
-                for sts_name in list(self.node_id_cache.keys()):
+                for pod_name in list(self.node_id_cache.keys()):
                     # force updating cache
                     async with self.update_lock:
-                        existing = self.node_id_cache[sts_name]
-                        self.node_id_cache[sts_name] = await self._query_node_metadata(
-                            existing.address
+                        existing = self.node_id_cache[pod_name]
+                        self.node_id_cache[pod_name] = await self._query_node_metadata(
+                            existing.address,
+                            read_replica=existing.primary_id is not None,
                         )
             except (
                 asyncio.CancelledError,

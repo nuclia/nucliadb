@@ -31,6 +31,7 @@ from nucliadb.common.cluster.exceptions import (
     NodeClusterSmall,
     NodeError,
     NodesUnsync,
+    NoHealthyNodeAvailable,
     ShardNotFound,
     ShardsNotFound,
 )
@@ -57,6 +58,7 @@ from .standalone.utils import get_self, get_standalone_node_id
 logger = logging.getLogger(__name__)
 
 INDEX_NODES: dict[str, AbstractIndexNode] = {}
+READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
 
 
 def get_index_nodes() -> list[AbstractIndexNode]:
@@ -67,8 +69,17 @@ def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
     return INDEX_NODES.get(node_id)
 
 
+def get_read_replica_node_ids(node_id: str) -> list[str]:
+    return list(READ_REPLICA_INDEX_NODES.get(node_id, set()))
+
+
 def add_index_node(
-    *, id: str, address: str, shard_count: int, dummy: bool = False
+    *,
+    id: str,
+    address: str,
+    shard_count: int,
+    dummy: bool = False,
+    primary_id: Optional[str] = None,
 ) -> AbstractIndexNode:
     if settings.standalone_mode:
         if id == get_standalone_node_id():
@@ -78,13 +89,26 @@ def add_index_node(
                 id=id, address=address, shard_count=shard_count, dummy=dummy
             )
     else:
-        node = IndexNode(id=id, address=address, shard_count=shard_count, dummy=dummy)  # type: ignore
+        node = IndexNode(  # type: ignore
+            id=id,
+            address=address,
+            shard_count=shard_count,
+            dummy=dummy,
+            primary_id=primary_id,
+        )
     INDEX_NODES[id] = node
+    if primary_id is not None:
+        if primary_id not in READ_REPLICA_INDEX_NODES:
+            READ_REPLICA_INDEX_NODES[primary_id] = set()
+        READ_REPLICA_INDEX_NODES[primary_id].add(id)
     return node
 
 
-def remove_index_node(node_id: str) -> None:
+def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
     INDEX_NODES.pop(node_id, None)
+    if primary_id is not None and primary_id in READ_REPLICA_INDEX_NODES:
+        if node_id in READ_REPLICA_INDEX_NODES[primary_id]:
+            READ_REPLICA_INDEX_NODES[primary_id].remove(node_id)
 
 
 class KBShardManager:
@@ -437,31 +461,45 @@ class StandaloneKBShardManager(KBShardManager):
 
 
 def choose_node(
-    shard: writer_pb2.ShardObject, target_replicas: Optional[list[str]] = None
+    shard: writer_pb2.ShardObject,
+    target_replicas: Optional[list[str]] = None,
+    read_only: bool = False,
 ) -> tuple[AbstractIndexNode, str, str]:
     """
-    Choose an arbitrary node storing `shard`. If passed, attempt to choose only between
-    nodes containing any of `target_replicas`.
+    Choose an arbitrary node storing `shard`.
     """
-    target_replicas = target_replicas or []
+    preferred_nodes = []
+    backend_nodes = []
+    for shardreplica in shard.replicas:
+        node_id = shardreplica.node
+        replica_id = shardreplica.shard.id
 
-    shuffled_replicas = [(x.shard.id, x.node) for x in shard.replicas]
-    random.shuffle(shuffled_replicas)
-
-    head_nodes = []
-    tail_nodes = []
-    for replica_id, node_id in shuffled_replicas:
-        if replica_id in target_replicas:
-            head_nodes.append((replica_id, node_id))
-        else:
-            tail_nodes.append((replica_id, node_id))
-
-    for replica_id, node_id in head_nodes + tail_nodes:
         node = get_index_node(node_id)
         if node is not None:
-            return node, replica_id, node_id
+            if target_replicas and replica_id in target_replicas:
+                preferred_nodes.append((replica_id, node))
+            else:
+                backend_nodes.append((replica_id, node))
 
-    raise KeyError("Could not find a node to query")
+        if read_only:
+            for read_replica_node_id in get_read_replica_node_ids(node_id):
+                read_replica_node = get_index_node(read_replica_node_id)
+                if read_replica_node is None:
+                    continue
+                if target_replicas and replica_id in target_replicas:
+                    preferred_nodes.append((replica_id, read_replica_node))
+                else:
+                    backend_nodes.append((replica_id, read_replica_node))
+
+    if len(preferred_nodes) == 0 and len(backend_nodes) == 0:
+        raise NoHealthyNodeAvailable("Could not find a node to query")
+
+    selected_node: AbstractIndexNode
+    if len(preferred_nodes) > 0:
+        replica_id, selected_node = random.choice(preferred_nodes)
+    else:
+        replica_id, selected_node = random.choice(backend_nodes)
+    return selected_node, replica_id, selected_node.id
 
 
 def check_enough_nodes():

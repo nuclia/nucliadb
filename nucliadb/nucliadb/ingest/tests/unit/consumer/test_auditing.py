@@ -23,10 +23,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
-from nucliadb_protos.nodesidecar_pb2 import Counter
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, ShardObject
 
 from nucliadb.ingest.consumer import auditing
+from nucliadb_protos import nodereader_pb2
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,14 +39,14 @@ def pubsub():
 
 
 @pytest.fixture()
-def sidecar():
+def reader():
     yield AsyncMock()
 
 
 @pytest.fixture()
-def shard_manager(sidecar):
+def shard_manager(reader):
     nm = MagicMock()
-    node = MagicMock(sidecar=sidecar)
+    node = MagicMock(reader=reader)
     nm.get_shards_by_kbid = AsyncMock(return_value=[ShardObject()])
     with patch(
         "nucliadb.ingest.consumer.auditing.get_shard_manager", return_value=nm
@@ -89,9 +89,9 @@ async def writes_audit_handler(pubsub, audit, shard_manager):
 
 
 async def test_handle_message(
-    index_audit_handler: auditing.IndexAuditHandler, sidecar, audit
+    index_audit_handler: auditing.IndexAuditHandler, reader, audit
 ):
-    sidecar.GetCount.return_value = Counter(fields=5, paragraphs=6)
+    reader.GetShard.return_value = nodereader_pb2.Shard(fields=5, paragraphs=6)
 
     notif = Notification(
         kbid="kbid",

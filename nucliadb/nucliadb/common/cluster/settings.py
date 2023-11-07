@@ -41,12 +41,10 @@ class Settings(BaseSettings):
 
     node_writer_port: int = 10000
     node_reader_port: int = 10001
-    node_sidecar_port: int = 10002
 
     # Only for testing purposes
     writer_port_map: dict[str, int] = {}
     reader_port_map: dict[str, int] = {}
-    sidecar_port_map: dict[str, int] = {}
 
     # Node limits
     max_shard_paragraphs: int = Field(
@@ -76,7 +74,7 @@ class Settings(BaseSettings):
 
     cluster_discovery_mode: ClusterDiscoveryMode = ClusterDiscoveryMode.KUBERNETES
     cluster_discovery_kubernetes_namespace: str = "nucliadb"
-    cluster_discovery_kubernetes_selector: str = "app.kubernetes.io/name=node"
+    cluster_discovery_kubernetes_selector: str = "appType=node"
     cluster_discovery_manual_addresses: list[str] = []
 
 

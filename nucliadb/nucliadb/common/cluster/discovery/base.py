@@ -30,6 +30,7 @@ from nucliadb_protos import (
     noderesources_pb2,
     nodewriter_pb2,
     nodewriter_pb2_grpc,
+    replication_pb2_grpc,
     standalone_pb2,
     standalone_pb2_grpc,
 )
@@ -88,7 +89,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
 
 @backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
 async def _get_index_node_metadata(
-    settings: Settings, address: str
+    settings: Settings, address: str, read_replica: bool = False
 ) -> IndexNodeMetadata:
     """
     Get node metadata directly from the writer.
@@ -105,13 +106,18 @@ async def _get_index_node_metadata(
     else:
         grpc_address = f"{address}:{settings.node_writer_port}"
     channel = get_traced_grpc_channel(grpc_address, "discovery", variant="_writer")
-    stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
+    if read_replica:
+        # on a read replica, we need to use the replication service
+        stub = replication_pb2_grpc.ReplicationServiceStub(channel)  # type: ignore
+    else:
+        stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
     metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
     return IndexNodeMetadata(
         node_id=metadata.node_id,
         name=metadata.node_id,
         address=address,
         shard_count=metadata.shard_count,
+        primary_id=getattr(metadata, "primary_id", None),
     )
 
 
@@ -148,8 +154,10 @@ class AbstractClusterDiscovery(abc.ABC):
     async def finalize(self) -> None:
         """ """
 
-    async def _query_node_metadata(self, address: str) -> IndexNodeMetadata:
+    async def _query_node_metadata(
+        self, address: str, read_replica: bool = False
+    ) -> IndexNodeMetadata:
         if self.settings.standalone_mode:
             return await _get_standalone_index_node_metadata(self.settings, address)
         else:
-            return await _get_index_node_metadata(self.settings, address)
+            return await _get_index_node_metadata(self.settings, address, read_replica)

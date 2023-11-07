@@ -75,7 +75,7 @@ async def find(
         key_filters=item.resource_filters,
     )
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
-        kbid, Method.SEARCH, pb_query, item.shards
+        kbid, Method.SEARCH, pb_query, target_replicas=item.shards
     )
 
     incomplete_results = incomplete_results or query_incomplete_results

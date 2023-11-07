@@ -189,14 +189,12 @@ pub async fn start_grpc_service(
         let grpc_driver = NodeWriterGRPCDriver::new(settings.clone(), shard_cache.clone())
             .with_sender(metadata_sender);
         grpc_driver.initialize().await?;
-        let replication_server =
-            replication::replication_service_server::ReplicationServiceServer::new(
-                ReplicationServiceGRPCDriver::new(settings.clone(), shard_cache.clone(), node_id),
-            );
-        server_builder = server_builder
-            .add_service(GrpcServer::new(grpc_driver))
-            .add_service(replication_server);
+        server_builder = server_builder.add_service(GrpcServer::new(grpc_driver));
     }
+    let replication_server = replication::replication_service_server::ReplicationServiceServer::new(
+        ReplicationServiceGRPCDriver::new(settings.clone(), shard_cache.clone(), node_id),
+    );
+    server_builder = server_builder.add_service(replication_server);
 
     eprintln!("Listening for gRPC requests at: {:?}", listen_address);
     server_builder

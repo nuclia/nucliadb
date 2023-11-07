@@ -103,7 +103,7 @@ async def suggest_knowledgebox(
         range_modification_end,
     )
     results, incomplete_results, _, queried_shards = await node_query(
-        kbid, Method.SUGGEST, pb_query, []
+        kbid, Method.SUGGEST, pb_query
     )
 
     # We need to merge

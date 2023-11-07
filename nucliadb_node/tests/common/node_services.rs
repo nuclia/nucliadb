@@ -155,8 +155,8 @@ impl NodeFixture {
         });
 
         Self {
-            settings: settings,
-            secondary_settings: secondary_settings,
+            settings,
+            secondary_settings,
             reader_client: None,
             writer_client: None,
             secondary_reader_client: None,
