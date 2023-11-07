@@ -335,11 +335,16 @@ class KnowledgeBox:
 
         for labelset, labelset_obj in response.items():
             base_label = f"/l/{labelset}"
+            base_label_new = f"/classification.labels/{labelset}/"
             search_result = self.client.search(
                 SearchRequest(features=["document"], faceted=[base_label], page_size=0)  # type: ignore
             )
             if search_result.fulltext is None or search_result.fulltext.facets is None:
                 raise Exception("Search error")
+
+            if base_label_new in search_result.fulltext.facets:
+                base_label = base_label_new
+
             for label, count in search_result.fulltext.facets.get(
                 base_label, {}
             ).items():
