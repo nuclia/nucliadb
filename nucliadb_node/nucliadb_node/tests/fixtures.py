@@ -34,13 +34,15 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_node.app import start_worker
+from nucliadb_node import SERVICE_NAME
+from nucliadb_node.app import start_listeners, start_worker
 from nucliadb_node.pull import Worker
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.utilities import get_storage
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -231,7 +233,6 @@ async def worker(
     natsd,
     data_path: str,
     writer,
-    reader,
     grpc_server,
 ) -> AsyncIterable[Worker]:
     settings.force_host_id = "node1"
@@ -239,6 +240,8 @@ async def worker(
     indexing_settings.index_jetstream_servers = [natsd]
     cache_settings.cache_pubsub_nats_url = [natsd]
 
+    await get_storage(service_name=SERVICE_NAME)
+    listeners = await start_listeners(writer)
     worker = await start_worker(writer)
     yield worker
 
@@ -251,6 +254,8 @@ async def worker(
         pass
 
     await worker.finalize()
+    for listener in listeners:
+        await listener.finalize()
 
 
 @pytest.fixture(scope="function")

@@ -26,7 +26,13 @@ import pytest
 from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 
+<<<<<<< HEAD
 from nucliadb_node.pull import IndexedPublisher, IndexNodeError, ShardManager, Worker
+=======
+from nucliadb_node.listeners import IndexedPublisher
+from nucliadb_node.listeners.gc_scheduler import ShardManager
+from nucliadb_node.pull import Worker
+>>>>>>> c840cc55 (Prioritary multi-shard indexing and refactor with signal dispatcher)
 from nucliadb_node.settings import settings
 from nucliadb_utils import const
 
@@ -34,7 +40,9 @@ from nucliadb_utils import const
 @pytest.fixture(autouse=True)
 def pubsub():
     pubsub = AsyncMock()
-    with mock.patch("nucliadb_node.pull.get_pubsub", return_value=pubsub):
+    with mock.patch(
+        "nucliadb_node.listeners.indexed_publisher.get_pubsub", return_value=pubsub
+    ):
         yield pubsub
 
 
@@ -157,7 +165,9 @@ class TestSubscriptionWorker:
     @pytest.fixture(scope="function")
     def worker(self, settings, nats_conn):
         writer = AsyncMock()
-        with mock.patch("nucliadb_node.pull.get_storage"):
+        with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
+            "nucliadb_node.indexer.get_storage"
+        ):
             worker = Worker(writer, "node")
             worker.store_seqid = Mock()
             yield worker

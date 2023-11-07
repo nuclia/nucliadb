@@ -24,6 +24,7 @@ import uuid
 import pkg_resources
 
 from nucliadb_node import SERVICE_NAME, logger
+from nucliadb_node.listeners import IndexedPublisher, ShardGcScheduler
 from nucliadb_node.pull import Worker
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import settings
@@ -33,6 +34,26 @@ from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
+from nucliadb_utils.utilities import get_storage
+
+
+async def start_listeners(writer: Writer):
+    return [
+        await start_indexed_publisher(),
+        await start_shard_gc_scheduler(writer),
+    ]
+
+
+async def start_indexed_publisher() -> IndexedPublisher:
+    publisher = IndexedPublisher()
+    await publisher.initialize()
+    return publisher
+
+
+async def start_shard_gc_scheduler(writer: Writer) -> ShardGcScheduler:
+    scheduler = ShardGcScheduler(writer)
+    await scheduler.initialize()
+    return scheduler
 
 
 async def start_worker(writer: Writer) -> Worker:
@@ -62,7 +83,9 @@ async def start_worker(writer: Writer) -> Worker:
 
 
 async def main():
+    storage = await get_storage(service_name=SERVICE_NAME)
     writer = Writer(settings.writer_listen_address)
+    listeners = await start_listeners(writer)
     worker = await start_worker(writer)
 
     await setup_telemetry(SERVICE_NAME)
@@ -78,8 +101,10 @@ async def main():
     finalizers = [
         grpc_finalizer,
         worker.finalize,
+        *[listener.finalize for listener in listeners],
         metrics_server.shutdown,
         writer.close,
+        storage.finalize,
     ]
 
     await run_until_exit(finalizers)

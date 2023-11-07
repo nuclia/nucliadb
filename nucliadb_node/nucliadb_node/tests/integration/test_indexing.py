@@ -20,17 +20,26 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import AsyncIterable, Optional
 
 import pytest
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardCreated, ShardId
+from nucliadb_protos.nodewriter_pb2 import (
+    IndexMessage,
+    IndexMessageSource,
+    NewShardRequest,
+    TypeMessage,
+)
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_protos.writer_pb2 import Notification
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
+from nucliadb_node.reader import Reader
 from nucliadb_node.settings import settings
+from nucliadb_node.writer import Writer
 from nucliadb_utils import const
 from nucliadb_utils.utilities import get_pubsub, get_storage
 
@@ -39,7 +48,7 @@ TEST_PARTITION = "111"
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_indexing(worker, shard: str, reader):
+async def test_indexing(worker, shard: str, reader: Reader):
     node = settings.force_host_id
 
     resource = resource_payload(shard)
@@ -55,13 +64,17 @@ async def test_indexing(worker, shard: str, reader):
     else:
         processed = False
 
+    count = 0
     while processed is False:  # pragma: no cover
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
         pbshard = await reader.get_shard(sipb)
         if pbshard is not None and pbshard.fields > 0:
             processed = True
         else:
             processed = False
+        count += 1
+        print("waiting", pbshard)
+        assert count < 5, "too much time waiting"
 
     assert pbshard is not None
     assert pbshard.fields == 2
@@ -70,6 +83,56 @@ async def test_indexing(worker, shard: str, reader):
     storage = await get_storage(service_name=SERVICE_NAME)
     # should still work because we leave it around now
     assert await storage.get_indexing(index) is not None
+
+
+@pytest.fixture(scope="function")
+async def shards(
+    request, writer_stub: NodeWriterStub, writer: Writer
+) -> AsyncIterable[list[str]]:
+    channel = (
+        ReleaseChannel.EXPERIMENTAL
+        if request.param == "EXPERIMENTAL"
+        else ReleaseChannel.STABLE
+    )
+    request = NewShardRequest(kbid="test", release_channel=channel)
+
+    shard_ids = []
+    try:
+        for _ in range(20):
+            shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
+            shard_ids.append(shard.id)
+
+        yield shard_ids
+
+    finally:
+        for shard_id in shard_ids:
+            await writer_stub.DeleteShard(ShardId(id=shard_id))  # type: ignore
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shards", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_massive_indexing(
+    worker, shards: list[str], reader: Reader, writer: Writer
+):
+    node = settings.force_host_id
+    RESOURCES_PER_SHARD = 25
+
+    for i in range(RESOURCES_PER_SHARD):
+        for shard_id in shards:
+            resource = resource_payload(shard_id)
+            index = await create_indexing_message(resource, "kb", shard_id, node)  # type: ignore
+            await send_indexing_message(worker, index, node)  # type: ignore
+
+    pending_shards = set(shards)
+    while pending_shards:
+        indexed = set()
+        for shard_id in pending_shards:
+            sipb = ShardId(id=shard_id)
+            pbshard: Optional[Shard] = await reader.get_shard(sipb)
+            if pbshard is not None and pbshard.fields == RESOURCES_PER_SHARD * 2:
+                indexed.add(shard_id)
+        pending_shards = pending_shards - indexed
+        await asyncio.sleep(0.1)
 
 
 @pytest.mark.asyncio
@@ -119,7 +182,7 @@ def resource_payload(shard: str) -> Resource:
     pb = Resource()
     pb.shard_id = shard
     pb.resource.shard_id = shard
-    pb.resource.uuid = "uuid"
+    pb.resource.uuid = str(uuid.uuid4())
     pb.metadata.modified.FromDatetime(datetime.now())
     pb.metadata.created.FromDatetime(datetime.now())
     pb.texts["title"].text = "My title"
@@ -147,14 +210,25 @@ def delete_indexing_message(uuid: str, shard: str, node_id: str):
 
 
 async def create_indexing_message(
-    resource: Resource, kb: str, shard: str, node: str
+    resource: Resource,
+    kb: str,
+    shard: str,
+    node: str,
+    source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
 ) -> IndexMessage:
     storage = await get_storage(service_name=SERVICE_NAME)
-    index: IndexMessage = await storage.indexing(
+    storage_key = await storage.indexing(
         resource, txid=1, partition=TEST_PARTITION, kb=kb, logical_shard=shard
     )
+    index = IndexMessage()
+    index.txid = 1
+    index.typemessage = TypeMessage.CREATION
+    index.storage_key = storage_key
+    index.kbid = kb
+    index.partition = TEST_PARTITION
     index.node = node
     index.shard = shard
+    index.source = source
     return index
 
 

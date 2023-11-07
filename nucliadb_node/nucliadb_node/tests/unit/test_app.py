@@ -28,6 +28,10 @@ pytestmark = pytest.mark.asyncio
 
 async def test_main():
     with patch("nucliadb_node.app.start_worker", AsyncMock()) as start_worker, patch(
+        "nucliadb_node.app.start_indexed_publisher", AsyncMock()
+    ) as start_indexed_publisher, patch(
+        "nucliadb_node.app.start_shard_gc_scheduler", AsyncMock()
+    ) as start_shard_gc_scheduler, patch(
         "nucliadb_node.app.start_grpc", AsyncMock()
     ) as start_grpc, patch(
         "nucliadb_node.app.serve_metrics", AsyncMock()
@@ -35,14 +39,20 @@ async def test_main():
         "nucliadb_node.app.run_until_exit", AsyncMock()
     ) as run_until_exit, patch(
         "nucliadb_node.app.Writer", MagicMock()
-    ) as writer:
+    ) as writer, patch(
+        "nucliadb_node.app.get_storage",
+        AsyncMock(),
+    ) as storage:
         await app.main()
 
         run_until_exit.assert_awaited_once_with(
             [
                 start_grpc.return_value,
                 start_worker.return_value.finalize,
+                start_indexed_publisher.return_value.finalize,
+                start_shard_gc_scheduler.return_value.finalize,
                 serve_metrics.return_value.shutdown,
                 writer.return_value.close,
+                storage.return_value.finalize,
             ]
         )
