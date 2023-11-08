@@ -321,6 +321,8 @@ async def _modify_resource(
     writer.source = BrokerMessage.MessageSource.WRITER
     set_processing_info(writer, processing_info)
 
+    maybe_mark_reindex(writer, item)
+
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=processing_info.seqid)
@@ -585,3 +587,23 @@ async def get_rid_from_params_or_raise_error(
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
     return rid
+
+
+def maybe_mark_reindex(message: BrokerMessage, item: UpdateResourcePayload):
+    if needs_resource_reindex(message, item):
+        message.reindex = True
+
+
+def needs_resource_reindex(message: BrokerMessage, item: UpdateResourcePayload) -> bool:
+    # Some metadata need to be applied as tags to all fields of
+    # a resource and that means this message should force reindexing everything.
+    # XXX This is not ideal. Long term, we should handle it differently
+    # so this is not required
+    return item.usermetadata is not None or (
+        item.origin is not None
+        and (
+            item.origin.created is not None
+            or item.origin.modified is not None
+            or item.origin.metadata is not None
+        )
+    )

@@ -35,6 +35,20 @@ def a_week_before(date):
     return date - timedelta(days=7)
 
 
+@pytest.fixture(scope="function")
+async def resource(nucliadb_writer, knowledgebox):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My resource",
+        },
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+    return rid
+
+
 @pytest.mark.parametrize(
     "creation_start,creation_end,modification_start,modification_end,found",
     [
@@ -61,8 +75,8 @@ def a_week_before(date):
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_bm25_search_with_date_range_filters_nucliadb_dates(
     nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
     knowledgebox,
+    resource,
     creation_start,
     creation_end,
     modification_start,
@@ -73,19 +87,9 @@ async def test_bm25_search_with_date_range_filters_nucliadb_dates(
     In this test we are filtering by the native nucliadb created and modified date fields.
     These are set by nucliadb internally upon resource creation and modification, respectively.
     """
-    kbid = knowledgebox
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "title": "My resource",
-        },
-        headers={"X-Synchronous": "true"},
-    )
-    assert resp.status_code == 201
-
     await _test_find_date_ranges(
         nucliadb_reader,
-        kbid,
+        knowledgebox,
         ["paragraph"],
         creation_start,
         creation_end,
@@ -123,6 +127,7 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
+    resource,
     creation_start,
     creation_end,
     modification_start,
@@ -133,11 +138,10 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
     In this test we set the origin dates to some time in the past and check that
     the filtering by date ranges works as expected.
     """
-    kbid = knowledgebox
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
+    # Set origin dates of the resource
+    resp = await nucliadb_writer.patch(
+        f"/kb/{knowledgebox}/resource/{resource}",
         json={
-            "title": "My resource",
             "origin": {
                 "created": ORIGIN_CREATION.isoformat(),
                 "modified": ORIGIN_MODIFICATION.isoformat(),
@@ -145,11 +149,11 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
         },
         headers={"X-Synchronous": "true"},
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 200
 
     await _test_find_date_ranges(
         nucliadb_reader,
-        kbid,
+        knowledgebox,
         ["paragraph"],
         creation_start,
         creation_end,
