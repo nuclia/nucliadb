@@ -69,6 +69,10 @@ async def test_bm25_search_with_date_range_filters_nucliadb_dates(
     modification_end,
     found,
 ):
+    """
+    In this test we are filtering by the native nucliadb created and modified date fields.
+    These are set by nucliadb internally upon resource creation and modification, respectively.
+    """
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -82,6 +86,7 @@ async def test_bm25_search_with_date_range_filters_nucliadb_dates(
     await _test_find_date_ranges(
         nucliadb_reader,
         kbid,
+        ["paragraph"],
         creation_start,
         creation_end,
         modification_start,
@@ -124,6 +129,10 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
     modification_end,
     found,
 ):
+    """
+    In this test we set the origin dates to some time in the past and check that
+    the filtering by date ranges works as expected.
+    """
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -141,6 +150,7 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
     await _test_find_date_ranges(
         nucliadb_reader,
         kbid,
+        ["paragraph"],
         creation_start,
         creation_end,
         modification_start,
@@ -152,6 +162,7 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
 async def _test_find_date_ranges(
     nucliadb_reader,
     kbid,
+    features,
     creation_start,
     creation_end,
     modification_start,
@@ -160,7 +171,7 @@ async def _test_find_date_ranges(
 ):
     payload = {
         "query": "resource",
-        "features": ["paragraph"],
+        "features": features,
     }
     if creation_start:
         payload["range_creation_start"] = creation_start.isoformat()
@@ -189,11 +200,3 @@ def parse_paragraphs(body):
         for field in res.get("fields", {}).values()
         for par in field.get("paragraphs", {}).values()
     ]
-
-
-"""
-range_creation_start
-range_creation_end
-range_modification_start
-range_modification_end
-"""
