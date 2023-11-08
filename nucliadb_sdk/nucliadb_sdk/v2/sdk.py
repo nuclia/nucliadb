@@ -778,7 +778,9 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(method.lower(), url=url, **opts) as response:
+            with self.session.stream(
+                method.lower(), url=url, **opts, timeout=30.0
+            ) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk

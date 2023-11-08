@@ -1,11 +1,12 @@
 reader_api=http://reader.nucliadb.svc.cluster.local:8080/api
 search_api=http://search.nucliadb.svc.cluster.local:8080/api
-error_tolerance=10
+error_tolerance=5
 max_workers=100
 duration_s=3600
 ramp_up=300
 sizing=--sizing
 kbid=tiny
+kb_slug=tiny
 test=test-search-cluster
 
 RED=\033[0;31m
@@ -61,7 +62,7 @@ test-search-cluster: export READER_API=$(reader_api)
 test-search-cluster: # Stress test search on a cluster.
 	echo " *  Test Started at: $$(date -u)"
 
-	molotov ./nucliadb_performance/test_search_cluster.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+	molotov ./nucliadb_performance/hosted/test_search_cluster.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
 
@@ -73,6 +74,20 @@ test-search-kb: export KBID=$(kbid)
 test-search-kb: # Stress test search on a KB
 	echo " *  Test Started at: $$(date -u)"
 
-	molotov ./nucliadb_performance/test_search_kb.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+	molotov ./nucliadb_performance/hosted/test_search_kb.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+
+	echo " *  Test Finished at: $$(date -u)"
+
+
+.PHONY: test-standalone-search
+test-standalone-search: export READER_API=http://localhost:8080/api
+test-standalone-search: export SEARCH_API=http://localhost:8080/api
+test-standalone-search: export KB_SLUG=$(kb_slug)
+test-standalone-search: export BENCHMARK_OUTPUT=standalone.json
+test-standalone-search: export SEARCH_TAGS=$(search_tags)
+test-standalone-search:
+	echo " *  Test Started at: $$(date -u)"
+
+	molotov ./nucliadb_performance/standalone/test_search.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"

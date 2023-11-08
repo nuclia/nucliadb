@@ -1,5 +1,4 @@
 import inspect
-import json
 import random
 import shelve
 import statistics
@@ -7,15 +6,14 @@ from dataclasses import dataclass
 from functools import cache
 from typing import Optional
 
-import httpx
 from faker import Faker
 
-from nucliadb_performance.settings import (
-    get_predict_api_url,
-    get_reader_api_url,
-    get_search_api_url,
-)
+from nucliadb_performance.settings import get_reader_api_url, get_search_api_url
+from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_sdk import NucliaDB
+
+from .metrics import record_request_process_time
+from .saved_searches import Search, load_kb_saved_searches
 
 fake = Faker()
 
@@ -30,7 +28,6 @@ EXCLUDE_KBIDS = [
 _DATA = {}
 
 MIN_KB_PARAGRAPHS = 5_000
-KB_REQUESTS_FILE = "kb_requests.json"
 
 
 @dataclass
@@ -93,6 +90,7 @@ class Client:
         kwargs["headers"] = kwargs_headers
         async with func(url, *args, **kwargs) as resp:
             if resp.status == 200:
+                record_request_process_time(resp)
                 return
             await self.handle_search_error(resp)
 
@@ -145,15 +143,22 @@ def print_cluster_stats(kbs, paragraphs):
     print(f" - Max: {max(paragraphs)}")
 
 
-def get_kb(kbid):
+def get_kb(kbid=None, slug=None) -> str:
+    if not any([kbid, slug]):
+        raise ValueError("Either slug or kbid must be set")
+
     print("Loading kb data...")
     ndb = NucliaDB(
         url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
-    kbid = ndb.get_knowledge_box(kbid=kbid).uuid
+    if kbid:
+        slug = ndb.get_knowledge_box(kbid=kbid).slug
+    else:
+        kbid = ndb.get_knowledge_box_by_slug(slug=slug).uuid
     paragraphs = get_kb_paragraphs(kbid)
-    print(f"Starting search kb test on {kbid} with {paragraphs} paragraphs")
+    print(f"Starting search kb test on kb={slug} with {paragraphs} paragraphs")
+    return kbid
 
 
 class CountersError(Exception):
@@ -217,47 +222,23 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
 
 
 def print_errors():
+    print("Errors summary:")
     for error in ERRORS:
         print(error)
+    print("=" * 50)
 
 
-@dataclass
-class SearchRequest:
-    query: str
-    filters: str
-    features: Optional[list[str]] = None
-    min_score: Optional[float] = None
+def get_kb_request(kbid_or_slug: str, with_tags=None) -> Search:
+    searches = load_kb_saved_searches(kbid_or_slug, with_tags=with_tags)
+    if len(searches) == 0:
+        return dict(
+            query=fake.sentence(),
+        )
+    return random.choice(searches)
 
 
 @cache
-def load_kb_requests(kbid) -> list[SearchRequest]:
-    try:
-        with open(KB_REQUESTS_FILE, "r") as f:
-            requests = json.loads(f.read())
-        kb_reqs = requests[kbid]
-        return [SearchRequest(**req) for req in kb_reqs]
-    except (FileNotFoundError, KeyError):
-        return []
-
-
-def get_kb_request(kbid):
-    requests = load_kb_requests(kbid)
-    if len(requests) == 0:
-        return SearchRequest(
-            query=fake.sentence(),
-            filters=[],
-        )
-    return random.choice(requests)
-
-
-@cache_to_disk
-async def convert_sentence_to_vector(kbid: str, sentence: str):
-    client = httpx.AsyncClient(base_url=get_predict_api_url())
-    resp = await client.get(
-        "/sentence",
-        headers={"X-STF-KBID": kbid},
-        params={"text": sentence},
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    return data["data"]
+def get_kb_to_test():
+    slug = parse_input_kb_slug()
+    kbid = get_kb(slug=slug)
+    return kbid, slug

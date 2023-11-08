@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     predict_api: str = (
         "http://predict.learning.svc.cluster.local:8080/api/internal/predict"
     )
+    benchmark_output: Optional[str] = None
 
 
 def get_search_api_url():
