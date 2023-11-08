@@ -28,11 +28,13 @@ use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
-use nucliadb_core::query_planner::{PreFilterRequest, PreFilterResponse};
+use nucliadb_core::query_planner::{
+    FieldDateType, PreFilterRequest, PreFilterResponse, ValidField,
+};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
-use tantivy::query::{AllQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
 
@@ -88,9 +90,48 @@ impl Debug for TextReaderService {
 
 impl FieldReader for TextReaderService {
     #[tracing::instrument(skip_all)]
-    fn pre_filter(&self, _request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
-        // Right now it returns an empty response
-        Ok(PreFilterResponse::default())
+    fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
+        let mut timestamp_queries = Vec::new();
+        for timestamp_query in request.timestamp_filters.iter() {
+            let from = timestamp_query.from.as_ref();
+            let to = timestamp_query.to.as_ref();
+            let field = match timestamp_query.applies_to {
+                FieldDateType::Created => self.schema.created,
+                FieldDateType::Modified => self.schema.modified,
+            };
+            if let Some(query) = search_query::produce_date_range_query(field, from, to) {
+                let query: Box<dyn Query> = Box::new(query);
+                timestamp_queries.push((Occur::Should, query));
+            }
+        }
+        let pre_filter_query = BooleanQuery::new(timestamp_queries);
+        let searcher = self.reader.searcher();
+        let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
+        let mut valid_fields = Vec::new();
+        for fulfilled_doc in docs_fulfilled {
+            let Ok(fulfilled_doc) = searcher.doc(fulfilled_doc) else {
+                error!("Could not retrieve {fulfilled_doc:?}");
+                continue;
+            };
+            let resource_id = fulfilled_doc
+                .get_first(self.schema.uuid)
+                .expect("documents must have a uuid.")
+                .as_text()
+                .expect("uuid field must be a text")
+                .to_string();
+            let field_id = fulfilled_doc
+                .get_first(self.schema.field)
+                .expect("documents must have a field.")
+                .as_facet()
+                .expect("field id must be a facet")
+                .to_path_string();
+            let fulfilled_field = ValidField {
+                resource_id,
+                field_id,
+            };
+            valid_fields.push(fulfilled_field);
+        }
+        Ok(PreFilterResponse { valid_fields })
     }
 
     #[tracing::instrument(skip_all)]
@@ -136,13 +177,13 @@ impl ReaderChild for TextReaderService {
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-            let Some(key) = searcher
+            let key = searcher
                 .doc(addr)?
                 .get_first(self.schema.uuid)
-                .and_then(|i| i.as_text().map(String::from))
-            else {
-                continue;
-            };
+                .expect("documents must have a uuid.")
+                .as_text()
+                .expect("uuid field must be a text")
+                .to_string();
             keys.push(key);
         }
 

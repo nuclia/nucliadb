@@ -21,10 +21,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::protos::{EmptyQuery, NodeMetadata};
 use nucliadb_core::tracing::{debug, warn};
 use nucliadb_core::NodeResult;
-use nucliadb_protos::replication;
+use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_stream::wrappers::ReceiverStream;
@@ -36,14 +35,14 @@ use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {
-    settings: Arc<Settings>,
+    settings: Settings,
     shards: Arc<AsyncUnboundedShardWriterCache>,
     node_id: String,
 }
 
 impl ReplicationServiceGRPCDriver {
     pub fn new(
-        settings: Arc<Settings>,
+        settings: Settings,
         shard_cache: Arc<AsyncUnboundedShardWriterCache>,
         node_id: String,
     ) -> Self {
@@ -279,9 +278,9 @@ impl replication::replication_service_server::ReplicationService for Replication
 
     async fn get_metadata(
         &self,
-        _request: tonic::Request<EmptyQuery>,
-    ) -> Result<tonic::Response<NodeMetadata>, tonic::Status> {
-        let metadata = crate::node_metadata::NodeMetadata::new().await;
+        _request: tonic::Request<noderesources::EmptyQuery>,
+    ) -> Result<tonic::Response<noderesources::NodeMetadata>, tonic::Status> {
+        let metadata = crate::node_metadata::NodeMetadata::new(self.settings.clone()).await;
         match metadata {
             Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
             Err(error) => Err(tonic::Status::internal(error.to_string())),

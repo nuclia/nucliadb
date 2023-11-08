@@ -32,7 +32,7 @@ use nucliadb_node::grpc::writer::NodeWriterGRPCDriver;
 use nucliadb_node::lifecycle;
 use nucliadb_node::replication::replicator::connect_to_primary_and_replicate;
 use nucliadb_node::replication::service::ReplicationServiceGRPCDriver;
-use nucliadb_node::settings::Settings;
+use nucliadb_node::settings::*;
 use nucliadb_node::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use nucliadb_node::utils::read_or_create_host_key;
 use nucliadb_protos::replication;
@@ -85,8 +85,8 @@ fn find_open_port() -> u16 {
 }
 
 pub struct NodeFixture {
-    pub settings: Arc<Settings>,
-    pub secondary_settings: Arc<Settings>,
+    pub settings: Settings,
+    pub secondary_settings: Settings,
     reader_client: Option<TestNodeReader>,
     writer_client: Option<TestNodeWriter>,
     secondary_reader_client: Option<TestNodeReader>,
@@ -101,7 +101,6 @@ pub struct NodeFixture {
     secondary_shard_cache: Option<Arc<AsyncUnboundedShardWriterCache>>,
     tempdir: TempDir,
     secondary_tempdir: TempDir,
-    original_data_path: String,
     shutdown_notifier: Arc<Notify>,
     shutdown_notified: Arc<AtomicBool>,
 }
@@ -110,9 +109,6 @@ impl NodeFixture {
     pub fn new() -> Self {
         let tempdir = TempDir::new().expect("Unable to create temporary data directory");
         let secondary_tempdir = TempDir::new().expect("Unable to create temporary data directory");
-
-        let original_data_path = std::env::var("DATA_PATH").unwrap_or_default();
-        std::env::set_var("DATA_PATH", tempdir.path());
 
         let reader_addr =
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), find_open_port());
@@ -159,8 +155,8 @@ impl NodeFixture {
         });
 
         Self {
-            settings: Arc::new(settings),
-            secondary_settings: Arc::new(secondary_settings),
+            settings,
+            secondary_settings,
             reader_client: None,
             writer_client: None,
             secondary_reader_client: None,
@@ -175,29 +171,29 @@ impl NodeFixture {
             secondary_shard_cache: None,
             tempdir,
             secondary_tempdir,
-            original_data_path,
             shutdown_notifier,
             shutdown_notified,
         }
     }
 
     pub async fn with_writer(&mut self) -> anyhow::Result<&mut Self> {
-        let settings = Arc::clone(&self.settings);
+        let settings = self.settings.clone();
+        let cache_settings = self.settings.clone();
         let addr = self.writer_addr;
-        let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+        let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(cache_settings));
         self.primary_shard_cache = Some(Arc::clone(&shards_cache));
         let notifier = Arc::clone(&self.shutdown_notifier);
         self.writer_server_task = Some(tokio::spawn(async move {
-            lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
+            lifecycle::initialize_writer(settings.clone())
                 .expect("Writer initialization has failed");
             let writer_server = NodeWriterServer::new(NodeWriterGRPCDriver::new(
-                Arc::clone(&settings),
+                settings.clone(),
                 Arc::clone(&shards_cache),
             ));
             let replication_server =
                 replication::replication_service_server::ReplicationServiceServer::new(
                     ReplicationServiceGRPCDriver::new(
-                        Arc::clone(&settings),
+                        settings.clone(),
                         Arc::clone(&shards_cache),
                         "primary_id".to_string(),
                     ),
@@ -222,13 +218,14 @@ impl NodeFixture {
 
     pub async fn with_secondary_writer(&mut self) -> anyhow::Result<&mut Self> {
         let settings = self.secondary_settings.clone();
+        let cache_settings = self.secondary_settings.clone();
         let host_key_path = settings.host_key_path();
         let node_id = read_or_create_host_key(host_key_path)?;
-        let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(settings.shards_path()));
+        let shards_cache = Arc::new(AsyncUnboundedShardWriterCache::new(cache_settings));
         self.secondary_shard_cache = Some(shards_cache.clone());
         let notified = Arc::clone(&self.shutdown_notified);
         self.secondary_writer_server_task = Some(tokio::spawn(async move {
-            lifecycle::initialize_writer(&settings.data_path(), &settings.shards_path())
+            lifecycle::initialize_writer(settings.clone())
                 .expect("Writer initialization has failed");
             connect_to_primary_and_replicate(settings, shards_cache, node_id.to_string(), notified)
                 .await
@@ -243,13 +240,13 @@ impl NodeFixture {
             self.with_writer().await?;
         }
 
-        let settings = Arc::clone(&self.settings);
+        let settings = self.settings.clone();
         let addr = self.reader_addr;
 
         let notifier = Arc::clone(&self.shutdown_notifier);
         self.reader_server_task = Some(tokio::spawn(async move {
-            lifecycle::initialize_reader();
-            let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
+            lifecycle::initialize_reader(settings.clone());
+            let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
             grpc_driver
                 .initialize()
                 .await
@@ -277,13 +274,13 @@ impl NodeFixture {
             self.with_secondary_writer().await?;
         }
 
-        let settings = Arc::clone(&self.secondary_settings);
+        let settings = self.settings.clone();
         let addr = self.secondary_reader_addr;
         let notifier = Arc::clone(&self.shutdown_notifier);
 
         self.reader_server_task = Some(tokio::spawn(async move {
-            lifecycle::initialize_reader();
-            let grpc_driver = NodeReaderGRPCDriver::new(Arc::clone(&settings));
+            lifecycle::initialize_reader(settings.clone());
+            let grpc_driver = NodeReaderGRPCDriver::new(settings.clone());
             grpc_driver
                 .initialize()
                 .await
@@ -345,6 +342,5 @@ impl NodeFixture {
 impl Drop for NodeFixture {
     fn drop(&mut self) {
         self.shutdown_notifier.notify_waiters();
-        std::env::set_var("DATA_PATH", self.original_data_path.clone());
     }
 }

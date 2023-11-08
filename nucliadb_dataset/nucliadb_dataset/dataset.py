@@ -208,7 +208,9 @@ class NucliaDBDataset(NucliaDataset):
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
-            raise Exception("Labelset is not valid")
+            raise Exception(
+                f"Labelset is not valid {labelset} not in {self.labels.labelsets}"
+            )
 
         schema = pa.schema(
             [
@@ -233,10 +235,13 @@ class NucliaDBDataset(NucliaDataset):
         computed_labelset = False
 
         if labelset not in self.labels.labelsets:
-            if labelset in self.knowledgebox.get_uploaded_labels():
+            uploaded_labels = self.knowledgebox.get_uploaded_labels()
+            if labelset in uploaded_labels:
                 computed_labelset = True
             else:
-                raise Exception("Labelset is not valid")
+                raise Exception(
+                    f"Labelset is not valid {labelset} not in {uploaded_labels}"
+                )
 
         if (
             computed_labelset is False
@@ -286,7 +291,9 @@ class NucliaDBDataset(NucliaDataset):
         labelset = self.trainset.filter.labels[0]
 
         if labelset not in self.labels.labelsets:
-            raise Exception("Labelset is not valid")
+            raise Exception(
+                f"Labelset is not valid {labelset} not in {self.labels.labelsets}"
+            )
 
         if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")

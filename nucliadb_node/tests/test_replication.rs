@@ -21,7 +21,6 @@
 mod common;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
@@ -62,7 +61,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&fixture.secondary_settings));
+    let health_manager_settings = fixture.secondary_settings.clone();
+    let repl_health_mng = ReplicationHealthManager::new(health_manager_settings);
     let healthy = repl_health_mng.healthy();
     assert!(healthy);
 

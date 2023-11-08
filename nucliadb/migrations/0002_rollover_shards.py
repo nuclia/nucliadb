@@ -19,8 +19,6 @@
 #
 from nucliadb.common.cluster.rollover import rollover_shards
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 
 async def migrate(context: ExecutionContext) -> None:
@@ -28,5 +26,4 @@ async def migrate(context: ExecutionContext) -> None:
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    if has_feature(const.Features.ROLLOVER_SHARDS):
-        await rollover_shards(context, kbid)
+    await rollover_shards(context, kbid)

@@ -26,7 +26,10 @@ from starlette.responses import StreamingResponse
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.exceptions import IncompleteFindResultsError
+from nucliadb.search.search.exceptions import (
+    IncompleteFindResultsError,
+    InvalidQueryError,
+)
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import ChatRequest, NucliaDBClientType
 from nucliadb_utils.authentication import requires
@@ -84,3 +87,5 @@ async def resource_chat_endpoint(
             status_code=529,
             detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
         )
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))

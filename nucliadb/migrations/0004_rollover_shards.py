@@ -16,31 +16,14 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+from nucliadb.common.cluster.rollover import rollover_shards
+from nucliadb.migrator.context import ExecutionContext
 
 
-from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.nodesidecar_pb2 import Counter
-
-from nucliadb_node.reader import Reader
-from nucliadb_node.writer import Writer
-from nucliadb_protos import nodesidecar_pb2_grpc
+async def migrate(context: ExecutionContext) -> None:
+    ...
 
 
-class SidecarServicer(nodesidecar_pb2_grpc.NodeSidecarServicer):
-    def __init__(self, reader: Reader, writer: Writer):
-        self.reader = reader
-        self.writer = writer
-
-    async def initialize(self):
-        pass
-
-    async def finalize(self):
-        pass
-
-    async def GetCount(self, request: ShardId, context) -> Counter:  # type: ignore
-        response = Counter()
-        shard = await self.reader.get_shard(request)
-        if shard is not None:
-            response.fields = shard.fields
-            response.paragraphs = shard.paragraphs
-        return response
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
+    await rollover_shards(context, kbid)

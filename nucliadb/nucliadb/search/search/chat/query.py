@@ -175,7 +175,9 @@ async def get_relations_results(
         _,
         _,
         _,
-    ) = await node_query(kbid, Method.RELATIONS, relation_request, chat_request.shards)
+    ) = await node_query(
+        kbid, Method.RELATIONS, relation_request, target_replicas=chat_request.shards
+    )
     return merge_relations_results(relations_results, relation_request.subgraph)
 
 

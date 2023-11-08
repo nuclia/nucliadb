@@ -41,6 +41,3 @@ pub mod telemetry;
 pub mod utils;
 
 mod disk_structure;
-
-// TODO: migrate missing functions and delete this module
-pub mod env;

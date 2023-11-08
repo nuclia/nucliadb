@@ -328,6 +328,7 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64
           tags: |
             ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE}}:${{ steps.env-vars.outputs.short_sha }}
             ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME_NODE}}:${{steps.env-vars.outputs.branch }}
