@@ -4,6 +4,7 @@ metadata:
   name: nucliadb
   labels:
     app: nucliadb
+    appType: node
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
@@ -23,6 +24,7 @@ spec:
       labels:
         app: nucliadb
         app.kubernetes.io/name: node
+        appType: node
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"

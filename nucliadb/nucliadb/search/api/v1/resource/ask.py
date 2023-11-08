@@ -31,7 +31,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import SendToPredictError
-from nucliadb.search.search.exceptions import ResourceNotFoundError
+from nucliadb.search.search.exceptions import InvalidQueryError, ResourceNotFoundError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, AskResponse, TextBlocks
@@ -85,6 +85,8 @@ async def resource_ask_endpoint(
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except SendToPredictError:
         return HTTPClientError(status_code=503, detail="Ask service not available")
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
 
 async def resource_ask(

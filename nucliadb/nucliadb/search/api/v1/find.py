@@ -30,6 +30,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -148,6 +149,8 @@ async def find_knowledgebox(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
 
 @api.post(
@@ -178,3 +181,5 @@ async def find_post_knowledgebox(
         return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))

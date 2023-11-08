@@ -38,6 +38,10 @@ from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.labels import (
+    translate_alias_to_system_label,
+    translate_system_to_alias_label,
+)
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
@@ -51,8 +55,27 @@ from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
+from .exceptions import InvalidQueryError
+
 ENTITY_FILTER_PREFIX = "/e/"
 LABEL_FILTER_PREFIX = "/l/"
+
+
+def translate_label_filters(filters: List[str]) -> List[str]:
+    """
+    Translate friendly filter names to the shortened filter names.
+    """
+    output = []
+    for fltr in filters:
+        if len(fltr) == 0:
+            raise InvalidQueryError("filters", f"Invalid empty label")
+        if fltr[0] != "/":
+            raise InvalidQueryError(
+                "filters", f"Invalid label. It must start with a `/`: {fltr}"
+            )
+
+        output.append(translate_alias_to_system_label(fltr))
+    return output
 
 
 def record_filters_counter(filters: list[str], counter: Counter) -> None:
@@ -62,10 +85,6 @@ def record_filters_counter(filters: list[str], counter: Counter) -> None:
     label_found = False
     for fltr in filters:
         if entity_found and label_found:
-            break
-        if fltr == "":
-            continue
-        if fltr[0] != "/":
             break
         if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
             entity_found = True
@@ -115,10 +134,11 @@ async def global_query_to_pb(
     request.body = query
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
+        filters = translate_label_filters(filters)
         request.filter.tags.extend(filters)
         record_filters_counter(filters, node_features)
 
-    request.faceted.tags.extend(faceted)
+    request.faceted.tags.extend(translate_label_filters(faceted))
     request.fields.extend(fields)
 
     if key_filters is not None and len(key_filters) > 0:
@@ -184,7 +204,9 @@ async def global_query_to_pb(
             node_features.inc({"type": "relations"})
         if autofilter:
             entity_filters = parse_entities_to_filters(request, detected_entities)
-            autofilters.extend(entity_filters)
+            autofilters.extend(
+                [translate_system_to_alias_label(e) for e in entity_filters]
+            )
 
     if with_synonyms:
         if vector_search or relations_search:
@@ -266,6 +288,7 @@ def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(SuggestFeatures.PARAGRAPHS)
+        filters = translate_label_filters(filters)
         request.filter.tags.extend(filters)
         request.fields.extend(fields)
 
@@ -320,8 +343,8 @@ async def paragraph_query_to_pb(
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
-        request.filter.tags.extend(filters)
-        request.faceted.tags.extend(faceted)
+        request.filter.tags.extend(translate_label_filters(filters))
+        request.faceted.tags.extend(translate_label_filters(faceted))
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
