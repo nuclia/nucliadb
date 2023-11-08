@@ -122,7 +122,7 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3032"
           {{- range $key, $value := .Values.env }}
           - name: "{{ $key }}"
@@ -161,7 +161,7 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3031"
         {{- range $key, $value := .Values.env }}
           - name: "{{ $key }}"
