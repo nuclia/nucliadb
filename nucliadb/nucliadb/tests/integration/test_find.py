@@ -61,7 +61,7 @@ async def test_find_with_label_changes(
     # assert we get no results with label filter
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
-        json={"query": "title", "filters": ["/l/labels/label1"]},
+        json={"query": "title", "filters": ["/classification.labels/labels/label1"]},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -92,7 +92,7 @@ async def test_find_with_label_changes(
     # we should get 1 result now with updated label
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
-        json={"query": "title", "filters": ["/l/labels/label1"]},
+        json={"query": "title", "filters": ["/classification.labels/labels/label1"]},
     )
     assert resp.status_code == 200
     body = resp.json()

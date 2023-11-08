@@ -219,7 +219,7 @@ def test_apply_field_metadata_populates_page_number():
         assert paragraph.metadata.position.end_seconds == [10]
 
 
-def test_set_global_tags_promotes_origin_dates():
+def test_set_resource_metadata_promotes_origin_dates():
     resource_brain = ResourceBrain("rid")
     basic = Basic()
     basic.created.seconds = 1
@@ -228,7 +228,7 @@ def test_set_global_tags_promotes_origin_dates():
     origin.created.seconds = 3
     origin.modified.seconds = 4
 
-    resource_brain.set_global_tags(basic, "rid", origin)
+    resource_brain.set_resource_metadata(basic, origin)
 
     assert resource_brain.brain.metadata.created.seconds == 3
     assert resource_brain.brain.metadata.modified.seconds == 4
