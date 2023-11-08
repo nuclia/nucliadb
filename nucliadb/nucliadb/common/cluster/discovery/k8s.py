@@ -68,8 +68,6 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
     ) -> IndexNodeMetadata:
         async with self.update_lock:
             if pod_name not in self.node_id_cache:
-                if read_replica:
-                    breakpoint()
                 self.node_id_cache[pod_name] = await self._query_node_metadata(
                     node_ip, read_replica
                 )

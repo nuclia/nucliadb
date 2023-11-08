@@ -68,8 +68,8 @@ service NodeWriter {
     rpc GC(noderesources.ShardId) returns (noderesources.EmptyResponse) {}
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
-    rpc DeleteRelationNodes(DeleteGraphNodes) returns (OpStatus) {} // XXX can this be removed?
-    rpc JoinGraph(SetGraph) returns (OpStatus) {} // XXX REMOVE
+    rpc DeleteRelationNodes(DeleteGraphNodes) returns (OpStatus) {}
+    rpc JoinGraph(SetGraph) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
     rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
