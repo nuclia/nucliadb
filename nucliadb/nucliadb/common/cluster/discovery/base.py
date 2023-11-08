@@ -117,7 +117,7 @@ async def _get_index_node_metadata(
         name=metadata.node_id,
         address=address,
         shard_count=metadata.shard_count,
-        primary_id=getattr(metadata, "primary_id", None),
+        primary_id=getattr(metadata, "primary_node_id", None),
     )
 
 
