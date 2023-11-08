@@ -114,7 +114,9 @@ async def _get_index_node_metadata(
     metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
     primary_id = getattr(metadata, "primary_node_id", None)
     if read_replica and primary_id is None:
-        raise Exception("Primary node id not found when it is expected to be a read replica")
+        raise Exception(
+            "Primary node id not found when it is expected to be a read replica"
+        )
     return IndexNodeMetadata(
         node_id=metadata.node_id,
         name=metadata.node_id,
