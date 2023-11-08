@@ -78,7 +78,7 @@ impl IndexQueries {
         for valid_field in pre_filtered.valid_fields.iter() {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
-            let as_vectors_key = format!("{resource_id}/f/{field_id}");
+            let as_vectors_key = format!("{resource_id}{field_id}");
             request.key_filters.push(as_vectors_key);
         }
     }
