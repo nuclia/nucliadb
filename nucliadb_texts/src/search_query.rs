@@ -31,17 +31,17 @@ use tantivy::Term;
 
 use crate::schema::{self, TextSchema};
 
-fn produce_date_range_query(
+pub fn produce_date_range_query(
     field: Field,
-    from: Option<ProstTimestamp>,
-    to: Option<ProstTimestamp>,
+    from: Option<&ProstTimestamp>,
+    to: Option<&ProstTimestamp>,
 ) -> Option<RangeQuery> {
     if from.is_none() && to.is_none() {
         return None;
     }
 
-    let left_date_time = from.map(|t| schema::timestamp_to_datetime_utc(&t));
-    let right_date_time = to.map(|t| schema::timestamp_to_datetime_utc(&t));
+    let left_date_time = from.map(schema::timestamp_to_datetime_utc);
+    let right_date_time = to.map(schema::timestamp_to_datetime_utc);
     let left_term = left_date_time.map(|t| Term::from_field_date(field, &t));
     let right_term = right_date_time.map(|t| Term::from_field_date(field, &t));
     let left_bound = left_term.map(Bound::Included).unwrap_or(Bound::Unbounded);
@@ -114,13 +114,13 @@ pub fn create_query(
     if let Some(time_ranges) = search.timestamps.as_ref() {
         let modified = produce_date_range_query(
             schema.modified,
-            time_ranges.from_modified.clone(),
-            time_ranges.to_modified.clone(),
+            time_ranges.from_modified.as_ref(),
+            time_ranges.to_modified.as_ref(),
         );
         let created = produce_date_range_query(
             schema.created,
-            time_ranges.from_created.clone(),
-            time_ranges.to_created.clone(),
+            time_ranges.from_created.as_ref(),
+            time_ranges.to_created.as_ref(),
         );
 
         if let Some(modified) = modified {
