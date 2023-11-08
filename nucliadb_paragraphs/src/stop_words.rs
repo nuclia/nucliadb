@@ -105,7 +105,7 @@ mod tests {
         let _ = is_stop_word("detector");
         let elapsed = start_time.elapsed().as_millis() as f64;
         // make sure we never spend more than 100 ms for the cache warmup
-        assert_eq!(elapsed < 100.0, true, "{}", elapsed);
+        assert!(elapsed < 100.0, "{}", elapsed);
 
         let tests = [
             ("nuclia", false),
@@ -122,7 +122,7 @@ mod tests {
             let elapsed = start_time.elapsed().as_micros() as f64;
             assert_eq!(matches, expected);
             // make sure we never spend more than 1 ms
-            assert_eq!(elapsed < 1000.0, true, "{}", elapsed);
+            assert!(elapsed < 1000.0, "{}", elapsed);
         }
     }
 }

@@ -77,7 +77,7 @@ async fn populate(writer: &mut TestNodeWriter, shard_id: String, metadata: Index
     };
 
     let text_content = TextInformation {
-        text: format!("Dummy text"),
+        text: "Dummy text".to_string(),
         labels: vec![],
     };
 
