@@ -112,7 +112,11 @@ async def _get_index_node_metadata(
     else:
         stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
     metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
-    primary_id = getattr(metadata, "primary_node_id", None)
+    primary_id = (
+        getattr(metadata, "primary_node_id", None)
+        # the or None here is important because the proto returns an empty string
+        or None
+    )
     if read_replica and primary_id:
         raise Exception(
             "Primary node id not found when it is expected to be a read replica"
