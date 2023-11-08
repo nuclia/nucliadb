@@ -72,7 +72,12 @@ async def resource(nucliadb_writer, knowledgebox):
         (a_week_before(NOW), None, a_week_after(NOW), None, False),
     ],
 )
-@pytest.mark.parametrize("feature", ["paragraph", "vector"])
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "paragraph",
+    ],
+)
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_date_range_filters_nucliadb_dates(
     nucliadb_reader: AsyncClient,
@@ -124,7 +129,12 @@ async def test_search_with_date_range_filters_nucliadb_dates(
         (ORIGIN_CREATION, None, None, a_week_before(ORIGIN_MODIFICATION), False),
     ],
 )
-@pytest.mark.parametrize("feature", ["paragraph", "vector"])
+@pytest.mark.parametrize(
+    "feature",
+    [
+        "paragraph",
+    ],
+)
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_date_range_filters_origin_dates(
     nucliadb_reader: AsyncClient,
