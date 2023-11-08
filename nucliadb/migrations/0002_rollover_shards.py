@@ -19,8 +19,6 @@
 #
 from nucliadb.common.cluster.rollover import rollover_shards
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 
 async def migrate(context: ExecutionContext) -> None:
