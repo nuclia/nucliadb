@@ -72,10 +72,12 @@ async def resource(nucliadb_writer, knowledgebox):
         (a_week_before(NOW), None, a_week_after(NOW), None, False),
     ],
 )
+@pytest.mark.parametrize("feature", ["paragraph", "vector"])
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_bm25_search_with_date_range_filters_nucliadb_dates(
+async def test_search_with_date_range_filters_nucliadb_dates(
     nucliadb_reader: AsyncClient,
     knowledgebox,
+    feature,
     resource,
     creation_start,
     creation_end,
@@ -90,7 +92,7 @@ async def test_bm25_search_with_date_range_filters_nucliadb_dates(
     await _test_find_date_ranges(
         nucliadb_reader,
         knowledgebox,
-        ["paragraph"],
+        [feature],
         creation_start,
         creation_end,
         modification_start,
@@ -122,11 +124,13 @@ async def test_bm25_search_with_date_range_filters_nucliadb_dates(
         (ORIGIN_CREATION, None, None, a_week_before(ORIGIN_MODIFICATION), False),
     ],
 )
+@pytest.mark.parametrize("feature", ["paragraph", "vector"])
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_bm25_search_with_date_range_filters_origin_dates(
+async def test_search_with_date_range_filters_origin_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
+    feature,
     resource,
     creation_start,
     creation_end,
@@ -154,7 +158,7 @@ async def test_bm25_search_with_date_range_filters_origin_dates(
     await _test_find_date_ranges(
         nucliadb_reader,
         knowledgebox,
-        ["paragraph"],
+        [feature],
         creation_start,
         creation_end,
         modification_start,
