@@ -60,6 +60,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
                 id=member.node_id,
                 address=member.address,
                 shard_count=shard_count,
+                primary_id=member.primary_id,
             )
             logger.debug("Node added")
         else:
@@ -77,7 +78,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
             if node is not None:
                 removed_node_ids.append(key)
                 logger.warning(f"{key} remove {node.address}")
-                manager.remove_index_node(key)
+                manager.remove_index_node(key, node.primary_id)
 
     if len(removed_node_ids) > 1:
         logger.warning(
@@ -112,12 +113,21 @@ async def _get_index_node_metadata(
     else:
         stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
     metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
+    primary_id = (
+        getattr(metadata, "primary_node_id", None)
+        # the or None here is important because the proto returns an empty string
+        or None
+    )
+    if read_replica and primary_id is None:
+        raise Exception(
+            "Primary node id not found when it is expected to be a read replica"
+        )
     return IndexNodeMetadata(
         node_id=metadata.node_id,
         name=metadata.node_id,
         address=address,
         shard_count=metadata.shard_count,
-        primary_id=getattr(metadata, "primary_id", None),
+        primary_id=primary_id,
     )
 
 

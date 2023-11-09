@@ -44,7 +44,12 @@ def writer_stub():
     with patch(
         "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",
         return_value=writer_stub,
-    ), patch("nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"):
+    ), patch(
+        "nucliadb.common.cluster.discovery.base.replication_pb2_grpc.ReplicationServiceStub",
+        return_value=writer_stub,
+    ), patch(
+        "nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"
+    ):
         yield writer_stub
 
 
