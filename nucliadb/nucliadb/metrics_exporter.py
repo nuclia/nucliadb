@@ -35,7 +35,7 @@ def update_node_metrics():
     all_nodes = manager.get_index_nodes()
 
     for node in all_nodes:
-        if node.primary_id is None:
+        if node.primary_id is not None:
             continue
         SHARD_COUNT.set(node.shard_count, labels=dict(node=node.id))
 
