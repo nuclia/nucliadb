@@ -55,6 +55,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.FACETS_TRANSLATION: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
 }
 
 

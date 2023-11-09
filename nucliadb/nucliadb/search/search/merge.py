@@ -68,6 +68,8 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
@@ -131,13 +133,7 @@ async def merge_documents_results(
         if query is None:
             query = document_response.query
         if document_response.facets:
-            for key, value in document_response.facets.items():
-                key = translate_system_to_alias_label(key)
-                for facetresult in value.facetresults:
-                    facet_label = translate_system_to_alias_label(facetresult.tag)
-                    facets.setdefault(key, {}).setdefault(facet_label, 0)
-                    facets[key][facet_label] += facetresult.total
-
+            parse_facets(document_response.facets, facets)
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
@@ -358,14 +354,8 @@ async def merge_paragraph_results(
             ematches = paragraph_response.ematches  # type: ignore
         if query is None:
             query = paragraph_response.query
-
         if paragraph_response.facets:
-            for key, value in paragraph_response.facets.items():
-                key = translate_system_to_alias_label(key)
-                for facetresult in value.facetresults:
-                    facet_label = translate_system_to_alias_label(facetresult.tag)
-                    facets.setdefault(key, {}).setdefault(facet_label, 0)
-                    facets[key][facet_label] += facetresult.total
+            parse_facets(paragraph_response.facets, facets)
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
@@ -615,3 +605,19 @@ async def merge_suggest_results(
     )
     api_results.entities = await merge_suggest_entities_results(suggest_responses)
     return api_results
+
+
+def parse_facets(facet_results, facets: dict[str, Any]):
+    if has_feature(const.Features.FACETS_TRANSLATION):
+        for key, value in facet_results.items():
+            key = translate_system_to_alias_label(key)
+            for facetresult in value.facetresults:
+                facet_label = translate_system_to_alias_label(facetresult.tag)
+                facets.setdefault(key, {}).setdefault(facet_label, 0)
+                facets[key][facet_label] += facetresult.total
+    else:
+        # TODO: Remove this once dashboard supports it in production
+        for key, value in facet_results.items():
+            for facetresult in value.facetresults:
+                facets.setdefault(key, {}).setdefault(facetresult.tag, 0)
+                facets[key][facetresult.tag] += facetresult.total
