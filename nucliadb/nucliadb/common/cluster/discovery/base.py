@@ -60,6 +60,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
                 id=member.node_id,
                 address=member.address,
                 shard_count=shard_count,
+                primary_id=member.primary_id,
             )
             logger.debug("Node added")
         else:
@@ -77,7 +78,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
             if node is not None:
                 removed_node_ids.append(key)
                 logger.warning(f"{key} remove {node.address}")
-                manager.remove_index_node(key)
+                manager.remove_index_node(key, node.primary_id)
 
     if len(removed_node_ids) > 1:
         logger.warning(

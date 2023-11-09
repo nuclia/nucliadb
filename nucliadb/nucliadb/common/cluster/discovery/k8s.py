@@ -125,6 +125,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     id=node_data.node_id,
                     address=node_data.address,
                     shard_count=node_data.shard_count,
+                    primary_id=node_data.primary_id,
                 )
             else:
                 logger.debug(
