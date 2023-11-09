@@ -42,9 +42,12 @@ class BrokerMessageBuilder:
         kbid: str,
         rid: Optional[str] = None,
         slug: Optional[str] = None,
+        vector_dimension: int = 100,
     ):
         self.bm = wpb.BrokerMessage()
         self.fields: dict[tuple[str, rpb.FieldType.ValueType], FieldBuilder] = {}
+
+        self.vector_dimension = vector_dimension
 
         self.bm.kbid = kbid
         self.bm.type = wpb.BrokerMessage.AUTOCOMMIT
@@ -78,6 +81,18 @@ class BrokerMessageBuilder:
     def with_title(self, title: str):
         title_builder = FieldBuilder("title", rpb.FieldType.GENERIC)
         title_builder.with_extracted_text(title)
+        title_builder.with_extracted_vector(
+            rpb.Vector(
+                start=0,
+                end=len(title),
+                start_paragraph=0,
+                end_paragraph=len(title),
+                vector=[
+                    0.0,
+                ]
+                * self.vector_dimension,
+            )
+        )
         # we do this to writer BMs in write resource API endpoint
         title_builder.with_extracted_paragraph_metadata(
             rpb.Paragraph(
@@ -92,6 +107,18 @@ class BrokerMessageBuilder:
     def with_summary(self, summary: str):
         summary_builder = FieldBuilder("summary", rpb.FieldType.GENERIC)
         summary_builder.with_extracted_text(summary)
+        summary_builder.with_extracted_vector(
+            rpb.Vector(
+                start=0,
+                end=len(summary),
+                start_paragraph=0,
+                end_paragraph=len(summary),
+                vector=[
+                    0.0,
+                ]
+                * self.vector_dimension,
+            )
+        )
         # we do this to writer BMs in write resource API endpoint
         summary_builder.with_extracted_paragraph_metadata(
             rpb.Paragraph(
@@ -102,6 +129,30 @@ class BrokerMessageBuilder:
         )
         self.bm.basic.summary = summary
         self.add_field_builder(summary_builder)
+
+    def with_text_field(self, field_id: str, text):
+        field_builder = FieldBuilder(field_id, rpb.FieldType.TEXT)
+        field_builder.with_extracted_text(text)
+        field_builder.with_extracted_vector(
+            rpb.Vector(
+                start=0,
+                end=len(text),
+                start_paragraph=0,
+                end_paragraph=len(text),
+                vector=[
+                    0.0,
+                ]
+                * self.vector_dimension,
+            )
+        )
+        field_builder.with_extracted_paragraph_metadata(
+            rpb.Paragraph(
+                start=0,
+                end=len(text),
+                kind=rpb.Paragraph.TypeParagraph.TEXT,
+            )
+        )
+        self.add_field_builder(field_builder)
 
     def with_resource_labels(self, labelset: str, labels: list[str]):
         classifications = labels_to_classifications(labelset, labels)
@@ -140,7 +191,7 @@ class BrokerMessageBuilder:
         for field_builder in self.fields.values():
             field = field_builder.build()
 
-            if field.id.field_type == rpb.FieldType.GENERIC:
+            if field.id.field_type in [rpb.FieldType.GENERIC, rpb.FieldType.TEXT]:
                 pass
             elif field.id.field_type == rpb.FieldType.FILE:
                 file_field = self.bm.files[field.id.field]
@@ -160,4 +211,8 @@ class BrokerMessageBuilder:
             if field.extracted.text is not None:
                 replace_if_exists(
                     self.bm.extracted_text, field.id, field.extracted.text
+                )
+            if field.extracted.vectors is not None:
+                replace_if_exists(
+                    self.bm.field_vectors, field.id, field.extracted.vectors
                 )

@@ -36,6 +36,7 @@ class FieldUser:
 class FieldExtracted:
     metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
     text: Optional[rpb.ExtractedTextWrapper] = None
+    vectors: Optional[rpb.ExtractedVectorsWrapper] = None
 
 
 @dataclasses.dataclass
@@ -51,6 +52,7 @@ class FieldBuilder:
         self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
         self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
         self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
+        self.__extracted_vectors: Optional[rpb.ExtractedVectorsWrapper] = None
 
     @property
     def id(self) -> rpb.FieldID:
@@ -82,6 +84,12 @@ class FieldBuilder:
             self.__user_metadata = rpb.UserFieldMetadata(field=self._field_id)
         return self.__user_metadata
 
+    @property
+    def _extracted_vectors(self) -> rpb.ExtractedVectorsWrapper:
+        if self.__extracted_vectors is None:
+            self.__extracted_vectors = rpb.ExtractedVectorsWrapper(field=self._field_id)
+        return self.__extracted_vectors
+
     def build(self) -> Field:
         field = Field(id=self._field_id)
 
@@ -97,6 +105,10 @@ class FieldBuilder:
             field.user.metadata = rpb.UserFieldMetadata()
             field.user.metadata.CopyFrom(self.__user_metadata)
 
+        if self.__extracted_vectors is not None:
+            field.extracted.vectors = rpb.ExtractedVectorsWrapper()
+            field.extracted.vectors.CopyFrom(self.__extracted_vectors)
+
         return field
 
     def with_extracted_labels(self, labelset: str, labels: list[str]):
@@ -107,6 +119,9 @@ class FieldBuilder:
 
     def with_extracted_text(self, text: str):
         self._extracted_text.body.text = text
+
+    def with_extracted_vector(self, vector: rpb.Vector):
+        self._extracted_vectors.vectors.vectors.vectors.append(vector)
 
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
         self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
