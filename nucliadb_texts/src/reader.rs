@@ -101,7 +101,7 @@ impl FieldReader for TextReaderService {
             };
             if let Some(query) = search_query::produce_date_range_query(field, from, to) {
                 let query: Box<dyn Query> = Box::new(query);
-                timestamp_queries.push((Occur::Should, query));
+                timestamp_queries.push((Occur::Must, query));
             }
         }
         let pre_filter_query = BooleanQuery::new(timestamp_queries);
