@@ -93,7 +93,7 @@ six==1.16.0
 sniffio==1.3.0
 starlette==0.27.0
 thrift==0.16.0
-tikv_client==0.0.3
+tikv-client @ git+https://github.com/tikv/client-py@master
 types-aiofiles==23.2.0.0
 types-orjson==3.6.2
 types-pkg-resources==0.1.3
