@@ -64,16 +64,16 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
         self.update_lock = asyncio.Lock()
 
     async def get_node_metadata(
-        self, sts_name: str, node_ip: str, read_replica: bool
+        self, pod_name: str, node_ip: str, read_replica: bool
     ) -> IndexNodeMetadata:
         async with self.update_lock:
-            if sts_name not in self.node_id_cache:
-                self.node_id_cache[sts_name] = await self._query_node_metadata(
+            if pod_name not in self.node_id_cache:
+                self.node_id_cache[pod_name] = await self._query_node_metadata(
                     node_ip, read_replica
                 )
             else:
-                self.node_id_cache[sts_name].address = node_ip
-        return self.node_id_cache[sts_name]
+                self.node_id_cache[pod_name].address = node_ip
+        return self.node_id_cache[pod_name]
 
     async def update_node(self, event: EventType) -> None:
         """
