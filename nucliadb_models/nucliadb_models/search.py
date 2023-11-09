@@ -490,12 +490,12 @@ class SearchParamDefaults:
         description="Controls which types of metadata are serialized on resources of search results",
     )
     extracted = ParamDefault(
-        default=list(ExtractedDataTypeName),
+        default=None,
         title="Extracted metadata",
         description="Controls which parts of the extracted metadata are serialized on search results",
     )
     field_type_filter = ParamDefault(
-        default=list(FieldTypeName),
+        default=None,
         title="Field type filter",
         description="Filter search results to match paragraphs of a specific field type. E.g: `['conversation', 'text']`",  # noqa
     )
