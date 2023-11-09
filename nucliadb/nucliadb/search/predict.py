@@ -279,14 +279,19 @@ class PredictEngine:
         else:
             return {"X-STF-KBID": kbid}
 
-    async def check_response(self, resp, expected: int = 200) -> None:
-        if resp.status == expected:
+    async def check_response(
+        self, resp: aiohttp.ClientResponse, expected_status: int = 200
+    ) -> None:
+        if resp.status == expected_status:
             return
+
         if resp.status == 402:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
-        else:
-            raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+
+        error = (await resp.read()).decode()
+        logger.error(f"Predict API error at {resp.url}: {error}")
+        raise SendToPredictError(f"{resp.status}: {error}")
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
@@ -321,7 +326,7 @@ class PredictEngine:
             json=data,
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=204)
+        await self.check_response(resp, expected_status=204)
 
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
@@ -338,7 +343,7 @@ class PredictEngine:
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         return await _parse_rephrase_response(resp)
 
     @predict_observer.wrap({"type": "chat"})
@@ -358,7 +363,7 @@ class PredictEngine:
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
         return ident, get_answer_generator(resp)
 
@@ -381,7 +386,7 @@ class PredictEngine:
             headers=await self.get_predict_headers(kbid),
             timeout=None,
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         return await resp.text()
 
     @predict_observer.wrap({"type": "sentence"})
@@ -400,7 +405,7 @@ class PredictEngine:
             params={"text": sentence},
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         data = await resp.json()
         if len(data["data"]) == 0:
             raise PredictVectorMissing()
@@ -422,7 +427,7 @@ class PredictEngine:
             params={"text": sentence},
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         data = await resp.json()
 
         return convert_relations(data)

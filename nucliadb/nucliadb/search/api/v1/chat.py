@@ -64,6 +64,14 @@ CHAT_EXAMPLES = {
             "query": "Who won the league final?",
         },
     ),
+    "search_and_chat_with_custom_prompt": Example(
+        summary="Ask for the gold price evolution in 2023 in a very conscise way",
+        description="You can ask a question and specify a custom prompt to tweak the tone of the response",  # noqa
+        value={
+            "query": "How has the price of gold evolved during 2023?",
+            "prompt": "Given this context: {context}. Answer this {question} in a concise way using the provided context",  # noqa
+        },
+    ),
 }
 
 

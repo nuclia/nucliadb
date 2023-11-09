@@ -21,7 +21,11 @@ import nucliadb_sdk
 
 
 def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
-    result = sdk.chat(kbid=docs_dataset, query="Nuclia loves Semantic Search")
+    result = sdk.chat(
+        kbid=docs_dataset,
+        query="Nuclia loves Semantic Search",
+        prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
+    )
     assert result.learning_id == "00"
     assert result.answer == "valid answer  to"
     assert len(result.result.resources) == 9

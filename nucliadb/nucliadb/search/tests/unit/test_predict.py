@@ -20,7 +20,9 @@
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock
 
+import aiohttp
 import pytest
+from yarl import URL
 
 from nucliadb.search.predict import (
     DummyPredictEngine,
@@ -50,6 +52,8 @@ def get_mocked_session(
     if json is not None:
         response.json = AsyncMock(return_value=json)
     if read is not None:
+        if isinstance(read, str):
+            read = read.encode()
         response.read = AsyncMock(return_value=read)
     if context_manager:
         # For when async with self.session.post() as response: is called
@@ -393,3 +397,24 @@ async def test_parse_rephrase_response(content, exception):
             await _parse_rephrase_response(resp)
     else:
         assert await _parse_rephrase_response(resp) == content.rstrip("0")
+
+
+async def test_check_response_error():
+    response = aiohttp.ClientResponse(
+        "GET",
+        URL("http://predict:8080/api/v1/chat"),
+        writer=None,
+        continue100=Mock(),
+        timer=Mock(),
+        request_info=Mock(),
+        traces=[],
+        loop=Mock(),
+        session=Mock(),
+    )
+    response.status = 503
+    response._body = b"some error"
+
+    with pytest.raises(SendToPredictError) as ex:
+        await PredictEngine().check_response(response, expected_status=200)
+
+    ex.errisinstance(SendToPredictError)
