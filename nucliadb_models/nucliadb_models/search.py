@@ -490,7 +490,7 @@ class SearchParamDefaults:
         description="Controls which types of metadata are serialized on resources of search results",
     )
     extracted = ParamDefault(
-        default=list(ExtractedDataTypeName),
+        default=[],
         title="Extracted metadata",
         description="Controls which parts of the extracted metadata are serialized on search results",
     )
