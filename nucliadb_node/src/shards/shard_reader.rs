@@ -408,7 +408,16 @@ impl ShardReader {
         // Apply pre-filtering to the query plan
         if let Some(pre_filter) = pre_filter {
             let pre_filtered = self.text_reader.pre_filter(&pre_filter)?;
-            index_queries.apply_pre_filter(pre_filtered);
+            if pre_filtered.valid_fields.is_empty() {
+                return Ok(SearchResponse {
+                    document: None,
+                    paragraph: None,
+                    vector: None,
+                    relation: None,
+                });
+            } else {
+                index_queries.apply_pre_filter(pre_filtered);
+            }
         }
 
         // Run the rest of the plan
