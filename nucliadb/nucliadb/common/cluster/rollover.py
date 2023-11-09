@@ -95,7 +95,7 @@ async def create_rollover_shards(
                     )
                 except Exception as e:
                     errors.capture_exception(e)
-                    logger.error(f"Error creating new shard at {node}")
+                    logger.exception(f"Error creating new shard at {node}")
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))
@@ -105,7 +105,7 @@ async def create_rollover_shards(
                 replicas_created += 1
     except Exception as e:
         errors.capture_exception(e)
-        logger.error("Unexpected error creating new shard")
+        logger.exception("Unexpected error creating new shard")
         for created_shard in created_shards:
             await sm.rollback_shard(created_shard)
         raise e
