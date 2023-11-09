@@ -117,7 +117,7 @@ async def _get_index_node_metadata(
         # the or None here is important because the proto returns an empty string
         or None
     )
-    if read_replica and primary_id:
+    if read_replica and primary_id is None:
         raise Exception(
             "Primary node id not found when it is expected to be a read replica"
         )
