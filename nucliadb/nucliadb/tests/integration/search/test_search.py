@@ -503,7 +503,7 @@ async def test_search_returns_sentence_positions(
     assert "page_number" not in position
 
 
-async def inject_resource_with_a_sentence(knowledgebox, writer):
+def get_resource_with_a_sentence(knowledgebox):
     bm = broker_resource(knowledgebox)
 
     bm.files["file"].file.uri = "http://nofile"
@@ -545,7 +545,11 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
     ev.vectors.vectors.vectors.append(v1)
 
     bm.field_vectors.append(ev)
+    return bm
 
+
+async def inject_resource_with_a_sentence(knowledgebox, writer):
+    bm = get_resource_with_a_sentence(knowledgebox)
     await inject_message(writer, bm)
 
 
