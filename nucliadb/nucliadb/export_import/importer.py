@@ -57,9 +57,9 @@ async def import_kb(
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     stream_reader = ExportStreamReader(stream)
 
-    if metadata is not None and metadata.total > 0:
+    if metadata is not None and metadata.processed > 0:
         # Resuming task in a retry
-        await stream_reader.seek(metadata.total)
+        await stream_reader.seek(metadata.processed)
 
     items_count = 0
     async for item_type, data in stream_reader.iter_items():
