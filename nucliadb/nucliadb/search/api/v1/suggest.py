@@ -19,15 +19,17 @@
 #
 from datetime import datetime
 from time import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.ingest.txn_utils import abort_transaction
+from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb_models.common import FieldTypeName
@@ -85,6 +87,51 @@ async def suggest_knowledgebox(
     x_forwarded_for: str = Header(""),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
+) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
+    try:
+        return await suggest(
+            response,
+            kbid,
+            query,
+            fields,
+            filters,
+            faceted,
+            range_creation_start,
+            range_creation_end,
+            range_modification_start,
+            range_modification_end,
+            features,
+            show,
+            field_type_filter,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            debug,
+            highlight,
+        )
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
+
+
+async def suggest(
+    response,
+    kbid: str,
+    query: str,
+    fields: List[str],
+    filters: List[str],
+    faceted: List[str],
+    range_creation_start: Optional[datetime],
+    range_creation_end: Optional[datetime],
+    range_modification_start: Optional[datetime],
+    range_modification_end: Optional[datetime],
+    features: List[SuggestOptions],
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    debug: bool,
+    highlight: bool,
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     audit = get_audit()
