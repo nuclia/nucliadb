@@ -105,12 +105,16 @@ impl FieldReader for TextReaderService {
                 add_to.push((Occur::Should, query));
             }
         }
-        let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-        let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-        let pre_filter_query = BooleanQuery::new(vec![
-            (Occur::Must, created_query),
-            (Occur::Must, modified_query),
-        ]);
+        let pre_filter_query: Box<dyn Query> = if created_queries.is_empty() {
+            Box::new(BooleanQuery::new(modified_queries))
+        } else if modified_queries.is_empty() {
+            Box::new(BooleanQuery::new(created_queries))
+        } else {
+            let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+            let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+            let subqueries = vec![(Occur::Must, created_query), (Occur::Must, modified_query)];
+            Box::new(BooleanQuery::new(subqueries))
+        };
         let searcher = self.reader.searcher();
         let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
         let mut valid_fields = Vec::new();
