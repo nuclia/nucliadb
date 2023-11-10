@@ -98,8 +98,14 @@ class FileDataMangaer:
         return self.metadata.get("content_type")
 
     @property
-    def size(self):
-        return self._data.get("size", 0)
+    def size(self) -> int:
+        default = 0
+        if self._data is None:
+            return default
+        size = self._data.get("size")
+        if size is None:
+            return default
+        return int(size)
 
     @property
     def offset(self):

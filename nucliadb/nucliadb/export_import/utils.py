@@ -436,6 +436,7 @@ class TaskRetryHandler:
     def wrap(self, func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            func_result = None
             metadata = self.metadata
             task = metadata.task
             if task.status in (Status.FINISHED, Status.ERRORED):
@@ -455,7 +456,7 @@ class TaskRetryHandler:
                 return
             try:
                 metadata.task.status = Status.RUNNING
-                await func(*args, **kwargs)
+                func_result = await func(*args, **kwargs)
             except Exception:
                 task.retries += 1
                 logger.info(
@@ -469,6 +470,7 @@ class TaskRetryHandler:
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
                 )
                 task.status = Status.FINISHED
+                return func_result
             finally:
                 await self.dm.set_metadata(self.type, metadata)
 

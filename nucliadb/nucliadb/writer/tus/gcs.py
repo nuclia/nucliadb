@@ -267,7 +267,7 @@ class GCloudFileStorageManager(FileStorageManager):
         if self.storage.session is None:
             raise AttributeError()
         if dm.size:
-            size = dm.size
+            size = str(dm.size)
         else:
             # assuming size will come eventually
             size = "*"
