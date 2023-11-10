@@ -42,7 +42,8 @@ from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
 from nucliadb_utils.cache.settings import settings as cache_settings
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_manager
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -184,7 +185,7 @@ def node_single():
 
 
 @pytest.fixture(scope="function")
-async def writer_stub(node_single):
+async def writer_stub(node_single) -> AsyncIterable[NodeWriterStub]:
     channel = aio.insecure_channel(settings.writer_listen_address)
     stub = NodeWriterStub(channel)
     yield stub
@@ -226,23 +227,58 @@ async def grpc_server(writer):
 
 
 @pytest.fixture(scope="function")
-async def worker(
-    node_single,
-    writer_stub: NodeWriterStub,
-    storage,
-    natsd,
-    data_path: str,
-    writer,
-    grpc_server,
-) -> AsyncIterable[Worker]:
-    settings.force_host_id = "node1"
-    settings.data_path = data_path
+def nats_settings(natsd):
+    original_index_jetstream_servers = indexing_settings.index_jetstream_servers
+    original_cache_pubsub_nats_url = cache_settings.cache_pubsub_nats_url
+
     indexing_settings.index_jetstream_servers = [natsd]
     cache_settings.cache_pubsub_nats_url = [natsd]
 
-    await get_storage(service_name=SERVICE_NAME)
+    yield
+
+    indexing_settings.index_jetstream_servers = original_index_jetstream_servers
+    cache_settings.cache_pubsub_nats_url = original_cache_pubsub_nats_url
+
+
+@pytest.fixture(scope="function")
+async def nats_manager(
+    natsd,
+    nats_settings,
+) -> AsyncIterable[NatsConnectionManager]:
+    nats_manager = await start_nats_manager(
+        SERVICE_NAME,
+        nats_servers=indexing_settings.index_jetstream_servers,
+        nats_creds=None,
+    )
+    yield nats_manager
+    await stop_nats_manager()
+
+
+@pytest.fixture(scope="function")
+async def listeners(writer: Writer):
     listeners = await start_listeners(writer)
-    worker = await start_worker(writer)
+    yield
+    for listener in listeners:
+        await listener.finalize()
+
+
+@pytest.fixture(scope="function")
+async def worker(
+    node_single,
+    gcs_storage,
+    nats_manager: NatsConnectionManager,
+    data_path: str,
+    writer: Writer,
+    writer_stub: NodeWriterStub,
+    grpc_server,
+    listeners,
+) -> AsyncIterable[Worker]:
+    settings.force_host_id = "node1"
+    settings.data_path = data_path
+
+    await get_storage(service_name=SERVICE_NAME)
+    worker = await start_worker(writer, nats_manager)
+
     yield worker
 
     # Cleanup all shards to be ready for following tests
@@ -254,8 +290,6 @@ async def worker(
         pass
 
     await worker.finalize()
-    for listener in listeners:
-        await listener.finalize()
 
 
 @pytest.fixture(scope="function")

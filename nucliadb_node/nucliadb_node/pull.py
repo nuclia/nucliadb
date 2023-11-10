@@ -26,11 +26,11 @@ from nats.js.errors import NotFoundError as StreamNotFoundError
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.indexer import ConcurrentShardIndexer
-from nucliadb_node.settings import indexing_settings, settings
+from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
-from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
@@ -60,77 +60,62 @@ class Worker:
     subscriptions: list[Subscription]
     storage: Storage
 
-    def __init__(self, writer: Writer, node: str):
+    def __init__(
+        self,
+        writer: Writer,
+        node: str,
+        nats_connection_manager: NatsConnectionManager,
+    ):
         self.writer = writer
         self.subscriptions = []
         self.node = node
-        self.load_seqid()
         self.indexer = ConcurrentShardIndexer(self.writer)
+        self.nats_connection_manager = nats_connection_manager
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         await self.indexer.initialize()
-        await self.subscriber_initialize()
+        await self.setup_nats_subscription()
 
     async def finalize(self):
-        await self.subscriber_finalize()
         await self.indexer.finalize()
 
-    async def disconnected_cb(self):
-        logger.info("Got disconnected from NATS!")
+    async def setup_nats_subscription(self):
+        self.load_seqid()
+        logger.info(f"Last seqid {self.last_seqid}")
 
-    async def reconnected_cb(self):
-        # See who we are connected to on reconnect
-        logger.warning(
-            f"Got reconnected to NATS {self.nc.connected_url}. Attempting reconnect"
-        )
-        await self.drain_subscriptions()
-        await self.subscribe()
-
-    async def error_cb(self, e):
-        errors.capture_exception(e)
-        logger.error(
-            "There was an error on the worker, check sentry: {}".format(e),
-            exc_info=True,
-        )
-
-    async def closed_cb(self):
-        logger.info("Connection is closed on NATS")
-
-    async def subscriber_initialize(self):
-        options = {
-            "error_cb": self.error_cb,
-            "closed_cb": self.closed_cb,
-            "reconnected_cb": self.reconnected_cb,
-        }
-
-        if indexing_settings.index_jetstream_auth:
-            options["user_credentials"] = indexing_settings.index_jetstream_auth
-
-        if len(indexing_settings.index_jetstream_servers) > 0:
-            options["servers"] = indexing_settings.index_jetstream_servers
-
-        self.nc = await nats.connect(**options)
-        self.js = get_traced_jetstream(self.nc, SERVICE_NAME)
-        logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
-        await self.subscribe()
-
-    async def drain_subscriptions(self) -> None:
-        for subscription in self.subscriptions:
-            try:
-                await subscription.drain()
-            except nats.errors.ConnectionClosedError:
-                pass
-        self.subscriptions = []
-
-    async def subscriber_finalize(self):
-        await self.drain_subscriptions()
         try:
-            await self.nc.close()
-        except (RuntimeError, AttributeError):  # pragma: no cover
-            # RuntimeError: can be thrown if event loop is closed
-            # AttributeError: can be thrown by nats-py when handling shutdown
-            pass
+            await self.nats_connection_manager.js.stream_info(const.Streams.INDEX.name)
+        except StreamNotFoundError:
+            logger.info("Creating stream")
+            await self.nats_connection_manager.js.add_stream(
+                name=const.Streams.INDEX.name,
+                subjects=[
+                    const.Streams.INDEX.subject.format(node=">"),
+                ],
+            )
+            await self.nats_connection_manager.js.stream_info(const.Streams.INDEX.name)
+
+        subject = const.Streams.INDEX.subject.format(node=self.node)
+        await self.nats_connection_manager.subscribe(
+            subject=subject,
+            queue=const.Streams.INDEX.group.format(node=self.node),
+            stream=const.Streams.INDEX.name,
+            flow_control=True,
+            manual_ack=True,
+            cb=self.subscription_worker,
+            subscription_lost_cb=self.setup_nats_subscription,
+            config=nats.js.api.ConsumerConfig(
+                deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
+                opt_start_seq=self.last_seqid or 1,
+                ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
+                max_deliver=nats_consumer_settings.nats_max_deliver,
+                ack_wait=nats_consumer_settings.nats_ack_wait,
+                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
+            ),
+        )
+        logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
     def store_seqid(self, seqid: int):
         if settings.data_path is None:
@@ -148,41 +133,6 @@ class Worker:
         except FileNotFoundError:
             # First time the consumer is started
             self.last_seqid = None
-
-    async def subscribe(self):
-        logger.info(f"Last seqid {self.last_seqid}")
-        try:
-            await self.js.stream_info(const.Streams.INDEX.name)
-        except StreamNotFoundError:
-            logger.info("Creating stream")
-            res = await self.js.add_stream(
-                name=const.Streams.INDEX.name,
-                subjects=[
-                    const.Streams.INDEX.subject.format(node=">"),
-                ],
-            )
-            await self.js.stream_info(const.Streams.INDEX.name)
-
-        subject = const.Streams.INDEX.subject.format(node=self.node)
-        res = await self.js.subscribe(
-            subject=subject,
-            queue=const.Streams.INDEX.group.format(node=self.node),
-            stream=const.Streams.INDEX.name,
-            flow_control=True,
-            cb=self.subscription_worker,
-            manual_ack=True,
-            config=nats.js.api.ConsumerConfig(
-                deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
-                opt_start_seq=self.last_seqid or 1,
-                ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
-                max_deliver=nats_consumer_settings.nats_max_deliver,
-                ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
-            ),
-        )
-        self.subscriptions.append(res)
-        logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):

@@ -156,7 +156,12 @@ class NatsConnectionManager:
                 asyncio.TimeoutError,
             ):  # pragma: no cover
                 pass
-            await self._nc.close()
+            try:
+                await self._nc.close()
+            except (RuntimeError, AttributeError):  # pragma: no cover
+                # RuntimeError: can be thrown if event loop is closed
+                # AttributeError: can be thrown by nats-py when handling shutdown
+                pass
             self._subscriptions = []
 
     async def disconnected_cb(self) -> None:

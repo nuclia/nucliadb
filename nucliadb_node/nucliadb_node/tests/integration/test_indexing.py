@@ -234,7 +234,7 @@ async def create_indexing_message(
 
 async def send_indexing_message(worker: Worker, index: IndexMessage, node: str):
     # Push on stream
-    await worker.js.publish(
+    await worker.nats_connection_manager.js.publish(
         const.Streams.INDEX.subject.format(node=node),
         index.SerializeToString(),
     )

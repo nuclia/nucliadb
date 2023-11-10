@@ -27,7 +27,13 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_main():
-    with patch("nucliadb_node.app.start_worker", AsyncMock()) as start_worker, patch(
+    with patch("nucliadb_node.app.get_storage", AsyncMock()) as storage, patch(
+        "nucliadb_node.app.start_worker", AsyncMock()
+    ) as start_worker, patch(
+        "nucliadb_node.app.start_nats_manager", AsyncMock()
+    ) as _, patch(
+        "nucliadb_node.app.stop_nats_manager", AsyncMock()
+    ) as stop_nats_manager, patch(
         "nucliadb_node.app.start_indexed_publisher", AsyncMock()
     ) as start_indexed_publisher, patch(
         "nucliadb_node.app.start_shard_gc_scheduler", AsyncMock()
@@ -53,6 +59,7 @@ async def test_main():
                 start_shard_gc_scheduler.return_value.finalize,
                 serve_metrics.return_value.shutdown,
                 writer.return_value.close,
+                stop_nats_manager,
                 storage.return_value.finalize,
             ]
         )

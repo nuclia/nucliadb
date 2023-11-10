@@ -153,22 +153,17 @@ class TestSubscriptionWorker:
             yield
         settings.data_path = previous
 
-    @pytest.fixture()
-    def nats_conn(self):
-        conn = MagicMock()
-        conn.jetstream.return_value = AsyncMock()
-        conn.drain = AsyncMock()
-        conn.close = AsyncMock()
-        with mock.patch("nucliadb_node.pull.nats.connect", return_value=conn):
-            yield conn
+    @pytest.fixture
+    def nats_manager(self):
+        return AsyncMock()
 
     @pytest.fixture(scope="function")
-    def worker(self, settings, nats_conn):
+    def worker(self, settings, nats_manager):
         writer = AsyncMock()
         with mock.patch("nucliadb_node.pull.get_storage"), mock.patch(
             "nucliadb_node.indexer.get_storage"
         ):
-            worker = Worker(writer, "node")
+            worker = Worker(writer, "node", nats_manager)
             worker.store_seqid = Mock()
             yield worker
 
@@ -188,23 +183,3 @@ class TestSubscriptionWorker:
         # The message is acked and ignored
         msg.ack.assert_awaited_once()
         worker.store_seqid.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_reconnected_cb(self, worker: Worker):
-        await worker.initialize()
-        try:
-            await worker.reconnected_cb()
-
-            assert worker.nc.jetstream().subscribe.call_count == 2
-        finally:
-            await worker.finalize()
-
-    @pytest.mark.asyncio
-    async def test_node_writer_errors_are_managed(self, worker: Worker):
-        status = OpStatus()
-        status.status = OpStatus.Status.ERROR
-        status.detail = "node writer error"
-        with patch("nucliadb_node.pull.Worker.set_resource", return_value=status):
-            msg = self.get_msg(seqid=1)
-            with pytest.raises(IndexNodeError):
-                await worker.subscription_worker(msg)
