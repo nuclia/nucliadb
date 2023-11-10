@@ -66,7 +66,7 @@ class ExportMetadata(Metadata):
 
 
 class ImportMetadata(Metadata):
-    read_bytes: int = 0
+    ...
 
 
 class NatsTaskMessage(BaseModel):

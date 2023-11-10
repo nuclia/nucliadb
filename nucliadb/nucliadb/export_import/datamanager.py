@@ -111,7 +111,7 @@ class ExportImportDataManager:
         import_bytes: AsyncGenerator[bytes, None],
         kbid: str,
         import_id: str,
-    ):
+    ) -> int:
         key = STORAGE_IMPORT_KEY.format(import_id=import_id)
         cf = resources_pb2.CloudFile()
         cf.bucket_name = self.storage.get_bucket_name(kbid)
@@ -119,6 +119,7 @@ class ExportImportDataManager:
         field: StorageField = self._get_storage_field(kbid, key, cf)
         iterator = iterate_storage_compatible(import_bytes, self.storage, cf)
         await self.storage.uploaditerator(iterator, field, cf)
+        return cf.size
 
     async def download_import(self, kbid: str, import_id: str):
         key = STORAGE_IMPORT_KEY.format(import_id=import_id)

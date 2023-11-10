@@ -57,17 +57,16 @@ async def import_kb(
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     stream_reader = ExportStreamReader(stream)
 
-    if metadata is not None and metadata.read_bytes > 0:
-        await stream_reader.seek(metadata.read_bytes)
+    if metadata is not None and metadata.total > 0:
+        # Resuming task in a retry
+        await stream_reader.seek(metadata.total)
 
-    count = 0
+    items_count = 0
     async for item_type, data in stream_reader.iter_items():
-        count += 1
+        items_count += 1
         if item_type == ExportedItemType.RESOURCE:
             bm = cast(writer_pb2.BrokerMessage, data)
             await import_broker_message(context, kbid, bm)
-            if metadata is not None:
-                metadata.processed += 1
 
         elif item_type == ExportedItemType.BINARY:
             cf = cast(resources_pb2.CloudFile, data[0])
@@ -86,13 +85,13 @@ async def import_kb(
             logger.warning(f"Unknown exporteed item type: {item_type}")
             continue
 
-        if metadata is not None and count % 10 == 0:
+        if metadata is not None and items_count % 10 == 0:
             # Save checkpoint in metadata every 10 items
-            metadata.read_bytes = stream_reader.read_bytes
+            metadata.processed = stream_reader.read_bytes
             await dm.set_metadata("import", metadata)
 
     if metadata is not None:
-        metadata.read_bytes = stream_reader.read_bytes
+        metadata.processed = stream_reader.read_bytes
         await dm.set_metadata("import", metadata)
 
 
