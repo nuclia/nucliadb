@@ -190,14 +190,16 @@ async def _test_find_date_ranges(
     modification_end,
     found,
 ):
-    payload = {"query": "Ramon", "features": features, "vector": V1}
-    if creation_start:
+    payload = {"query": "Ramon", "features": features}
+    if "vector" in features:
+        payload["vector"] = V1
+    if creation_start is not None:
         payload["range_creation_start"] = creation_start.isoformat()
-    if creation_end:
+    if creation_end is not None:
         payload["range_creation_end"] = creation_end.isoformat()
-    if modification_start:
+    if modification_start is not None:
         payload["range_modification_start"] = modification_start.isoformat()
-    if modification_end:
+    if modification_end is not None:
         payload["range_modification_end"] = modification_end.isoformat()
 
     resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload)
