@@ -98,22 +98,21 @@ async def start_kb_import_endpoint(request: Request, kbid: str):
         )
         return CreateImportResponse(import_id=import_id)
     else:
-        # TODO: Implement range/resumable uploads to better suppor big exports.
-        await upload_import_to_blob_storage(
+        import_size = await upload_import_to_blob_storage(
             context=context,
             request=request,
             kbid=kbid,
             import_id=import_id,
         )
-        await start_import_task(context, kbid, import_id)
+        await start_import_task(context, kbid, import_id, import_size)
         return CreateImportResponse(import_id=import_id)
 
 
 async def upload_import_to_blob_storage(
     context: ApplicationContext, request: Request, kbid: str, import_id: str
-):
+) -> int:
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    await dm.upload_import(
+    return await dm.upload_import(
         import_bytes=request.stream(),
         kbid=kbid,
         import_id=import_id,
@@ -138,10 +137,13 @@ async def start_export_task(context: ApplicationContext, kbid: str, export_id: s
         raise
 
 
-async def start_import_task(context: ApplicationContext, kbid: str, import_id: str):
+async def start_import_task(
+    context: ApplicationContext, kbid: str, import_id: str, import_size: int
+):
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = ImportMetadata(kbid=kbid, id=import_id)
     metadata.task.status = Status.SCHEDULED
+    metadata.total = import_size
     await dm.set_metadata("import", metadata)
     try:
         producer = await get_imports_producer(context)

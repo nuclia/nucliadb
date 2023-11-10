@@ -61,12 +61,13 @@ async def download_export_kb_endpoint(request: Request, kbid: str, export_id: st
             headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
         )
     try:
-        # TODO: Support range downloads to better support big export downloads.
         return StreamingResponse(
             await download_export_from_blob_storage(context, kbid, export_id),
             status_code=200,
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f"attachment; filename={kbid}.export"},
+            headers={
+                "Content-Disposition": f"attachment; filename={kbid}.export",
+            },
         )
     except export_exceptions.MetadataNotFound:
         return HTTPClientError(status_code=404, detail="Export not found")

@@ -80,10 +80,14 @@ async def export_kb_to_blob_storage(
     retry_handler = TaskRetryHandler("export", dm, metadata)
 
     @retry_handler.wrap
-    async def upload_export_retried(iterator, kbid, export_id):
-        await dm.upload_export(iterator, kbid, export_id)
+    async def upload_export_retried(iterator, kbid, export_id) -> int:
+        return await dm.upload_export(iterator, kbid, export_id)
 
-    await upload_export_retried(iterator, kbid, export_id)
+    export_size = await upload_export_retried(iterator, kbid, export_id)
+
+    # Store export size
+    metadata.total = metadata.processed = export_size
+    await dm.set_metadata("export", metadata)
 
 
 async def export_resources(
