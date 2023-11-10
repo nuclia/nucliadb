@@ -86,6 +86,8 @@ impl IndexQueries {
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
     pub fn apply_pre_filter(&mut self, pre_filtered: PreFilterResponse) {
+        // TODO:
+        //  - Apply to relations?
         if let Some(vectors_request) = self.vectors_request.as_mut() {
             IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
         };

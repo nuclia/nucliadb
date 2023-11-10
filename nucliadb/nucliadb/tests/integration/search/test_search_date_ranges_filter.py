@@ -22,6 +22,10 @@ from datetime import datetime, timedelta
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.tests.vectors import V1
+from nucliadb.tests.integration.search.test_search import get_resource_with_a_sentence
+from nucliadb.tests.utils import inject_message
+
 NOW = datetime.now()
 ORIGIN_CREATION = datetime(2021, 1, 1)
 ORIGIN_MODIFICATION = datetime(2022, 1, 1)
@@ -36,17 +40,14 @@ def a_week_before(date):
 
 
 @pytest.fixture(scope="function")
-async def resource(nucliadb_writer, knowledgebox):
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json={
-            "title": "My resource",
-        },
-        headers={"X-Synchronous": "true"},
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-    return rid
+async def resource(nucliadb_grpc, knowledgebox):
+    bm = get_resource_with_a_sentence(knowledgebox)
+    bm.basic.created.FromDatetime(NOW)
+    bm.basic.modified.FromDatetime(NOW)
+    bm.origin.ClearField("created")
+    bm.origin.ClearField("modified")
+    await inject_message(nucliadb_grpc, bm)
+    return bm.uuid
 
 
 @pytest.mark.parametrize(
@@ -76,6 +77,7 @@ async def resource(nucliadb_writer, knowledgebox):
     "feature",
     [
         "paragraph",
+        "vector",
     ],
 )
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
@@ -133,6 +135,7 @@ async def test_search_with_date_range_filters_nucliadb_dates(
     "feature",
     [
         "paragraph",
+        "vector",
     ],
 )
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
@@ -187,17 +190,16 @@ async def _test_find_date_ranges(
     modification_end,
     found,
 ):
-    payload = {
-        "query": "resource",
-        "features": features,
-    }
-    if creation_start:
+    payload = {"query": "Ramon", "features": features}
+    if "vector" in features:
+        payload["vector"] = V1
+    if creation_start is not None:
         payload["range_creation_start"] = creation_start.isoformat()
-    if creation_end:
+    if creation_end is not None:
         payload["range_creation_end"] = creation_end.isoformat()
-    if modification_start:
+    if modification_start is not None:
         payload["range_modification_start"] = modification_start.isoformat()
-    if modification_end:
+    if modification_end is not None:
         payload["range_modification_end"] = modification_end.isoformat()
 
     resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload)
@@ -206,7 +208,7 @@ async def _test_find_date_ranges(
     paragraphs = parse_paragraphs(body)
     if found:
         assert len(paragraphs) == 1
-        assert "My resource" in paragraphs
+        assert "Ramon" in paragraphs[0]
     else:
         assert len(paragraphs) == 0
 
