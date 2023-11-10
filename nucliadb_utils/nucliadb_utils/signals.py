@@ -21,7 +21,7 @@ import asyncio
 from enum import Enum
 from functools import partial, wraps
 from inspect import iscoroutinefunction
-from typing import Callable, Coroutine, Type, Union
+from typing import Any, Callable, Coroutine, Type, Union
 
 
 class ListenerPriority(Enum):
@@ -51,7 +51,7 @@ class Signal:
     def remove_listener(self, listener_id: str):
         self.callbacks.pop(listener_id, None)
 
-    async def dispatch(self, payload: Type):
+    async def dispatch(self, payload: Any):
         """Send signal to all registered callbacks by they priority order."""
         assert (
             type(payload) == self.payload_model_type

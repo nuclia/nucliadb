@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-
 import nats
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
@@ -28,7 +26,7 @@ from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.indexer import ConcurrentShardIndexer
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
-from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import nats_consumer_settings
@@ -137,6 +135,7 @@ class Worker:
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
         seqid = int(msg.reply.split(".")[5])
+
         if self.last_seqid and self.last_seqid >= seqid:
             logger.warning(
                 f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
@@ -144,17 +143,6 @@ class Worker:
             await msg.ack()
             return
 
-        def done_callback(task):
-            if task.exception() is not None:
-                error = task.exception()
-                event_id = errors.capture_exception(error)
-                logger.error(
-                    f"An error on indexer task. Check sentry for more details. Event id: {event_id}",
-                    exc_info=True,
-                )
-                raise error
-
-        task = asyncio.create_task(self.indexer.index_message(msg))
-        task.add_done_callback(done_callback)
+        self.indexer.index_message_nowait(msg)
 
         # TODO? accounting for current indexing, manage seqid

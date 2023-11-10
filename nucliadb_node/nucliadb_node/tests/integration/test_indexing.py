@@ -37,8 +37,8 @@ from nucliadb_protos.writer_pb2 import Notification
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
-from nucliadb_node.reader import Reader
 from nucliadb_node.settings import settings
+from nucliadb_node.tests.fixtures import Reader
 from nucliadb_node.writer import Writer
 from nucliadb_utils import const
 from nucliadb_utils.utilities import get_pubsub, get_storage

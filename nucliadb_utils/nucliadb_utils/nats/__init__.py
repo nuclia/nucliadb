@@ -17,17 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from dataclasses import dataclass
-
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
-
-from nucliadb_utils.signals import Signal
-
-
-@dataclass
-class SuccessfulIndexingPayload:
-    seqid: int
-    index_message: IndexMessage
-
-
-successful_indexing = Signal(payload_model=SuccessfulIndexingPayload)
+from .connection_manager import NatsConnectionManager, get_traced_jetstream  # noqa
+from .demux import NatsDemultiplexer  # noqa
+from .message_progress_updater import MessageProgressUpdater  # noqa
