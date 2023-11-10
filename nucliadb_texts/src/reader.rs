@@ -91,20 +91,26 @@ impl Debug for TextReaderService {
 impl FieldReader for TextReaderService {
     #[tracing::instrument(skip_all)]
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
-        let mut timestamp_queries = Vec::new();
+        let mut created_queries = Vec::new();
+        let mut modified_queries = Vec::new();
         for timestamp_query in request.timestamp_filters.iter() {
             let from = timestamp_query.from.as_ref();
             let to = timestamp_query.to.as_ref();
-            let field = match timestamp_query.applies_to {
-                FieldDateType::Created => self.schema.created,
-                FieldDateType::Modified => self.schema.modified,
+            let (field, add_to) = match timestamp_query.applies_to {
+                FieldDateType::Created => (self.schema.created, &mut created_queries),
+                FieldDateType::Modified => (self.schema.modified, &mut modified_queries),
             };
             if let Some(query) = search_query::produce_date_range_query(field, from, to) {
                 let query: Box<dyn Query> = Box::new(query);
-                timestamp_queries.push((Occur::Must, query));
+                add_to.push((Occur::Should, query));
             }
         }
-        let pre_filter_query = BooleanQuery::new(timestamp_queries);
+        let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+        let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+        let pre_filter_query = BooleanQuery::new(vec![
+            (Occur::Must, created_query),
+            (Occur::Must, modified_query),
+        ]);
         let searcher = self.reader.searcher();
         let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
         let mut valid_fields = Vec::new();
