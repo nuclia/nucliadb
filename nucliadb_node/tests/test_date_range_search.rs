@@ -172,6 +172,19 @@ async fn test_date_range_search() -> Result<(), Box<dyn std::error::Error>> {
     let vectors = result.vector.unwrap();
     assert_eq!(vectors.documents.len(), 4);
 
+    // Time range allows only second batch, but with modified only
+    let mut request_second_batch = request.clone();
+    request_second_batch.timestamps = Some(Timestamps {
+        from_modified: Some(base_time_plus_one.clone()),
+        to_modified: None,
+        from_created: None,
+        to_created: None,
+    });
+    let result = reader.search(request_second_batch).await.unwrap();
+    let result = result.into_inner();
+    let vectors = result.vector.unwrap();
+    assert_eq!(vectors.documents.len(), 4);
+
     let mut base_time_plus_two = base_time_plus_one.clone();
     base_time_plus_two.seconds += 1;
 
