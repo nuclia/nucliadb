@@ -14,7 +14,7 @@ permissions: write-all
 jobs:
   check-perf-main-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    name: Record performance on main (nightly)
+    name: Record performance (long run)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -25,7 +25,7 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Run the bench
+      - name: Run the Rust bench
         run: |
           make -C vectors_benchmark nightly
       - name: Store performance data
@@ -36,10 +36,39 @@ jobs:
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
           influxdb_bucket: benchmarks
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+      - name: Install the package
+        run: make -C nucliadb/ install-dev
+      - name: Install tikv
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
+          source /home/runner/.profile
+          tiup playground 5.3.1 --mode tikv-slim --without-monitor &
+          while ! nc -zv 127.0.0.1 2379; do echo "waiting for tikv to come up" && sleep 1; done; echo "TiKV is running on 127.0.0.1 2379."
+      - name: Run the Python benches
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE -s --tb=native -v --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: benchmars.json
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
 
   check-perf-main:
     if: github.event_name == 'push'
-    name: Record performance on main
+    name: Record performance (fast run)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -61,10 +90,40 @@ jobs:
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
           influxdb_bucket: benchmarks
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+      - name: Install the package
+        run: make -C nucliadb/ install-dev
+      - name: Install tikv
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
+          source /home/runner/.profile
+          tiup playground 5.3.1 --mode tikv-slim --without-monitor &
+          while ! nc -zv 127.0.0.1 2379; do echo "waiting for tikv to come up" && sleep 1; done; echo "TiKV is running on 127.0.0.1 2379."
+      - name: Run the Python benches
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE -s --tb=native -v --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: benchmars.json
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
+
   check-perf-pr:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
     runs-on: ubuntu-latest
-    name: Check performance on the PR
+    name: Record performance on PR (fast run)
     steps:
       - name: Get PR branch
         uses: xt0rted/pull-request-comment-branch@v1
@@ -88,6 +147,22 @@ jobs:
         with:
           metrics_file: vectors_benchmark/benchmark.json
           head_ref: ${{ steps.comment-branch.outputs.head_ref }}
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
+      - name: Run the Python benches
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: |
+            pytest -rfE -s --tb=native -v --benchmark-json benchmarks.json nucliadb/nucliadb/tests
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: benchmars.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
