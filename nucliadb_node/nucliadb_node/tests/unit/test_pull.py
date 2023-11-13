@@ -173,13 +173,3 @@ class TestSubscriptionWorker:
         msg = Msg(client, "subject", reply)
         msg.ack = AsyncMock()
         return msg
-
-    @pytest.mark.asyncio
-    async def test_discards_old_messages(self, worker):
-        worker.last_seqid = 10
-        msg = self.get_msg(seqid=9)
-        await worker.subscription_worker(msg)
-
-        # The message is acked and ignored
-        msg.ack.assert_awaited_once()
-        worker.store_seqid.assert_not_called()

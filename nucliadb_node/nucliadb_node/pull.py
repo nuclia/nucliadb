@@ -24,7 +24,6 @@ from nats.js.errors import NotFoundError as StreamNotFoundError
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.indexer import ConcurrentShardIndexer
-from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import metrics
 from nucliadb_utils import const
@@ -79,9 +78,6 @@ class Worker:
         await self.indexer.finalize()
 
     async def setup_nats_subscription(self):
-        self.load_seqid()
-        logger.info(f"Last seqid {self.last_seqid}")
-
         try:
             await self.nats_connection_manager.js.stream_info(const.Streams.INDEX.name)
         except StreamNotFoundError:
@@ -104,8 +100,7 @@ class Worker:
             cb=self.subscription_worker,
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
-                deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
-                opt_start_seq=self.last_seqid or 1,
+                deliver_policy=nats.js.api.DeliverPolicy.ALL,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
@@ -115,34 +110,6 @@ class Worker:
         )
         logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
-    def store_seqid(self, seqid: int):
-        if settings.data_path is None:
-            raise Exception("We need a DATA_PATH env")
-        with open(f"{settings.data_path}/seqid", "w+") as seqfile:
-            seqfile.write(str(seqid))
-        self.last_seqid = seqid
-
-    def load_seqid(self):
-        if settings.data_path is None:
-            raise Exception("We need a DATA_PATH env")
-        try:
-            with open(f"{settings.data_path}/seqid", "r") as seqfile:
-                self.last_seqid = int(seqfile.read())
-        except FileNotFoundError:
-            # First time the consumer is started
-            self.last_seqid = None
-
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
-        seqid = int(msg.reply.split(".")[5])
-
-        if self.last_seqid and self.last_seqid >= seqid:
-            logger.warning(
-                f"Skipping already processed message. Msg seqid {seqid} vs Last seqid {self.last_seqid}"
-            )
-            await msg.ack()
-            return
-
         self.indexer.index_message_nowait(msg)
-
-        # TODO? accounting for current indexing, manage seqid
