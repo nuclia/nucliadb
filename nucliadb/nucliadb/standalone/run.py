@@ -89,7 +89,7 @@ def run():
 
     settings_to_output = {
         "API": f"http://{settings.http_host}:{settings.http_port}/api",
-        "Contributor/management UI": f"http://{settings.http_host}:{settings.http_port}/contributor",
+        "Admin UI": f"http://{settings.http_host}:{settings.http_port}/admin",
         "Key-value backend": ingest_settings.driver,
         "Blog storage backend": storage_settings.file_backend,
         "Cluster discovery mode": cluster_settings.cluster_discovery_mode,
