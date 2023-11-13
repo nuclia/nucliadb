@@ -50,25 +50,27 @@ logger = logging.getLogger(__name__)
 
 
 def application_factory(settings: Settings) -> FastAPI:
+    middleware = [
+        Middleware(
+            CORSMiddleware,
+            allow_origins=http_settings.cors_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        ),
+        Middleware(
+            AuthenticationMiddleware,
+            backend=get_auth_backend(settings),
+        ),
+    ]
+    if running_settings.debug:
+        middleware.append(Middleware(ProcessTimeHeaderMiddleware))
+
     fastapi_settings = dict(
         debug=running_settings.debug,
-        middleware=[
-            Middleware(
-                CORSMiddleware,
-                allow_origins=http_settings.cors_origins,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            ),
-            Middleware(
-                AuthenticationMiddleware,
-                backend=get_auth_backend(settings),
-            ),
-        ],
+        middleware=middleware,
         on_startup=[initialize],
         on_shutdown=[finalize],
     )
-    if running_settings.debug:
-        fastapi_settings["middleware"].append(Middleware(ProcessTimeHeaderMiddleware))
 
     base_app = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
     base_app.include_router(api_writer_v1)

@@ -85,6 +85,7 @@ test-standalone-search: export SEARCH_API=http://localhost:8080/api
 test-standalone-search: export KB_SLUG=$(kb_slug)
 test-standalone-search: export BENCHMARK_OUTPUT=standalone.json
 test-standalone-search: export SEARCH_TAGS=$(search_tags)
+test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.json
 test-standalone-search:
 	echo " *  Test Started at: $$(date -u)"
 

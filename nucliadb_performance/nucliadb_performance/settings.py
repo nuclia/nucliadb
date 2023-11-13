@@ -11,6 +11,8 @@ class Settings(BaseSettings):
         "http://predict.learning.svc.cluster.local:8080/api/internal/predict"
     )
     benchmark_output: Optional[str] = None
+    saved_requests_file: Optional[str] = None
+    request_tags: Optional[list[str]] = None
 
 
 def get_search_api_url():

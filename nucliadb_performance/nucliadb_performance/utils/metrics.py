@@ -1,13 +1,12 @@
 import json
 import statistics as stats
-from dataclasses import dataclass
 from typing import Optional
 
 import aiohttp
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 
-METRICS = {}
+METRICS: dict[str, list[float]] = {}
 
 
 def record_sample(metric_name, sample):

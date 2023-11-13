@@ -1,5 +1,5 @@
 import httpx
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer  # type: ignore
 
 from .misc import cache_to_disk
 

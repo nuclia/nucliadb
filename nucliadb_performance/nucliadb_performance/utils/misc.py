@@ -1,4 +1,5 @@
 import inspect
+import os
 import random
 import shelve
 import statistics
@@ -8,12 +9,18 @@ from typing import Optional
 
 from faker import Faker
 
-from nucliadb_performance.settings import get_reader_api_url, get_search_api_url
+from nucliadb_performance.settings import (
+    get_reader_api_url,
+    get_search_api_url,
+    settings,
+)
 from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_sdk import NucliaDB
 
 from .metrics import record_request_process_time
-from .saved_searches import Search, load_kb_saved_searches
+from .saved_requests import Request, load_saved_request
+
+CURRENT_DIR = os.getcwd()
 
 fake = Faker()
 
@@ -228,13 +235,16 @@ def print_errors():
     print("=" * 50)
 
 
-def get_kb_request(kbid_or_slug: str, with_tags=None) -> Search:
-    searches = load_kb_saved_searches(kbid_or_slug, with_tags=with_tags)
-    if len(searches) == 0:
-        return dict(
-            query=fake.sentence(),
-        )
-    return random.choice(searches)
+def get_request(kbid_or_slug: str, with_tags=None) -> Request:
+    if settings.saved_requests_file is None:
+        raise AttributeError("SAVED_REQUESTS_FILE env var is not set!")
+    saved_requests_file = CURRENT_DIR + "/" + settings.saved_requests_file
+    requests = load_saved_request(
+        saved_requests_file, kbid_or_slug, with_tags=tuple(with_tags)
+    )
+    if len(requests) == 0:
+        raise ValueError("Could not find any request saved")
+    return random.choice(requests)
 
 
 @cache

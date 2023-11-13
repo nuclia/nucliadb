@@ -1,8 +1,5 @@
-import os
 from functools import cache
-from typing import Optional
 
-from faker import Faker
 from molotov import global_setup, global_teardown, scenario
 
 from nucliadb_performance.settings import settings
@@ -13,24 +10,11 @@ from nucliadb_performance.utils.metrics import (
 )
 from nucliadb_performance.utils.misc import (
     get_kb,
-    get_kb_request,
+    get_request,
     make_kbid_request,
     print_errors,
 )
 from nucliadb_performance.utils.vectors import compute_vector
-
-fake = Faker()
-
-
-@cache
-def get_search_tags() -> Optional[tuple[str]]:
-    envvar = os.environ.get("SEARCH_TAGS")
-    if not envvar:
-        return None
-    tags = envvar.split(",")
-    if len(tags) == 1 and tags[0] == "":
-        return None
-    return tuple(tags)
 
 
 @cache
@@ -46,16 +30,16 @@ def init_test(args):
 
 
 @scenario(weight=1)
-async def test_find_with_filter(session):
+async def test_find(session):
     kbid, slug = get_test_kb()
-    payload = get_kb_request(slug, with_tags=get_search_tags())
-    payload["vector"] = compute_vector(payload["query"])
+    request = get_request(slug, with_tags=settings.request_tags)
+    request.payload["vector"] = compute_vector(request.payload["query"])
     await make_kbid_request(
         session,
         kbid,
-        "POST",
-        f"/v1/kb/{kbid}/find",
-        json=payload,
+        request.method.upper(),
+        request.url.format(kbid=kbid),
+        json=request.payload,
     )
 
 
