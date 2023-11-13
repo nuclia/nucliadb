@@ -20,10 +20,9 @@
 import logging
 import os
 
-from fastapi.responses import RedirectResponse
-
 import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
