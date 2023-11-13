@@ -29,7 +29,7 @@ use nucliadb_core::protos::{
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
 use nucliadb_core::query_planner::{
-    FieldDateType, FieldMatches, PreFilterRequest, PreFilterResponse, ValidField,
+    FieldDateType, PreFilterRequest, PreFilterResponse, ValidField, ValidFieldCollector,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -126,15 +126,14 @@ impl FieldReader for TextReaderService {
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
             return Ok(PreFilterResponse {
-                valid_fields: FieldMatches::None,
+                valid_fields: ValidFieldCollector::None,
             });
         }
 
         // If all the fields match the pre-filter, thats all the query planner needs to know
-        let total_number_of_docs = searcher.search(&AllQuery, &Count)?;
-        if docs_fulfilled.len() == total_number_of_docs {
+        if docs_fulfilled.len() as u64 == searcher.num_docs() {
             return Ok(PreFilterResponse {
-                valid_fields: FieldMatches::All,
+                valid_fields: ValidFieldCollector::All,
             });
         }
 
@@ -165,7 +164,7 @@ impl FieldReader for TextReaderService {
             valid_fields.push(fulfilled_field);
         }
         Ok(PreFilterResponse {
-            valid_fields: FieldMatches::Some(valid_fields),
+            valid_fields: ValidFieldCollector::Some(valid_fields),
         })
     }
 

@@ -59,7 +59,7 @@ pub struct ValidField {
 
 /// Utility type to identify and allow optimizations in filtering edge cases
 #[derive(Debug, Default, Clone)]
-pub enum FieldMatches {
+pub enum ValidFieldCollector {
     #[default]
     None,
     All,
@@ -70,7 +70,7 @@ pub enum FieldMatches {
 /// this type can be used to modify the rest of the query plan.
 #[derive(Debug, Default, Clone)]
 pub struct PreFilterResponse {
-    pub valid_fields: FieldMatches,
+    pub valid_fields: ValidFieldCollector,
 }
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
@@ -83,7 +83,10 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
-    fn apply_to_vectors(request: &mut VectorSearchRequest, valid_fields: &[ValidField]) {
+    fn apply_to_vectors(request: &mut VectorSearchRequest, response: &PreFilterResponse) {
+        let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
+            return;
+        };
         for valid_field in valid_fields {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
@@ -92,26 +95,30 @@ impl IndexQueries {
         }
     }
 
+    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
+        if matches!(response.valid_fields, ValidFieldCollector::All) {
+            // Since all the fields are matching there is no need to use this filter.
+            request.timestamps = None;
+        }
+    }
+
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
     pub fn apply_pre_filter(&mut self, pre_filtered: PreFilterResponse) {
-        if matches!(pre_filtered.valid_fields, FieldMatches::None) {
+        if matches!(pre_filtered.valid_fields, ValidFieldCollector::None) {
             // There are no matches so there is no need to run the rest of the search
-            *self = IndexQueries::default();
+            self.vectors_request = None;
+            self.paragraphs_request = None;
+            self.texts_request = None;
+            self.relations_request = None;
             return;
         }
-        if matches!(pre_filtered.valid_fields, FieldMatches::All) {
-            // If everything matches is correct to leave the query as it is.
-            return;
-        }
-
-        let FieldMatches::Some(valid_fields) = &pre_filtered.valid_fields else {
-            // Is covered by the other cases
-            return;
-        };
 
         if let Some(vectors_request) = self.vectors_request.as_mut() {
-            IndexQueries::apply_to_vectors(vectors_request, valid_fields);
+            IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
+        };
+        if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
+            IndexQueries::apply_to_paragraphs(paragraph_request, &pre_filtered);
         };
     }
 }
