@@ -18,5 +18,5 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from .connection_manager import NatsConnectionManager, get_traced_jetstream  # noqa
-from .demux import NatsDemultiplexer  # noqa
+from .demux import DemuxProcessor, NatsDemultiplexer  # noqa
 from .message_progress_updater import MessageProgressUpdater  # noqa

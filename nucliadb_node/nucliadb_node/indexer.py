@@ -38,7 +38,7 @@ from nucliadb_node import SERVICE_NAME, logger, signals
 from nucliadb_node.signals import SuccessfulIndexingPayload
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors
-from nucliadb_utils.nats import NatsDemultiplexer
+from nucliadb_utils.nats import DemuxProcessor, NatsDemultiplexer
 from nucliadb_utils.utilities import get_storage
 
 # Messages coming from processor take loner to index, so we want to prioritize
@@ -68,12 +68,11 @@ class IndexerWorkUnit:
         return self.seqid.__hash__()
 
 
-class ConcurrentShardIndexer:
+class ConcurrentShardIndexer(DemuxProcessor):
     def __init__(self, writer: Writer):
         self.writer = writer
         self.nats_demux = NatsDemultiplexer(
-            splitter=self.splitter,
-            process_cb=self.index_message,
+            processor=self,
             queue_klass=asyncio.PriorityQueue,
         )
 
@@ -107,6 +106,9 @@ class ConcurrentShardIndexer:
 
         work = IndexerWorkUnit(seqid=seqid, index_message=pb)
         return (shard_id, work)
+
+    async def process(self, work: IndexerWorkUnit) -> bool:
+        return await self.index_message(work)
 
     async def index_message(self, work: IndexerWorkUnit) -> bool:
         start = time.time()

@@ -19,9 +19,10 @@
 
 import asyncio
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial, total_ordering
-from typing import Any, Awaitable, Callable, Optional, Type
+from typing import Awaitable, Callable, Optional, Type, TypeVar
 
 from nats.aio.client import Msg
 
@@ -33,21 +34,45 @@ from nucliadb_utils.signals import Signal
 logger = logging.getLogger(__name__)
 
 
-_Split = str
-_Splitter = Callable[[Msg], tuple[_Split, Any]]
-_Callback = Callable[[Any], Awaitable[bool]]
+Split = str
+DemuxProcessorWork = TypeVar("DemuxProcessorWork")
+
+
+class DemuxProcessor(ABC):
+    """Interface for NatsDemultiplexer internal processing."""
+
+    @abstractmethod
+    def splitter(self, msg: Msg) -> tuple[Split, DemuxProcessorWork]:
+        """Decide in which split this message should go and return an appropiate
+        work unit from it.
+
+        NOTE: if work units will be added in an ordered data structure, the
+        return value should be sortable in the desired order.
+
+        """
+        ...
+
+    @abstractmethod
+    async def process(self, work: DemuxProcessorWork) -> bool:
+        """Process a work unit and return a boolean indicating processing
+        success or failure.
+
+        """
+        ...
 
 
 @total_ordering
 @dataclass
 class WorkUnit:
     work_id: str
-    work: Any
+    work: DemuxProcessorWork
 
     def __eq__(self, other: "WorkUnit"):
+        # A work unit is the same if we assign them the same id
         return self.work_id == other.work_id
 
     def __lt__(self, other: "WorkUnit"):
+        # Rely on DemuxProcessorWork implementing partial ordering
         return self.work.__lt__(other.work)
 
     def __hash__(self):
@@ -73,10 +98,20 @@ work_unit_done = Signal(payload_model=WorkOutcome)
 class NatsDemultiplexer:
     """Given a NATS consumer, allow concurrent message processing.
 
-    Message processing will be done in a separate async task. Make sure
+    NatsDemultiplexer relies on a DemuxProcessor. It's `splitter` function will
+    be used to decide the split and the resulting work unit will be added into a
+    queue.
+
+    Concurrent workers will get work from their respective queues and use
+    `DemuxProcessor.process` to process it. Depending on the result, the message
+    will be acked or nacked to NATS.
+
+    If an exception is raised during any of this process, the message will be
+    automatically nacked.
+
+    NOTE: Message processing will be done in a separate async task. Make sure
     `manual_ack` is set to True in NATS configuration to avoid JetStream
     autoacking the messages.
-
 
 
              (split X)
@@ -85,72 +120,58 @@ class NatsDemultiplexer:
             / +--+-- work unit ----> ... |  |  |  |  <---- DemuxWorker
            /  |                        --+--+--+--+    (separate async task)
            |  +-----  ...                                    |
-           |  |                                              |
+           |  |                                              | work
     Msg ---+  +-----  ...                                    |
-           |  |                                              +---> process_cb(work unit)
+           |  |                                              +---> DemuxProcessor.process
            |  +    ...                                       |      |
            \\ |                                              |      |        +--- ack
             | +-----  ...                                    |      |        |
             |\\                                              +------+---->---+
             |                                                                |
-            +--- splitter                                                    +--- nak
+            +--- DemuxProcessor.splitter                                     +--- nak
+
     """
 
     def __init__(
         self,
         *,
-        splitter: _Splitter,
-        process_cb: _Callback,
+        processor: DemuxProcessor,
         queue_klass: Type[asyncio.Queue] = asyncio.Queue,
     ):
-        """A `splitter` function gets the original message and returns the split
-        and a work unit. The work unit is added to a queue and a concurrent
-        worker gets it and calls `cb`. The result is a boolean indicating if the
-        message should be acked or nacked.
-
-        If an exception is raised during any of this, the message is
-        automatically nacked.
-
-        Remember: if you use a priority queue, the work unit returned by
-        `splitter` should be sortable in the desired order.
-
-        """
-        self.splitter = splitter
-        self.process_cb = process_cb
+        self.processor = processor
         self.queue_klass = queue_klass
         self.workers: dict[str, "DemuxWorker"] = {}
 
     def handle_message_nowait(self, msg: Msg):
-        def done_callback(task):
-            if task.exception() is not None:
-                error = task.exception()
-                event_id = capture_exception(error)
-                logger.error(
-                    "Error while concurrently handling a NATS message. "
-                    f"Check sentry for more details. Event id: {event_id}",
-                    exc_info=True,
-                )
-                raise error
+        """Eventually process `msg` asynchronously and ack/nak it when finished."""
+        task = asyncio.create_task(self.safe_demux(msg))
+        task.add_done_callback(NatsDemultiplexer._handle_message_done_callback)
 
-        task = asyncio.create_task(self.demux(msg))
-        task.add_done_callback(done_callback)
+    @staticmethod
+    def _handle_message_done_callback(task: asyncio.Task):
+        if task.exception() is not None:
+            error = task.exception()
+            event_id = capture_exception(error)
+            logger.error(
+                "Error while concurrently handling a NATS message. "
+                f"Check sentry for more details. Event id: {event_id}",
+                exc_info=True,
+            )
+            raise error
 
-    async def demux(self, msg: Msg):
+    async def safe_demux(self, msg: Msg):
         try:
-            await self._demux(msg)
+            await self.demux(msg)
         except Exception as exc:
             logger.info("Exception on demux", exc_info=exc)
             await msg.nak()
             raise exc
 
-    async def _demux(self, msg: Msg):
+    async def demux(self, msg: Msg):
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ):
-            split, work = self.splitter(msg)
-
-            seqid = int(msg.reply.split(".")[5])
-            work_id = f"{split}:{seqid}"
+            split, work = self.processor.splitter(msg)
 
             worker, created = self.get_or_create_worker(split)
             if created or (not created and not worker.working):
@@ -159,6 +180,8 @@ class NatsDemultiplexer:
                 # task for it
                 self.start_worker(split)
 
+            seqid = int(msg.reply.split(".")[5])
+            work_id = f"{split}:{seqid}"
             work_unit = WorkUnit(work_id, work)
 
             await worker.add_work(work_unit)
@@ -188,7 +211,7 @@ class NatsDemultiplexer:
         new_worker = worker_id not in self.workers
         if new_worker:
             queue = self.queue_klass()
-            worker = DemuxWorker(queue, self.process_cb)
+            worker = DemuxWorker(queue, self.processor.process)
             self.workers[worker_id] = worker
         else:
             worker = self.workers[worker_id]
@@ -218,17 +241,22 @@ class NatsDemultiplexer:
 
 
 class DemuxWorker:
-    def __init__(self, work_queue: asyncio.Queue, cb: _Callback):
+    def __init__(
+        self,
+        work_queue: asyncio.Queue,
+        cb: Callable[[DemuxProcessorWork], Awaitable[bool]],
+    ):
         self.cb = cb
         self.work_queue = work_queue
         self.working = False
         self.current_work_ids: set[str] = set()
 
-    async def add_work(self, work: Any):
+    async def add_work(self, work: WorkUnit):
         if work.work_id in self.current_work_ids:
             logger.warning(f"Trying to add already pending work unit: {work.work_id}")
             return
         await self.work_queue.put(work)
+        self.current_work_ids.add(work.work_id)
 
     async def work_until_finish(self):
         self.working = True
