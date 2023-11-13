@@ -132,7 +132,7 @@ class NatsConnectionManager:
             "disconnected_cb": self.disconnected_cb,
         }
 
-        if self._nats_creds is not None:
+        if self._nats_creds:
             options["user_credentials"] = self._nats_creds
 
         if len(self._nats_servers) > 0:
