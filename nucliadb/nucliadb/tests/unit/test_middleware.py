@@ -25,7 +25,7 @@ from starlette.testclient import TestClient
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 
 
-class TestCaseCaptureTraceIdMiddleware:
+class TestCaseProcessTimeHeaderMiddleware:
     @pytest.fixture(scope="class")
     def app(self):
         app_ = Starlette()
