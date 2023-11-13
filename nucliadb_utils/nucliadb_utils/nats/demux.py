@@ -174,17 +174,17 @@ class NatsDemultiplexer:
             split, work = self.processor.splitter(msg)
 
             worker, created = self.get_or_create_worker(split)
+
+            seqid = int(msg.reply.split(".")[5])
+            work_id = f"{split}:{seqid}"
+            work_unit = WorkUnit(work_id, work)
+            await worker.add_work(work_unit)
+
             if created or (not created and not worker.working):
                 # The second condition should never happen, the worker task finished
                 # between us getting the worker and adding work. We'll create a new
                 # task for it
                 self.start_worker(split)
-
-            seqid = int(msg.reply.split(".")[5])
-            work_id = f"{split}:{seqid}"
-            work_unit = WorkUnit(work_id, work)
-
-            await worker.add_work(work_unit)
 
             loop = asyncio.get_event_loop()
             wait_condition = loop.create_future()
