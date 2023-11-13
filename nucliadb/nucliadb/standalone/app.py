@@ -20,8 +20,9 @@
 import logging
 import os
 
-import nucliadb_contributor_assets  # type: ignore
+import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -99,14 +100,16 @@ def application_factory(settings: Settings) -> FastAPI:
     application.add_route("/", homepage)
     application.add_route("/metrics", metrics_endpoint)
 
-    # mount contributor app assets
+    # mount admin app assets
     application.mount(
-        "/contributor",
+        "/admin",
         StaticFiles(
-            directory=os.path.dirname(nucliadb_contributor_assets.__file__), html=True
+            directory=os.path.dirname(nucliadb_admin_assets.__file__), html=True
         ),
         name="static",
     )
+    # redirect /contributor -> /admin
+    application.add_route("/contributor", lambda request: RedirectResponse("/admin"))
     application.mount(
         "/widget",
         StaticFiles(directory=os.path.dirname(__file__) + "/static", html=True),
