@@ -197,7 +197,7 @@ class Worker:
             "reconnected_cb": self.reconnected_cb,
         }
 
-        if indexing_settings.index_jetstream_auth is not None:
+        if indexing_settings.index_jetstream_auth:
             options["user_credentials"] = indexing_settings.index_jetstream_auth
 
         if len(indexing_settings.index_jetstream_servers) > 0:
