@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -43,4 +42,3 @@ class StatusResponse(BaseModel):
     total: int = 0
     processed: int = 0
     retries: int = 0
-    size_bytes: Optional[int] = None
