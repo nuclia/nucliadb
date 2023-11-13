@@ -20,6 +20,8 @@
 import logging
 import os
 
+from fastapi.responses import RedirectResponse
+
 import nucliadb_admin_assets  # type: ignore
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -102,6 +104,8 @@ def application_factory(settings: Settings) -> FastAPI:
         ),
         name="static",
     )
+    # redirect /contributor -> /admin
+    application.add_route("/contributor", lambda request: RedirectResponse("/admin"))
     application.mount(
         "/widget",
         StaticFiles(directory=os.path.dirname(__file__) + "/static", html=True),
