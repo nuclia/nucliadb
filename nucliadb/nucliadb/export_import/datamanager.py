@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Union
+from typing import AsyncGenerator, Union
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import import logger
@@ -98,20 +98,6 @@ class ExportImportDataManager:
         iterator = iterate_storage_compatible(export_bytes, self.storage, cf)
         await self.storage.uploaditerator(iterator, field, cf)
         return cf.size
-
-    async def get_export_size(self, kbid: str, export_id: str) -> Optional[int]:
-        key = STORAGE_EXPORT_KEY.format(export_id=export_id)
-        cf = resources_pb2.CloudFile()
-        cf.bucket_name = self.storage.get_bucket_name(kbid)
-        cf.content_type = "binary/octet-stream"
-        cf.source = resources_pb2.CloudFile.Source.EXPORT
-        field: StorageField = self._get_storage_field(kbid, key, cf)
-        metadata = await field.exists()
-        size = metadata.get("SIZE", None)
-        if size is not None:
-            return int(size)
-        else:
-            return None
 
     async def download_export(
         self, kbid: str, export_id: str
