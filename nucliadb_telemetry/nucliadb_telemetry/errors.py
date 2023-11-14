@@ -20,7 +20,7 @@
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
 from typing import Any, ContextManager, Optional
-
+import os
 import pydantic
 
 try:
@@ -32,7 +32,7 @@ try:
     import sentry_sdk
     from sentry_sdk import Scope
 
-    SENTRY = True
+    SENTRY = os.environ.get("SENTRY_URL") is not None
 except ImportError:  # pragma: no cover
     Scope = sentry_sdk = None  # type: ignore
     SENTRY = False
