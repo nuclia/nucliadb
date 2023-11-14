@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
+
 # abstract advanced error handling into its own module to prevent
 # code from handling sentry integration everywhere
 from typing import Any, ContextManager, Optional
@@ -32,7 +34,7 @@ try:
     import sentry_sdk
     from sentry_sdk import Scope
 
-    SENTRY = True
+    SENTRY = os.environ.get("SENTRY_URL") is not None
 except ImportError:  # pragma: no cover
     Scope = sentry_sdk = None  # type: ignore
     SENTRY = False
