@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from collections.abc import Awaitable
 from enum import Enum
 from functools import partial, wraps
 from inspect import iscoroutinefunction
-from typing import Any, Callable, Coroutine, Type, Union
+from typing import Any, Callable, Type, Union
 
 
 class ListenerPriority(Enum):
@@ -32,13 +33,12 @@ class ListenerPriority(Enum):
 class Signal:
     def __init__(self, payload_model: Type):
         self.payload_model_type = payload_model
-        self.callbacks: dict[str, tuple[Callable, int]] = {}
-        self.async_callbacks: dict[str, tuple[Coroutine, int]] = {}
+        self.callbacks: dict[str, tuple[Callable[..., Awaitable], int]] = {}
 
     def add_listener(
         self,
         listener_id: str,
-        cb: Union[Callable, Coroutine],
+        cb: Union[Callable, Callable[..., Awaitable]],
         priority: ListenerPriority = ListenerPriority.DONT_CARE,
     ):
         if listener_id in self.callbacks:

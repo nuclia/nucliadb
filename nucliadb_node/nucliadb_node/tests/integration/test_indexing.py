@@ -20,27 +20,21 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import AsyncIterable, Optional
+from typing import Optional
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardCreated, ShardId
-from nucliadb_protos.nodewriter_pb2 import (
-    IndexMessage,
-    IndexMessageSource,
-    NewShardRequest,
-    TypeMessage,
-)
-from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
-from nucliadb_protos.utils_pb2 import ReleaseChannel
+from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
 from nucliadb_protos.writer_pb2 import Notification
 
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
 from nucliadb_node.settings import settings
 from nucliadb_node.tests.fixtures import Reader
-from nucliadb_node.writer import Writer
 from nucliadb_utils import const
+from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.utilities import get_pubsub, get_storage
 
 TEST_PARTITION = "111"
@@ -64,17 +58,17 @@ async def test_indexing(worker, shard: str, reader: Reader):
     else:
         processed = False
 
-    count = 0
+    start = datetime.now()
     while processed is False:  # pragma: no cover
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         pbshard = await reader.get_shard(sipb)
         if pbshard is not None and pbshard.fields > 0:
             processed = True
         else:
             processed = False
-        count += 1
-        print("waiting", pbshard)
-        assert count < 5, "too much time waiting"
+
+        elapsed = datetime.now() - start
+        assert elapsed.seconds < 10, "too much time waiting"
 
     assert pbshard is not None
     assert pbshard.fields == 2
@@ -85,54 +79,69 @@ async def test_indexing(worker, shard: str, reader: Reader):
     assert await storage.get_indexing(index) is not None
 
 
-@pytest.fixture(scope="function")
-async def shards(
-    request, writer_stub: NodeWriterStub, writer: Writer
-) -> AsyncIterable[list[str]]:
-    channel = (
-        ReleaseChannel.EXPERIMENTAL
-        if request.param == "EXPERIMENTAL"
-        else ReleaseChannel.STABLE
-    )
-    request = NewShardRequest(kbid="test", release_channel=channel)
-
-    shard_ids = []
-    try:
-        for _ in range(20):
-            shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
-            shard_ids.append(shard.id)
-
-        yield shard_ids
-
-    finally:
-        for shard_id in shard_ids:
-            await writer_stub.DeleteShard(ShardId(id=shard_id))  # type: ignore
+@pytest.fixture
+def concurrent_nats_processing():
+    original = nats_consumer_settings.nats_max_ack_pending
+    nats_consumer_settings.nats_max_ack_pending = 10
+    yield
+    nats_consumer_settings.nats_max_ack_pending = original
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("shards", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_massive_indexing(
-    worker, shards: list[str], reader: Reader, writer: Writer
+@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_prioritary_indexing_on_one_shard(
+    concurrent_nats_processing,
+    worker,
+    shard: str,
+    reader: Reader,
 ):
+    """Add some resources from the processor and some more from the writer.
+    Validate the writer messages take priority over the processor ones.
+
+    """
     node = settings.force_host_id
-    RESOURCES_PER_SHARD = 25
+    assert node is not None
 
-    for i in range(RESOURCES_PER_SHARD):
-        for shard_id in shards:
-            resource = resource_payload(shard_id)
-            index = await create_indexing_message(resource, "kb", shard_id, node)  # type: ignore
-            await send_indexing_message(worker, index, node)  # type: ignore
+    resource = resource_payload(shard)
+    processor_index = await create_indexing_message(
+        resource, "kb", shard, node, source=IndexMessageSource.PROCESSOR
+    )
+    writer_index = await create_indexing_message(
+        resource, "kb", shard, node, source=IndexMessageSource.WRITER
+    )
 
-    pending_shards = set(shards)
-    while pending_shards:
-        indexed = set()
-        for shard_id in pending_shards:
-            sipb = ShardId(id=shard_id)
-            pbshard: Optional[Shard] = await reader.get_shard(sipb)
-            if pbshard is not None and pbshard.fields == RESOURCES_PER_SHARD * 2:
-                indexed.add(shard_id)
-        pending_shards = pending_shards - indexed
+    sources = []
+
+    async def indexer_process_side_effect(work):
+        nonlocal sources
+        sources.append(work.index_message.source)
         await asyncio.sleep(0.1)
+        return True
+
+    indexer_process_mock = AsyncMock(side_effect=indexer_process_side_effect)
+    with patch.object(worker.indexer, "process", new=indexer_process_mock):
+        for i in range(3):
+            await send_indexing_message(worker, processor_index, node)  # type: ignore
+        for i in range(3):
+            await send_indexing_message(worker, writer_index, node)  # type: ignore
+
+        processing = True
+        start = datetime.now()
+        while processing:
+            await asyncio.sleep(0.1)
+            processing = indexer_process_mock.await_count < 6
+
+            elapsed = datetime.now() - start
+            assert elapsed.seconds < 10, "too much time waiting"
+
+    assert sources == [
+        IndexMessageSource.PROCESSOR,
+        IndexMessageSource.WRITER,
+        IndexMessageSource.WRITER,
+        IndexMessageSource.WRITER,
+        IndexMessageSource.PROCESSOR,
+        IndexMessageSource.PROCESSOR,
+    ]
 
 
 @pytest.mark.asyncio

@@ -42,10 +42,12 @@ from nucliadb_utils.nats import DemuxProcessor, NatsDemultiplexer
 from nucliadb_utils.utilities import get_storage
 
 # Messages coming from processor take loner to index, so we want to prioritize
-# small messages coming from the writer (user creations/updates/deletes)
+# small messages coming from the writer (user creations/updates/deletes).
+#
+# Priority order: lower values first
 PRIORITIES = {
-    IndexMessageSource.PROCESSOR: 0,
-    IndexMessageSource.WRITER: 1,
+    IndexMessageSource.WRITER: 0,
+    IndexMessageSource.PROCESSOR: 1,
 }
 
 
@@ -86,26 +88,14 @@ class ConcurrentShardIndexer(DemuxProcessor):
         self.nats_demux.handle_message_nowait(msg)
 
     def splitter(self, msg: Msg) -> tuple[str, IndexerWorkUnit]:
-        subject = msg.subject
-        reply = msg.reply
         seqid = int(msg.reply.split(".")[5])
 
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
-        shard_id = pb.shard
-        logger.info(
-            "Message received",
-            extra={
-                "shard": shard_id,
-                "subject": subject,
-                "reply": reply,
-                "seqid": seqid,
-                "storage_key": pb.storage_key,
-            },
-        )
+        split = pb.shard
 
         work = IndexerWorkUnit(seqid=seqid, index_message=pb)
-        return (shard_id, work)
+        return (split, work)
 
     async def process(self, work: IndexerWorkUnit) -> bool:
         return await self.index_message(work)
@@ -131,8 +121,9 @@ class ConcurrentShardIndexer(DemuxProcessor):
             SuccessfulIndexingPayload(seqid=work.seqid, index_message=pb)
         )
         logger.info(
-            "Message finished",
+            "Message indexing finished",
             extra={
+                "seqid": work.seqid,
                 "shard": pb.shard,
                 "storage_key": pb.storage_key,
                 "time": time.time() - start,

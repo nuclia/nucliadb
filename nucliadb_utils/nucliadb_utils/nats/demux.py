@@ -22,7 +22,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial, total_ordering
-from typing import Awaitable, Callable, Optional, Type, TypeVar
+from typing import Any, Awaitable, Callable, Optional, Type
 
 from nats.aio.client import Msg
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 Split = str
-DemuxProcessorWork = TypeVar("DemuxProcessorWork")
+DemuxProcessorWork = Any
 
 
 class DemuxProcessor(ABC):
@@ -67,12 +67,16 @@ class WorkUnit:
     work_id: str
     work: DemuxProcessorWork
 
-    def __eq__(self, other: "WorkUnit"):
+    def __eq__(self, other):
         # A work unit is the same if we assign them the same id
+        if not isinstance(other, WorkUnit):
+            return NotImplemented
         return self.work_id == other.work_id
 
-    def __lt__(self, other: "WorkUnit"):
+    def __lt__(self, other):
         # Rely on DemuxProcessorWork implementing partial ordering
+        if not isinstance(other, WorkUnit):
+            return NotImplemented
         return self.work.__lt__(other.work)
 
     def __hash__(self):
@@ -141,29 +145,39 @@ class NatsDemultiplexer:
         self.processor = processor
         self.queue_klass = queue_klass
         self.workers: dict[str, "DemuxWorker"] = {}
+        self.working_on: set[str] = set()
 
     def handle_message_nowait(self, msg: Msg):
         """Eventually process `msg` asynchronously and ack/nak it when finished."""
-        task = asyncio.create_task(self.safe_demux(msg))
-        task.add_done_callback(NatsDemultiplexer._handle_message_done_callback)
-
-    @staticmethod
-    def _handle_message_done_callback(task: asyncio.Task):
-        if task.exception() is not None:
-            error = task.exception()
-            event_id = capture_exception(error)
-            logger.error(
-                "Error while concurrently handling a NATS message. "
-                f"Check sentry for more details. Event id: {event_id}",
-                exc_info=True,
-            )
-            raise error
+        subject = msg.subject
+        reply = msg.reply
+        seqid = int(msg.reply.split(".")[5])
+        logger.debug(
+            "Message will be soon demultiplexed and processed",
+            extra={"subject": subject, "reply": reply, "seqid": seqid},
+        )
+        asyncio.create_task(self.safe_demux(msg))
 
     async def safe_demux(self, msg: Msg):
         try:
             await self.demux(msg)
         except Exception as exc:
-            logger.info("Exception on demux", exc_info=exc)
+            subject = msg.subject
+            reply = msg.reply
+            seqid = int(msg.reply.split(".")[5])
+
+            event_id = capture_exception(exc)
+            logger.error(
+                "Error while concurrently handling a NATS message. "
+                f"Check sentry for more details. Event id: {event_id}",
+                extra={
+                    "subject": subject,
+                    "reply": reply,
+                    "seqid": seqid,
+                },
+                exc_info=exc,
+            )
+
             await msg.nak()
             raise exc
 
@@ -171,14 +185,30 @@ class NatsDemultiplexer:
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ):
+            subject = msg.subject
+            reply = msg.reply
+            seqid = int(msg.reply.split(".")[5])
+
             split, work = self.processor.splitter(msg)
+            logger.info(
+                f"Message demultiplexed to split '{split}'",
+                extra={"subject": subject, "reply": reply, "seqid": seqid},
+            )
 
             worker, created = self.get_or_create_worker(split)
 
             seqid = int(msg.reply.split(".")[5])
             work_id = f"{split}:{seqid}"
             work_unit = WorkUnit(work_id, work)
+
+            if work_id in self.working_on:
+                logger.warning(
+                    f"Trying to process again an already received NATS message. Skipping (workid={work_id})"
+                )
+                return
+
             await worker.add_work(work_unit)
+            self.working_on.add(work_id)
 
             if created or (not created and not worker.working):
                 # The second condition should never happen, the worker task finished
@@ -199,6 +229,7 @@ class NatsDemultiplexer:
             )
 
             work_outcome = await wait_condition
+            self.working_on.discard(work_id)
             if work_outcome.error:
                 await msg.nak()
             else:
@@ -228,7 +259,7 @@ class NatsDemultiplexer:
 
         # propagate errors
         if task.exception() is not None:
-            raise task.exception()
+            raise task.exception()  # type: ignore
 
     @staticmethod
     async def on_work_unit_done(
@@ -249,14 +280,9 @@ class DemuxWorker:
         self.cb = cb
         self.work_queue = work_queue
         self.working = False
-        self.current_work_ids: set[str] = set()
 
     async def add_work(self, work: WorkUnit):
-        if work.work_id in self.current_work_ids:
-            logger.warning(f"Trying to add already pending work unit: {work.work_id}")
-            return
         await self.work_queue.put(work)
-        self.current_work_ids.add(work.work_id)
 
     async def work_until_finish(self):
         self.working = True
@@ -267,12 +293,14 @@ class DemuxWorker:
 
     async def do_work(self, work: WorkUnit):
         try:
+            logger.info(f"Working on '{work.work_id}'", extra={"work_id": work.work_id})
             success = await self.cb(work.work)
         except Exception as exc:
             event_id = capture_exception(exc)
             logger.error(
                 "An error happened on nats demux worker. Check sentry for more details. "
                 f"Event id: {event_id}",
+                extra={"work_id": work.work_id},
                 exc_info=exc,
             )
             await work_unit_done.dispatch(WorkOutcome(work_id=work.work_id, error=exc))
@@ -280,5 +308,3 @@ class DemuxWorker:
             await work_unit_done.dispatch(
                 WorkOutcome(work_id=work.work_id, success=success)
             )
-        finally:
-            self.current_work_ids.discard(work.work_id)

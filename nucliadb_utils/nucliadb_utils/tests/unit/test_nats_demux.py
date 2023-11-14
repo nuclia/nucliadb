@@ -113,9 +113,39 @@ class TestNatsDemultiplexer:
         assert msg.nak.await_count == 0
 
     @pytest.mark.asyncio
+    async def test_demux_ignores_duplicated_work(
+        self,
+        nats_demux: NatsDemultiplexer,
+        work_unit_done,
+        msg,
+        DemuxWorker,
+        asyncio_mock,
+    ):
+        """Simulate NATS redeliver and validate duplicated work is not done."""
+
+        async def fake_processing():
+            await asyncio.sleep(0.05)
+            return WorkOutcome(work_id="test-work", success=True)
+
+        asyncio_mock.get_event_loop().create_future = AsyncMock(
+            side_effect=fake_processing
+        )
+
+        await asyncio.gather(
+            nats_demux.demux(msg),
+            nats_demux.demux(msg),
+        )
+
+        assert DemuxWorker().add_work.await_count == 1
+        # called but not awaited, as we have mocked asyncio
+        assert DemuxWorker().work_until_finish.call_count == 1
+        assert msg.ack.await_count == 1
+        assert msg.nak.await_count == 0
+
+    @pytest.mark.asyncio
     async def test_safe_demux_auto_nak(self, nats_demux: NatsDemultiplexer):
         msg = AsyncMock()
-        nats_demux.demux = AsyncMock(side_effect=Exception)
+        nats_demux.demux = AsyncMock(side_effect=Exception)  # type: ignore
 
         with pytest.raises(Exception):
             await nats_demux.safe_demux(msg)
@@ -179,14 +209,6 @@ class TestDemuxWorker:
         await demux_worker.add_work(WorkUnit(work_id="test-2", work=Mock()))
 
         assert demux_worker.work_queue.qsize() == 2
-
-    @pytest.mark.asyncio
-    async def test_add_work_ignores_duplicated_work(self, demux_worker: DemuxWorker):
-        work_unit = WorkUnit(work_id="test", work=Mock())
-        await demux_worker.add_work(work_unit)
-        await demux_worker.add_work(work_unit)
-
-        assert demux_worker.work_queue.qsize() == 1
 
     @pytest.mark.asyncio
     async def test_do_work_processes_a_work_unit(
