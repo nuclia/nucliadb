@@ -31,6 +31,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 from nucliadb.common.context.fastapi import set_app_context
+from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -50,20 +51,24 @@ logger = logging.getLogger(__name__)
 
 
 def application_factory(settings: Settings) -> FastAPI:
+    middleware = [
+        Middleware(
+            CORSMiddleware,
+            allow_origins=http_settings.cors_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        ),
+        Middleware(
+            AuthenticationMiddleware,
+            backend=get_auth_backend(settings),
+        ),
+    ]
+    if running_settings.debug:
+        middleware.append(Middleware(ProcessTimeHeaderMiddleware))
+
     fastapi_settings = dict(
         debug=running_settings.debug,
-        middleware=[
-            Middleware(
-                CORSMiddleware,
-                allow_origins=http_settings.cors_origins,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            ),
-            Middleware(
-                AuthenticationMiddleware,
-                backend=get_auth_backend(settings),
-            ),
-        ],
+        middleware=middleware,
         on_startup=[initialize],
         on_shutdown=[finalize],
     )

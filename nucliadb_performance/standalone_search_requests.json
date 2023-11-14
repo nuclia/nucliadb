@@ -1,0 +1,189 @@
+{
+    "sets": {
+        "tiny": {
+            "kbs": [
+                "tiny",
+                "experimental-tiny"
+            ],
+            "requests": [
+                {
+                    "description": "Filtered hybrid search",
+                    "tags": [
+                        "filtered",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Division Bell",
+                            "filters": [
+                                "/classification.labels/resources/label1",
+                                "/metadata.language/en"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "Filtered vector search",
+                    "tags": [
+                        "filtered",
+                        "vector"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Royal Navy",
+                            "filters": [
+                                "/classification.labels/resources/label2"
+                            ],
+                            "features": [
+                                "vector"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "Hybrid search with date range filter",
+                    "tags": [
+                        "date_range",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Royal Navy",
+                            "range_creation_start": "2020-1-1T00:00:00",
+                            "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                }
+            ]
+        },
+        "small": {
+            "kbs": [
+                "small",
+                "experimental-small"
+            ],
+            "requests": [
+                {
+                    "description": "Filtered hybrid search",
+                    "tags": [
+                        "filtered",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "When was Vladimir Putin's campaing?",
+                            "filters": [
+                                "/classification.labels/resources/label1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "Filtered vector search",
+                    "tags": [
+                        "filtered",
+                        "vector"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "who won the Vice Presidential Election?",
+                            "filters": [
+                                "/classification.labels/resources/label2"
+                            ],
+                            "features": [
+                                "vector"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "Hybrid search with date range filter",
+                    "tags": [
+                        "date_range",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "who won the Vice Presidential Election?",
+                            "range_creation_start": "2020-1-1T00:00:00",
+                            "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                }
+            ]
+        },
+        "medium": {
+            "kbs": [
+                "medium",
+                "experimental-medium"
+            ],
+            "requests": [
+                {
+                    "description": "Filtered hybrid search",
+                    "tags": [
+                        "filtered",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "The Teaching and Learning of Mathematics at University Level",
+                            "filters": [
+                                "/classification.labels/resources/label1",
+                                "/metadata.language/en"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "Filtered vector search",
+                    "tags": [
+                        "filtered",
+                        "vector"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Napoleonic wars",
+                            "filters": [
+                                "/classification.labels/resources/label2"
+                            ],
+                            "features": [
+                                "vector"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "Hybrid search with date range filter",
+                    "tags": [
+                        "date_range",
+                        "hybrid"
+                    ],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/find",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Napoleonic wars",
+                            "range_creation_start": "2020-1-1T00:00:00",
+                            "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

@@ -61,6 +61,7 @@ jobs:
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
           influxdb_bucket: benchmarks
+
   check-perf-pr:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
     runs-on: ubuntu-latest
@@ -80,10 +81,10 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Run the bench
+      - name: Run the vectors bench
         run: |
           make -C vectors_benchmark fast-bench
-      - name: Store Performance data and report back
+      - name: Store performance data and report back
         uses: nuclia/nucliadb_performance@main
         with:
           metrics_file: vectors_benchmark/benchmark.json
@@ -92,3 +93,4 @@ jobs:
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
           influxdb_org: nuclia
           influxdb_bucket: benchmarks
+
