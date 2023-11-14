@@ -456,12 +456,23 @@ pub fn search_query(
             fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
-    // Keys
-    search.key_filters.iter().for_each(|uuid| {
-        let term = Term::from_field_text(schema.uuid, uuid);
-        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(term_query.clone())));
-        originals.push((Occur::Must, Box::new(term_query)));
+    // Paragraph key prefix filter
+    search.key_filters.iter().for_each(|key| {
+        let parts: Vec<String> = key.split('/').map(str::to_string).collect();
+
+        let uuid = &parts[0];
+        let uuid_term = Term::from_field_text(schema.uuid, uuid);
+        let uuid_term_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
+        fuzzies.push((Occur::Must, Box::new(uuid_term_query.clone())));
+        originals.push((Occur::Must, Box::new(uuid_term_query)));
+
+        if parts.len() > 1 {
+            let field_key = &parts[1..].join("/");
+            let field_term = Term::from_field_text(schema.field, field_key);
+            let field_term_query = TermQuery::new(field_term, IndexRecordOption::Basic);
+            fuzzies.push((Occur::Must, Box::new(field_term_query.clone())));
+            originals.push((Occur::Must, Box::new(field_term_query)));
+        }
     });
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {

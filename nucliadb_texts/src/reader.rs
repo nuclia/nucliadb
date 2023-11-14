@@ -34,7 +34,7 @@ use nucliadb_core::query_planner::{
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, TopDocs};
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
 
@@ -93,6 +93,7 @@ impl FieldReader for TextReaderService {
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
         let mut created_queries = Vec::new();
         let mut modified_queries = Vec::new();
+        let mut facet_queries: Vec<Box<dyn Query>> = Vec::new();
 
         for timestamp_query in request.timestamp_filters.iter() {
             let from = timestamp_query.from.as_ref();
@@ -107,19 +108,34 @@ impl FieldReader for TextReaderService {
             }
         }
 
-        let pre_filter_query: Box<dyn Query> =
-            if created_queries.is_empty() && modified_queries.is_empty() {
-                Box::new(AllQuery)
-            } else if created_queries.is_empty() {
-                Box::new(BooleanQuery::new(modified_queries))
-            } else if modified_queries.is_empty() {
-                Box::new(BooleanQuery::new(created_queries))
-            } else {
+        for facet_key in request.facet_filters.iter() {
+            let facet = Facet::from_text(facet_key).unwrap();
+            let facet_term = Term::from_facet(self.schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            facet_queries.push(Box::new(facet_term_query));
+        }
+
+        let pre_filter_query: Box<dyn Query> = if created_queries.is_empty()
+            && modified_queries.is_empty()
+            && facet_queries.is_empty()
+        {
+            Box::new(AllQuery)
+        } else {
+            let mut subqueries = vec![];
+            if !created_queries.is_empty() {
                 let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+                subqueries.push(created_query);
+            }
+            if !modified_queries.is_empty() {
                 let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-                let subqueries = vec![(Occur::Must, created_query), (Occur::Must, modified_query)];
-                Box::new(BooleanQuery::new(subqueries))
-            };
+                subqueries.push(modified_query);
+            }
+            if !facet_queries.is_empty() {
+                let facet_query = Box::new(BooleanQuery::intersection(facet_queries));
+                subqueries.push(facet_query);
+            }
+            Box::new(BooleanQuery::intersection(subqueries))
+        };
         let searcher = self.reader.searcher();
         let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
 

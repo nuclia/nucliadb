@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nucliadb_protos::prelude::Faceted;
+
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest,
@@ -47,6 +49,7 @@ pub struct TimestampFilter {
 #[derive(Debug, Clone)]
 pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
+    pub facet_filters: Vec<String>,
 }
 
 /// Represents a field that has met all of the
@@ -87,12 +90,16 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
+        // Add vectors key prefix filters
         for valid_field in valid_fields {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
             let as_vectors_key = format!("{resource_id}{field_id}");
             request.key_filters.push(as_vectors_key);
         }
+        // At this point we are sure that the resulting key_filters include the specified tags.
+        // We can remove them from the request to skip duplicated filter checks.
+        request.tags.clear();
     }
 
     fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
@@ -100,6 +107,20 @@ impl IndexQueries {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
         }
+        let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
+            return;
+        };
+        // Add paragraph key prefix filters
+        for valid_field in valid_fields {
+            let resource_id = &valid_field.resource_id;
+            let field_id = &valid_field.field_id;
+            let as_paragraph_key_prefix = format!("{resource_id}{field_id}");
+            request.key_filters.push(as_paragraph_key_prefix);
+        }
+        // At this point we are sure that the resulting key_filters include the specified tags.
+        // We can remove them from the request to skip duplicated filter checks.
+        let empty_facets = Faceted { tags: vec![] };
+        request.faceted.replace(empty_facets);
     }
 
     /// When a pre-filter is run, the result can be used to modify the queries
@@ -148,8 +169,10 @@ impl From<SearchRequest> for QueryPlan {
 fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
     let mut pre_filter_request = PreFilterRequest {
         timestamp_filters: vec![],
+        facet_filters: vec![],
     };
 
+    // Timestamp filters
     let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
     if request_has_timestamp_filters {
         let timestamp_filters = compute_timestamp_pre_filters(search_request);
@@ -158,7 +181,15 @@ fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterReques
             .extend(timestamp_filters);
     }
 
-    if !request_has_timestamp_filters {
+    // Facet filters
+    let request_has_facet_filters =
+        search_request.filter.is_some() && !search_request.filter.clone().unwrap().tags.is_empty();
+    if request_has_facet_filters {
+        let facet_filters = compute_facet_pre_filters(search_request);
+        pre_filter_request.facet_filters.extend(facet_filters);
+    }
+
+    if !request_has_timestamp_filters && !request_has_facet_filters {
         return None;
     }
     Some(pre_filter_request)
@@ -184,6 +215,18 @@ fn compute_timestamp_pre_filters(search_request: &SearchRequest) -> Vec<Timestam
     };
     timestamp_pre_filters.push(created_filter);
     timestamp_pre_filters
+}
+
+fn compute_facet_pre_filters(search_request: &SearchRequest) -> Vec<String> {
+    let mut facet_pre_filters = vec![];
+    search_request
+        .filter
+        .iter()
+        .flat_map(|f| f.tags.iter())
+        .for_each(|tag| {
+            facet_pre_filters.push(tag.clone());
+        });
+    facet_pre_filters
 }
 
 fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<ParagraphSearchRequest> {
