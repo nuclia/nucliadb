@@ -18,12 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import time
 from typing import Optional
 
 from opentelemetry.context import Context  # type: ignore
 from opentelemetry.sdk.trace import TracerProvider  # type: ignore
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor  # type: ignore
-from opentelemetry.util._time import _time_ns  # type: ignore
 
 
 class AsyncMultiSpanProcessor(SpanProcessor):
@@ -76,9 +76,9 @@ class AsyncMultiSpanProcessor(SpanProcessor):
             True if all span processors flushed their spans within the
             given timeout, False otherwise.
         """
-        deadline_ns = _time_ns() + timeout_millis * 1000000
+        deadline_ns = time.perf_counter_ns() + timeout_millis * 1000000
         for sp in self._span_processors:
-            current_time_ns = _time_ns()
+            current_time_ns = time.perf_counter_ns()
             if current_time_ns >= deadline_ns:
                 return False
 
