@@ -523,9 +523,7 @@ class ResourceBrain:
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:
-                        self.brain.paragraphs[field_key].paragraphs[
-                            paragraph_annotation.key
-                        ].labels.append(
+                        classification_label = (
                             f"/l/{classification.labelset}/{classification.label}"
                         )
         extend_unique(
