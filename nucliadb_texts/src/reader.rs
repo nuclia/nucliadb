@@ -29,7 +29,7 @@ use nucliadb_core::protos::{
     FacetResults, OrderBy, ResultScore, StreamRequest,
 };
 use nucliadb_core::query_planner::{
-    FieldDateType, PreFilterRequest, PreFilterResponse, ValidField,
+    FieldDateType, PreFilterRequest, PreFilterResponse, ValidField, ValidFieldCollector,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
@@ -93,6 +93,7 @@ impl FieldReader for TextReaderService {
     fn pre_filter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
         let mut created_queries = Vec::new();
         let mut modified_queries = Vec::new();
+
         for timestamp_query in request.timestamp_filters.iter() {
             let from = timestamp_query.from.as_ref();
             let to = timestamp_query.to.as_ref();
@@ -105,6 +106,7 @@ impl FieldReader for TextReaderService {
                 add_to.push((Occur::Should, query));
             }
         }
+
         let pre_filter_query: Box<dyn Query> =
             if created_queries.is_empty() && modified_queries.is_empty() {
                 Box::new(AllQuery)
@@ -120,6 +122,23 @@ impl FieldReader for TextReaderService {
             };
         let searcher = self.reader.searcher();
         let docs_fulfilled = searcher.search(&pre_filter_query, &DocSetCollector)?;
+
+        // If none of the fields match the pre-filter, thats all the query planner needs to know.
+        if docs_fulfilled.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::None,
+            });
+        }
+
+        // If all the fields match the pre-filter, thats all the query planner needs to know
+        if docs_fulfilled.len() as u64 == searcher.num_docs() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
+        }
+
+        // The fields matching the pre-filter are a non-empty subset of all the fields, so they are
+        // brought to memory
         let mut valid_fields = Vec::new();
         for fulfilled_doc in docs_fulfilled {
             let Ok(fulfilled_doc) = searcher.doc(fulfilled_doc) else {
@@ -144,7 +163,9 @@ impl FieldReader for TextReaderService {
             };
             valid_fields.push(fulfilled_field);
         }
-        Ok(PreFilterResponse { valid_fields })
+        Ok(PreFilterResponse {
+            valid_fields: ValidFieldCollector::Some(valid_fields),
+        })
     }
 
     #[tracing::instrument(skip_all)]
