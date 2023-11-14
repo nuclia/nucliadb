@@ -211,7 +211,7 @@ async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
         f"/kb/{kbid}/find",
         json=dict(
             query="",
-            filters=["/e/COUNTRY/Spain"],
+            filters=["/entities/COUNTRY/Spain"],
             vector=[0.5, 0.5, 0.5],
             min_score=-1,
         ),
@@ -235,7 +235,7 @@ async def test_resource_classification_label_filters(
         f"/kb/{kbid}/find",
         json=dict(
             query="",
-            filters=["/l/resource/label"],
+            filters=["/classification.labels/resource/label"],
             vector=[0.5, 0.5, 0.5],
             min_score=-1,
         ),
@@ -258,7 +258,7 @@ async def test_paragraph_classification_label_filters(
         f"/kb/{kbid}/find",
         json=dict(
             query="",
-            filters=["/l/paragraph/label"],
+            filters=["/classification.labels/paragraph/label"],
             vector=[0.5, 0.5, 0.5],
             min_score=-1,
         ),
@@ -277,9 +277,9 @@ async def test_paragraph_classification_label_filters(
 
 
 def _check_paragraphs(paragraphs, expected):
-    expected_paragraphs = set(expected)
+    not_yet_found = set(expected)
     for par in paragraphs.values():
-        if par["text"] in expected_paragraphs:
+        if par["text"] in not_yet_found:
             assert par["score_type"] == "BOTH"
-            expected_paragraphs.remove(par["text"])
-    assert len(expected_paragraphs) == 0
+            not_yet_found.remove(par["text"])
+    assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"

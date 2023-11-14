@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_protos::prelude::Faceted;
-
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest,
@@ -117,10 +115,6 @@ impl IndexQueries {
             let as_paragraph_key_prefix = format!("{resource_id}{field_id}");
             request.key_filters.push(as_paragraph_key_prefix);
         }
-        // At this point we are sure that the resulting key_filters include the specified tags.
-        // We can remove them from the request to skip duplicated filter checks.
-        let empty_facets = Faceted { tags: vec![] };
-        request.faceted.replace(empty_facets);
     }
 
     /// When a pre-filter is run, the result can be used to modify the queries

@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 use itertools::Itertools;
 use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
 use nucliadb_core::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
+use nucliadb_core::tracing::debug;
 use tantivy::query::*;
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
@@ -32,7 +33,6 @@ use tantivy::{DocId, InvertedIndexReader, Term};
 use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::{self, ParagraphSchema};
 use crate::stop_words::is_stop_word;
-
 type QueryP = (Occur, Box<dyn Query>);
 
 // Used to identify the terms matched by tantivy
@@ -459,15 +459,15 @@ pub fn search_query(
     // Paragraph key prefix filter
     search.key_filters.iter().for_each(|key| {
         let parts: Vec<String> = key.split('/').map(str::to_string).collect();
-
         let uuid = &parts[0];
         let uuid_term = Term::from_field_text(schema.uuid, uuid);
         let uuid_term_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
         fuzzies.push((Occur::Must, Box::new(uuid_term_query.clone())));
         originals.push((Occur::Must, Box::new(uuid_term_query)));
 
-        if parts.len() > 1 {
-            let field_key = &parts[1..].join("/");
+        if parts.len() >= 3 {
+            let field_key = &parts[1..2].join("/");
+            debug!("Executing field_key: {}", field_key);
             let field_term = Term::from_field_text(schema.field, field_key);
             let field_term_query = TermQuery::new(field_term, IndexRecordOption::Basic);
             fuzzies.push((Occur::Must, Box::new(field_term_query.clone())));
