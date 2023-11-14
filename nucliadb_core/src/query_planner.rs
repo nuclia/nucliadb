@@ -146,25 +146,44 @@ impl From<SearchRequest> for QueryPlan {
 }
 
 fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
-    let Some(timestamp_filters) = search_request.timestamps.as_ref() else {
-        return None;
-    };
     let mut pre_filter_request = PreFilterRequest {
         timestamp_filters: vec![],
     };
+
+    let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
+    if request_has_timestamp_filters {
+        let timestamp_filters = compute_timestamp_pre_filters(search_request);
+        pre_filter_request
+            .timestamp_filters
+            .extend(timestamp_filters);
+    }
+
+    if !request_has_timestamp_filters {
+        return None;
+    }
+    Some(pre_filter_request)
+}
+
+fn compute_timestamp_pre_filters(search_request: &SearchRequest) -> Vec<TimestampFilter> {
+    let mut timestamp_pre_filters = vec![];
+    let Some(request_timestamp_filters) = search_request.timestamps.as_ref() else {
+        return timestamp_pre_filters;
+    };
+
     let modified_filter = TimestampFilter {
         applies_to: FieldDateType::Modified,
-        from: timestamp_filters.from_modified.clone(),
-        to: timestamp_filters.to_modified.clone(),
+        from: request_timestamp_filters.from_modified.clone(),
+        to: request_timestamp_filters.to_modified.clone(),
     };
+    timestamp_pre_filters.push(modified_filter);
+
     let created_filter = TimestampFilter {
         applies_to: FieldDateType::Created,
-        from: timestamp_filters.from_created.clone(),
-        to: timestamp_filters.to_created.clone(),
+        from: request_timestamp_filters.from_created.clone(),
+        to: request_timestamp_filters.to_created.clone(),
     };
-    pre_filter_request.timestamp_filters.push(modified_filter);
-    pre_filter_request.timestamp_filters.push(created_filter);
-    Some(pre_filter_request)
+    timestamp_pre_filters.push(created_filter);
+    timestamp_pre_filters
 }
 
 fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<ParagraphSearchRequest> {
