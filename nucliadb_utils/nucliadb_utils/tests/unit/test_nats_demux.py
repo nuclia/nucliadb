@@ -64,8 +64,10 @@ class TestNatsDemultiplexer:
 
     @pytest.fixture
     def msg(self):
+        seqid = 1
         msg = Mock()
-        msg.reply = "x.x.x.x.x.1"
+        msg.subject = "test-subject"
+        msg.reply = f"x.x.x.x.x.{seqid}"
         msg.ack = AsyncMock()
         msg.nak = AsyncMock()
         yield msg
@@ -85,9 +87,8 @@ class TestNatsDemultiplexer:
     # Tests
 
     def test_handle_message_spawns_async_task(
-        self, nats_demux: NatsDemultiplexer, asyncio_mock
+        self, nats_demux: NatsDemultiplexer, asyncio_mock, msg
     ):
-        msg = Mock()
         nats_demux.handle_message_nowait(msg)
         assert asyncio_mock.create_task.called_once
 
@@ -143,8 +144,7 @@ class TestNatsDemultiplexer:
         assert msg.nak.await_count == 0
 
     @pytest.mark.asyncio
-    async def test_safe_demux_auto_nak(self, nats_demux: NatsDemultiplexer):
-        msg = AsyncMock()
+    async def test_safe_demux_auto_nak(self, nats_demux: NatsDemultiplexer, msg):
         nats_demux.demux = AsyncMock(side_effect=Exception)  # type: ignore
 
         with pytest.raises(Exception):
