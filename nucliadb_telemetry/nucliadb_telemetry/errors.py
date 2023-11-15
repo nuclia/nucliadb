@@ -76,6 +76,7 @@ def push_scope(**kwargs: Any) -> ContextManager[Scope]:
 
 
 class ErrorHandlingSettings(BaseSettings):
+    zone: str = pydantic.Field(default="local", env=["NUCLIA_ZONE"])
     sentry_url: Optional[str] = None
     environment: str = pydantic.Field(
         default="local", env=["environment", "running_environment"]
@@ -99,3 +100,4 @@ def setup_error_handling(version: str) -> None:
             integrations=[],
             default_integrations=False,
         )
+        sentry_sdk.set_tag("zone", settings.zone)
