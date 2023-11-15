@@ -35,11 +35,31 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.utilities import get_storage
 
-MAX_GET_EXTRACTED_TEXT_OPS = 5
+MAX_GET_EXTRACTED_TEXT_OPS = 20
 
 
 async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     predict_request = SummarizeModel()
+
+    for rid, field_id, extracted_text in await get_extracted_texts(
+        kbid, request.resources
+    ):
+        if extracted_text is None:
+            continue
+
+        fields = predict_request.resources.setdefault(
+            rid, SummarizeResourceModel()
+        ).fields
+        fields[field_id] = extracted_text.text
+
+    predict = get_predict()
+    return await predict.summarize(kbid, predict_request)
+
+
+async def get_extracted_texts(
+    kbid: str, resource_uuids: list[str]
+) -> list[tuple[str, str, Optional[ExtractedText]]]:
+    results = []
 
     driver = get_driver()
     storage = await get_storage()
@@ -49,43 +69,33 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     tasks = []
 
     # Schedule fetching extracted texts in async tasks
-    for resource_uuid in set(request.resources):
-        resource = await rdm.get_resource(kbid, resource_uuid)
+    for rid in set(resource_uuids):
+        resource = await rdm.get_resource(kbid, rid)
         if resource is None:
             continue
 
-        predict_request.resources[resource_uuid] = SummarizeResourceModel()
         fields = await resource.get_fields(force=True)
         for _, field in fields.items():
-            task = asyncio.create_task(get_extracted_text(field, max_tasks))
+            task = asyncio.create_task(get_extracted_text(rid, field, max_tasks))
             tasks.append(task)
 
     # Parse the task results
     done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-    done_task: asyncio.Task
     for done_task in done:
-        task_exception = done_task.exception()
-        if task_exception is not None:  # pragma: no cover
-            logger.error("Error fetching extracted text", exc_info=task_exception)
-            pending_task: asyncio.Task
+        if done_task.exception() is not None:  # pragma: no cover
+            exception = done_task.exception()
+            logger.error("Error fetching extracted text", exc_info=exception)
             for pending_task in pending:
                 pending_task.cancel()
-            raise task_exception
-
-        extracted_text, field = done_task.result()
-        if extracted_text is None:
-            continue
-
-        field_key = f"{field.type}/{field.id}"
-        predict_request.resources[resource_uuid].fields[field_key] = extracted_text.text
-
-    predict = get_predict()
-    return await predict.summarize(kbid, predict_request)
+            raise exception  # type: ignore
+        results.append(done_task.result())
+    return results
 
 
 async def get_extracted_text(
-    field: Field, max_operations: asyncio.Semaphore
-) -> tuple[Optional[ExtractedText], Field]:
+    rid: str, field: Field, max_operations: asyncio.Semaphore
+) -> tuple[str, str, Optional[ExtractedText]]:
     async with max_operations:
         extracted_text = await field.get_extracted_text(force=True)
-        return extracted_text, field
+        field_key = f"{field.type}/{field.id}"
+        return rid, field_key, extracted_text
