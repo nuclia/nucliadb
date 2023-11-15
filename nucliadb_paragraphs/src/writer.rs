@@ -320,9 +320,6 @@ impl ParagraphWriterService {
                     .chain(paragraph_labels.iter())
                     .cloned()
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
-
-                // TODO: paragraph
-
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
                 doc.add_text(self.schema.text, &text);
