@@ -63,6 +63,7 @@ spec:
 {{ toYaml $values.readReplicas.tolerations | indent 8 }}
 {{- end }}
       dnsPolicy: ClusterFirst
+      serviceAccount:  {{ (($values.readReplicas).serviceAccount) | default "default" }}
       volumes:
       - name: data-dir
         emptyDir:
