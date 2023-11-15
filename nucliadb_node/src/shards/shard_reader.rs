@@ -421,6 +421,7 @@ impl ShardReader {
         });
 
         let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
+            eprintln!("paragaph_task");
             request.id = search_id.clone();
             let paragraph_reader_service = self.paragraph_reader.clone();
             let info = info_span!(parent: &span, "paragraph search");
@@ -429,6 +430,7 @@ impl ShardReader {
         });
 
         let vector_task = index_queries.vectors_request.map(|mut request| {
+            eprintln!("vector_task");
             request.id = search_id.clone();
             let vector_reader_service = self.vector_reader.clone();
             let info = info_span!(parent: &span, "vector search");

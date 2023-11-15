@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
@@ -111,6 +112,7 @@ def broker_message_with_labels(kbid):
     level (resource, field and paragraph).
     """
     bm = broker_resource(kbid=kbid)
+    
     field_id = "text"
 
     p1 = PAR_LAB_1
@@ -199,11 +201,19 @@ async def kbid(
     await inject_message(nucliadb_grpc, bm1)
     bm2 = broker_message_with_labels(knowledgebox)
     await inject_message(nucliadb_grpc, bm2)
+
+    await asyncio.sleep(2)
     return knowledgebox
 
 
+TESTED_IN_CHANNELS = (
+    "STABLE",
+    "EXPERIMENTAL",
+)
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("knowledgebox", TESTED_IN_CHANNELS, indirect=True)
 async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
     # Find + entity filter should return paragraphs of that
     # field even if the paragraphs are not labeled with the entity individually.
@@ -218,6 +228,7 @@ async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
     )
     assert resp.status_code == 200
     content = resp.json()
+    assert len(content["resources"]) == 1
     resource = content["resources"].popitem()[1]
     paragraphs = resource["fields"]["/t/text"]["paragraphs"]
     assert len(paragraphs) == 3
@@ -225,7 +236,7 @@ async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("knowledgebox", TESTED_IN_CHANNELS, indirect=True)
 async def test_resource_classification_label_filters(
     nucliadb_reader: AsyncClient, kbid: str
 ):
@@ -244,12 +255,12 @@ async def test_resource_classification_label_filters(
     content = resp.json()
     resource = content["resources"].popitem()[1]
     paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 3
+    assert len(paragraphs) == 2
     _check_paragraphs(paragraphs, expected=[PAR_LAB_1, PAR_LAB_2])
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("knowledgebox", TESTED_IN_CHANNELS, indirect=True)
 async def test_paragraph_classification_label_filters(
     nucliadb_reader: AsyncClient, kbid: str
 ):

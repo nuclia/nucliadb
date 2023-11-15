@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nucliadb_protos::prelude::Filter;
+
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest,
@@ -108,12 +110,26 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
+        
+        // At this point we are sure that the resulting key_filters include the specified tags.
+        // We can remove them from the request to skip duplicated filter checks.
+        let mut new_tags = vec![];
+        request.filter
+            .iter()
+            .flat_map(|f| f.tags.iter())
+            .filter(|tag| tag.starts_with("/l/"))
+            .for_each(|tag| new_tags.push(tag.clone()));
+
+        eprintln!("apply_to_paragraphs::new_tags: {:?}", new_tags);
+        let new_filter = Filter { tags: new_tags };
+        request.filter.replace(new_filter);
+
         // Add paragraph key prefix filters
         for valid_field in valid_fields {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
-            let as_paragraph_key_prefix = format!("{resource_id}{field_id}");
-            request.key_filters.push(as_paragraph_key_prefix);
+            let unique_field_key = format!("{resource_id}{field_id}");
+            request.key_filters.push(unique_field_key);
         }
     }
 
@@ -130,9 +146,11 @@ impl IndexQueries {
         }
 
         if let Some(vectors_request) = self.vectors_request.as_mut() {
+            eprintln!("apply_pre_filter::apply_to_vectors");
             IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
         };
         if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
+            eprintln!("apply_pre_filter::apply_to_paragraphs");
             IndexQueries::apply_to_paragraphs(paragraph_request, &pre_filtered);
         };
     }

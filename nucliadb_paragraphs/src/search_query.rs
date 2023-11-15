@@ -25,7 +25,6 @@ use std::sync::{Arc, Mutex};
 use itertools::Itertools;
 use nucliadb_core::protos::prost_types::Timestamp as ProstTimestamp;
 use nucliadb_core::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
-use nucliadb_core::tracing::debug;
 use tantivy::query::*;
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
@@ -457,23 +456,37 @@ pub fn search_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
     // Paragraph key prefix filter
+    let mut key_filters: Vec<Box<dyn Query>> = vec![];
     search.key_filters.iter().for_each(|key| {
+        let mut key_filter : Vec<Box<dyn Query>> = vec![];
+
+        eprintln!("Parsing paragraph key prefix filter: {}", key);
         let parts: Vec<String> = key.split('/').map(str::to_string).collect();
         let uuid = &parts[0];
-        let uuid_term = Term::from_field_text(schema.uuid, uuid);
-        let uuid_term_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(uuid_term_query.clone())));
-        originals.push((Occur::Must, Box::new(uuid_term_query)));
+        eprintln!("-  uuid: {}", uuid);
+        let term = Term::from_field_text(schema.uuid, uuid);
+        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+        key_filter.push(Box::new(term_query));
 
         if parts.len() >= 3 {
-            let field_key = &parts[1..2].join("/");
-            debug!("Executing field_key: {}", field_key);
-            let field_term = Term::from_field_text(schema.field, field_key);
-            let field_term_query = TermQuery::new(field_term, IndexRecordOption::Basic);
-            fuzzies.push((Occur::Must, Box::new(field_term_query.clone())));
-            originals.push((Occur::Must, Box::new(field_term_query)));
+            let mut field_key: String = "/".to_owned();
+            field_key.push_str(&parts[1..3].join("/"));
+            eprintln!("-  field_key: {}", field_key);
+            let facet = Facet::from_text(&field_key).unwrap();
+            let facet_term = Term::from_facet(schema.field, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            key_filter.push(Box::new(facet_term_query));
         }
+
+        let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
+        key_filters.push(key_filter_query);
     });
+    if key_filters.len() > 0 {
+        let key_filters_query = Box::new(BooleanQuery::union(key_filters));
+        fuzzies.push((Occur::Must, key_filters_query.clone()));
+        originals.push((Occur::Must, key_filters_query));
+    }
+
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
