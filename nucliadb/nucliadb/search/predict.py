@@ -37,6 +37,9 @@ from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
 )
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -79,6 +82,7 @@ PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
+SUMMARIZE = "/summarize"
 CHAT = "/chat"
 ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
@@ -199,6 +203,15 @@ class DummyPredictEngine:
             return convert_relations(json.loads(dummy_data))
         else:
             return DUMMY_RELATION_NODE
+
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        self.calls.append((kbid, item))
+        return SummarizedResponse(
+            resources={
+                "rid": SummarizedResource(summary="resource summary", tokens=10)
+            },
+            summary="global summary",
+        )
 
 
 class PredictEngine:
@@ -431,6 +444,24 @@ class PredictEngine:
         data = await resp.json()
 
         return convert_relations(data)
+
+    @predict_observer.wrap({"type": "summarize"})
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined. Summarize operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(SUMMARIZE),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return SummarizedResponse.parse_raw(data)
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):
