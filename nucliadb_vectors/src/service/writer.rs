@@ -175,7 +175,7 @@ impl WriterChild for VectorWriterService {
                             .cloned()
                             .collect(),
                     );
-                    eprintln!("HNSW indexed labels: {:?}", labels);
+                    eprintln!("HNSW indexed labels: {:?}", index.labels);
                     for (key, sentence) in index.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();

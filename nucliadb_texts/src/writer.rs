@@ -307,6 +307,19 @@ impl TextWriterService {
                 let facet = Facet::from(label.as_str());
                 field_doc.add_facet(self.schema.facets, facet);
             }
+            let empty_paragraph = HashMap::with_capacity(0);
+            let inspect_paragraph = |field: &str| {
+                resource
+                    .paragraphs
+                    .get(field)
+                    .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
+            };
+            for paragraph in inspect_paragraph(field).values() {
+                for label in paragraph.labels.iter() {
+                    let facet = Facet::from_text(label).unwrap();
+                    field_doc.add_facet(self.schema.facets, facet)
+                }
+            }
             self.writer.add_document(field_doc).unwrap();
         }
     }

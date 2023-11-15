@@ -235,7 +235,7 @@ async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
     assert len(content["resources"]) == 1
     resource = content["resources"].popitem()[1]
     paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 3
+    assert len(paragraphs) == 2
     _check_paragraphs(paragraphs, expected=[PAR_ENT_1, PAR_ENT_2])
 
 
@@ -260,7 +260,7 @@ async def test_resource_classification_label_filters(
     assert len(content["resources"]) == 1
     resource = content["resources"].popitem()[1]
     paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 3
+    assert len(paragraphs) == 2
     _check_paragraphs(paragraphs, expected=[PAR_LAB_1, PAR_LAB_2])
 
 
