@@ -3,10 +3,44 @@ MAX_RETRIES=3
 MAX_TIMEOUT=60
 COMMAND="nc -zv 127.0.0.1 2379"
 
+unameOut="$(uname -s)"
+case "${unameOut}" in
+Linux*) machine=Linux ;;
+Darwin*) machine=Mac ;;
+CYGWIN*) machine=Cygwin ;;
+MINGW*) machine=MinGw ;;
+*) machine="UNKNOWN:${unameOut}" ;;
+esac
+
+INSTALL_SCRIPT_PATH="./install.sh"
+TIUP_BIN="$HOME/.tiup/bin/tiup"
+
 start_tikv() {
-	curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh -s -- v1.11.3
-	source /home/runner/.profile
-	tiup playground 5.3.1 --mode tikv-slim --without-monitor &
+	# tiup installation
+	if ! [ -e $TIUP_BIN ]; then
+		if ! [ -e $INSTALL_SCRIPT_PATH ]; then
+			echo $INSTALL_SCRIPT_PATH
+			curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh -o $INSTALL_SCRIPT_PATH
+			chmod +x $INSTALL_SCRIPT_PATH
+		fi
+
+		sh $INSTALL_SCRIPT_PATH
+
+		if [ "$machine" = "Mac" ] && [ -f "$HOME/.bash_profile" ]; then
+			source "$HOME/.bash_profile"
+		elif [ -f "$HOME/.profile" ]; then
+			source "$HOME/.profile"
+		else
+			echo "Error: Neither .bash_profile nor .profile found."
+		fi
+
+		# we synchronously install all required components here, so `tiup playground` does not.
+		tiup install playground
+		tiup install tikv
+		tiup install pd
+	fi
+
+	tiup playground --mode tikv-slim --without-monitor &
 
 	start_time=$(date +%s)
 
@@ -18,6 +52,7 @@ start_tikv() {
 
 		if [ $exit_code -eq 0 ]; then
 			echo "Running on 127.0.0.1 2379."
+			sleep 5 # breathe
 			break
 		elif [ $elapsed_time -ge $MAX_TIMEOUT ]; then
 			echo "Not running within the maximum timeout of $MAX_TIMEOUT seconds."
