@@ -86,9 +86,6 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
 async def get_extracted_text(
     field: Field, max_operations: asyncio.Semaphore
 ) -> tuple[Optional[ExtractedText], Field]:
-    await max_operations.acquire()
-    try:
+    async with max_operations:
         extracted_text = await field.get_extracted_text(force=True)
         return extracted_text, field
-    finally:
-        max_operations.release()
