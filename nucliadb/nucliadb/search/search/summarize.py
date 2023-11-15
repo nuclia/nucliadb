@@ -17,10 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+from typing import Optional
+
+from nucliadb_protos.utils_pb2 import ExtractedText
+
 from nucliadb.common.datamanagers.resources import ResourcesDataManager
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.fields.base import Field
+from nucliadb.search import logger
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_models.search import (
     SummarizedResponse,
     SummarizeModel,
@@ -28,6 +34,8 @@ from nucliadb_models.search import (
     SummarizeResourceModel,
 )
 from nucliadb_utils.utilities import get_storage
+
+MAX_GET_EXTRACTED_TEXT_OPS = 5
 
 
 async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
@@ -37,6 +45,10 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
     storage = await get_storage()
     rdm = ResourcesDataManager(driver, storage)
 
+    max_tasks = asyncio.Semaphore(MAX_GET_EXTRACTED_TEXT_OPS)
+    tasks = []
+
+    # Schedule fetching extracted texts in async tasks
     for resource_uuid in set(request.resources):
         resource = await rdm.get_resource(kbid, resource_uuid)
         if resource is None:
@@ -44,16 +56,39 @@ async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
 
         predict_request.resources[resource_uuid] = SummarizeResourceModel()
         fields = await resource.get_fields(force=True)
-        for (field_type, field_id), field in fields.items():
-            field_extracted_text = await field.get_extracted_text(force=True)
-            if field_extracted_text is None:
-                continue
+        for _, field in fields.items():
+            task = asyncio.create_task(get_extracted_text(field, max_tasks))
+            tasks.append(task)
 
-            field_type_str = FIELD_TYPES_MAP[field_type].value
-            field_key = f"{field_type_str}/{field_id}"
-            predict_request.resources[resource_uuid].fields[
-                field_key
-            ] = field_extracted_text.text
+    # Parse the task results
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    done_task: asyncio.Task
+    for done_task in done:
+        task_exception = done_task.exception()
+        if task_exception is not None:  # pragma: no cover
+            logger.error("Error fetching extracted text", exc_info=task_exception)
+            pending_task: asyncio.Task
+            for pending_task in pending:
+                pending_task.cancel()
+            raise task_exception
+
+        extracted_text, field = done_task.result()
+        if extracted_text is None:
+            continue
+
+        field_key = f"{field.type}/{field.id}"
+        predict_request.resources[resource_uuid].fields[field_key] = extracted_text.text
 
     predict = get_predict()
     return await predict.summarize(kbid, predict_request)
+
+
+async def get_extracted_text(
+    field: Field, max_operations: asyncio.Semaphore
+) -> tuple[Optional[ExtractedText], Field]:
+    await max_operations.acquire()
+    try:
+        extracted_text = await field.get_extracted_text(force=True)
+        return extracted_text, field
+    finally:
+        max_operations.release()
