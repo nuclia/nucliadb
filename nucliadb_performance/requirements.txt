@@ -1,5 +1,6 @@
-molotov
+molotov @ git+https://github.com/tarekziade/molotov@main
 nucliadb-sdk
 certifi
 faker
 httpx
+sentence_transformers
