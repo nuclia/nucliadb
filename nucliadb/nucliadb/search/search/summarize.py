@@ -17,9 +17,43 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_models.search import SummarizedResponse, SummarizeRequest
+from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.search.utilities import get_predict
+from nucliadb_models.common import FIELD_TYPES_MAP
+from nucliadb_models.search import (
+    SummarizedResponse,
+    SummarizeModel,
+    SummarizeRequest,
+    SummarizeResourceModel,
+)
+from nucliadb_utils.utilities import get_storage
 
 
-async def summarize(kbid: str, item: SummarizeRequest) -> SummarizedResponse:
-    # TODO
-    return SummarizedResponse(resources={}, summary="")
+async def summarize(kbid: str, request: SummarizeRequest) -> SummarizedResponse:
+    predict_request = SummarizeModel()
+
+    driver = get_driver()
+    storage = await get_storage()
+    rdm = ResourcesDataManager(driver, storage)
+
+    for resource_uuid in set(request.resources):
+        resource = await rdm.get_resource(kbid, resource_uuid)
+        if resource is None:
+            continue
+
+        predict_request.resources[resource_uuid] = SummarizeResourceModel()
+        fields = await resource.get_fields(force=True)
+        for (field_type, field_id), field in fields.items():
+            field_extracted_text = await field.get_extracted_text(force=True)
+            if field_extracted_text is None:
+                continue
+
+            field_type_str = FIELD_TYPES_MAP[field_type].value
+            field_key = f"{field_type_str}/{field_id}"
+            predict_request.resources[resource_uuid].fields[
+                field_key
+            ] = field_extracted_text.text
+
+    predict = get_predict()
+    return await predict.summarize(kbid, predict_request)

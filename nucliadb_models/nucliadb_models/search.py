@@ -732,7 +732,7 @@ class ChatRequest(BaseModel):
 
 
 class SummarizeResourceModel(BaseModel):
-    fields: Dict[str, str]
+    fields: Dict[str, str] = {}
 
 
 class SummarizeModel(BaseModel):
@@ -740,7 +740,7 @@ class SummarizeModel(BaseModel):
     Model for the summarize predict api request payload
     """
 
-    resources: Dict[str, SummarizeResourceModel]
+    resources: Dict[str, SummarizeResourceModel] = {}
 
 
 class SummarizeRequest(BaseModel):
@@ -763,7 +763,7 @@ class SummarizedResource(BaseModel):
 
 class SummarizedResponse(BaseModel):
     resources: Dict[str, SummarizedResource] = Field(
-        ..., title="Resources", description="Individual resource summaries"
+        default={}, title="Resources", description="Individual resource summaries"
     )
     summary: str = Field(
         default="", title="Summary", description="Globla summary of all resources"
