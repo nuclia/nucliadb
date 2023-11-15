@@ -207,6 +207,7 @@ class NatsConnectionManager:
         cb: Callable[[Msg], Awaitable[None]],
         subscription_lost_cb: Callable[[], Awaitable[None]],
         flow_control: bool = False,
+        manual_ack: bool = True,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> Subscription:
         sub = await self.js.subscribe(
@@ -215,6 +216,7 @@ class NatsConnectionManager:
             stream=stream,
             cb=cb,
             flow_control=flow_control,
+            manual_ack=manual_ack,
             config=config,
         )
 
