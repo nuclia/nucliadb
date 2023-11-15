@@ -99,7 +99,16 @@ impl IndexQueries {
         }
         // At this point we are sure that the resulting key_filters include the specified tags.
         // We can remove them from the request to skip duplicated filter checks.
+        let mut new_tags = vec![];
+        request
+            .tags
+            .iter()
+            .filter(|tag| tag.starts_with("/l/"))
+            .for_each(|tag| new_tags.push(tag.clone()));
+
+        eprintln!("apply_to_vectors::new_tags: {:?}", new_tags);
         request.tags.clear();
+        request.tags.extend(new_tags);
     }
 
     fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
@@ -110,11 +119,12 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
-        
+
         // At this point we are sure that the resulting key_filters include the specified tags.
         // We can remove them from the request to skip duplicated filter checks.
         let mut new_tags = vec![];
-        request.filter
+        request
+            .filter
             .iter()
             .flat_map(|f| f.tags.iter())
             .filter(|tag| tag.starts_with("/l/"))

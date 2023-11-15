@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
@@ -93,12 +94,12 @@ def broker_message_with_entities(kbid):
     evw = ExtractedVectorsWrapper()
     evw.field.CopyFrom(field)
     p1vec = Vector()
-    p1vec.start = par1.start
-    p1vec.end = par1.end
+    p1vec.start = p1vec.start_paragraph = par1.start
+    p1vec.end = p1vec.end_paragraph = par1.end
     p1vec.vector.extend([1, 1, 1])
     p2vec = Vector()
-    p2vec.start = par2.start
-    p2vec.end = par2.end
+    p2vec.start = p2vec.start_paragraph = par2.start
+    p2vec.end = p2vec.end_paragraph = par2.end
     p2vec.vector.extend([2, 2, 2])
     evw.vectors.vectors.vectors.append(p1vec)
     evw.vectors.vectors.vectors.append(p2vec)
@@ -112,7 +113,7 @@ def broker_message_with_labels(kbid):
     level (resource, field and paragraph).
     """
     bm = broker_resource(kbid=kbid)
-    
+
     field_id = "text"
 
     p1 = PAR_LAB_1
@@ -158,8 +159,8 @@ def broker_message_with_labels(kbid):
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
     c1 = Classification()
-    c1.labelset = "paragraph"
-    c1.label = "computed_label"
+    c1.labelset = "field_computed"
+    c1.label = "label"
     fmw.metadata.metadata.classifications.append(c1)
 
     par1 = Paragraph()
@@ -178,16 +179,19 @@ def broker_message_with_labels(kbid):
     evw = ExtractedVectorsWrapper()
     evw.field.CopyFrom(field)
     p1vec = Vector()
-    p1vec.start = par1.start
-    p1vec.end = par1.end
+    p1vec.start = p1vec.start_paragraph = par1.start
+    p1vec.end = p1vec.end_paragraph = par1.end
     p1vec.vector.extend([1, 1, 1])
+
     p2vec = Vector()
-    p2vec.start = par2.start
-    p2vec.end = par2.end
+    p2vec.start = p2vec.start_paragraph = par2.start
+    p2vec.end = p2vec.end_paragraph = par2.end
+    p2vec.start_paragraph
     p2vec.vector.extend([2, 2, 2])
     evw.vectors.vectors.vectors.append(p1vec)
     evw.vectors.vectors.vectors.append(p2vec)
     bm.field_vectors.append(evw)
+
     return bm
 
 
@@ -206,14 +210,14 @@ async def kbid(
     return knowledgebox
 
 
-TESTED_IN_CHANNELS = (
+RELEASE_CHANNELS = (
     "STABLE",
     "EXPERIMENTAL",
 )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", TESTED_IN_CHANNELS, indirect=True)
+@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
 async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
     # Find + entity filter should return paragraphs of that
     # field even if the paragraphs are not labeled with the entity individually.
@@ -236,7 +240,7 @@ async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", TESTED_IN_CHANNELS, indirect=True)
+@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
 async def test_resource_classification_label_filters(
     nucliadb_reader: AsyncClient, kbid: str
 ):
@@ -253,14 +257,15 @@ async def test_resource_classification_label_filters(
     )
     assert resp.status_code == 200
     content = resp.json()
+    assert len(content["resources"]) == 1
     resource = content["resources"].popitem()[1]
     paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 2
+    assert len(paragraphs) == 3
     _check_paragraphs(paragraphs, expected=[PAR_LAB_1, PAR_LAB_2])
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", TESTED_IN_CHANNELS, indirect=True)
+@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
 async def test_paragraph_classification_label_filters(
     nucliadb_reader: AsyncClient, kbid: str
 ):
@@ -276,6 +281,7 @@ async def test_paragraph_classification_label_filters(
     )
     assert resp.status_code == 200
     content = resp.json()
+    assert len(content["resources"]) == 1
     resource = content["resources"].popitem()[1]
     paragraphs = resource["fields"]["/t/text"]["paragraphs"]
     assert len(paragraphs) == 1

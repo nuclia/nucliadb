@@ -458,7 +458,7 @@ pub fn search_query(
     // Paragraph key prefix filter
     let mut key_filters: Vec<Box<dyn Query>> = vec![];
     search.key_filters.iter().for_each(|key| {
-        let mut key_filter : Vec<Box<dyn Query>> = vec![];
+        let mut key_filter: Vec<Box<dyn Query>> = vec![];
 
         eprintln!("Parsing paragraph key prefix filter: {}", key);
         let parts: Vec<String> = key.split('/').map(str::to_string).collect();
@@ -481,12 +481,11 @@ pub fn search_query(
         let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
         key_filters.push(key_filter_query);
     });
-    if key_filters.len() > 0 {
+    if !key_filters.is_empty() {
         let key_filters_query = Box::new(BooleanQuery::union(key_filters));
         fuzzies.push((Occur::Must, key_filters_query.clone()));
         originals.push((Occur::Must, key_filters_query));
     }
-
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;

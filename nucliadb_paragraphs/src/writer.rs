@@ -269,8 +269,20 @@ impl ParagraphWriterService {
                 .get(field)
                 .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
         };
+        let resource_facets = resource
+            .labels
+            .iter()
+            .map(Facet::from_text)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
         let mut paragraph_counter = 0;
         for (field, text_info) in &resource.texts {
+            let text_labels = text_info
+                .labels
+                .iter()
+                .map(Facet::from_text)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
             for (paragraph_id, p) in inspect_paragraph(field) {
                 paragraph_counter += 1;
                 let paragraph_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
@@ -302,10 +314,15 @@ impl ParagraphWriterService {
                     doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
                 }
 
-                paragraph_labels
+                resource_facets
                     .iter()
+                    .chain(text_labels.iter())
+                    .chain(paragraph_labels.iter())
                     .cloned()
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
+
+                // TODO: paragraph
+
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
                 doc.add_text(self.schema.text, &text);
