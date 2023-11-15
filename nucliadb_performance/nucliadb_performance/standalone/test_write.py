@@ -1,4 +1,6 @@
 import molotov
+from molotov.session import get_context
+
 import os
 import uuid
 from datetime import datetime
@@ -16,9 +18,9 @@ TEST_KB = []
 
 
 async def get_kb_id(session):
+    """Creates a shard for the test"""
     if len(TEST_KB) > 0:
         return TEST_KB[0]
-
     # creating a shard and a kb uuid
     stub = nodewriter_pb2_grpc.NodeWriterStub(session)
     request = nodewriter_pb2.NewShardRequest()
@@ -35,24 +37,33 @@ async def get_kb_id(session):
     return shard_id, kb_id
 
 
-@molotov.scenario(weight=95)
-async def writer(session, session_factory="grpc", grpc_url=GRPC_URL):
-    """Creating resources"""
-
-    shard_id, kb_id = await get_kb_id(session)
-    stub = nodewriter_pb2_grpc.NodeWriterStub(session)
-
+def create_resource(shard_id):
+    """Create a new resource"""
+    # TODO: add more realistic content in the resource
     rid = noderesources_pb2.ResourceID(uuid=str(uuid.uuid4()))
     rid.shard_id = shard_id
     metadata = noderesources_pb2.IndexMetadata()
     metadata.created.FromDatetime(datetime.now())
     metadata.modified.FromDatetime(datetime.now())
-
     resource = noderesources_pb2.Resource(resource=rid, metadata=metadata)
     resource.shard_id = shard_id
-    response = await stub.SetResource(resource)
+    return resource
 
-    assert response.status == 0, response
+
+@molotov.scenario(weight=95)
+async def writer(session, session_factory="grpc", grpc_url=GRPC_URL):
+    """Creating a resource"""
+
+    shard_id, kb_id = await get_kb_id(session)
+    stub = nodewriter_pb2_grpc.NodeWriterStub(session)
+
+    worker_id = get_context(session).worker_id
+    # send 10 resources within the same channel+worker
+    for i in range(10):
+        session.print(f"[W:{worker_id}] Creating resource in shard {shard_id}")
+        resource = create_resource(shard_id)
+        response = await stub.SetResource(resource)
+        assert response.status == 0, response
 
 
 @molotov.scenario(weight=5)
