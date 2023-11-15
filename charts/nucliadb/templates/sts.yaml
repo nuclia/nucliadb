@@ -39,6 +39,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount:  {{ .Values.serviceAccount | default "default" }}
       containers:
       - name: app
         image: "{{ .Values.image }}:{{ .Values.imageVersion }}"

@@ -46,6 +46,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount:  {{ ((.Values.migrator).serviceAccount) | default "default" }}
       containers:
       - name: migrator
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

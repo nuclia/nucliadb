@@ -44,6 +44,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount: {{ ((.Values.ingest_subscriber_workers).serviceAccount) | default "default" }}
       containers:
       - name: ingest-subscriber-workers
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

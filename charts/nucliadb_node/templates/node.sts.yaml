@@ -53,6 +53,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.serviceAccount | default "default" }}
 {{- if .Values.nats.secretName }}
       volumes:
       - name: nats-creds
