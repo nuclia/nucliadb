@@ -106,7 +106,6 @@ impl IndexQueries {
             .filter(|tag| tag.starts_with("/l/"))
             .for_each(|tag| new_tags.push(tag.clone()));
 
-        eprintln!("apply_to_vectors::new_tags: {:?}", new_tags);
         request.tags.clear();
         request.tags.extend(new_tags);
     }
@@ -130,7 +129,6 @@ impl IndexQueries {
             .filter(|tag| tag.starts_with("/l/"))
             .for_each(|tag| new_tags.push(tag.clone()));
 
-        eprintln!("apply_to_paragraphs::new_tags: {:?}", new_tags);
         let new_filter = Filter { tags: new_tags };
         request.filter.replace(new_filter);
 
@@ -156,11 +154,9 @@ impl IndexQueries {
         }
 
         if let Some(vectors_request) = self.vectors_request.as_mut() {
-            eprintln!("apply_pre_filter::apply_to_vectors");
             IndexQueries::apply_to_vectors(vectors_request, &pre_filtered);
         };
         if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-            eprintln!("apply_pre_filter::apply_to_paragraphs");
             IndexQueries::apply_to_paragraphs(paragraph_request, &pre_filtered);
         };
     }

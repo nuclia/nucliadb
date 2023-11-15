@@ -460,10 +460,8 @@ pub fn search_query(
     search.key_filters.iter().for_each(|key| {
         let mut key_filter: Vec<Box<dyn Query>> = vec![];
 
-        eprintln!("Parsing paragraph key prefix filter: {}", key);
         let parts: Vec<String> = key.split('/').map(str::to_string).collect();
         let uuid = &parts[0];
-        eprintln!("-  uuid: {}", uuid);
         let term = Term::from_field_text(schema.uuid, uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         key_filter.push(Box::new(term_query));
@@ -471,7 +469,6 @@ pub fn search_query(
         if parts.len() >= 3 {
             let mut field_key: String = "/".to_owned();
             field_key.push_str(&parts[1..3].join("/"));
-            eprintln!("-  field_key: {}", field_key);
             let facet = Facet::from_text(&field_key).unwrap();
             let facet_term = Term::from_facet(schema.field, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
