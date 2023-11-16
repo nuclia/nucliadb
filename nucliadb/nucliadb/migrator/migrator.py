@@ -99,6 +99,7 @@ async def run_all_kb_migrations(context: ExecutionContext, target_version: int) 
             await run_kb_migrations(context, kbid, target_version)
         except Exception as exc:
             errors.capture_exception(exc)
+            logger.exception("Failed to migrate KB", extra={"kbid": kbid})
             failures.append(kbid)
 
     if len(failures) > 0:
