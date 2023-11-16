@@ -364,7 +364,9 @@ async def test_generate_index_message_contains_all_metadata(
     resource = await create_resource(gcs_storage, maindb_driver, knowledgebox_ingest)
     resource.disable_vectors = False
 
-    resource_brain = await resource.generate_index_message()
+    async with maindb_driver.transaction() as txn:
+        resource.txn = txn  # I don't like this but this is the API we have...
+        resource_brain = await resource.generate_index_message()
     index_message = resource_brain.brain
 
     # Global resource labels
