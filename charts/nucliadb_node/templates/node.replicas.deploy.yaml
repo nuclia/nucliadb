@@ -67,9 +67,11 @@ spec:
       volumes:
       - name: data-dir
         emptyDir:
+{{- with $values.nats.secretName }}
       - name: nats-creds
         secret:
-          secretName: {{ $values.nats.secretName }}
+          secretName: {{ . }}
+{{- end }}
       containers:
       - name: writer
         securityContext:
