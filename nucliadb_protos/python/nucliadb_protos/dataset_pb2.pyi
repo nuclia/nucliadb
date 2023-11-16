@@ -30,6 +30,7 @@ class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumT
     TOKEN_CLASSIFICATION: _TaskType.ValueType  # 3
     IMAGE_CLASSIFICATION: _TaskType.ValueType  # 4
     PARAGRAPH_STREAMING: _TaskType.ValueType  # 5
+    QUESTION_ANSWER_STREAMING: _TaskType.ValueType  # 6
 
 class TaskType(_TaskType, metaclass=_TaskTypeEnumTypeWrapper):
     """Train API V2"""
@@ -40,6 +41,7 @@ SENTENCE_CLASSIFICATION: TaskType.ValueType  # 2
 TOKEN_CLASSIFICATION: TaskType.ValueType  # 3
 IMAGE_CLASSIFICATION: TaskType.ValueType  # 4
 PARAGRAPH_STREAMING: TaskType.ValueType  # 5
+QUESTION_ANSWER_STREAMING: TaskType.ValueType  # 6
 global___TaskType = TaskType
 
 class _LabelFrom:

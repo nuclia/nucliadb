@@ -12,6 +12,7 @@ enum TaskType {
     TOKEN_CLASSIFICATION = 3;
     IMAGE_CLASSIFICATION = 4;
     PARAGRAPH_STREAMING = 5;
+    QUESTION_ANSWER_STREAMING = 6;
 }
 
 message TrainSet {
