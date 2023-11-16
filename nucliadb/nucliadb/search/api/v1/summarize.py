@@ -52,5 +52,5 @@ async def summarize_endpoint(
         return await summarize(kbid, item)
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except predict.SendToPredictError:
-        return HTTPClientError(status_code=503, detail="Summarize service unavailable")
+    except predict.ProxiedPredictAPIError as err:
+        return HTTPClientError(status_code=err.status, detail=err.detail)

@@ -28,6 +28,7 @@ from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
     PredictVectorMissing,
+    ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
     SendToPredictError,
@@ -40,6 +41,10 @@ from nucliadb_models.search import (
     FeedbackRequest,
     FeedbackTasks,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
+    SummarizeResourceModel,
 )
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -122,8 +127,8 @@ async def test_convert_sentence_error(onprem):
         "service-account",
         onprem=onprem,
     )
-    pe.session = get_mocked_session("GET", 400, read="uops!", context_manager=False)
-    with pytest.raises(SendToPredictError):
+    pe.session = get_mocked_session("GET", 400, json="uops!", context_manager=False)
+    with pytest.raises(ProxiedPredictAPIError):
         await pe.convert_sentence_to_vector("kbid", "some sentence")
 
 
@@ -190,8 +195,8 @@ async def test_detect_entities_error(onprem):
         "service-account",
         onprem=onprem,
     )
-    pe.session = get_mocked_session("GET", 500, read="error", context_manager=False)
-    with pytest.raises(SendToPredictError):
+    pe.session = get_mocked_session("GET", 500, json="error", context_manager=False)
+    with pytest.raises(ProxiedPredictAPIError):
         await pe.detect_entities("kbid", "some sentence")
 
 
@@ -390,8 +395,38 @@ async def test_check_response_error():
     )
     response.status = 503
     response._body = b"some error"
+    response._headers = {"Content-Type": "application/json"}
 
-    with pytest.raises(SendToPredictError) as ex:
+    with pytest.raises(ProxiedPredictAPIError) as ex:
         await PredictEngine().check_response(response, expected_status=200)
+    assert ex.value.status == 503
+    assert ex.value.detail == "some error"
 
-    ex.errisinstance(SendToPredictError)
+
+async def test_summarize():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+
+    summarized = SummarizedResponse(
+        resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, json=summarized.json(), context_manager=False
+    )
+
+    item = SummarizeModel(
+        resources={"r1": SummarizeResourceModel(fields={"f1": "field extracted text"})}
+    )
+    summarize_response = await pe.summarize("kbid", item)
+
+    assert summarize_response == summarized
+
+    pe.session.post.assert_awaited_once_with(
+        url="cluster/api/internal/predict/summarize",
+        json=item.dict(),
+        headers={"X-STF-KBID": "kbid"},
+    )

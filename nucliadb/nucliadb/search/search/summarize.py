@@ -89,6 +89,7 @@ async def get_extracted_texts(
                 pending_task.cancel()
             raise exception  # type: ignore
         results.append(done_task.result())
+
     return results
 
 

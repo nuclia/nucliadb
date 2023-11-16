@@ -51,6 +51,12 @@ class SendToPredictError(Exception):
     pass
 
 
+class ProxiedPredictAPIError(Exception):
+    def __init__(self, status: int, detail: str = ""):
+        self.status = status
+        self.detail = detail
+
+
 class PredictVectorMissing(Exception):
     pass
 
@@ -206,12 +212,17 @@ class DummyPredictEngine:
 
     async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
         self.calls.append((kbid, item))
-        return SummarizedResponse(
-            resources={
-                "rid": SummarizedResource(summary="resource summary", tokens=10)
-            },
+        response = SummarizedResponse(
             summary="global summary",
         )
+        for rid in item.resources.keys():
+            rsummary = []
+            for field_id, field_text in item.resources[rid].fields.items():
+                rsummary.append(f"{field_id}: {field_text}")
+            response.resources[rid] = SummarizedResource(
+                summary="\n\n".join(rsummary), tokens=10
+            )
+        return response
 
 
 class PredictEngine:
@@ -302,9 +313,12 @@ class PredictEngine:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
 
-        error = (await resp.read()).decode()
-        logger.error(f"Predict API error at {resp.url}: {error}")
-        raise SendToPredictError(f"{resp.status}: {error}")
+        try:
+            detail = await resp.json()
+        except Exception:
+            detail = await resp.text()
+        logger.error(f"Predict API error at {resp.url}: {detail}")
+        raise ProxiedPredictAPIError(status=resp.status, detail=detail)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
