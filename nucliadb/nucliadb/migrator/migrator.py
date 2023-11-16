@@ -81,7 +81,7 @@ async def run_kb_migrations(
 
 
 async def run_all_kb_migrations(context: ExecutionContext, target_version: int) -> None:
-    failures = []
+    failures: list[str] = []
     while True:
         kbids = [
             kid
@@ -102,7 +102,7 @@ async def run_all_kb_migrations(context: ExecutionContext, target_version: int) 
             failures.append(kbid)
 
     if len(failures) > 0:
-        raise Exception("Failed to migrate KBs", extra={"kbids": failures})
+        raise Exception("Failed to migrate KBs")
 
 
 async def run_global_migrations(context: ExecutionContext, target_version: int) -> None:
