@@ -19,7 +19,6 @@
 #
 import asyncio
 import logging
-import random
 from typing import Optional
 
 from nucliadb.migrator.context import ExecutionContext
