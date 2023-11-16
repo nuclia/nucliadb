@@ -87,7 +87,7 @@ async def run_all_kb_migrations(context: ExecutionContext, target_version: int) 
         kbids = [
             kid
             for kid in await context.data_manager.get_kb_migrations(
-                limit=10 + len(failures)
+                limit=1 + len(failures)
             )
             if kid not in failures
         ]
