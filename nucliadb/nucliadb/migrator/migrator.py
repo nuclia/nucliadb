@@ -24,6 +24,7 @@ from typing import Optional
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
+import random
 
 migration_observer = metrics.Observer(
     "nucliadb_migrations", labels={"type": "kb", "target_version": ""}
@@ -81,12 +82,27 @@ async def run_kb_migrations(
 
 
 async def run_all_kb_migrations(context: ExecutionContext, target_version: int) -> None:
+    failures = []
     while True:
-        kbids = await context.data_manager.get_kb_migrations(limit=1)
+        kbids = [
+            kid
+            for kid in await context.data_manager.get_kb_migrations(
+                limit=10 + len(failures)
+            )
+            if kid not in failures
+        ]
         if len(kbids) == 0:
             break
 
-        await run_kb_migrations(context, kbids[0], target_version)
+        kbid = kbids[0]
+        try:
+            await run_kb_migrations(context, kbid, target_version)
+        except Exception as exc:
+            errors.capture_exception(exc)
+            failures.append(kbid)
+
+    if len(failures) > 0:
+        raise Exception("Failed to migrate KBs", extra={"kbids": failures})
 
 
 async def run_global_migrations(context: ExecutionContext, target_version: int) -> None:
