@@ -19,12 +19,12 @@
 #
 import asyncio
 import logging
+import random
 from typing import Optional
 
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
-import random
 
 migration_observer = metrics.Observer(
     "nucliadb_migrations", labels={"type": "kb", "target_version": ""}
