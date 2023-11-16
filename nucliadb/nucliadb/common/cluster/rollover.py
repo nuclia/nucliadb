@@ -143,6 +143,10 @@ async def index_resource(
     resource_id: str,
     shard: writer_pb2.ShardObject,
 ) -> Optional[noderesources_pb2.Resource]:
+    logger.warning(
+        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
+    )
+
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
     resources_datamanager = ResourcesDataManager(
@@ -158,9 +162,6 @@ async def index_resource(
             extra={"kbid": kbid, "resource_id": resource_id},
         )
         return None
-    logger.warning(
-        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
-    )
     partition = partitioning.generate_partition(kbid, resource_id)
     await sm.add_resource(
         shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid
