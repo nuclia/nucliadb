@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs;
+use std::{fs, vec};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -175,6 +175,19 @@ impl WriterChild for VectorWriterService {
                             .cloned()
                             .collect(),
                     );
+                    // // Only propagate resource labels to those paragraphs that have some labels assigned.
+                    // let mut paragraph_labels = vec![];
+                    // if !index.labels.is_empty() {
+                    //     paragraph_labels = resource
+                    //         .labels
+                    //         .iter()
+                    //         .chain(index.labels.iter())
+                    //         .chain(field.iter())
+                    //         .cloned()
+                    //         .collect();
+                    // };
+                    // eprintln!("HNSW par labels: {:?}", paragraph_labels);
+                    // let labels = LabelDictionary::new(paragraph_labels);
                     for (key, sentence) in index.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();

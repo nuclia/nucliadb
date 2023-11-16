@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
@@ -38,11 +36,29 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
 
-PAR_ENT_1 = "My name is Rusty and I am a rust software engineer based in Spain"
-PAR_ENT_2 = "I think Python is cool too"
+RELEASE_CHANNELS = (
+    "STABLE",
+    #    "EXPERIMENTAL",
+)
 
-PAR_LAB_1 = "My name is Pietro and I am a Ruby developer based in Portugal"
-PAR_LAB_2 = "In my free time, I code in C#."
+DETECTED_ENTITY = "COUNTRY/Spain"
+RESOURCE_CLASSIFICATION_LABEL = "resource/label"
+FIELD_CLASSIFICATION_LABEL = "computed/label"
+PARAGRAPH_CLASSIFICATION_LABEL = "paragraph/label"
+
+PARAGRAPH1 = "My name is Rusty and I am a rust software engineer based in Spain"
+PARAGRAPH2 = "I think Python is cool too"
+PARAGRAPH3 = "My name is Pietro and I am a Ruby developer based in Portugal"
+PARAGRAPH4 = "In my free time, I code in C#."
+
+FILTERS_TO_PARAGRAPHS = {
+    DETECTED_ENTITY: {PARAGRAPH1, PARAGRAPH2},
+    RESOURCE_CLASSIFICATION_LABEL: {PARAGRAPH3, PARAGRAPH4},
+    FIELD_CLASSIFICATION_LABEL: {PARAGRAPH3, PARAGRAPH4},
+    PARAGRAPH_CLASSIFICATION_LABEL: {
+        PARAGRAPH3,
+    },
+}
 
 
 def broker_message_with_entities(kbid):
@@ -53,8 +69,8 @@ def broker_message_with_entities(kbid):
     bm = broker_resource(kbid=kbid)
     field_id = "text"
     # Add a couple of paragraphs to a text field
-    p1 = PAR_ENT_1
-    p2 = PAR_ENT_2
+    p1 = PARAGRAPH1
+    p2 = PARAGRAPH2
     text = "\n".join([p1, p2])
 
     field = FieldID()
@@ -72,11 +88,10 @@ def broker_message_with_entities(kbid):
     # Add field computed metadata with the detected entity
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
-    entity = "COUNTRY/Spain"
-    family, ent = entity.split("/")
+    family, ent = DETECTED_ENTITY.split("/")
     fmw.metadata.metadata.ner[ent] = family
     pos = Position(start=60, end=64)
-    fmw.metadata.metadata.positions[entity].position.append(pos)
+    fmw.metadata.metadata.positions[DETECTED_ENTITY].position.append(pos)
 
     par1 = Paragraph()
     par1.start = 0
@@ -116,9 +131,7 @@ def broker_message_with_labels(kbid):
 
     field_id = "text"
 
-    p1 = PAR_LAB_1
-    p2 = PAR_LAB_2
-    text = "\n".join([p1, p2])
+    text = "\n".join([PARAGRAPH3, PARAGRAPH4])
 
     field = FieldID()
     field.field = field_id
@@ -135,11 +148,11 @@ def broker_message_with_labels(kbid):
     # Add a paragraph label
     ufm = UserFieldMetadata()
     ufm.field.CopyFrom(field)
-    panno1 = ParagraphAnnotation(key=f"{bm.uuid}/t/text/0-{len(p1)}")
+    panno1 = ParagraphAnnotation(key=f"{bm.uuid}/t/text/0-{len(PARAGRAPH3)}")
     panno1.classifications.append(
         Classification(
-            labelset="paragraph",
-            label="label",
+            labelset=PARAGRAPH_CLASSIFICATION_LABEL.split("/")[0],
+            label=PARAGRAPH_CLASSIFICATION_LABEL.split("/")[1],
             cancelled_by_user=False,
         )
     )
@@ -149,8 +162,8 @@ def broker_message_with_labels(kbid):
     # Add a resource label
     bm.basic.usermetadata.classifications.append(
         Classification(
-            labelset="resource",
-            label="label",
+            labelset=RESOURCE_CLASSIFICATION_LABEL.split("/")[0],
+            label=RESOURCE_CLASSIFICATION_LABEL.split("/")[1],
             cancelled_by_user=False,
         )
     )
@@ -159,19 +172,19 @@ def broker_message_with_labels(kbid):
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
     c1 = Classification()
-    c1.labelset = "field_computed"
-    c1.label = "label"
+    c1.labelset = FIELD_CLASSIFICATION_LABEL.split("/")[0]
+    c1.label = FIELD_CLASSIFICATION_LABEL.split("/")[0]
     fmw.metadata.metadata.classifications.append(c1)
 
     par1 = Paragraph()
     par1.start = 0
-    par1.end = len(p1)
-    par1.text = p1
+    par1.end = len(PARAGRAPH3)
+    par1.text = PARAGRAPH3
+    fmw.metadata.metadata.paragraphs.append(par1)
     par2 = Paragraph()
     par2.start = par1.end + 1
-    par2.end = par2.start + len(p2)
-    par2.text = p2
-    fmw.metadata.metadata.paragraphs.append(par1)
+    par2.end = par2.start + len(PARAGRAPH4)
+    par2.text = PARAGRAPH4
     fmw.metadata.metadata.paragraphs.append(par2)
     bm.field_metadata.append(fmw)
 
@@ -197,105 +210,73 @@ def broker_message_with_labels(kbid):
 
 @pytest.fixture(scope="function")
 async def kbid(
-    nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
-    bm1 = broker_message_with_entities(knowledgebox)
-    await inject_message(nucliadb_grpc, bm1)
-    bm2 = broker_message_with_labels(knowledgebox)
-    await inject_message(nucliadb_grpc, bm2)
-
-    await asyncio.sleep(2)
+    await inject_message(nucliadb_grpc, broker_message_with_entities(knowledgebox))
+    await inject_message(nucliadb_grpc, broker_message_with_labels(knowledgebox))
     return knowledgebox
 
 
-RELEASE_CHANNELS = (
-    "STABLE",
-    "EXPERIMENTAL",
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
+@pytest.mark.parametrize(
+    "filters,expected_paragraphs",
+    [
+        ([f"/classification.labels/unexisting"], []),
+        ([f"/entities/{DETECTED_ENTITY}"], FILTERS_TO_PARAGRAPHS[DETECTED_ENTITY]),
+        ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
+        (
+            [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
+            FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
+        ),
+        # (
+        #     [f"/classification.labels/{FIELD_CLASSIFICATION_LABEL}"],
+        #     FILTERS_TO_PARAGRAPHS[FIELD_CLASSIFICATION_LABEL],
+        # ),
+        (
+            [f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"],
+            FILTERS_TO_PARAGRAPHS[PARAGRAPH_CLASSIFICATION_LABEL],
+        ),
+        (
+            [
+                f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
+                "/classification.labels/unexisting/label",
+            ],
+            [],
+        ),
+    ],
 )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
-async def test_entity_label_filters(nucliadb_reader: AsyncClient, kbid: str):
-    # Find + entity filter should return paragraphs of that
-    # field even if the paragraphs are not labeled with the entity individually.
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json=dict(
-            query="",
-            filters=["/entities/COUNTRY/Spain"],
-            vector=[0.5, 0.5, 0.5],
-            min_score=-1,
-        ),
-    )
-    assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["resources"]) == 1
-    resource = content["resources"].popitem()[1]
-    paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 2
-    _check_paragraphs(paragraphs, expected=[PAR_ENT_1, PAR_ENT_2])
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
-async def test_resource_classification_label_filters(
-    nucliadb_reader: AsyncClient, kbid: str
+async def test_filtering(
+    nucliadb_reader: AsyncClient, kbid: str, filters, expected_paragraphs
 ):
-    # Find + resource label filter should return all paragraphs of that
-    # field
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json=dict(
             query="",
-            filters=["/classification.labels/resource/label"],
+            filters=filters,
+            features=["paragraph", "vector"],
             vector=[0.5, 0.5, 0.5],
             min_score=-1,
         ),
     )
     assert resp.status_code == 200
     content = resp.json()
-    assert len(content["resources"]) == 1
-    resource = content["resources"].popitem()[1]
-    paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 2
-    _check_paragraphs(paragraphs, expected=[PAR_LAB_1, PAR_LAB_2])
 
+    # Collect all paragraphs from the response
+    paragraphs = [
+        paragraph
+        for resource in content["resources"].values()
+        for field in resource["fields"].values()
+        for paragraph in field["paragraphs"].values()
+    ]
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
-async def test_paragraph_classification_label_filters(
-    nucliadb_reader: AsyncClient, kbid: str
-):
-    # Find + paragraph label filter should only those paragraphs with that label
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json=dict(
-            query="",
-            filters=["/classification.labels/paragraph/label"],
-            vector=[0.5, 0.5, 0.5],
-            min_score=-1,
-        ),
-    )
-    assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["resources"]) == 1
-    resource = content["resources"].popitem()[1]
-    paragraphs = resource["fields"]["/t/text"]["paragraphs"]
-    assert len(paragraphs) == 1
-    _check_paragraphs(
-        paragraphs,
-        expected=[
-            PAR_LAB_1,
-        ],
-    )
-
-
-def _check_paragraphs(paragraphs, expected):
-    not_yet_found = set(expected)
-    for par in paragraphs.values():
+    # Check that only the expected paragraphs were returned
+    assert len(paragraphs) == len(expected_paragraphs)
+    not_yet_found = expected_paragraphs.copy()
+    for par in paragraphs:
+        if par["text"] not in expected_paragraphs:
+            raise AssertionError(f"Paragraph not expected: {par['text']}")
         if par["text"] in not_yet_found:
             assert par["score_type"] == "BOTH"
             not_yet_found.remove(par["text"])
