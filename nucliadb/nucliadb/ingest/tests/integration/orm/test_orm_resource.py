@@ -355,3 +355,60 @@ async def test_generate_broker_message(
 
     # TODO: Add checks for remaining field types and
     # other broker message metadata that is missing
+
+
+async def test_generate_index_message_contains_all_metadata(
+    gcs_storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+):
+    # Create a resource with all possible metadata in it
+    resource = await create_resource(gcs_storage, maindb_driver, knowledgebox_ingest)
+    resource.disable_vectors = False
+
+    async with maindb_driver.transaction() as txn:
+        resource.txn = txn  # I don't like this but this is the API we have...
+        resource_brain = await resource.generate_index_message()
+    index_message = resource_brain.brain
+
+    # Global resource labels
+    assert set(index_message.labels) == {
+        "/l/labelset1/label1",
+        "/n/i/text/plain",
+        "/s/p/ca",
+        "/u/s/My Source",
+        "/o/My Source",
+        "/n/s/PROCESSED",
+    }
+
+    # Check texts are populated with field extracted text and field computed labels
+    expected_fields = {
+        "a/title",
+        "a/summary",
+        "u/link1",
+        "d/datetime1",
+        "c/conv1",
+        "f/file1",
+        "t/text1",
+        "k/keywordset1",
+        "l/layout1",
+    }
+    fields_to_be_found = expected_fields.copy()
+    for field, text in index_message.texts.items():
+        assert field in fields_to_be_found
+        fields_to_be_found.remove(field)
+        assert text.text == "MyText"
+        assert {"/l/labelset1/label1", "/e/ENTITY/document"}.issubset(set(text.labels))
+        if field in ("u/link", "t/text1"):
+            assert "/e/Location/My home" in text.labels
+
+    assert len(fields_to_be_found) == 0
+
+    # TODO: check the following fields for the noderesources_pb.Resource (aka Brain)
+    # metadata
+    # status
+    # paragraphs
+    # paragraphs_to_delete
+    # sentences_to_delete
+    # relations
+    # relations_to_delete
+    # vectors
+    # vectors_to_delete

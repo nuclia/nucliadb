@@ -365,6 +365,7 @@ class Resource:
         basic = await self.get_basic()
         if basic is not None:
             brain.set_resource_metadata(basic, origin)
+        await self.compute_global_tags(brain)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore

@@ -528,10 +528,12 @@ class ResourceBrain:
                         ].labels.append(
                             f"/l/{classification.labelset}/{classification.label}"
                         )
-        self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
+        extend_unique(
+            self.brain.texts[field_key].labels, flatten_resource_labels(labels)  # type: ignore
+        )
 
     def compute_labels(self):
-        self.brain.labels.extend(flatten_resource_labels(self.labels))
+        extend_unique(self.brain.labels, flatten_resource_labels(self.labels))
 
 
 def get_paragraph_text(
@@ -577,3 +579,12 @@ def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
             return int(page_number)
     logger.error("Could not found a page")
     return int(page_number)
+
+
+def extend_unique(a: list, b: list):
+    """
+    Prevents extending with duplicate elements
+    """
+    for item in b:
+        if item not in a:
+            a.append(item)

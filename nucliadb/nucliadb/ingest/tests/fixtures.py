@@ -313,6 +313,13 @@ TEST_CLOUDFILE = rpb.CloudFile(
 # HELPERS
 
 
+async def make_field(field, extracted_text):
+    await field.set_extracted_text(make_extracted_text(field.id, body=extracted_text))
+    await field.set_field_metadata(make_field_metadata(field.id))
+    await field.set_large_field_metadata(make_field_large_metadata(field.id))
+    await field.set_vectors(make_extracted_vectors(field.id))
+
+
 def make_extracted_text(field_id, body: str):
     ex1 = rpb.ExtractedTextWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
@@ -573,6 +580,18 @@ async def create_resource(
     #
     # Add an example of each of the files, containing all possible metadata
 
+    # Title
+    title_field = await test_resource.get_field(
+        "title", rpb.FieldType.GENERIC, load=False
+    )
+    await make_field(title_field, "MyText")
+
+    # Summary
+    summary_field = await test_resource.get_field(
+        "summary", rpb.FieldType.GENERIC, load=False
+    )
+    await make_field(summary_field, "MyText")
+
     # 2.1 FILE FIELD
 
     t2 = rpb.FieldFile(
@@ -581,10 +600,10 @@ async def create_resource(
     t2.added.FromDatetime(datetime.now())
     t2.file.CopyFrom(TEST_CLOUDFILE)
 
-    await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+    file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+    await make_field(file_field, "MyText")
 
     # 2.2 LINK FIELD
-
     li2 = rpb.FieldLink(
         uri="htts://nuclia.cloud",
         language="ca",
@@ -603,21 +622,13 @@ async def create_resource(
     ex1.link_thumbnail.CopyFrom(THUMBNAIL)
 
     await linkfield.set_link_extracted_data(ex1)
-
-    await linkfield.set_extracted_text(make_extracted_text(linkfield.id, body="MyText"))
-    await linkfield.set_field_metadata(make_field_metadata(linkfield.id))
-    await linkfield.set_large_field_metadata(make_field_large_metadata(linkfield.id))
-    await linkfield.set_vectors(make_extracted_vectors(linkfield.id))
+    await make_field(linkfield, "MyText")
 
     # 2.3 TEXT FIELDS
 
     t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
     textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
-
-    await textfield.set_extracted_text(make_extracted_text(textfield.id, body="MyText"))
-    await textfield.set_field_metadata(make_field_metadata(textfield.id))
-    await textfield.set_large_field_metadata(make_field_large_metadata(textfield.id))
-    await textfield.set_vectors(make_extracted_vectors(textfield.id))
+    await make_field(textfield, "MyText")
 
     # 2.4 LAYOUT FIELD
 
@@ -667,20 +678,26 @@ async def create_resource(
         c2.messages.append(new_message)
 
     convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
-    await convfield.set_extracted_text(make_extracted_text(convfield.id, body="MyText"))
+    await make_field(convfield, extracted_text="MyText")
 
     # 2.6 KEYWORDSET FIELD
 
     k2 = rpb.FieldKeywordset(
         keywords=[rpb.Keyword(value="kw1"), rpb.Keyword(value="kw2")]
     )
-    await test_resource.set_field(rpb.FieldType.KEYWORDSET, "keywordset1", k2)
+    kws_field = await test_resource.set_field(
+        rpb.FieldType.KEYWORDSET, "keywordset1", k2
+    )
+    await make_field(kws_field, "MyText")
 
     # 2.7 DATETIMES FIELD
 
     d2 = rpb.FieldDatetime()
     d2.value.FromDatetime(datetime.now())
-    await test_resource.set_field(rpb.FieldType.DATETIME, "datetime1", d2)
+    datetime_field = await test_resource.set_field(
+        rpb.FieldType.DATETIME, "datetime1", d2
+    )
+    await make_field(datetime_field, "MyText")
 
     # 3 USER VECTORS
 
