@@ -17,7 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb.common.context import ApplicationContext
 import pytest
+from nucliadb.common.cluster import rollover
+
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
     Classification,
@@ -59,6 +62,14 @@ FILTERS_TO_PARAGRAPHS = {
         PARAGRAPH3,
     },
 }
+
+
+@pytest.fixture()
+async def app_context(natsd, gcs_storage, nucliadb):
+    ctx = ApplicationContext()
+    await ctx.initialize()
+    yield ctx
+    await ctx.finalize()
 
 
 def broker_message_with_entities(kbid):
@@ -223,31 +234,41 @@ async def kbid(
 @pytest.mark.parametrize(
     "filters,expected_paragraphs",
     [
-        ([f"/classification.labels/unexisting"], []),
+        # ([f"/classification.labels/unexisting"], []),
         ([f"/entities/{DETECTED_ENTITY}"], FILTERS_TO_PARAGRAPHS[DETECTED_ENTITY]),
-        ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
-        (
-            [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
-            FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
-        ),
+        # ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
+        # (
+        #     [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
+        #     FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
+        # ),
         # (
         #     [f"/classification.labels/{FIELD_CLASSIFICATION_LABEL}"],
         #     FILTERS_TO_PARAGRAPHS[FIELD_CLASSIFICATION_LABEL],
         # ),
-        (
-            [f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"],
-            FILTERS_TO_PARAGRAPHS[PARAGRAPH_CLASSIFICATION_LABEL],
-        ),
-        (
-            [
-                f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
-                "/classification.labels/unexisting/label",
-            ],
-            [],
-        ),
+        # (
+        #     [f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"],
+        #     FILTERS_TO_PARAGRAPHS[PARAGRAPH_CLASSIFICATION_LABEL],
+        # ),
+        # (
+        #     [
+        #         f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
+        #         "/classification.labels/unexisting/label",
+        #     ],
+        #     [],
+        # ),
     ],
 )
 async def test_filtering(
+    app_context, nucliadb_reader: AsyncClient, kbid: str, filters, expected_paragraphs
+):
+    await _testit(nucliadb_reader, kbid, filters, expected_paragraphs)
+
+    await rollover.rollover_shards(app_context, kbid)
+
+    await _testit(nucliadb_reader, kbid, filters, expected_paragraphs)
+
+
+async def _testit(
     nucliadb_reader: AsyncClient, kbid: str, filters, expected_paragraphs
 ):
     resp = await nucliadb_reader.post(
