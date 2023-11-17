@@ -35,13 +35,15 @@ from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.search.filters import (
+    record_filters_counter,
+    split_filters_by_label_type,
+    translate_label_filters,
+)
 from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.labels import (
-    translate_alias_to_system_label,
-    translate_system_to_alias_label,
-)
+from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
@@ -51,47 +53,8 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
-
-from .exceptions import InvalidQueryError
-
-ENTITY_FILTER_PREFIX = "/e/"
-LABEL_FILTER_PREFIX = "/l/"
-
-
-def translate_label_filters(filters: List[str]) -> List[str]:
-    """
-    Translate friendly filter names to the shortened filter names.
-    """
-    output = []
-    for fltr in filters:
-        if len(fltr) == 0:
-            raise InvalidQueryError("filters", f"Invalid empty label")
-        if fltr[0] != "/":
-            raise InvalidQueryError(
-                "filters", f"Invalid label. It must start with a `/`: {fltr}"
-            )
-
-        output.append(translate_alias_to_system_label(fltr))
-    return output
-
-
-def record_filters_counter(filters: list[str], counter: Counter) -> None:
-    counter.inc({"type": "filters"})
-    filters.sort()
-    entity_found = False
-    label_found = False
-    for fltr in filters:
-        if entity_found and label_found:
-            break
-        if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
-            entity_found = True
-            counter.inc({"type": "filters_entities"})
-        elif not label_found and fltr.startswith(LABEL_FILTER_PREFIX):
-            label_found = True
-            counter.inc({"type": "filters_labels"})
 
 
 async def global_query_to_pb(
@@ -135,7 +98,9 @@ async def global_query_to_pb(
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
         filters = translate_label_filters(filters)
-        request.filter.labels.extend(filters)
+        labels, paragraph_labels = await split_filters_by_label_type(kbid, filters)
+        request.filter.labels.extend(labels)
+        request.filter.paragraph_labels.extend(paragraph_labels)
         record_filters_counter(filters, node_features)
 
     request.faceted.labels.extend(translate_label_filters(faceted))

@@ -19,6 +19,7 @@
 #
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.knowledgebox_pb2 import Label
 from nucliadb_protos.resources_pb2 import (
     Classification,
     ExtractedTextWrapper,
@@ -32,14 +33,18 @@ from nucliadb_protos.resources_pb2 import (
     UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Vector
+from nucliadb_protos.writer_pb2 import OpStatusWriter, SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
+from nucliadb_models.labels import LabelSetKind
+from nucliadb_protos import writer_pb2
 
 RELEASE_CHANNELS = (
     "STABLE",
     #    "EXPERIMENTAL",
 )
+
 
 DETECTED_ENTITY = "COUNTRY/Spain"
 RESOURCE_CLASSIFICATION_LABEL = "resource/label"
@@ -208,11 +213,43 @@ def broker_message_with_labels(kbid):
     return bm
 
 
+async def create_test_labelsets(nucliadb_grpc, kbid: str):
+    for req in [
+        set_labelset_request(
+            kbid,
+            PARAGRAPH_CLASSIFICATION_LABEL.split("/")[0],
+            kind=LabelSetKind.PARAGRAPHS,
+            labels=[Label(title=PARAGRAPH_CLASSIFICATION_LABEL.split("/")[1])],
+        ),
+        set_labelset_request(
+            kbid,
+            RESOURCE_CLASSIFICATION_LABEL.split("/")[0],
+            kind=LabelSetKind.RESOURCES,
+            labels=[Label(title=RESOURCE_CLASSIFICATION_LABEL.split("/")[1])],
+        ),
+    ]:
+        resp = await nucliadb_grpc.SetLabels(req)
+        assert resp.status == OpStatusWriter.OK
+
+
+def set_labelset_request(
+    kbid, labelset_id, kind: LabelSetKind, labels: list[Label]
+) -> writer_pb2.SetLabelsRequest:
+    req = SetLabelsRequest()
+    req.kb.uuid = kbid
+    req.id = labelset_id
+    req.labelset.multiple = True
+    req.labelset.kind.append(kind)
+    req.labelset.labels.extend(labels)
+    return req
+
+
 @pytest.fixture(scope="function")
 async def kbid(
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
+    await create_test_labelsets(nucliadb_grpc, knowledgebox)
     await inject_message(nucliadb_grpc, broker_message_with_entities(knowledgebox))
     await inject_message(nucliadb_grpc, broker_message_with_labels(knowledgebox))
     return knowledgebox
@@ -223,9 +260,7 @@ async def kbid(
 @pytest.mark.parametrize(
     "filters,expected_paragraphs",
     [
-        ([f"/classification.labels/unexisting"], []),
         ([f"/entities/{DETECTED_ENTITY}"], FILTERS_TO_PARAGRAPHS[DETECTED_ENTITY]),
-        ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
         (
             [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
             FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
@@ -238,6 +273,9 @@ async def kbid(
             [f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"],
             FILTERS_TO_PARAGRAPHS[PARAGRAPH_CLASSIFICATION_LABEL],
         ),
+        # Matching on unexisting filters should yield no results
+        ([f"/classification.labels/unexisting"], []),
+        ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
         (
             [
                 f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
@@ -258,6 +296,7 @@ async def test_filtering(
             features=["paragraph", "vector"],
             vector=[0.5, 0.5, 0.5],
             min_score=-1,
+            timeout=None,
         ),
     )
     assert resp.status_code == 200
