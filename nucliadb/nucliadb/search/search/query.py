@@ -135,10 +135,10 @@ async def global_query_to_pb(
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
         filters = translate_label_filters(filters)
-        request.filter.tags.extend(filters)
+        request.filter.labels.extend(filters)
         record_filters_counter(filters, node_features)
 
-    request.faceted.tags.extend(translate_label_filters(faceted))
+    request.faceted.labels.extend(translate_label_filters(faceted))
     request.fields.extend(fields)
 
     if key_filters is not None and len(key_filters) > 0:
@@ -263,8 +263,8 @@ def parse_entities_to_filters(
         for entity in detected_entities
         if entity.ntype == RelationNode.NodeType.ENTITY
     ]:
-        if entity_filter not in request.filter.tags:
-            request.filter.tags.append(entity_filter)
+        if entity_filter not in request.filter.labels:
+            request.filter.labels.append(entity_filter)
             added_filters.append(entity_filter)
     return added_filters
 
@@ -289,7 +289,7 @@ def suggest_query_to_pb(
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(SuggestFeatures.PARAGRAPHS)
         filters = translate_label_filters(filters)
-        request.filter.tags.extend(filters)
+        request.filter.labels.extend(filters)
         request.fields.extend(fields)
 
     if range_creation_start is not None:
@@ -343,8 +343,8 @@ async def paragraph_query_to_pb(
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
-        request.filter.tags.extend(translate_label_filters(filters))
-        request.faceted.tags.extend(translate_label_filters(faceted))
+        request.filter.labels.extend(translate_label_filters(filters))
+        request.faceted.labels.extend(translate_label_filters(faceted))
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore

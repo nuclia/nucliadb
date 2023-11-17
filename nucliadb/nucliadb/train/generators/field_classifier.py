@@ -65,7 +65,7 @@ async def generate_field_classification_payloads(
     # Query how many resources has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-    request.filter.tags.append(labelset)
+    request.filter.labels.append(labelset)
     total = 0
 
     async for document_item in node.stream_get_fields(request):

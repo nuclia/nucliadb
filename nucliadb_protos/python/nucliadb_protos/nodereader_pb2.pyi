@@ -84,15 +84,19 @@ global___SuggestFeatures = SuggestFeatures
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TAGS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    PARAGRAPH_LABELS_FIELD_NUMBER: builtins.int
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def paragraph_labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
+        paragraph_labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "paragraph_labels", b"paragraph_labels"]) -> None: ...
 
 global___Filter = Filter
 
@@ -116,17 +120,17 @@ class StreamFilter(google.protobuf.message.Message):
     NOT: StreamFilter.Conjunction.ValueType  # 2
 
     CONJUNCTION_FIELD_NUMBER: builtins.int
-    TAGS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     conjunction: global___StreamFilter.Conjunction.ValueType
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         conjunction: global___StreamFilter.Conjunction.ValueType = ...,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["conjunction", b"conjunction", "tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["conjunction", b"conjunction", "labels", b"labels"]) -> None: ...
 
 global___StreamFilter = StreamFilter
 
@@ -134,15 +138,15 @@ global___StreamFilter = StreamFilter
 class Faceted(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TAGS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["tags", b"tags"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels"]) -> None: ...
 
 global___Faceted = Faceted
 
@@ -348,7 +352,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     def order(self) -> global___OrderBy: ...
     @property
     def faceted(self) -> global___Faceted:
-        """Faceted{ tags: Vec<String>}"""
+        """Faceted{ labels: Vec<String>}"""
     page_number: builtins.int
     result_per_page: builtins.int
     @property
@@ -616,7 +620,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
 
     ID_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
-    TAGS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
@@ -630,7 +634,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
         """Embedded vector search."""
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """tags to filter"""
     page_number: builtins.int
     """What page is the answer."""
@@ -650,7 +654,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
         *,
         id: builtins.str = ...,
         vector: collections.abc.Iterable[builtins.float] | None = ...,
-        tags: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
         page_number: builtins.int = ...,
         result_per_page: builtins.int = ...,
         reload: builtins.bool = ...,
@@ -659,7 +663,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
         key_filters: collections.abc.Iterable[builtins.str] | None = ...,
         min_score: builtins.float = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "key_filters", b"key_filters", "labels", b"labels", "min_score", b"min_score", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 

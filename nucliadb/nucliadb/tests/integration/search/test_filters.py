@@ -248,7 +248,7 @@ async def kbid(
     ],
 )
 async def test_filtering(
-    app_context, nucliadb_reader: AsyncClient, kbid: str, filters, expected_paragraphs
+    nucliadb_reader: AsyncClient, kbid: str, filters, expected_paragraphs
 ):
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",

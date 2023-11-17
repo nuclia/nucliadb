@@ -97,17 +97,8 @@ impl IndexQueries {
             let as_vectors_key = format!("{resource_id}{field_id}");
             request.key_filters.push(as_vectors_key);
         }
-        // At this point we are sure that the resulting key_filters include the specified tags.
-        // We can remove them from the request to skip duplicated filter checks.
-        let mut new_tags = vec![];
-        request
-            .tags
-            .iter()
-            .filter(|tag| tag.starts_with("/l/"))
-            .for_each(|tag| new_tags.push(tag.clone()));
-
-        request.tags.clear();
-        request.tags.extend(new_tags);
+        // Clear labels to avoid duplicate filtering
+        request.labels.clear();
     }
 
     fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
@@ -119,18 +110,10 @@ impl IndexQueries {
             return;
         };
 
-        // At this point we are sure that the resulting key_filters include the specified tags.
-        // We can remove them from the request to skip duplicated filter checks.
-        let mut new_tags = vec![];
-        request
-            .filter
-            .iter()
-            .flat_map(|f| f.tags.iter())
-            .filter(|tag| tag.starts_with("/l/"))
-            .for_each(|tag| new_tags.push(tag.clone()));
-
-        let new_filter = Filter { tags: new_tags };
-        request.filter.replace(new_filter);
+        // Clear filter labels to avoid duplicate filtering
+        if let Some(filter) = request.filter {
+            filter.labels.clear();
+        }
 
         // Add paragraph key prefix filters
         for valid_field in valid_fields {
