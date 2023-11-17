@@ -98,7 +98,7 @@ impl IndexQueries {
             request.key_filters.push(as_vectors_key);
         }
         // Clear labels to avoid duplicate filtering
-        request.labels.clear();
+        request.field_labels.clear();
     }
 
     fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
@@ -116,7 +116,7 @@ impl IndexQueries {
             paragraph_labels = filter.paragraph_labels.clone();
         }
         let filter = Filter {
-            labels: vec![],
+            field_labels: vec![],
             paragraph_labels,
         };
         request.filter.replace(filter);
@@ -190,7 +190,12 @@ fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterReques
 
     // Labels filters
     let request_has_labels_filters = search_request.filter.is_some()
-        && !search_request.filter.clone().unwrap().labels.is_empty();
+        && !search_request
+            .filter
+            .clone()
+            .unwrap()
+            .field_labels
+            .is_empty();
     if request_has_labels_filters {
         let labels = compute_labels_pre_filters(search_request);
         pre_filter_request.labels_filters.extend(labels);
@@ -229,7 +234,7 @@ fn compute_labels_pre_filters(search_request: &SearchRequest) -> Vec<String> {
     search_request
         .filter
         .iter()
-        .flat_map(|f| f.labels.iter())
+        .flat_map(|f| f.field_labels.iter())
         .for_each(|tag| {
             labels_pre_filters.push(tag.clone());
         });
@@ -285,7 +290,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
     let label_filters = search_request
         .filter
         .iter()
-        .flat_map(|f| f.labels.iter().cloned())
+        .flat_map(|f| f.field_labels.iter().cloned())
         .chain(search_request.fields.iter().cloned())
         .collect();
     Some(VectorSearchRequest {
@@ -295,7 +300,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
-        labels: label_filters,
+        field_labels: label_filters,
         min_score: search_request.min_score,
         ..Default::default()
     })

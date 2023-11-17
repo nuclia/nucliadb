@@ -8,7 +8,7 @@ import public "nucliadb_protos/utils.proto";
 
 
 message Filter {
-    repeated string labels = 1;
+    repeated string field_labels = 1;
     repeated string paragraph_labels = 2;
 }
 
@@ -191,7 +191,10 @@ message VectorSearchRequest {
     // Embedded vector search.
     repeated float vector = 2;
     // labels to filter
-    repeated string labels = 3;
+    repeated string field_labels = 3;
+    // paragraph labels to filter
+    repeated string paragraph_labels = 18;
+
     // What page is the answer.
     int32 page_number = 4;
 

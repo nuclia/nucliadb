@@ -23,7 +23,7 @@ from nucliadb_protos.knowledgebox_pb2 import Labels, LabelSet
 
 from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_models.labels import LabelSetKind, translate_alias_to_system_label
+from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_telemetry.metrics import Counter
 
 from .exceptions import InvalidQueryError
@@ -71,7 +71,7 @@ async def split_filters_by_label_type(
     """ """
     labels = []
     paragraph_labels = []
-    cache = {}
+    cache: dict[str, bool] = {}
     try:
         for fltr in filters:
             if len(fltr) == 0 or fltr[0] != "/":
@@ -116,7 +116,7 @@ async def is_paragraph_labelset_kind(kbid, labelset_id: str) -> bool:
         labelset: Optional[LabelSet] = labels.labelset.get(labelset_id)
         if labelset is None:
             return False
-        return LabelSetKind.PARAGRAPHS in labelset.kind
+        return LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
     except KeyError:
         # labelset_id not found
         return False

@@ -711,11 +711,12 @@ mod tests {
         // Testing filtering one filter from resource, one from field and one from paragraph
 
         let filter = Filter {
-            labels: vec![
+            field_labels: vec![
                 "/l/mylabel_resource".to_string(),
                 "/c/ool".to_string(),
                 "/e/mylabel".to_string(),
             ],
+            paragraph_labels: vec![],
         };
 
         let faceted = Faceted {

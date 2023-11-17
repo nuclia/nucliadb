@@ -1,7 +1,7 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Filter {
     #[prost(string, repeated, tag="1")]
-    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="2")]
     pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
@@ -247,7 +247,10 @@ pub struct VectorSearchRequest {
     pub vector: ::prost::alloc::vec::Vec<f32>,
     /// labels to filter
     #[prost(string, repeated, tag="3")]
-    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// paragraph labels to filter
+    #[prost(string, repeated, tag="18")]
+    pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// What page is the answer.
     #[prost(int32, tag="4")]
     pub page_number: i32,

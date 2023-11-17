@@ -23,6 +23,7 @@ from typing import List, Optional, Tuple
 from async_lru import alru_cache
 from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
+    Filter,
     ParagraphSearchRequest,
     SearchRequest,
     SuggestFeatures,
@@ -97,11 +98,7 @@ async def global_query_to_pb(
     request.body = query
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
-        filters = translate_label_filters(filters)
-        labels, paragraph_labels = await split_filters_by_label_type(kbid, filters)
-        request.filter.labels.extend(labels)
-        request.filter.paragraph_labels.extend(paragraph_labels)
-        record_filters_counter(filters, node_features)
+        filters = await parse_filters(request.filter, kbid, filters)
 
     request.faceted.labels.extend(translate_label_filters(faceted))
     request.fields.extend(fields)
@@ -228,8 +225,8 @@ def parse_entities_to_filters(
         for entity in detected_entities
         if entity.ntype == RelationNode.NodeType.ENTITY
     ]:
-        if entity_filter not in request.filter.labels:
-            request.filter.labels.append(entity_filter)
+        if entity_filter not in request.filter.field_labels:
+            request.filter.field_labels.append(entity_filter)
             added_filters.append(entity_filter)
     return added_filters
 
@@ -254,7 +251,7 @@ def suggest_query_to_pb(
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(SuggestFeatures.PARAGRAPHS)
         filters = translate_label_filters(filters)
-        request.filter.labels.extend(filters)
+        request.filter.field_labels.extend(filters)
         request.fields.extend(fields)
 
     if range_creation_start is not None:
@@ -270,6 +267,7 @@ def suggest_query_to_pb(
 
 
 async def paragraph_query_to_pb(
+    kbid: str,
     features: List[SearchOptions],
     rid: str,
     query: str,
@@ -308,7 +306,9 @@ async def paragraph_query_to_pb(
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
-        request.filter.labels.extend(translate_label_filters(filters))
+        if len(filters) > 0:
+            filters = await parse_filters(request.filter, kbid, filters)
+
         request.faceted.labels.extend(translate_label_filters(faceted))
         if sort:
             request.order.field = sort
@@ -351,3 +351,14 @@ async def get_default_min_score(kbid: str) -> float:
         # B/w compatible code until we figure out how to
         # set default min score for old on-prem kbs
         return fallback
+
+
+async def parse_filters(
+    request_filter: Filter, kbid: str, filters: list[str]
+) -> list[str]:
+    filters = translate_label_filters(filters)
+    field_labels, paragraph_labels = await split_filters_by_label_type(kbid, filters)
+    request_filter.field_labels.extend(field_labels)
+    request_filter.paragraph_labels.extend(paragraph_labels)
+    record_filters_counter(filters, node_features)
+    return filters

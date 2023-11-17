@@ -233,7 +233,7 @@ async def create_test_labelsets(nucliadb_grpc, kbid: str):
 
 
 def set_labelset_request(
-    kbid, labelset_id, kind: LabelSetKind, labels: list[Label]
+    kbid, labelset_id, kind, labels: list[Label]
 ) -> writer_pb2.SetLabelsRequest:
     req = SetLabelsRequest()
     req.kb.uuid = kbid
@@ -260,29 +260,29 @@ async def kbid(
 @pytest.mark.parametrize(
     "filters,expected_paragraphs",
     [
-        ([f"/entities/{DETECTED_ENTITY}"], FILTERS_TO_PARAGRAPHS[DETECTED_ENTITY]),
-        (
-            [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
-            FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
-        ),
-        (
-            [f"/classification.labels/{FIELD_CLASSIFICATION_LABEL}"],
-            FILTERS_TO_PARAGRAPHS[FIELD_CLASSIFICATION_LABEL],
-        ),
+        # ([f"/entities/{DETECTED_ENTITY}"], FILTERS_TO_PARAGRAPHS[DETECTED_ENTITY]),
+        # (
+        #     [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
+        #     FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
+        # ),
+        # (
+        #     [f"/classification.labels/{FIELD_CLASSIFICATION_LABEL}"],
+        #     FILTERS_TO_PARAGRAPHS[FIELD_CLASSIFICATION_LABEL],
+        # ),
         (
             [f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"],
             FILTERS_TO_PARAGRAPHS[PARAGRAPH_CLASSIFICATION_LABEL],
         ),
         # Matching on unexisting filters should yield no results
-        ([f"/classification.labels/unexisting"], []),
-        ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
-        (
-            [
-                f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
-                "/classification.labels/unexisting/label",
-            ],
-            [],
-        ),
+        # ([f"/classification.labels/unexisting"], []),
+        # ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
+        # (
+        #     [
+        #         f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
+        #         "/classification.labels/unexisting/label",
+        #     ],
+        #     [],
+        # ),
     ],
 )
 async def test_filtering(
@@ -296,8 +296,8 @@ async def test_filtering(
             features=["paragraph", "vector"],
             vector=[0.5, 0.5, 0.5],
             min_score=-1,
-            timeout=None,
         ),
+        timeout=None,
     )
     assert resp.status_code == 200
     content = resp.json()

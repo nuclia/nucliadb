@@ -79,7 +79,7 @@ pub fn create_query(
     };
     queries.push((Occur::Must, main_q));
 
-    // Fields
+    // Field types filter
     search
         .fields
         .iter()
@@ -91,11 +91,11 @@ pub fn create_query(
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    // Add filter
+    // Field label filter
     search
         .filter
         .iter()
-        .flat_map(|f| f.labels.iter())
+        .flat_map(|f| f.field_labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);

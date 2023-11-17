@@ -350,7 +350,7 @@ pub fn suggest_query(
     request
         .filter
         .iter()
-        .flat_map(|f| f.labels.iter())
+        .flat_map(|f| f.field_labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
@@ -447,7 +447,7 @@ pub fn search_query(
     search
         .filter
         .iter()
-        .flat_map(|f| f.labels.iter())
+        .flat_map(|f| f.field_labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
@@ -456,6 +456,7 @@ pub fn search_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
     // Paragraph label filters
+    let mut paragraph_label_filters: Vec<Box<dyn Query>> = vec![];
     search
         .filter
         .iter()
@@ -464,9 +465,14 @@ pub fn search_query(
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            fuzzies.push((Occur::Should, Box::new(facet_term_query.clone())));
-            originals.push((Occur::Should, Box::new(facet_term_query)));
+            paragraph_label_filters.push(Box::new(facet_term_query));
         });
+    if !paragraph_label_filters.is_empty() {
+        let paragraph_filters_query = Box::new(BooleanQuery::intersection(paragraph_label_filters));
+        fuzzies.push((Occur::Should, paragraph_filters_query.clone()));
+        originals.push((Occur::Should, paragraph_filters_query));
+    }
+
     // Keys filter
     let mut key_filters: Vec<Box<dyn Query>> = vec![];
     search.key_filters.iter().for_each(|key| {
