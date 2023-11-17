@@ -25,7 +25,6 @@ axum-server = "0.4.7"
 
 tonic = "0.7"
 tonic-health = "0.6"
-async-std = "1.10.0"
 futures-core = "0.3.17"
 futures-util = "0.3.17"
 futures = "0.3.17"

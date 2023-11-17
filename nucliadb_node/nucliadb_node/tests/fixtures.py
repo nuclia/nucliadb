@@ -164,16 +164,18 @@ def node_single():
         + nucliadb_node_reader.container_obj.logs().decode("utf-8")
     )
 
+    container_ids = [
+        nucliadb_node_reader.container_obj.id,
+        nucliadb_node_writer.container_obj.id,
+    ]
+
     nucliadb_node_reader.stop()
     nucliadb_node_writer.stop()
 
-    for container in (
-        nucliadb_node_reader,
-        nucliadb_node_writer,
-    ):
+    for container_id in container_ids:
         for i in range(5):
             try:
-                docker_client.containers.get(container.container_obj.id)
+                docker_client.containers.get(container_id)
             except docker.errors.NotFound:
                 break
             time.sleep(2)  # pragma: no cover

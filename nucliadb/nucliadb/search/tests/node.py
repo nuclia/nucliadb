@@ -287,6 +287,14 @@ class _NodeRunner:
         return self.data
 
     def stop(self):
+        container_ids = [
+            nucliadb_node_1_reader.container_obj.id,
+            nucliadb_node_1_writer.container_obj.id,
+            nucliadb_node_1_sidecar.container_obj.id,
+            nucliadb_node_2_writer.container_obj.id,
+            nucliadb_node_2_reader.container_obj.id,
+            nucliadb_node_2_sidecar.container_obj.id,
+        ]
         nucliadb_node_1_reader.stop()
         nucliadb_node_1_writer.stop()
         nucliadb_node_1_sidecar.stop()
@@ -294,17 +302,10 @@ class _NodeRunner:
         nucliadb_node_2_reader.stop()
         nucliadb_node_2_sidecar.stop()
 
-        for container in (
-            nucliadb_node_1_reader,
-            nucliadb_node_1_writer,
-            nucliadb_node_2_reader,
-            nucliadb_node_2_writer,
-            nucliadb_node_2_sidecar,
-            nucliadb_node_2_sidecar,
-        ):
+        for container_id in container_ids:
             for i in range(5):
                 try:
-                    self.docker_client.containers.get(container.container_obj.id)  # type: ignore
+                    self.docker_client.containers.get(container_id)  # type: ignore
                 except docker.errors.NotFound:
                     break
                 time.sleep(2)
