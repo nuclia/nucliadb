@@ -21,11 +21,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use async_std::sync::RwLock;
 use async_trait::async_trait;
 use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, Context, NodeResult};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::disk_structure;
