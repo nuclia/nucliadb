@@ -10,4 +10,4 @@ mrflagly
 
 # automatically bumped during release
 nucliadb-protos
-nucliadb-telemetry[all]>=2.33.0
+nucliadb-telemetry

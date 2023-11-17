@@ -41,7 +41,7 @@ aiodns>=3.0.0
 types-orjson
 
 # nucliadb dependencies are auto pinned on release
-nucliadb-telemetry
+nucliadb-telemetry[all]>=2.33.0
 nucliadb-utils[storages,fastapi,cache]
 nucliadb-protos
 nucliadb-models
