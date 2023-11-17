@@ -24,6 +24,7 @@ use crate::data_point::{Address, DataRetriever};
 pub enum AtomKind {
     KeyPrefix,
     Label,
+    ParagraphLabel,
 }
 
 /// Is a singleton clause.
@@ -39,6 +40,9 @@ impl AtomClause {
     pub fn label(value: String) -> AtomClause {
         AtomClause::new(value, AtomKind::Label)
     }
+    pub fn paragraph_label(value: String) -> AtomClause {
+        AtomClause::new(value, AtomKind::ParagraphLabel)
+    }
     pub fn key_prefix(value: String) -> AtomClause {
         AtomClause::new(value, AtomKind::KeyPrefix)
     }
@@ -46,6 +50,7 @@ impl AtomClause {
         match self.kind {
             AtomKind::KeyPrefix => retriever.get_key(x).starts_with(self.value.as_bytes()),
             AtomKind::Label => retriever.has_label(x, self.value.as_bytes()),
+            AtomKind::ParagraphLabel => retriever.has_label(x, self.value.as_bytes()),
         }
     }
 }
@@ -114,6 +119,7 @@ impl From<CompoundClause> for Clause {
 #[derive(Default)]
 pub struct AtomCollector {
     pub labels: Vec<String>,
+    pub paragraph_labels: Vec<String>,
     pub key_prefixes: Vec<String>,
 }
 impl AtomCollector {
@@ -121,6 +127,7 @@ impl AtomCollector {
         match atom.kind {
             AtomKind::KeyPrefix => self.key_prefixes.push(atom.value),
             AtomKind::Label => self.labels.push(atom.value),
+            AtomKind::ParagraphLabel => self.paragraph_labels.push(atom.value),
         }
     }
 }

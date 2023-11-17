@@ -107,6 +107,12 @@ impl ReaderChild for VectorReaderService {
             .cloned()
             .map(AtomClause::label)
             .for_each(|c| formula.extend(c));
+        request
+            .paragraph_labels
+            .iter()
+            .cloned()
+            .map(AtomClause::paragraph_label)
+            .for_each(|c| formula.extend(c));
         if key_filters.len() > 0 {
             formula.extend(CompoundClause::new(1, key_filters.collect()));
         }
