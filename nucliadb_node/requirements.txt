@@ -6,6 +6,6 @@ grpcio-status>=1.44.0
 grpcio-tools>=1.44.0
 grpcio-testing>=1.44.0
 grpcio-reflection>=1.44.0
-nucliadb-telemetry>=1.15.0
+nucliadb-telemetry[all]>=2.33.0
 nucliadb-protos>=2.24.0
 nucliadb-utils[storages,cache,fastapi]>=2.24.0

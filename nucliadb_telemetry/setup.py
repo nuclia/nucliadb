@@ -21,6 +21,29 @@ def load_reqs(filename):
 
 requirements = load_reqs("requirements.txt")
 
+requirements_otel = [
+    "opentelemetry-sdk==1.21.0",
+    "opentelemetry-api==1.21.0",
+    "opentelemetry-proto==1.21.0",
+    "opentelemetry-exporter-jaeger==1.21.0",
+    "opentelemetry-propagator-b3==1.21.0",
+    "opentelemetry-instrumentation-fastapi==0.42b0",
+    "opentelemetry-instrumentation-aiohttp-client==0.42b0",
+    "opentelemetry-semantic-conventions==0.42b0",
+]
+requirements_grpc = [
+    "grpcio>=1.44.0",
+    "grpcio-health-checking>=1.44.0",
+    "grpcio-channelz>=1.44.0",
+    "grpcio-status>=1.44.0",
+    "grpcio-tools>=1.44.0",
+    "grpcio-testing>=1.44.0",
+    "grpcio-reflection>=1.44.0",
+] + requirements_otel
+requirements_nats = ["nats-py[nkeys]>=2.2.0"] + requirements_otel
+requirements_fastapi = ["fastapi"] + requirements_otel
+requirements_tikv = ["tikv-client>=0.0.3"] + requirements_otel
+
 setup(
     name="nucliadb_telemetry",
     version=VERSION,
@@ -46,6 +69,22 @@ setup(
     ],
     python_requires=">=3.8",
     include_package_data=True,
+    extras_require={
+        "otel": requirements_otel,
+        "grpc": requirements_grpc,
+        "nats": requirements_nats,
+        "fastapi": requirements_fastapi,
+        "tikv": requirements_tikv,
+        "all": list(
+            set(
+                requirements_otel
+                + requirements_grpc
+                + requirements_nats
+                + requirements_fastapi
+                + requirements_tikv
+            )
+        ),
+    },
     package_data={"": ["*.txt", "*.md"], "nucliadb_telemetry": ["py.typed"]},
     packages=find_packages(),
     install_requires=requirements,

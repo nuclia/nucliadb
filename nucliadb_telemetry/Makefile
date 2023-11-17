@@ -6,7 +6,7 @@ protos:
 .PHONY: install-dev
 install-dev:
 	pip install --upgrade pip wheel
-	pip install -r ../test-requirements.txt -r ../code-requirements.txt -r requirements.txt
+	pip install -r ../test-requirements.txt -r ../code-requirements.txt -r requirements.txt -r requirements-test.txt
 # utils dep required for test fixtures for nats
 # NEEDS TO BE DECOUPLED EVENTUALLY
 	pip install -e ../nucliadb_protos/python
