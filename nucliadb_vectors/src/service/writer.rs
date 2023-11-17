@@ -574,7 +574,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "4".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            labels: vec!["4/label".to_string()],
+            field_labels: vec!["4/label".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -586,7 +586,7 @@ mod tests {
         assert_eq!(id, "4/key");
 
         // Same set, but no label match
-        request.labels = vec!["5/label".to_string()];
+        request.field_labels = vec!["5/label".to_string()];
         let results = reader.search(&request).unwrap();
         assert_eq!(results.documents.len(), 0);
 
@@ -609,7 +609,7 @@ mod tests {
 
         // Now vectorset 4 is no longer available
         request.vector_set = "4".to_string();
-        request.labels = vec!["4/label".to_string()];
+        request.field_labels = vec!["4/label".to_string()];
         let results = reader.search(&request).unwrap();
         assert_eq!(results.documents.len(), 0);
     }

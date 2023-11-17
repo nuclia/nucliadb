@@ -287,11 +287,16 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
         return None;
     }
-    let label_filters = search_request
+    let field_label_filters = search_request
         .filter
         .iter()
         .flat_map(|f| f.field_labels.iter().cloned())
         .chain(search_request.fields.iter().cloned())
+        .collect();
+    let paragraph_label_filters = search_request
+        .filter
+        .iter()
+        .flat_map(|f| f.paragraph_labels.iter().cloned())
         .collect();
     Some(VectorSearchRequest {
         vector_set: search_request.vectorset.clone(),
@@ -300,7 +305,8 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
-        field_labels: label_filters,
+        field_labels: field_label_filters,
+        paragraph_labels: paragraph_label_filters,
         min_score: search_request.min_score,
         ..Default::default()
     })

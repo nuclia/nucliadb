@@ -48,8 +48,11 @@ RELEASE_CHANNELS = (
 
 DETECTED_ENTITY = "COUNTRY/Spain"
 RESOURCE_CLASSIFICATION_LABEL = "resource/label"
-FIELD_CLASSIFICATION_LABEL = "computed/label"
 PARAGRAPH_CLASSIFICATION_LABEL = "paragraph/label"
+
+ENTITY_FILTER = f"/entities/{DETECTED_ENTITY}"
+RESOURCE_LABEL_FILTER = f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"
+PARAGRAPH_LABEL_FILTER = f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"
 
 PARAGRAPH1 = "My name is Rusty and I am a rust software engineer based in Spain"
 PARAGRAPH2 = "I think Python is cool too"
@@ -57,12 +60,9 @@ PARAGRAPH3 = "My name is Pietro and I am a Ruby developer based in Portugal"
 PARAGRAPH4 = "In my free time, I code in C#."
 
 FILTERS_TO_PARAGRAPHS = {
-    DETECTED_ENTITY: {PARAGRAPH1, PARAGRAPH2},
-    RESOURCE_CLASSIFICATION_LABEL: {PARAGRAPH3, PARAGRAPH4},
-    FIELD_CLASSIFICATION_LABEL: {PARAGRAPH3, PARAGRAPH4},
-    PARAGRAPH_CLASSIFICATION_LABEL: {
-        PARAGRAPH3,
-    },
+    ENTITY_FILTER: {PARAGRAPH1, PARAGRAPH2},
+    RESOURCE_LABEL_FILTER: {PARAGRAPH3, PARAGRAPH4},
+    PARAGRAPH_LABEL_FILTER: {PARAGRAPH3},
 }
 
 
@@ -176,11 +176,6 @@ def broker_message_with_labels(kbid):
     # Add a classification label at the field level
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
-    c1 = Classification()
-    c1.labelset = FIELD_CLASSIFICATION_LABEL.split("/")[0]
-    c1.label = FIELD_CLASSIFICATION_LABEL.split("/")[0]
-    fmw.metadata.metadata.classifications.append(c1)
-
     par1 = Paragraph()
     par1.start = 0
     par1.end = len(PARAGRAPH3)
@@ -258,36 +253,39 @@ async def kbid(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
 @pytest.mark.parametrize(
-    "filters,expected_paragraphs",
+    "filters",
     [
-        # ([f"/entities/{DETECTED_ENTITY}"], FILTERS_TO_PARAGRAPHS[DETECTED_ENTITY]),
-        # (
-        #     [f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"],
-        #     FILTERS_TO_PARAGRAPHS[RESOURCE_CLASSIFICATION_LABEL],
-        # ),
-        # (
-        #     [f"/classification.labels/{FIELD_CLASSIFICATION_LABEL}"],
-        #     FILTERS_TO_PARAGRAPHS[FIELD_CLASSIFICATION_LABEL],
-        # ),
-        (
-            [f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"],
-            FILTERS_TO_PARAGRAPHS[PARAGRAPH_CLASSIFICATION_LABEL],
-        ),
-        # Matching on unexisting filters should yield no results
-        # ([f"/classification.labels/unexisting"], []),
-        # ([f"/entities/{DETECTED_ENTITY}", "/entities/unexisting/entity"], []),
-        # (
-        #     [
-        #         f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}",
-        #         "/classification.labels/unexisting/label",
-        #     ],
-        #     [],
-        # ),
+        # One filter at a time
+        [
+            ENTITY_FILTER,
+        ],
+        [
+            RESOURCE_LABEL_FILTER,
+        ],
+        [
+            PARAGRAPH_LABEL_FILTER,
+        ],
+        # Combinations of them
+        [ENTITY_FILTER, RESOURCE_LABEL_FILTER],
+        [ENTITY_FILTER, PARAGRAPH_LABEL_FILTER],
+        [RESOURCE_LABEL_FILTER, PARAGRAPH_LABEL_FILTER],
+        # With unexisting filters
+        ["/entities/unexisting/entity"],
+        [ENTITY_FILTER, "/entities/unexisting/entity"],
+        [ENTITY_FILTER, "/classification.labels/paragraph/unexisting"],
+        [ENTITY_FILTER, "/classification.labels/resource/unexisting"],
+        [RESOURCE_LABEL_FILTER, "/classification.labels/foo/bar"],
+        [PARAGRAPH_LABEL_FILTER, "/classification.labels/foo/bar"],
+        [PARAGRAPH_LABEL_FILTER, "/classification.labels/paragraph/unexisting"],
     ],
 )
-async def test_filtering(
-    nucliadb_reader: AsyncClient, kbid: str, filters, expected_paragraphs
-):
+async def test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
+    # The set of expected results is always the AND of the filters
+    filter_paragraphs = []
+    for filter in filters:
+        filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(filter, set()))
+    expected_paragraphs = set.intersection(*filter_paragraphs)
+
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json=dict(

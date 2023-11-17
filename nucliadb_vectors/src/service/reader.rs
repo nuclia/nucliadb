@@ -116,7 +116,10 @@ impl ReaderChild for VectorReaderService {
             formula.extend(CompoundClause::new(1, key_filters.collect()));
         }
         if paragraph_labels.len() > 0 {
-            formula.extend(CompoundClause::new(1, paragraph_labels.collect()));
+            formula.extend(CompoundClause::new(
+                paragraph_labels.len(),
+                paragraph_labels.collect(),
+            ));
         };
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
