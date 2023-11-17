@@ -254,6 +254,31 @@ impl Index {
             }
         }
     }
+    pub fn merge(&mut self, _lock: &Lock) -> VectorR<()> {
+        if matches!(self.merger_status, MergerStatus::Free) {
+            let location = self.location.clone();
+            let similarity = self.metadata.similarity;
+            let (sender, receiver) = channel::unbounded();
+            let worker = Worker::request(location, sender, similarity, self.metadata.channel);
+            self.merger_status = MergerStatus::WorkScheduled(receiver);
+            worker.do_work()?;
+        }
+
+        let possible_merge = self.take_available_merge();
+        let mut state = self.write_state();
+        let mut date = self.write_date();
+
+        if let Some(journal) = possible_merge {
+            state.replace_work_unit(journal)
+        }
+
+        fs_state::persist_state::<State>(&self.location, &state)?;
+        *date = fs_state::crnt_version(&self.location)?;
+        std::mem::drop(state);
+        std::mem::drop(date);
+
+        Ok(())
+    }
     pub fn commit(&mut self, _lock: &Lock) -> VectorR<()> {
         let possible_merge = self.take_available_merge();
         let mut state = self.write_state();
@@ -264,12 +289,13 @@ impl Index {
 
         fs_state::persist_state::<State>(&self.location, &state)?;
         *date = fs_state::crnt_version(&self.location)?;
-        let work_stack_len = state.work_stack_len();
+        let has_enough_work = state.work_stack_len() > ALLOWED_BEFORE_MERGE;
+        let merger_is_free = matches!(self.merger_status, MergerStatus::Free);
+        let merger_enabled = true; // TODO: READ SOME ENVAR THAT TELLS YOU IF AUTOMATIC MERGING IS OFF OR ON
         std::mem::drop(state);
         std::mem::drop(date);
 
-        if matches!(self.merger_status, MergerStatus::Free) && work_stack_len > ALLOWED_BEFORE_MERGE
-        {
+        if merger_is_free && has_enough_work && merger_enabled {
             let location = self.location.clone();
             let similarity = self.metadata.similarity;
             let (sender, receiver) = channel::unbounded();

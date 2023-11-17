@@ -437,4 +437,20 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
+
+    async fn merge(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
+        send_analytics_event(AnalyticsEvent::GarbageCollect).await;
+        let shard_id = request.into_inner();
+        let shard = self.obtain_shard(&shard_id.id).await?;
+        let span = Span::current();
+        let info = info_span!(parent: &span, "list vector sets");
+        let task = || run_with_telemetry(info, move || shard.merge());
+        let result = tokio::task::spawn_blocking(task).await.map_err(|error| {
+            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
+        })?;
+        match result {
+            Ok(()) => Ok(tonic::Response::new(EmptyResponse {})),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
+    }
 }

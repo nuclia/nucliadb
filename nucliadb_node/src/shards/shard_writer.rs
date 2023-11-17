@@ -474,6 +474,12 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
+    pub fn merge(&self) -> NodeResult<()> {
+        let _lock = self.gc_lock.blocking_lock();
+        vector_write(&self.vector_writer).merge()
+    }
+
+    #[tracing::instrument(skip_all)]
     pub fn get_generation_id(&self) -> String {
         // we can not cache this on the ShardWriter instance unless we get swap our
         // Arc implementation for a RwLock implementation because we'd need

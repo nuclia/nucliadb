@@ -255,6 +255,28 @@ pub mod node_writer_client {
             let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/GC");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn merge(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::EmptyResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/Merge",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn set_resource(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::Resource>,
@@ -451,6 +473,13 @@ pub mod node_writer_server {
             tonic::Status,
         >;
         async fn gc(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::EmptyResponse>,
+            tonic::Status,
+        >;
+        async fn merge(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<
@@ -729,6 +758,44 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = GCSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeWriter/Merge" => {
+                    #[allow(non_camel_case_types)]
+                    struct MergeSvc<T: NodeWriter>(pub Arc<T>);
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for MergeSvc<T> {
+                        type Response = super::super::noderesources::EmptyResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).merge(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = MergeSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
