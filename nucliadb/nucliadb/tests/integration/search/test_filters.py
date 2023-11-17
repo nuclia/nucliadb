@@ -42,7 +42,7 @@ from nucliadb_protos import writer_pb2
 
 RELEASE_CHANNELS = (
     "STABLE",
-    #    "EXPERIMENTAL",
+    "EXPERIMENTAL",
 )
 
 
@@ -256,15 +256,9 @@ async def kbid(
     "filters",
     [
         # One filter at a time
-        [
-            ENTITY_FILTER,
-        ],
-        [
-            RESOURCE_LABEL_FILTER,
-        ],
-        [
-            PARAGRAPH_LABEL_FILTER,
-        ],
+        [ENTITY_FILTER],
+        [RESOURCE_LABEL_FILTER],
+        [PARAGRAPH_LABEL_FILTER],
         # Combinations of them
         [ENTITY_FILTER, RESOURCE_LABEL_FILTER],
         [ENTITY_FILTER, PARAGRAPH_LABEL_FILTER],
