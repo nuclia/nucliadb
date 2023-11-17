@@ -196,7 +196,7 @@ async def global_query_to_pb(
         )
 
     relations_search = SearchOptions.RELATIONS in features
-    if (relations_search or autofilter) and len(query) > 1:
+    if (relations_search or autofilter) and len(query) > 0:
         detected_entities = await detect_entities(kbid, query)
         if relations_search:
             request.relation_subgraph.entry_points.extend(detected_entities)
