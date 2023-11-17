@@ -1,4 +1,4 @@
 -e ./nucliadb_protos/python
 -e ./nucliadb_utils[storages,fastapi,cache]
--e ./nucliadb_telemetry
+-e ./nucliadb_telemetry[all]
 -e ./nucliadb_models
