@@ -84,4 +84,6 @@ async def merge(session, session_factory="grpc", grpc_url=GRPC_URL):
     shard_id, kb_id = await get_kb_id(session)
 
     stub = nodewriter_pb2_grpc.NodeWriterStub(session)
+
+    # this locks in the merge worker do_work()
     await stub.Merge(noderesources_pb2.ShardId(id=shard_id))
