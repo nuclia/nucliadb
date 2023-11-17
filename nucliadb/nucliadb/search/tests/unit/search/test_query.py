@@ -40,10 +40,10 @@ def test_parse_entities_to_filters():
 
     request = SearchRequest()
     assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
-    assert request.filter.labels == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/John"]
 
     assert parse_entities_to_filters(request, detected_entities) == []
-    assert request.filter.labels == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/John"]
 
 
 @pytest.fixture()
