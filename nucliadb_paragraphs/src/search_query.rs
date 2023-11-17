@@ -350,7 +350,7 @@ pub fn suggest_query(
     request
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter())
+        .flat_map(|f| f.labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
@@ -443,11 +443,11 @@ pub fn search_query(
         fuzzies.push((Occur::Must, field_filter.clone()));
         originals.push((Occur::Must, field_filter));
     }
-    // Tags filters
+    // Label filters
     search
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter())
+        .flat_map(|f| f.labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
@@ -504,7 +504,7 @@ pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box
     request
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter())
+        .flat_map(|f| f.labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);

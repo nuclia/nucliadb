@@ -95,7 +95,7 @@ pub fn create_query(
     search
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter())
+        .flat_map(|f| f.labels.iter())
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
@@ -155,7 +155,7 @@ fn create_stream_filter_queries(
         .into_occur();
 
     filter
-        .tags
+        .labels
         .iter()
         .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
         .for_each(|facet| {
@@ -196,7 +196,7 @@ mod tests {
         assert!(queries.is_empty());
 
         let filter = StreamFilter {
-            tags: vec!["/A".to_string(); 10],
+            labels: vec!["/A".to_string(); 10],
             ..Default::default()
         };
         let queries = create_stream_filter_queries(&schema, &filter);
@@ -207,7 +207,7 @@ mod tests {
     fn test_default_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
-            tags: vec!["/A".to_string(), "/B".to_string()],
+            labels: vec!["/A".to_string(), "/B".to_string()],
             ..Default::default()
         };
 
@@ -222,7 +222,7 @@ mod tests {
     fn test_AND_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
-            tags: vec!["/A".to_string(), "/B".to_string()],
+            labels: vec!["/A".to_string(), "/B".to_string()],
             conjunction: Conjunction::And.into(),
         };
 
@@ -237,7 +237,7 @@ mod tests {
     fn test_OR_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
-            tags: vec!["/A".to_string(), "/B".to_string()],
+            labels: vec!["/A".to_string(), "/B".to_string()],
             conjunction: Conjunction::Or.into(),
         };
 
@@ -252,7 +252,7 @@ mod tests {
     fn test_NOT_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
-            tags: vec!["/A".to_string(), "/B".to_string()],
+            labels: vec!["/A".to_string(), "/B".to_string()],
             conjunction: Conjunction::Not.into(),
         };
 

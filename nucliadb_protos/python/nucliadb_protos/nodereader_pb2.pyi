@@ -635,7 +635,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
         """Embedded vector search."""
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """tags to filter"""
+        """labels to filter"""
     page_number: builtins.int
     """What page is the answer."""
     result_per_page: builtins.int
@@ -972,8 +972,7 @@ class SearchRequest(google.protobuf.message.Message):
     @property
     def order(self) -> global___OrderBy: ...
     @property
-    def faceted(self) -> global___Faceted:
-        """Faceted{ tags: Vec<String>}"""
+    def faceted(self) -> global___Faceted: ...
     page_number: builtins.int
     result_per_page: builtins.int
     @property

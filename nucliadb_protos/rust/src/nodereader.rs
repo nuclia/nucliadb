@@ -245,7 +245,7 @@ pub struct VectorSearchRequest {
     /// Embedded vector search.
     #[prost(float, repeated, tag="2")]
     pub vector: ::prost::alloc::vec::Vec<f32>,
-    /// tags to filter
+    /// labels to filter
     #[prost(string, repeated, tag="3")]
     pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// What page is the answer.
@@ -396,7 +396,6 @@ pub struct SearchRequest {
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="5")]
     pub order: ::core::option::Option<OrderBy>,
-    /// Faceted{ tags: Vec<String>}
     #[prost(message, optional, tag="6")]
     pub faceted: ::core::option::Option<Faceted>,
     #[prost(int32, tag="7")]

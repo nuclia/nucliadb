@@ -159,7 +159,7 @@ impl ReaderChild for ParagraphReaderService {
             .faceted
             .as_ref()
             .iter()
-            .flat_map(|v| v.tags.iter())
+            .flat_map(|v| v.labels.iter())
             .filter(|s| ParagraphReaderService::is_valid_facet(s))
             .cloned()
             .collect();
@@ -711,7 +711,7 @@ mod tests {
         // Testing filtering one filter from resource, one from field and one from paragraph
 
         let filter = Filter {
-            tags: vec![
+            labels: vec![
                 "/l/mylabel_resource".to_string(),
                 "/c/ool".to_string(),
                 "/e/mylabel".to_string(),
@@ -719,7 +719,7 @@ mod tests {
         };
 
         let faceted = Faceted {
-            tags: vec![
+            labels: vec![
                 "".to_string(),
                 "/l".to_string(),
                 "/e".to_string(),

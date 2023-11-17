@@ -455,7 +455,7 @@ impl TextReaderService {
         let extra_result = results + 1;
         let maybe_order = request.order.clone();
         let valid_facet_iter = request.faceted.iter().flat_map(|v| {
-            v.tags
+            v.labels
                 .iter()
                 .filter(|s| TextReaderService::is_valid_facet(s))
         });

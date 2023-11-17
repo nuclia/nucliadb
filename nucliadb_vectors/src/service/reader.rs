@@ -102,7 +102,7 @@ impl ReaderChild for VectorReaderService {
             .map(AtomClause::key_prefix);
         let mut formula = Formula::new();
         request
-            .tags
+            .labels
             .iter()
             .cloned()
             .map(AtomClause::label)
@@ -302,7 +302,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             key_filters: vec!["DOC/KEY/1".to_string()],
             page_number: 0,
             result_per_page: 20,
@@ -383,7 +383,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -396,7 +396,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -412,7 +412,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -428,7 +428,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -500,7 +500,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -513,7 +513,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,

@@ -90,7 +90,7 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
-        // Add vectors key prefix filters
+        // Add vectors key filters
         for valid_field in valid_fields {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
@@ -111,11 +111,17 @@ impl IndexQueries {
         };
 
         // Clear filter labels to avoid duplicate filtering
-        if let Some(filter) = request.filter {
-            filter.labels.clear();
+        let mut paragraph_labels = vec![];
+        if let Some(filter) = request.filter.as_ref() {
+            paragraph_labels = filter.paragraph_labels.clone();
         }
+        let filter = Filter {
+            labels: vec![],
+            paragraph_labels,
+        };
+        request.filter.replace(filter);
 
-        // Add paragraph key prefix filters
+        // Add key filters
         for valid_field in valid_fields {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
@@ -183,8 +189,8 @@ fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterReques
     }
 
     // Labels filters
-    let request_has_labels_filters =
-        search_request.filter.is_some() && !search_request.filter.clone().unwrap().tags.is_empty();
+    let request_has_labels_filters = search_request.filter.is_some()
+        && !search_request.filter.clone().unwrap().labels.is_empty();
     if request_has_labels_filters {
         let labels = compute_labels_pre_filters(search_request);
         pre_filter_request.labels_filters.extend(labels);
@@ -223,7 +229,7 @@ fn compute_labels_pre_filters(search_request: &SearchRequest) -> Vec<String> {
     search_request
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter())
+        .flat_map(|f| f.labels.iter())
         .for_each(|tag| {
             labels_pre_filters.push(tag.clone());
         });
@@ -276,10 +282,10 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
         return None;
     }
-    let tag_filters = search_request
+    let label_filters = search_request
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter().cloned())
+        .flat_map(|f| f.labels.iter().cloned())
         .chain(search_request.fields.iter().cloned())
         .collect();
     Some(VectorSearchRequest {
@@ -289,7 +295,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
-        tags: tag_filters,
+        labels: label_filters,
         min_score: search_request.min_score,
         ..Default::default()
     })
