@@ -32,7 +32,6 @@ use tantivy::{DocId, InvertedIndexReader, Term};
 use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::{self, ParagraphSchema};
 use crate::stop_words::is_stop_word;
-
 type QueryP = (Occur, Box<dyn Query>);
 
 // Used to identify the terms matched by tantivy
@@ -444,7 +443,7 @@ pub fn search_query(
         fuzzies.push((Occur::Must, field_filter.clone()));
         originals.push((Occur::Must, field_filter));
     }
-    // Add filter
+    // Tags filters
     search
         .filter
         .iter()
@@ -456,13 +455,34 @@ pub fn search_query(
             fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
-    // Keys
-    search.key_filters.iter().for_each(|uuid| {
+    // Keys filter
+    let mut key_filters: Vec<Box<dyn Query>> = vec![];
+    search.key_filters.iter().for_each(|key| {
+        let mut key_filter: Vec<Box<dyn Query>> = vec![];
+
+        let parts: Vec<String> = key.split('/').map(str::to_string).collect();
+        let uuid = &parts[0];
         let term = Term::from_field_text(schema.uuid, uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(term_query.clone())));
-        originals.push((Occur::Must, Box::new(term_query)));
+        key_filter.push(Box::new(term_query));
+
+        if parts.len() >= 3 {
+            let mut field_key: String = "/".to_owned();
+            field_key.push_str(&parts[1..3].join("/"));
+            let facet = Facet::from_text(&field_key).unwrap();
+            let facet_term = Term::from_facet(schema.field, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            key_filter.push(Box::new(facet_term_query));
+        }
+
+        let key_filter_query = Box::new(BooleanQuery::intersection(key_filter));
+        key_filters.push(key_filter_query);
     });
+    if !key_filters.is_empty() {
+        let key_filters_query = Box::new(BooleanQuery::union(key_filters));
+        fuzzies.push((Occur::Must, key_filters_query.clone()));
+        originals.push((Occur::Must, key_filters_query));
+    }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
