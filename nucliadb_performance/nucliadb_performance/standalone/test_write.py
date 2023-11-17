@@ -50,7 +50,7 @@ def create_resource(shard_id):
     return resource
 
 
-@molotov.scenario(weight=95)
+@molotov.scenario(weight=90)
 async def writer(session, session_factory="grpc", grpc_url=GRPC_URL):
     """Creating a resource"""
 
@@ -76,12 +76,11 @@ async def gc(session, session_factory="grpc", grpc_url=GRPC_URL):
     # why do we have EmptyResponse ? how do I assert that GC worked
 
 
-# TODO: trigger a merge with an agressive scheduler
-# @molotov.scenario(weight=5)
+@molotov.scenario(weight=5)
 async def merge(session, session_factory="grpc", grpc_url=GRPC_URL):
     """Triggering a GC"""
     shard_id, kb_id = await get_kb_id(session)
 
     stub = nodewriter_pb2_grpc.NodeWriterStub(session)
 
-    await stub.GC(nodewriter_pb2.EmptyQuery())
+    await stub.Merge(nodewriter_pb2.EmptyQuery())
