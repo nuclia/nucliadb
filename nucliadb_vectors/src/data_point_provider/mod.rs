@@ -261,6 +261,8 @@ impl Index {
             let (sender, receiver) = channel::unbounded();
             let worker = Worker::request(location, sender, similarity, self.metadata.channel);
             self.merger_status = MergerStatus::WorkScheduled(receiver);
+
+            println!("do_work");
             worker.do_work()?;
         }
 

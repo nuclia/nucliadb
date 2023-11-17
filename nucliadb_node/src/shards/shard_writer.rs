@@ -475,7 +475,7 @@ impl ShardWriter {
 
     #[tracing::instrument(skip_all)]
     pub fn merge(&self) -> NodeResult<()> {
-        let _lock = self.gc_lock.blocking_lock();
+        println!("here");
         vector_write(&self.vector_writer).merge()
     }
 

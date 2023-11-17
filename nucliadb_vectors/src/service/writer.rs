@@ -335,6 +335,20 @@ impl WriterChild for VectorWriterService {
         Ok(())
     }
 
+    #[measure(actor = "vectors", metric = "merge")]
+    #[tracing::instrument(skip_all)]
+    fn merge(&mut self) -> NodeResult<()> {
+        let time = SystemTime::now();
+
+        let lock = self.index.try_elock()?;
+        self.index.merge(&lock)?;
+
+        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
+        debug!("Merge {took} ms");
+
+        Ok(())
+    }
+
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
         let mut seg_ids = self.get_segment_ids_for_vectorset(&self.index.location)?;
         let vectorsets = self.list_vectorsets()?;

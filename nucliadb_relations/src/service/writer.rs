@@ -227,6 +227,11 @@ impl WriterChild for RelationsWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         Ok(())
     }
+
+    fn merge(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
         // not implemented, not supported right now
         Ok(Vec::new())
