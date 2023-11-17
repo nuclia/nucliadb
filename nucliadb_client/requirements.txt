@@ -5,4 +5,4 @@ grpcio>=1.44.0
 aiofiles
 nucliadb-protos>=2.24.0
 nucliadb-models>=2.24.0
-nucliadb-telemetry[all]>=2.33.0
+nucliadb-telemetry[all]
