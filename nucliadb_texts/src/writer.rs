@@ -148,6 +148,10 @@ impl WriterChild for TextWriterService {
         Ok(())
     }
 
+    fn merge(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
         Ok(self
             .index

@@ -154,7 +154,7 @@ def get_kb(kbid=None, slug=None) -> str:
     if not any([kbid, slug]):
         raise ValueError("Either slug or kbid must be set")
 
-    print("Loading kb data...")
+    print(f"Loading kb data from... {get_reader_api_url()}")
     ndb = NucliaDB(
         url=get_reader_api_url(),
         headers={"X-NUCLIADB-ROLES": "READER"},

@@ -92,3 +92,8 @@ test-standalone-search:
 	molotov ./nucliadb_performance/standalone/test_search.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
+
+
+.PHONY: test-standalone-grpc-write
+test-standalone-grpc-write:
+	molotov ./nucliadb_performance/standalone/test_write.py --single-run -c -v

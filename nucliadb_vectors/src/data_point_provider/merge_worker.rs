@@ -55,6 +55,7 @@ impl Worker {
     }
     fn work(&self) -> VectorR<()> {
         let subscriber = self.location.as_path();
+        info!("{subscriber:?} locking");
         let _lock = fs_state::shared_lock(subscriber)?;
         info!("{subscriber:?} is ready to perform a merge");
         let state: State = fs_state::load_state(subscriber)?;

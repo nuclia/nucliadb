@@ -147,6 +147,11 @@ impl WriterChild for ParagraphWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         Ok(())
     }
+
+    fn merge(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
+
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
         Ok(self
             .index

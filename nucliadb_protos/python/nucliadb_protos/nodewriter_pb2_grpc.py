@@ -40,6 +40,11 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
                 )
+        self.Merge = channel.unary_unary(
+                '/nodewriter.NodeWriter/Merge',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+                )
         self.SetResource = channel.unary_unary(
                 '/nodewriter.NodeWriter/SetResource',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.Resource.SerializeToString,
@@ -110,6 +115,12 @@ class NodeWriterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GC(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Merge(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -188,6 +199,11 @@ def add_NodeWriterServicer_to_server(servicer, server):
             ),
             'GC': grpc.unary_unary_rpc_method_handler(
                     servicer.GC,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.SerializeToString,
+            ),
+            'Merge': grpc.unary_unary_rpc_method_handler(
+                    servicer.Merge,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.SerializeToString,
             ),
@@ -321,6 +337,23 @@ class NodeWriter(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/GC',
+            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Merge(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/Merge',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
             options, channel_credentials,
