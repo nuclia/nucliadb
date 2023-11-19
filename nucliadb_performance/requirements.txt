@@ -3,3 +3,4 @@ nucliadb-sdk
 certifi
 faker
 httpx
+sentence-transformers
