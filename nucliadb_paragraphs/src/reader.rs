@@ -494,31 +494,22 @@ mod tests {
     use super::*;
     use crate::writer::ParagraphWriterService;
 
-    fn create_resource(shard_id: String, with_time: Option<Timestamp>) -> Resource {
+    const DOC1_TI: &str = "This is the first document";
+    const DOC1_P1: &str = "This is the text of the second paragraph.";
+    const DOC1_P2: &str = "This should be enough to test the tantivy.";
+    const DOC1_P3: &str = "But I wanted to make it three anyway.";
+
+    fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let resource_id = ResourceId {
             shard_id: shard_id.to_string(),
             uuid: UUID.to_string(),
         };
 
-        let timestamp = with_time.unwrap_or_else(|| {
-            let nanos = 0;
-            let seconds = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map(|t| t.as_secs() as i64)
-                .unwrap();
-            Timestamp { seconds, nanos }
-        });
-
         let metadata = IndexMetadata {
             created: Some(timestamp.clone()),
             modified: Some(timestamp),
         };
-
-        const DOC1_TI: &str = "This is the first document";
-        const DOC1_P1: &str = "This is the text of the second paragraph.";
-        const DOC1_P2: &str = "This should be enough to test the tantivy.";
-        const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
         let ti_title = TextInformation {
             text: DOC1_TI.to_string(),
@@ -642,8 +633,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|t| t.as_secs() as i64)
+            .unwrap();
+        let timestamp = Timestamp { seconds, nanos: 0 };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string(), None);
+        let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
 
@@ -695,8 +692,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|t| t.as_secs() as i64)
+            .unwrap();
+        let timestamp = Timestamp { seconds, nanos: 0 };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string(), None);
+        let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
 
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
@@ -986,7 +989,7 @@ mod tests {
         };
 
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string(), Some(time_baseline.clone()));
+        let resource1 = create_resource("shard1".to_string(), time_baseline.clone());
 
         let _ = paragraph_writer_service.set_resource(&resource1);
 
