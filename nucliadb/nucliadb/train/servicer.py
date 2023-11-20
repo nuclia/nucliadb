@@ -47,10 +47,14 @@ from nucliadb_telemetry import errors
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
     async def initialize(self):
+        self.session = aiohttp.ClientSession()
         self.proc = get_shard_manager()  # XXX this is odd use here
 
     async def finalize(self):
-        pass
+        try:
+            self.session.close()
+        except Exception:
+            pass
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):
@@ -72,9 +76,9 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         result = TrainInfo()
         url = settings.internal_counter_api.format(kbid=request.kb.uuid)
         headers = {"X-NUCLIADB-ROLES": "READER"}
-        async with aiohttp.ClientSession() as sess:
-            async with sess.get(url, headers=headers) as resp:
-                data = await resp.json()
+        resp = await self.session.get(url, headers=headers)
+        resp.raise_for_status()
+        data = await resp.json()
         result.resources = data["resources"]
         result.paragraphs = data["paragraphs"]
         result.fields = data["fields"]
