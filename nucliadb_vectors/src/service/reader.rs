@@ -100,9 +100,14 @@ impl ReaderChild for VectorReaderService {
             .iter()
             .cloned()
             .map(AtomClause::key_prefix);
+        let paragraph_labels = request
+            .paragraph_labels
+            .iter()
+            .cloned()
+            .map(AtomClause::label);
         let mut formula = Formula::new();
         request
-            .tags
+            .field_labels
             .iter()
             .cloned()
             .map(AtomClause::label)
@@ -110,7 +115,12 @@ impl ReaderChild for VectorReaderService {
         if key_filters.len() > 0 {
             formula.extend(CompoundClause::new(1, key_filters.collect()));
         }
-
+        if paragraph_labels.len() > 0 {
+            formula.extend(CompoundClause::new(
+                paragraph_labels.len(),
+                paragraph_labels.collect(),
+            ));
+        };
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
@@ -302,7 +312,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             key_filters: vec!["DOC/KEY/1".to_string()],
             page_number: 0,
             result_per_page: 20,
@@ -383,7 +393,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -396,7 +406,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -412,7 +422,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -428,7 +438,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -500,7 +510,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -513,7 +523,7 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            tags: vec!["1".to_string()],
+            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,

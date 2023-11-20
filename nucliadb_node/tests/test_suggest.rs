@@ -98,7 +98,8 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let response = reader
         .suggest(Request::new(SuggestRequest {
             filter: Some(Filter {
-                tags: vec!["/s/p/en".to_string()],
+                field_labels: vec!["/s/p/en".to_string()],
+                paragraph_labels: vec![],
             }),
             ..request.clone()
         }))
@@ -117,7 +118,8 @@ async fn test_suggest_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let response = reader
         .suggest(Request::new(SuggestRequest {
             filter: Some(Filter {
-                tags: vec!["/s/p/de".to_string()],
+                field_labels: vec!["/s/p/de".to_string()],
+                paragraph_labels: vec![],
             }),
             ..request
         }))

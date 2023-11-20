@@ -240,7 +240,9 @@ def get_request(kbid_or_slug: str, with_tags=None) -> Request:
         raise AttributeError("SAVED_REQUESTS_FILE env var is not set!")
     saved_requests_file = CURRENT_DIR + "/" + settings.saved_requests_file
     requests = load_saved_request(
-        saved_requests_file, kbid_or_slug, with_tags=tuple(with_tags)
+        saved_requests_file,
+        kbid_or_slug,
+        with_tags=tuple(with_tags) if with_tags else None,
     )
     if len(requests) == 0:
         raise ValueError("Could not find any request saved")

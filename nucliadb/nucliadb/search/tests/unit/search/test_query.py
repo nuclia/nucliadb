@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
-from unittest.mock import Mock, call
 
 import pytest
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
@@ -29,7 +28,6 @@ from nucliadb.search.search.query import (
     get_default_min_score,
     get_kb_model_default_min_score,
     parse_entities_to_filters,
-    record_filters_counter,
 )
 
 QUERY_MODULE = "nucliadb.search.search.query"
@@ -42,10 +40,10 @@ def test_parse_entities_to_filters():
 
     request = SearchRequest()
     assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
-    assert request.filter.tags == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/John"]
 
     assert parse_entities_to_filters(request, detected_entities) == []
-    assert request.filter.tags == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/John"]
 
 
 @pytest.fixture()
@@ -139,17 +137,3 @@ async def test_get_kb_model_default_min_score_backward_compatible(has_feature, k
         similarity_function=VectorSimilarity.COSINE
     )
     assert await get_kb_model_default_min_score("kbid") is None
-
-
-def test_record_filters_counter():
-    counter = Mock()
-
-    record_filters_counter(["", "/l/ls/l1", "/e/ORG/Nuclia"], counter)
-
-    counter.inc.assert_has_calls(
-        [
-            call({"type": "filters"}),
-            call({"type": "filters_entities"}),
-            call({"type": "filters_labels"}),
-        ]
-    )

@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nucliadb_protos::prelude::Filter;
+
 pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest,
@@ -47,6 +49,7 @@ pub struct TimestampFilter {
 #[derive(Debug, Clone)]
 pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
+    pub labels_filters: Vec<String>,
 }
 
 /// Represents a field that has met all of the
@@ -87,18 +90,43 @@ impl IndexQueries {
         let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
             return;
         };
+        // Add vectors key filters
         for valid_field in valid_fields {
             let resource_id = &valid_field.resource_id;
             let field_id = &valid_field.field_id;
             let as_vectors_key = format!("{resource_id}{field_id}");
             request.key_filters.push(as_vectors_key);
         }
+        // Clear labels to avoid duplicate filtering
+        request.field_labels.clear();
     }
 
     fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
         if matches!(response.valid_fields, ValidFieldCollector::All) {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
+        }
+        let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
+            return;
+        };
+
+        // Clear filter labels to avoid duplicate filtering
+        let mut paragraph_labels = vec![];
+        if let Some(filter) = request.filter.as_ref() {
+            paragraph_labels = filter.paragraph_labels.clone();
+        }
+        let filter = Filter {
+            field_labels: vec![],
+            paragraph_labels,
+        };
+        request.filter.replace(filter);
+
+        // Add key filters
+        for valid_field in valid_fields {
+            let resource_id = &valid_field.resource_id;
+            let field_id = &valid_field.field_id;
+            let unique_field_key = format!("{resource_id}{field_id}");
+            request.key_filters.push(unique_field_key);
         }
     }
 
@@ -146,25 +174,70 @@ impl From<SearchRequest> for QueryPlan {
 }
 
 fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
-    let Some(timestamp_filters) = search_request.timestamps.as_ref() else {
-        return None;
-    };
     let mut pre_filter_request = PreFilterRequest {
         timestamp_filters: vec![],
+        labels_filters: vec![],
     };
+
+    // Timestamp filters
+    let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
+    if request_has_timestamp_filters {
+        let timestamp_filters = compute_timestamp_pre_filters(search_request);
+        pre_filter_request
+            .timestamp_filters
+            .extend(timestamp_filters);
+    }
+
+    // Labels filters
+    let request_has_labels_filters = search_request
+        .filter
+        .as_ref()
+        .map(|i| !i.field_labels.is_empty())
+        .unwrap_or_default();
+
+    if request_has_labels_filters {
+        let labels = compute_labels_pre_filters(search_request);
+        pre_filter_request.labels_filters.extend(labels);
+    }
+
+    if !request_has_timestamp_filters && !request_has_labels_filters {
+        return None;
+    }
+    Some(pre_filter_request)
+}
+
+fn compute_timestamp_pre_filters(search_request: &SearchRequest) -> Vec<TimestampFilter> {
+    let mut timestamp_pre_filters = vec![];
+    let Some(request_timestamp_filters) = search_request.timestamps.as_ref() else {
+        return timestamp_pre_filters;
+    };
+
     let modified_filter = TimestampFilter {
         applies_to: FieldDateType::Modified,
-        from: timestamp_filters.from_modified.clone(),
-        to: timestamp_filters.to_modified.clone(),
+        from: request_timestamp_filters.from_modified.clone(),
+        to: request_timestamp_filters.to_modified.clone(),
     };
+    timestamp_pre_filters.push(modified_filter);
+
     let created_filter = TimestampFilter {
         applies_to: FieldDateType::Created,
-        from: timestamp_filters.from_created.clone(),
-        to: timestamp_filters.to_created.clone(),
+        from: request_timestamp_filters.from_created.clone(),
+        to: request_timestamp_filters.to_created.clone(),
     };
-    pre_filter_request.timestamp_filters.push(modified_filter);
-    pre_filter_request.timestamp_filters.push(created_filter);
-    Some(pre_filter_request)
+    timestamp_pre_filters.push(created_filter);
+    timestamp_pre_filters
+}
+
+fn compute_labels_pre_filters(search_request: &SearchRequest) -> Vec<String> {
+    let mut labels_pre_filters = vec![];
+    search_request
+        .filter
+        .iter()
+        .flat_map(|f| f.field_labels.iter())
+        .for_each(|tag| {
+            labels_pre_filters.push(tag.clone());
+        });
+    labels_pre_filters
 }
 
 fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<ParagraphSearchRequest> {
@@ -213,11 +286,16 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
         return None;
     }
-    let tag_filters = search_request
+    let field_label_filters = search_request
         .filter
         .iter()
-        .flat_map(|f| f.tags.iter().cloned())
+        .flat_map(|f| f.field_labels.iter().cloned())
         .chain(search_request.fields.iter().cloned())
+        .collect();
+    let paragraph_label_filters = search_request
+        .filter
+        .iter()
+        .flat_map(|f| f.paragraph_labels.iter().cloned())
         .collect();
     Some(VectorSearchRequest {
         vector_set: search_request.vectorset.clone(),
@@ -226,7 +304,8 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         key_filters: search_request.key_filters.clone(),
-        tags: tag_filters,
+        field_labels: field_label_filters,
+        paragraph_labels: paragraph_label_filters,
         min_score: search_request.min_score,
         ..Default::default()
     })

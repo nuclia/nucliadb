@@ -23,6 +23,7 @@ from typing import List, Optional, Tuple
 from async_lru import alru_cache
 from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
+    Filter,
     ParagraphSearchRequest,
     SearchRequest,
     SuggestFeatures,
@@ -35,13 +36,15 @@ from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.search.filters import (
+    record_filters_counter,
+    split_filters_by_label_type,
+    translate_label_filters,
+)
 from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.labels import (
-    translate_alias_to_system_label,
-    translate_system_to_alias_label,
-)
+from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     SearchOptions,
@@ -51,47 +54,8 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_telemetry.metrics import Counter
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
-
-from .exceptions import InvalidQueryError
-
-ENTITY_FILTER_PREFIX = "/e/"
-LABEL_FILTER_PREFIX = "/l/"
-
-
-def translate_label_filters(filters: List[str]) -> List[str]:
-    """
-    Translate friendly filter names to the shortened filter names.
-    """
-    output = []
-    for fltr in filters:
-        if len(fltr) == 0:
-            raise InvalidQueryError("filters", f"Invalid empty label")
-        if fltr[0] != "/":
-            raise InvalidQueryError(
-                "filters", f"Invalid label. It must start with a `/`: {fltr}"
-            )
-
-        output.append(translate_alias_to_system_label(fltr))
-    return output
-
-
-def record_filters_counter(filters: list[str], counter: Counter) -> None:
-    counter.inc({"type": "filters"})
-    filters.sort()
-    entity_found = False
-    label_found = False
-    for fltr in filters:
-        if entity_found and label_found:
-            break
-        if not entity_found and fltr.startswith(ENTITY_FILTER_PREFIX):
-            entity_found = True
-            counter.inc({"type": "filters_entities"})
-        elif not label_found and fltr.startswith(LABEL_FILTER_PREFIX):
-            label_found = True
-            counter.inc({"type": "filters_labels"})
 
 
 async def global_query_to_pb(
@@ -134,11 +98,9 @@ async def global_query_to_pb(
     request.body = query
     request.with_duplicates = with_duplicates
     if len(filters) > 0:
-        filters = translate_label_filters(filters)
-        request.filter.tags.extend(filters)
-        record_filters_counter(filters, node_features)
+        filters = await parse_filters(request.filter, kbid, filters)
 
-    request.faceted.tags.extend(translate_label_filters(faceted))
+    request.faceted.labels.extend(translate_label_filters(faceted))
     request.fields.extend(fields)
 
     if key_filters is not None and len(key_filters) > 0:
@@ -196,7 +158,7 @@ async def global_query_to_pb(
         )
 
     relations_search = SearchOptions.RELATIONS in features
-    if (relations_search or autofilter) and len(query) > 1:
+    if (relations_search or autofilter) and len(query) > 0:
         detected_entities = await detect_entities(kbid, query)
         if relations_search:
             request.relation_subgraph.entry_points.extend(detected_entities)
@@ -263,8 +225,8 @@ def parse_entities_to_filters(
         for entity in detected_entities
         if entity.ntype == RelationNode.NodeType.ENTITY
     ]:
-        if entity_filter not in request.filter.tags:
-            request.filter.tags.append(entity_filter)
+        if entity_filter not in request.filter.field_labels:
+            request.filter.field_labels.append(entity_filter)
             added_filters.append(entity_filter)
     return added_filters
 
@@ -289,7 +251,7 @@ def suggest_query_to_pb(
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(SuggestFeatures.PARAGRAPHS)
         filters = translate_label_filters(filters)
-        request.filter.tags.extend(filters)
+        request.filter.field_labels.extend(filters)
         request.fields.extend(fields)
 
     if range_creation_start is not None:
@@ -305,6 +267,7 @@ def suggest_query_to_pb(
 
 
 async def paragraph_query_to_pb(
+    kbid: str,
     features: List[SearchOptions],
     rid: str,
     query: str,
@@ -343,8 +306,10 @@ async def paragraph_query_to_pb(
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
-        request.filter.tags.extend(translate_label_filters(filters))
-        request.faceted.tags.extend(translate_label_filters(faceted))
+        if len(filters) > 0:
+            filters = await parse_filters(request.filter, kbid, filters)
+
+        request.faceted.labels.extend(translate_label_filters(faceted))
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
@@ -386,3 +351,14 @@ async def get_default_min_score(kbid: str) -> float:
         # B/w compatible code until we figure out how to
         # set default min score for old on-prem kbs
         return fallback
+
+
+async def parse_filters(
+    request_filter: Filter, kbid: str, filters: list[str]
+) -> list[str]:
+    filters = translate_label_filters(filters)
+    field_labels, paragraph_labels = await split_filters_by_label_type(kbid, filters)
+    request_filter.field_labels.extend(field_labels)
+    request_filter.paragraph_labels.extend(paragraph_labels)
+    record_filters_counter(filters, node_features)
+    return filters

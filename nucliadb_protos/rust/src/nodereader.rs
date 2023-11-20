@@ -1,14 +1,16 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Filter {
     #[prost(string, repeated, tag="1")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="2")]
+    pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StreamFilter {
     #[prost(enumeration="stream_filter::Conjunction", tag="1")]
     pub conjunction: i32,
     #[prost(string, repeated, tag="2")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `StreamFilter`.
 pub mod stream_filter {
@@ -23,7 +25,7 @@ pub mod stream_filter {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Faceted {
     #[prost(string, repeated, tag="1")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OrderBy {
@@ -118,7 +120,7 @@ pub struct ParagraphSearchRequest {
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="7")]
     pub order: ::core::option::Option<OrderBy>,
-    /// Faceted{ tags: Vec<String>}
+    /// Faceted{ labels: Vec<String>}
     #[prost(message, optional, tag="8")]
     pub faceted: ::core::option::Option<Faceted>,
     #[prost(int32, tag="10")]
@@ -243,9 +245,12 @@ pub struct VectorSearchRequest {
     /// Embedded vector search.
     #[prost(float, repeated, tag="2")]
     pub vector: ::prost::alloc::vec::Vec<f32>,
-    /// tags to filter
+    /// labels to filter
     #[prost(string, repeated, tag="3")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// paragraph labels to filter
+    #[prost(string, repeated, tag="18")]
+    pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// What page is the answer.
     #[prost(int32, tag="4")]
     pub page_number: i32,
@@ -394,7 +399,6 @@ pub struct SearchRequest {
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="5")]
     pub order: ::core::option::Option<OrderBy>,
-    /// Faceted{ tags: Vec<String>}
     #[prost(message, optional, tag="6")]
     pub faceted: ::core::option::Option<Faceted>,
     #[prost(int32, tag="7")]

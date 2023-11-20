@@ -115,7 +115,7 @@ fn create_request(
     dataset_name: String,
     query_name: String,
     query: String,
-    tags: Vec<String>,
+    labels: Vec<String>,
     key_prefixes: Vec<String>,
     dimension: usize,
 ) -> Request {
@@ -146,7 +146,8 @@ fn create_request(
     let mut formula = Formula::new();
     let key_prefixes = key_prefixes.iter().cloned().map(AtomClause::key_prefix);
 
-    tags.iter()
+    labels
+        .iter()
         .cloned()
         .map(AtomClause::label)
         .for_each(|c| formula.extend(c));
@@ -283,7 +284,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
 
                 let query_name = trim(query["name"].to_string());
 
-                let tags: Vec<String> = if query.contains_key("tags") {
+                let labels: Vec<String> = if query.contains_key("tags") {
                     query["tags"]
                         .as_array()
                         .unwrap()
@@ -311,7 +312,7 @@ fn get_dataset(definition_file: String, dataset_name: String) -> Option<Dataset>
                     dataset_name.clone(),
                     query_name.clone(),
                     trim(query["query"].to_string()),
-                    tags,
+                    labels,
                     key_prefixes,
                     num_dimensions,
                 );

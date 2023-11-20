@@ -100,6 +100,7 @@ async def resource_search(
     # We need to query all nodes
     try:
         pb_query = await paragraph_query_to_pb(
+            kbid,
             [SearchOptions.PARAGRAPH],
             rid,
             query,

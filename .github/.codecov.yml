@@ -7,6 +7,7 @@ coverage:
     patch: off
 ignore:
   - "**/tests/*.py"
+  - "**/test_*.py"
   - "nucliadb_client/examples/"
   - "**/setup.py"
 flag_management:

@@ -67,7 +67,7 @@ async def generate_paragraph_classification_payloads(
     # Query how many paragraphs has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-    request.filter.tags.append(labelset)
+    request.filter.labels.append(labelset)
 
     async for paragraph_item in node.stream_get_paragraphs(request):
         text_labels = []

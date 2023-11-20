@@ -60,7 +60,7 @@ async def generate_token_classification_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     for entitygroup in trainset.filter.labels:
-        request.filter.tags.append(f"/e/{entitygroup}")
+        request.filter.labels.append(f"/e/{entitygroup}")
         request.filter.conjunction = StreamFilter.Conjunction.OR
     async for field_item in node.stream_get_fields(request):
         _, field_type, field = field_item.field.split("/")

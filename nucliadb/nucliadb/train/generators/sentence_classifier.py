@@ -69,7 +69,7 @@ async def generate_sentence_classification_payloads(
     for label in trainset.filter.labels:
         labelset = f"/l/{trainset.filter.labels[0]}"
         labelsets.append(labelset)
-        request.filter.tags.append(labelset)
+        request.filter.labels.append(labelset)
 
     async for paragraph_item in node.stream_get_paragraphs(request):
         text_labels: List[str] = []
