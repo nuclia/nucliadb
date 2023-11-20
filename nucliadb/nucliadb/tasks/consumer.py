@@ -82,6 +82,11 @@ class NatsTaskConsumer:
         subject = self.stream.subject
         group = self.stream.group
         stream = self.stream.name
+        max_ack_pending = (
+            self.max_concurrent_messages
+            if self.max_concurrent_messages
+            else nats_consumer_settings.nats_max_ack_pending
+        )
         self.subscription = await self.context.nats_manager.subscribe(
             subject=subject,
             queue=group,
@@ -94,7 +99,7 @@ class NatsTaskConsumer:
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
                 idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
-                max_ack_pending=self.max_concurrent_messages,
+                max_ack_pending=max_ack_pending,
             ),
         )
         logger.info(

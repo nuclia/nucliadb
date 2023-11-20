@@ -33,6 +33,7 @@ def get_exports_consumer() -> NatsTaskConsumer:
         stream=const.Streams.KB_EXPORTS,  # type: ignore
         callback=export_kb_to_blob_storage,  # type: ignore
         msg_type=NatsTaskMessage,  # type: ignore
+        max_concurrent_messages=10,
     )
 
 
@@ -52,6 +53,7 @@ def get_imports_consumer() -> NatsTaskConsumer:
         stream=const.Streams.KB_IMPORTS,  # type: ignore
         callback=import_kb_from_blob_storage,  # type: ignore
         msg_type=NatsTaskMessage,  # type: ignore
+        max_concurrent_messages=10,
     )
 
 
