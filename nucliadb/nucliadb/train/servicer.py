@@ -46,9 +46,8 @@ from nucliadb_telemetry import errors
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
-    session = aiohttp.ClientSession()
-
     async def initialize(self):
+        self.session = aiohttp.ClientSession()
         self.proc = get_shard_manager()  # XXX this is odd use here
 
     async def finalize(self):
@@ -77,7 +76,6 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         result = TrainInfo()
         url = settings.internal_counter_api.format(kbid=request.kb.uuid)
         headers = {"X-NUCLIADB-ROLES": "READER"}
-        breakpoint()
         resp = await self.session.get(url, headers=headers)
         resp.raise_for_status()
         data = await resp.json()

@@ -118,6 +118,12 @@ async def test_tasks_factory_api(context):
 
 
 async def test_consumer_consumes_multiple_messages_concurrently(context):
+    class Streams(const.Streams):
+        class CONCURRENT_WORK:
+            name = "concurrent_work"
+            subject = "concurrent_work"
+            group = "concurrent_work"
+
     work_duration_s = 2
     work_done = {
         "kbid1": asyncio.Event(),
@@ -133,16 +139,17 @@ async def test_consumer_consumes_multiple_messages_concurrently(context):
 
     producer = tasks.create_producer(
         name="some_work",
-        stream=MyStreams.SOME_WORK,
+        stream=Streams.CONCURRENT_WORK,
         msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
-        stream=MyStreams.SOME_WORK,
+        stream=Streams.CONCURRENT_WORK,
         callback=some_work,
         msg_type=Message,
+        max_concurrent_messages=10,
     )
     await consumer.initialize(context=context)
 
