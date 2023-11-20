@@ -138,9 +138,13 @@ class NatsTaskConsumer:
             try:
                 await self.callback(self.context, task_msg)  # type: ignore
             except asyncio.CancelledError:
-                logger.debug(f"Task cancelled. Naking and exiting...")
+                logger.debug(
+                    f"Task cancelled. Naking and exiting...",
+                    extra={
+                        "consumer_name": self.name,
+                    },
+                )
                 await msg.nak()
-                return
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error(
