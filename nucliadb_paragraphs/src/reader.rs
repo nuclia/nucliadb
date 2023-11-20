@@ -494,30 +494,22 @@ mod tests {
     use super::*;
     use crate::writer::ParagraphWriterService;
 
-    fn create_resource(shard_id: String) -> Resource {
+    const DOC1_TI: &str = "This is the first document";
+    const DOC1_P1: &str = "This is the text of the second paragraph.";
+    const DOC1_P2: &str = "This should be enough to test the tantivy.";
+    const DOC1_P3: &str = "But I wanted to make it three anyway.";
+
+    fn create_resource(shard_id: String, timestamp: Timestamp) -> Resource {
         const UUID: &str = "f56c58ac-b4f9-4d61-a077-ffccaadd0001";
         let resource_id = ResourceId {
             shard_id: shard_id.to_string(),
             uuid: UUID.to_string(),
         };
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let timestamp = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: 0,
-        };
-
         let metadata = IndexMetadata {
             created: Some(timestamp.clone()),
             modified: Some(timestamp),
         };
-
-        const DOC1_TI: &str = "This is the first document";
-        const DOC1_P1: &str = "This is the text of the second paragraph.";
-        const DOC1_P2: &str = "This should be enough to test the tantivy.";
-        const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
         let ti_title = TextInformation {
             text: DOC1_TI.to_string(),
@@ -641,8 +633,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|t| t.as_secs() as i64)
+            .unwrap();
+        let timestamp = Timestamp { seconds, nanos: 0 };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
+        let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
 
@@ -694,8 +692,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let seconds = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|t| t.as_secs() as i64)
+            .unwrap();
+        let timestamp = Timestamp { seconds, nanos: 0 };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
+        let resource1 = create_resource("shard1".to_string(), timestamp);
         let _ = paragraph_writer_service.set_resource(&resource1);
 
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
@@ -979,8 +983,14 @@ mod tests {
         let psc = ParagraphConfig {
             path: dir.path().join("paragraphs"),
         };
+        let time_baseline = Timestamp {
+            seconds: 2,
+            nanos: 0,
+        };
+
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
-        let resource1 = create_resource("shard1".to_string());
+        let resource1 = create_resource("shard1".to_string(), time_baseline.clone());
+
         let _ = paragraph_writer_service.set_resource(&resource1);
 
         let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
@@ -990,10 +1000,6 @@ mod tests {
 
         let (_top_docs, count) = searcher.search(&AllQuery, &(TopDocs::with_limit(10), Count))?;
         assert_eq!(count, 4);
-
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
 
         fn do_search(
             paragraph_reader_service: &ParagraphReaderService,
@@ -1022,20 +1028,20 @@ mod tests {
             &paragraph_reader_service,
             Timestamps {
                 from_modified: Some(Timestamp {
-                    seconds: (now.as_secs() - 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
                 }),
                 to_modified: Some(Timestamp {
-                    seconds: (now.as_secs() + 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
                 }),
                 from_created: Some(Timestamp {
-                    seconds: (now.as_secs() - 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
                 }),
                 to_created: Some(Timestamp {
-                    seconds: (now.as_secs() + 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
                 }),
             },
         );
@@ -1046,8 +1052,8 @@ mod tests {
             &paragraph_reader_service,
             Timestamps {
                 from_modified: Some(Timestamp {
-                    seconds: (now.as_secs() - 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
                 }),
                 to_modified: None,
                 from_created: None,
@@ -1061,8 +1067,8 @@ mod tests {
             &paragraph_reader_service,
             Timestamps {
                 from_modified: Some(Timestamp {
-                    seconds: (now.as_secs() + 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
                 }),
                 to_modified: None,
                 from_created: None,
@@ -1077,8 +1083,8 @@ mod tests {
             Timestamps {
                 from_modified: None,
                 to_modified: Some(Timestamp {
-                    seconds: (now.as_secs() + 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
                 }),
                 from_created: None,
                 to_created: None,
@@ -1092,8 +1098,8 @@ mod tests {
             Timestamps {
                 from_modified: None,
                 to_modified: Some(Timestamp {
-                    seconds: (now.as_secs() - 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
                 }),
                 from_created: None,
                 to_created: None,
@@ -1108,8 +1114,8 @@ mod tests {
                 from_modified: None,
                 to_modified: None,
                 from_created: Some(Timestamp {
-                    seconds: (now.as_secs() - 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
                 }),
                 to_created: None,
             },
@@ -1123,8 +1129,8 @@ mod tests {
                 from_modified: None,
                 to_modified: None,
                 from_created: Some(Timestamp {
-                    seconds: (now.as_secs() + 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
                 }),
                 to_created: None,
             },
@@ -1139,8 +1145,8 @@ mod tests {
                 to_modified: None,
                 from_created: None,
                 to_created: Some(Timestamp {
-                    seconds: (now.as_secs() + 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds + 1,
+                    nanos: time_baseline.nanos,
                 }),
             },
         );
@@ -1154,8 +1160,8 @@ mod tests {
                 to_modified: None,
                 from_created: None,
                 to_created: Some(Timestamp {
-                    seconds: (now.as_secs() - 1) as i64,
-                    nanos: 0,
+                    seconds: time_baseline.seconds - 1,
+                    nanos: time_baseline.nanos,
                 }),
             },
         );
