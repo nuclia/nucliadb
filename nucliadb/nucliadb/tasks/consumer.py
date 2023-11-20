@@ -106,7 +106,14 @@ class NatsTaskConsumer:
         seqid = int(msg.reply.split(".")[5])
         task_name = f"NatsTaskConsumer({self.name}, msg={seqid})"
         task = asyncio.create_task(self.subscription_worker(msg), name=task_name)
+        task.add_done_callback(self._running_tasks_remove)
         self.running_tasks.append(task)
+
+    def _running_tasks_remove(self, task: asyncio.Task):
+        try:
+            self.running_tasks.remove(task)
+        except ValueError:
+            pass
 
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
