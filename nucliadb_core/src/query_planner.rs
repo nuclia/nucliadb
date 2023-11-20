@@ -192,8 +192,9 @@ fn compute_pre_filters(search_request: &SearchRequest) -> Option<PreFilterReques
     let request_has_labels_filters = search_request
         .filter
         .as_ref()
-        .map(|i| i.field_labels.is_empty())
+        .map(|i| !i.field_labels.is_empty())
         .unwrap_or_default();
+
     if request_has_labels_filters {
         let labels = compute_labels_pre_filters(search_request);
         pre_filter_request.labels_filters.extend(labels);

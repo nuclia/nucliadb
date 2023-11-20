@@ -376,6 +376,8 @@ async def test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         if par["text"] not in expected_paragraphs:
             raise AssertionError(f"Paragraph not expected: {par['text']}")
         if par["text"] in not_yet_found:
-            assert par["score_type"] == "BOTH"
+            assert (
+                par["score_type"] == "BOTH"
+            ), f"Score type not expected with filters {filters}"
             not_yet_found.remove(par["text"])
     assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
