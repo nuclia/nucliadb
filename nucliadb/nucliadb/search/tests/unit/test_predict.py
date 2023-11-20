@@ -33,6 +33,7 @@ from nucliadb.search.predict import (
     SendToPredictError,
     _parse_rephrase_response,
 )
+from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 from nucliadb_models.search import (
     AskDocumentModel,
     ChatModel,
@@ -41,30 +42,6 @@ from nucliadb_models.search import (
     RephraseModel,
 )
 from nucliadb_utils.exceptions import LimitsExceededError
-
-
-def get_mocked_session(
-    http_method: str, status: int, text=None, json=None, read=None, context_manager=True
-):
-    response = Mock(status=status)
-    if text is not None:
-        response.text = AsyncMock(return_value=text)
-    if json is not None:
-        response.json = AsyncMock(return_value=json)
-    if read is not None:
-        if isinstance(read, str):
-            read = read.encode()
-        response.read = AsyncMock(return_value=read)
-    if context_manager:
-        # For when async with self.session.post() as response: is called
-        session = Mock()
-        http_method_mock = AsyncMock(__aenter__=AsyncMock(return_value=response))
-        getattr(session, http_method.lower()).return_value = http_method_mock
-    else:
-        # For when await self.session.post() is called
-        session = AsyncMock()
-        getattr(session, http_method.lower()).return_value = response
-    return session
 
 
 @pytest.mark.asyncio
