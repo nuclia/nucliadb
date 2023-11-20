@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Type
+from typing import Any, Callable, Coroutine, Optional, Type
 
 import pydantic
 
@@ -36,3 +36,4 @@ class RegisteredTask:
     stream: const.Streams
     callback: Callback
     msg_type: MsgType
+    max_concurrent_messages: Optional[int] = None

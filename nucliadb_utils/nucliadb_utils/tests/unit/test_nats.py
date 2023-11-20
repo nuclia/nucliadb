@@ -73,6 +73,7 @@ class TestNatsConnectionManager:
             queue="queue",
             stream="stream",
             cb=cb,
+            manual_ack=True,
             flow_control=True,
             config=None,
         )
@@ -101,6 +102,33 @@ class TestNatsConnectionManager:
         manager._nc.is_connected = False
         assert manager.healthy()
         assert manager._last_unhealthy is not None
+
+    async def test_unsubscribe(
+        self, manager: nats.NatsConnectionManager, nats_conn, js
+    ):
+        await manager.initialize()
+
+        cb = AsyncMock()
+        lost_cb = AsyncMock()
+        sub = await manager.subscribe(
+            subject="subject",
+            queue="queue",
+            stream="stream",
+            cb=cb,
+            subscription_lost_cb=lost_cb,
+            flow_control=True,
+        )
+        assert len(manager._subscriptions) == 1
+
+        await manager.unsubscribe(sub)
+
+        sub.unsubscribe.assert_awaited_once()
+        assert len(manager._subscriptions) == 0
+
+        await manager.finalize()
+
+        nats_conn.drain.assert_called_once()
+        nats_conn.close.assert_called_once()
 
 
 async def test_message_progress_updater():
