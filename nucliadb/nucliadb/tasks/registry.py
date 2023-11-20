@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import functools
+from typing import Optional
 
 import pydantic
 
@@ -27,7 +28,12 @@ from nucliadb_utils import const
 REGISTRY: dict[str, RegisteredTask] = dict()
 
 
-def register_task(name: str, stream: const.Streams, msg_type: pydantic.BaseModel):
+def register_task(
+    name: str,
+    stream: const.Streams,
+    msg_type: pydantic.BaseModel,
+    max_concurrent_messages: Optional[int] = None,
+):
     """
     Decorator to register a task in the registry.
     """
@@ -37,6 +43,7 @@ def register_task(name: str, stream: const.Streams, msg_type: pydantic.BaseModel
             callback=func,
             stream=stream,
             msg_type=msg_type,
+            max_concurrent_messages=max_concurrent_messages,
         )
 
         @functools.wraps(func)

@@ -45,13 +45,17 @@ class NatsTaskConsumer:
         stream: const.Streams,
         callback: TaskCallback,
         msg_type: MsgType,
+        max_concurrent_messages: Optional[int] = None,
     ):
         self.name = name
         self.stream = stream
         self.callback = callback
         self.msg_type = msg_type
+        self.max_concurrent_messages = max_concurrent_messages
         self.initialized = False
         self.context: Optional[ApplicationContext] = None
+        self.running_tasks: list[asyncio.Task] = []
+        self.subscription = None
 
     async def initialize(self, context: ApplicationContext):
         self.context = context
@@ -61,28 +65,60 @@ class NatsTaskConsumer:
         await self._setup_nats_subscription()
         self.initialized = True
 
+    async def finalize(self):
+        self.initialized = False
+        if self.subscription is not None:
+            await self.context.nats_manager.unsubscribe(self.subscription)
+        for task in self.running_tasks:
+            task.cancel()
+        try:
+            await asyncio.wait(self.running_tasks, timeout=5)
+            self.running_tasks.clear()
+        except asyncio.TimeoutError:
+            pass
+
     async def _setup_nats_subscription(self):
         # Nats push consumer
         subject = self.stream.subject
         group = self.stream.group
         stream = self.stream.name
-        await self.context.nats_manager.subscribe(
+        max_ack_pending = (
+            self.max_concurrent_messages
+            if self.max_concurrent_messages
+            else nats_consumer_settings.nats_max_ack_pending
+        )
+        self.subscription = await self.context.nats_manager.subscribe(
             subject=subject,
             queue=group,
             stream=stream,
-            cb=self.subscription_worker,
+            cb=self._subscription_worker_as_task,
             subscription_lost_cb=self._setup_nats_subscription,
+            manual_ack=True,
             config=nats.js.api.ConsumerConfig(
                 deliver_policy=nats.js.api.DeliverPolicy.ALL,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
                 idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
+                max_ack_pending=max_ack_pending,
             ),
         )
         logger.info(
             f"Subscribed to {subject} on stream {stream}",
             extra={"consumer_name": self.name},
         )
+
+    async def _subscription_worker_as_task(self, msg: Msg):
+        seqid = int(msg.reply.split(".")[5])
+        task_name = f"NatsTaskConsumer({self.name}, msg={seqid})"
+        task = asyncio.create_task(self.subscription_worker(msg), name=task_name)
+        task.add_done_callback(self._running_tasks_remove)
+        self.running_tasks.append(task)
+
+    def _running_tasks_remove(self, task: asyncio.Task):
+        try:
+            self.running_tasks.remove(task)
+        except ValueError:
+            pass
 
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
@@ -113,6 +149,14 @@ class NatsTaskConsumer:
             )
             try:
                 await self.callback(self.context, task_msg)  # type: ignore
+            except asyncio.CancelledError:
+                logger.debug(
+                    f"Task cancelled. Naking and exiting...",
+                    extra={
+                        "consumer_name": self.name,
+                    },
+                )
+                await msg.nak()
             except Exception as e:
                 errors.capture_exception(e)
                 logger.error(
@@ -141,6 +185,7 @@ def create_consumer(
     stream: const.Streams,
     callback: TaskCallback,
     msg_type: MsgType,
+    max_concurrent_messages: Optional[int] = None,
 ) -> NatsTaskConsumer:
     """
     Returns a non-initialized consumer
@@ -150,6 +195,7 @@ def create_consumer(
         stream=stream,
         callback=callback,
         msg_type=msg_type,
+        max_concurrent_messages=max_concurrent_messages,
     )
     return consumer
 
@@ -169,6 +215,7 @@ async def start_consumer(
         stream=task.stream,
         callback=task.callback,  # type: ignore
         msg_type=task.msg_type,  # type: ignore
+        max_concurrent_messages=task.max_concurrent_messages,
     )
     await consumer.initialize(context)
     return consumer
