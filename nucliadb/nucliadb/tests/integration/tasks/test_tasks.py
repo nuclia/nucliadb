@@ -31,17 +31,6 @@ from nucliadb_utils import const
 
 pytestmark = pytest.mark.asyncio
 
-WORK_DONE = None
-
-
-@pytest.fixture(scope="function")
-def work_done():
-    global WORK_DONE
-    event = asyncio.Event()
-    WORK_DONE = event
-    yield event
-    WORK_DONE = None
-
 
 @contextmanager
 def set_standalone_mode(value: bool):
@@ -71,19 +60,19 @@ class MyStreams(const.Streams):
         group = "work"
 
 
-@tasks.register_task(
-    name="some_work",
-    stream=MyStreams.SOME_WORK,  # type: ignore
-    msg_type=Message,  # type: ignore
-    max_concurrent_messages=5,
-)
-async def some_work(context: ApplicationContext, msg: Message):
-    global WORK_DONE
+async def test_tasks_registry_api(context):
+    work_done = asyncio.Event()
 
-    WORK_DONE.set()  # type: ignore
+    @tasks.register_task(
+        name="some_work",
+        stream=MyStreams.SOME_WORK,  # type: ignore
+        msg_type=Message,  # type: ignore
+    )
+    async def some_work(context: ApplicationContext, msg: Message):
+        nonlocal work_done
 
+        work_done.set()
 
-async def test_tasks_registry_api(context, work_done):
     producer = await tasks.get_producer("some_work", context=context)
     consumer = await tasks.start_consumer("some_work", context=context)
 
@@ -96,7 +85,14 @@ async def test_tasks_registry_api(context, work_done):
     await consumer.finalize()
 
 
-async def test_tasks_factory_api(context, work_done):
+async def test_tasks_factory_api(context):
+    work_done = asyncio.Event()
+
+    async def some_work(context: ApplicationContext, msg: Message):
+        nonlocal work_done
+
+        work_done.set()
+
     producer = tasks.create_producer(
         name="some_work",
         stream=MyStreams.SOME_WORK,
@@ -210,6 +206,12 @@ async def test_consumer_finalize_cancels_tasks(context):
 
 
 async def test_consumer_max_concurrent_tasks(context):
+    class MyMaxedStream(const.Streams):
+        class SOME_WORK:
+            name = "work_with_max"
+            subject = "work_with_max"
+            group = "work_with_max"
+
     async def some_work(context: ApplicationContext, msg: Message):
         print(f"Doing some work! {msg.kbid}")
         start = time.perf_counter()
@@ -218,18 +220,17 @@ async def test_consumer_max_concurrent_tasks(context):
         except asyncio.CancelledError:
             elapsed = time.perf_counter() - start
             print(f"Work cancelled after {elapsed:.2f}s! {msg.kbid}")
-            pass
 
     producer = tasks.create_producer(
         name="some_work",
-        stream=MyStreams.SOME_WORK,
+        stream=MyMaxedStream.SOME_WORK,
         msg_type=Message,
     )
     await producer.initialize(context=context)
 
     consumer = tasks.create_consumer(
         name="some_work",
-        stream=MyStreams.SOME_WORK,
+        stream=MyMaxedStream.SOME_WORK,
         callback=some_work,
         msg_type=Message,
         max_concurrent_messages=5,
