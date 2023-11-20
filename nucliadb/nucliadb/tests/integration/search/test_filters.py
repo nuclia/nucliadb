@@ -30,6 +30,7 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     ParagraphAnnotation,
     Position,
+    TokenSplit,
     UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Vector
@@ -46,23 +47,40 @@ RELEASE_CHANNELS = (
 )
 
 
-DETECTED_ENTITY = "COUNTRY/Spain"
-RESOURCE_CLASSIFICATION_LABEL = "resource/label"
-PARAGRAPH_CLASSIFICATION_LABEL = "paragraph/label"
+class ClassificationLabels:
+    RESOURCE_ANNOTATED = "user-resource/label"
+    PARAGRAPH_ANNOTATED = "user-paragraph/label"
+    FIELD_DETECTED = "field/label"
+    PARAGRAPH_DETECTED = "paragraph/label"
 
-ENTITY_FILTER = f"/entities/{DETECTED_ENTITY}"
-RESOURCE_LABEL_FILTER = f"/classification.labels/{RESOURCE_CLASSIFICATION_LABEL}"
-PARAGRAPH_LABEL_FILTER = f"/classification.labels/{PARAGRAPH_CLASSIFICATION_LABEL}"
+
+class EntityLabels:
+    ANNOTATED = "PERSON/Rusty"
+    DETECTED = "COUNTRY/Spain"
+
+
+def entity_filter(entity):
+    return f"/entities/{entity}"
+
+
+def label_filter(label):
+    return f"/classification.labels/{label}"
+
 
 PARAGRAPH1 = "My name is Rusty and I am a rust software engineer based in Spain"
 PARAGRAPH2 = "I think Python is cool too"
 PARAGRAPH3 = "My name is Pietro and I am a Ruby developer based in Portugal"
 PARAGRAPH4 = "In my free time, I code in C#."
+ALL_PARAGRAPHS = {PARAGRAPH1, PARAGRAPH2, PARAGRAPH3, PARAGRAPH4}
+
 
 FILTERS_TO_PARAGRAPHS = {
-    ENTITY_FILTER: {PARAGRAPH1, PARAGRAPH2},
-    RESOURCE_LABEL_FILTER: {PARAGRAPH3, PARAGRAPH4},
-    PARAGRAPH_LABEL_FILTER: {PARAGRAPH3},
+    entity_filter(EntityLabels.ANNOTATED): {PARAGRAPH1, PARAGRAPH2},
+    entity_filter(EntityLabels.DETECTED): {PARAGRAPH1, PARAGRAPH2},
+    label_filter(ClassificationLabels.RESOURCE_ANNOTATED): {PARAGRAPH3, PARAGRAPH4},
+    label_filter(ClassificationLabels.FIELD_DETECTED): {PARAGRAPH3, PARAGRAPH4},
+    label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED): {PARAGRAPH3},
+    label_filter(ClassificationLabels.PARAGRAPH_DETECTED): {PARAGRAPH4},
 }
 
 
@@ -73,14 +91,25 @@ def broker_message_with_entities(kbid):
     """
     bm = broker_resource(kbid=kbid)
     field_id = "text"
+    field = FieldID()
+    field.field = field_id
+    field.field_type = FieldType.TEXT
+
+    # Add annotated entity
+    ufm = UserFieldMetadata()
+    ufm.field.CopyFrom(field)
+    family, entity = EntityLabels.ANNOTATED.split("/")
+    ufm.token.append(
+        TokenSplit(
+            token=entity, klass=family, start=11, end=16, cancelled_by_user=False
+        )
+    )
+    bm.basic.fieldmetadata.append(ufm)
+
     # Add a couple of paragraphs to a text field
     p1 = PARAGRAPH1
     p2 = PARAGRAPH2
     text = "\n".join([p1, p2])
-
-    field = FieldID()
-    field.field = field_id
-    field.field_type = FieldType.TEXT
 
     bm.texts[field_id].body = text
 
@@ -93,10 +122,10 @@ def broker_message_with_entities(kbid):
     # Add field computed metadata with the detected entity
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
-    family, ent = DETECTED_ENTITY.split("/")
-    fmw.metadata.metadata.ner[ent] = family
+    family, entity = EntityLabels.DETECTED.split("/")
+    fmw.metadata.metadata.ner[entity] = family
     pos = Position(start=60, end=64)
-    fmw.metadata.metadata.positions[DETECTED_ENTITY].position.append(pos)
+    fmw.metadata.metadata.positions[EntityLabels.DETECTED].position.append(pos)
 
     par1 = Paragraph()
     par1.start = 0
@@ -133,14 +162,12 @@ def broker_message_with_labels(kbid):
     level (resource, field and paragraph).
     """
     bm = broker_resource(kbid=kbid)
-
     field_id = "text"
-
-    text = "\n".join([PARAGRAPH3, PARAGRAPH4])
-
     field = FieldID()
     field.field = field_id
     field.field_type = FieldType.TEXT
+
+    text = "\n".join([PARAGRAPH3, PARAGRAPH4])
 
     bm.texts[field_id].body = text
 
@@ -154,10 +181,11 @@ def broker_message_with_labels(kbid):
     ufm = UserFieldMetadata()
     ufm.field.CopyFrom(field)
     panno1 = ParagraphAnnotation(key=f"{bm.uuid}/t/text/0-{len(PARAGRAPH3)}")
+    labelset, label = ClassificationLabels.PARAGRAPH_ANNOTATED.split("/")
     panno1.classifications.append(
         Classification(
-            labelset=PARAGRAPH_CLASSIFICATION_LABEL.split("/")[0],
-            label=PARAGRAPH_CLASSIFICATION_LABEL.split("/")[1],
+            labelset=labelset,
+            label=label,
             cancelled_by_user=False,
         )
     )
@@ -165,10 +193,11 @@ def broker_message_with_labels(kbid):
     bm.basic.fieldmetadata.append(ufm)
 
     # Add a resource label
+    labelset, label = ClassificationLabels.RESOURCE_ANNOTATED.split("/")
     bm.basic.usermetadata.classifications.append(
         Classification(
-            labelset=RESOURCE_CLASSIFICATION_LABEL.split("/")[0],
-            label=RESOURCE_CLASSIFICATION_LABEL.split("/")[1],
+            labelset=labelset,
+            label=label,
             cancelled_by_user=False,
         )
     )
@@ -181,11 +210,29 @@ def broker_message_with_labels(kbid):
     par1.end = len(PARAGRAPH3)
     par1.text = PARAGRAPH3
     fmw.metadata.metadata.paragraphs.append(par1)
+
     par2 = Paragraph()
     par2.start = par1.end + 1
     par2.end = par2.start + len(PARAGRAPH4)
     par2.text = PARAGRAPH4
+
+    # Add a detected classification label at the paragraph level
+    labelset, label = ClassificationLabels.PARAGRAPH_DETECTED.split("/")
+    par2.classifications.append(
+        Classification(
+            labelset=labelset,
+            label=label,
+        )
+    )
     fmw.metadata.metadata.paragraphs.append(par2)
+    # Add a detected classification label at the field level
+    labelset, label = ClassificationLabels.FIELD_DETECTED.split("/")
+    fmw.metadata.metadata.classifications.append(
+        Classification(
+            labelset=labelset,
+            label=label,
+        )
+    )
     bm.field_metadata.append(fmw)
 
     # Add extracted vectors for the field
@@ -209,20 +256,19 @@ def broker_message_with_labels(kbid):
 
 
 async def create_test_labelsets(nucliadb_grpc, kbid: str):
-    for req in [
-        set_labelset_request(
+    for kind, _label in (
+        (LabelSetKind.RESOURCES, ClassificationLabels.RESOURCE_ANNOTATED),
+        (LabelSetKind.RESOURCES, ClassificationLabels.FIELD_DETECTED),
+        (LabelSetKind.PARAGRAPHS, ClassificationLabels.PARAGRAPH_DETECTED),
+        (LabelSetKind.PARAGRAPHS, ClassificationLabels.PARAGRAPH_ANNOTATED),
+    ):
+        labelset, label = _label.split("/")
+        req = set_labelset_request(
             kbid,
-            PARAGRAPH_CLASSIFICATION_LABEL.split("/")[0],
-            kind=LabelSetKind.PARAGRAPHS,
-            labels=[Label(title=PARAGRAPH_CLASSIFICATION_LABEL.split("/")[1])],
-        ),
-        set_labelset_request(
-            kbid,
-            RESOURCE_CLASSIFICATION_LABEL.split("/")[0],
-            kind=LabelSetKind.RESOURCES,
-            labels=[Label(title=RESOURCE_CLASSIFICATION_LABEL.split("/")[1])],
-        ),
-    ]:
+            labelset,
+            kind=kind,
+            labels=[Label(title=label)],
+        )
         resp = await nucliadb_grpc.SetLabels(req)
         assert resp.status == OpStatusWriter.OK
 
@@ -255,29 +301,50 @@ async def kbid(
 @pytest.mark.parametrize(
     "filters",
     [
-        # One filter at a time
-        [ENTITY_FILTER],
-        [RESOURCE_LABEL_FILTER],
-        [PARAGRAPH_LABEL_FILTER],
-        # Combinations of them
-        [ENTITY_FILTER, RESOURCE_LABEL_FILTER],
-        [ENTITY_FILTER, PARAGRAPH_LABEL_FILTER],
-        [RESOURCE_LABEL_FILTER, PARAGRAPH_LABEL_FILTER],
-        # With unexisting filters
-        ["/entities/unexisting/entity"],
-        [ENTITY_FILTER, "/entities/unexisting/entity"],
-        [ENTITY_FILTER, "/classification.labels/paragraph/unexisting"],
-        [ENTITY_FILTER, "/classification.labels/resource/unexisting"],
-        [RESOURCE_LABEL_FILTER, "/classification.labels/foo/bar"],
-        [PARAGRAPH_LABEL_FILTER, "/classification.labels/foo/bar"],
-        [PARAGRAPH_LABEL_FILTER, "/classification.labels/paragraph/unexisting"],
+        # Filter with unexisting labels and entities
+        [entity_filter("unexisting/entity")],
+        [label_filter("user-paragraph/unexisting")],
+        [label_filter("paragraph/unexisting")],
+        [label_filter("resource/unexisting")],
+        [label_filter("user-resource/unexisting")],
+        # Filter with existing labels and entities
+        [entity_filter(EntityLabels.ANNOTATED)],
+        [entity_filter(EntityLabels.DETECTED)],
+        [label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED)],
+        [label_filter(ClassificationLabels.PARAGRAPH_DETECTED)],
+        [label_filter(ClassificationLabels.RESOURCE_ANNOTATED)],
+        [label_filter(ClassificationLabels.FIELD_DETECTED)],
+        # Combine filters
+        [entity_filter(EntityLabels.ANNOTATED), entity_filter("unexisting/entity")],
+        [entity_filter(EntityLabels.ANNOTATED), entity_filter(EntityLabels.DETECTED)],
+        [
+            entity_filter(EntityLabels.ANNOTATED),
+            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
+        ],
+        [
+            label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED),
+            label_filter("user-paragraph/unexisting"),
+        ],
+        [
+            label_filter(ClassificationLabels.FIELD_DETECTED),
+            label_filter("resource/unexisting"),
+        ],
+        [
+            label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED),
+            label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
+        ],
+        [
+            label_filter(ClassificationLabels.RESOURCE_ANNOTATED),
+            label_filter(ClassificationLabels.FIELD_DETECTED),
+        ],
     ],
 )
 async def test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
     # The set of expected results is always the AND of the filters
     filter_paragraphs = []
-    for filter in filters:
-        filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(filter, set()))
+    expected_paragraphs = set()
+    for fltr in filters:
+        filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(fltr, set()))
     expected_paragraphs = set.intersection(*filter_paragraphs)
 
     resp = await nucliadb_reader.post(
