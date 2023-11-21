@@ -406,7 +406,7 @@ async def find_merge_results(
             page_number=page,
             page_size=count,
             next_page=next_page,
-            min_score=min_score,
+            min_score=round(min_score, ndigits=3),
         )
 
         await fetch_find_metadata(
