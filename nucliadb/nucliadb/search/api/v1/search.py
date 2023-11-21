@@ -215,7 +215,9 @@ async def catalog(
     if sort_field:
         sort_options = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
     try:
-        min_score = await get_default_min_score(kbid)
+        # Min score is not relevant here, as catalog endpoint
+        # only returns bm25 results on titles
+        min_score = 0.0
 
         # We need to query all nodes
         pb_query, _, _ = await global_query_to_pb(
