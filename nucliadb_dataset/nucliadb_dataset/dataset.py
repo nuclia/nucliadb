@@ -44,6 +44,7 @@ from nucliadb_protos.dataset_pb2 import (
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
+    QuestionAnswerStreamingBatch,
     SentenceClassificationBatch,
     TaskType,
     TokenClassificationBatch,
@@ -53,6 +54,7 @@ from nucliadb_protos.dataset_pb2 import (
 from nucliadb_dataset.mapping import (
     batch_to_image_classification_arrow,
     batch_to_paragraph_streaming_arrow,
+    batch_to_question_answer_streaming_arrow,
     batch_to_text_classification_arrow,
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
@@ -82,6 +84,7 @@ class Task(str, Enum):
     TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
     IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
     PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
+    QUESTION_ANSWER_STREAMING = "QUESTION_ANSWER_STREAMING"
 
 
 class NucliaDataset(object):
@@ -168,6 +171,8 @@ class NucliaDBDataset(NucliaDataset):
                 trainset.filter.labels.extend(labels)
             elif Task.IMAGE_CLASSIFICATION == task:
                 trainset = TrainSet(type=TaskType.IMAGE_CLASSIFICATION)
+            elif Task.QUESTION_ANSWER_STREAMING == task:
+                trainset = TrainSet(type=TaskType.QUESTION_ANSWER_STREAMING)
             else:
                 raise KeyError("Not a valid task")
         elif trainset is None and task is None:
@@ -198,6 +203,9 @@ class NucliaDBDataset(NucliaDataset):
 
         elif self.trainset.type == TaskType.PARAGRAPH_STREAMING:
             self._configure_paragraph_streaming()
+
+        elif self.trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
+            self._configure_question_answer_streaming()
 
         else:
             raise AttributeError(
@@ -338,6 +346,25 @@ class NucliaDBDataset(NucliaDataset):
             [
                 bytes_to_batch(ParagraphStreamingBatch),
                 batch_to_paragraph_streaming_arrow(schema),
+            ]
+        )
+        self._set_schema(schema)
+
+    def _configure_question_answer_streaming(self):
+        schema = pa.schema(
+            [
+                pa.field("paragraph_id", pa.list_(pa.string())),
+                pa.field("paragraph", pa.list_(pa.string())),
+                pa.field("question", pa.string()),
+                pa.field("question_language", pa.string()),
+                pa.field("answer", pa.string()),
+                pa.field("answer_language", pa.string()),
+            ]
+        )
+        self._set_mappings(
+            [
+                bytes_to_batch(QuestionAnswerStreamingBatch),
+                batch_to_question_answer_streaming_arrow(schema),
             ]
         )
         self._set_schema(schema)

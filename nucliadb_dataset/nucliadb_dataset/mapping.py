@@ -26,6 +26,7 @@ from nucliadb_protos.dataset_pb2 import (
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
+    QuestionAnswerStreamingBatch,
     SentenceClassificationBatch,
     TokenClassificationBatch,
 )
@@ -126,6 +127,44 @@ def batch_to_paragraph_streaming_arrow(schema: pa.schema):
 
         if len(PARARGAPH_ID):
             pa_data = [pa.array(PARARGAPH_ID), pa.array(TEXT)]
+            output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
+
+
+def batch_to_question_answer_streaming_arrow(schema: pa.schema):
+    def func(batch: QuestionAnswerStreamingBatch):
+        PARARGAPH_ID = []
+        PARAGRAPH_TEXT = []
+        QUESTION = []
+        QUESTION_LANGUAGE = []
+        ANSWER = []
+        ANSWER_LANGUAGE = []
+        for data in batch.data:
+            QUESTION.append(data.question.text)
+            QUESTION_LANGUAGE.append(data.question.language)
+            ANSWER.append(data.answer.text)
+            ANSWER_LANGUAGE.append(data.answer.language)
+            paragraph_ids = []
+            paragraphs = []
+            for paragraph in data.paragraphs:
+                paragraph_ids.append(paragraph.id)
+                paragraphs.append(paragraph.text)
+            PARARGAPH_ID.append(paragraph_ids)
+            PARAGRAPH_TEXT.append(paragraphs)
+
+        if len(QUESTION):
+            pa_data = [
+                pa.array(PARARGAPH_ID),
+                pa.array(PARAGRAPH_TEXT),
+                pa.array(QUESTION),
+                pa.array(QUESTION_LANGUAGE),
+                pa.array(ANSWER),
+                pa.array(ANSWER_LANGUAGE),
+            ]
             output_batch = pa.record_batch(pa_data, schema=schema)
         else:
             output_batch = None
