@@ -19,34 +19,24 @@
 #
 import asyncio
 from datetime import datetime
-from functools import cache
 from typing import Awaitable, List, Optional, Tuple
 
 from async_lru import alru_cache
-from fastapi import HTTPException
-from nucliadb.common.datamanagers.labels import LabelsDataManager
-from nucliadb_protos.nodereader_pb2 import (
-    Filter,
-    ParagraphSearchRequest,
-    SearchRequest,
-    SuggestFeatures,
-    SuggestRequest,
-)
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.common.datamanagers.entities import EntitiesDataManager, EntitiesMetaCache
 from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
+from nucliadb.common.datamanagers.labels import LabelsDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.filters import (
-    CLASSIFICATION_LABEL_PREFIX,
+    has_classification_label_filters,
     record_filters_counter,
-    split_filters_by_label_type,
+    split_labels_by_type,
     translate_label_filters,
 )
-from nucliadb.search.search.metrics import node_features
 from nucliadb.search.search.metrics import (
     node_features,
     query_parse_dependency_observer,
@@ -63,15 +53,11 @@ from nucliadb_models.search import (
     SortOrderMap,
     SuggestOptions,
 )
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
-
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
-
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -88,6 +74,7 @@ class QueryParser:
     some stateful interaction with a query and different depenedencies during
     query parsing.
     """
+
     _min_score_task: Optional[asyncio.Task] = None
     _convert_vectors_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
@@ -192,25 +179,20 @@ class QueryParser:
             )
         return self._get_classification_labels_task
 
-    @cache
-    @staticmethod
-    def has_classification_label_filters(filters: list[str]) -> bool:
-        return any(
-            filter.startswith(CLASSIFICATION_LABEL_PREFIX) for filter in filters
-        )
-
     async def _schedule_dependency_tasks(self) -> None:
         """
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.filters) > 0 and self.has_classification_label_filters(self.filters):
+        if len(self.filters) > 0 and has_classification_label_filters(self.filters):
             asyncio.ensure_future(self._get_classification_labels())
         if self.min_score is None:
             asyncio.ensure_future(self._get_default_min_score())
         if SearchOptions.VECTOR in self.features and self.user_vector is None:
             asyncio.ensure_future(self._get_converted_vectors())
-        if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(self.query) > 0:
+        if (SearchOptions.RELATIONS in self.features or self.autofilter) and len(
+            self.query
+        ) > 0:
             asyncio.ensure_future(self._get_detected_entities())
             asyncio.ensure_future(self._get_entities_meta_cache())
             asyncio.ensure_future(self._get_deleted_entity_groups())
@@ -243,36 +225,17 @@ class QueryParser:
 
         return request, incomplete, autofilters
 
-    async def parse_label_filters(self, filters: list[str]) -> tuple[list[str], list[str]]:
-        field_labels = []
-        paragraph_labels = []
-        classification_labels = await self._get_classification_labels()
-        for fltr in filters:
-            if len(fltr) == 0 or fltr[0] != "/":
-                continue
-            if not fltr.startswith(CLASSIFICATION_LABEL_PREFIX):
-                field_labels.append(fltr)
-                continue
-            # Classification labels should have the form /l/labelset/label
-            parts = fltr.split("/")
-            if len(parts) < 4:
-                field_labels.append(fltr)
-                continue
-            labelset_id = parts[2]
-            if is_paragraph_labelset_kind(labelset_id, classification_labels):
-                paragraph_labels.append(fltr)
-            else:
-                field_labels.append(fltr)
-        return field_labels, paragraph_labels
-
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.filters) > 0:
             field_labels = self.filters
-            paragraph_labels = []
-            if self.has_classification_label_filters(self.filters):
-                field_labels, paragraph_labels = await self.parse_label_filters(self.filters)      
-            request.field_labels.extend(field_labels)
-            request.paragraph_labels.extend(paragraph_labels)
+            paragraph_labels: list[str] = []
+            if has_classification_label_filters(self.filters):
+                classification_labels = await self._get_classification_labels()
+                field_labels, paragraph_labels = split_labels_by_type(
+                    self.filters, classification_labels
+                )
+            request.filter.field_labels.extend(field_labels)
+            request.filter.paragraph_labels.extend(paragraph_labels)
 
         request.faceted.labels.extend(translate_label_filters(self.faceted))
         request.fields.extend(self.fields)
@@ -444,9 +407,6 @@ class QueryParser:
             request.ClearField("body")
 
 
-
-
-
 async def paragraph_query_to_pb(
     kbid: str,
     features: List[SearchOptions],
@@ -488,7 +448,15 @@ async def paragraph_query_to_pb(
         request.uuid = rid
         request.body = query
         if len(filters) > 0:
-            filters = await parse_filters(request.filter, kbid, filters)
+            field_labels = filters
+            paragraph_labels: list[str] = []
+            if has_classification_label_filters(filters):
+                classification_labels = await get_classification_labels(kbid)
+                field_labels, paragraph_labels = split_labels_by_type(
+                    filters, classification_labels
+                )
+            request.filter.field_labels.extend(field_labels)
+            request.filter.paragraph_labels.extend(paragraph_labels)
 
         request.faceted.labels.extend(translate_label_filters(faceted))
         if sort:
@@ -625,9 +593,6 @@ PROCESSING_STATUS_TO_PB_MAP = {
 }
 
 
-
-
-
 @query_parse_dependency_observer.wrap({"type": "min_score"})
 async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
     driver = get_driver()
@@ -652,17 +617,6 @@ async def get_default_min_score(kbid: str) -> float:
         # B/w compatible code until we figure out how to
         # set default min score for old on-prem kbs
         return fallback
-
-
-async def parse_filters(
-    request_filter: Filter, kbid: str, filters: list[str]
-) -> list[str]:
-    filters = translate_label_filters(filters)
-    field_labels, paragraph_labels = await split_filters_by_label_type(kbid, filters)
-    request_filter.field_labels.extend(field_labels)
-    request_filter.paragraph_labels.extend(paragraph_labels)
-    record_filters_counter(filters, node_features)
-    return filters
 
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
@@ -693,14 +647,3 @@ async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
     driver = get_driver()
     ldm = LabelsDataManager(driver)
     return await ldm.get_labels(kbid)
-
-
-def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledgebox_pb2.Labels) -> bool:
-    try:
-        labelset: Optional[knowledgebox_pb2.LabelSet] = classification_labels.labelset.get(labelset_id)
-        if labelset is None:
-            return False
-        return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
-    except KeyError:
-        # labelset_id not found
-        return False

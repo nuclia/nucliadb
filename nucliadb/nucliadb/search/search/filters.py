@@ -17,7 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
+
 from nucliadb_models.labels import translate_alias_to_system_label
+from nucliadb_protos import knowledgebox_pb2
 from nucliadb_telemetry.metrics import Counter
 
 from .exceptions import InvalidQueryError
@@ -57,3 +60,46 @@ def record_filters_counter(filters: list[str], counter: Counter) -> None:
         elif not label_found and fltr.startswith(CLASSIFICATION_LABEL_PREFIX):
             label_found = True
             counter.inc({"type": "filters_labels"})
+
+
+def split_labels_by_type(
+    filters: list[str], classification_labels: knowledgebox_pb2.Labels
+) -> tuple[list[str], list[str]]:
+    field_labels = []
+    paragraph_labels = []
+    for fltr in filters:
+        if len(fltr) == 0 or fltr[0] != "/":
+            continue
+        if not fltr.startswith(CLASSIFICATION_LABEL_PREFIX):
+            field_labels.append(fltr)
+            continue
+        # Classification labels should have the form /l/labelset/label
+        parts = fltr.split("/")
+        if len(parts) < 4:
+            field_labels.append(fltr)
+            continue
+        labelset_id = parts[2]
+        if is_paragraph_labelset_kind(labelset_id, classification_labels):
+            paragraph_labels.append(fltr)
+        else:
+            field_labels.append(fltr)
+    return field_labels, paragraph_labels
+
+
+def is_paragraph_labelset_kind(
+    labelset_id: str, classification_labels: knowledgebox_pb2.Labels
+) -> bool:
+    try:
+        labelset: Optional[
+            knowledgebox_pb2.LabelSet
+        ] = classification_labels.labelset.get(labelset_id)
+        if labelset is None:
+            return False
+        return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
+    except KeyError:
+        # labelset_id not found
+        return False
+
+
+def has_classification_label_filters(filters: list[str]) -> bool:
+    return any(filter.startswith(CLASSIFICATION_LABEL_PREFIX) for filter in filters)
