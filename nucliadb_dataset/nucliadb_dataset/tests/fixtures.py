@@ -28,7 +28,7 @@ import pytest
 import requests
 from google.auth.credentials import AnonymousCredentials  # type: ignore
 from google.cloud import storage  # type: ignore
-from grpc import aio
+from grpc import aio  # type: ignore
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
