@@ -200,8 +200,8 @@ async def test_search_errors_if_vectors_or_relations_requested(
             with_synonyms=True,
         ),
     )
-    assert resp.status_code == 422
-    assert (
-        resp.json()["detail"]
-        == "Search with custom synonyms is only supported on paragraph and document search"
+    assert resp.status_code == 412
+    assert resp.json()["detail"] == (
+        "Invalid query. Error in synonyms: Search with custom synonyms "
+        "is only supported on paragraph and document search"
     )

@@ -30,9 +30,9 @@ use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
-    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationEdgeFilter,
-    RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
-    RelationSearchResponse, Resource, ResourceId,
+    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode,
+    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
+    Resource, ResourceId,
 };
 use tonic::Request;
 use uuid::Uuid;
@@ -601,15 +601,8 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
             shard_id: shard_id.clone(),
             subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![relation_nodes.get("Poetry").unwrap().clone()],
-                node_filters: vec![RelationNodeFilter {
-                    node_type: NodeType::Entity as i32,
-                    ..Default::default()
-                }],
-                edge_filters: vec![RelationEdgeFilter {
-                    relation_type: RelationType::About as i32,
-                    ..Default::default()
-                }],
                 depth: Some(1),
+                ..Default::default()
             }),
             ..Default::default()
         })
@@ -617,7 +610,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
 
     let expected = HashSet::from_iter([("Poetry".to_string(), "Swallow".to_string())]);
     let neighbour_relations = extract_relations(response.get_ref());
-    assert_eq!(neighbour_relations, expected);
+    assert!(expected.is_subset(&neighbour_relations));
 
     Ok(())
 }

@@ -46,14 +46,15 @@ images.settings["nucliadb_node_reader"] = {
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "DEBUG": "1",
+        "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_reader",
         ],
         "ports": {"4445": None},
-        "mem_limit": "2g",  # default is 1g, need to override
+        "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
 }
@@ -67,14 +68,15 @@ images.settings["nucliadb_node_writer"] = {
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG",  # noqa
+        "DEBUG": "1",
+        "RUST_LOG": "nucliadb_*=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_writer",
         ],
         "ports": {"4446": None},
-        "mem_limit": "2g",  # default is 1g, need to override
+        "mem_limit": "3g",  # default is 1g, need to override
         "platform": "linux/amd64",
     },
 }

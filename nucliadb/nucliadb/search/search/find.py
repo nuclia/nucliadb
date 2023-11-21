@@ -22,7 +22,7 @@ from typing import Tuple
 
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import find_merge_results
-from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
+from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models.search import (
     FindRequest,
@@ -47,13 +47,9 @@ async def find(
         if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
-    min_score = item.min_score
-    if min_score is None:
-        min_score = await get_default_min_score(kbid)
-
     # We need to query all nodes
-    pb_query, incomplete_results, autofilters = await global_query_to_pb(
-        kbid,
+    query_parser = QueryParser(
+        kbid=kbid,
         features=item.features,
         query=item.query,
         filters=item.filters,
@@ -61,7 +57,7 @@ async def find(
         sort=None,
         page_number=item.page_number,
         page_size=item.page_size,
-        min_score=min_score,
+        min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
@@ -74,6 +70,7 @@ async def find(
         autofilter=item.autofilter,
         key_filters=item.resource_filters,
     )
+    pb_query, incomplete_results, autofilters = await query_parser.parse()
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, target_replicas=item.shards
     )
@@ -90,7 +87,7 @@ async def find(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         requested_relations=pb_query.relation_subgraph,
-        min_score=min_score,
+        min_score=query_parser.min_score,
         highlight=item.highlight,
     )
 

@@ -740,9 +740,8 @@ async def entities_manager_mock():
     """
     klass = "nucliadb.ingest.service.writer.EntitiesManager"
     with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
-        with patch(f"{klass}.index_entities_group", AsyncMock(return_value=None)):
-            with patch(
-                f"nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
-                AsyncMock(return_value=[]),
-            ):
-                yield
+        with patch(
+            f"nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
+            AsyncMock(return_value=[]),
+        ):
+            yield

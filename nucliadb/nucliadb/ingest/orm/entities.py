@@ -34,8 +34,7 @@ from nucliadb_protos.nodereader_pb2 import (
     TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.nodewriter_pb2 import SetGraph
-from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
 from nucliadb.common.cluster.base import AbstractIndexNode
@@ -56,6 +55,11 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
 
+from .exceptions import EntityManagementException
+
+MAX_DUPLICATES = 300
+MAX_DELETED = 300
+
 
 class EntitiesManager:
     def __init__(
@@ -72,7 +76,6 @@ class EntitiesManager:
             raise AlreadyExists(f"Entities group {group} already exists")
 
         await self.store_entities_group(group, entities)
-        await self.index_entities_group(group, entities)
 
     async def get_entities(self, entities: GetEntitiesResponse):
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
@@ -121,8 +124,6 @@ class EntitiesManager:
             entities_group.entities[name].CopyFrom(entity)
 
         await self.store_entities_group(group, entities_group)
-        # XXX: this is indexing everything. We could do it better indexing only diffs
-        await self.index_entities_group(group, entities_group)
 
     async def set_entities_group(self, group: str, entities: EntitiesGroup):
         indexed = await self.get_indexed_entities_group(group)
@@ -138,11 +139,9 @@ class EntitiesManager:
                     updated.entities[name].deleted = True
 
         await self.store_entities_group(group, updated)
-        await self.index_entities_group(group, updated)
 
     async def set_entities_group_force(self, group: str, entitiesgroup: EntitiesGroup):
         await self.store_entities_group(group, entitiesgroup)
-        await self.index_entities_group(group, entitiesgroup)
 
     async def set_entities_group_metadata(
         self, group: str, *, title: Optional[str] = None, color: Optional[str] = None
@@ -160,19 +159,16 @@ class EntitiesManager:
 
     async def delete_entities(self, group: str, delete: List[str]):
         stored = await self.get_stored_entities_group(group)
-        indexed = await self.get_indexed_entities_group(group)
-
-        if stored is None and indexed is None:
-            return
 
         stored = stored or EntitiesGroup()
-        indexed = indexed or EntitiesGroup()
         for name in delete:
-            if name in stored.entities or name in indexed.entities:
+            if name not in stored.entities:
                 entity = stored.entities[name]
-                entity.deleted = True
+                entity.value = name
+            else:
+                entity = stored.entities[name]
+            entity.deleted = True
         await self.store_entities_group(group, stored)
-        # TODO: we should remove indexed entities here
 
     async def delete_entities_group(self, group: str):
         await self.delete_stored_entities_group(group)
@@ -316,6 +312,36 @@ class EntitiesManager:
         return indexed_groups
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
+        meta_cache = await EntitiesDataManager.get_entities_meta_cache(
+            self.kbid, self.txn
+        )
+        duplicates = {}
+        deleted = []
+        duplicate_count = 0
+        for entity in eg.entities.values():
+            if entity.deleted:
+                deleted.append(entity.value)
+                continue
+            if len(entity.represents) == 0:
+                continue
+            duplicates[entity.value] = list(entity.represents)
+            duplicate_count += len(duplicates[entity.value])
+
+        if duplicate_count > MAX_DUPLICATES:
+            raise EntityManagementException(
+                f"Too many duplicates: {duplicate_count}. Max of {MAX_DUPLICATES} currently allowed"
+            )
+        if len(deleted) > MAX_DELETED:
+            raise EntityManagementException(
+                f"Too many deleted entities: {len(deleted)}. Max of {MAX_DELETED} currently allowed"
+            )
+
+        meta_cache.set_duplicates(group, duplicates)
+        meta_cache.set_deleted(group, deleted)
+        await EntitiesDataManager.set_entities_meta_cache(
+            self.kbid, meta_cache, self.txn
+        )
+
         await EntitiesDataManager.set_entities_group(self.kbid, group, eg, self.txn)
         # if it was preivously deleted, we must unmark it
         await self.unmark_entities_group_as_deleted(group)
@@ -329,25 +355,10 @@ class EntitiesManager:
         await self.txn.delete(entities_key)
 
     async def mark_entities_group_as_deleted(self, group: str):
-        deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
-        payload = await self.txn.get(deleted_groups_key)
-        deg = DeletedEntitiesGroups()
-        if payload:
-            deg.ParseFromString(payload)
-        if group not in deg.entities_groups:
-            deg.entities_groups.append(group)
-            await self.txn.set(deleted_groups_key, deg.SerializeToString())
+        await EntitiesDataManager.mark_group_as_deleted(self.kbid, group, self.txn)
 
     async def unmark_entities_group_as_deleted(self, group: str):
-        key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
-        payload = await self.txn.get(key)
-        if not payload:
-            return
-        deg = DeletedEntitiesGroups()
-        deg.ParseFromString(payload)
-        if group in deg.entities_groups:
-            deg.entities_groups.remove(group)
-            await self.txn.set(key, deg.SerializeToString())
+        await EntitiesDataManager.unmark_group_as_deleted(self.kbid, group, self.txn)
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
@@ -360,6 +371,11 @@ class EntitiesManager:
         merged_entities.update(indexed.entities)
         merged_entities.update(stored.entities)
 
+        for entity, edata in list(stored.entities.items()):
+            # filter out deleted entities
+            if edata.deleted:
+                del merged_entities[entity]
+
         merged = EntitiesGroup(
             entities=merged_entities,
             title=stored.title or indexed.title or "",
@@ -367,20 +383,3 @@ class EntitiesManager:
             custom=False,  # if there are indexed entities, can't be a custom group
         )
         return merged
-
-    async def index_entities_group(self, group: str, entities: EntitiesGroup):
-        # TODO properly indexing of SYNONYM relations
-        graph_nodes = {
-            i: RelationNode(
-                value=entity.value,
-                ntype=RelationNode.NodeType.ENTITY,
-                subtype=group,
-            )
-            for i, (name, entity) in enumerate(entities.entities.items())
-        }
-
-        jg = JoinGraph(nodes=graph_nodes, edges=[])
-
-        async for node, shard_id in self.kb.iterate_kb_nodes():
-            sg = SetGraph(shard_id=ShardId(id=shard_id), graph=jg)
-            await node.writer.JoinGraph(sg)  # type: ignore

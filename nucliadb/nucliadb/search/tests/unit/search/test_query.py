@@ -18,13 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode, VectorSimilarity
 
 from nucliadb.search.search.query import (
+    QueryParser,
     get_default_min_score,
     get_kb_model_default_min_score,
     parse_entities_to_filters,
@@ -137,3 +139,70 @@ async def test_get_kb_model_default_min_score_backward_compatible(has_feature, k
         similarity_function=VectorSimilarity.COSINE
     )
     assert await get_kb_model_default_min_score("kbid") is None
+
+
+class TestApplySynonymsToRequest:
+    @pytest.fixture
+    def get_synonyms(self):
+        get_kb_synonyms = AsyncMock()
+        synonyms = Synonyms()
+        synonyms.terms["planet"].synonyms.extend(["earth", "globe"])
+        get_kb_synonyms.return_value = synonyms
+        yield get_kb_synonyms
+
+    @pytest.fixture
+    def query_parser(self, get_synonyms):
+        qp = QueryParser(
+            kbid="kbid",
+            features=[],
+            query="query",
+            filters=[],
+            faceted=[],
+            page_number=0,
+            page_size=10,
+            min_score=0.5,
+            with_synonyms=True,
+        )
+        with patch("nucliadb.search.search.query.get_kb_synonyms", get_synonyms):
+            yield qp
+
+    @pytest.mark.asyncio
+    async def test_not_applies_if_empty_body(
+        self, query_parser: QueryParser, get_synonyms
+    ):
+        query_parser.query = ""
+        search_request = Mock()
+        await query_parser.parse_synonyms(search_request)
+
+        get_synonyms.assert_not_awaited()
+        search_request.ClearField.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_not_applies_if_synonyms_object_not_found(
+        self, query_parser: QueryParser, get_synonyms
+    ):
+        query_parser.query = "planet"
+        get_synonyms.return_value = None
+        request = Mock()
+
+        await query_parser.parse_synonyms(Mock())
+
+        request.ClearField.assert_not_called()
+        get_synonyms.assert_awaited_once_with("kbid")
+
+    @pytest.mark.asyncio
+    async def test_not_applies_if_synonyms_not_found_for_query(
+        self, query_parser: QueryParser, get_synonyms
+    ):
+        query_parser.query = "foobar"
+        request = Mock()
+
+        await query_parser.parse_synonyms(request)
+
+        request.ClearField.assert_not_called()
+
+        query_parser.query = "planet"
+        await query_parser.parse_synonyms(request)
+
+        request.ClearField.assert_called_once_with("body")
+        assert request.advanced_query == "planet OR earth OR globe"

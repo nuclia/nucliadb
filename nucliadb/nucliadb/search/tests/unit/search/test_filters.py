@@ -21,10 +21,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from nucliadb.search.search.filters import (
-    record_filters_counter,
-    split_filters_by_label_type,
-)
+from nucliadb.search.search.filters import record_filters_counter
 
 
 def test_record_filters_counter():
@@ -47,19 +44,3 @@ def is_paragraph_labelset_kind_mock():
         "nucliadb.search.search.filters.is_paragraph_labelset_kind"
     ) as mocked:
         yield mocked
-
-
-async def test_split_filters_by_label_type(is_paragraph_labelset_kind_mock):
-    is_paragraph_labelset_kind_mock.return_value = False
-    field_labels, paragraph_labels = await split_filters_by_label_type(
-        "kbid", ["/e/foo/bar", "/l/bar/baa", "foo/"]
-    )
-    assert field_labels == ["/e/foo/bar", "/l/bar/baa"]
-    assert paragraph_labels == []
-
-    is_paragraph_labelset_kind_mock.return_value = True
-    field_labels, paragraph_labels = await split_filters_by_label_type(
-        "kbid", ["/e/foo/bar", "/l/bar/baa"]
-    )
-    assert field_labels == ["/e/foo/bar"]
-    assert paragraph_labels == ["/l/bar/baa"]

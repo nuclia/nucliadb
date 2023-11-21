@@ -59,9 +59,8 @@ images.settings["nucliadb_node_reader"] = {
             "/usr/local/bin/node_reader",
         ],
         "platform": "linux/amd64",
-        "mem_limit": "2g",
+        "mem_limit": "3g",
         "ports": {"4445": None},
-        "mem_limit": "2g",  # default is 1g, need to override
     },
 }
 
@@ -81,9 +80,8 @@ images.settings["nucliadb_node_writer"] = {
             "/usr/local/bin/node_writer",
         ],
         "platform": "linux/amd64",
-        "mem_limit": "2g",
+        "mem_limit": "3g",
         "ports": {"4446": None},
-        "mem_limit": "2g",  # default is 1g, need to override
     },
 }
 
