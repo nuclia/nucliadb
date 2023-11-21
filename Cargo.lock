@@ -1721,6 +1721,7 @@ dependencies = [
  "nucliadb_procs",
  "nucliadb_protos",
  "nucliadb_relations",
+ "nucliadb_relations2",
  "nucliadb_texts",
  "nucliadb_vectors",
  "num_cpus",
@@ -1786,7 +1787,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde_json",
- "tantivy",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
  "tantivy-common 0.2.0",
  "tantivy-fst",
  "tempfile",
@@ -1830,7 +1831,29 @@ dependencies = [
  "regex",
  "ring 0.16.20",
  "serde",
- "tantivy",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?rev=2183120aaa565b14fde05aa35342e5c5a3306d3b)",
+ "tempfile",
+ "thiserror",
+ "uuid 1.5.0",
+]
+
+[[package]]
+name = "nucliadb_relations2"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "data-encoding",
+ "derive_builder",
+ "deunicode",
+ "itertools",
+ "lazy_static",
+ "nucliadb_core",
+ "nucliadb_procs",
+ "rand",
+ "regex",
+ "ring 0.16.20",
+ "serde",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
  "tempfile",
  "thiserror",
  "uuid 1.5.0",
@@ -1843,7 +1866,7 @@ dependencies = [
  "itertools",
  "nucliadb_core",
  "nucliadb_procs",
- "tantivy",
+ "tantivy 0.17.0 (git+https://github.com/nuclia/tantivy.git?branch=original-17)",
  "tempfile",
 ]
 
@@ -3144,6 +3167,56 @@ checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "tantivy"
+version = "0.17.0"
+source = "git+https://github.com/nuclia/tantivy.git?branch=original-17#12667ead066ddcc56eaff79aea1a7d76206ee217"
+dependencies = [
+ "async-trait",
+ "base64 0.13.1",
+ "bitpacking",
+ "byteorder",
+ "census",
+ "chrono",
+ "crc32fast",
+ "crossbeam",
+ "downcast-rs",
+ "fail",
+ "fastdivide",
+ "fastfield_codecs",
+ "fnv",
+ "fs2",
+ "futures",
+ "htmlescape",
+ "itertools",
+ "levenshtein_automata",
+ "log",
+ "lru",
+ "lz4_flex",
+ "measure_time",
+ "memmap2",
+ "murmurhash32",
+ "num_cpus",
+ "once_cell",
+ "ownedbytes",
+ "pretty_assertions",
+ "rayon",
+ "regex",
+ "rust-stemmers",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "stable_deref_trait",
+ "tantivy-bitpacker",
+ "tantivy-common 0.2.0",
+ "tantivy-fst",
+ "tantivy-query-grammar",
+ "tempfile",
+ "thiserror",
+ "uuid 0.8.2",
+ "winapi 0.3.9",
 ]
 
 [[package]]

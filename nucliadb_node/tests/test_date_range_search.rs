@@ -91,7 +91,6 @@ async fn populate(writer: &mut TestNodeWriter, shard_id: String, metadata: Index
         paragraphs: HashMap::from([(format!("{raw_resource_id}/{field_id}"), paragraphs)]),
         paragraphs_to_delete: vec![],
         sentences_to_delete: vec![],
-        relations_to_delete: vec![],
         relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),

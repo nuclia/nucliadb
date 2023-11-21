@@ -126,7 +126,7 @@ async def test_limited_sorted_search_of_most_relevant_results(
         },
     )
     # must pass a sort limit
-    assert resp.status_code == 422
+    assert resp.status_code == 412
 
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",

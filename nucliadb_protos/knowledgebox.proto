@@ -158,6 +158,22 @@ message EntitiesGroups {
     map <string, EntitiesGroup> entities_groups = 1;
 }
 
+message EntityGroupDuplicateIndex {
+    //
+    // Structure to represent all duplicates defined in a kb
+    //     - call it an "Index" because it should include flattened version of all duplicated entries
+    //     - this allows 1 call to pull all duplicates
+    //
+
+    message EntityDuplicates {
+        repeated string duplicates = 1;
+    }
+    message EntityGroupDuplicates {
+        map<string, EntityDuplicates> entities = 1;
+    }
+    map <string, EntityGroupDuplicates> entities_groups = 1;
+}
+
 
 // Vectorsets
 

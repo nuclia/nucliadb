@@ -15,6 +15,7 @@ COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
+COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
@@ -54,6 +55,7 @@ COPY nucliadb_paragraphs /nucliadb/nucliadb_paragraphs
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations /nucliadb/nucliadb_relations
+COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
 COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark

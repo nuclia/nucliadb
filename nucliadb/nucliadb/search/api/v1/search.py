@@ -35,11 +35,8 @@ from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import get_default_min_score, global_query_to_pb
-from nucliadb.search.search.utils import (
-    parse_sort_options,
-    should_disable_vector_search,
-)
+from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.utils import should_disable_vector_search
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -220,8 +217,8 @@ async def catalog(
         min_score = 0.0
 
         # We need to query all nodes
-        pb_query, _, _ = await global_query_to_pb(
-            kbid,
+        query_parser = QueryParser(
+            kbid=kbid,
             features=[SearchOptions.DOCUMENT],
             query=query,
             filters=filters,
@@ -233,6 +230,7 @@ async def catalog(
             fields=["a/title"],
             with_status=with_status,
         )
+        pb_query, _, _ = await query_parser.parse()
 
         (results, _, _, _) = await node_query(
             kbid,
@@ -255,7 +253,7 @@ async def catalog(
             extracted=[],
             sort=sort_options,
             requested_relations=pb_query.relation_subgraph,
-            min_score=min_score,
+            min_score=query_parser.min_score,
             highlight=False,
         )
         return search_results
@@ -326,27 +324,21 @@ async def search(
     audit = get_audit()
     start_time = time()
 
-    sort_options = parse_sort_options(item)
-
     if SearchOptions.VECTOR in item.features:
         if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
-    min_score = item.min_score
-    if min_score is None:
-        min_score = await get_default_min_score(kbid)
-
     # We need to query all nodes
-    pb_query, incomplete_results, autofilters = await global_query_to_pb(
-        kbid,
+    query_parser = QueryParser(
+        kbid=kbid,
         features=item.features,
         query=item.query,
         filters=item.filters,
         faceted=item.faceted,
-        sort=sort_options,
+        sort=item.sort,
         page_number=item.page_number,
         page_size=item.page_size,
-        min_score=min_score,
+        min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
@@ -359,6 +351,7 @@ async def search(
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
     )
+    pb_query, incomplete_results, autofilters = await query_parser.parse()
 
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, target_replicas=item.shards
@@ -375,9 +368,9 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=sort_options,
+        sort=query_parser.sort,
         requested_relations=pb_query.relation_subgraph,
-        min_score=min_score,
+        min_score=query_parser.min_score,
         highlight=item.highlight,
     )
     await abort_transaction()

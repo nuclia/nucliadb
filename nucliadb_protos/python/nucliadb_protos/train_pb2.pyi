@@ -26,6 +26,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroupSummary as EntitiesGroupSummary,
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
+    EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KBConfiguration as KBConfiguration,
     KnowledgeBox as KnowledgeBox,

@@ -22,9 +22,9 @@ use std::sync::Arc;
 
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest,
-    NodeMetadata, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
+    op_status, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest, NodeMetadata,
+    OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
+    VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::NodeResult;
@@ -245,71 +245,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 };
                 Ok(tonic::Response::new(status))
             }
-        }
-    }
-
-    async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
-        let span = Span::current();
-        let request = request.into_inner();
-        let shard_id = match request.shard_id {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let graph = match request.graph {
-            Some(graph) => graph,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let shard = self.obtain_shard(shard_id).await?;
-        let info = info_span!(parent: &span, "join graph");
-        let task = || {
-            run_with_telemetry(info, move || {
-                shard
-                    .join_relations_graph(&graph)
-                    .and_then(|()| shard.get_opstatus())
-            })
-        };
-        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
-            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-        })?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
-    }
-
-    async fn delete_relation_nodes(
-        &self,
-        request: Request<DeleteGraphNodes>,
-    ) -> Result<Response<OpStatus>, Status> {
-        let span = Span::current();
-        let request = request.into_inner();
-        let shard_id = match request.shard_id {
-            Some(ref shard_id) => &shard_id.id,
-            None => return Err(tonic::Status::invalid_argument("Shard ID must be provided")),
-        };
-        let shard = self.obtain_shard(shard_id).await?;
-        let info = info_span!(parent: &span, "delete relations nodes");
-        let task = || {
-            run_with_telemetry(info, move || {
-                shard
-                    .delete_relation_nodes(&request)
-                    .and_then(|()| shard.get_opstatus())
-            })
-        };
-        let status = tokio::task::spawn_blocking(task).await.map_err(|error| {
-            tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
-        })?;
-        match status {
-            Ok(mut status) => {
-                status.status = 0;
-                status.detail = "Success!".to_string();
-                Ok(tonic::Response::new(status))
-            }
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
 

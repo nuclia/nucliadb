@@ -46,20 +46,6 @@ pub struct IndexMessage {
     pub kbid: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SetGraph {
-    #[prost(message, optional, tag="1")]
-    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
-    #[prost(message, optional, tag="2")]
-    pub graph: ::core::option::Option<super::utils::JoinGraph>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DeleteGraphNodes {
-    #[prost(message, optional, tag="2")]
-    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
-    #[prost(message, repeated, tag="1")]
-    pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewShardRequest {
     #[prost(enumeration="super::utils::VectorSimilarity", tag="1")]
     pub similarity: i32,
@@ -274,44 +260,6 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn delete_relation_nodes(
-            &mut self,
-            request: impl tonic::IntoRequest<super::DeleteGraphNodes>,
-        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/DeleteRelationNodes",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
-        pub async fn join_graph(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SetGraph>,
-        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/JoinGraph",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
         pub async fn remove_resource(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ResourceId>,
@@ -460,14 +408,6 @@ pub mod node_writer_server {
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
-        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        async fn delete_relation_nodes(
-            &self,
-            request: tonic::Request<super::DeleteGraphNodes>,
-        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        async fn join_graph(
-            &self,
-            request: tonic::Request<super::SetGraph>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
         async fn remove_resource(
             &self,
@@ -771,82 +711,6 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = SetResourceSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodewriter.NodeWriter/DeleteRelationNodes" => {
-                    #[allow(non_camel_case_types)]
-                    struct DeleteRelationNodesSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<
-                        T: NodeWriter,
-                    > tonic::server::UnaryService<super::DeleteGraphNodes>
-                    for DeleteRelationNodesSvc<T> {
-                        type Response = super::OpStatus;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::DeleteGraphNodes>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).delete_relation_nodes(request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = DeleteRelationNodesSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodewriter.NodeWriter/JoinGraph" => {
-                    #[allow(non_camel_case_types)]
-                    struct JoinGraphSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter> tonic::server::UnaryService<super::SetGraph>
-                    for JoinGraphSvc<T> {
-                        type Response = super::OpStatus;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::SetGraph>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move { (*inner).join_graph(request).await };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = JoinGraphSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

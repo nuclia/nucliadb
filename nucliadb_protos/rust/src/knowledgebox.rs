@@ -193,6 +193,29 @@ pub struct EntitiesGroups {
     #[prost(map="string, message", tag="1")]
     pub entities_groups: ::std::collections::HashMap<::prost::alloc::string::String, EntitiesGroup>,
 }
+///
+/// Structure to represent all duplicates defined in a kb
+///     - call it an "Index" because it should include flattened version of all duplicated entries
+///     - this allows 1 call to pull all duplicates
+///
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EntityGroupDuplicateIndex {
+    #[prost(map="string, message", tag="1")]
+    pub entities_groups: ::std::collections::HashMap<::prost::alloc::string::String, entity_group_duplicate_index::EntityGroupDuplicates>,
+}
+/// Nested message and enum types in `EntityGroupDuplicateIndex`.
+pub mod entity_group_duplicate_index {
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct EntityDuplicates {
+        #[prost(string, repeated, tag="1")]
+        pub duplicates: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct EntityGroupDuplicates {
+        #[prost(map="string, message", tag="1")]
+        pub entities: ::std::collections::HashMap<::prost::alloc::string::String, EntityDuplicates>,
+    }
+}
 // Vectorsets
 
 #[derive(Clone, PartialEq, ::prost::Message)]

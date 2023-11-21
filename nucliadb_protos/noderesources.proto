@@ -43,6 +43,7 @@ message ShardCreated {
     enum RelationService {
         RELATION_V0 = 0;
         RELATION_V1 = 1;
+        RELATION_V2 = 2;
     }
     RelationService relation_service = 5;
 }
@@ -157,7 +158,6 @@ message Resource {
 
     // Relations
     repeated utils.Relation relations = 9;
-    repeated utils.Relation relations_to_delete = 10;
 
     string shard_id = 11;
 

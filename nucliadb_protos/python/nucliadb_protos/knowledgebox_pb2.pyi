@@ -21,8 +21,6 @@ from nucliadb_protos.utils_pb2 import (
     DOT as DOT,
     EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
-    JoinGraph as JoinGraph,
-    JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
@@ -551,6 +549,92 @@ class EntitiesGroups(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["entities_groups", b"entities_groups"]) -> None: ...
 
 global___EntitiesGroups = EntitiesGroups
+
+@typing_extensions.final
+class EntityGroupDuplicateIndex(google.protobuf.message.Message):
+    """
+    Structure to represent all duplicates defined in a kb
+        - call it an "Index" because it should include flattened version of all duplicated entries
+        - this allows 1 call to pull all duplicates
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class EntityDuplicates(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        DUPLICATES_FIELD_NUMBER: builtins.int
+        @property
+        def duplicates(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        def __init__(
+            self,
+            *,
+            duplicates: collections.abc.Iterable[builtins.str] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["duplicates", b"duplicates"]) -> None: ...
+
+    @typing_extensions.final
+    class EntityGroupDuplicates(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        @typing_extensions.final
+        class EntitiesEntry(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KEY_FIELD_NUMBER: builtins.int
+            VALUE_FIELD_NUMBER: builtins.int
+            key: builtins.str
+            @property
+            def value(self) -> global___EntityGroupDuplicateIndex.EntityDuplicates: ...
+            def __init__(
+                self,
+                *,
+                key: builtins.str = ...,
+                value: global___EntityGroupDuplicateIndex.EntityDuplicates | None = ...,
+            ) -> None: ...
+            def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+            def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+        ENTITIES_FIELD_NUMBER: builtins.int
+        @property
+        def entities(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___EntityGroupDuplicateIndex.EntityDuplicates]: ...
+        def __init__(
+            self,
+            *,
+            entities: collections.abc.Mapping[builtins.str, global___EntityGroupDuplicateIndex.EntityDuplicates] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["entities", b"entities"]) -> None: ...
+
+    @typing_extensions.final
+    class EntitiesGroupsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___EntityGroupDuplicateIndex.EntityGroupDuplicates: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___EntityGroupDuplicateIndex.EntityGroupDuplicates | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    ENTITIES_GROUPS_FIELD_NUMBER: builtins.int
+    @property
+    def entities_groups(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___EntityGroupDuplicateIndex.EntityGroupDuplicates]: ...
+    def __init__(
+        self,
+        *,
+        entities_groups: collections.abc.Mapping[builtins.str, global___EntityGroupDuplicateIndex.EntityGroupDuplicates] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entities_groups", b"entities_groups"]) -> None: ...
+
+global___EntityGroupDuplicateIndex = EntityGroupDuplicateIndex
 
 @typing_extensions.final
 class VectorSet(google.protobuf.message.Message):

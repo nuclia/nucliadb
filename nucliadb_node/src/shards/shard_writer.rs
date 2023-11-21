@@ -23,9 +23,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity,
-};
+use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
@@ -64,7 +62,10 @@ impl ShardWriter {
         vsc: VectorConfig,
         rsc: RelationConfig,
     ) -> NodeResult<ShardWriter> {
-        let versions = Versions::load_or_create(&path.join(VERSION_FILE))?;
+        let versions = Versions::load_or_create(
+            &path.join(VERSION_FILE),
+            metadata.channel.unwrap_or_default(),
+        )?;
         let text_task = || Some(versions.get_texts_writer(&tsc));
         let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
         let vector_task = || Some(versions.get_vectors_writer(&vsc));
@@ -142,6 +143,7 @@ impl ShardWriter {
         match self.relation_service_version {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
+            2 => RelationService::RelationV2,
             i => panic!("Unknown relation version {i}"),
         }
     }
@@ -167,6 +169,7 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
@@ -191,6 +194,7 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
 
         std::fs::create_dir(path)?;
@@ -222,6 +226,7 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
 
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
@@ -435,20 +440,6 @@ impl ShardWriter {
 
         self.new_generation_id();
 
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> NodeResult<()> {
-        let mut writer = relation_write(&self.relation_writer);
-        writer.delete_nodes(nodes)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn join_relations_graph(&self, graph: &JoinGraph) -> NodeResult<()> {
-        let mut writer = relation_write(&self.relation_writer);
-        writer.join_graph(graph)?;
         Ok(())
     }
 
