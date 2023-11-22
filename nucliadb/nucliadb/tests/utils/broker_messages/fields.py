@@ -36,6 +36,7 @@ class FieldUser:
 class FieldExtracted:
     metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
     text: Optional[rpb.ExtractedTextWrapper] = None
+    question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
 
 
 @dataclasses.dataclass
@@ -51,10 +52,13 @@ class FieldBuilder:
         self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
         self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
         self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
+        self.__question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
 
     @property
     def id(self) -> rpb.FieldID:
         return self._field_id
+
+    # properties to generate a default value per pb
 
     @property
     def _extracted_metadata(self) -> rpb.FieldComputedMetadataWrapper:
@@ -77,6 +81,14 @@ class FieldBuilder:
         return self.__extracted_text
 
     @property
+    def _question_answers(self) -> rpb.FieldQuestionAnswerWrapper:
+        if self.__question_answers is None:
+            self.__question_answers = rpb.FieldQuestionAnswerWrapper(
+                field=self._field_id
+            )
+        return self.__question_answers
+
+    @property
     def _user_metadata(self) -> rpb.UserFieldMetadata:
         if self.__user_metadata is None:
             self.__user_metadata = rpb.UserFieldMetadata(field=self._field_id)
@@ -92,6 +104,10 @@ class FieldBuilder:
         if self.__extracted_text is not None:
             field.extracted.text = rpb.ExtractedTextWrapper()
             field.extracted.text.CopyFrom(self.__extracted_text)
+
+        if self.__question_answers is not None:
+            field.extracted.question_answers = rpb.FieldQuestionAnswerWrapper()
+            field.extracted.question_answers.CopyFrom(self.__question_answers)
 
         if self.__user_metadata is not None:
             field.user.metadata = rpb.UserFieldMetadata()
@@ -133,3 +149,33 @@ class FieldBuilder:
         pa.key = key
         pa.classifications.extend(classifications)
         self._user_metadata.paragraphs.append(pa)
+
+    def add_question_answer(
+        self,
+        question: str,
+        answer: str,
+        question_lang: str = "en",
+        question_paragraph_ids: list[str] = [],
+        answer_lang: str = "en",
+        answer_paragraph_ids: list[str] = [],
+    ):
+        question_pb = rpb.Question(
+            text=question,
+            language=question_lang,
+            ids_paragraphs=question_paragraph_ids,
+        )
+        answer_pb = rpb.Answers(
+            text=answer,
+            language=answer_lang,
+            ids_paragraphs=answer_paragraph_ids,
+        )
+
+        # check if is another answer for an already added question
+        for question_answer in self._question_answers.question_answers.question_answer:
+            if question_answer.question == question_pb:
+                question_answer.answers.append(answer_pb)
+                return
+
+        question_answer = rpb.QuestionAnswer(question=question_pb)
+        question_answer.answers.append(answer_pb)
+        self._question_answers.question_answers.question_answer.append(question_answer)

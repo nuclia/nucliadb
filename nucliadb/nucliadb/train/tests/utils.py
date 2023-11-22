@@ -25,6 +25,7 @@ from nucliadb_protos.dataset_pb2 import (
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
+    QuestionAnswerStreamingBatch,
     SentenceClassificationBatch,
     TokenClassificationBatch,
 )
@@ -65,6 +66,14 @@ def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
     pb_klass: type[ParagraphStreamingBatch],
 ) -> AsyncGenerator[ParagraphStreamingBatch, None]:
+    ...
+
+
+@overload
+def get_batches_from_train_response_stream(
+    response: aiohttp.ClientResponse,
+    pb_klass: type[QuestionAnswerStreamingBatch],
+) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]:
     ...
 
 
