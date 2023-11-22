@@ -567,11 +567,11 @@ async def get_rid_from_params_or_raise_error(
 
 
 def maybe_mark_reindex(message: BrokerMessage, item: UpdateResourcePayload):
-    if needs_resource_reindex(message, item):
+    if needs_resource_reindex(item):
         message.reindex = True
 
 
-def needs_resource_reindex(message: BrokerMessage, item: UpdateResourcePayload) -> bool:
+def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     # Some metadata need to be applied as tags to all fields of
     # a resource and that means this message should force reindexing everything.
     # XXX This is not ideal. Long term, we should handle it differently
