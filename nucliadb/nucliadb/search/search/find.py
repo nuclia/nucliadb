@@ -47,7 +47,6 @@ async def find(
         if should_disable_vector_search(item):
             item.features.remove(SearchOptions.VECTOR)
 
-    # We need to query all nodes
     query_parser = QueryParser(
         kbid=kbid,
         features=item.features,
@@ -74,7 +73,6 @@ async def find(
     results, query_incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, target_replicas=item.shards
     )
-
     incomplete_results = incomplete_results or query_incomplete_results
 
     # We need to merge
