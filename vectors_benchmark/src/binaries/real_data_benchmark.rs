@@ -153,7 +153,7 @@ fn create_request(
         .for_each(|c| formula.extend(c));
 
     if key_prefixes.len() > 0 {
-        formula.extend(CompoundClause::new(1, key_prefixes.collect()));
+        formula.extend(CompoundClause::new(key_prefixes.collect()));
     }
 
     let res = Request {
