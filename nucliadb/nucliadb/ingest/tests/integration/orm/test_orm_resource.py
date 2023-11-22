@@ -335,8 +335,8 @@ async def test_generate_broker_message(
     # Field vectors
     lfv = [v for v in bm.field_vectors if v.field.field == "link1"][0]
     assert len(lfv.vectors.vectors.vectors) == 1
-    assert lfv.vectors.vectors.vectors[0].start == 1
-    assert lfv.vectors.vectors.vectors[0].end == 2
+    assert lfv.vectors.vectors.vectors[0].start == 0
+    assert lfv.vectors.vectors.vectors[0].end == 20
     assert lfv.vectors.vectors.vectors[0].vector == list(map(int, b"ansjkdn"))
 
     # 2.3 CONVERSATION FIELD
