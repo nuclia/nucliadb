@@ -37,6 +37,8 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import OpStatusWriter, SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.common.cluster import rollover
+from nucliadb.common.context import ApplicationContext
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_models.labels import LabelSetKind
 from nucliadb_protos import writer_pb2
@@ -339,7 +341,17 @@ async def kbid(
         ],
     ],
 )
-async def test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
+async def test_filtering_before_and_after_reindexing(
+    app_context, nucliadb_reader: AsyncClient, kbid: str, filters
+):
+    await _test_filtering(nucliadb_reader, kbid, filters)
+
+    await rollover.rollover_shards(app_context, kbid)
+
+    await _test_filtering(nucliadb_reader, kbid, filters)
+
+
+async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
     # The set of expected results is always the AND of the filters
     filter_paragraphs = []
     expected_paragraphs = set()
@@ -381,3 +393,11 @@ async def test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             ), f"Score type not expected with filters {filters}"
             not_yet_found.remove(par["text"])
     assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
+
+
+@pytest.fixture()
+async def app_context(natsd, gcs_storage, nucliadb):
+    ctx = ApplicationContext()
+    await ctx.initialize()
+    yield ctx
+    await ctx.finalize()

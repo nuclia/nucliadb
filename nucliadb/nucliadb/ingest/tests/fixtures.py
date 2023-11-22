@@ -333,10 +333,10 @@ def make_field_metadata(field_id):
     ex1.metadata.metadata.links.append("https://nuclia.com")
 
     p1 = rpb.Paragraph(start=0, end=20)
-    p1.sentences.append(rpb.Sentence(start=0, end=10, key="test"))
-    p1.sentences.append(rpb.Sentence(start=11, end=20, key="test"))
+    p1.sentences.append(rpb.Sentence(start=0, end=20, key=""))
     cl1 = rpb.Classification(labelset="labelset1", label="label1")
-    p1.classifications.append(cl1)
+    cl2 = rpb.Classification(labelset="paragraph-labelset", label="label1")
+    p1.classifications.append(cl2)
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
     # ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
@@ -347,7 +347,7 @@ def make_field_metadata(field_id):
     ex1.metadata.metadata.thumbnail.CopyFrom(THUMBNAIL)
     ex1.metadata.metadata.positions["ENTITY/document"].entity = "document"
     ex1.metadata.metadata.positions["ENTITY/document"].position.extend(
-        [rpb.Position(start=0, end=5), rpb.Position(start=23, end=28)]
+        [rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)]
     )
     return ex1
 
@@ -366,7 +366,7 @@ def make_field_large_metadata(field_id):
 def make_extracted_vectors(field_id):
     ex1 = rpb.ExtractedVectorsWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
-    v1 = rpb.Vector(start=1, end=2, vector=b"ansjkdn")
+    v1 = rpb.Vector(start=0, end=20, vector=b"ansjkdn")
     ex1.vectors.vectors.vectors.append(v1)
     return ex1
 
