@@ -56,7 +56,8 @@ pub fn get_pointer(x: &[u8], i: usize) -> Pointer {
 }
 
 // O(1)
-pub fn get_no_elems(x: &[u8]) -> HeaderE {
+// Returns how many elements are in x, alive or deleted.
+pub fn elements_in_total(x: &[u8]) -> HeaderE {
     usize_from_slice_le(&x[..HEADER_LEN])
 }
 
@@ -133,7 +134,7 @@ where
 // O(log n) where n is the number of slots in src.
 #[allow(unused)]
 pub fn search_by_key<S: Slot>(interface: S, src: &[u8], key: &[u8]) -> Option<usize> {
-    let number_of_values = get_no_elems(src);
+    let number_of_values = elements_in_total(src);
     let mut start = 0;
     let mut end = number_of_values;
     let mut found = None;
@@ -168,33 +169,31 @@ pub fn get_keys<'a, S: Slot + Copy + 'a>(
     interface: S,
     x: &'a [u8],
 ) -> impl Iterator<Item = &'a [u8]> {
-    (0..get_no_elems(x))
+    (0..elements_in_total(x))
         .map(move |i| get_value(interface, x, i))
         .map(move |v| interface.get_key(v))
 }
 
-fn transfer_elem<S, R>(
-    interface: S,
+fn transfer_elem<R>(
     at: &mut R,
-    from: &[u8],
-    id: Pointer,
+    value: &[u8],
     writen_elems: usize,
     crnt_length: usize,
 ) -> io::Result<usize>
 where
-    S: Slot,
     R: Write + Seek,
 {
     let idx_slot = (HEADER_LEN + (writen_elems * POINTER_LEN)) as u64;
-    let value = get_value::<S>(interface, from, id);
     at.seek(SeekFrom::Start(idx_slot))?;
     at.write_all(&crnt_length.to_le_bytes())?;
     at.seek(SeekFrom::Start(crnt_length as u64))?;
     at.write_all(value)?;
     Ok(crnt_length + value.len())
 }
+
+// Returns the number of alive elements in the store and the space they consume.
 fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
-    let len = get_no_elems(source);
+    let len = elements_in_total(source);
     let mut value_space = 0;
     let mut no_elems = 0;
     for id in 0..len {
@@ -208,84 +207,135 @@ fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
     (no_elems, value_space)
 }
 
-// Merge algorithm for n key-value stores.
+// Merge algorithm
+
+/// Given the status of each producer and their lengths, this function
+/// will return the index of the ones that are not finished.
+fn compute_unfinished(buffer: &mut Vec<usize>, status: &[usize], lens: &[usize]) {
+    buffer.clear();
+    let iterator = status.iter().copied().zip(lens.iter().copied()).enumerate();
+    for (current_id, _) in iterator.filter(|(_, i)| i.0 < i.1) {
+        buffer.push(current_id);
+    }
+}
+
+fn find_minimum<'a, S: Slot + Copy>(
+    unfinished: &[usize],
+    status: &[usize],
+    producers: &[(S, &'a [u8])],
+) -> Option<&'a [u8]> {
+    let interface = producers[0].0;
+    let mut minimum = None;
+    for producer in unfinished.iter().copied() {
+        let next_elem = status[producer];
+        let store = producers[producer].1;
+        let element_pointer = get_pointer(store, next_elem);
+        let element_slice = &store[element_pointer..];
+        if !interface.keep_in_merge(element_slice) {
+            continue;
+        } else if let Some(minimum_slice) = minimum {
+            minimum = Some(std::cmp::min_by(minimum_slice, element_slice, |i, j| {
+                interface.cmp_slot(i, j)
+            }));
+        } else {
+            minimum = Some(element_slice);
+        }
+    }
+    minimum.map(|v| interface.read_exact(v).0)
+}
+
+fn advance_merge<S: Slot + Copy>(
+    minimum: Option<&[u8]>,
+    unfinished: &[usize],
+    status: &mut [usize],
+    producers: &[(S, &[u8])],
+) {
+    let interface = producers[0].0;
+    for producer in unfinished.iter().copied() {
+        let next_elem = status[producer];
+        let store = producers[producer].1;
+        let element_pointer = get_pointer(store, next_elem);
+        let element_slice = &store[element_pointer..];
+        if !interface.keep_in_merge(element_slice) {
+            status[producer] += 1;
+            continue;
+        }
+
+        let Some(inner_minimum) = minimum else {
+            continue;
+        };
+        if interface.cmp_slot(inner_minimum, element_slice).is_eq() {
+            status[producer] += 1;
+        }
+    }
+}
+
+// Entry point for the merge algorithm. Returns the number of elements merged into the file.
 // WARNING: In case of keys duplicatied keys it favors the contents of the first slot.
-// Returns the number of elements merged into the file.
-pub fn merge<S, R>(recepient: &mut R, producers: Vec<(S, &[u8])>) -> io::Result<usize>
+pub fn merge<S, R>(recipient: &mut R, producers: Vec<(S, &[u8])>) -> io::Result<usize>
 where
     S: Slot + Copy,
     R: Write + Seek,
 {
-    let lens = producers
-        .iter()
-        .copied()
-        .map(|(_, data)| data)
-        .map(get_no_elems)
-        .collect::<Vec<_>>();
+    // Number of elements that will be transferred to the recipient.
+    let mut number_of_elements = 0;
+    // Space required to perform the merge.
+    let mut value_space = 0;
+    // Index of the producers that have alive elements.
+    let mut non_empty_producers = Vec::with_capacity(producers.len());
+    // Number of total elements (alive or deleted) each producer has
+    let mut lens = Vec::with_capacity(producers.len());
+    for (id, (interface, data)) in producers.iter().copied().enumerate() {
+        let total_elements = elements_in_total(data);
+        let (alive_elements, space) = get_metrics::<S>(interface, data);
+        number_of_elements += alive_elements;
+        value_space += space;
 
-    // The number of elements that will remain at the merged file
-    // needs to be computed so the space is reserved.
-    let (no_elems, value_space) = producers
-        .iter()
-        .copied()
-        .map(|(interface, p)| get_metrics::<S>(interface, p))
-        .fold((0, 0), |(ne, vs), (ne_p, vs_p)| (ne + ne_p, vs + vs_p));
-
-    // Reserve space
-    let total_space = HEADER_LEN + (POINTER_LEN * no_elems) + value_space;
-    for _ in 0..total_space {
-        recepient.write_all(&[0])?;
-    }
-
-    // Merge loop
-    let mut writen_elems = 0;
-    let mut crnt_length = HEADER_LEN + (POINTER_LEN * no_elems);
-    let mut ids = vec![0usize; producers.len()];
-
-    while ids
-        .iter()
-        .copied()
-        .zip(lens.iter().copied())
-        .any(|(id, len)| id < len)
-    {
-        let min_data = producers
-            .iter()
-            .copied()
-            .zip(ids.iter().copied())
-            .zip(lens.iter().copied())
-            .filter(|((_, x_id), x_len)| *x_id < *x_len)
-            .map(|((x, x_id), _)| (x, x_id, get_pointer(x.1, x_id)))
-            .filter(|((interface, x), _, x_ptr)| interface.keep_in_merge(&x[*x_ptr..]))
-            .min_by(|(x, _, x_ptr), (y, _, y_ptr)| x.0.cmp_slot(&x.1[*x_ptr..], &y.1[*y_ptr..]));
-        producers
-            .iter()
-            .copied()
-            .zip(ids.iter_mut())
-            .zip(lens.iter().copied())
-            .filter(|((_, x_id), x_len)| **x_id < *x_len)
-            .map(|((x, x_id), _)| (x, get_pointer(x.1, *x_id), x_id))
-            .for_each(|((interface, x), x_ptr, x_id)| {
-                let is_equal = min_data.map(|(min, _, min_ptr)| {
-                    interface.cmp_slot(&x[x_ptr..], &min.1[min_ptr..]).is_eq()
-                });
-                if !interface.keep_in_merge(&x[x_ptr..]) {
-                    *x_id += 1;
-                } else if is_equal.unwrap_or_default() {
-                    *x_id += 1
-                }
-            });
-        if let Some(((interface, min), min_id, _)) = min_data {
-            crnt_length =
-                transfer_elem(interface, recepient, min, min_id, writen_elems, crnt_length)?;
-            writen_elems += 1;
+        lens.push(total_elements);
+        if alive_elements > 0 {
+            non_empty_producers.push(id);
         }
     }
+
+    // Taking deletions into account, how many elements will be on the recipient.
+    let number_of_elements = number_of_elements;
+    // Taking deletions into account, the number of bytes required to fit them.
+    let value_space = value_space;
+    // Per producer, the number of elements it has (deleted included).
+    let lens = lens;
+    // Unfinished producers, initialized to every non-empty producer.
+    let mut unfinished = non_empty_producers;
+    // At most, the merge will need total_space bytes.
+    let total_space = HEADER_LEN + (POINTER_LEN * number_of_elements) + value_space;
+    // Number of elements that have been written into the recipient.
+    let mut written_elems = 0;
+    // Length of the recipient's written part
+    let mut recipient_length = HEADER_LEN + (POINTER_LEN * number_of_elements);
+    // Per producer, which element should be visited next.
+    let mut status = vec![0usize; producers.len()];
+
+    // Reserving enough space to fit the merge result.
+    for _ in 0..total_space {
+        recipient.write_all(&[0])?;
+    }
+
+    // Merge loop, transfers the contents of each producer into the recipient in order
+    while !unfinished.is_empty() {
+        let minimum = find_minimum(&unfinished, &status, &producers);
+        if let Some(minimum) = minimum {
+            recipient_length = transfer_elem(recipient, minimum, written_elems, recipient_length)?;
+            written_elems += 1;
+        }
+        advance_merge(minimum, &unfinished, &mut status, &producers);
+        compute_unfinished(&mut unfinished, &status, &lens);
+    }
+
     // Write the number of elements
-    recepient.seek(SeekFrom::Start(0))?;
-    recepient.write_all(&writen_elems.to_le_bytes())?;
-    recepient.seek(SeekFrom::Start(0)).unwrap();
-    recepient.flush()?;
-    Ok(writen_elems)
+    recipient.seek(SeekFrom::Start(0))?;
+    recipient.write_all(&written_elems.to_le_bytes())?;
+    recipient.seek(SeekFrom::Start(0)).unwrap();
+    recipient.flush()?;
+    Ok(written_elems)
 }
 
 #[cfg(test)]
@@ -307,7 +357,7 @@ mod tests {
     }
 
     fn store_checks(expected: &[impl AsRef<[u8]>], buf: &[u8]) {
-        let no_values = get_no_elems(buf);
+        let no_values = elements_in_total(buf);
         assert_eq!(no_values, expected.len());
         for (i, item) in expected.iter().enumerate() {
             let value_ptr = get_pointer(buf, i);

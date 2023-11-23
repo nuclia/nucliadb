@@ -236,7 +236,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
             nodes,
             delete_log,
             similarity,
-            no_nodes: key_value::get_no_elems(nodes),
+            no_nodes: key_value::elements_in_total(nodes),
             min_score,
         }
     }
@@ -441,7 +441,7 @@ impl AsRef<DataPoint> for DataPoint {
 
 impl DataPoint {
     pub fn stored_len(&self) -> Option<u64> {
-        if key_value::get_no_elems(&self.nodes) == 0 {
+        if key_value::elements_in_total(&self.nodes) == 0 {
             return None;
         }
         let node = key_value::get_value(Node, &self.nodes, 0);
@@ -481,7 +481,7 @@ impl DataPoint {
             min_score,
         );
 
-        let no_nodes = key_value::get_no_elems(&self.nodes);
+        let no_nodes = key_value::elements_in_total(&self.nodes);
 
         let filter = FormulaFilter::new(
             filter,
@@ -546,7 +546,7 @@ impl DataPoint {
         }
 
         let nodes = unsafe { Mmap::map(&nodes)? };
-        let no_nodes = key_value::get_no_elems(&nodes);
+        let no_nodes = key_value::elements_in_total(&nodes);
 
         // Creating the FSTs with the new nodes
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
@@ -655,7 +655,7 @@ impl DataPoint {
         root_dir: &path::Path,
         nodes: &[u8],
     ) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
-        let no_nodes = key_value::get_no_elems(nodes);
+        let no_nodes = key_value::elements_in_total(nodes);
 
         // building the KeyIndex and LabelIndex FSTs
         let fst_dir = root_dir.join(file_names::FST);
@@ -741,7 +741,7 @@ impl DataPoint {
             nodesf_buffer.flush()?;
         }
         let nodes = unsafe { Mmap::map(&nodesf)? };
-        let no_nodes = key_value::get_no_elems(&nodes);
+        let no_nodes = key_value::elements_in_total(&nodes);
 
         // Creating the FSTs
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
