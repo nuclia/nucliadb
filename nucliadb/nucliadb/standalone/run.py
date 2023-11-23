@@ -28,6 +28,7 @@ from fastapi import FastAPI
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.standalone import versions
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry import errors
@@ -110,10 +111,19 @@ def run():
         ]
     )
 
+    installed_version = versions.installed_nucliadb()
+    latest_version = versions.latest_nucliadb()
+    if installed_version != latest_version:
+        version_info_fmted = f"{installed_version} (Update available: {latest_version})"
+    else:
+        version_info_fmted = installed_version
+
     sys.stdout.write(
         f"""=================================================
 ||
 ||   NucliaDB Standalone Server Running!
+||
+||   Version: {version_info_fmted}
 ||
 ||   Configuration:
 {settings_to_output_fmted}
