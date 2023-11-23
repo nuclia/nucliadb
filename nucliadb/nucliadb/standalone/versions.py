@@ -17,45 +17,60 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import enum
 import logging
+from typing import Optional
 
-import httpx
 import pkg_resources
-from async_lru import alru_cache
+from cachetools import TTLCache
+from packaging import version
+
+from nucliadb.common.http_clients.pypi import PyPi, PyPiAsync
 
 logger = logging.getLogger(__name__)
 
 
-VERSION_CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
-WAIT_AFTER_ERROR_SECONDS = 5 * 60  # 5 minutes
-PYPI_JSON_API = "https://pypi.org/pypi/{package_name}/json"
-
-NUCLIADB_PKG = "nucliadb"
-NUCLIADB_ADMIN_ASSETS_PKG = "nucliadb-admin-assets"
-WATCHED_PYPI_PACKAGES = [NUCLIADB_PKG, NUCLIADB_ADMIN_ASSETS_PKG]
+CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
+CACHE = TTLCache(maxsize=128, ttl=CACHE_TTL_SECONDS)  # type: ignore
 
 
-async def get_versions() -> dict[str, dict[str, str]]:
-    return {
-        package: {
-            "installed": release(get_package_version(package)),
-            "latest": release(await cached_get_latest_package_version(package)),
-        }
-        for package in WATCHED_PYPI_PACKAGES
-    }
+class StandalonePackages(enum.Enum):
+    NUCLIADB = "nucliadb"
+    NUCLIADB_ADMIN_ASSETS = "nucliadb-admin-assets"
+
+
+WatchedPackages = [pkg.value for pkg in StandalonePackages]
 
 
 def installed_nucliadb() -> str:
-    return release(get_package_version(NUCLIADB_PKG))
+    return get_package_version(StandalonePackages.NUCLIADB.value)
 
 
-def latest_nucliadb() -> str:
-    return release(get_latest_package_version(NUCLIADB_PKG))
+def can_update_nucliadb() -> bool:
+    _installed = installed_nucliadb()
+    installed = version.parse(_release(_installed))
+    _latest = latest_nucliadb()
+    if _latest is None:
+        return False
+    latest = version.parse(_release(_latest))
+    return installed < latest
 
 
-def release(version: str) -> str:
-    # Remove automatic post versions and only keep explicit
-    # release that are cut on important changes/bugfixes
+def latest_nucliadb() -> Optional[str]:
+    latest = get_latest_package_version(StandalonePackages.NUCLIADB.value)
+    if latest is None:
+        return None
+    return latest
+
+
+def _release(version: str) -> str:
+    """
+    We want to remove the .postX part of the version, so we can compare major.minor.patch only
+    >>> _release("1.2.3")
+    '1.2.3'
+    >>> _release("1.2.3.post1")
+    '1.2.3'
+    """
     return version.split(".post")[0]
 
 
@@ -63,61 +78,35 @@ def get_package_version(package_name: str) -> str:
     return pkg_resources.get_distribution(package_name).version
 
 
-def get_latest_package_version(package_name: str) -> str:
-    pypi = PyPi()
-    try:
-        return pypi.get_latest_version(package_name)
-    finally:
-        pypi.close()
-
-
-@alru_cache(maxsize=1, ttl=VERSION_CACHE_TTL_SECONDS)
-async def cached_get_latest_package_version(package_name: str) -> str:
-    pypi = PyPiAsync()
-    try:
-        return await pypi.get_latest_version(package_name)
-    finally:
-        await pypi.aclose()
-
-
-class PyPi:
-    def __init__(self):
-        self.session = httpx.Client()
-
-    def close(self):
-        self.session.close()
-
-    def get_latest_version(self, package_name: str) -> str:
-        response = self.session.get(
-            PYPI_JSON_API.format(package_name=package_name),
-            headers={"Accept": "application/json"},
-        )
-        response.raise_for_status()
-        return response.json()["info"]["version"]
-
-
-class PyPiAsync:
-    def __init__(self):
-        self._asession = None
-
-    @property
-    def asession(self):
-        if self._asession is None:
-            self._asession = httpx.AsyncClient()
-        return self._asession
-
-    async def aclose(self):
-        if self._asession is None:
-            return
+def get_latest_package_version(package: str) -> Optional[str]:
+    result = CACHE.get(package, None)
+    if result is None:
         try:
-            await self._asession.aclose()
-        except Exception:
-            pass
+            result = _get_latest_package_version(package)
+        except Exception as exc:
+            logger.warning("Error getting latest nucliadb version", exc_info=exc)
+            return None
+        CACHE[package] = result
+    return result
 
-    async def get_latest_version(self, package_name: str) -> str:
-        response = await self.asession.get(
-            PYPI_JSON_API.format(package_name=package_name),
-            headers={"Accept": "application/json"},
-        )
-        response.raise_for_status()
-        return response.json()["info"]["version"]
+
+async def async_get_latest_package_version(package: str) -> Optional[str]:
+    result = CACHE.get(package, None)
+    if result is None:
+        try:
+            result = await _async_get_latest_package_version(package)
+        except Exception as exc:
+            logger.warning("Error getting latest nucliadb version", exc_info=exc)
+            return None
+        CACHE[package] = result
+    return result
+
+
+def _get_latest_package_version(package_name: str) -> str:
+    with PyPi() as pypi:
+        return pypi.get_latest_version(package_name)
+
+
+async def _async_get_latest_package_version(package_name: str) -> str:
+    async with PyPiAsync() as pypi:
+        return await pypi.get_latest_version(package_name)

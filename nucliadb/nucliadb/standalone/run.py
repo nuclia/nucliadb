@@ -21,7 +21,6 @@ import logging
 import os
 import sys
 
-import pkg_resources
 import pydantic_argparse
 import uvicorn  # type: ignore
 from fastapi import FastAPI
@@ -41,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup() -> Settings:
-    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
+    errors.setup_error_handling(versions.get_package_version("nucliadb"))
     parser = pydantic_argparse.ArgumentParser(
         model=Settings,
         prog="NucliaDB",
@@ -112,8 +111,8 @@ def run():
     )
 
     installed_version = versions.installed_nucliadb()
-    latest_version = versions.latest_nucliadb()
-    if installed_version != latest_version:
+    if versions.can_update_nucliadb():
+        latest_version = versions.latest_nucliadb()
         version_info_fmted = f"{installed_version} (Update available: {latest_version})"
     else:
         version_info_fmted = installed_version

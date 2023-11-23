@@ -128,4 +128,12 @@ async def ready(request: Request) -> JSONResponse:
 
 @standalone_api_router.get("/versions")
 async def versions_endpoint(request: Request) -> JSONResponse:
-    return JSONResponse(await versions.get_versions())
+    return JSONResponse(
+        {
+            package: {
+                "installed": versions.get_package_version(package),
+                "latest": await versions.async_get_latest_package_version(package),
+            }
+            for package in versions.WatchedPackages
+        }
+    )
