@@ -60,4 +60,5 @@ sniffio>=1.2.0
 
 async_lru==2.0.2
 cachetools==5.3.2
+types-cachetools==5.3.0.5
 kubernetes_asyncio
