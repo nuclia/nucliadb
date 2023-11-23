@@ -32,7 +32,7 @@ PYPI_JSON_API = "https://pypi.org/pypi/{package_name}/json"
 
 NUCLIADB_PKG = "nucliadb"
 NUCLIADB_ADMIN_ASSETS_PKG = "nucliadb-admin-assets"
-WATCHED_PACKAGES = [NUCLIADB_PKG, NUCLIADB_ADMIN_ASSETS_PKG]
+WATCHED_PYPI_PACKAGES = [NUCLIADB_PKG, NUCLIADB_ADMIN_ASSETS_PKG]
 
 
 async def get_versions() -> dict[str, dict[str, str]]:
@@ -41,7 +41,7 @@ async def get_versions() -> dict[str, dict[str, str]]:
             "installed": release(get_package_version(package)),
             "latest": release(await cached_get_latest_package_version(package)),
         }
-        for package in WATCHED_PACKAGES
+        for package in WATCHED_PYPI_PACKAGES
     }
 
 
@@ -73,9 +73,9 @@ def get_latest_package_version(package_name: str) -> str:
 
 @alru_cache(maxsize=1, ttl=VERSION_CACHE_TTL_SECONDS)
 async def cached_get_latest_package_version(package_name: str) -> str:
-    pypi = PyPi()
+    pypi = PyPiAsync()
     try:
-        return await pypi.async_get_latest_version(package_name)
+        return await pypi.get_latest_version(package_name)
     finally:
         await pypi.aclose()
 
@@ -83,23 +83,9 @@ async def cached_get_latest_package_version(package_name: str) -> str:
 class PyPi:
     def __init__(self):
         self.session = httpx.Client()
-        self._asession = None
-
-    @property
-    def asession(self):
-        if self._asession is None:
-            self._asession = httpx.AsyncClient()
-        return self._asession
 
     def close(self):
         self.session.close()
-
-    async def aclose(self):
-        if self._asession is not None:
-            try:
-                await self._asession.aclose()
-            except Exception:
-                pass
 
     def get_latest_version(self, package_name: str) -> str:
         response = self.session.get(
@@ -109,7 +95,26 @@ class PyPi:
         response.raise_for_status()
         return response.json()["info"]["version"]
 
-    async def async_get_latest_version(self, package_name: str) -> str:
+
+class PyPiAsync:
+    def __init__(self):
+        self._asession = None
+
+    @property
+    def asession(self):
+        if self._asession is None:
+            self._asession = httpx.AsyncClient()
+        return self._asession
+
+    async def aclose(self):
+        if self._asession is None:
+            return
+        try:
+            await self._asession.aclose()
+        except Exception:
+            pass
+
+    async def get_latest_version(self, package_name: str) -> str:
         response = await self.asession.get(
             PYPI_JSON_API.format(package_name=package_name),
             headers={"Accept": "application/json"},
