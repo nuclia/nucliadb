@@ -23,7 +23,6 @@ from typing import Optional
 
 import pkg_resources
 from cachetools import TTLCache
-from packaging import version
 
 from nucliadb.common.http_clients.pypi import PyPi, PyPiAsync
 
@@ -71,7 +70,9 @@ def is_newer_release(installed: str, latest: str) -> bool:
     >>> is_newer_release("1.2.3", "1.2.3.post1")
     False
     """
-    return version.parse(_release(installed)) < version.parse(_release(latest))
+    parsed_installed = pkg_resources.parse_version(_release(installed))
+    parsed_latest = pkg_resources.parse_version(_release(latest))
+    return parsed_latest > parsed_installed
 
 
 def _release(version: str) -> str:
