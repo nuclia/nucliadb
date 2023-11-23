@@ -25,6 +25,7 @@ storage:
   gcs_deadletter_bucket: XX
   gcs_indexing_bucket: XX
 
+  s3_irsa: disabled
   s3_client_id: XX
   s3_client_secret: XX
   s3_ssl: True

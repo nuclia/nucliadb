@@ -26,8 +26,10 @@ data:
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}
 {{- else if eq .Values.storage.file_backend "s3" }}
+{{- if eq .Values.storage.s3_irsa "disabled" }}
   S3_CLIENT_ID: {{ .Values.storage.s3_client_id }}
   S3_CLIENT_SECRET: {{ .Values.storage.s3_client_secret }}
+{{- end }}
 {{- if .Values.storage.s3_ssl }}
   S3_SSL: "True"
 {{- end }}
