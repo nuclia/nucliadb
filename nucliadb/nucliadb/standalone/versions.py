@@ -46,14 +46,12 @@ def installed_nucliadb() -> str:
     return get_package_version(StandalonePackages.NUCLIADB.value)
 
 
-def can_update_nucliadb() -> bool:
-    _installed = installed_nucliadb()
-    installed = version.parse(_release(_installed))
-    _latest = latest_nucliadb()
-    if _latest is None:
+def nucliadb_updates_available() -> bool:
+    installed = version.parse(_release(installed_nucliadb()))
+    latest = latest_nucliadb()
+    if latest is None:
         return False
-    latest = version.parse(_release(_latest))
-    return installed < latest
+    return installed < version.parse(_release(latest))
 
 
 def latest_nucliadb() -> Optional[str]:

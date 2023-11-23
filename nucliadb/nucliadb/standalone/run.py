@@ -111,7 +111,7 @@ def run():
     )
 
     installed_version = versions.installed_nucliadb()
-    if versions.can_update_nucliadb():
+    if versions.nucliadb_updates_available():
         latest_version = versions.latest_nucliadb()
         version_info_fmted = f"{installed_version} (Update available: {latest_version})"
     else:
