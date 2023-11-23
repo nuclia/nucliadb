@@ -43,6 +43,12 @@ class TestPyPi:
     def test_get_latest_version(self, client):
         assert client.get_latest_version("foo") == "1.0.0"
 
+    @pytest.mark.asyncio
+    def test_context_manager(self, client):
+        with client:
+            pass
+        client.session.close.assert_called_once()
+
 
 class TestPyPiAsync:
     @pytest.fixture()
@@ -57,9 +63,16 @@ class TestPyPiAsync:
         cl = pypi.PyPiAsync()
         cl.session = mock.MagicMock()
         cl.session.get = mock.AsyncMock()
+        cl.session.aclose = mock.AsyncMock()
         cl.session.get.return_value = response
         yield cl
 
     @pytest.mark.asyncio
     async def test_get_latest_version(self, client):
         assert await client.get_latest_version("foo") == "1.0.0"
+
+    @pytest.mark.asyncio
+    async def test_context_manager(self, client):
+        async with client:
+            pass
+        client.session.aclose.assert_awaited_once()

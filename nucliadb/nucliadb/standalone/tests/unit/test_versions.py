@@ -17,9 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from unittest import mock
+
+import pkg_resources
 import pytest
 
-from nucliadb.standalone.versions import is_newer_release
+from nucliadb.standalone.versions import (
+    async_get_latest_package_version,
+    get_latest_package_version,
+    installed_nucliadb,
+    is_newer_release,
+    latest_nucliadb,
+)
 
 
 @pytest.mark.parametrize(
@@ -37,3 +46,32 @@ from nucliadb.standalone.versions import is_newer_release
 )
 def test_is_newer_release(installed, latest, expected):
     assert is_newer_release(installed, latest) is expected
+
+
+def test_installed_nucliadb():
+    pkg_resources.parse_version(installed_nucliadb())
+
+
+@pytest.fixture()
+def pypi_mock():
+    version = "1.0.0"
+    with mock.patch(
+        "nucliadb.standalone.versions._get_latest_package_version", return_value=version
+    ):
+        with mock.patch(
+            "nucliadb.standalone.versions._async_get_latest_package_version",
+            return_value=version,
+        ):
+            yield
+
+
+def test_latest_nucliadb(pypi_mock):
+    assert latest_nucliadb() == "1.0.0"
+
+
+def test_get_latest_package_version(pypi_mock):
+    assert get_latest_package_version("baz") == "1.0.0"
+
+
+async def test_async_get_latest_package_version(pypi_mock):
+    assert await async_get_latest_package_version("foobar") == "1.0.0"
