@@ -51,7 +51,7 @@ def nucliadb_updates_available() -> bool:
     latest = latest_nucliadb()
     if latest is None:
         return False
-    return is_newer_version(installed, latest)
+    return is_newer_release(installed, latest)
 
 
 def latest_nucliadb() -> Optional[str]:
@@ -61,12 +61,14 @@ def latest_nucliadb() -> Optional[str]:
     return latest
 
 
-def is_newer_version(installed: str, latest: str) -> bool:
+def is_newer_release(installed: str, latest: str) -> bool:
     """
     Returns true if the latest version is newer than the installed version.
-    >>> is_newer_version("1.2.3", "1.2.4")
+    >>> is_newer_release("1.2.3", "1.2.4")
     True
-    >>> is_newer_version("1.2.3", "1.2.3")
+    >>> is_newer_release("1.2.3", "1.2.3")
+    False
+    >>> is_newer_release("1.2.3", "1.2.3.post1")
     False
     """
     return version.parse(_release(installed)) < version.parse(_release(latest))
