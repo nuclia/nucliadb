@@ -174,23 +174,6 @@ pub fn get_keys<'a, S: Slot + Copy + 'a>(
         .map(move |v| interface.get_key(v))
 }
 
-fn transfer_elem<R>(
-    at: &mut R,
-    value: &[u8],
-    writen_elems: usize,
-    crnt_length: usize,
-) -> io::Result<usize>
-where
-    R: Write + Seek,
-{
-    let idx_slot = (HEADER_LEN + (writen_elems * POINTER_LEN)) as u64;
-    at.seek(SeekFrom::Start(idx_slot))?;
-    at.write_all(&crnt_length.to_le_bytes())?;
-    at.seek(SeekFrom::Start(crnt_length as u64))?;
-    at.write_all(value)?;
-    Ok(crnt_length + value.len())
-}
-
 // Returns the number of alive elements in the store and the space they consume.
 fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
     let len = elements_in_total(source);
@@ -219,9 +202,12 @@ fn compute_unfinished(buffer: &mut Vec<usize>, status: &[usize], lens: &[usize])
     }
 }
 
-fn find_minimum<'a, S: Slot + Copy>(
+/// Given the ids of unfinished producers, this function will find the minimum
+/// alive element. The status of every producer pointing to deleted element will
+/// be change to the next element.
+fn minimum_alive_value<'a, S: Slot + Copy>(
     unfinished: &[usize],
-    status: &[usize],
+    status: &mut [usize],
     producers: &[(S, &'a [u8])],
 ) -> Option<&'a [u8]> {
     let interface = producers[0].0;
@@ -232,6 +218,7 @@ fn find_minimum<'a, S: Slot + Copy>(
         let element_pointer = get_pointer(store, next_elem);
         let element_slice = &store[element_pointer..];
         if !interface.keep_in_merge(element_slice) {
+            status[producer] += 1;
             continue;
         } else if let Some(minimum_slice) = minimum {
             minimum = Some(std::cmp::min_by(minimum_slice, element_slice, |i, j| {
@@ -244,8 +231,10 @@ fn find_minimum<'a, S: Slot + Copy>(
     minimum.map(|v| interface.read_exact(v).0)
 }
 
+/// The status of every producer pointing to the current minimum
+/// will be change to the next element.
 fn advance_merge<S: Slot + Copy>(
-    minimum: Option<&[u8]>,
+    minimum: &[u8],
     unfinished: &[usize],
     status: &mut [usize],
     producers: &[(S, &[u8])],
@@ -256,15 +245,8 @@ fn advance_merge<S: Slot + Copy>(
         let store = producers[producer].1;
         let element_pointer = get_pointer(store, next_elem);
         let element_slice = &store[element_pointer..];
-        if !interface.keep_in_merge(element_slice) {
-            status[producer] += 1;
-            continue;
-        }
 
-        let Some(inner_minimum) = minimum else {
-            continue;
-        };
-        if interface.cmp_slot(inner_minimum, element_slice).is_eq() {
+        if interface.cmp_slot(minimum, element_slice).is_eq() {
             status[producer] += 1;
         }
     }
@@ -308,7 +290,7 @@ where
     // At most, the merge will need total_space bytes.
     let total_space = HEADER_LEN + (POINTER_LEN * number_of_elements) + value_space;
     // Number of elements that have been written into the recipient.
-    let mut written_elems = 0;
+    let mut written_elements = 0;
     // Length of the recipient's written part
     let mut recipient_length = HEADER_LEN + (POINTER_LEN * number_of_elements);
     // Per producer, which element should be visited next.
@@ -321,21 +303,27 @@ where
 
     // Merge loop, transfers the contents of each producer into the recipient in order
     while !unfinished.is_empty() {
-        let minimum = find_minimum(&unfinished, &status, &producers);
-        if let Some(minimum) = minimum {
-            recipient_length = transfer_elem(recipient, minimum, written_elems, recipient_length)?;
-            written_elems += 1;
+        if let Some(minimum) = minimum_alive_value(&unfinished, &mut status, &producers) {
+            // There is a minimum that needs to be transferred to the recipient.
+            let idx_slot = (HEADER_LEN + (written_elements * POINTER_LEN)) as u64;
+            recipient.seek(SeekFrom::Start(idx_slot))?;
+            recipient.write_all(&recipient_length.to_le_bytes())?;
+            recipient.seek(SeekFrom::Start(recipient_length as u64))?;
+            recipient.write_all(minimum)?;
+            recipient_length += minimum.len();
+            written_elements += 1;
+            // Every producer pointing containing the minimum is advanced.
+            advance_merge(minimum, &unfinished, &mut status, &producers);
         }
-        advance_merge(minimum, &unfinished, &mut status, &producers);
         compute_unfinished(&mut unfinished, &status, &lens);
     }
 
     // Write the number of elements
     recipient.seek(SeekFrom::Start(0))?;
-    recipient.write_all(&written_elems.to_le_bytes())?;
+    recipient.write_all(&written_elements.to_le_bytes())?;
     recipient.seek(SeekFrom::Start(0)).unwrap();
     recipient.flush()?;
-    Ok(written_elems)
+    Ok(written_elements)
 }
 
 #[cfg(test)]
