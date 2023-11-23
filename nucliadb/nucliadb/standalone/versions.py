@@ -94,7 +94,7 @@ def get_latest_package_version(package: str) -> Optional[str]:
         try:
             result = _get_latest_package_version(package)
         except Exception as exc:
-            logger.warning("Error getting latest nucliadb version", exc_info=exc)
+            logger.warning(f"Error getting latest {package} version", exc_info=exc)
             return None
         CACHE[package] = result
     return result
@@ -106,7 +106,7 @@ async def async_get_latest_package_version(package: str) -> Optional[str]:
         try:
             result = await _async_get_latest_package_version(package)
         except Exception as exc:
-            logger.warning("Error getting latest nucliadb version", exc_info=exc)
+            logger.warning(f"Error getting latest {package} version", exc_info=exc)
             return None
         CACHE[package] = result
     return result
