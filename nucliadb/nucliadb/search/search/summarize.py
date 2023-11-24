@@ -22,9 +22,12 @@ from typing import Optional
 
 from nucliadb_protos.utils_pb2 import ExtractedText
 
-from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search import logger
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
@@ -63,24 +66,26 @@ async def get_extracted_texts(
 
     driver = get_driver()
     storage = await get_storage()
-    rdm = ResourcesDataManager(driver, storage)
+
+    kbm = KnowledgeBoxDataManager(driver)
+    if not await kbm.exists_kb(kbid):
+        raise KnowledgeBoxNotFound(kbid)
 
     max_tasks = asyncio.Semaphore(MAX_GET_EXTRACTED_TEXT_OPS)
     tasks = []
 
-    # Schedule fetching extracted texts in async tasks
-    for rid in set(resource_uuids):
-        resource = await rdm.get_resource(kbid, rid)
-        if resource is None:
-            continue
-
-        fields = await resource.get_fields(force=True)
-        for _, field in fields.items():
-            task = asyncio.create_task(get_extracted_text(rid, field, max_tasks))
-            tasks.append(task)
+    # Schedule getting extracted text for each field of each resource
+    async with driver.transaction() as txn:
+        kb_orm = KnowledgeBox(txn, storage, kbid)
+        for rid in set(resource_uuids):
+            resource_orm = Resource(txn=txn, storage=storage, kb=kb_orm, uuid=rid)
+            fields = await resource_orm.get_fields(force=True)
+            for _, field in fields.items():
+                task = asyncio.create_task(get_extracted_text(rid, field, max_tasks))
+                tasks.append(task)
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     # Parse the task results
-    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
     for done_task in done:
         if done_task.exception() is not None:  # pragma: no cover
             exception = done_task.exception()
@@ -90,6 +95,7 @@ async def get_extracted_texts(
             raise exception  # type: ignore
         results.append(done_task.result())
 
+    tasks.clear()
     return results
 
 

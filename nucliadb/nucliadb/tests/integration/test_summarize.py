@@ -48,10 +48,20 @@ async def test_summarize(
 
     # Summarize all of them
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/summarize", json={"resources": resource_uuids}
+        f"/kb/{kbid}/summarize", json={"resources": resource_uuids + ["non-existent"]}
     )
     assert resp.status_code == 200, resp.text
 
     content = resp.json()
     response = SummarizedResponse.parse_obj(content)
     assert set(response.resources.keys()) == set(resource_uuids)
+
+
+@pytest.mark.asyncio()
+async def test_summarize_unexisting_kb(
+    nucliadb_reader: AsyncClient,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/foobar/summarize", json={"resources": ["1", "2", "3"]}
+    )
+    assert resp.status_code == 404

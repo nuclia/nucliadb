@@ -22,6 +22,7 @@ from typing import Union
 from fastapi import Request
 from fastapi_versioning import version
 
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -56,6 +57,8 @@ async def summarize_endpoint(
         )
     try:
         return await summarize(kbid, item)
+    except KnowledgeBoxNotFound:
+        return HTTPClientError(status_code=404, detail="Knowledge box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except predict.ProxiedPredictAPIError as err:
