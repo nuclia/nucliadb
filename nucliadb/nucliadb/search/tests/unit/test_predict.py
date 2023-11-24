@@ -28,6 +28,7 @@ from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
     PredictVectorMissing,
+    ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
     SendToPredictError,
@@ -40,6 +41,10 @@ from nucliadb_models.search import (
     FeedbackRequest,
     FeedbackTasks,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
+    SummarizeResourceModel,
 )
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -54,6 +59,8 @@ async def test_dummy_predict_engine():
     assert await pe.chat_query("kbid", Mock())
     assert await pe.convert_sentence_to_vector("kbid", "some sentence")
     assert await pe.detect_entities("kbid", "some sentence")
+    assert await pe.ask_document("kbid", "query", [["footext"]], "userid")
+    assert await pe.summarize("kbid", Mock(resources={}))
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -122,8 +129,8 @@ async def test_convert_sentence_error(onprem):
         "service-account",
         onprem=onprem,
     )
-    pe.session = get_mocked_session("GET", 400, read="uops!", context_manager=False)
-    with pytest.raises(SendToPredictError):
+    pe.session = get_mocked_session("GET", 400, json="uops!", context_manager=False)
+    with pytest.raises(ProxiedPredictAPIError):
         await pe.convert_sentence_to_vector("kbid", "some sentence")
 
 
@@ -190,8 +197,8 @@ async def test_detect_entities_error(onprem):
         "service-account",
         onprem=onprem,
     )
-    pe.session = get_mocked_session("GET", 500, read="error", context_manager=False)
-    with pytest.raises(SendToPredictError):
+    pe.session = get_mocked_session("GET", 500, json="error", context_manager=False)
+    with pytest.raises(ProxiedPredictAPIError):
         await pe.detect_entities("kbid", "some sentence")
 
 
@@ -250,6 +257,7 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("convert_sentence_to_vector", ["kbid", "sentence"], False, []),
         ("detect_entities", ["kbid", "sentence"], False, []),
         ("ask_document", ["kbid", "query", [["footext"]], "userid"], True, None),
+        ("summarize", ["kbid", Mock(resources={})], True, None),
     ],
 )
 async def test_onprem_nuclia_service_account_not_configured(
@@ -390,8 +398,64 @@ async def test_check_response_error():
     )
     response.status = 503
     response._body = b"some error"
+    response._headers = {"Content-Type": "application/json"}
 
-    with pytest.raises(SendToPredictError) as ex:
+    with pytest.raises(ProxiedPredictAPIError) as ex:
         await PredictEngine().check_response(response, expected_status=200)
+    assert ex.value.status == 503
+    assert ex.value.detail == "some error"
 
-    ex.errisinstance(SendToPredictError)
+
+async def test_summarize():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+
+    summarized = SummarizedResponse(
+        resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
+    )
+    pe.session = get_mocked_session(
+        "POST", 200, json=summarized.json(), context_manager=False
+    )
+
+    item = SummarizeModel(
+        resources={"r1": SummarizeResourceModel(fields={"f1": "field extracted text"})}
+    )
+    summarize_response = await pe.summarize("kbid", item)
+
+    assert summarize_response == summarized
+
+    pe.session.post.assert_awaited_once_with(
+        url="cluster/api/internal/predict/summarize",
+        json=item.dict(),
+        headers={"X-STF-KBID": "kbid"},
+        timeout=None,
+    )
+
+
+@pytest.fixture(scope="function")
+def txn():
+    txn = mock.MagicMock()
+    txn.get = AsyncMock(return_value=None)
+    with mock.patch("nucliadb.search.predict.get_transaction", return_value=txn):
+        yield
+
+
+@pytest.mark.parametrize("onprem", [True, False])
+async def test_get_predict_headers(onprem, txn):
+    nua_service_account = "nua-service-account"
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=onprem,
+        nuclia_service_account=nua_service_account,
+    )
+    predict_headers = await pe.get_predict_headers("kbid")
+    if onprem:
+        assert predict_headers == {"X-STF-NUAKEY": f"Bearer {nua_service_account}"}
+    else:
+        assert predict_headers == {"X-STF-KBID": "kbid"}

@@ -660,6 +660,10 @@ class UserPrompt(BaseModel):
 
 
 class ChatModel(BaseModel):
+    """
+    This is the model for the predict request payload on the chat endpoint
+    """
+
     question: str = Field(description="Question to ask the generative model")
     user_id: str
     retrieval: bool = True
@@ -726,6 +730,45 @@ class ChatRequest(BaseModel):
         str
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[str] = SearchParamDefaults.prompt.to_pydantic_field()
+
+
+class SummarizeResourceModel(BaseModel):
+    fields: Dict[str, str] = {}
+
+
+class SummarizeModel(BaseModel):
+    """
+    Model for the summarize predict api request payload
+    """
+
+    resources: Dict[str, SummarizeResourceModel] = {}
+
+
+class SummarizeRequest(BaseModel):
+    """
+    Model for the request payload of the summarize endpoint
+    """
+
+    resources: List[str] = Field(
+        ...,
+        min_items=1,
+        title="Resources",
+        description="Uids of the resources to summarize",
+    )
+
+
+class SummarizedResource(BaseModel):
+    summary: str
+    tokens: int
+
+
+class SummarizedResponse(BaseModel):
+    resources: Dict[str, SummarizedResource] = Field(
+        default={}, title="Resources", description="Individual resource summaries"
+    )
+    summary: str = Field(
+        default="", title="Summary", description="Globla summary of all resources"
+    )
 
 
 class FindRequest(BaseSearchRequest):
