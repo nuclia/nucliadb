@@ -41,7 +41,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     },
     const.Features.ASK_YOUR_DOCUMENTS: {
         "rollout": 0,
-        "variants": {"environment": ["stage", "none"]},
+        "variants": {"environment": ["stage", "local"]},
     },
     const.Features.EXPERIMENTAL_KB: {
         "rollout": 0,
