@@ -54,13 +54,7 @@ def get_kb_model_default_min_score_mock():
         yield mock
 
 
-@pytest.fixture(scope="function")
-def has_feature():
-    with unittest.mock.patch(f"{QUERY_MODULE}.has_feature", return_value=True) as mock:
-        yield mock
-
-
-async def test_get_default_min_score(has_feature, get_kb_model_default_min_score_mock):
+async def test_get_default_min_score(get_kb_model_default_min_score_mock):
     get_kb_model_default_min_score_mock.return_value = 1.5
 
     assert await get_default_min_score("kbid") == 1.5
@@ -68,9 +62,7 @@ async def test_get_default_min_score(has_feature, get_kb_model_default_min_score
     get_default_min_score.cache_clear()
 
 
-async def test_get_default_min_score_default_value(
-    has_feature, get_kb_model_default_min_score_mock
-):
+async def test_get_default_min_score_default_value(get_kb_model_default_min_score_mock):
     get_kb_model_default_min_score_mock.return_value = None
 
     assert await get_default_min_score("kbid") == 0.7
@@ -78,9 +70,7 @@ async def test_get_default_min_score_default_value(
     get_default_min_score.cache_clear()
 
 
-async def test_get_default_min_score_is_cached(
-    has_feature, get_kb_model_default_min_score_mock
-):
+async def test_get_default_min_score_is_cached(get_kb_model_default_min_score_mock):
     await get_default_min_score("kbid1")
     await get_default_min_score("kbid1")
     await get_default_min_score("kbid1")
@@ -90,15 +80,6 @@ async def test_get_default_min_score_is_cached(
     assert get_kb_model_default_min_score_mock.call_count == 2
 
     get_default_min_score.cache_clear()
-
-
-async def test_get_default_min_score_feature_not_enabled(
-    has_feature, get_kb_model_default_min_score_mock
-):
-    has_feature.return_value = False
-    get_kb_model_default_min_score_mock.return_value = 1.5
-
-    assert await get_default_min_score("kbid1") == 0.7
 
 
 @pytest.fixture()
@@ -124,7 +105,7 @@ def kbdm(driver):
         yield kbdm
 
 
-async def test_get_kb_model_default_min_score(has_feature, kbdm):
+async def test_get_kb_model_default_min_score(kbdm):
     # If min_score is set, it should return it
     kbdm.get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE,
@@ -133,7 +114,7 @@ async def test_get_kb_model_default_min_score(has_feature, kbdm):
     assert await get_kb_model_default_min_score("kbid") == 1.5
 
 
-async def test_get_kb_model_default_min_score_backward_compatible(has_feature, kbdm):
+async def test_get_kb_model_default_min_score_backward_compatible(kbdm):
     # If min_score is not set yet, it should return None
     kbdm.get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE
