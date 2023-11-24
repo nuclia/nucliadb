@@ -207,11 +207,6 @@ async def fetch_find_metadata(
             resources.add(result_paragraph.rid)
     etcache.clear()
 
-    for order, (rid, field_id, paragraph_id) in enumerate(
-        orderer.sorted_by_insertion()
-    ):
-        find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
-
     for resource in resources:
         operations.append(
             asyncio.create_task(
@@ -233,6 +228,12 @@ async def fetch_find_metadata(
         for task in done:
             if task.exception() is not None:  # pragma: no cover
                 logger.error("Error fetching find metadata", exc_info=task.exception())
+
+    order = 0
+    for rid, field_id, paragraph_id in orderer.sorted_by_insertion():
+        if rid in find_resources and field_id in find_resources[rid].fields:
+            find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
+            order += 1
 
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
