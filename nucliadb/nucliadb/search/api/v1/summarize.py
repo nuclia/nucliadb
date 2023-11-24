@@ -59,4 +59,4 @@ async def summarize_endpoint(
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except predict.ProxiedPredictAPIError as err:
-        return HTTPClientError(status_code=err.status, detail=err.detail)
+        return HTTPClientError(status_code=503, detail=f"{err.status}: {err.detail}")
