@@ -54,8 +54,6 @@ from nucliadb_models.search import (
     SuggestOptions,
 )
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
 
@@ -607,16 +605,16 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
 @alru_cache(maxsize=None)
 async def get_default_min_score(kbid: str) -> float:
     fallback = 0.7
-    if not has_feature(const.Features.DEFAULT_MIN_SCORE):
-        return fallback
-
-    model_min_score = await get_kb_model_default_min_score(kbid)
-    if model_min_score is not None:
-        return model_min_score
-    else:
-        # B/w compatible code until we figure out how to
-        # set default min score for old on-prem kbs
-        return fallback
+    try:
+        model_min_score = await get_kb_model_default_min_score(kbid)
+        if model_min_score is not None:
+            return model_min_score
+    except Exception as exc:
+        logger.warning(
+            f"Error retrieving default min score for kb {kbid}: {exc}",
+            exc_info=True,
+        )
+    return fallback
 
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
