@@ -432,6 +432,7 @@ async def test_summarize():
         url="cluster/api/internal/predict/summarize",
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
+        timeout=None,
     )
 
 

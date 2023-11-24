@@ -472,6 +472,7 @@ class PredictEngine:
             url=self.get_predict_url(SUMMARIZE),
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
+            timeout=None,
         )
         await self.check_response(resp, expected_status=200)
         data = await resp.json()
