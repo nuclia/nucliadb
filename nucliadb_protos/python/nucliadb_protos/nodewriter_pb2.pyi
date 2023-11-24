@@ -3,9 +3,7 @@
 isort:skip_file
 """
 import builtins
-import collections.abc
 import google.protobuf.descriptor
-import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import nucliadb_protos.noderesources_pb2
@@ -145,48 +143,6 @@ class IndexMessage(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_partition", b"_partition"]) -> typing_extensions.Literal["partition"] | None: ...
 
 global___IndexMessage = IndexMessage
-
-@typing_extensions.final
-class SetGraph(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    GRAPH_FIELD_NUMBER: builtins.int
-    @property
-    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    @property
-    def graph(self) -> nucliadb_protos.utils_pb2.JoinGraph: ...
-    def __init__(
-        self,
-        *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        graph: nucliadb_protos.utils_pb2.JoinGraph | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["graph", b"graph", "shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["graph", b"graph", "shard_id", b"shard_id"]) -> None: ...
-
-global___SetGraph = SetGraph
-
-@typing_extensions.final
-class DeleteGraphNodes(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    NODES_FIELD_NUMBER: builtins.int
-    @property
-    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
-    def __init__(
-        self,
-        *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes", "shard_id", b"shard_id"]) -> None: ...
-
-global___DeleteGraphNodes = DeleteGraphNodes
 
 @typing_extensions.final
 class NewShardRequest(google.protobuf.message.Message):

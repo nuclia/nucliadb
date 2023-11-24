@@ -44,3 +44,7 @@ class ResourceNotIndexable(Exception):
     """
     Unable to index resource
     """
+
+
+class EntityManagementException(Exception):
+    pass

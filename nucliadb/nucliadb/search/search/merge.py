@@ -334,7 +334,7 @@ async def merge_vectors_results(
         facets=facets,
         page_number=page,
         page_size=count,
-        min_score=min_score,
+        min_score=round(min_score, ndigits=3),
     )
 
 

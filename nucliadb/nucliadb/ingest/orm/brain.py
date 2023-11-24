@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Union
 
 from google.protobuf.internal.containers import MessageMap
@@ -68,6 +70,12 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
 }
 
 
+@dataclass
+class ParagraphClassifications:
+    valid: dict[str, list[str]]
+    denied: dict[str, list[str]]
+
+
 class ResourceBrain:
     def __init__(self, rid: str):
         self.rid = rid
@@ -77,6 +85,22 @@ class ResourceBrain:
 
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
+
+    def _get_paragraph_user_classifications(
+        self, basic_user_field_metadata: Optional[UserFieldMetadata]
+    ) -> ParagraphClassifications:
+        pc = ParagraphClassifications(valid={}, denied={})
+        if basic_user_field_metadata is None:
+            return pc
+        for annotated_paragraph in basic_user_field_metadata.paragraphs:
+            for classification in annotated_paragraph.classifications:
+                paragraph_key = compute_paragraph_key(self.rid, annotated_paragraph.key)
+                classif_label = f"/l/{classification.labelset}/{classification.label}"
+                if classification.cancelled_by_user:
+                    pc.denied.setdefault(paragraph_key, []).append(classif_label)
+                else:
+                    pc.valid.setdefault(paragraph_key, []).append(classif_label)
+        return pc
 
     def apply_field_metadata(
         self,
@@ -91,15 +115,10 @@ class ResourceBrain:
         # To check for duplicate paragraphs
         unique_paragraphs: set[str] = set()
 
-        # Expose also user classes
-
-        if basic_user_field_metadata is not None:
-            paragraphs = {
-                compute_paragraph_key(self.rid, paragraph.key): paragraph
-                for paragraph in basic_user_field_metadata.paragraphs
-            }
-        else:
-            paragraphs = {}
+        # Expose also user classifications
+        paragraph_classifications = self._get_paragraph_user_classifications(
+            basic_user_field_metadata
+        )
 
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
@@ -107,13 +126,7 @@ class ResourceBrain:
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
-                denied_classifications = []
-                if key in paragraphs:
-                    denied_classifications = [
-                        f"/l/{classification.labelset}/{classification.label}"
-                        for classification in paragraphs[key].classifications
-                        if classification.cancelled_by_user is True
-                    ]
+                denied_classifications = paragraph_classifications.denied.get(key, [])
                 position = TextPosition(
                     index=index,
                     start=paragraph.start,
@@ -144,18 +157,14 @@ class ResourceBrain:
                     if label not in denied_classifications:
                         p.labels.append(label)
 
+                # Add user annotated labels to paragraphs
+                extend_unique(p.labels, paragraph_classifications.valid.get(key, []))  # type: ignore
+
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            denied_classifications = []
-            if key in paragraphs:
-                denied_classifications = [
-                    f"/l/{classification.labelset}/{classification.label}"
-                    for classification in paragraphs[key].classifications
-                    if classification.cancelled_by_user is True
-                ]
-
+            denied_classifications = paragraph_classifications.denied.get(key, [])
             position = TextPosition(
                 index=index,
                 start=paragraph.start,
@@ -179,6 +188,9 @@ class ResourceBrain:
                 label = f"/l/{classification.labelset}/{classification.label}"
                 if label not in denied_classifications:
                     p.labels.append(label)
+
+            # Add user annotated labels to paragraphs
+            extend_unique(p.labels, paragraph_classifications.valid.get(key, []))  # type: ignore
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
@@ -326,13 +338,24 @@ class ResourceBrain:
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
     def set_resource_metadata(self, basic: Basic, origin: Optional[Origin]):
-        if basic.HasField("created"):
+        self._set_resource_dates(basic, origin)
+        self._set_resource_labels(basic, origin)
+        self._set_resource_relations(basic, origin)
+
+    def _set_resource_dates(self, basic: Basic, origin: Optional[Origin]):
+        if basic.created.seconds > 0:
             self.brain.metadata.created.CopyFrom(basic.created)
-        if basic.HasField("modified"):
+        else:
+            logging.warning(f"Basic metadata has no created field for {self.rid}")
+            self.brain.metadata.created.GetCurrentTime()
+        if basic.modified.seconds > 0:
             self.brain.metadata.modified.CopyFrom(basic.modified)
-        elif basic.HasField("created"):
-            # if no modified field, use created field
-            self.brain.metadata.modified.CopyFrom(basic.created)
+        else:
+            logging.warning(f"Basic metadata has no modified field for {self.rid}")
+            if basic.created.seconds > 0:
+                self.brain.metadata.modified.CopyFrom(basic.created)
+            else:
+                self.brain.metadata.modified.GetCurrentTime()
 
         if origin is not None:
             # overwrite created/modified if provided on origin
@@ -340,9 +363,6 @@ class ResourceBrain:
                 self.brain.metadata.created.CopyFrom(origin.created)
             if origin.HasField("modified") and origin.modified.seconds > 0:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
-
-        self._set_resource_labels(basic, origin)
-        self._set_resource_relations(basic, origin)
 
     def _set_resource_relations(self, basic: Basic, origin: Optional[Origin]):
         relationnodedocument = RelationNode(
@@ -523,11 +543,10 @@ class ResourceBrain:
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:
+                        label = f"/l/{classification.labelset}/{classification.label}"
                         self.brain.paragraphs[field_key].paragraphs[
                             paragraph_annotation.key
-                        ].labels.append(
-                            f"/l/{classification.labelset}/{classification.label}"
-                        )
+                        ].labels.append(label)
         extend_unique(
             self.brain.texts[field_key].labels, flatten_resource_labels(labels)  # type: ignore
         )

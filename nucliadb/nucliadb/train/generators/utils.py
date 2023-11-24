@@ -22,9 +22,10 @@ from contextvars import ContextVar
 from typing import Any, AsyncIterator, Dict, Optional
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.txn_utils import get_transaction
-from nucliadb.train import SERVICE_NAME
+from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
 from nucliadb_utils.utilities import get_storage
 
@@ -54,6 +55,42 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> Optional[Resour
     else:
         orm_resource = resouce_cache.get(uuid)
     return orm_resource
+
+
+async def get_paragraph(kbid: str, paragraph_id: str) -> str:
+    if paragraph_id.count("/") == 5:
+        rid, field_type, field, split_str, start_end = paragraph_id.split("/")
+        split = int(split_str)
+        start_str, end_str = start_end.split("-")
+    else:
+        rid, field_type, field, start_end = paragraph_id.split("/")
+        split = None
+        start_str, end_str = start_end.split("-")
+    start = int(start_str)
+    end = int(end_str)
+
+    orm_resource = await get_resource_from_cache_or_db(kbid, rid)
+
+    if orm_resource is None:
+        logger.error(f"{rid} does not exist on DB")
+        return ""
+
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    extracted_text = await field_obj.get_extracted_text()
+    if extracted_text is None:
+        logger.warning(
+            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
+        )
+        return ""
+
+    if split is not None:
+        text = extracted_text.split_text[split]
+        splitted_text = text[start:end]
+    else:
+        splitted_text = extracted_text.text[start:end]
+
+    return splitted_text
 
 
 async def batchify(

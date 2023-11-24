@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -140,6 +141,7 @@ impl ShardReader {
         match self.relation_service_version {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
+            2 => RelationService::RelationV2,
             i => panic!("Unknown relation version {i}"),
         }
     }
@@ -235,6 +237,7 @@ impl ShardReader {
         };
         let rsc = RelationConfig {
             path: shard_path.join(RELATIONS_DIR),
+            channel,
         };
         let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
         let text_task = || Some(versions.get_texts_reader(&tsc));
@@ -353,7 +356,12 @@ impl ShardReader {
                     .flat_map(|prefix_response| prefix_response.nodes.into_iter())
                     .map(|node| node.value);
 
-                entities.collect::<Vec<_>>()
+                // remove duplicate entities
+                let mut seen = HashSet::new();
+                let mut ent_result = entities.collect::<Vec<_>>();
+                ent_result.retain(|e| seen.insert(e.clone()));
+
+                ent_result
             };
 
             let info = info_span!(parent: &span, "relations suggest");

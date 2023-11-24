@@ -24,6 +24,7 @@ use lazy_static::lazy_static;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::*;
+use nucliadb_core::Channel;
 use prost_types::Timestamp;
 use relation::*;
 use relation_node::NodeType;
@@ -71,28 +72,14 @@ lazy_static! {
     };
     static ref REQUEST0: EntitiesSubgraphRequest = EntitiesSubgraphRequest {
         entry_points: vec![E0.clone()],
-        node_filters: vec![
-            RelationNodeFilter {
-                node_type: NodeType::Entity as i32,
-                node_subtype: None
-            },
-            RelationNodeFilter {
-                node_type: NodeType::Entity as i32,
-                node_subtype: Some("Nonexisting".to_string())
-            }
-        ],
         depth: Some(1),
-        edge_filters: vec![],
+        ..Default::default()
     };
     static ref RESPONSE0: Vec<RelationNode> = vec![E0.clone(), E1.clone(), E2.clone()];
     static ref REQUEST1: EntitiesSubgraphRequest = EntitiesSubgraphRequest {
         entry_points: vec![E0.clone()],
-        node_filters: vec![RelationNodeFilter {
-            node_type: NodeType::Entity as i32,
-            node_subtype: Some("Official".to_string())
-        },],
         depth: Some(1),
-        edge_filters: vec![],
+        ..Default::default()
     };
     static ref RESPONSE1: Vec<RelationNode> = vec![E0.clone(), E1.clone()];
     static ref EDGE_LIST: EdgeList = EdgeList {
@@ -133,7 +120,6 @@ fn create_empty_resource(shard_id: String) -> Resource {
         paragraphs: HashMap::with_capacity(0),
         paragraphs_to_delete: vec![],
         sentences_to_delete: vec![],
-        relations_to_delete: vec![],
         relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),
@@ -205,6 +191,7 @@ fn similatity_edges(mut edges: Vec<Relation>) -> Vec<Relation> {
 fn simple_graph(at: &Path) -> (RelationsWriterService, RelationsReaderService) {
     let rsc = RelationConfig {
         path: at.join("relations"),
+        channel: Channel::EXPERIMENTAL,
     };
     println!("Writer starts");
     let writer = RelationsWriterService::start(&rsc).unwrap();
@@ -222,63 +209,6 @@ fn simple_request() -> NodeResult<()> {
     writer.set_resource(&resource).unwrap();
 
     reader.reload();
-    let mut request = REQUEST_BONES.clone();
-    request.subgraph = Some(REQUEST0.clone());
-    let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.subgraph else {
-        unreachable!("Wrong variant")
-    };
-    let len = bfs_response
-        .relations
-        .into_iter()
-        .flat_map(|v| v.to.zip(v.source))
-        .filter(|v| RESPONSE0.contains(&v.0))
-        .filter(|v| RESPONSE0.contains(&v.1))
-        .count();
-    assert_eq!(len + 1, RESPONSE0.len());
-    Ok(())
-}
-
-#[test]
-fn join_graph_test() -> NodeResult<()> {
-    let dir = tempfile::tempdir().unwrap();
-    let (mut writer, reader) = simple_graph(dir.path());
-    let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
-    let graph = empty_graph();
-    resource.relations = graph;
-    writer.set_resource(&resource).unwrap();
-    let got = reader.count().unwrap();
-    assert_eq!(got, 0);
-
-    let graph = JoinGraph {
-        nodes: HashMap::from([(0i32, E0.clone()), (1i32, E1.clone()), (2i32, E2.clone())]),
-        edges: vec![
-            JoinGraphEdge {
-                source: 2,
-                target: 1,
-                rtype: RelationType::Child as i32,
-                rsubtype: "".to_string(),
-                metadata: None,
-            },
-            JoinGraphEdge {
-                source: 0,
-                target: 2,
-                rtype: RelationType::Entity as i32,
-                rsubtype: "".to_string(),
-                metadata: None,
-            },
-            JoinGraphEdge {
-                source: 0,
-                target: 1,
-                rtype: RelationType::Entity as i32,
-                rsubtype: "".to_string(),
-                metadata: None,
-            },
-        ],
-    };
-    writer.join_graph(&graph).unwrap();
-    reader.reload();
-
     let mut request = REQUEST_BONES.clone();
     request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();

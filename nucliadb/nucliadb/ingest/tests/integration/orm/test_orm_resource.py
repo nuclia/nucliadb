@@ -22,6 +22,7 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper
@@ -334,8 +335,8 @@ async def test_generate_broker_message(
     # Field vectors
     lfv = [v for v in bm.field_vectors if v.field.field == "link1"][0]
     assert len(lfv.vectors.vectors.vectors) == 1
-    assert lfv.vectors.vectors.vectors[0].start == 1
-    assert lfv.vectors.vectors.vectors[0].end == 2
+    assert lfv.vectors.vectors.vectors[0].start == 0
+    assert lfv.vectors.vectors.vectors[0].end == 20
     assert lfv.vectors.vectors.vectors[0].vector == list(map(int, b"ansjkdn"))
 
     # 2.3 CONVERSATION FIELD
@@ -402,13 +403,36 @@ async def test_generate_index_message_contains_all_metadata(
 
     assert len(fields_to_be_found) == 0
 
-    # TODO: check the following fields for the noderesources_pb.Resource (aka Brain)
-    # metadata
-    # status
-    # paragraphs
-    # paragraphs_to_delete
-    # sentences_to_delete
+    # Metadata
+    assert index_message.metadata.created.seconds > 0
+    assert index_message.metadata.modified.seconds > 0
+    assert (
+        index_message.metadata.modified.seconds
+        >= index_message.metadata.created.seconds
+    )
+
+    # Processing status
+    assert index_message.status == Resource.ResourceStatus.PROCESSED
+
+    # Paragraphs
+    assert set(index_message.paragraphs.keys()) == expected_fields
+    for field, field_paragraphs in index_message.paragraphs.items():
+        for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
+            # Check that the key is correct
+            parts = paragraph_id.split("/")
+            uuid = parts[0]
+            field_id = "/".join(parts[1:3])
+            start, end = map(int, parts[-1].split("-"))
+            assert uuid == resource.uuid
+            assert field_id == field
+            assert start == paragraph.metadata.position.start == paragraph.start
+            assert end == paragraph.metadata.position.end == paragraph.end
+            assert start <= end
+
     # relations
-    # relations_to_delete
-    # vectors
-    # vectors_to_delete
+    assert len(index_message.relations) > 0
+
+    # vectors in vectorset
+    assert len(index_message.vectors) == 1
+    vector = index_message.vectors["vectorset1"].vectors.popitem()[1].vector
+    assert len(vector) > 0

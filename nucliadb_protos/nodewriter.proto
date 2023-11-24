@@ -38,17 +38,6 @@ message IndexMessage {
     string kbid = 9;
 }
 
-message SetGraph {
-    noderesources.ShardId shard_id = 1;
-    utils.JoinGraph graph = 2;
-}
-
-message DeleteGraphNodes {
-    noderesources.ShardId shard_id = 2;
-    repeated utils.RelationNode nodes = 1;
-}
-
-
 message NewShardRequest {
     utils.VectorSimilarity similarity = 1;
     string kbid = 2;
@@ -68,8 +57,6 @@ service NodeWriter {
     rpc GC(noderesources.ShardId) returns (noderesources.EmptyResponse) {}
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
-    rpc DeleteRelationNodes(DeleteGraphNodes) returns (OpStatus) {}
-    rpc JoinGraph(SetGraph) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
     rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New

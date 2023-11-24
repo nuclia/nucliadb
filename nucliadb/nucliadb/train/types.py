@@ -22,12 +22,13 @@ from typing import Union
 from nucliadb_protos import dataset_pb2 as dpb
 
 TrainBatch = Union[
-    dpb.ParagraphClassificationBatch,
     dpb.FieldClassificationBatch,
+    dpb.ImageClassificationBatch,
+    dpb.ParagraphClassificationBatch,
+    dpb.ParagraphStreamingBatch,
+    dpb.QuestionAnswerStreamingBatch,
     dpb.SentenceClassificationBatch,
     dpb.TokenClassificationBatch,
-    dpb.ImageClassificationBatch,
-    dpb.ParagraphStreamingBatch,
 ]
 
 TrainBatchType = Union[
@@ -35,6 +36,7 @@ TrainBatchType = Union[
     type[dpb.ImageClassificationBatch],
     type[dpb.ParagraphClassificationBatch],
     type[dpb.ParagraphStreamingBatch],
+    type[dpb.QuestionAnswerStreamingBatch],
     type[dpb.SentenceClassificationBatch],
     type[dpb.TokenClassificationBatch],
 ]

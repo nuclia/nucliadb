@@ -62,6 +62,7 @@ pub mod shard_created {
     pub enum RelationService {
         RelationV0 = 0,
         RelationV1 = 1,
+        RelationV2 = 2,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -212,8 +213,6 @@ pub struct Resource {
     /// Relations
     #[prost(message, repeated, tag="9")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
-    #[prost(message, repeated, tag="10")]
-    pub relations_to_delete: ::prost::alloc::vec::Vec<super::utils::Relation>,
     #[prost(string, tag="11")]
     pub shard_id: ::prost::alloc::string::String,
     /// vectorset is the key

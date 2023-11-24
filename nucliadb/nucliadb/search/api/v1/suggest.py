@@ -154,7 +154,6 @@ async def suggest(
     )
 
     # We need to merge
-
     search_results = await merge_suggest_results(
         results,
         kbid=kbid,

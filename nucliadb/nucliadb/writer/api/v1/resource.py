@@ -38,7 +38,7 @@ from starlette.requests import Request
 
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.processing import PushPayload, Source
+from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, SYNC_CALL, X_NUCLIADB_USER
 from nucliadb.writer.api.v1.router import (
@@ -102,7 +102,6 @@ async def create_resource(
     x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction_utility()
-    processing = get_processing()
     partitioning = get_partitioning()
 
     # Create resource message
@@ -176,25 +175,17 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+    seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
     if x_synchronous:
         t0 = time()
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     if x_synchronous:
-        return ResourceCreated(
-            seqid=processing_info.seqid, uuid=uuid, elapsed=time() - t0
-        )
+        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
     else:
-        return ResourceCreated(seqid=processing_info.seqid, uuid=uuid)
+        return ResourceCreated(seqid=seqid, uuid=uuid)
 
 
 @api.patch(
@@ -266,7 +257,6 @@ async def _modify_resource(
     rslug: Optional[str] = None,
 ):
     transaction = get_transaction_utility()
-    processing = get_processing()
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
@@ -311,21 +301,16 @@ async def _modify_resource(
             raise HTTPException(status_code=412, detail=str("No vectorsets found"))
 
     set_status_modify(writer.basic, item)
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+
+    seqid = await maybe_send_to_process(writer, toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_processing_info(writer, processing_info)
 
     maybe_mark_reindex(writer, item)
 
     await transaction.commit(writer, partition, wait=x_synchronous)
 
-    return ResourceUpdated(seqid=processing_info.seqid)
+    return ResourceUpdated(seqid=seqid)
 
 
 @api.post(
@@ -371,7 +356,6 @@ async def _reprocess_resource(
     rslug: Optional[str] = None,
 ):
     transaction = get_transaction_utility()
-    processing = get_processing()
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
@@ -404,14 +388,7 @@ async def _reprocess_resource(
     if txn.open:
         await txn.abort()
 
-    # Send current resource to reprocess.
-
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(status_code=500, detail="Error while sending to process")
+    processing_info = await send_to_process(toprocess, partition)
 
     writer = BrokerMessage()
     writer.kbid = kbid
@@ -590,11 +567,11 @@ async def get_rid_from_params_or_raise_error(
 
 
 def maybe_mark_reindex(message: BrokerMessage, item: UpdateResourcePayload):
-    if needs_resource_reindex(message, item):
+    if needs_resource_reindex(item):
         message.reindex = True
 
 
-def needs_resource_reindex(message: BrokerMessage, item: UpdateResourcePayload) -> bool:
+def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     # Some metadata need to be applied as tags to all fields of
     # a resource and that means this message should force reindexing everything.
     # XXX This is not ideal. Long term, we should handle it differently
@@ -607,3 +584,44 @@ def needs_resource_reindex(message: BrokerMessage, item: UpdateResourcePayload) 
             or item.origin.metadata is not None
         )
     )
+
+
+async def maybe_send_to_process(
+    writer: BrokerMessage, toprocess: PushPayload, partition
+) -> Optional[int]:
+    if not needs_reprocess(toprocess):
+        return None
+
+    processing_info = await send_to_process(toprocess, partition)
+    set_processing_info(writer, processing_info)
+    return processing_info.seqid
+
+
+async def send_to_process(toprocess: PushPayload, partition) -> ProcessingInfo:
+    try:
+        processing = get_processing()
+        processing_info = await processing.send_to_process(toprocess, partition)
+        return processing_info
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except SendToProcessError:
+        raise HTTPException(status_code=500, detail="Error while sending to process")
+
+
+def needs_reprocess(processing_payload: PushPayload) -> bool:
+    """
+    Processing only pays attention to when there are fields to process,
+    so sometimes we can skip sending to processing, for instance if a
+    resource/paragraph is being annotated.
+    """
+    for field in (
+        "genericfield",
+        "filefield",
+        "linkfield",
+        "textfield",
+        "layoutfield",
+        "conversationfield",
+    ):
+        if len(getattr(processing_payload, field)) > 0:
+            return True
+    return False

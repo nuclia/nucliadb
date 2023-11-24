@@ -35,6 +35,9 @@ from nucliadb.train.generators.paragraph_classifier import (
 from nucliadb.train.generators.paragraph_streaming import (
     paragraph_streaming_batch_generator,
 )
+from nucliadb.train.generators.question_answer_streaming import (
+    question_answer_batch_generator,
+)
 from nucliadb.train.generators.sentence_classifier import (
     sentence_classification_batch_generator,
 )
@@ -78,6 +81,11 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
         )
     elif trainset.type == TaskType.PARAGRAPH_STREAMING:
         batch_generator = paragraph_streaming_batch_generator(
+            kbid, trainset, node, shard_replica_id
+        )
+
+    elif trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
+        batch_generator = question_answer_batch_generator(
             kbid, trainset, node, shard_replica_id
         )
 

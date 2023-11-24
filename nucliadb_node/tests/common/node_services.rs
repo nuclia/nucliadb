@@ -177,6 +177,10 @@ impl NodeFixture {
     }
 
     pub async fn with_writer(&mut self) -> anyhow::Result<&mut Self> {
+        if self.writer_server_task.is_some() {
+            return Ok(self);
+        }
+
         let settings = self.settings.clone();
         let cache_settings = self.settings.clone();
         let addr = self.writer_addr;
@@ -217,6 +221,10 @@ impl NodeFixture {
     }
 
     pub async fn with_secondary_writer(&mut self) -> anyhow::Result<&mut Self> {
+        if self.secondary_writer_server_task.is_some() {
+            return Ok(self);
+        }
+
         let settings = self.secondary_settings.clone();
         let cache_settings = self.secondary_settings.clone();
         let host_key_path = settings.host_key_path();

@@ -161,3 +161,7 @@ class BrokerMessageBuilder:
                 replace_if_exists(
                     self.bm.extracted_text, field.id, field.extracted.text
                 )
+            if field.extracted.question_answers is not None:
+                replace_if_exists(
+                    self.bm.question_answers, field.id, field.extracted.question_answers
+                )

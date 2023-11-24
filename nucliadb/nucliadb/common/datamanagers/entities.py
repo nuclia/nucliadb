@@ -18,14 +18,47 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pickle
 from typing import AsyncGenerator, Optional
 
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 
-KB_ENTITIES = "/kbs/{kbid}/entities"
+KB_ENTITIES = "/kbs/{kbid}/entities/"
 KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
 KB_DELETED_ENTITIES_GROUPS = "/kbs/{kbid}/deletedentities"
+KB_ENTITIES_CACHE = "/kbs/{kbid}/entities-cache"
+
+
+class EntitiesMetaCache:
+    """
+    A cache of duplicates and deleted entities. This is used to speed up
+    lookups of duplicate and deletions at query time. It's not used for anything else.
+
+    This is materialized on every change to an entity group.
+
+    [XXX] We're in python pickle hell here. We need to make sure we don't
+    change the structure of this class or we'll break the index.
+    """
+
+    def __init__(self):
+        self.deleted_entities: dict[str, list[str]] = {}
+        self.duplicate_entities: dict[str, dict[str, list[str]]] = {}
+        # materialize by value for faster lookups
+        self.duplicate_entities_by_value: dict[str, dict[str, str]] = {}
+
+    def set_duplicates(self, group_id: str, dups: dict[str, list[str]]) -> None:
+        self.duplicate_entities[group_id] = dups
+        self.duplicate_entities_by_value[group_id] = {}
+        for entity_id, duplicates in dups.items():
+            for duplicate in duplicates:
+                self.duplicate_entities_by_value[group_id][duplicate] = entity_id
+
+    def set_deleted(self, group_id: str, deleted_entities: list[str]) -> None:
+        if len(deleted_entities) == 0:
+            self.deleted_entities.pop(group_id, None)
+        else:
+            self.deleted_entities[group_id] = deleted_entities
 
 
 class EntitiesDataManager:
@@ -77,3 +110,53 @@ class EntitiesDataManager:
         eg = kb_pb2.EntitiesGroup()
         eg.ParseFromString(payload)
         return eg
+
+    @classmethod
+    async def get_deleted_groups(
+        cls, kbid: str, txn: Transaction
+    ) -> kb_pb2.DeletedEntitiesGroups:
+        deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid)
+        payload = await txn.get(deleted_groups_key)
+        deg = kb_pb2.DeletedEntitiesGroups()
+        if payload:
+            deg.ParseFromString(payload)
+        return deg
+
+    @classmethod
+    async def mark_group_as_deleted(
+        cls, kbid: str, group: str, txn: Transaction
+    ) -> None:
+        deg = await cls.get_deleted_groups(kbid, txn)
+        if group not in deg.entities_groups:
+            deg.entities_groups.append(group)
+            await txn.set(
+                KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString()
+            )
+
+    @classmethod
+    async def unmark_group_as_deleted(
+        cls, kbid: str, group: str, txn: Transaction
+    ) -> None:
+        deg = await cls.get_deleted_groups(kbid, txn)
+        if group in deg.entities_groups:
+            deg.entities_groups.remove(group)
+            await txn.set(
+                KB_DELETED_ENTITIES_GROUPS.format(kbid=kbid), deg.SerializeToString()
+            )
+
+    @classmethod
+    async def get_entities_meta_cache(
+        cls, kbid: str, txn: Transaction
+    ) -> EntitiesMetaCache:
+        value = await txn.get(KB_ENTITIES_CACHE.format(kbid=kbid))
+        if not value:
+            return EntitiesMetaCache()
+        return pickle.loads(value)
+
+    @classmethod
+    async def set_entities_meta_cache(
+        cls, kbid: str, cache: EntitiesMetaCache, txn: Transaction
+    ) -> None:
+        await txn.set(
+            KB_ENTITIES_CACHE.format(kbid=kbid), pickle.dumps(cache, protocol=5)
+        )

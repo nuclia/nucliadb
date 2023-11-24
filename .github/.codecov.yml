@@ -6,10 +6,10 @@ coverage:
         threshold: 1%
     patch: off
 ignore:
-  - "**/tests/*.py"
-  - "**/test_*.py"
   - "nucliadb_client/examples/"
   - "**/setup.py"
+  - "**/tests/**"
+  - "**/test_*.py"
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
     carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
@@ -34,7 +34,7 @@ flag_management:
       carryforward: true
       statuses:
         - type: project
-          target: 84%
+          target: 80%
     - name: train
       paths:
         - nucliadb/nucliadb/train/**

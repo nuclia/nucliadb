@@ -20,7 +20,7 @@
 import re
 import tempfile
 from io import BytesIO
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 import boto3
 import docker  # type: ignore
@@ -28,6 +28,8 @@ import pytest
 import requests
 from google.auth.credentials import AnonymousCredentials  # type: ignore
 from google.cloud import storage  # type: ignore
+from grpc import aio  # type: ignore
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
@@ -132,6 +134,15 @@ def text_editors_kb(knowledgebox: KnowledgeBox):
 def temp_folder():
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname
+
+
+@pytest.fixture
+@pytest.mark.asyncio
+async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
+    channel = aio.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
+    stub = WriterStub(channel)  # type: ignore
+    yield stub
+    await channel.close(grace=True)
 
 
 images.settings["gcs"] = {

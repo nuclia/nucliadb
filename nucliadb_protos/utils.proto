@@ -47,20 +47,6 @@ message RelationNode {
     string subtype = 6;
 }
 
-message JoinGraphEdge {
-    int32 source = 4;
-    int32 target = 1;
-    Relation.RelationType rtype = 2;
-    string rsubtype = 3;
-    RelationMetadata metadata = 5;
-}
-
-message JoinGraph {
-    map<int32, RelationNode> nodes = 1;
-    repeated JoinGraphEdge edges = 2;
-}
-
-
 message ExtractedText {
     string text = 1;
     map<string, string> split_text = 2;

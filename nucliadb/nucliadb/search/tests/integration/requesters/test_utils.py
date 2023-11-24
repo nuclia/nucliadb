@@ -23,7 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.query import global_query_to_pb
+from nucliadb.search.search.query import QueryParser
 from nucliadb_models.search import SearchOptions, SortField, SortOptions, SortOrder
 
 
@@ -34,8 +34,8 @@ async def test_vector_result_metadata(
 ) -> None:
     kbid = multiple_search_resource
 
-    pb_query, _, _ = await global_query_to_pb(
-        kbid,
+    pb_query, _, _ = await QueryParser(
+        kbid=kbid,
         query="own text",
         features=[SearchOptions.VECTOR],
         filters=[],
@@ -48,7 +48,7 @@ async def test_vector_result_metadata(
             order=SortOrder.DESC,
             limit=None,
         ),
-    )
+    ).parse()
 
     results, _, _, _ = await node_query(kbid, Method.SEARCH, pb_query)
     assert len(results[0].vector.documents) > 0

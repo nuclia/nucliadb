@@ -23,13 +23,12 @@ use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
+use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::IndexFiles;
 use nucliadb_procs::measure;
 
 use super::utils::*;
-use crate::errors::RelationsErr as InnerErr;
 use crate::index::*;
 
 pub struct RelationsWriterService {
@@ -56,83 +55,7 @@ impl RelationsWriterService {
     }
 }
 
-impl RelationWriter for RelationsWriterService {
-    #[measure(actor = "relations", metric = "delete_nodes")]
-    #[tracing::instrument(skip_all)]
-    fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> NodeResult<()> {
-        let time = SystemTime::now();
-
-        let id = graph.shard_id.as_ref().map(|s| &s.id);
-        let mut writer = self.index.start_writing()?;
-        for node in graph.nodes.iter() {
-            let name = node.value.clone();
-            let (xtype, subtype) = node_type_parsing(node.ntype(), &node.subtype);
-            let node = IoNode::new(name, xtype.to_string(), subtype.map(|s| s.to_string()));
-            if let Some(id) = writer.get_node_id(node.hash())? {
-                self.delete_node(&mut writer, id)?;
-            }
-        }
-        let result = Ok(writer.commit(&mut self.wmode)?);
-
-        let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);
-        debug!("{id:?} - Ending at {took} ms");
-
-        result
-    }
-
-    #[measure(actor = "relations", metric = "join_graph")]
-    #[tracing::instrument(skip_all)]
-    fn join_graph(&mut self, graph: &JoinGraph) -> NodeResult<()> {
-        let time = SystemTime::now();
-
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Creating nodes: starts {v} ms");
-        }
-
-        let mut writer = self.index.start_writing()?;
-        let nodes: HashMap<_, _> = graph
-            .nodes
-            .iter()
-            .map(|(k, v)| (k, v.value.clone(), node_type_parsing(v.ntype(), &v.subtype)))
-            .map(|(key, value, (xtype, subtype))| (key, value, xtype, subtype))
-            .map(|(key, value, xtype, subtype)| {
-                (
-                    key,
-                    value,
-                    xtype.to_string(),
-                    subtype.map(|s| s.to_string()),
-                )
-            })
-            .map(|(&key, value, xtype, subtype)| (key, IoNode::user_node(value, xtype, subtype)))
-            .collect();
-
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Creating nodes: ends {v} ms");
-        }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Populating the graph: starts {v} ms");
-        }
-
-        let ubehaviour = || Err(InnerErr::UBehaviour);
-        for protos_edge in graph.edges.iter() {
-            let from = nodes.get(&protos_edge.source).map_or_else(ubehaviour, Ok)?;
-            let to = nodes.get(&protos_edge.target).map_or_else(ubehaviour, Ok)?;
-            let edge = relation_type_parsing(protos_edge.rtype(), &protos_edge.rsubtype);
-            let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
-            let metadata = protos_edge.metadata.clone().map(IoEdgeMetadata::from);
-            writer.connect(&self.wmode, from, to, &edge, metadata.as_ref())?;
-        }
-
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Populating the graph: ends {v} ms");
-        }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            debug!("Ending at {v} ms")
-        }
-
-        Ok(writer.commit(&mut self.wmode)?)
-    }
-}
+impl RelationWriter for RelationsWriterService {}
 
 impl std::fmt::Debug for RelationsWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

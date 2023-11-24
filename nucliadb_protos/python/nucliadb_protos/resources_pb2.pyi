@@ -23,8 +23,6 @@ from nucliadb_protos.utils_pb2 import (
     DOT as DOT,
     EXPERIMENTAL as EXPERIMENTAL,
     ExtractedText as ExtractedText,
-    JoinGraph as JoinGraph,
-    JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,

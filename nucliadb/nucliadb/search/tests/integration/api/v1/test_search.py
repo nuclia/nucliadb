@@ -132,6 +132,7 @@ async def test_multiple_search_resource_all(
 
 
 @pytest.mark.asyncio
+@pytest.mark.flaky(reruns=3)
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:

@@ -325,6 +325,7 @@ class VectorServiceEnum(str, Enum):
 class RelationServiceEnum(str, Enum):
     RELATION_V0 = "RELATION_V0"
     RELATION_V1 = "RELATION_V1"
+    RELATION_V2 = "RELATION_V2"
 
 
 class ShardCreated(BaseModel):

@@ -112,15 +112,14 @@ impl ReaderChild for VectorReaderService {
             .cloned()
             .map(AtomClause::label)
             .for_each(|c| formula.extend(c));
+
         if key_filters.len() > 0 {
-            formula.extend(CompoundClause::new(1, key_filters.collect()));
+            formula.extend(CompoundClause::new(key_filters.collect()));
         }
-        if paragraph_labels.len() > 0 {
-            formula.extend(CompoundClause::new(
-                paragraph_labels.len(),
-                paragraph_labels.collect(),
-            ));
-        };
+        for paragraph_label in paragraph_labels {
+            formula.extend(paragraph_label);
+        }
+
         let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             debug!("{id:?} - Searching: starts at {v} ms");
@@ -296,7 +295,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
@@ -378,7 +376,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),
@@ -496,7 +493,6 @@ mod tests {
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],
             sentences_to_delete: vec![],
-            relations_to_delete: vec![],
             relations: vec![],
             vectors: HashMap::default(),
             vectors_to_delete: HashMap::default(),

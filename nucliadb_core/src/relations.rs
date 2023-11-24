@@ -22,6 +22,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::prelude::*;
 use crate::protos::*;
+use crate::Channel;
 
 pub type RelationsReaderPointer = Arc<dyn RelationReader>;
 pub type RelationsWriterPointer = Arc<RwLock<dyn RelationWriter>>;
@@ -29,6 +30,7 @@ pub type RelationsWriterPointer = Arc<RwLock<dyn RelationWriter>>;
 #[derive(Clone)]
 pub struct RelationConfig {
     pub path: PathBuf,
+    pub channel: Channel,
 }
 
 pub trait RelationReader:
@@ -39,7 +41,4 @@ pub trait RelationReader:
     fn count(&self) -> NodeResult<usize>;
 }
 
-pub trait RelationWriter: WriterChild {
-    fn join_graph(&mut self, graph: &JoinGraph) -> NodeResult<()>;
-    fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> NodeResult<()>;
-}
+pub trait RelationWriter: WriterChild {}
