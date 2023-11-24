@@ -50,7 +50,7 @@ async def test_summarize(
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/summarize", json={"resources": resource_uuids}
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
 
     content = resp.json()
     response = SummarizedResponse.parse_obj(content)
