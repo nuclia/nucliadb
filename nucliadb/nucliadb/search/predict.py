@@ -315,7 +315,10 @@ class PredictEngine:
 
         try:
             detail = await resp.json()
-        except json.decoder.JSONDecodeError:
+        except (
+            json.decoder.JSONDecodeError,
+            aiohttp.client_exceptions.ContentTypeError,
+        ):
             detail = await resp.text()
         logger.error(f"Predict API error at {resp.url}: {detail}")
         raise ProxiedPredictAPIError(status=resp.status, detail=detail)
@@ -389,6 +392,7 @@ class PredictEngine:
             url=self.get_predict_url(CHAT),
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
+            timeout=None,
         )
         await self.check_response(resp, expected_status=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
