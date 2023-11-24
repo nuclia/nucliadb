@@ -605,15 +605,9 @@ async def get_kb_model_default_min_score(kbid: str) -> Optional[float]:
 @alru_cache(maxsize=None)
 async def get_default_min_score(kbid: str) -> float:
     fallback = 0.7
-    try:
-        model_min_score = await get_kb_model_default_min_score(kbid)
-        if model_min_score is not None:
-            return model_min_score
-    except Exception as exc:
-        logger.warning(
-            f"Error retrieving default min score for kb {kbid}: {exc}",
-            exc_info=True,
-        )
+    model_min_score = await get_kb_model_default_min_score(kbid)
+    if model_min_score is not None:
+        return model_min_score
     return fallback
 
 
