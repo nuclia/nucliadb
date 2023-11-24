@@ -315,7 +315,7 @@ class PredictEngine:
 
         try:
             detail = await resp.json()
-        except Exception:
+        except json.decoder.JSONDecodeError:
             detail = await resp.text()
         logger.error(f"Predict API error at {resp.url}: {detail}")
         raise ProxiedPredictAPIError(status=resp.status, detail=detail)
