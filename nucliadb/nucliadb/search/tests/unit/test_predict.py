@@ -59,6 +59,8 @@ async def test_dummy_predict_engine():
     assert await pe.chat_query("kbid", Mock())
     assert await pe.convert_sentence_to_vector("kbid", "some sentence")
     assert await pe.detect_entities("kbid", "some sentence")
+    assert await pe.ask_document("kbid", "query", [["footext"]], "userid")
+    assert await pe.summarize("kbid", Mock(resources={}))
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -255,6 +257,7 @@ async def test_predict_engine_handles_limits_exceeded_error(
         ("convert_sentence_to_vector", ["kbid", "sentence"], False, []),
         ("detect_entities", ["kbid", "sentence"], False, []),
         ("ask_document", ["kbid", "query", [["footext"]], "userid"], True, None),
+        ("summarize", ["kbid", Mock(resources={})], True, None),
     ],
 )
 async def test_onprem_nuclia_service_account_not_configured(
@@ -430,3 +433,28 @@ async def test_summarize():
         json=item.dict(),
         headers={"X-STF-KBID": "kbid"},
     )
+
+
+@pytest.fixture(scope="function")
+def txn():
+    txn = mock.MagicMock()
+    txn.get = AsyncMock(return_value=None)
+    with mock.patch("nucliadb.search.predict.get_transaction", return_value=txn):
+        yield
+
+
+@pytest.mark.parametrize("onprem", [True, False])
+async def test_get_predict_headers(onprem, txn):
+    nua_service_account = "nua-service-account"
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=onprem,
+        nuclia_service_account=nua_service_account,
+    )
+    predict_headers = await pe.get_predict_headers("kbid")
+    if onprem:
+        assert predict_headers == {"X-STF-NUAKEY": f"Bearer {nua_service_account}"}
+    else:
+        assert predict_headers == {"X-STF-KBID": "kbid"}
