@@ -112,14 +112,14 @@ async def test_prioritary_indexing_on_one_shard(
 
     sources = []
 
-    async def indexer_process_side_effect(work):
+    async def side_effect(pb: IndexMessage):
         nonlocal sources
-        sources.append(work.index_message.source)
+        sources.append(pb.source)
         await asyncio.sleep(0.1)
         return True
 
-    indexer_process_mock = AsyncMock(side_effect=indexer_process_side_effect)
-    with patch.object(worker.indexer, "process", new=indexer_process_mock):
+    mock = AsyncMock(side_effect=side_effect)
+    with patch("nucliadb_node.indexer.ShardIndexer.index_message", new=mock):
         for i in range(3):
             await send_indexing_message(worker, processor_index, node)  # type: ignore
         for i in range(3):
@@ -129,7 +129,7 @@ async def test_prioritary_indexing_on_one_shard(
         start = datetime.now()
         while processing:
             await asyncio.sleep(0.1)
-            processing = indexer_process_mock.await_count < 6
+            processing = mock.await_count < 6
 
             elapsed = datetime.now() - start
             assert elapsed.seconds < 10, "too much time waiting"

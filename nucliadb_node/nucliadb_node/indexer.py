@@ -38,7 +38,10 @@ from nucliadb_node import SERVICE_NAME, logger, signals
 from nucliadb_node.signals import SuccessfulIndexingPayload
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import errors
-from nucliadb_utils.nats import DemuxProcessor, NatsDemultiplexer
+from nucliadb_telemetry.errors import capture_exception
+from nucliadb_utils.nats import MessageProgressUpdater
+from nucliadb_utils.settings import nats_consumer_settings
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 # Messages coming from processor take loner to index, so we want to prioritize
@@ -53,30 +56,40 @@ PRIORITIES = {
 
 @total_ordering
 @dataclass
-class IndexerWorkUnit:
-    seqid: int
+class WorkUnit:
     index_message: IndexMessage
+    nats_msg: Msg
+    message_progress_updater: MessageProgressUpdater
 
     def priority(self) -> int:
         return PRIORITIES[self.index_message.source]
 
-    def __eq__(self, other):
-        return self.priority().__eq__(other.priority())
+    @property
+    def seqid(self) -> int:
+        return int(self.nats_msg.reply.split(".")[5])
+
+    @property
+    def _id(self):
+        return (self.priority(), self.seqid)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, WorkUnit):
+            return NotImplemented
+        return self._id.__eq__(other._id)
 
     def __lt__(self, other):
-        return self.priority().__lt__(other.priority())
+        if not isinstance(other, WorkUnit):
+            return NotImplemented
+        return self._id.__lt__(other._id)
 
     def __hash__(self):
-        return self.seqid.__hash__()
+        return self._id.__hash__()
 
 
-class ConcurrentShardIndexer(DemuxProcessor):
+class ConcurrentShardIndexer:
     def __init__(self, writer: Writer):
         self.writer = writer
-        self.nats_demux = NatsDemultiplexer(
-            processor=self,
-            queue_klass=asyncio.PriorityQueue,
-        )
+        self.workers: dict[str, "ShardIndexer"] = {}
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
@@ -84,52 +97,99 @@ class ConcurrentShardIndexer(DemuxProcessor):
     async def finalize(self):
         pass
 
-    def index_message_nowait(self, msg: Msg):
-        self.nats_demux.handle_message_nowait(msg)
+    async def index_message_soon(self, msg: Msg):
+        mpu = MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66)
+        await mpu.start()
 
-    def splitter(self, msg: Msg) -> tuple[str, IndexerWorkUnit]:
+        subject = msg.subject
+        reply = msg.reply
         seqid = int(msg.reply.split(".")[5])
 
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
+
         split = pb.shard
+        work = WorkUnit(index_message=pb, nats_msg=msg, message_progress_updater=mpu)
+        logger.info(
+            f"Message demultiplexed to split '{split}'",
+            extra={
+                "shard": pb.shard,
+                "subject": subject,
+                "reply": reply,
+                "seqid": seqid,
+                "storage_key": pb.storage_key,
+            },
+        )
 
-        work = IndexerWorkUnit(seqid=seqid, index_message=pb)
-        return (split, work)
+        indexer = ShardIndexer(self.writer, self.storage)
+        await indexer.do_work(work)
 
-    async def process(self, work: IndexerWorkUnit) -> bool:
-        return await self.index_message(work)
 
-    async def index_message(self, work: IndexerWorkUnit) -> bool:
+class IndexWriterError(Exception):
+    pass
+
+
+class ShardIndexer:
+    def __init__(self, writer: Writer, storage: Storage):
+        self.work_queue = asyncio.PriorityQueue()
+        self.writer = writer
+        self.storage = storage
+
+    async def add_work(self, work: WorkUnit):
+        await self.work_queue.put(work)
+
+    async def do_work(self, work: WorkUnit):
         start = time.time()
-        pb = work.index_message
-
-        if pb.typemessage == TypeMessage.CREATION:
-            await self.set_resource(pb)
-        elif pb.typemessage == TypeMessage.DELETION:
-            await self.delete_resource(pb)
-        else:
-            logger.warning(
-                f"Unknown type message {pb.typemessage}",
+        try:
+            logger.info(
+                f"Working on message for shard {work.index_message.shard} (seqid={work.seqid})",
                 extra={
                     "seqid": work.seqid,
                     "shard": work.index_message.shard,
+                    "storage_key": work.index_message.storage_key,
                 },
             )
+            await self.index_message(work.index_message)
+        except Exception as exc:
+            event_id = capture_exception(exc)
+            logger.error(
+                "An error happened on shard indexer. Check sentry for more details. "
+                f"Event id: {event_id}",
+                extra={
+                    "seqid": work.seqid,
+                    "shard": work.index_message.shard,
+                    "storage_key": work.index_message.storage_key,
+                },
+                exc_info=exc,
+            )
+            await work.nats_msg.nak()
+        else:
+            await work.nats_msg.ack()
+            await signals.successful_indexing.dispatch(
+                SuccessfulIndexingPayload(
+                    seqid=work.seqid, index_message=work.index_message
+                )
+            )
+            logger.info(
+                "Message indexing finished",
+                extra={
+                    "seqid": work.seqid,
+                    "shard": work.index_message.shard,
+                    "storage_key": work.index_message.storage_key,
+                    "time": time.time() - start,
+                },
+            )
+        finally:
+            await work.message_progress_updater.end()
 
-        await signals.successful_indexing.dispatch(
-            SuccessfulIndexingPayload(seqid=work.seqid, index_message=pb)
-        )
-        logger.info(
-            "Message indexing finished",
-            extra={
-                "seqid": work.seqid,
-                "shard": pb.shard,
-                "storage_key": pb.storage_key,
-                "time": time.time() - start,
-            },
-        )
-        return True
+    async def index_message(self, pb: IndexMessage):
+        if pb.typemessage == TypeMessage.CREATION:
+            status = await self.set_resource(pb)
+        elif pb.typemessage == TypeMessage.DELETION:
+            status = await self.delete_resource(pb)
+
+        if status is not None and status.status != OpStatus.Status.OK:
+            raise IndexWriterError(status.detail)
 
     async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain = await self.storage.get_indexing(pb)

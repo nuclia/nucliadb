@@ -39,12 +39,15 @@ class MessageProgressUpdater:
         self.msg = msg
         self.timeout = timeout
 
-    async def __aenter__(self):
+    async def start(self):
         task_name = f"MessageProgressUpdater: {id(self)}"
         self._task = asyncio.create_task(self._progress(), name=task_name)
+
+    async def __aenter__(self):
+        await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    async def end(self):
         self._task.cancel()
         try:
             await self._task
@@ -52,6 +55,9 @@ class MessageProgressUpdater:
             pass
         except Exception:  # pragma: no cover
             pass
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.end()
 
     async def _progress(self):
         while True:

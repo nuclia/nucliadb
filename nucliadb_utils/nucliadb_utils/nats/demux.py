@@ -229,6 +229,7 @@ class NatsDemultiplexer:
             )
 
             work_outcome = await wait_condition
+            work_unit_done.remove_listener(work_id)
             self.working_on.discard(work_id)
             if work_outcome.error:
                 await msg.nak()
@@ -287,6 +288,16 @@ class DemuxWorker:
     async def work_until_finish(self):
         self.working = True
         while not self.work_queue.empty():
+            print(
+                "---- QUEUE {} -------------------------------------------------".format(
+                    self.work_queue.qsize()
+                )
+            )
+            from nucliadb_utils.settings import nats_consumer_settings
+
+            print("Consumer settings:", nats_consumer_settings.nats_max_ack_pending)
+            print(self.work_queue)
+            print("----------------------------------------------------------------")
             work: WorkUnit = await self.work_queue.get()
             await self.do_work(work)
         self.working = False

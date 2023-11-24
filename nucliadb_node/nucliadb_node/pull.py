@@ -112,4 +112,6 @@ class Worker:
 
     @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
-        self.indexer.index_message_nowait(msg)
+        seqid = int(msg.reply.split(".")[5])
+        print(f"Subscription worker received msg with seqid={seqid}")
+        await self.indexer.index_message_soon(msg)
