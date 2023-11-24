@@ -89,6 +89,6 @@ test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.js
 test-standalone-search:
 	echo " *  Test Started at: $$(date -u)"
 
-	molotov ./nucliadb_performance/standalone/test_search.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+	molotov ./nucliadb_performance/standalone/test_search_all.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"

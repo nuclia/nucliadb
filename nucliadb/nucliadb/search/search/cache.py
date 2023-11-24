@@ -35,7 +35,6 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 
-
 RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 

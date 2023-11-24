@@ -206,6 +206,7 @@ class Counter:
         else:
             self.counter.inc()
 
+        merged_labels.clear()
 
 class Histogram:
     def __init__(

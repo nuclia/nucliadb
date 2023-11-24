@@ -128,7 +128,7 @@ def run():
     finally:
         snapshot2 = tracemalloc.take_snapshot()
         top_stats = snapshot2.compare_to(snapshot1, 'lineno')
-        display_top(snapshot2)
+        display_top(snapshot2, limit=10, filters="/Users/ferran/Code/nucliadb")
         breakpoint()
         pass
 
@@ -139,7 +139,7 @@ async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
     return server
 
 
-def display_top(snapshot, key_type='lineno', limit=10):
+def display_top(snapshot, key_type='lineno', limit=10, filters=None):
     import tracemalloc
     import linecache
     snapshot = snapshot.filter_traces((
@@ -147,10 +147,14 @@ def display_top(snapshot, key_type='lineno', limit=10):
         tracemalloc.Filter(False, "<unknown>"),
     ))
     top_stats = snapshot.statistics(key_type)
+    if filters:
+        limit = limit * 3
 
     print("Top %s lines" % limit)
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
+        if filters and filters not in frame.filename:
+            continue
         print("#%s: %s:%s: %.1f KiB"
               % (index, frame.filename, frame.lineno, stat.size / 1024))
         line = linecache.getline(frame.filename, frame.lineno).strip()
