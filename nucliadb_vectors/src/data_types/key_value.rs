@@ -210,16 +210,15 @@ fn minimum_alive_value<'a, S: Slot + Copy>(
     status: &mut [usize],
     producers: &[(S, &'a [u8])],
 ) -> Option<&'a [u8]> {
-    let interface = producers[0].0;
     let mut minimum = None;
     for producer in unfinished.iter().copied() {
         let next_elem = status[producer];
+        let interface = producers[producer].0;
         let store = producers[producer].1;
         let element_pointer = get_pointer(store, next_elem);
-        let element_slice = &store[element_pointer..];
+        let (element_slice, _) = interface.read_exact(&store[element_pointer..]);
         if !interface.keep_in_merge(element_slice) {
             status[producer] += 1;
-            continue;
         } else if let Some(minimum_slice) = minimum {
             minimum = Some(std::cmp::min_by(minimum_slice, element_slice, |i, j| {
                 interface.cmp_slot(i, j)
@@ -228,7 +227,7 @@ fn minimum_alive_value<'a, S: Slot + Copy>(
             minimum = Some(element_slice);
         }
     }
-    minimum.map(|v| interface.read_exact(v).0)
+    minimum
 }
 
 /// The status of every producer pointing to the current minimum
@@ -239,9 +238,9 @@ fn advance_merge<S: Slot + Copy>(
     status: &mut [usize],
     producers: &[(S, &[u8])],
 ) {
-    let interface = producers[0].0;
     for producer in unfinished.iter().copied() {
         let next_elem = status[producer];
+        let interface = producers[producer].0;
         let store = producers[producer].1;
         let element_pointer = get_pointer(store, next_elem);
         let element_slice = &store[element_pointer..];
@@ -254,7 +253,7 @@ fn advance_merge<S: Slot + Copy>(
 
 // Entry point for the merge algorithm. Returns the number of elements merged into the file.
 // WARNING: In case of keys duplicatied keys it favors the contents of the first slot.
-pub fn merge<S, R>(recipient: &mut R, producers: Vec<(S, &[u8])>) -> io::Result<usize>
+pub fn merge<S, R>(recipient: &mut R, producers: &[(S, &[u8])]) -> io::Result<usize>
 where
     S: Slot + Copy,
     R: Write + Seek,
@@ -267,6 +266,8 @@ where
     let mut non_empty_producers = Vec::with_capacity(producers.len());
     // Number of total elements (alive or deleted) each producer has
     let mut lens = Vec::with_capacity(producers.len());
+
+    // Initializing merge loop parameters
     for (id, (interface, data)) in producers.iter().copied().enumerate() {
         let total_elements = elements_in_total(data);
         let (alive_elements, space) = get_metrics::<S>(interface, data);
@@ -303,7 +304,7 @@ where
 
     // Merge loop, transfers the contents of each producer into the recipient in order
     while !unfinished.is_empty() {
-        if let Some(minimum) = minimum_alive_value(&unfinished, &mut status, &producers) {
+        if let Some(minimum) = minimum_alive_value(&unfinished, &mut status, producers) {
             // There is a minimum that needs to be transferred to the recipient.
             let idx_slot = (HEADER_LEN + (written_elements * POINTER_LEN)) as u64;
             recipient.seek(SeekFrom::Start(idx_slot))?;
@@ -313,7 +314,7 @@ where
             recipient_length += minimum.len();
             written_elements += 1;
             // Every producer pointing containing the minimum is advanced.
-            advance_merge(minimum, &unfinished, &mut status, &producers);
+            advance_merge(minimum, &unfinished, &mut status, producers);
         }
         compute_unfinished(&mut unfinished, &status, &lens);
     }
@@ -413,7 +414,7 @@ mod tests {
             .into_iter()
             .map(|e| (TElem, e.as_slice()))
             .collect();
-        merge(&mut file, elems).unwrap();
+        merge(&mut file, &elems).unwrap();
         let mut buf = vec![];
         file.read_to_end(&mut buf).unwrap();
         store_checks(&expected, &buf);

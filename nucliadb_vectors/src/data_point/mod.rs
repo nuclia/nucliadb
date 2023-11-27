@@ -540,8 +540,9 @@ impl DataPoint {
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
         {
+            let node_producers: Vec<_> = node_producers.collect();
             let mut node_buffer = BufWriter::new(&mut nodes);
-            key_value::merge(&mut node_buffer, node_producers.collect())?;
+            key_value::merge(&mut node_buffer, &node_producers)?;
             node_buffer.flush()?;
         }
 
