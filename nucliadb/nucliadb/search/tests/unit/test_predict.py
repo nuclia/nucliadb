@@ -398,7 +398,7 @@ async def test_check_response_error():
     )
     response.status = 503
     response._body = b"some error"
-    response._headers = {"Content-Type": "application/json"}
+    response._headers = {"Content-Type": "text/plain; charset=utf-8"}
 
     with pytest.raises(ProxiedPredictAPIError) as ex:
         await PredictEngine().check_response(response, expected_status=200)
