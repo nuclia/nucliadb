@@ -79,6 +79,10 @@ gc_observer = metrics.Observer(
 )
 
 
+class IndexNodeError(Exception):
+    pass
+
+
 class ShardManager:
     schedule_delay_seconds = 30.0
 
@@ -307,10 +311,13 @@ class Worker:
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), sm.lock:
             try:
+                status = None
                 if pb.typemessage == TypeMessage.CREATION:
-                    await self.set_resource(pb)
+                    status = await self.set_resource(pb)
                 elif pb.typemessage == TypeMessage.DELETION:
-                    await self.delete_resource(pb)
+                    status = await self.delete_resource(pb)
+                if status is not None and status.status != OpStatus.Status.OK:
+                    raise IndexNodeError(status.detail)
                 sm.shard_changed_event()
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
