@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
 from typing import List, Optional
 
 import nucliadb_models as models
@@ -135,14 +134,34 @@ async def serialize(
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
-    driver = get_driver()
-    txn = await driver.begin()
+    async with get_driver().transaction() as txn:
+        return await managed_serialize(
+            txn,
+            kbid,
+            rid=rid,
+            show=show,
+            field_type_filter=field_type_filter,
+            extracted=extracted,
+            service_name=service_name,
+            slug=slug,
+        )
 
-    orm_resource = await get_orm_resource(
-        txn, kbid, rid=rid, slug=slug, service_name=service_name
+
+async def managed_serialize(
+    txn: Transaction,
+    kbid: str,
+    rid: Optional[str],
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    service_name: Optional[str] = None,
+    slug: Optional[str] = None,
+    rcache: Optional[dict[str, ORMResource]] = None,
+) -> Optional[Resource]:
+    orm_resource = await get_resource_from_cache_or_db(
+        txn, kbid, rid=rid, slug=slug, service_name=service_name, rcache=rcache
     )
     if orm_resource is None:
-        await txn.abort()
         return None
 
     resource = Resource(id=orm_resource.uuid)
@@ -437,8 +456,25 @@ async def serialize(
                             text=resource.data.generics[field.id].value
                         )
                     )
-    asyncio.create_task(txn.abort())
     return resource
+
+
+async def get_resource_from_cache_or_db(
+    txn: Transaction,
+    kbid: str,
+    rid: Optional[str],
+    slug: Optional[str],
+    service_name: Optional[str] = None,
+    rcache: Optional[dict[str, ORMResource]] = None,
+) -> Optional[ORMResource]:
+    orm_resource = None
+    if all([rid, rcache]):
+        orm_resource = rcache.get(rid)
+    if orm_resource is None:
+        orm_resource = await get_orm_resource(
+            txn, kbid, rid=rid, slug=slug, service_name=service_name
+        )
+    return orm_resource
 
 
 async def get_orm_resource(

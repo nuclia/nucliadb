@@ -30,7 +30,7 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.cache import get_resource_cache
+from nucliadb.search.search.cache import resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -64,9 +64,7 @@ async def set_text_value(
     ematches: Optional[List[str]] = None,
     extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
-    # TODO: Improve
-    await max_operations.acquire()
-    try:
+    async with max_operations:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
         result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
@@ -81,8 +79,6 @@ async def set_text_value(
             matches=[],  # TODO
             extracted_text_cache=extracted_text_cache,
         )
-    finally:
-        max_operations.release()
 
 
 @merge_observer.wrap({"type": "set_resource_metadada_value"})
@@ -95,9 +91,7 @@ async def set_resource_metadata_value(
     find_resources: Dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
-    await max_operations.acquire()
-
-    try:
+    async with max_operations:
         serialized_resource = await serialize(
             kbid,
             resource,
@@ -111,9 +105,6 @@ async def set_resource_metadata_value(
         else:
             logger.warning(f"Resource {resource} not found in {kbid}")
             find_resources.pop(resource, None)
-
-    finally:
-        max_operations.release()
 
 
 class Orderer:
@@ -157,55 +148,56 @@ async def fetch_find_metadata(
     operations = []
     max_operations = asyncio.Semaphore(50)
     orderer = Orderer()
-    etcache = paragraphs.ExtractedTextCache()
-    for result_paragraph in result_paragraphs:
-        if result_paragraph.paragraph is not None:
-            find_resource = find_resources.setdefault(
-                result_paragraph.rid, FindResource(id=result_paragraph.id, fields={})
-            )
-            find_field = find_resource.fields.setdefault(
-                result_paragraph.field, FindField(paragraphs={})
-            )
 
-            if result_paragraph.paragraph.id in find_field.paragraphs:
-                # Its a multiple match, push the score
-                find_field.paragraphs[result_paragraph.paragraph.id].score = 25
-                find_field.paragraphs[
-                    result_paragraph.paragraph.id
-                ].score_type = SCORE_TYPE.BOTH
-                orderer.add_boosted(
-                    (
-                        result_paragraph.rid,
-                        result_paragraph.field,
-                        result_paragraph.paragraph.id,
-                    )
+    with paragraphs.extracted_text_cache() as etcache:
+        for result_paragraph in result_paragraphs:
+            if result_paragraph.paragraph is not None:
+                find_resource = find_resources.setdefault(
+                    result_paragraph.rid,
+                    FindResource(id=result_paragraph.id, fields={}),
                 )
-            else:
-                find_field.paragraphs[
-                    result_paragraph.paragraph.id
-                ] = result_paragraph.paragraph
-                orderer.add(
-                    (
-                        result_paragraph.rid,
-                        result_paragraph.field,
-                        result_paragraph.paragraph.id,
-                    )
+                find_field = find_resource.fields.setdefault(
+                    result_paragraph.field, FindField(paragraphs={})
                 )
 
-            operations.append(
-                asyncio.create_task(
-                    set_text_value(
-                        kbid=kbid,
-                        result_paragraph=result_paragraph,
-                        highlight=highlight,
-                        ematches=ematches,
-                        max_operations=max_operations,
-                        extracted_text_cache=etcache,
+                if result_paragraph.paragraph.id in find_field.paragraphs:
+                    # Its a multiple match, push the score
+                    find_field.paragraphs[result_paragraph.paragraph.id].score = 25
+                    find_field.paragraphs[
+                        result_paragraph.paragraph.id
+                    ].score_type = SCORE_TYPE.BOTH
+                    orderer.add_boosted(
+                        (
+                            result_paragraph.rid,
+                            result_paragraph.field,
+                            result_paragraph.paragraph.id,
+                        )
+                    )
+                else:
+                    find_field.paragraphs[
+                        result_paragraph.paragraph.id
+                    ] = result_paragraph.paragraph
+                    orderer.add(
+                        (
+                            result_paragraph.rid,
+                            result_paragraph.field,
+                            result_paragraph.paragraph.id,
+                        )
+                    )
+
+                operations.append(
+                    asyncio.create_task(
+                        set_text_value(
+                            kbid=kbid,
+                            result_paragraph=result_paragraph,
+                            highlight=highlight,
+                            ematches=ematches,
+                            max_operations=max_operations,
+                            extracted_text_cache=etcache,
+                        )
                     )
                 )
-            )
-            resources.add(result_paragraph.rid)
-    etcache.clear()
+                resources.add(result_paragraph.rid)
 
     for resource in resources:
         operations.append(
@@ -392,8 +384,7 @@ async def find_merge_results(
 
         relations.append(response.relation)
 
-    rcache = get_resource_cache(clear=True)
-    try:
+    with resource_cache():
         result_paragraphs, merged_next_page = merge_paragraphs_vectors(
             paragraphs, vectors, count, page, min_score
         )
@@ -424,5 +415,3 @@ async def find_merge_results(
 
         await abort_transaction()
         return api_results
-    finally:
-        rcache.clear()

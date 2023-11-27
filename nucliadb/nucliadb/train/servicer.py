@@ -52,7 +52,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
 
     async def finalize(self):
         try:
-            self.session.close()
+            await self.session.close()
         except Exception:
             pass
 

@@ -1097,6 +1097,9 @@ class Resource:
         brain.apply_field_text(fieldkey, field_text)
 
     def clean(self):
+        self.fields.clear()
+        self.conversations.clear()
+        self.all_fields_keys.clear()
         self._indexer = None
         self.txn = None
 

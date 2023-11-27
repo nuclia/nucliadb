@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
 import logging
 import re
 import string
@@ -83,6 +84,15 @@ class ExtractedTextCache:
     def clear(self):
         self.values.clear()
         self.locks.clear()
+
+
+@contextlib.contextmanager
+def extracted_text_cache():
+    etcache = ExtractedTextCache()
+    try:
+        yield etcache
+    finally:
+        etcache.clear()
 
 
 async def get_field_extracted_text(

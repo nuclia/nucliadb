@@ -60,12 +60,18 @@ class Transaction:
 
 class Driver:
     initialized = False
+    _abort_tasks: List[asyncio.Task] = []
 
     async def initialize(self):
         raise NotImplementedError()
 
     async def finalize(self):
-        raise NotImplementedError()
+        for txn_abort in self._abort_tasks:
+            try:
+                await txn_abort
+            except Exception:
+                pass
+        self._abort_tasks.clear()
 
     async def begin(self) -> Transaction:
         raise NotImplementedError()
@@ -94,4 +100,5 @@ class Driver:
                 if error or wait_for_abort:
                     await txn.abort()
                 else:
-                    asyncio.create_task(txn.abort())
+                    abort_task = asyncio.create_task(txn.abort())
+                    self._abort_tasks.append(abort_task)

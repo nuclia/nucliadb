@@ -69,9 +69,9 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 
-from .cache import get_resource_cache, get_resource_from_cache
+from .cache import get_resource_from_cache, resource_cache
 from .metrics import merge_observer
-from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentence
+from .paragraphs import extracted_text_cache, get_paragraph_text, get_text_sentence
 
 Bm25Score = Tuple[float, float]
 TimestampScore = datetime.datetime
@@ -204,9 +204,7 @@ async def merge_suggest_paragraph_results(
     if len(suggest_responses) > 1:
         sort_results_by_score(raw_paragraph_list)
 
-    rcache = get_resource_cache(clear=True)
-    etcache = ExtractedTextCache()
-    try:
+    with resource_cache(), extracted_text_cache() as etcache:
         result_paragraph_list: List[Paragraph] = []
         for result in raw_paragraph_list[:10]:
             _, field_type, field = result.field.split("/")
@@ -252,9 +250,6 @@ async def merge_suggest_paragraph_results(
                     new_paragraph.end_seconds = seconds_positions[1]
             result_paragraph_list.append(new_paragraph)
         return Paragraphs(results=result_paragraph_list, query=query)
-    finally:
-        etcache.clear()
-        rcache.clear()
 
 
 async def merge_vectors_results(
@@ -384,8 +379,8 @@ async def merge_paragraph_results(
         next_page = True
 
     result_paragraph_list: List[Paragraph] = []
-    etcache = ExtractedTextCache()
-    try:
+
+    with extracted_text_cache() as etcache:
         for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
             _, field_type, field = result.field.split("/")
             text = await get_paragraph_text(
@@ -432,6 +427,7 @@ async def merge_paragraph_results(
             result_paragraph_list.append(new_paragraph)
             if new_paragraph.rid not in resources:
                 resources.append(new_paragraph.rid)
+
         return Paragraphs(
             results=result_paragraph_list,
             facets=facets,
@@ -441,8 +437,6 @@ async def merge_paragraph_results(
             page_size=count,
             next_page=next_page,
         )
-    finally:
-        etcache.clear()
 
 
 @merge_observer.wrap({"type": "merge_relations"})
@@ -521,9 +515,8 @@ async def merge_results(
 
     api_results = KnowledgeboxSearchResults()
 
-    rcache = get_resource_cache(clear=True)
-    try:
-        resources: List[str] = list()
+    with resource_cache() as rcache:
+        resources: list[str] = []
         api_results.fulltext = await merge_documents_results(
             documents, resources, count, page, kbid, sort
         )
@@ -545,11 +538,9 @@ async def merge_results(
         api_results.relations = merge_relations_results(relations, requested_relations)
 
         api_results.resources = await fetch_resources(
-            resources, kbid, show, field_type_filter, extracted
+            resources, kbid, show, field_type_filter, extracted, rcache=rcache
         )
         return api_results
-    finally:
-        rcache.clear()
 
 
 async def merge_paragraphs_results(
@@ -568,8 +559,7 @@ async def merge_paragraphs_results(
 
     api_results = ResourceSearchResults()
 
-    rcache = get_resource_cache(clear=True)
-    try:
+    with resource_cache():
         resources: List[str] = list()
         api_results.paragraphs = await merge_paragraph_results(
             paragraphs,
@@ -585,8 +575,6 @@ async def merge_paragraphs_results(
             ),
         )
         return api_results
-    finally:
-        rcache.clear()
 
 
 async def merge_suggest_entities_results(

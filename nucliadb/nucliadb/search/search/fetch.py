@@ -25,7 +25,8 @@ from nucliadb_protos.resources_pb2 import Paragraph
 
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.serialize import serialize
+from nucliadb.ingest.serialize import managed_serialize
+from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -44,16 +45,20 @@ async def fetch_resources(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-) -> Dict[str, Resource]:
+    rcache: Optional[dict[str, ResourceORM]] = None,
+) -> dict[str, Resource]:
+    txn = await get_transaction()
     result = {}
     for resource in resources:
-        serialization = await serialize(
+        serialization = await managed_serialize(
+            txn,
             kbid,
             resource,
             show,
             field_type_filter=field_type_filter,
             extracted=extracted,
             service_name=SERVICE_NAME,
+            rcache=rcache,
         )
         if serialization is not None:
             result[resource] = serialization
