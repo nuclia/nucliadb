@@ -20,11 +20,11 @@
 import asyncio
 import tempfile
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from nats.aio.client import Msg
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 
 from nucliadb_node.pull import IndexedPublisher, ShardManager, Worker
 from nucliadb_node.settings import settings
@@ -188,3 +188,13 @@ class TestSubscriptionWorker:
             assert worker.nc.jetstream().subscribe.call_count == 2
         finally:
             await worker.finalize()
+
+    @pytest.mark.asyncio
+    async def test_node_writer_errors_are_managed(self, worker: Worker):
+        status = OpStatus()
+        status.status = OpStatus.Status.ERROR
+        status.detail = "node writer error"
+        with patch("nucliadb_node.pull.Worker.set_resource", return_value=status):
+            msg = self.get_msg(seqid=1)
+            with pytest.raises(Exception):
+                await worker.subscription_worker(msg)
