@@ -536,6 +536,10 @@ impl ShardWriter {
             vector_read(&self.vector_writer)
                 .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
         );
+        files.push(
+            relation_read(&self.relation_writer)
+                .get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?,
+        );
 
         Ok(files)
     }

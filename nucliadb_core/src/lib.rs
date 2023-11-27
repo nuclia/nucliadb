@@ -132,6 +132,7 @@ pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
     Arc::new(RwLock::new(writer))
 }
 
+#[derive(Debug)]
 pub struct IndexFiles {
     pub metadata_files: HashMap<String, Vec<u8>>,
     pub files: Vec<String>,
