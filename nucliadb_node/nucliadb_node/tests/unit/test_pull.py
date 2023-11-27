@@ -26,7 +26,7 @@ import pytest
 from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 
-from nucliadb_node.pull import IndexedPublisher, ShardManager, Worker
+from nucliadb_node.pull import IndexedPublisher, IndexNodeError, ShardManager, Worker
 from nucliadb_node.settings import settings
 from nucliadb_utils import const
 
@@ -196,5 +196,5 @@ class TestSubscriptionWorker:
         status.detail = "node writer error"
         with patch("nucliadb_node.pull.Worker.set_resource", return_value=status):
             msg = self.get_msg(seqid=1)
-            with pytest.raises(Exception):
+            with pytest.raises(IndexNodeError):
                 await worker.subscription_worker(msg)
