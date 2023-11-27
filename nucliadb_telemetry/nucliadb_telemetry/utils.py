@@ -29,7 +29,6 @@ from opentelemetry.sdk.resources import Resource  # type: ignore
 from nucliadb_telemetry.batch_span import BatchSpanProcessor
 from nucliadb_telemetry.jaeger import JaegerExporterAsync
 from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.tikv import TiKVInstrumentor
 from nucliadb_telemetry.tracerprovider import (
     AsyncMultiSpanProcessor,
     AsyncTracerProvider,
@@ -121,13 +120,19 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
     if tracer_provider is not None:  # pragma: no cover
         await init_telemetry(tracer_provider)
         set_global_textmap(B3MultiFormat())
-        TiKVInstrumentor().instrument(tracer_provider=tracer_provider)
+
+        try:
+            from nucliadb_telemetry.tikv import TiKVInstrumentor
+
+            TiKVInstrumentor().instrument(tracer_provider=tracer_provider)
+        except ImportError:  # pragma: no cover
+            pass
         try:
             from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
                 AioHttpClientInstrumentor,
             )
 
             AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
-        except ImportError:
+        except ImportError:  # pragma: no cover
             pass
     return tracer_provider

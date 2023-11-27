@@ -11,7 +11,7 @@ install-dev:
 # NEEDS TO BE DECOUPLED EVENTUALLY
 	pip install -e ../nucliadb_protos/python
 	pip install -e ../nucliadb_utils
-	pip install -e .
+	pip install -e ".[all]"
 
 .PHONY: format
 format:
