@@ -40,7 +40,7 @@ requirements_grpc = [
     "grpcio-testing>=1.44.0",
     "grpcio-reflection>=1.44.0",
 ] + requirements_otel
-requirements_nats = ["nats-py[nkeys]>=2.2.0"] + requirements_otel
+requirements_nats = ["nats-py[nkeys]>=2.5.0"] + requirements_otel
 requirements_fastapi = ["fastapi"] + requirements_otel
 requirements_tikv = ["tikv-client>=0.0.3"] + requirements_otel
 
