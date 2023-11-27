@@ -47,6 +47,53 @@ def get_traced_jetstream(nc: NATSClient, service_name: str) -> JetStreamContext:
     return jetstream
 
 
+class MessageProgressUpdater:
+    """
+    Context manager to send progress updates to NATS.
+
+    This should allow lower ack_wait time settings without causing
+    messages to be redelivered.
+    """
+
+    _task: asyncio.Task
+
+    def __init__(self, msg: Msg, timeout: float):
+        self.msg = msg
+        self.timeout = timeout
+
+    async def start(self):
+        task_name = f"MessageProgressUpdater: {id(self)}"
+        self._task = asyncio.create_task(self._progress(), name=task_name)
+
+    async def end(self):
+        self._task.cancel()
+        try:
+            await self._task
+        except asyncio.CancelledError:  # pragma: no cover
+            pass
+        except Exception:  # pragma: no cover
+            pass
+
+    async def __aenter__(self):
+        await self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.end()
+
+    async def _progress(self):
+        while True:
+            try:
+                await asyncio.sleep(self.timeout)
+                if self.msg._ackd:  # all done, do not mark with in_progress
+                    return
+                await self.msg.in_progress()
+            except (RuntimeError, asyncio.CancelledError):
+                return
+            except Exception:  # pragma: no cover
+                logger.exception("Error sending task progress to NATS")
+
+
 class NatsConnectionManager:
     _nc: NATSClient
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
@@ -115,12 +162,7 @@ class NatsConnectionManager:
                 asyncio.TimeoutError,
             ):  # pragma: no cover
                 pass
-            try:
-                await self._nc.close()
-            except (RuntimeError, AttributeError):  # pragma: no cover
-                # RuntimeError: can be thrown if event loop is closed
-                # AttributeError: can be thrown by nats-py when handling shutdown
-                pass
+            await self._nc.close()
             self._subscriptions = []
 
     async def disconnected_cb(self) -> None:
