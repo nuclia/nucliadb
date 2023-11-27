@@ -19,6 +19,7 @@
 
 import asyncio
 import contextlib
+import logging
 from contextvars import ContextVar
 from typing import Dict, Generator, Optional
 
@@ -36,6 +37,7 @@ ResourceCacheType = Dict[str, ResourceORM]
 
 rcache: ContextVar[Optional[ResourceCacheType]] = ContextVar("rcache", default=None)
 
+logger = logging.getLogger(__name__)
 
 RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
@@ -53,6 +55,10 @@ def resource_cache() -> Generator[ResourceCacheType, None, None]:
 def get_resource_cache(clear: bool = False) -> ResourceCacheType:
     value: Optional[Dict[str, ResourceORM]] = rcache.get()
     if value is None or clear:
+        if clear and value is not None:
+            logger.warning(
+                f"Clearing a non-empty resource cache. This may lead to a memory leak."
+            )
         value = {}
         rcache.set(value)
     return value
