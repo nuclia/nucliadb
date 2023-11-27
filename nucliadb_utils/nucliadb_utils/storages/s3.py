@@ -390,19 +390,8 @@ class S3Storage(Storage):
             created = True
         return created
 
-    async def bucket_exists(self, bucket_name: str):
-        try:
-            res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
-            if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                return False
-            else:
-                return True
-        except botocore.exceptions.ClientError as e:
-            error_code = int(e.response["Error"]["Code"])
-            if error_code == 404:
-                return False
-            else:
-                raise
+    async def bucket_exists(self, bucket_name: str) -> bool:
+        return await bucket_exists(self._s3aioclient, bucket_name)
 
     async def create_bucket(self, bucket_name: str):
         await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags)
