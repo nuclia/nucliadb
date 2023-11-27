@@ -63,7 +63,7 @@ class TestIndexerWorkUnit:
         yield WorkUnit(
             nats_msg=msg,
             index_message=processor_index_message,
-            message_progress_updater=message_progress_updater,
+            mpu=message_progress_updater,
         )
 
     @pytest.fixture
@@ -76,7 +76,7 @@ class TestIndexerWorkUnit:
         yield WorkUnit(
             nats_msg=msg,
             index_message=writer_index_message,
-            message_progress_updater=message_progress_updater,
+            mpu=message_progress_updater,
         )
 
     def test_priority_comparaisons_same_seqid(

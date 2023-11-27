@@ -119,7 +119,7 @@ async def test_prioritary_indexing_on_one_shard(
         return True
 
     mock = AsyncMock(side_effect=side_effect)
-    with patch("nucliadb_node.indexer.ShardIndexer.index_message", new=mock):
+    with patch("nucliadb_node.indexer.PriorityIndexer.index_message", new=mock):
         for i in range(3):
             await send_indexing_message(worker, processor_index, node)  # type: ignore
         for i in range(3):

@@ -19,7 +19,6 @@
 
 import asyncio
 import time
-from dataclasses import dataclass
 from functools import total_ordering
 from typing import Optional
 
@@ -41,8 +40,12 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
-from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
+
+
+class IndexWriterError(Exception):
+    pass
+
 
 # Messages coming from processor take loner to index, so we want to prioritize
 # small messages coming from the writer (user creations/updates/deletes).
@@ -55,12 +58,30 @@ PRIORITIES = {
 
 
 @total_ordering
-@dataclass
 class WorkUnit:
-    index_message: IndexMessage
-    nats_msg: Msg
-    message_progress_updater: MessageProgressUpdater
+    def __init__(
+        self,
+        *,
+        index_message: IndexMessage,
+        nats_msg: Msg,
+        mpu: MessageProgressUpdater,
+    ):
+        self.index_message = index_message
+        self.nats_msg = nats_msg
+        self.mpu = mpu
+        self._id = (self.priority, self.seqid)
 
+    @classmethod
+    def from_msg(cls, msg: Msg) -> "WorkUnit":
+        mpu = MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66)
+
+        pb = IndexMessage()
+        pb.ParseFromString(msg.data)
+
+        work = cls(index_message=pb, nats_msg=msg, mpu=mpu)
+        return work
+
+    @property
     def priority(self) -> int:
         return PRIORITIES[self.index_message.source]
 
@@ -69,8 +90,8 @@ class WorkUnit:
         return int(self.nats_msg.reply.split(".")[5])
 
     @property
-    def _id(self):
-        return (self.priority(), self.seqid)
+    def shard_id(self) -> str:
+        return self.index_message.shard
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, WorkUnit):
@@ -89,7 +110,62 @@ class WorkUnit:
 class ConcurrentShardIndexer:
     def __init__(self, writer: Writer):
         self.writer = writer
-        self.workers: dict[str, "ShardIndexer"] = {}
+        self.workers: dict[str, PriorityIndexer] = {}
+
+    async def initialize(self):
+        self.storage = await get_storage(service_name=SERVICE_NAME)
+
+    async def finalize(self):
+        for indexer in self.workers.values():
+            await indexer.wait_until_finish()
+        self.workers.clear()
+
+    async def index_message_soon(self, msg: Msg):
+        work = WorkUnit.from_msg(msg)
+        await work.mpu.start()
+
+        logger.info(
+            f"Index message for shard {work.shard_id} is being enqueued",
+            extra={
+                "shard": work.shard_id,
+                "subject": msg.subject,
+                "reply": msg.reply,
+                "seqid": work.seqid,
+                "storage_key": work.index_message.storage_key,
+            },
+        )
+
+        indexer, created = await self.get_or_create_indexer(work.shard_id)
+        await indexer.index_message_soon(work)
+        await self.clean_idle_indexers()
+
+    async def get_or_create_indexer(
+        self, shard_id: str
+    ) -> tuple["PriorityIndexer", bool]:
+        create = shard_id not in self.workers
+        if create:
+            indexer = PriorityIndexer(self.writer)
+            await indexer.initialize()
+            self.workers[shard_id] = indexer
+        else:
+            indexer = self.workers[shard_id]
+        return (indexer, create)
+
+    async def clean_idle_indexers(self):
+        remove = set()
+        for shard_id, indexer in self.workers.items():
+            if not indexer.working:
+                remove.add(shard_id)
+        for shard_id in remove:
+            indexer = self.workers.pop(shard_id)
+            await indexer.finalize()
+
+
+class PriorityIndexer:
+    def __init__(self, writer: Writer):
+        self.writer = writer
+        self.work_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self.task: Optional[asyncio.Task] = None
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
@@ -97,46 +173,31 @@ class ConcurrentShardIndexer:
     async def finalize(self):
         pass
 
-    async def index_message_soon(self, msg: Msg):
-        mpu = MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66)
-        await mpu.start()
-
-        subject = msg.subject
-        reply = msg.reply
-        seqid = int(msg.reply.split(".")[5])
-
-        pb = IndexMessage()
-        pb.ParseFromString(msg.data)
-
-        split = pb.shard
-        work = WorkUnit(index_message=pb, nats_msg=msg, message_progress_updater=mpu)
-        logger.info(
-            f"Message demultiplexed to split '{split}'",
-            extra={
-                "shard": pb.shard,
-                "subject": subject,
-                "reply": reply,
-                "seqid": seqid,
-                "storage_key": pb.storage_key,
-            },
-        )
-
-        indexer = ShardIndexer(self.writer, self.storage)
-        await indexer.do_work(work)
-
-
-class IndexWriterError(Exception):
-    pass
-
-
-class ShardIndexer:
-    def __init__(self, writer: Writer, storage: Storage):
-        self.work_queue = asyncio.PriorityQueue()
-        self.writer = writer
-        self.storage = storage
-
-    async def add_work(self, work: WorkUnit):
+    async def index_message_soon(self, work: WorkUnit):
         await self.work_queue.put(work)
+
+        if self.task is None:
+            task = asyncio.create_task(self.work_until_finish())
+            task.add_done_callback(PriorityIndexer._done_callback)
+            self.task = task
+
+    @property
+    def working(self) -> bool:
+        return self.task is not None
+
+    async def wait_until_finish(self):
+        await self.task
+
+    async def work_until_finish(self):
+        while not self.work_queue.empty():
+            work = await self.work_queue.get()
+            await self.do_work(work)
+
+    @staticmethod
+    def _done_callback(task: asyncio.Task):
+        # propagate errors
+        if task.exception() is not None:
+            raise task.exception()  # type: ignore
 
     async def do_work(self, work: WorkUnit):
         start = time.time()
@@ -153,7 +214,7 @@ class ShardIndexer:
         except Exception as exc:
             event_id = capture_exception(exc)
             logger.error(
-                "An error happened on shard indexer. Check sentry for more details. "
+                "An error happened on indexer. Check sentry for more details. "
                 f"Event id: {event_id}",
                 extra={
                     "seqid": work.seqid,
@@ -180,7 +241,7 @@ class ShardIndexer:
                 },
             )
         finally:
-            await work.message_progress_updater.end()
+            await work.mpu.end()
 
     async def index_message(self, pb: IndexMessage):
         if pb.typemessage == TypeMessage.CREATION:
