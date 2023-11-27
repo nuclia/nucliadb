@@ -19,7 +19,7 @@
 
 import asyncio
 import time
-from functools import total_ordering
+from functools import partial, total_ordering
 from typing import Optional
 
 from grpc import StatusCode
@@ -59,17 +59,19 @@ PRIORITIES = {
 
 @total_ordering
 class WorkUnit:
-    def __init__(
-        self,
-        *,
-        index_message: IndexMessage,
-        nats_msg: Msg,
-        mpu: MessageProgressUpdater,
+    def __init__(self, *args, **kwargs):
+        raise Exception("__init__ method not allowed. Use a from_* method instead")
+
+    @classmethod
+    def __new__(
+        cls, *, index_messsage: IndexMessage, nats_msg: Msg, mpu: MessageProgressUpdater
     ):
-        self.index_message = index_message
-        self.nats_msg = nats_msg
-        self.mpu = mpu
-        self._id = (self.priority, self.seqid)
+        instance = super().__new__(cls)
+        instance.index_message = index_messsage
+        instance.nats_msg = nats_msg
+        instance.mpu = mpu
+        instance._id = (instance.priority, instance.seqid)
+        return instance
 
     @classmethod
     def from_msg(cls, msg: Msg) -> "WorkUnit":
@@ -78,8 +80,7 @@ class WorkUnit:
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
 
-        work = cls(index_message=pb, nats_msg=msg, mpu=mpu)
-        return work
+        return cls.__new__(index_messsage=pb, nats_msg=msg, mpu=mpu)
 
     @property
     def priority(self) -> int:
@@ -117,7 +118,7 @@ class ConcurrentShardIndexer:
 
     async def finalize(self):
         for indexer in self.workers.values():
-            await indexer.wait_until_finish()
+            await indexer.finalize()
         self.workers.clear()
 
     async def index_message_soon(self, msg: Msg):
@@ -171,30 +172,35 @@ class PriorityIndexer:
         self.storage = await get_storage(service_name=SERVICE_NAME)
 
     async def finalize(self):
-        pass
+        if self.task is not None and not self.task.done():
+            try:
+                await self.task
+            except Exception as exc:
+                logger.warning(
+                    "Indexing task raised an error while finalizing indexer",
+                    exc_info=exc,
+                )
 
     async def index_message_soon(self, work: WorkUnit):
         await self.work_queue.put(work)
 
         if self.task is None:
             task = asyncio.create_task(self.work_until_finish())
-            task.add_done_callback(PriorityIndexer._done_callback)
+            task.add_done_callback(partial(self._done_callback, self))
             self.task = task
 
     @property
     def working(self) -> bool:
         return self.task is not None
 
-    async def wait_until_finish(self):
-        await self.task
-
     async def work_until_finish(self):
         while not self.work_queue.empty():
             work = await self.work_queue.get()
             await self.do_work(work)
 
-    @staticmethod
-    def _done_callback(task: asyncio.Task):
+    def _done_callback(self, task: asyncio.Task):
+        self.task = None
+
         # propagate errors
         if task.exception() is not None:
             raise task.exception()  # type: ignore
