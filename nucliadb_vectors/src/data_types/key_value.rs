@@ -468,9 +468,15 @@ mod tests {
             (greater_than_2, v2_store.as_slice()),
         ];
         merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+        let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = elements_in_total(&merge_store);
+        let values: Vec<u32> = (0..number_of_elements)
+            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .collect();
         assert_eq!(number_of_elements, 6);
+        assert_eq!(values, expected);
 
         let elems = vec![
             // cero and one will be removed
@@ -481,8 +487,14 @@ mod tests {
             (greater_than_10, v2_store.as_slice()),
         ];
         merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+        let expected: Vec<u32> = vec![3, 4, 5];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = elements_in_total(&merge_store);
+        let values: Vec<u32> = (0..number_of_elements)
+            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .collect();
         assert_eq!(number_of_elements, 3);
+        assert_eq!(values, expected);
     }
 }
