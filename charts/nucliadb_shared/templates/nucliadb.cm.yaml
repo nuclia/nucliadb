@@ -36,6 +36,7 @@ data:
   S3_MAX_POOL_CONNECTIONS: {{ .Values.storage.s3_max_pool_connections | quote }}
   S3_REGION_NAME: {{ .Values.storage.s3_region_name }}
   S3_BUCKET: {{ .Values.storage.s3_bucket }}
+  S3_BUCKET_TAGS: {{ toJson .Values.storage.s3_bucket_tags | quote }}
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
 {{- end }}
