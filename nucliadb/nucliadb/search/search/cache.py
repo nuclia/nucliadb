@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
 from contextvars import ContextVar
-from typing import Dict, Optional
+from typing import Dict, Generator, Optional
 
 from lru import LRU  # type: ignore
 
@@ -31,21 +32,36 @@ from nucliadb.search import SERVICE_NAME
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 
-rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
-    "rcache", default=None
-)
+ResourceCacheType = Dict[str, ResourceORM]
+
+rcache: ContextVar[Optional[ResourceCacheType]] = ContextVar("rcache", default=None)
 
 
 RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
 RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"type": ""})
 
 
-def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
+@contextlib.contextmanager
+def resource_cache() -> Generator[ResourceCacheType, None, None]:
+    rcache = get_resource_cache(clear=True)
+    try:
+        yield rcache
+    finally:
+        clear_resource_cache(rcache)
+
+
+def get_resource_cache(clear: bool = False) -> ResourceCacheType:
     value: Optional[Dict[str, ResourceORM]] = rcache.get()
     if value is None or clear:
         value = {}
         rcache.set(value)
     return value
+
+
+def clear_resource_cache(rcache: ResourceCacheType) -> None:
+    for resource in rcache.values():
+        resource.clean()
+    rcache.clear()
 
 
 async def get_resource_from_cache(

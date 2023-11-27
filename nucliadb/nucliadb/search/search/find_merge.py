@@ -30,7 +30,7 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.cache import get_resource_cache
+from nucliadb.search.search.cache import resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -382,8 +382,7 @@ async def find_merge_results(
 
         relations.append(response.relation)
 
-    rcache = get_resource_cache(clear=True)
-    try:
+    with resource_cache():
         result_paragraphs, merged_next_page = merge_paragraphs_vectors(
             paragraphs, vectors, count, page, min_score
         )
@@ -414,5 +413,3 @@ async def find_merge_results(
 
         await abort_transaction()
         return api_results
-    finally:
-        rcache.clear()

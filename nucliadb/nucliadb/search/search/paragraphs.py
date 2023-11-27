@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
 import logging
 import re
 import string
-from typing import Optional
+from typing import Generator, Optional
 
 from nucliadb_protos.utils_pb2 import ExtractedText
 
@@ -83,6 +84,15 @@ class ExtractedTextCache:
     def clear(self):
         self.values.clear()
         self.locks.clear()
+
+
+@contextlib.contextmanager
+def extracted_text_cache() -> Generator[ExtractedTextCache, None, None]:
+    cache = ExtractedTextCache()
+    try:
+        yield cache
+    finally:
+        cache.clear()
 
 
 async def get_field_extracted_text(
