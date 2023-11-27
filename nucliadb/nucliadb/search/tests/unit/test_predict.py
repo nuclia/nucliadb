@@ -418,7 +418,7 @@ async def test_summarize():
         resources={"r1": SummarizedResource(summary="resource summary", tokens=10)}
     )
     pe.session = get_mocked_session(
-        "POST", 200, json=summarized.json(), context_manager=False
+        "POST", 200, json=summarized.dict(), context_manager=False
     )
 
     item = SummarizeModel(

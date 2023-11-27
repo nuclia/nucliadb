@@ -480,7 +480,7 @@ class PredictEngine:
         )
         await self.check_response(resp, expected_status=200)
         data = await resp.json()
-        return SummarizedResponse.parse_raw(data)
+        return SummarizedResponse.parse_obj(data)
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):

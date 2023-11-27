@@ -76,6 +76,7 @@ async def initialize():
             endpoint_url=storage_settings.s3_endpoint,
             region_name=storage_settings.s3_region_name,
             bucket=storage_settings.s3_bucket,
+            bucket_tags=storage_settings.s3_bucket_tags,
         )
 
         storage_manager = S3FileStorageManager(storage_backend)

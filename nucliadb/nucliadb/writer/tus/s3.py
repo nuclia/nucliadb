@@ -34,6 +34,7 @@ from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataMangaer
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
+from nucliadb_utils.storages.s3 import bucket_exists, create_bucket
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
@@ -180,16 +181,7 @@ class S3FileStorageManager(FileStorageManager):
 
 class S3BlobStore(BlobStore):
     async def check_exists(self, bucket_name: str) -> bool:
-        exists = True
-        try:
-            res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
-            if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                exists = False
-        except botocore.exceptions.ClientError as e:
-            error_code = int(e.response["Error"]["Code"])
-            if error_code == 404:
-                exists = False
-        return exists
+        return await bucket_exists(self._s3aioclient, bucket_name)
 
     def get_bucket_name(self, kbid: str) -> str:
         bucket_name = super().get_bucket_name(kbid)
@@ -201,7 +193,7 @@ class S3BlobStore(BlobStore):
     async def create_bucket(self, bucket):
         exists = await self.check_exists(bucket)
         if not exists:
-            await self._s3aioclient.create_bucket(Bucket=bucket)
+            await create_bucket(self._s3aioclient, bucket, self.bucket_tags)
         return exists
 
     async def finalize(self):
@@ -217,8 +209,10 @@ class S3BlobStore(BlobStore):
         endpoint_url,
         region_name,
         bucket,
+        bucket_tags: Optional[dict[str, str]] = None,
     ):
         self.bucket = bucket
+        self.bucket_tags = bucket_tags
         self.source = CloudFile.Source.S3
 
         self._exit_stack = AsyncExitStack()
