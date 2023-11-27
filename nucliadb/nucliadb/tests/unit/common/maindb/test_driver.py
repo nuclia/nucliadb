@@ -34,12 +34,29 @@ class TransactionTest:
 
 
 @pytest.fixture(scope="function")
-def driver() -> Driver:  # type: ignore
+def txn():
+    return TransactionTest()
+
+
+@pytest.fixture(scope="function")
+def driver(txn) -> Driver:  # type: ignore
     driver = Driver()
-    with mock.patch.object(
-        driver, "begin", new=mock.AsyncMock(return_value=TransactionTest())
-    ):
+    with mock.patch.object(driver, "begin", new=mock.AsyncMock(return_value=txn)):
         yield driver
+
+
+@pytest.mark.asyncio
+async def test_driver_finalize_aborts_transactions(driver, txn):
+    async with driver.transaction(wait_for_abort=False):
+        pass
+
+    assert len(driver._abort_tasks) == 1
+
+    await driver.finalize()
+
+    txn.abort.assert_called_once()
+
+    assert len(driver._abort_tasks) == 0
 
 
 @pytest.mark.asyncio
