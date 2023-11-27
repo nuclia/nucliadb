@@ -64,9 +64,7 @@ async def set_text_value(
     ematches: Optional[List[str]] = None,
     extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
-    # TODO: Improve
-    await max_operations.acquire()
-    try:
+    async with max_operations:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
         result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
@@ -81,8 +79,6 @@ async def set_text_value(
             matches=[],  # TODO
             extracted_text_cache=extracted_text_cache,
         )
-    finally:
-        max_operations.release()
 
 
 @merge_observer.wrap({"type": "set_resource_metadada_value"})
@@ -95,9 +91,7 @@ async def set_resource_metadata_value(
     find_resources: Dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
-    await max_operations.acquire()
-
-    try:
+    async with max_operations:
         serialized_resource = await serialize(
             kbid,
             resource,
@@ -111,9 +105,6 @@ async def set_resource_metadata_value(
         else:
             logger.warning(f"Resource {resource} not found in {kbid}")
             find_resources.pop(resource, None)
-
-    finally:
-        max_operations.release()
 
 
 class Orderer:
