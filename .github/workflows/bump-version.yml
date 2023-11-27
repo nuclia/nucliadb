@@ -1,3 +1,4 @@
+## XXX This can not currently run with restrictions we have on branch protections
 name: Bump Version
 
 on:
