@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::tracing::{debug, warn};
+use nucliadb_core::tracing::{debug, error, warn};
 use nucliadb_core::NodeResult;
 use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
@@ -232,8 +232,12 @@ impl replication::replication_service_server::ReplicationService for Replication
             .await
             .map_err(|error| {
                 tonic::Status::internal(format!("Error getting shard files: {error:?}"))
-            })
-            .expect("Error getting shard files");
+            });
+            if let Err(error) = shard_files {
+                error!("Error getting shard files: {:?}", error);
+                return;
+            }
+            let shard_files = shard_files.unwrap();
 
             for segment_files in shard_files {
                 for segment_file in segment_files.files {
