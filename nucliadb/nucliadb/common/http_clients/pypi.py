@@ -23,8 +23,8 @@ PYPI_JSON_API = "https://pypi.org/pypi/{package_name}/json"
 
 
 class PyPi:
-    def __init__(self):
-        self.session = httpx.AsyncClient()
+    def __init__(self, timeout_seconds: int = 2):
+        self.session = httpx.AsyncClient(timeout=timeout_seconds)
 
     async def __aenter__(self):
         return self

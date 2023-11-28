@@ -114,7 +114,9 @@ def run():
     installed_version = versions.installed_nucliadb()
     loop = asyncio.get_event_loop()
     latest_version = loop.run_until_complete(versions.latest_nucliadb())
-    if versions.nucliadb_updates_available(installed_version, latest_version):
+    if latest_version is None:
+        version_info_fmted = f"{installed_version} (Update check failed)"
+    elif versions.nucliadb_updates_available(installed_version, latest_version):
         version_info_fmted = f"{installed_version} (Update available: {latest_version})"
     else:
         version_info_fmted = installed_version
