@@ -460,7 +460,7 @@ mod tests {
         let mut file = tempfile::tempfile().unwrap();
 
         let elems = vec![
-            // cero and one will be removed
+            // all will be removed
             (greater_than_2, v0_store.as_slice()),
             // no element is removed
             (greater_than_2, v1_store.as_slice()),
