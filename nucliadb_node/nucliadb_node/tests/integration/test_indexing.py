@@ -60,7 +60,7 @@ async def test_indexing(worker, shard: str, reader: Reader):
 
     start = datetime.now()
     while processed is False:  # pragma: no cover
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         pbshard = await reader.get_shard(sipb)
         if pbshard is not None and pbshard.fields > 0:
             processed = True
@@ -72,7 +72,7 @@ async def test_indexing(worker, shard: str, reader: Reader):
 
     assert pbshard is not None
     assert pbshard.fields == 2
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.01)
 
     storage = await get_storage(service_name=SERVICE_NAME)
     # should still work because we leave it around now
@@ -82,7 +82,7 @@ async def test_indexing(worker, shard: str, reader: Reader):
 @pytest.fixture
 def concurrent_nats_processing():
     original = nats_consumer_settings.nats_max_ack_pending
-    nats_consumer_settings.nats_max_ack_pending = 10
+    # nats_consumer_settings.nats_max_ack_pending = 10
     yield
     nats_consumer_settings.nats_max_ack_pending = original
 
@@ -115,11 +115,11 @@ async def test_prioritary_indexing_on_one_shard(
     async def side_effect(pb: IndexMessage):
         nonlocal sources
         sources.append(pb.source)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         return True
 
     mock = AsyncMock(side_effect=side_effect)
-    with patch("nucliadb_node.indexer.PriorityIndexer.index_message", new=mock):
+    with patch("nucliadb_node.indexer.PriorityIndexer._index_message", new=mock):
         for i in range(3):
             await send_indexing_message(worker, processor_index, node)  # type: ignore
         for i in range(3):
@@ -128,7 +128,7 @@ async def test_prioritary_indexing_on_one_shard(
         processing = True
         start = datetime.now()
         while processing:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
             processing = mock.await_count < 6
 
             elapsed = datetime.now() - start
@@ -171,7 +171,7 @@ async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, na
     )
 
     waiting_task = asyncio.create_task(wait_for_indexed_message("kb"))
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.01)
 
     await send_indexing_message(worker, indexpb, node_id)  # type: ignore
 

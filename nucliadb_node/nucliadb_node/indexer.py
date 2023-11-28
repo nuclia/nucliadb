@@ -19,7 +19,7 @@
 
 import asyncio
 import time
-from functools import partial, total_ordering
+from functools import cached_property, partial, total_ordering
 from typing import Optional
 
 from grpc import StatusCode
@@ -47,18 +47,22 @@ class IndexWriterError(Exception):
     pass
 
 
-# Messages coming from processor take loner to index, so we want to prioritize
-# small messages coming from the writer (user creations/updates/deletes).
-#
-# Priority order: lower values first
-PRIORITIES = {
-    IndexMessageSource.WRITER: 0,
-    IndexMessageSource.PROCESSOR: 1,
-}
-
-
 @total_ordering
 class WorkUnit:
+    # Messages coming from processor take longer to index, so we want to
+    # prioritize small messages coming from the writer (user
+    # creations/updates/deletes).
+    #
+    # Priority order: lower values first
+    priorities = {
+        IndexMessageSource.WRITER: 0,
+        IndexMessageSource.PROCESSOR: 1,
+    }
+
+    index_message: IndexMessage
+    nats_msg: Msg
+    mpu: MessageProgressUpdater
+
     def __init__(self, *args, **kwargs):
         raise Exception("__init__ method not allowed. Use a from_* method instead")
 
@@ -70,7 +74,6 @@ class WorkUnit:
         instance.index_message = index_messsage
         instance.nats_msg = nats_msg
         instance.mpu = mpu
-        instance._id = (instance.priority, instance.seqid)
         return instance
 
     @classmethod
@@ -83,10 +86,6 @@ class WorkUnit:
         return cls.__new__(index_messsage=pb, nats_msg=msg, mpu=mpu)
 
     @property
-    def priority(self) -> int:
-        return PRIORITIES[self.index_message.source]
-
-    @property
     def seqid(self) -> int:
         return int(self.nats_msg.reply.split(".")[5])
 
@@ -97,15 +96,18 @@ class WorkUnit:
     def __eq__(self, other) -> bool:
         if not isinstance(other, WorkUnit):
             return NotImplemented
-        return self._id.__eq__(other._id)
+        return self._priority_id.__eq__(other._priority_id)
+
+    @cached_property
+    def _priority_id(self) -> tuple[int, int]:
+        # Priority based on message source and smaller seqid
+        source_priority = self.priorities[self.index_message.source]
+        return (source_priority, self.seqid)
 
     def __lt__(self, other):
         if not isinstance(other, WorkUnit):
             return NotImplemented
-        return self._id.__lt__(other._id)
-
-    def __hash__(self):
-        return self._id.__hash__()
+        return self._priority_id.__lt__(other._priority_id)
 
 
 class ConcurrentShardIndexer:
@@ -137,7 +139,7 @@ class ConcurrentShardIndexer:
         )
 
         indexer, created = await self.get_or_create_indexer(work.shard_id)
-        await indexer.index_message_soon(work)
+        await indexer.index_soon(work)
         await self.clean_idle_indexers()
 
     async def get_or_create_indexer(
@@ -181,11 +183,11 @@ class PriorityIndexer:
                     exc_info=exc,
                 )
 
-    async def index_message_soon(self, work: WorkUnit):
+    async def index_soon(self, work: WorkUnit):
         await self.work_queue.put(work)
 
         if self.task is None:
-            task = asyncio.create_task(self.work_until_finish())
+            task = asyncio.create_task(self._work_until_finish())
             task.add_done_callback(partial(self._done_callback, self))
             self.task = task
 
@@ -193,10 +195,10 @@ class PriorityIndexer:
     def working(self) -> bool:
         return self.task is not None
 
-    async def work_until_finish(self):
+    async def _work_until_finish(self):
         while not self.work_queue.empty():
             work = await self.work_queue.get()
-            await self.do_work(work)
+            await self._do_work(work)
 
     def _done_callback(self, task: asyncio.Task):
         self.task = None
@@ -205,7 +207,7 @@ class PriorityIndexer:
         if task.exception() is not None:
             raise task.exception()  # type: ignore
 
-    async def do_work(self, work: WorkUnit):
+    async def _do_work(self, work: WorkUnit):
         start = time.time()
         try:
             logger.info(
@@ -216,7 +218,7 @@ class PriorityIndexer:
                     "storage_key": work.index_message.storage_key,
                 },
             )
-            await self.index_message(work.index_message)
+            await self._index_message(work.index_message)
         except Exception as exc:
             event_id = capture_exception(exc)
             logger.error(
@@ -249,16 +251,16 @@ class PriorityIndexer:
         finally:
             await work.mpu.end()
 
-    async def index_message(self, pb: IndexMessage):
+    async def _index_message(self, pb: IndexMessage):
         if pb.typemessage == TypeMessage.CREATION:
-            status = await self.set_resource(pb)
+            status = await self._set_resource(pb)
         elif pb.typemessage == TypeMessage.DELETION:
-            status = await self.delete_resource(pb)
+            status = await self._delete_resource(pb)
 
         if status is not None and status.status != OpStatus.Status.OK:
             raise IndexWriterError(status.detail)
 
-    async def set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+    async def _set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain = await self.storage.get_indexing(pb)
         shard_id = pb.shard
         rid = brain.resource.uuid
@@ -286,7 +288,7 @@ class PriorityIndexer:
             logger.info(f"...done (Added {rid} at {shard_id} otx:{pb.txid})")
             return status
 
-    async def delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
+    async def _delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         shard_id = pb.shard
         rid = pb.resource
         resource = ResourceID(uuid=rid, shard_id=shard_id)

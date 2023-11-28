@@ -34,16 +34,14 @@ class TestNatsConnectionManager:
         conn = MagicMock()
         conn.drain = AsyncMock()
         conn.close = AsyncMock()
-        with patch(
-            "nucliadb_utils.nats.connection_manager.nats.connect", return_value=conn
-        ):
+        with patch("nucliadb_utils.nats.nats.connect", return_value=conn):
             yield conn
 
     @pytest.fixture()
     def js(self):
         conn = AsyncMock()
         with patch(
-            "nucliadb_utils.nats.connection_manager.get_traced_jetstream",
+            "nucliadb_utils.nats.get_traced_jetstream",
             return_value=conn,
         ):
             yield conn
@@ -80,7 +78,6 @@ class TestNatsConnectionManager:
             cb=cb,
             manual_ack=True,
             flow_control=True,
-            manual_ack=False,
             config=None,
         )
 
