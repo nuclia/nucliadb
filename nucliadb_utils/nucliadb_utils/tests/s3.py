@@ -43,7 +43,7 @@ class S3(BaseImage):
         try:
             response = requests.get(f"http://{self.host}:{self.get_port()}")
             return response.status_code == 404
-        except:
+        except Exception:
             return False
 
 
@@ -68,6 +68,7 @@ async def s3_storage(s3):
         use_ssl=False,
         region_name=None,
         bucket="test-{kbid}",
+        bucket_tags={"testTag": "test"},
     )
     await storage.initialize()
     MAIN["storage"] = storage

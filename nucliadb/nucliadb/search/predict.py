@@ -37,6 +37,9 @@ from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
 )
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -46,6 +49,12 @@ from nucliadb_utils.utilities import Utility, set_utility
 
 class SendToPredictError(Exception):
     pass
+
+
+class ProxiedPredictAPIError(Exception):
+    def __init__(self, status: int, detail: str = ""):
+        self.status = status
+        self.detail = detail
 
 
 class PredictVectorMissing(Exception):
@@ -79,6 +88,7 @@ PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
+SUMMARIZE = "/summarize"
 CHAT = "/chat"
 ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
@@ -200,6 +210,20 @@ class DummyPredictEngine:
         else:
             return DUMMY_RELATION_NODE
 
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        self.calls.append((kbid, item))
+        response = SummarizedResponse(
+            summary="global summary",
+        )
+        for rid in item.resources.keys():
+            rsummary = []
+            for field_id, field_text in item.resources[rid].fields.items():
+                rsummary.append(f"{field_id}: {field_text}")
+            response.resources[rid] = SummarizedResource(
+                summary="\n\n".join(rsummary), tokens=10
+            )
+        return response
+
 
 class PredictEngine:
     def __init__(
@@ -289,9 +313,15 @@ class PredictEngine:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
 
-        error = (await resp.read()).decode()
-        logger.error(f"Predict API error at {resp.url}: {error}")
-        raise SendToPredictError(f"{resp.status}: {error}")
+        try:
+            detail = await resp.json()
+        except (
+            json.decoder.JSONDecodeError,
+            aiohttp.client_exceptions.ContentTypeError,
+        ):
+            detail = await resp.text()
+        logger.error(f"Predict API error at {resp.url}: {detail}")
+        raise ProxiedPredictAPIError(status=resp.status, detail=detail)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
@@ -362,6 +392,7 @@ class PredictEngine:
             url=self.get_predict_url(CHAT),
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
+            timeout=None,
         )
         await self.check_response(resp, expected_status=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
@@ -431,6 +462,25 @@ class PredictEngine:
         data = await resp.json()
 
         return convert_relations(data)
+
+    @predict_observer.wrap({"type": "summarize"})
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined. Summarize operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(SUMMARIZE),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+            timeout=None,
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return SummarizedResponse.parse_obj(data)
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):

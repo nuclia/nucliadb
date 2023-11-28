@@ -1,0 +1,6 @@
+httpx>=0.23.0
+pydantic
+requests
+tikv-client>=0.0.3
+types-protobuf>=3.19.5
+types-requests

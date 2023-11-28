@@ -146,7 +146,8 @@ pub async fn replicate_shard(
 
     debug!("Finished replicating shard: {:?}", shard_state.shard_id);
 
-    // gc after replication to clean up old segments
+    // GC after replication to clean up old segments
+    // We only do this here because GC will not be done otherwise on a secondary
     let sshard = Arc::clone(&shard); // moved shard for gc
     tokio::task::spawn_blocking(move || sshard.gc())
         .await?

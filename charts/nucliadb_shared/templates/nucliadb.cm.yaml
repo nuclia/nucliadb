@@ -26,14 +26,17 @@ data:
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}
 {{- else if eq .Values.storage.file_backend "s3" }}
+{{- if eq .Values.storage.s3_irsa "disabled" }}
   S3_CLIENT_ID: {{ .Values.storage.s3_client_id }}
   S3_CLIENT_SECRET: {{ .Values.storage.s3_client_secret }}
+{{- end }}
 {{- if .Values.storage.s3_ssl }}
   S3_SSL: "True"
 {{- end }}
   S3_MAX_POOL_CONNECTIONS: {{ .Values.storage.s3_max_pool_connections | quote }}
   S3_REGION_NAME: {{ .Values.storage.s3_region_name }}
   S3_BUCKET: {{ .Values.storage.s3_bucket }}
+  S3_BUCKET_TAGS: {{ toJson .Values.storage.s3_bucket_tags | quote }}
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
 {{- end }}

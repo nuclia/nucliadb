@@ -105,8 +105,11 @@ async def chat_knowledgebox_endpoint(
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except predict.SendToPredictError:
-        return HTTPClientError(status_code=503, detail="Chat service unavailable")
+    except predict.ProxiedPredictAPIError as err:
+        return HTTPClientError(
+            status_code=503,
+            detail=f"Chat service unavailable. {err.status}: {err.detail}",
+        )
     except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,

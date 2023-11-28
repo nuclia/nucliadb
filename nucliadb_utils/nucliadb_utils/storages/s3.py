@@ -312,6 +312,7 @@ class S3Storage(Storage):
         region_name: Optional[str] = None,
         max_pool_connections: int = 30,
         bucket: Optional[str] = None,
+        bucket_tags: Optional[dict[str, str]] = None,
     ):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
@@ -325,6 +326,8 @@ class S3Storage(Storage):
             self._bucket_creation_options = {
                 "CreateBucketConfiguration": {"LocationConstraint": self._region_name}
             }
+
+        self._bucket_tags = bucket_tags
 
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
@@ -379,26 +382,19 @@ class S3Storage(Storage):
                 yield item
 
     async def create_kb(self, kbid: str):
-        bucket_name = self.get_bucket_name(kbid)
-        missing = False
         created = False
-        try:
-            res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
-            if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                missing = True
-        except botocore.exceptions.ClientError as e:
-            error_code = int(e.response["Error"]["Code"])
-            if error_code == 404:
-                missing = True
-            else:
-                raise
-
-        if missing:
-            await self._s3aioclient.create_bucket(
-                Bucket=bucket_name, **self._bucket_creation_options
-            )
+        bucket_name = self.get_bucket_name(kbid)
+        bucket_exists = await self.bucket_exists(bucket_name)
+        if not bucket_exists:
+            await self.create_bucket(bucket_name)
             created = True
         return created
+
+    async def bucket_exists(self, bucket_name: str) -> bool:
+        return await bucket_exists(self._s3aioclient, bucket_name)
+
+    async def create_bucket(self, bucket_name: str):
+        await create_bucket(self._s3aioclient, bucket_name, self._bucket_tags)
 
     async def schedule_delete_kb(self, kbid: str):
         bucket_name = self.get_bucket_name(kbid)
@@ -446,3 +442,35 @@ class S3Storage(Storage):
                 if error_code in (200, 204):
                     deleted = True
         return deleted, conflict
+
+
+async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
+    exists = True
+    try:
+        res = await client.head_bucket(Bucket=bucket_name)
+        if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
+            exists = False
+    except botocore.exceptions.ClientError as e:
+        error_code = int(e.response["Error"]["Code"])
+        if error_code == 404:
+            exists = False
+    return exists
+
+
+async def create_bucket(
+    client: AioSession, bucket_name: str, bucket_tags: Optional[dict[str, str]] = None
+):
+    # Create the bucket
+    await client.create_bucket(Bucket=bucket_name)
+
+    if bucket_tags is not None and len(bucket_tags) > 0:
+        # Set bucket tags
+        await client.put_bucket_tagging(
+            Bucket=bucket_name,
+            Tagging={
+                "TagSet": [
+                    {"Key": tag_key, "Value": tag_value}
+                    for tag_key, tag_value in bucket_tags.items()
+                ]
+            },
+        )

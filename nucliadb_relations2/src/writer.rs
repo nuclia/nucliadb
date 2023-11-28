@@ -113,6 +113,12 @@ impl WriterChild for RelationsWriterService {
         // Should be called along with a lock at a higher level to be safe
         let mut meta_files = HashMap::new();
         let path = self.config.path.join("meta.json");
+        if !path.exists() {
+            return Ok(IndexFiles {
+                metadata_files: meta_files,
+                files: Vec::new(),
+            });
+        }
         meta_files.insert("text/meta.json".to_string(), fs::read(path)?);
 
         let mut files = Vec::new();

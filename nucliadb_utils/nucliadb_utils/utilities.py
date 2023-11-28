@@ -111,6 +111,7 @@ async def get_storage(
             region_name=storage_settings.s3_region_name,
             max_pool_connections=storage_settings.s3_max_pool_connections,
             bucket=storage_settings.s3_bucket,
+            bucket_tags=storage_settings.s3_bucket_tags,
         )
         set_utility(Utility.STORAGE, s3util)
         await s3util.initialize()

@@ -25,12 +25,14 @@ storage:
   gcs_deadletter_bucket: XX
   gcs_indexing_bucket: XX
 
+  s3_irsa: disabled
   s3_client_id: XX
   s3_client_secret: XX
   s3_ssl: True
   s3_max_pool_connections: 30
   s3_region_name: XX
   s3_bucket: nucliadb_{kbid}
+  s3_bucket_tags:
   s3_deadletter_bucket: XX
   s3_indexing_bucket: XX
 

@@ -39,10 +39,6 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
-    const.Features.DEFAULT_MIN_SCORE: {
-        "rollout": 0,
-        "variants": {"environment": ["none"]},
-    },
     const.Features.ASK_YOUR_DOCUMENTS: {
         "rollout": 0,
         "variants": {"environment": ["stage", "local"]},
@@ -52,6 +48,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "variants": {"environment": ["local"]},
     },
     const.Features.READ_REPLICA_SEARCHES: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
+    const.Features.SUMMARIZATION: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
