@@ -467,6 +467,43 @@ mod tests {
     }
 
     #[test]
+    fn merge_some_deleted_different_length() {
+        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
+        let v1: Vec<_> = [3u32, 4, 5, 11].iter().map(|x| x.to_be_bytes()).collect();
+        let v2: Vec<_> = [6u32, 7, 8, 9, 10]
+            .iter()
+            .map(|x| x.to_be_bytes())
+            .collect();
+        let mut v0_store = vec![];
+        let mut v1_store = vec![];
+        let mut v2_store = vec![];
+        create_key_value(&mut v0_store, v0).unwrap();
+        create_key_value(&mut v1_store, v1).unwrap();
+        create_key_value(&mut v2_store, v2).unwrap();
+
+        let interface = (GreaterThan(ONE), TElem);
+        let mut file = tempfile::tempfile().unwrap();
+
+        let elems = vec![
+            // zero and 1 will be removed
+            (interface, v0_store.as_slice()),
+            // no element is removed
+            (interface, v1_store.as_slice()),
+            // no element is removed
+            (interface, v2_store.as_slice()),
+        ];
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+        let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
+        let number_of_elements = elements_in_total(&merge_store);
+        let values: Vec<u32> = (0..number_of_elements)
+            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .collect();
+        assert_eq!(values, expected);
+    }
+
+    #[test]
     fn merge_some_elements_deleted() {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
