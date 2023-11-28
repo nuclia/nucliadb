@@ -131,7 +131,7 @@ async def versions_endpoint(request: Request) -> JSONResponse:
     return JSONResponse(
         {
             package: {
-                "installed": versions.get_package_version(package),
+                "installed": versions.get_installed_version(package),
                 "latest": await versions.get_latest_package_version(package),
             }
             for package in versions.WatchedPackages

@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup() -> Settings:
-    errors.setup_error_handling(versions.get_package_version("nucliadb"))
+    errors.setup_error_handling(versions.get_installed_version("nucliadb"))
     parser = pydantic_argparse.ArgumentParser(
         model=Settings,
         prog="NucliaDB",

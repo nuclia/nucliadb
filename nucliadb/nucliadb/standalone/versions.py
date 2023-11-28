@@ -42,7 +42,7 @@ WatchedPackages = [pkg.value for pkg in StandalonePackages]
 
 
 def installed_nucliadb() -> str:
-    return get_package_version(StandalonePackages.NUCLIADB.value)
+    return get_installed_version(StandalonePackages.NUCLIADB.value)
 
 
 async def latest_nucliadb() -> Optional[str]:
@@ -82,7 +82,7 @@ def _release(version: str) -> str:
     return version.split(".post")[0]
 
 
-def get_package_version(package_name: str) -> str:
+def get_installed_version(package_name: str) -> str:
     return pkg_resources.get_distribution(package_name).version
 
 
