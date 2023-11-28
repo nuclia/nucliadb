@@ -360,8 +360,11 @@ mod tests {
     use super::*;
     use crate::data_types::DeleteLog;
 
+    const ZERO: [u8; 4] = [0, 0, 0, 0];
     const ONE: [u8; 4] = [0, 0, 0, 1];
+    const THREE: [u8; 4] = [0, 0, 0, 3];
     const TWO: [u8; 4] = [0, 0, 0, 2];
+    const SIX: [u8; 4] = [0, 0, 0, 6];
     const TEN: [u8; 4] = [0, 0, 0, 10];
 
     #[derive(Clone, Copy)]
@@ -488,6 +491,39 @@ mod tests {
         ];
         merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
+        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
+        let number_of_elements = elements_in_total(&merge_store);
+        let values: Vec<u32> = (0..number_of_elements)
+            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .collect();
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn merge_first_deleted() {
+        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
+        let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
+        let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
+        let mut v0_store = vec![];
+        let mut v1_store = vec![];
+        let mut v2_store = vec![];
+        create_key_value(&mut v0_store, v0).unwrap();
+        create_key_value(&mut v1_store, v1).unwrap();
+        create_key_value(&mut v2_store, v2).unwrap();
+
+        let mut file = tempfile::tempfile().unwrap();
+
+        let elems = vec![
+            // The first element is deleted
+            ((GreaterThan(ZERO), TElem), v0_store.as_slice()),
+            // The first element is deleted
+            ((GreaterThan(THREE), TElem), v1_store.as_slice()),
+            // The first element is deleted
+            ((GreaterThan(SIX), TElem), v2_store.as_slice()),
+        ];
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+        let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = elements_in_total(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
