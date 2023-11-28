@@ -24,7 +24,7 @@ from typing import Optional
 import pkg_resources
 from cachetools import TTLCache
 
-from nucliadb.common.http_clients.pypi import PyPi, PyPiAsync
+from nucliadb.common.http_clients.pypi import PyPi
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +45,11 @@ def installed_nucliadb() -> str:
     return get_package_version(StandalonePackages.NUCLIADB.value)
 
 
-def latest_nucliadb() -> Optional[str]:
-    return get_latest_package_version(StandalonePackages.NUCLIADB.value)
+async def latest_nucliadb() -> Optional[str]:
+    return await get_latest_package_version(StandalonePackages.NUCLIADB.value)
 
 
-def nucliadb_updates_available() -> bool:
-    installed = installed_nucliadb()
-    latest = latest_nucliadb()
+def nucliadb_updates_available(installed: str, latest: Optional[str]) -> bool:
     if latest is None:
         return False
     return is_newer_release(installed, latest)
@@ -88,11 +86,11 @@ def get_package_version(package_name: str) -> str:
     return pkg_resources.get_distribution(package_name).version
 
 
-def get_latest_package_version(package: str) -> Optional[str]:
+async def get_latest_package_version(package: str) -> Optional[str]:
     result = CACHE.get(package, None)
     if result is None:
         try:
-            result = _get_latest_package_version(package)
+            result = await _get_latest_package_version(package)
         except Exception as exc:
             logger.warning(f"Error getting latest {package} version", exc_info=exc)
             return None
@@ -100,23 +98,6 @@ def get_latest_package_version(package: str) -> Optional[str]:
     return result
 
 
-async def async_get_latest_package_version(package: str) -> Optional[str]:
-    result = CACHE.get(package, None)
-    if result is None:
-        try:
-            result = await _async_get_latest_package_version(package)
-        except Exception as exc:
-            logger.warning(f"Error getting latest {package} version", exc_info=exc)
-            return None
-        CACHE[package] = result
-    return result
-
-
-def _get_latest_package_version(package_name: str) -> str:
-    with PyPi() as pypi:
-        return pypi.get_latest_version(package_name)
-
-
-async def _async_get_latest_package_version(package_name: str) -> str:
-    async with PyPiAsync() as pypi:
+async def _get_latest_package_version(package_name: str) -> str:
+    async with PyPi() as pypi:
         return await pypi.get_latest_version(package_name)

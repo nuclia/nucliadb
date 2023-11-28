@@ -24,28 +24,6 @@ PYPI_JSON_API = "https://pypi.org/pypi/{package_name}/json"
 
 class PyPi:
     def __init__(self):
-        self.session = httpx.Client()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        self.close()
-
-    def close(self):
-        self.session.close()
-
-    def get_latest_version(self, package_name: str) -> str:
-        response = self.session.get(
-            PYPI_JSON_API.format(package_name=package_name),
-            headers={"Accept": "application/json"},
-        )
-        response.raise_for_status()
-        return response.json()["info"]["version"]
-
-
-class PyPiAsync:
-    def __init__(self):
         self.session = httpx.AsyncClient()
 
     async def __aenter__(self):
