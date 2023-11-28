@@ -101,5 +101,9 @@ class Driver:
                 if error or wait_for_abort:
                     await txn.abort()
                 else:
-                    abort_task = asyncio.create_task(txn.abort())
-                    self._abort_tasks.append(abort_task)
+                    self._async_abort(txn)
+
+    def _async_abort(self, txn: Transaction):
+        task = asyncio.create_task(txn.abort())
+        task.add_done_callback(lambda task: self._abort_tasks.remove(task))
+        self._abort_tasks.append(task)

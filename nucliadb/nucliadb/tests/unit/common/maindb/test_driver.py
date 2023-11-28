@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest import mock
 
 import pytest
@@ -43,6 +44,18 @@ def driver(txn) -> Driver:  # type: ignore
     driver = Driver()
     with mock.patch.object(driver, "begin", new=mock.AsyncMock(return_value=txn)):
         yield driver
+
+
+@pytest.mark.asyncio
+async def test_driver_async_abort(driver, txn):
+    async with driver.transaction(wait_for_abort=False):
+        pass
+
+    assert len(driver._abort_tasks) == 1
+    await asyncio.sleep(0.1)
+
+    txn.abort.assert_called_once()
+    assert len(driver._abort_tasks) == 0
 
 
 @pytest.mark.asyncio
