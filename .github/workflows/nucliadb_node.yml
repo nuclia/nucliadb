@@ -257,7 +257,6 @@ jobs:
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
       skip: ${{ ! needs.dockerfile-changes.outputs.basenode }}
-      platforms: linux/amd64
       file: Dockerfile.basenode
       image-name: basenode
       cache-gha-mode: min
@@ -270,7 +269,6 @@ jobs:
     needs: build-base-rust
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
-      platforms: linux/amd64
       file: Dockerfile.node
       image-name: node
     secrets:
