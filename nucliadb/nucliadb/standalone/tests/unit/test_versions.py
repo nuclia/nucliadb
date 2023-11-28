@@ -23,7 +23,7 @@ import pkg_resources
 import pytest
 
 from nucliadb.standalone.versions import (
-    get_latest_package_version,
+    get_latest_version,
     installed_nucliadb,
     is_newer_release,
     latest_nucliadb,
@@ -55,7 +55,7 @@ def test_installed_nucliadb():
 def pypi_mock():
     version = "1.0.0"
     with mock.patch(
-        "nucliadb.standalone.versions._get_latest_package_version", return_value=version
+        "nucliadb.standalone.versions._get_latest_version", return_value=version
     ):
         yield
 
@@ -64,5 +64,5 @@ async def test_latest_nucliadb(pypi_mock):
     assert await latest_nucliadb() == "1.0.0"
 
 
-async def test_get_latest_package_version(pypi_mock):
-    assert await get_latest_package_version("foobar") == "1.0.0"
+async def test_get_latest_version(pypi_mock):
+    assert await get_latest_version("foobar") == "1.0.0"

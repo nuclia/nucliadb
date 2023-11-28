@@ -46,7 +46,7 @@ def installed_nucliadb() -> str:
 
 
 async def latest_nucliadb() -> Optional[str]:
-    return await get_latest_package_version(StandalonePackages.NUCLIADB.value)
+    return await get_latest_version(StandalonePackages.NUCLIADB.value)
 
 
 def nucliadb_updates_available(installed: str, latest: Optional[str]) -> bool:
@@ -86,11 +86,11 @@ def get_installed_version(package_name: str) -> str:
     return pkg_resources.get_distribution(package_name).version
 
 
-async def get_latest_package_version(package: str) -> Optional[str]:
+async def get_latest_version(package: str) -> Optional[str]:
     result = CACHE.get(package, None)
     if result is None:
         try:
-            result = await _get_latest_package_version(package)
+            result = await _get_latest_version(package)
         except Exception as exc:
             logger.warning(f"Error getting latest {package} version", exc_info=exc)
             return None
@@ -98,6 +98,6 @@ async def get_latest_package_version(package: str) -> Optional[str]:
     return result
 
 
-async def _get_latest_package_version(package_name: str) -> str:
+async def _get_latest_version(package_name: str) -> str:
     async with PyPi() as pypi:
         return await pypi.get_latest_version(package_name)
