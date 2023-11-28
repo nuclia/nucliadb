@@ -29,9 +29,9 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use std::{fs, io, path};
 
+use data_store::Slot;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
-use key_value::Slot;
 use memmap2::Mmap;
 use node::Node;
 use nucliadb_core::tracing::{debug, error};
@@ -42,7 +42,7 @@ use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
 pub use uuid::Uuid as DpId;
 
-use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
+use crate::data_types::{data_store, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
 use crate::fst_index::{KeyIndex, Label, LabelIndex};
 use crate::VectorR;
@@ -236,7 +236,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
             nodes,
             delete_log,
             similarity,
-            no_nodes: key_value::elements_in_total(nodes),
+            no_nodes: data_store::number_of_written_slots(nodes),
             min_score,
         }
     }
@@ -244,7 +244,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
         if x == self.no_nodes {
             self.temp
         } else {
-            key_value::get_value(Node, self.nodes, x)
+            data_store::get_value(Node, self.nodes, x)
         }
     }
 }
@@ -280,7 +280,7 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         if x == self.no_nodes {
             false
         } else {
-            let x = key_value::get_value(Node, self.nodes, x);
+            let x = data_store::get_value(Node, self.nodes, x);
             Node::has_label(x, label)
         }
     }
@@ -344,7 +344,7 @@ impl Elem {
     }
 }
 
-impl key_value::KVElem for Elem {
+impl data_store::Data for Elem {
     fn serialized_len(&self) -> usize {
         Node::serialized_len(
             &self.key,
@@ -400,7 +400,7 @@ impl Neighbour {
         }
     }
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
-        let node = key_value::get_value(Node, data, addr);
+        let node = data_store::get_value(Node, data, addr);
         let (exact, _) = Node.read_exact(node);
         Neighbour {
             score,
@@ -441,10 +441,10 @@ impl AsRef<DataPoint> for DataPoint {
 
 impl DataPoint {
     pub fn stored_len(&self) -> Option<u64> {
-        if key_value::elements_in_total(&self.nodes) == 0 {
+        if data_store::number_of_written_slots(&self.nodes) == 0 {
             return None;
         }
-        let node = key_value::get_value(Node, &self.nodes, 0);
+        let node = data_store::get_value(Node, &self.nodes, 0);
         Some(vector::vector_len(Node::vector(node)))
     }
     pub fn get_id(&self) -> DpId {
@@ -454,7 +454,7 @@ impl DataPoint {
         self.journal
     }
     pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
-        key_value::get_keys(Node, &self.nodes)
+        data_store::get_keys(Node, &self.nodes)
             .filter(|k| !delete_log.is_deleted(k))
             .map(String::from_utf8_lossy)
             .map(|s| s.to_string())
@@ -481,7 +481,7 @@ impl DataPoint {
             min_score,
         );
 
-        let no_nodes = key_value::elements_in_total(&self.nodes);
+        let no_nodes = data_store::number_of_written_slots(&self.nodes);
 
         let filter = FormulaFilter::new(
             filter,
@@ -542,12 +542,12 @@ impl DataPoint {
         {
             let node_producers: Vec<_> = node_producers.collect();
             let mut node_buffer = BufWriter::new(&mut nodes);
-            key_value::merge(&mut node_buffer, &node_producers)?;
+            data_store::merge(&mut node_buffer, &node_producers)?;
             node_buffer.flush()?;
         }
 
         let nodes = unsafe { Mmap::map(&nodes)? };
-        let no_nodes = key_value::elements_in_total(&nodes);
+        let no_nodes = data_store::number_of_written_slots(&nodes);
 
         // Creating the FSTs with the new nodes
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
@@ -656,7 +656,7 @@ impl DataPoint {
         root_dir: &path::Path,
         nodes: &[u8],
     ) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
-        let no_nodes = key_value::elements_in_total(nodes);
+        let no_nodes = data_store::number_of_written_slots(nodes);
 
         // building the KeyIndex and LabelIndex FSTs
         let fst_dir = root_dir.join(file_names::FST);
@@ -671,7 +671,7 @@ impl DataPoint {
 
         // we iterate on each node to fill `keys`
         for node_id in 0..no_nodes {
-            let node = key_value::get_value(Node, nodes, node_id);
+            let node = data_store::get_value(Node, nodes, node_id);
             let key: String = String::from_utf8(Node::key(node).to_vec())?;
             let node_labels = Node::labels(node);
 
@@ -708,7 +708,7 @@ impl DataPoint {
 
     pub fn new(
         dir: &path::Path,
-        mut elems: Vec<Elem>,
+        elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
         channel: Channel,
@@ -732,17 +732,11 @@ impl DataPoint {
             .create(true)
             .open(id.join(file_names::HNSW))?;
 
-        elems.sort_by(|a, b| a.key.cmp(&b.key));
-        elems.dedup_by(|a, b| a.key.cmp(&b.key).is_eq());
-        {
-            // Serializing nodes on disk
-            // Nodes are stored on disk and mmaped.
-            let mut nodesf_buffer = BufWriter::new(&mut nodesf);
-            key_value::create_key_value(&mut nodesf_buffer, elems)?;
-            nodesf_buffer.flush()?;
-        }
+        // Serializing nodes on disk
+        // Nodes are stored on disk and mmaped.
+        data_store::create_key_value(&mut nodesf, elems)?;
         let nodes = unsafe { Mmap::map(&nodesf)? };
-        let no_nodes = key_value::elements_in_total(&nodes);
+        let no_nodes = data_store::number_of_written_slots(&nodes);
 
         // Creating the FSTs
         let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {

@@ -19,34 +19,30 @@
 //
 
 use std::cmp::Ordering;
-use std::io::{self, Seek, SeekFrom, Write};
+use std::fs::File;
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
 use super::usize_utils::*;
 
-// A key-value store schema.
+// A data store schema.
 // The data is arrange in a way such that the following operations can be performed:
-// -> Given a key, find its value. O(log(n))
 // -> Given an id, find its value. O(1).
+// -> Get the total number of values, or valid ids.
 // N = Address size in bytes.
 // Serialization schema:
 //
-// [ number of values: N bytes in little endian.   ] --> Header
-// [ sequence of pointers sorted by the keys.      ]
-// [ slots: in sequence.                           ]
+// [ number of values: N bytes in little endian.            ] --> Header
+// [ sequence of pointers to slots, stored in little endian)]
+// [ slots: variable-sized data                             ]
 //
-// A pointer in idx is the start of a value, stored N bytes in little endian)
-// It might not be obvious why the list of pointers is needed. It is because the slots may be of
-// variable length, which would render a binary search imposible. Idx elements do have a fixed
-// length (N bytes).
+// Ids are a normalized representation of pointers.
 
 const N: usize = USIZE_LEN;
 const HEADER_LEN: usize = N;
 const POINTER_LEN: usize = N;
 pub type Pointer = usize;
-pub type HeaderE = usize;
 
-// Given an index i, the start of its element on idx is:
-//              [i*IDXE_LEN + HEADER_LEN]
+// Given an index i, the start of its element on idx is: [i*IDXE_LEN + HEADER_LEN]
 pub fn get_pointer(x: &[u8], i: usize) -> Pointer {
     let start = (i * POINTER_LEN) + HEADER_LEN;
     let end = start + POINTER_LEN;
@@ -57,7 +53,7 @@ pub fn get_pointer(x: &[u8], i: usize) -> Pointer {
 
 // O(1)
 // Returns how many elements are in x, alive or deleted.
-pub fn elements_in_total(x: &[u8]) -> HeaderE {
+pub fn number_of_written_slots(x: &[u8]) -> usize {
     usize_from_slice_le(&x[..HEADER_LEN])
 }
 
@@ -89,12 +85,12 @@ pub trait Slot {
     }
 }
 
-pub trait KVElem {
+pub trait Data {
     fn serialized_len(&self) -> usize;
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()>;
 }
 
-impl<T: AsRef<[u8]>> KVElem for T {
+impl<T: AsRef<[u8]>> Data for T {
     fn serialized_len(&self) -> usize {
         self.as_ref().len()
     }
@@ -103,38 +99,41 @@ impl<T: AsRef<[u8]>> KVElem for T {
     }
 }
 
-#[allow(unused)]
-pub fn new_key_value<S>(slots: Vec<S>) -> Vec<u8>
-where S: KVElem {
-    let mut buf = vec![];
-    create_key_value(&mut buf, slots).unwrap();
-    buf
-}
-// Slots are expected to be sorted by their key.
-pub fn create_key_value<S, W>(mut at: W, slots: Vec<S>) -> io::Result<()>
-where
-    S: KVElem,
-    W: Write,
-{
-    let no_values: [u8; POINTER_LEN] = slots.len().to_le_bytes();
-    at.write_all(&no_values)?;
-    slots.iter().try_fold::<_, _, io::Result<_>>(
-        HEADER_LEN + (slots.len() * POINTER_LEN),
-        |pos, slot| {
-            let pbytes: [u8; POINTER_LEN] = pos.to_le_bytes();
-            at.write_all(&pbytes)?;
-            Ok(pos + slot.serialized_len())
-        },
-    )?;
-    slots
-        .into_iter()
-        .try_for_each(|slot| slot.serialize_into(&mut at))
+pub fn create_key_value<D: Data>(recipient: &mut File, slots: Vec<D>) -> io::Result<()> {
+    let fixed_size = (HEADER_LEN + (POINTER_LEN * slots.len())) as u64;
+    recipient.set_len(fixed_size)?;
+
+    let number_of_values: [u8; POINTER_LEN] = slots.len().to_le_bytes();
+    let mut recipient_buffer = BufWriter::new(recipient);
+
+    // Writing the storage header
+    recipient_buffer.seek(SeekFrom::Start(0))?;
+    recipient_buffer.write_all(&number_of_values)?;
+
+    // Serializing values into the recipient. Each slot is serialized at the end of the
+    // loop and its address pointer is written in the pointer section.
+    let mut pointer_section_cursor = HEADER_LEN as u64;
+    for slot in slots {
+        // slot serialization
+        let slot_address = recipient_buffer.seek(SeekFrom::End(0))?;
+        slot.serialize_into(&mut recipient_buffer)?;
+
+        // The slot address needs to be written in the pointer section
+        recipient_buffer.seek(SeekFrom::Start(pointer_section_cursor))?;
+        let slot_address_as_bytes = slot_address.to_le_bytes();
+        recipient_buffer.write_all(&slot_address_as_bytes)?;
+
+        // The cursor need to be moved forward
+        pointer_section_cursor += POINTER_LEN as u64;
+    }
+
+    recipient_buffer.flush()
 }
 
 // O(log n) where n is the number of slots in src.
 #[allow(unused)]
 pub fn search_by_key<S: Slot>(interface: S, src: &[u8], key: &[u8]) -> Option<usize> {
-    let number_of_values = elements_in_total(src);
+    let number_of_values = number_of_written_slots(src);
     let mut start = 0;
     let mut end = number_of_values;
     let mut found = None;
@@ -169,14 +168,14 @@ pub fn get_keys<'a, S: Slot + Copy + 'a>(
     interface: S,
     x: &'a [u8],
 ) -> impl Iterator<Item = &'a [u8]> {
-    (0..elements_in_total(x))
+    (0..number_of_written_slots(x))
         .map(move |i| get_value(interface, x, i))
         .map(move |v| interface.get_key(v))
 }
 
 // Returns the number of alive elements in the store and the space they consume.
 fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
-    let len = elements_in_total(source);
+    let len = number_of_written_slots(source);
     let mut value_space = 0;
     let mut no_elems = 0;
     for id in 0..len {
@@ -285,7 +284,7 @@ where
 
     // Initializing merge loop parameters
     for (id, (interface, store)) in producers.iter().copied().enumerate() {
-        let total_elements = elements_in_total(store);
+        let total_elements = number_of_written_slots(store);
         let (alive_elements, space) = get_metrics::<S>(interface, store);
         number_of_elements += alive_elements;
         value_space += space;
@@ -391,7 +390,7 @@ mod tests {
     }
 
     fn store_checks(expected: &[impl AsRef<[u8]>], buf: &[u8]) {
-        let no_values = elements_in_total(buf);
+        let no_values = number_of_written_slots(buf);
         assert_eq!(no_values, expected.len());
         for (i, item) in expected.iter().enumerate() {
             let value_ptr = get_pointer(buf, i);
@@ -422,18 +421,22 @@ mod tests {
     fn store_test() {
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
         let encoded: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
-        let mut buf = Vec::new();
+        let mut buf = tempfile::tempfile().unwrap();
         create_key_value(&mut buf, encoded.clone()).unwrap();
-        store_checks(&encoded, &buf);
+
+        let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
+        store_checks(&encoded, &buf_map);
     }
     #[test]
     fn retrieval_test() {
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
         let encoded: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
-        let mut buf = Vec::new();
+        let mut buf = tempfile::tempfile().unwrap();
         create_key_value(&mut buf, encoded.clone()).unwrap();
-        store_checks(&encoded, &buf);
-        retrieval_checks(&encoded, &buf);
+
+        let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
+        store_checks(&encoded, &buf_map);
+        retrieval_checks(&encoded, &buf_map);
     }
     #[test]
     fn merge_test() {
@@ -446,22 +449,32 @@ mod tests {
             .iter()
             .map(|x| x.to_be_bytes())
             .collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
-        let mut v3_store = vec![];
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+        let mut v3_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
         create_key_value(&mut v3_store, v3).unwrap();
-        let mut file = tempfile::tempfile().unwrap();
-        let elems: Vec<_> = [&v0_store, &v1_store, &v2_store, &v3_store]
-            .into_iter()
-            .map(|e| (TElem, e.as_slice()))
-            .collect();
-        merge(&mut file, &elems).unwrap();
+
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
+        let v3_map = unsafe { memmap2::Mmap::map(&v3_store).unwrap() };
+
+        let mut merge_store = tempfile::tempfile().unwrap();
+        let elems = vec![
+            (TElem, v0_map.as_ref()),
+            (TElem, v1_map.as_ref()),
+            (TElem, v2_map.as_ref()),
+            (TElem, v3_map.as_ref()),
+        ];
+
+        merge(&mut merge_store, &elems).unwrap();
         let mut buf = vec![];
-        file.read_to_end(&mut buf).unwrap();
+        merge_store.read_to_end(&mut buf).unwrap();
         store_checks(&expected, &buf);
         retrieval_checks(&expected, &buf);
     }
@@ -474,30 +487,36 @@ mod tests {
             .iter()
             .map(|x| x.to_be_bytes())
             .collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
+
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
 
-        let interface = (GreaterThan(ONE), TElem);
-        let mut file = tempfile::tempfile().unwrap();
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
+        let interface = (GreaterThan(ONE), TElem);
+        let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![
             // zero and 1 will be removed
-            (interface, v0_store.as_slice()),
+            (interface, v0_map.as_ref()),
             // no element is removed
-            (interface, v1_store.as_slice()),
+            (interface, v1_map.as_ref()),
             // no element is removed
-            (interface, v2_store.as_slice()),
+            (interface, v2_map.as_ref()),
         ];
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = elements_in_total(&merge_store);
+        let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
+        let number_of_elements = number_of_written_slots(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
         assert_eq!(values, expected);
@@ -508,30 +527,35 @@ mod tests {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
 
-        let interface = (GreaterThan(ONE), TElem);
-        let mut file = tempfile::tempfile().unwrap();
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
+        let interface = (GreaterThan(ONE), TElem);
+        let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![
             // zero and 1 will be removed
-            (interface, v0_store.as_slice()),
+            (interface, v0_map.as_ref()),
             // no element is removed
-            (interface, v1_store.as_slice()),
+            (interface, v1_map.as_ref()),
             // no element is removed
-            (interface, v2_store.as_slice()),
+            (interface, v2_map.as_ref()),
         ];
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
-        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = elements_in_total(&merge_store);
+        let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
+        let number_of_elements = number_of_written_slots(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
         assert_eq!(values, expected);
@@ -542,29 +566,34 @@ mod tests {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
 
-        let mut file = tempfile::tempfile().unwrap();
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
+        let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![
             // The first element is deleted
-            ((GreaterThan(ZERO), TElem), v0_store.as_slice()),
+            ((GreaterThan(ZERO), TElem), v0_map.as_ref()),
             // The first element is deleted
-            ((GreaterThan(THREE), TElem), v1_store.as_slice()),
+            ((GreaterThan(THREE), TElem), v1_map.as_ref()),
             // The first element is deleted
-            ((GreaterThan(SIX), TElem), v2_store.as_slice()),
+            ((GreaterThan(SIX), TElem), v2_map.as_ref()),
         ];
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
-        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = elements_in_total(&merge_store);
+        let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
+        let number_of_elements = number_of_written_slots(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_store, i))
+            .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
         assert_eq!(values, expected);
@@ -575,28 +604,33 @@ mod tests {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
 
-        let interface = (GreaterThan(TWO), TElem);
-        let mut file = tempfile::tempfile().unwrap();
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
+        let interface = (GreaterThan(TWO), TElem);
+        let mut merge_storage = tempfile::tempfile().unwrap();
         let elems = vec![
             // all the elements are deleted
-            (interface, v0_store.as_slice()),
+            (interface, v0_map.as_ref()),
             // no element is removed
-            (interface, v1_store.as_slice()),
+            (interface, v1_map.as_ref()),
             // no element is removed
-            (interface, v2_store.as_slice()),
+            (interface, v2_map.as_ref()),
         ];
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_storage, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
-        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = elements_in_total(&merge_store);
+        let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
+        let number_of_elements = number_of_written_slots(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -609,29 +643,34 @@ mod tests {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
 
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
+
         let greater_than_2 = (GreaterThan(TWO), TElem);
         let greater_than_10 = (GreaterThan(TEN), TElem);
-        let mut file = tempfile::tempfile().unwrap();
-
+        let mut merge_storage = tempfile::tempfile().unwrap();
         let elems = vec![
             // all the elements are removed
-            (greater_than_2, v0_store.as_slice()),
+            (greater_than_2, v0_map.as_ref()),
             // no element are removed
-            (greater_than_2, v1_store.as_slice()),
+            (greater_than_2, v1_map.as_ref()),
             // all the elements are removed
-            (greater_than_10, v2_store.as_slice()),
+            (greater_than_10, v2_map.as_ref()),
         ];
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+
+        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_storage, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5];
-        let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = elements_in_total(&merge_store);
+        let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
+        let number_of_elements = number_of_written_slots(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -644,28 +683,34 @@ mod tests {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
-        let mut v0_store = vec![];
-        let mut v1_store = vec![];
-        let mut v2_store = vec![];
+        let mut v0_store = tempfile::tempfile().unwrap();
+        let mut v1_store = tempfile::tempfile().unwrap();
+        let mut v2_store = tempfile::tempfile().unwrap();
+
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
+
+        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
+        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
+        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
         let interface = (GreaterThan(TEN), TElem);
         let mut file = tempfile::tempfile().unwrap();
 
         let elems = vec![
             // all the elements are removed
-            (interface, v0_store.as_slice()),
+            (interface, v0_map.as_ref()),
             // all the elements are removed
-            (interface, v1_store.as_slice()),
+            (interface, v1_map.as_ref()),
             // all the elements are removed
-            (interface, v2_store.as_slice()),
+            (interface, v2_map.as_ref()),
         ];
+
         merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = elements_in_total(&merge_store);
+        let number_of_elements = number_of_written_slots(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
