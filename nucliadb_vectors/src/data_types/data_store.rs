@@ -130,32 +130,6 @@ pub fn create_key_value<D: Data>(recipient: &mut File, slots: Vec<D>) -> io::Res
     recipient_buffer.flush()
 }
 
-// O(log n) where n is the number of slots in src.
-#[allow(unused)]
-pub fn search_by_key<S: Slot>(interface: S, src: &[u8], key: &[u8]) -> Option<usize> {
-    let number_of_values = number_of_written_slots(src);
-    let mut start = 0;
-    let mut end = number_of_values;
-    let mut found = None;
-    while start < end && found.is_none() {
-        let m = start + ((end - start) / 2);
-        let slot_start = get_pointer(src, m);
-        let slot = &src[slot_start..];
-        match interface.cmp_keys(slot, key) {
-            Ordering::Equal => {
-                found = Some(m);
-            }
-            Ordering::Less => {
-                start = m + 1;
-            }
-            Ordering::Greater => {
-                end = m;
-            }
-        }
-    }
-    found
-}
-
 // O(1)
 pub fn get_value<S: Slot>(interface: S, src: &[u8], id: usize) -> &[u8] {
     let pointer = get_pointer(src, id);
@@ -279,54 +253,24 @@ mod tests {
         }
     }
 
-    fn store_checks(expected: &[impl AsRef<[u8]>], buf: &[u8]) {
-        let no_values = number_of_written_slots(buf);
-        assert_eq!(no_values, expected.len());
-        for (i, item) in expected.iter().enumerate() {
-            let value_ptr = get_pointer(buf, i);
-            let (exact, _) = TElem.read_exact(&buf[value_ptr..]);
-            assert_eq!(exact, item.as_ref());
-        }
-    }
-
-    fn retrieval_checks(expected: &[impl AsRef<[u8]>], buf: &[u8]) {
-        let interface = TElem;
-        let mut expected_keys = vec![];
-        for i in 0..expected.len() {
-            let id =
-                search_by_key(interface, buf, interface.get_key(expected[i].as_ref())).unwrap();
-            let value = get_value(interface, buf, id);
-            let key = interface.get_key(value);
-            let (head, tail) = interface.read_exact(value);
-            expected_keys.push(key);
-            assert_eq!(id, i);
-            assert_eq!(value, head);
-            assert_eq!(tail, &[] as &[u8]);
-            assert_eq!(value, expected[id].as_ref());
-        }
-        let got_keys = get_keys(interface, buf).collect::<Vec<_>>();
-        assert_eq!(expected_keys, got_keys);
-    }
     #[test]
     fn store_test() {
+        let interface = TElem;
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
-        let encoded: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
+        let expected: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
         let mut buf = tempfile::tempfile().unwrap();
-        create_key_value(&mut buf, encoded.clone()).unwrap();
+        create_key_value(&mut buf, expected.clone()).unwrap();
 
         let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
-        store_checks(&encoded, &buf_map);
-    }
-    #[test]
-    fn retrieval_test() {
-        let elems: [u32; 5] = [0, 1, 2, 3, 4];
-        let encoded: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
-        let mut buf = tempfile::tempfile().unwrap();
-        create_key_value(&mut buf, encoded.clone()).unwrap();
-
-        let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
-        store_checks(&encoded, &buf_map);
-        retrieval_checks(&encoded, &buf_map);
+        let no_values = number_of_written_slots(&buf_map);
+        assert_eq!(no_values, expected.len());
+        for (id, expected_value) in expected.iter().enumerate() {
+            let actual_value = get_value(interface, &buf_map, id);
+            let (head, tail) = interface.read_exact(actual_value);
+            assert_eq!(actual_value, head);
+            assert_eq!(tail, &[] as &[u8]);
+            assert_eq!(actual_value, expected_value);
+        }
     }
 
     #[test]
@@ -334,8 +278,8 @@ mod tests {
         let v0: Vec<_> = [0u32, 2, 4].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [1u32, 5, 7].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [8u32, 9, 10, 11].iter().map(|x| x.to_be_bytes()).collect();
+        let expected = [0u32, 1, 2, 4, 5, 7, 8, 9, 10, 11];
 
-        let expected = vec![0u32, 1, 2, 4, 5, 7, 8, 9, 10, 11];
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
