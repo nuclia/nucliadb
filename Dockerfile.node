@@ -20,6 +20,7 @@ COPY nucliadb_texts /nucliadb/nucliadb_texts
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark
 
+WORKDIR /nucliadb
 RUN cargo chef prepare --recipe-path recipe.json
 
 # --------------------------------------------------------------------
