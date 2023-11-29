@@ -36,11 +36,15 @@ from nucliadb_protos.nodewriter_pb2 import (
 from nucliadb_node import SERVICE_NAME, logger, signals
 from nucliadb_node.signals import SuccessfulIndexingPayload
 from nucliadb_node.writer import Writer
-from nucliadb_telemetry import errors
+from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.utilities import get_storage
+
+CONCURRENT_INDEXERS_COUNT = metrics.Gauge(
+    "nucliadb_concurrent_indexers_count", labels={"node": ""}
+)
 
 
 class IndexWriterError(Exception):
@@ -88,6 +92,10 @@ class WorkUnit:
     @property
     def seqid(self) -> int:
         return int(self.nats_msg.reply.split(".")[5])
+
+    @property
+    def node_id(self) -> str:
+        return self.index_message.node
 
     @property
     def shard_id(self) -> str:
@@ -138,20 +146,21 @@ class ConcurrentShardIndexer:
             },
         )
 
-        indexer, created = await self.get_or_create_indexer(work.shard_id)
+        indexer, created = await self.get_or_create_indexer(work)
         await indexer.index_soon(work)
         await self.clean_idle_indexers()
+        CONCURRENT_INDEXERS_COUNT.set(len(self.workers), labels=dict(node=work.node_id))
 
     async def get_or_create_indexer(
-        self, shard_id: str
+        self, work: WorkUnit
     ) -> tuple["PriorityIndexer", bool]:
-        create = shard_id not in self.workers
+        create = work.shard_id not in self.workers
         if create:
             indexer = PriorityIndexer(self.writer)
             await indexer.initialize()
-            self.workers[shard_id] = indexer
+            self.workers[work.shard_id] = indexer
         else:
-            indexer = self.workers[shard_id]
+            indexer = self.workers[work.shard_id]
         return (indexer, create)
 
     async def clean_idle_indexers(self):
