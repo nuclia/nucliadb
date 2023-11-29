@@ -173,184 +173,74 @@ pub fn get_keys<'a, S: Slot + Copy + 'a>(
         .map(move |v| interface.get_key(v))
 }
 
-// Returns the number of alive elements in the store and the space they consume.
-fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
-    let len = number_of_written_slots(source);
-    let mut value_space = 0;
-    let mut no_elems = 0;
-    for id in 0..len {
-        let ptr = get_pointer(source, id);
-        let (elem, _) = interface.read_exact(&source[ptr..]);
-        if interface.keep_in_merge(elem) {
-            value_space += elem.len();
-            no_elems += 1;
-        }
+// Merge algorithm. Returns the number of elements merged into the file.
+pub fn merge<S: Slot + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> io::Result<usize> {
+    // Number of elements, deleted or alive.
+    let mut prologue_section_size = HEADER_LEN;
+    // To know the range of valid ids per producer
+    let mut lengths = Vec::with_capacity(producers.len());
+
+    // Computing lengths and total sizes
+    for (_, store) in producers.iter().copied() {
+        let producer_elements = number_of_written_slots(store);
+        lengths.push(producer_elements);
+        prologue_section_size += POINTER_LEN * producer_elements;
     }
-    (no_elems, value_space)
-}
 
-// Merge algorithm
+    // Reserving space for the prologue, formed by the header
+    // and the id section.
+    recipient.set_len(prologue_section_size as u64)?;
 
-/// Given the ids of unfinished producers, this function will find the minimum
-/// alive element.
-fn minimum_alive_value<'a, S: Slot + Copy>(
-    unfinished: &[usize],
-    status: &[usize],
-    producers: &[(S, &'a [u8])],
-) -> Option<&'a [u8]> {
-    let mut minimum = None;
-    for producer in unfinished.iter().copied() {
-        let next_elem = status[producer];
-        let (interface, store) = producers[producer];
-        let element_pointer = get_pointer(store, next_elem);
-        let (element_slice, _) = interface.read_exact(&store[element_pointer..]);
-        match minimum {
-            _ if !interface.keep_in_merge(element_slice) => (),
-            None => {
-                minimum = Some(element_slice);
-            }
-            Some(minimum_slice) => {
-                minimum = Some(std::cmp::min_by(minimum_slice, element_slice, |i, j| {
-                    interface.cmp_slot(i, j)
-                }));
-            }
+    // Lengths of the producers have been computed and
+    // should not be modified anymore.
+    let lengths = lengths;
+    // Producer being traversed
+    let mut producer_cursor = 0;
+    // Next element to be visited in the current producer.
+    let mut element_cursor = 0;
+    // Number of elements that are actually written in the recipient.
+    let mut written_elements: usize = 0;
+    // Using a buffered writer for efficient transferring.
+    let mut recipient_buffer = BufWriter::new(recipient);
+    // Pointer to the next unused id slot
+    let mut id_section_cursor = HEADER_LEN;
+
+    while producer_cursor < producers.len() {
+        // If the end of the current producer was reached we move
+        // to the start of the next producer.
+        if element_cursor == lengths[producer_cursor] {
+            element_cursor = 0;
+            producer_cursor += 1;
+            continue;
         }
-    }
-    minimum
-}
 
-/// Moves the cursor to the next alive element.
-fn advance_producer<S: Slot + Copy>(interface: S, cursor: &mut usize, length: usize, store: &[u8]) {
-    while *cursor < length {
-        // cursor points to an in-range element.
-        let element_pointer = get_pointer(store, *cursor);
+        // We check if the current element is deleted and, in that case, it
+        // is transferred to the recipient.
+        let (interface, store) = producers[producer_cursor];
+        let element_pointer = get_pointer(store, element_cursor);
         let element_slice = &store[element_pointer..];
         if interface.keep_in_merge(element_slice) {
-            // The element is alive, we can stop
-            break;
-        }
-
-        // The element is not alive,
-        // the cursor is moved to the next one.
-        *cursor += 1;
-    }
-}
-
-/// The status of every producer pointing to the current minimum or to a deleted element
-/// will be changed to the next element.
-fn advance_merge<S: Slot + Copy>(
-    minimum: Option<&[u8]>,
-    unfinished: &mut Vec<usize>,
-    status: &mut [usize],
-    producers: &[(S, &[u8])],
-    lengths: &[usize],
-) {
-    let current_work = std::mem::take(unfinished);
-    for producer in current_work.iter().copied() {
-        let next_elem = status[producer];
-        let (interface, store) = producers[producer];
-        let element_pointer = get_pointer(store, next_elem);
-        let element_slice = &store[element_pointer..];
-
-        if minimum.map_or(false, |m| interface.cmp_slot(m, element_slice).is_eq()) {
-            status[producer] += 1;
-        }
-
-        advance_producer(interface, &mut status[producer], lengths[producer], store);
-
-        if status[producer] < lengths[producer] {
-            unfinished.push(producer)
-        }
-    }
-}
-
-// Entry point for the merge algorithm. Returns the number of elements merged into the file.
-// WARNING: In case of keys duplicatied keys it favors the contents of the first slot.
-pub fn merge<S, R>(recipient: &mut R, producers: &[(S, &[u8])]) -> io::Result<usize>
-where
-    S: Slot + Copy,
-    R: Write + Seek,
-{
-    // Number of elements that will be transferred to the recipient.
-    let mut number_of_elements = 0;
-    // Space required to perform the merge.
-    let mut value_space = 0;
-    // Index of the producers that have alive elements.
-    let mut non_empty_producers = Vec::with_capacity(producers.len());
-    // Number of total elements (alive or deleted) each producer has
-    let mut lens = Vec::with_capacity(producers.len());
-    // Per producer, which element should be visited next.
-    let mut status = Vec::with_capacity(producers.len());
-
-    // Initializing merge loop parameters
-    for (id, (interface, store)) in producers.iter().copied().enumerate() {
-        let total_elements = number_of_written_slots(store);
-        let (alive_elements, space) = get_metrics::<S>(interface, store);
-        number_of_elements += alive_elements;
-        value_space += space;
-
-        let mut cursor = total_elements;
-        if alive_elements > 0 {
-            cursor = 0;
-            advance_producer(interface, &mut cursor, total_elements, store);
-        }
-        if cursor < total_elements {
-            non_empty_producers.push(id);
-        }
-
-        status.push(cursor);
-        lens.push(total_elements);
-    }
-
-    // Taking deletions into account, how many elements will be on the recipient.
-    let number_of_elements = number_of_elements;
-    // Taking deletions into account, the number of bytes required to fit them.
-    let value_space = value_space;
-    // Per producer, the number of elements it has (deleted included).
-    let producer_lengths = lens;
-    // Unfinished producers, initialized to every non-empty producer.
-    let mut unfinished = non_empty_producers;
-    // At most, the merge will need total_space bytes.
-    let total_space = HEADER_LEN + (POINTER_LEN * number_of_elements) + value_space;
-    // Number of elements that have been written into the recipient.
-    let mut written_elements = 0;
-    // Length of the recipient's written part
-    let mut recipient_length = HEADER_LEN + (POINTER_LEN * number_of_elements);
-
-    // Reserving enough space to fit the merge result.
-    for _ in 0..total_space {
-        recipient.write_all(&[0])?;
-    }
-
-    // Merge loop, transfers the contents of each producer into the recipient in order
-    while !unfinished.is_empty() {
-        let current_minimum = minimum_alive_value(&unfinished, &status, producers);
-        if let Some(minimum) = current_minimum {
-            // There is a minimum that needs to be transferred to the recipient.
-            let idx_slot = (HEADER_LEN + (written_elements * POINTER_LEN)) as u64;
-            recipient.seek(SeekFrom::Start(idx_slot))?;
-            recipient.write_all(&recipient_length.to_le_bytes())?;
-            recipient.seek(SeekFrom::Start(recipient_length as u64))?;
-            recipient.write_all(minimum)?;
-            recipient_length += minimum.len();
+            // Moving to the end of the file to write the current element.
+            let (exact_element, _) = interface.read_exact(element_slice);
+            let element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
+            recipient_buffer.write_all(exact_element)?;
+            // Moving to the next free slot in the section id to write
+            // the offset where the element was written.
+            recipient_buffer.seek(SeekFrom::Start(id_section_cursor as u64))?;
+            recipient_buffer.write_all(&element_pointer.to_le_bytes())?;
+            id_section_cursor += POINTER_LEN;
             written_elements += 1;
         }
 
-        // Every producer is  advanced.
-        advance_merge(
-            current_minimum,
-            &mut unfinished,
-            &mut status,
-            producers,
-            &producer_lengths,
-        );
+        // Moving to the next element of this producer.
+        element_cursor += 1;
     }
 
     // Write the number of elements
-    recipient.seek(SeekFrom::Start(0))?;
-    recipient.write_all(&written_elements.to_le_bytes())?;
-    recipient.seek(SeekFrom::Start(0)).unwrap();
-    recipient.flush()?;
+    recipient_buffer.seek(SeekFrom::Start(0))?;
+    recipient_buffer.write_all(&written_elements.to_le_bytes())?;
+    recipient_buffer.seek(SeekFrom::Start(0))?;
+    recipient_buffer.flush()?;
     Ok(written_elements)
 }
 
@@ -438,45 +328,44 @@ mod tests {
         store_checks(&encoded, &buf_map);
         retrieval_checks(&encoded, &buf_map);
     }
+
     #[test]
     fn merge_test() {
-        use std::io::Read;
         let v0: Vec<_> = [0u32, 2, 4].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [1u32, 2, 5, 7].iter().map(|x| x.to_be_bytes()).collect();
+        let v1: Vec<_> = [1u32, 5, 7].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [8u32, 9, 10, 11].iter().map(|x| x.to_be_bytes()).collect();
-        let v3: Vec<_> = [1u32, 2, 5, 7].iter().map(|x| x.to_be_bytes()).collect();
-        let expected: Vec<_> = [0u32, 1, 2, 4, 5, 7, 8, 9, 10, 11]
-            .iter()
-            .map(|x| x.to_be_bytes())
-            .collect();
+
+        let expected = vec![0u32, 1, 2, 4, 5, 7, 8, 9, 10, 11];
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
-        let mut v3_store = tempfile::tempfile().unwrap();
 
         create_key_value(&mut v0_store, v0).unwrap();
         create_key_value(&mut v1_store, v1).unwrap();
         create_key_value(&mut v2_store, v2).unwrap();
-        create_key_value(&mut v3_store, v3).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
-        let v3_map = unsafe { memmap2::Mmap::map(&v3_store).unwrap() };
 
         let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![
             (TElem, v0_map.as_ref()),
             (TElem, v1_map.as_ref()),
             (TElem, v2_map.as_ref()),
-            (TElem, v3_map.as_ref()),
         ];
 
         merge(&mut merge_store, &elems).unwrap();
-        let mut buf = vec![];
-        merge_store.read_to_end(&mut buf).unwrap();
-        store_checks(&expected, &buf);
-        retrieval_checks(&expected, &buf);
+        let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
+        let number_of_elements = number_of_written_slots(&merge_map);
+        let values: Vec<u32> = (0..number_of_elements)
+            .map(|i| get_value(TElem, &merge_map, i))
+            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .collect();
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 
     #[test]
@@ -511,7 +400,7 @@ mod tests {
             (interface, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_store, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = number_of_written_slots(&merge_map);
@@ -519,7 +408,10 @@ mod tests {
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
-        assert_eq!(values, expected);
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 
     #[test]
@@ -550,7 +442,7 @@ mod tests {
             (interface, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_store, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = number_of_written_slots(&merge_map);
@@ -558,7 +450,10 @@ mod tests {
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
-        assert_eq!(values, expected);
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 
     #[test]
@@ -588,7 +483,7 @@ mod tests {
             ((GreaterThan(SIX), TElem), v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_store, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = number_of_written_slots(&merge_map);
@@ -596,7 +491,10 @@ mod tests {
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
-        assert_eq!(values, expected);
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 
     #[test]
@@ -627,7 +525,7 @@ mod tests {
             (interface, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_storage, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = number_of_written_slots(&merge_store);
@@ -635,7 +533,10 @@ mod tests {
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
-        assert_eq!(values, expected);
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 
     #[test]
@@ -667,7 +568,7 @@ mod tests {
             (greater_than_10, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut merge_storage, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = number_of_written_slots(&merge_store);
@@ -675,7 +576,10 @@ mod tests {
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
-        assert_eq!(values, expected);
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 
     #[test]
@@ -707,7 +611,7 @@ mod tests {
             (interface, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem), std::fs::File>(&mut file, elems.as_slice()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = number_of_written_slots(&merge_store);
@@ -715,6 +619,9 @@ mod tests {
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
             .collect();
-        assert_eq!(values, expected);
+
+        assert_eq!(number_of_elements, values.len());
+        assert_eq!(values.len(), expected.len());
+        assert!(values.iter().all(|i| expected.contains(i)));
     }
 }

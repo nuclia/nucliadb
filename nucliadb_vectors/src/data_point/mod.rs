@@ -536,16 +536,11 @@ impl DataPoint {
             .collect::<VectorR<Vec<_>>>()?;
 
         // Creating the node store
-        let node_producers = operants
+        let node_producers: Vec<_> = operants
             .iter()
-            .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
-        {
-            let node_producers: Vec<_> = node_producers.collect();
-            let mut node_buffer = BufWriter::new(&mut nodes);
-            data_store::merge(&mut node_buffer, &node_producers)?;
-            node_buffer.flush()?;
-        }
-
+            .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()))
+            .collect();
+        data_store::merge(&mut nodes, &node_producers)?;
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = data_store::number_of_written_slots(&nodes);
 
