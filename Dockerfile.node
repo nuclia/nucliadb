@@ -63,6 +63,8 @@ COPY vectors_benchmark /nucliadb/vectors_benchmark
 RUN mkdir -p /nucliadb/tmp
 ENV TMPDIR=/nucliadb/tmp
 
+WORKDIR /nucliadb
+
 RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
     && rm -rf /nucliadb/tmp/* \
     && rm -rf target \
