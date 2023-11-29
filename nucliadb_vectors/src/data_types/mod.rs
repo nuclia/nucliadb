@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod data_store;
 pub mod dtrie_ram;
-pub mod key_value;
 pub mod trie;
 pub mod trie_ram;
 pub mod vector;
@@ -49,7 +49,7 @@ impl DeleteLog for dtrie_ram::DTrie {
     }
 }
 
-impl<Dl: DeleteLog, S: key_value::Slot> key_value::Slot for (Dl, S) {
+impl<Dl: DeleteLog, S: data_store::Slot> data_store::Slot for (Dl, S) {
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         self.1.get_key(x)
     }

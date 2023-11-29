@@ -20,7 +20,7 @@
 
 use std::io;
 
-use crate::data_types::key_value::Slot;
+use crate::data_types::data_store::Slot;
 use crate::data_types::trie;
 use crate::data_types::usize_utils::*;
 
