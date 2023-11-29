@@ -202,12 +202,12 @@ async def chat(
     rephrased_query = None
     if chat_request.context and len(chat_request.context) > 0:
         rephrased_query = await rephrase_query_from_chat_history(
-            kbid, chat_request.context, chat_request.query, user_id
+            kbid, chat_request.context, user_query, user_id
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(
         kbid=kbid,
-        query=user_query or rephrased_query or "",
+        query=rephrased_query or user_query or "",
         chat_request=chat_request,
         ndb_client=client_type,
         user=user_id,
