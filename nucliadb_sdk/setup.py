@@ -38,7 +38,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3 :: Only",
     ],
-    url="https://nucliadb.com",
+    url="https://docs.nuclia.dev/docs/guides/nucliadb/python_nucliadb_sdk",
     python_requires=">=3.8, <4",
     license="BSD",
     zip_safe=True,
