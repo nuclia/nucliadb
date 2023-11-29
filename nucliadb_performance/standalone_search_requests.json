@@ -7,6 +7,7 @@
             ],
             "requests": [
                 {
+                    "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
                         "filtered",
@@ -25,6 +26,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Filtered vector search",
                     "tags": [
                         "filtered",
@@ -45,6 +47,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Hybrid search with date range filter",
                     "tags": [
                         "date_range",
@@ -59,6 +62,37 @@
                             "range_creation_end": "3020-1-1T00:00:00"
                         }
                     }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest some paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "united kingdom",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": ["a/title"]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest some paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "united kingdom",
+                            "features": [
+                                "paragraph", "entities"
+                            ]
+                        }
+                    }
                 }
             ]
         },
@@ -69,6 +103,7 @@
             ],
             "requests": [
                 {
+                    "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
                         "filtered",
@@ -86,6 +121,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Filtered vector search",
                     "tags": [
                         "filtered",
@@ -106,6 +142,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Hybrid search with date range filter",
                     "tags": [
                         "date_range",
@@ -120,6 +157,37 @@
                             "range_creation_end": "3020-1-1T00:00:00"
                         }
                     }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest some paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "studies quarterly",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": ["a/title"]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest some paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "studies quarterly",
+                            "features": [
+                                "paragraph", "entities"
+                            ]
+                        }
+                    }
                 }
             ]
         },
@@ -130,6 +198,7 @@
             ],
             "requests": [
                 {
+                    "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
                         "filtered",
@@ -148,6 +217,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Filtered vector search",
                     "tags": [
                         "filtered",
@@ -168,6 +238,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Hybrid search with date range filter",
                     "tags": [
                         "date_range",
@@ -180,6 +251,37 @@
                             "query": "Napoleonic wars",
                             "range_creation_start": "2020-1-1T00:00:00",
                             "range_creation_end": "3020-1-1T00:00:00"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest some paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Radiation protection",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": ["a/title"]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest some paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Radiation protection",
+                            "features": [
+                                "paragraph", "entities"
+                            ]
                         }
                     }
                 }
