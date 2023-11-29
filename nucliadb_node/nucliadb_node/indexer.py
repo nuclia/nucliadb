@@ -66,7 +66,7 @@ indexer_observer = metrics.Observer(
 )
 
 
-class IndexWriterError(Exception):
+class IndexNodeError(Exception):
     pass
 
 
@@ -287,7 +287,7 @@ class PriorityIndexer:
             status = await self._delete_resource(pb)
 
         if status is not None and status.status != OpStatus.Status.OK:
-            raise IndexWriterError(status.detail)
+            raise IndexNodeError(status.detail)
 
     async def _set_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         brain = await self.storage.get_indexing(pb)
