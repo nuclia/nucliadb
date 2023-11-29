@@ -1,2 +1,3 @@
 [toolchain]
+# if this changes, also change the version in the Dockerfile.basenode
 channel = "1.72.1"
