@@ -9,6 +9,7 @@ from nucliadb_performance.utils.metrics import (
     save_benchmark_json_results,
 )
 from nucliadb_performance.utils.misc import (
+    get_fake_word,
     get_kb,
     get_request,
     make_kbid_request,
@@ -40,6 +41,20 @@ async def test_find(session):
         request.method.upper(),
         request.url.format(kbid=kbid),
         json=request.payload,
+    )
+
+
+@scenario(weight=2)
+async def test_suggest(session):
+    kbid, _ = get_test_kb()
+    url = "/v1/kb/{kbid}/suggest".format(kbid=kbid)
+    method = "GET"
+    await make_kbid_request(
+        session,
+        kbid,
+        method,
+        url,
+        params={"query": get_fake_word()},
     )
 
 

@@ -1,0 +1,60 @@
+name: Performance Regression
+on:
+  push:
+    branches:
+      - ferran/sc-7816/integrate-search-benchmarks-on-ci
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions: write-all
+
+jobs:
+  check-performance:
+    if: github.event_name == 'push' || github.event.issue.pull_request && contains(github.event.comment.body, '/bench')
+    name: Run NucliaDB standalone performance tests
+    runs-on: ubuntu-latest
+    env:
+      KB_SLUG: small
+      EXPORTS_URI: ${{ secrets.EXPORTS_URI }}
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      - name: Install NucliaDB
+        run: |
+          make -C nucliadb install
+
+      - name: Start NucliaDB
+        run: |
+          DEBUG=true nucliadb &
+          echo NDB_PID=$! >> "$GITHUB_ENV"
+
+      - name: Import data
+        run: |
+          python nucliadb/nucliadb_performance/import-kb.py --kb=$KB_SLUG --uri=$EXPORTS_URI/$KB_SLUG
+
+      - name: Run the bench
+        run: |
+          make -C nucliadb_performance test-standalone-search
+
+      - name: Stop NucliaDB
+        run: kill $NDB_PID
+
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Store performance data
+        uses: nuclia/nucliadb_performance@main
+        with:
+          metrics_file: nucliadb_performace/standalone.json
+          influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
+          influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
+          influxdb_org: nuclia
+          influxdb_bucket: benchmarks
