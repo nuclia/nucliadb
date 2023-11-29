@@ -195,7 +195,7 @@ class NATSConsumerSettings(BaseSettings):
     #
     # NOTE this parameter don't actually change already existing consumers! If
     # you want to update the value, you should use nats-cli to do so
-    nats_max_ack_pending: int = 10
+    nats_max_ack_pending: int = 1
     nats_max_deliver: int = 10000
     nats_ack_wait: int = 10 * 60
     nats_idle_heartbeat: float = 5.0
