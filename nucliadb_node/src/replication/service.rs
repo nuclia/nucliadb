@@ -152,7 +152,7 @@ async fn replica_shard(
             stream_file(
                 chunk_size,
                 &shard_path,
-                &generation_id,
+                generation_id,
                 &PathBuf::from(segment_file),
                 &sender,
             )
@@ -161,7 +161,7 @@ async fn replica_shard(
         for (metadata_file, data) in segment_files.metadata_files {
             stream_data(
                 &shard_path,
-                &generation_id,
+                generation_id,
                 &PathBuf::from(metadata_file),
                 data,
                 &sender,
@@ -175,7 +175,7 @@ async fn replica_shard(
         stream_file(
             chunk_size,
             &shard_path,
-            &generation_id,
+            generation_id,
             &PathBuf::from(filename),
             &sender,
         )
