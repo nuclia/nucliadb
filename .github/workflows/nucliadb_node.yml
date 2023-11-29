@@ -29,6 +29,7 @@ on:
       - "charts/nucliadb_node/**"
       - "Dockerfile.node"
       - "Dockerfile.node_sidecar"
+      - "Dockerfile.basenode"
       - "Cargo.lock"
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
