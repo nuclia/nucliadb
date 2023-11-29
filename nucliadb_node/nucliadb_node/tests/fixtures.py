@@ -44,7 +44,7 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "env": {
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",
@@ -66,7 +66,7 @@ images.settings["nucliadb_node_reader"] = {
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "env": {
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "DATA_PATH": "/data",

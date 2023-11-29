@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
@@ -61,7 +61,7 @@ images.settings["nucliadb_node_reader"] = {
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
@@ -83,7 +83,7 @@ images.settings["nucliadb_node_writer"] = {
 
 images.settings["nucliadb_node_sidecar"] = {
     "image": "eu.gcr.io/stashify-218417/node_sidecar",
-    "version": "latest",
+    "version": "main",
     "env": {
         "INDEX_JETSTREAM_SERVERS": "[]",
         "CACHE_PUBSUB_NATS_URL": "",
