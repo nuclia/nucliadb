@@ -40,6 +40,7 @@ from nucliadb_telemetry import errors, metrics
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 CONCURRENT_INDEXERS_COUNT = metrics.Gauge(
@@ -140,15 +141,20 @@ class WorkUnit:
 class ConcurrentShardIndexer:
     def __init__(self, writer: Writer):
         self.writer = writer
-        self.workers: dict[str, PriorityIndexer] = {}
+        self.indexers: dict[str, tuple[PriorityIndexer, asyncio.Task]] = {}
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
 
     async def finalize(self):
-        for indexer in self.workers.values():
-            await indexer.finalize()
-        self.workers.clear()
+        for _, task in self.indexers.items():
+            try:
+                await task
+            except Exception as exc:
+                logger.exception(
+                    "Indexer task raised an error while finalizing it", exc_info=exc
+                )
+        self.indexers.clear()
 
     async def index_message_soon(self, msg: Msg):
         work = WorkUnit.from_msg(msg)
@@ -165,65 +171,48 @@ class ConcurrentShardIndexer:
             },
         )
 
-        indexer, created = await self.get_or_create_indexer(work)
-        await indexer.index_soon(work)
-        await self.clean_idle_indexers()
-        CONCURRENT_INDEXERS_COUNT.set(len(self.workers), labels=dict(node=work.node_id))
+        await self.push_work_to_indexer(work)
+        CONCURRENT_INDEXERS_COUNT.set(
+            len(self.indexers), labels=dict(node=work.node_id)
+        )
 
-    async def get_or_create_indexer(
-        self, work: WorkUnit
-    ) -> tuple["PriorityIndexer", bool]:
-        create = work.shard_id not in self.workers
-        if create:
-            indexer = PriorityIndexer(self.writer)
-            await indexer.initialize()
-            self.workers[work.shard_id] = indexer
+    async def push_work_to_indexer(self, work: WorkUnit):
+        exists = work.shard_id in self.indexers
+        if exists:
+            indexer, _ = self.indexers[work.shard_id]
+            await indexer.index_soon(work)
         else:
-            indexer = self.workers[work.shard_id]
-        return (indexer, create)
+            indexer = PriorityIndexer(writer=self.writer, storage=self.storage)
+            await indexer.index_soon(work)
+            task = asyncio.create_task(indexer.work_until_finish())
+            task.add_done_callback(
+                partial(
+                    ConcurrentShardIndexer._indexer_done_callback, self, work.shard_id
+                )
+            )
+            self.indexers[work.shard_id] = (indexer, task)
 
-    async def clean_idle_indexers(self):
-        remove = set()
-        for shard_id, indexer in self.workers.items():
-            if not indexer.working:
-                remove.add(shard_id)
-        for shard_id in remove:
-            indexer = self.workers.pop(shard_id)
-            await indexer.finalize()
+    def _indexer_done_callback(self, shard_id: str, task: asyncio.Task):
+        # autoremove indexer when finished
+        self.indexers.pop(shard_id)
+
+        # propagate errors
+        if task.exception() is not None:
+            raise task.exception()  # type: ignore
 
 
 class PriorityIndexer:
-    def __init__(self, writer: Writer):
+    def __init__(self, writer: Writer, storage: Storage):
         self.writer = writer
+        self.storage = storage
         self.work_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
-        self.task: Optional[asyncio.Task] = None
-
-    async def initialize(self):
-        self.storage = await get_storage(service_name=SERVICE_NAME)
-
-    async def finalize(self):
-        if self.task is not None and not self.task.done():
-            try:
-                await self.task
-            except Exception as exc:
-                logger.warning(
-                    "Indexing task raised an error while finalizing indexer",
-                    exc_info=exc,
-                )
+        self.working = False
 
     async def index_soon(self, work: WorkUnit):
         await self.work_queue.put(work)
 
-        if self.task is None:
-            task = asyncio.create_task(self._work_until_finish())
-            task.add_done_callback(partial(PriorityIndexer._done_callback, self))
-            self.task = task
-
-    @property
-    def working(self) -> bool:
-        return self.task is not None
-
-    async def _work_until_finish(self):
+    async def work_until_finish(self):
+        self.working = True
         try:
             while not self.work_queue.empty():
                 work = await self.work_queue.get()
@@ -246,13 +235,8 @@ class PriorityIndexer:
             while not self.work_queue.empty():
                 work = await self.work_queue.get()
                 await work.nats_msg.nak()
-
-    def _done_callback(self, task: asyncio.Task):
-        self.task = None
-
-        # propagate errors
-        if task.exception() is not None:
-            raise task.exception()  # type: ignore
+        finally:
+            self.working = False
 
     @indexer_observer.wrap()
     async def _do_work(self, work: WorkUnit):
