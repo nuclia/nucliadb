@@ -20,19 +20,15 @@
 import asyncio
 import tempfile
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from nats.aio.client import Msg
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
 
-<<<<<<< HEAD
-from nucliadb_node.pull import IndexedPublisher, IndexNodeError, ShardManager, Worker
-=======
 from nucliadb_node.listeners import IndexedPublisher
 from nucliadb_node.listeners.gc_scheduler import ShardManager
 from nucliadb_node.pull import Worker
->>>>>>> c840cc55 (Prioritary multi-shard indexing and refactor with signal dispatcher)
 from nucliadb_node.settings import settings
 from nucliadb_utils import const
 

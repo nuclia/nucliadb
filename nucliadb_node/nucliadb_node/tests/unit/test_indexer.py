@@ -23,10 +23,22 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from nats.aio.client import Msg
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource
+from nucliadb_protos.nodewriter_pb2 import (
+    IndexMessage,
+    IndexMessageSource,
+    OpStatus,
+    TypeMessage,
+)
 
-from nucliadb_node.indexer import ConcurrentShardIndexer, PriorityIndexer, WorkUnit
+from nucliadb_node.indexer import (
+    ConcurrentShardIndexer,
+    IndexNodeError,
+    PriorityIndexer,
+    WorkUnit,
+)
+from nucliadb_node.writer import Writer
 from nucliadb_utils.nats import MessageProgressUpdater
+from nucliadb_utils.signals import Signal
 
 
 class TestIndexerWorkUnit:
@@ -196,7 +208,7 @@ class TestConcurrentShardIndexer:
 
 class TestPriorityIndexer:
     @pytest.fixture
-    def successful_indexing(self):
+    def successful_indexing(self) -> AsyncIterator[Signal]:
         mock = AsyncMock()
         with patch("nucliadb_node.signals.successful_indexing", new=mock):
             yield mock
@@ -207,19 +219,18 @@ class TestPriorityIndexer:
             yield
 
     @pytest.fixture
-    @pytest.mark.asyncio
-    async def indexer(self):
-        indexer = PriorityIndexer(writer=AsyncMock())
-        indexer._index_message = AsyncMock()
-        await indexer.initialize()
-        yield indexer
-        await indexer.finalize()
+    def writer(self) -> AsyncIterator[Writer]:
+        writer = Mock()
+        status = OpStatus()
+        status.status = OpStatus.Status.OK
+        writer.set_resource = AsyncMock(return_value=status)
+        writer.delete_resource = AsyncMock(return_value=status)
+        yield writer
 
     @pytest.fixture
     @pytest.mark.asyncio
-    async def evil_indexer(self):
-        indexer = PriorityIndexer(writer=AsyncMock())
-        indexer._index_message = AsyncMock(side_effect=Exception)
+    async def indexer(self, writer: Writer):
+        indexer = PriorityIndexer(writer=writer)
         await indexer.initialize()
         yield indexer
         await indexer.finalize()
@@ -227,6 +238,7 @@ class TestPriorityIndexer:
     def work(self):
         work = AsyncMock()
         work.__lt__ = lambda x, y: id(x) < id(y)
+        work.index_message = IndexMessage()
         return work
 
     # Tests
@@ -243,27 +255,19 @@ class TestPriorityIndexer:
 
     @pytest.mark.asyncio
     async def test_do_work_processes_a_work_unit(
-        self, indexer: PriorityIndexer, successful_indexing
+        self, indexer: PriorityIndexer, writer: Writer, successful_indexing: Signal
     ):
         work = self.work()
         work.seqid = 10
         await indexer._do_work(work)
 
-        assert indexer._index_message.await_count == 1  # type: ignore
+        assert writer.set_resource.await_count == 1
         assert successful_indexing.dispatch.await_count == 1
         assert successful_indexing.dispatch.await_args.args[0].seqid == 10
 
     @pytest.mark.asyncio
-    async def test_do_work_processes_handles_exceptions(
-        self, evil_indexer: PriorityIndexer, successful_indexing
-    ):
-        await evil_indexer._do_work(self.work())
-        assert evil_indexer._index_message.await_count == 1  # type: ignore
-        assert successful_indexing.dispatch.await_count == 0
-
-    @pytest.mark.asyncio
     async def test_work_until_finish_processes_everything(
-        self, indexer: PriorityIndexer, successful_indexing
+        self, indexer: PriorityIndexer, successful_indexing: Signal, writer: Writer
     ):
         total = 10
         for i in range(total):
@@ -273,7 +277,7 @@ class TestPriorityIndexer:
         await indexer._work_until_finish()
 
         assert indexer.work_queue.qsize() == 0
-        assert indexer._index_message.await_count == total  # type: ignore
+        assert writer.set_resource.await_count == total
         assert successful_indexing.dispatch.await_count == total
 
     @pytest.mark.asyncio
@@ -284,3 +288,45 @@ class TestPriorityIndexer:
         with patch("nucliadb_node.indexer.asyncio") as asyncio_mock:
             await indexer.index_soon(self.work())
             assert asyncio_mock.create_task.called_once
+
+    @pytest.mark.asyncio
+    async def test_node_writer_errors_are_managed(
+        self, indexer: PriorityIndexer, writer: Writer
+    ):
+        status = OpStatus()
+        status.status = OpStatus.Status.ERROR
+        status.detail = "node writer error"
+        writer.set_resource.return_value = status
+        writer.delete_resource.return_value = status
+
+        with pytest.raises(IndexNodeError):
+            pb = IndexMessage()
+            pb.typemessage = TypeMessage.CREATION
+            await indexer._index_message(pb)
+
+        with pytest.raises(IndexNodeError):
+            pb = IndexMessage()
+            pb.typemessage = TypeMessage.DELETION
+            await indexer._index_message(pb)
+
+    @pytest.mark.asyncio
+    async def test_indexing_error_flushes_queue(
+        self, indexer: PriorityIndexer, writer: Writer
+    ):
+        status = OpStatus()
+        status.status = OpStatus.Status.ERROR
+        status.detail = "node writer error"
+        writer.set_resource.return_value = status
+        writer.delete_resource.return_value = status
+
+        with patch("nucliadb_node.indexer.asyncio"):
+            await indexer.index_soon(self.work())
+            await indexer.index_soon(self.work())
+            await indexer.index_soon(self.work())
+            assert indexer.work_queue.qsize() == 3
+
+        indexer._do_work = AsyncMock(side_effect=indexer._do_work)
+        await indexer._work_until_finish()
+
+        assert indexer._do_work.await_count == 1
+        assert indexer.work_queue.qsize() == 0

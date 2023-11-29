@@ -216,7 +216,7 @@ class PriorityIndexer:
 
         if self.task is None:
             task = asyncio.create_task(self._work_until_finish())
-            task.add_done_callback(partial(self._done_callback, self))
+            task.add_done_callback(partial(PriorityIndexer._done_callback, self))
             self.task = task
 
     @property
@@ -224,9 +224,28 @@ class PriorityIndexer:
         return self.task is not None
 
     async def _work_until_finish(self):
-        while not self.work_queue.empty():
-            work = await self.work_queue.get()
-            await self._do_work(work)
+        try:
+            while not self.work_queue.empty():
+                work = await self.work_queue.get()
+                await self._do_work(work)
+        except Exception as exc:
+            # if an exception occurred, we can't longer ensure proper ordering
+            # for this queue. We flush the queue and wait for the messages to be
+            # redelivered
+            event_id = capture_exception(exc)
+            logger.error(
+                "An error happened on indexer, all messages for this queue will be flushed. "
+                f"Check sentry for more details. Event id: {event_id}",
+                extra={
+                    "seqid": work.seqid,
+                    "shard": work.index_message.shard,
+                    "storage_key": work.index_message.storage_key,
+                },
+                exc_info=exc,
+            )
+            while not self.work_queue.empty():
+                work = await self.work_queue.get()
+                await work.nats_msg.nak()
 
     def _done_callback(self, task: asyncio.Task):
         self.task = None
@@ -238,31 +257,22 @@ class PriorityIndexer:
     @indexer_observer.wrap()
     async def _do_work(self, work: WorkUnit):
         start = time.time()
+        logger.info(
+            f"Working on message for shard {work.index_message.shard} (seqid={work.seqid})",
+            extra={
+                "seqid": work.seqid,
+                "shard": work.index_message.shard,
+                "storage_key": work.index_message.storage_key,
+            },
+        )
+
         try:
-            logger.info(
-                f"Working on message for shard {work.index_message.shard} (seqid={work.seqid})",
-                extra={
-                    "seqid": work.seqid,
-                    "shard": work.index_message.shard,
-                    "storage_key": work.index_message.storage_key,
-                },
-            )
             await self._index_message(work.index_message)
         except Exception as exc:
-            event_id = capture_exception(exc)
-            logger.error(
-                "An error happened on indexer. Check sentry for more details. "
-                f"Event id: {event_id}",
-                extra={
-                    "seqid": work.seqid,
-                    "shard": work.index_message.shard,
-                    "storage_key": work.index_message.storage_key,
-                },
-                exc_info=exc,
-            )
-            await work.nats_msg.nak()
+            raise exc
         else:
             await work.nats_msg.ack()
+
             await signals.successful_indexing.dispatch(
                 SuccessfulIndexingPayload(
                     seqid=work.seqid, index_message=work.index_message
@@ -281,6 +291,7 @@ class PriorityIndexer:
             await work.mpu.end()
 
     async def _index_message(self, pb: IndexMessage):
+        status = None
         if pb.typemessage == TypeMessage.CREATION:
             status = await self._set_resource(pb)
         elif pb.typemessage == TypeMessage.DELETION:
