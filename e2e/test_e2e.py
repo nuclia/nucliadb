@@ -64,6 +64,17 @@ def test_nodes_ready():
             tries += 1
 
 
+def test_versions():
+    resp = requests.get(os.path.join(BASE_URL, "api/v1/versions"))
+    resp.raise_for_status()
+    data = resp.json()
+    print(f"Versions: {data}")
+    assert data["nucliadb"]["installed"]
+    assert "latest" in data["nucliadb"]
+    assert data["nucliadb-admin-assets"]["installed"]
+    assert "latest" in data["nucliadb-admin-assets"]
+
+
 def test_config_check(kbid: str):
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/config-check"),

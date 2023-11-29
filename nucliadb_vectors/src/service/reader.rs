@@ -64,16 +64,18 @@ impl Debug for VectorReaderService {
 impl VectorReader for VectorReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> NodeResult<usize> {
-        let indexet_slock = self.indexset.get_slock()?;
         if vectorset.is_empty() {
             debug!("Id for the vectorset is empty");
             self.index_count(&self.index)
-        } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
-            debug!("Counting nodes for {vectorset}");
-            self.index_count(&index)
         } else {
-            debug!("There was not a set called {vectorset}");
-            Ok(0)
+            let indexet_slock = self.indexset.get_slock()?;
+            if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
+                debug!("Counting nodes for {vectorset}");
+                self.index_count(&index)
+            } else {
+                debug!("There was not a set called {vectorset}");
+                Ok(0)
+            }
         }
     }
 }

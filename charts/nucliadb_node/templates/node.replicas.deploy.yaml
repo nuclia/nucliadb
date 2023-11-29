@@ -94,7 +94,7 @@ spec:
             value: secondary
           - name: PRIMARY_ADDRESS
             value: "node-{{ $i }}.node:{{ $values.serving.grpc_writer }}"
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3032"
           {{- range $key, $value := $values.env }}
           - name: "{{ $key }}"
@@ -138,7 +138,7 @@ spec:
         env:
           - name: NODE_ROLE
             value: secondary
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3031"
         {{- range $key, $value := $values.env }}
           - name: "{{ $key }}"
