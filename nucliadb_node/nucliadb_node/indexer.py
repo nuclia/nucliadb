@@ -45,6 +45,25 @@ from nucliadb_utils.utilities import get_storage
 CONCURRENT_INDEXERS_COUNT = metrics.Gauge(
     "nucliadb_concurrent_indexers_count", labels={"node": ""}
 )
+indexer_observer = metrics.Observer(
+    "nucliadb_message_indexing",
+    buckets=[
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.5,
+        1.0,
+        2.5,
+        5.0,
+        7.5,
+        10.0,
+        30.0,
+        60.0,
+        120.0,
+        float("inf"),
+    ],
+)
 
 
 class IndexWriterError(Exception):
@@ -216,6 +235,7 @@ class PriorityIndexer:
         if task.exception() is not None:
             raise task.exception()  # type: ignore
 
+    @indexer_observer.wrap()
     async def _do_work(self, work: WorkUnit):
         start = time.time()
         try:

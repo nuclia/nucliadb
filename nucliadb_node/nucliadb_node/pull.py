@@ -25,32 +25,11 @@ from nats.js.errors import NotFoundError as StreamNotFoundError
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.indexer import ConcurrentShardIndexer
 from nucliadb_node.writer import Writer
-from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
-
-subscriber_observer = metrics.Observer(
-    "message_processor",
-    buckets=[
-        0.01,
-        0.025,
-        0.05,
-        0.1,
-        0.5,
-        1.0,
-        2.5,
-        5.0,
-        7.5,
-        10.0,
-        30.0,
-        60.0,
-        120.0,
-        float("inf"),
-    ],
-)
 
 
 class Worker:
@@ -110,6 +89,5 @@ class Worker:
         )
         logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
-    @subscriber_observer.wrap()
     async def subscription_worker(self, msg: Msg):
         await self.indexer.index_message_soon(msg)
