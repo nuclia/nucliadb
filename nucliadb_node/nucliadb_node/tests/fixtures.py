@@ -43,6 +43,7 @@ from nucliadb_node.writer import Writer
 from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_manager
 
 images.settings["nucliadb_node_reader"] = {
@@ -224,6 +225,16 @@ async def grpc_server(writer):
     grpc_finalizer = await start_grpc(writer=writer)
     yield
     await grpc_finalizer()
+
+
+# As consumers are not removed and recreated changes per test won't have effect,
+# so we set this value per session
+@pytest.fixture(scope="session", autouse=True)
+def concurrent_nats_processing():
+    original = nats_consumer_settings.nats_max_ack_pending
+    nats_consumer_settings.nats_max_ack_pending = 10
+    yield
+    nats_consumer_settings.nats_max_ack_pending = original
 
 
 @pytest.fixture(scope="function")

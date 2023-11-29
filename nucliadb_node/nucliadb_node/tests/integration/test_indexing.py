@@ -34,7 +34,6 @@ from nucliadb_node.pull import Worker
 from nucliadb_node.settings import settings
 from nucliadb_node.tests.fixtures import Reader
 from nucliadb_utils import const
-from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.utilities import get_pubsub, get_storage
 
 TEST_PARTITION = "111"
@@ -77,14 +76,6 @@ async def test_indexing(worker, shard: str, reader: Reader):
     storage = await get_storage(service_name=SERVICE_NAME)
     # should still work because we leave it around now
     assert await storage.get_indexing(index) is not None
-
-
-@pytest.fixture
-def concurrent_nats_processing():
-    original = nats_consumer_settings.nats_max_ack_pending
-    # nats_consumer_settings.nats_max_ack_pending = 10
-    yield
-    nats_consumer_settings.nats_max_ack_pending = original
 
 
 @pytest.mark.asyncio
