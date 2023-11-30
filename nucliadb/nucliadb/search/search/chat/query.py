@@ -195,14 +195,14 @@ async def chat(
     origin: str,
 ) -> ChatResult:
     nuclia_learning_id: Optional[str] = None
-    chat_history = chat_request.context or []
+    user_query = chat_request.query
+    chat_history = chat_request.chat_history or []
     start_time = time()
 
-    user_query = chat_request.query
     rephrased_query = None
-    if chat_request.context and len(chat_request.context) > 0:
+    if len(chat_history) > 0:
         rephrased_query = await rephrase_query_from_chat_history(
-            kbid, chat_request.context, user_query, user_id
+            kbid, chat_history, user_query, user_id
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(

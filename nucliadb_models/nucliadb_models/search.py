@@ -530,11 +530,6 @@ class SearchParamDefaults:
         title="Vectorset id",
         description="Id of the vectorset to perform the vector search into.",
     )
-    chat_context = ParamDefault(
-        default=None,
-        title="Chat history",
-        description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
-    )
 
     chat_features = ParamDefault(
         default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
@@ -721,9 +716,13 @@ class ChatRequest(BaseModel):
         ExtractedDataTypeName
     ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    context: Optional[
-        List[ChatContextMessage]
-    ] = SearchParamDefaults.chat_context.to_pydantic_field()
+    chat_history = Field(
+        default=None,
+        title="Chat history",
+        description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
+        # B/w compatibility: this field was previously named 'context'
+        validation_alias="context",
+    )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: List[

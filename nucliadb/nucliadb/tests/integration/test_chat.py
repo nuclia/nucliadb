@@ -41,9 +41,10 @@ async def test_chat(
     )
     assert resp.status_code == 200
 
-    context = [{"author": "USER", "text": "query"}]
+    chat_history = [{"author": "USER", "text": "query"}]
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/chat", json={"query": "query", "context": context}
+        f"/kb/{knowledgebox}/chat",
+        json={"query": "query", "chat_history": chat_history},
     )
     assert resp.status_code == 200
 

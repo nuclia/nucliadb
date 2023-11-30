@@ -126,7 +126,7 @@ def test_search(kbid: str, resource_id: str):
         },
         json={
             "query": "What is Cricket?",
-            "context": [],
+            "chat_history": [],
             "show": ["basic", "values", "origin"],
             "features": ["paragraphs", "relations"],
             "inTitleOnly": False,

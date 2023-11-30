@@ -547,7 +547,7 @@ class KnowledgeBox:
 
         args["min_score"] = min_score
         args["fields"] = fields or []
-        args["context"] = context
+        args["chat_history"] = context
         args["extracted"] = extracted
         args["field_type_filter"] = field_type_filter
         args["show"] = show
