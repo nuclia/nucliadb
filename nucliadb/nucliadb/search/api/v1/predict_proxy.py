@@ -28,13 +28,12 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.predict_proxy import predict_proxy
-from nucliadb_models.predict import PredictProxiedEndpoints
+from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
-DESCRIPTION = "Convenience endpoint that proxies requests to the Predict API with the configured Knowledge Box settings. Check the Predict API documentation for more information about request and response models: https://docs.nuclia.dev/docs/nua-api#tag/Predict"  # noqa: E501
+DESCRIPTION = "Convenience endpoint that proxies requests to the Predict API. It adds the Knowledge Box configuration settings as headers to the predict API request. Refer to the Predict API documentation for more details about the request and response models: https://docs.nuclia.dev/docs/nua-api#tag/Predict"  # noqa: E501
 
 
 @api.get(

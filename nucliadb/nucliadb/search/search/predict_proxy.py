@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from enum import Enum
 from typing import Any, Optional, Union
 
 from fastapi.datastructures import QueryParams
@@ -27,7 +28,16 @@ from nucliadb.common.datamanagers.kb import KnowledgeBoxDataManager
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.predict import PredictProxiedEndpoints
+
+
+class PredictProxiedEndpoints(str, Enum):
+    """
+    Enum for the different endpoints that are proxied to the Predict API
+    """
+
+    TOKENS = "tokens"
+    CHAT = "chat"
+    REPHRASE = "rephrase"
 
 
 async def predict_proxy(
