@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
@@ -51,21 +50,11 @@ pub fn get_pointer(x: &[u8], i: usize) -> Pointer {
     usize::from_le_bytes(buff)
 }
 
-// O(1)
-// Returns how many elements are in x, alive or deleted.
-pub fn number_of_written_slots(x: &[u8]) -> usize {
-    usize_from_slice_le(&x[..HEADER_LEN])
-}
-
-pub trait Slot {
+pub trait Interpreter {
     // Is a mistake to assume that x does not have trailing bytes at the end.
     // Is safe to assume that there is an i such that x[0],.., x[i] is a valid
     // Slot.
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8];
-    // Is a mistake to assume that x does not have trailing bytes at the end.
-    // Is safe to assume that there is an i such that x[0],.., x[i] is a valid
-    // Slot.
-    fn cmp_keys(&self, x: &[u8], key: &[u8]) -> Ordering;
     // The function should split x at i, being i the index where
     // x[0],..,x[i] is a valid representation of a slot value.
     // i is ensured to exists.
@@ -76,30 +65,31 @@ pub trait Slot {
     fn keep_in_merge(&self, _: &[u8]) -> bool {
         true
     }
-    // Is a mistake to assume that x and y do not have trailing bytes at the end.
-    // Is safe to assume that there is an i such that x[0],.., x[i] is a valid Slot.
-    // Is safe to assume that there is an j such that y[0],.., y[k] is a valid Slot.
-    fn cmp_slot(&self, x: &[u8], y: &[u8]) -> Ordering {
-        let y_key = self.get_key(y);
-        self.cmp_keys(x, y_key)
-    }
 }
 
-pub trait Data {
-    fn serialized_len(&self) -> usize;
+pub trait IntoBuffer {
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()>;
 }
 
-impl<T: AsRef<[u8]>> Data for T {
-    fn serialized_len(&self) -> usize {
-        self.as_ref().len()
-    }
+impl<T: AsRef<[u8]>> IntoBuffer for T {
     fn serialize_into<W: io::Write>(self, mut w: W) -> io::Result<()> {
         w.write_all(self.as_ref())
     }
 }
 
-pub fn create_key_value<D: Data>(recipient: &mut File, slots: Vec<D>) -> io::Result<()> {
+// O(1)
+// Returns how many elements are in x, alive or deleted.
+pub fn stored_elements(x: &[u8]) -> usize {
+    usize_from_slice_le(&x[..HEADER_LEN])
+}
+
+// O(1)
+pub fn get_value<I: Interpreter>(interpreter: I, src: &[u8], id: usize) -> &[u8] {
+    let pointer = get_pointer(src, id);
+    interpreter.read_exact(&src[pointer..]).0
+}
+
+pub fn create_key_value<D: IntoBuffer>(recipient: &mut File, slots: Vec<D>) -> io::Result<()> {
     let fixed_size = (HEADER_LEN + (POINTER_LEN * slots.len())) as u64;
     recipient.set_len(fixed_size)?;
 
@@ -130,25 +120,11 @@ pub fn create_key_value<D: Data>(recipient: &mut File, slots: Vec<D>) -> io::Res
     recipient_buffer.flush()
 }
 
-// O(1)
-pub fn get_value<S: Slot>(interface: S, src: &[u8], id: usize) -> &[u8] {
-    let pointer = get_pointer(src, id);
-    interface.read_exact(&src[pointer..]).0
-}
-
-// Returns all the keys stored at the serialized key-value 'x'
-// O(1)
-pub fn get_keys<'a, S: Slot + Copy + 'a>(
-    interface: S,
-    x: &'a [u8],
-) -> impl Iterator<Item = &'a [u8]> {
-    (0..number_of_written_slots(x))
-        .map(move |i| get_value(interface, x, i))
-        .map(move |v| interface.get_key(v))
-}
-
 // Merge algorithm. Returns the number of elements merged into the file.
-pub fn merge<S: Slot + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> io::Result<usize> {
+pub fn merge<S: Interpreter + Copy>(
+    recipient: &mut File,
+    producers: &[(S, &[u8])],
+) -> io::Result<usize> {
     // Number of elements, deleted or alive.
     let mut prologue_section_size = HEADER_LEN;
     // To know the range of valid ids per producer
@@ -156,7 +132,7 @@ pub fn merge<S: Slot + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> 
 
     // Computing lengths and total sizes
     for (_, store) in producers.iter().copied() {
-        let producer_elements = number_of_written_slots(store);
+        let producer_elements = stored_elements(store);
         lengths.push(producer_elements);
         prologue_section_size += POINTER_LEN * producer_elements;
     }
@@ -190,12 +166,12 @@ pub fn merge<S: Slot + Copy>(recipient: &mut File, producers: &[(S, &[u8])]) -> 
 
         // We check if the current element is deleted and, in that case, it
         // is transferred to the recipient.
-        let (interface, store) = producers[producer_cursor];
+        let (interpreter, store) = producers[producer_cursor];
         let element_pointer = get_pointer(store, element_cursor);
         let element_slice = &store[element_pointer..];
-        if interface.keep_in_merge(element_slice) {
+        if interpreter.keep_in_merge(element_slice) {
             // Moving to the end of the file to write the current element.
-            let (exact_element, _) = interface.read_exact(element_slice);
+            let (exact_element, _) = interpreter.read_exact(element_slice);
             let element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
             recipient_buffer.write_all(exact_element)?;
             // Moving to the next free slot in the section id to write
@@ -234,19 +210,16 @@ mod tests {
     struct GreaterThan([u8; 4]);
     impl DeleteLog for GreaterThan {
         fn is_deleted(&self, x: &[u8]) -> bool {
-            TElem.cmp_keys(x, &self.0).is_le()
+            x.cmp(&self.0).is_le()
         }
     }
 
     // u32 numbers in big-endian (so cmp is faster)
     #[derive(Clone, Copy)]
     struct TElem;
-    impl Slot for TElem {
+    impl Interpreter for TElem {
         fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
             &x[0..4]
-        }
-        fn cmp_keys(&self, x: &[u8], key: &[u8]) -> Ordering {
-            x[0..4].cmp(&key[0..4])
         }
         fn read_exact<'a>(&self, x: &'a [u8]) -> (&'a [u8], &'a [u8]) {
             x.split_at(4)
@@ -255,18 +228,18 @@ mod tests {
 
     #[test]
     fn store_test() {
-        let interface = TElem;
+        let interpreter = TElem;
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
         let expected: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
         let mut buf = tempfile::tempfile().unwrap();
         create_key_value(&mut buf, expected.clone()).unwrap();
 
         let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
-        let no_values = number_of_written_slots(&buf_map);
+        let no_values = stored_elements(&buf_map);
         assert_eq!(no_values, expected.len());
         for (id, expected_value) in expected.iter().enumerate() {
-            let actual_value = get_value(interface, &buf_map, id);
-            let (head, tail) = interface.read_exact(actual_value);
+            let actual_value = get_value(interpreter, &buf_map, id);
+            let (head, tail) = interpreter.read_exact(actual_value);
             assert_eq!(actual_value, head);
             assert_eq!(tail, &[] as &[u8]);
             assert_eq!(actual_value, expected_value);
@@ -301,7 +274,7 @@ mod tests {
 
         merge(&mut merge_store, &elems).unwrap();
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_map);
+        let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -333,21 +306,21 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interface = (GreaterThan(ONE), TElem);
+        let interpreter = (GreaterThan(ONE), TElem);
         let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![
             // zero and 1 will be removed
-            (interface, v0_map.as_ref()),
+            (interpreter, v0_map.as_ref()),
             // no element is removed
-            (interface, v1_map.as_ref()),
+            (interpreter, v1_map.as_ref()),
             // no element is removed
-            (interface, v2_map.as_ref()),
+            (interpreter, v2_map.as_ref()),
         ];
 
         merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_map);
+        let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -375,21 +348,21 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interface = (GreaterThan(ONE), TElem);
+        let interpreter = (GreaterThan(ONE), TElem);
         let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![
             // zero and 1 will be removed
-            (interface, v0_map.as_ref()),
+            (interpreter, v0_map.as_ref()),
             // no element is removed
-            (interface, v1_map.as_ref()),
+            (interpreter, v1_map.as_ref()),
             // no element is removed
-            (interface, v2_map.as_ref()),
+            (interpreter, v2_map.as_ref()),
         ];
 
         merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_map);
+        let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -430,7 +403,7 @@ mod tests {
         merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_map);
+        let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_map, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -458,21 +431,21 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interface = (GreaterThan(TWO), TElem);
+        let interpreter = (GreaterThan(TWO), TElem);
         let mut merge_storage = tempfile::tempfile().unwrap();
         let elems = vec![
             // all the elements are deleted
-            (interface, v0_map.as_ref()),
+            (interpreter, v0_map.as_ref()),
             // no element is removed
-            (interface, v1_map.as_ref()),
+            (interpreter, v1_map.as_ref()),
             // no element is removed
-            (interface, v2_map.as_ref()),
+            (interpreter, v2_map.as_ref()),
         ];
 
         merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_store);
+        let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -484,7 +457,7 @@ mod tests {
     }
 
     #[test]
-    fn merge_with_different_interfaces() {
+    fn merge_with_different_interpreters() {
         let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
         let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
         let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
@@ -515,7 +488,7 @@ mod tests {
         merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_store);
+        let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
@@ -543,22 +516,22 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interface = (GreaterThan(TEN), TElem);
+        let interpreter = (GreaterThan(TEN), TElem);
         let mut file = tempfile::tempfile().unwrap();
 
         let elems = vec![
             // all the elements are removed
-            (interface, v0_map.as_ref()),
+            (interpreter, v0_map.as_ref()),
             // all the elements are removed
-            (interface, v1_map.as_ref()),
+            (interpreter, v1_map.as_ref()),
             // all the elements are removed
-            (interface, v2_map.as_ref()),
+            (interpreter, v2_map.as_ref()),
         ];
 
         merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice()).unwrap();
         let expected: Vec<u32> = vec![];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
-        let number_of_elements = number_of_written_slots(&merge_store);
+        let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
             .map(|i| get_value(TElem, &merge_store, i))
             .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
