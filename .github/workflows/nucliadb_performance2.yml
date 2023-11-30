@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Install NucliaDB
         run: |
-          make -C nucliadb install
+          make -C nucliadb install-dev
 
       - name: Start NucliaDB
         run: |
@@ -34,7 +34,7 @@ jobs:
 
       - name: Import data
         run: |
-          python nucliadb/nucliadb_performance/import-kb.py --kb=$KB_SLUG --uri=$EXPORTS_URI/$KB_SLUG
+          python nucliadb/nucliadb_performance/export_import.py --kb=$KB_SLUG --uri=$EXPORTS_URI/$KB_SLUG
 
       - name: Run the bench
         run: |

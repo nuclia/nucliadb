@@ -41,7 +41,7 @@ async def test_find(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    #TODO: assert that there are results!
+    # TODO: assert that there are results!
 
 
 @scenario(weight=2)

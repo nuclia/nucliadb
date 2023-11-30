@@ -44,15 +44,10 @@ def import_kb(*, uri, slug, release_channel=None):
     import_id = ndb.writer.start_import(
         kbid=kbid, content=read_import_stream(uri)
     ).import_id
-    print(f"Started import task. Import id: {import_id}")
 
-    print("Waiting for the data to be imported")
-    status = ndb.reader.import_status(kbid=kbid, import_id=import_id)
-    while status.status != "finished":
-        print(f"Status: {status.status} {status.processed}/{status.total}")
-        assert status.status != "error"
-        time.sleep(2)
-        status = ndb.reader.import_status(kbid=kbid, import_id=import_id)
+    print(f"Started import task. Import id: {import_id}")
+    wait_until_finished(ndb, kbid, "import", import_id)
+
     print(f"Import finished!")
 
 
@@ -61,16 +56,31 @@ def export_kb(*, uri, slug):
     export_id = ndb.writer.start_export(kbid=kbid).export_id
 
     print(f"Starting export for {slug}. Export id: {export_id}")
-    status = ndb.reader.export_status(kbid=kbid, export_id=export_id)
-    while status.status != "finished":
-        print(f"Status: {status.status} {status.processed}/{status.total}")
-        assert status.status != "error"
-        time.sleep(2)
-        status = ndb.reader.export_status(kbid=kbid, export_id=export_id)
+    wait_until_finished(ndb, kbid, "export", export_id)
 
     print(f"Downloading export at {uri}")
     export_generator = ndb.reader.download_export(kbid=kbid, export_id=export_id)
     save_export_stream(uri, export_generator)
+
+    print(f"Export finished!")
+
+
+def get_status(ndb, kbid, task_type, task_id):
+    if task_type == "import":
+        return ndb.reader.import_status(kbid=kbid, import_id=task_id)
+    elif task_type == "export":
+        return ndb.reader.export_status(kbid=kbid, export_id=task_id)
+    else:
+        raise ValueError(f"Unknown task type {task_type}")
+
+
+def wait_until_finished(ndb, kbid, task_type, task_id, wait_interval=2):
+    status = get_status(ndb, kbid, task_type, task_id)
+    while status.status != "finished":
+        print(f"Status: {status.status} {status.processed}/{status.total}")
+        assert status.status != "error"
+        time.sleep(wait_interval)
+        status = get_status(ndb, kbid, task_type, task_id)
 
 
 def save_export_stream(uri, export_generator):
@@ -136,9 +146,9 @@ def progressify(func, **tqdm_kwargs):
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=["export", "import"])
-    parser.add_argument("--uri", type=str)
-    parser.add_argument("--kb", type=str)
+    parser.add_argument("--action", choices=["export", "import"], required=True)
+    parser.add_argument("--uri", type=str, required=True)
+    parser.add_argument("--kb", type=str, required=True)
     parser.add_argument(
         "--release_channel",
         type=str,
@@ -156,6 +166,8 @@ def main():
     elif args.action == "import":
         release_channel = ReleaseChannel(args.release_channel)
         import_kb(uri=args.uri, slug=args.kb, release_channel=release_channel)
+    else:
+        raise ValueError(f"Unknown action {args.action}")
 
 
 if __name__ == "__main__":
