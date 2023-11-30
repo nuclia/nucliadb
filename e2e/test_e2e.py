@@ -1,11 +1,12 @@
-import pytest
-import requests
+import base64
+import io
+import json
 import os
 import random
 import time
-import io
-import json
-import base64
+
+import pytest
+import requests
 
 BASE_URL = os.environ.get("NUCLIADB_URL", "http://localhost:8080")
 
@@ -149,3 +150,74 @@ def test_search(kbid: str, resource_id: str):
 
     assert "Not enough data to answer this" not in chat_response
     assert len(search_results["resources"]) == 1
+
+
+def test_predict_proxy(kbid: str):
+    _test_predict_proxy_chat(kbid)
+    _test_predict_proxy_tokens(kbid)
+    _test_predict_proxy_rephrase(kbid)
+
+
+def _test_predict_proxy_chat(kbid: str):
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/chat"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "question": "Who is the best one?",
+            "query_context": [
+                "Many football players have existed. Cristiano Ronaldo and Messi among them, but Messi is by far the greatest."
+            ],
+            "user_id": "someone@company.uk",
+        },
+    )
+    resp.raise_for_status()
+    data = io.BytesIO(resp.content)
+    answer = data.read().decode("utf-8")
+    assert "Messi" in answer and "Ronaldo" not in answer
+
+
+def _test_predict_proxy_tokens(kbid: str):
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/tokens"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        params={
+            "text": "Barcelona",
+        },
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    assert data["tokens"][0]["text"] == "Barcelona"
+
+
+def _test_predict_proxy_rephrase(kbid: str):
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/predict/rephrase"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "question": "Who is the best one?",
+            "context": [
+                {
+                    "author": "NUCLIA",
+                    "text": "Many football players have existed. Cristiano Ronaldo and Messi among them.",
+                },
+                {"author": "USER", "text": "Tell me some football players"},
+            ],
+            "user_id": "someone@company.uk",
+        },
+    )
+    resp.raise_for_status()
+    rephrased_query = resp.json()
+    # Status code 0 means success...
+    assert rephrased_query.endswith("0")
