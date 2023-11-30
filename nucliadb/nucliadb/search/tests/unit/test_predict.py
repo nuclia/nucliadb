@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
 import pytest
+from nucliadb_protos.knowledgebox_pb2 import KBConfiguration
 from yarl import URL
 
 from nucliadb.search.predict import (
@@ -64,11 +65,11 @@ async def test_dummy_predict_engine():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def get_configuration():
-    with mock.patch(
-        "nucliadb.search.predict.PredictEngine.get_configuration", return_value=None
-    ):
-        yield
+def txn():
+    txn = mock.MagicMock()
+    txn.get = AsyncMock(return_value=None)
+    with mock.patch("nucliadb.search.predict.get_transaction", return_value=txn):
+        yield txn
 
 
 @pytest.mark.asyncio
@@ -436,16 +437,17 @@ async def test_summarize():
     )
 
 
-@pytest.fixture(scope="function")
-def txn():
-    txn = mock.MagicMock()
-    txn.get = AsyncMock(return_value=None)
-    with mock.patch("nucliadb.search.predict.get_transaction", return_value=txn):
-        yield
-
-
 @pytest.mark.parametrize("onprem", [True, False])
 async def test_get_predict_headers(onprem, txn):
+    kb_config = KBConfiguration(
+        semantic_model="foo",
+        generative_model="bar",
+        ner_model="baz",
+        anonymization_model="qux",
+        visual_labeling="quux",
+    )
+    txn.get.return_value = kb_config.SerializeToString()
+
     nua_service_account = "nua-service-account"
     pe = PredictEngine(
         "cluster",
@@ -456,6 +458,14 @@ async def test_get_predict_headers(onprem, txn):
     )
     predict_headers = await pe.get_predict_headers("kbid")
     if onprem:
-        assert predict_headers == {"X-STF-NUAKEY": f"Bearer {nua_service_account}"}
+        assert predict_headers["X-STF-NUAKEY"] == f"Bearer {pe.nuclia_service_account}"
+        assert predict_headers["X-STF-SEMANTIC-MODEL"] == kb_config.semantic_model
+        assert predict_headers["X-STF-GENERATIVE-MODEL"] == kb_config.generative_model
+        assert predict_headers["X-STF-NER-MODEL"] == kb_config.ner_model
+        assert (
+            predict_headers["X-STF-ANONYMIZATION-MODEL"]
+            == kb_config.anonymization_model
+        )
+        assert predict_headers["X-STF-VISUAL-LABELING"] == kb_config.visual_labeling
     else:
         assert predict_headers == {"X-STF-KBID": "kbid"}

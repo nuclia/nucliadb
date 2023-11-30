@@ -21,6 +21,7 @@ from . import chat  # noqa
 from . import feedback  # noqa
 from . import find  # noqa
 from . import knowledgebox  # noqa
+from . import predict_proxy  # noqa
 from . import search  # noqa
 from . import suggest  # noqa
 from . import summarize  # noqa
