@@ -21,6 +21,7 @@ import json
 import os
 from enum import Enum
 from typing import AsyncIterator, Dict, List, Optional, Tuple
+from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
@@ -409,6 +410,9 @@ class PredictEngine:
 
 class DummyPredictEngine(PredictEngine):
     def __init__(self):
+        self.onprem = True
+        self.cluster_url = "http://localhost:8000"
+        self.public_url = "http://localhost:8000"
         self.calls = []
         self.generated_answer = [
             b"valid ",
@@ -425,6 +429,13 @@ class DummyPredictEngine(PredictEngine):
 
     async def get_predict_headers(self, kbid: str) -> dict[str, str]:
         return {}
+
+    async def make_request(self, method: str, **request_args):
+        self.calls.append((method, request_args))
+        response = Mock(status=200)
+        response.json = AsyncMock(return_value={"foo": "bar"})
+        response.headers = {"NUCLIA-LEARNING-ID": DUMMY_LEARNING_ID}
+        return response
 
     async def send_feedback(
         self,
