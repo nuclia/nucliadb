@@ -49,12 +49,9 @@ impl DeleteLog for dtrie_ram::DTrie {
     }
 }
 
-impl<Dl: DeleteLog, S: data_store::Slot> data_store::Slot for (Dl, S) {
+impl<Dl: DeleteLog, S: data_store::Interpreter> data_store::Interpreter for (Dl, S) {
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         self.1.get_key(x)
-    }
-    fn cmp_keys(&self, x: &[u8], key: &[u8]) -> std::cmp::Ordering {
-        self.1.cmp_keys(x, key)
     }
     fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
         self.1.read_exact(x)
