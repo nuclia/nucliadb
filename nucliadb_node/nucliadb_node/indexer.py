@@ -180,10 +180,10 @@ class ConcurrentShardIndexer:
         exists = work.shard_id in self.indexers
         if exists:
             indexer, _ = self.indexers[work.shard_id]
-            await indexer.index_soon(work)
+            indexer.index_soon(work)
         else:
             indexer = PriorityIndexer(writer=self.writer, storage=self.storage)
-            await indexer.index_soon(work)
+            indexer.index_soon(work)
             task = asyncio.create_task(indexer.work_until_finish())
             task.add_done_callback(
                 partial(
@@ -208,8 +208,8 @@ class PriorityIndexer:
         self.work_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self.working = False
 
-    async def index_soon(self, work: WorkUnit):
-        await self.work_queue.put(work)
+    def index_soon(self, work: WorkUnit):
+        self.work_queue.put_nowait(work)
 
     async def work_until_finish(self):
         self.working = True
