@@ -29,6 +29,7 @@ from .keywordset import *  # noqa
 from .layout import *  # noqa
 from .link import *  # noqa
 from .metadata import *  # noqa
+from .predict import *  # noqa
 from .processing import *  # noqa
 from .text import *  # noqa
 from .writer import *  # noqa
