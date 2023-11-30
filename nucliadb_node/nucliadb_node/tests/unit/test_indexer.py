@@ -18,11 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from typing import AsyncIterator, Iterator
+from typing import AsyncIterator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from nats.aio.client import Msg
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
     IndexMessageSource,
@@ -36,68 +35,31 @@ from nucliadb_node.indexer import (
     PriorityIndexer,
     WorkUnit,
 )
-from nucliadb_utils.nats import MessageProgressUpdater
 
 
 class TestIndexerWorkUnit:
-    @pytest.fixture
-    def processor_index_message(self) -> Iterator[IndexMessage]:
-        index_message = IndexMessage()
-        index_message.source = IndexMessageSource.PROCESSOR
-        yield index_message
-
-    @pytest.fixture
-    def writer_index_message(self) -> Iterator[IndexMessage]:
-        index_message = IndexMessage()
-        index_message.source = IndexMessageSource.WRITER
-        yield index_message
-
-    @pytest.fixture
-    def msg(self) -> Iterator[Msg]:
-        seqid = 1
-        msg = AsyncMock()
-        msg.reply = f"x.x.x.x.x.{seqid}"
-        yield msg
-
-    @pytest.fixture
-    def message_progress_updater(self) -> Iterator[MessageProgressUpdater]:
-        mpu = AsyncMock()
-        yield mpu
-
-    @pytest.fixture
-    def processor_work_unit(
-        self,
-        msg: Msg,
-        processor_index_message: IndexMessage,
-    ) -> Iterator[WorkUnit]:
-        msg.data = processor_index_message.SerializeToString()
-        yield WorkUnit.from_msg(msg)
-
-    @pytest.fixture
-    def writer_work_unit(
-        self,
-        msg: Msg,
-        writer_index_message: IndexMessage,
-    ) -> Iterator[WorkUnit]:
-        msg.data = writer_index_message.SerializeToString()
-        yield WorkUnit.from_msg(msg)
-
-    def test_from_msg_constructor(
-        self, msg: Msg, processor_index_message: IndexMessage
-    ):
-        msg.data = processor_index_message.SerializeToString()
-        WorkUnit.from_msg(msg)
+    @pytest.mark.parametrize(
+        "source",
+        IndexMessageSource.keys(),
+    )
+    def test_from_msg_constructor(self, source):
+        source = IndexMessageSource.Value(source)
+        msg = gen_msg(source=source)
+        work = WorkUnit.from_msg(msg)
+        assert work.index_message.source == source
 
     @pytest.mark.parametrize("writer_seqid,processor_seqid", [(1, 2), (2, 1)])
     def test_priority_comparaisons_with_different_seqid(
         self,
-        processor_work_unit: WorkUnit,
-        writer_work_unit: WorkUnit,
-        writer_seqid: int,
         processor_seqid: int,
+        writer_seqid: int,
     ):
-        processor_work_unit.nats_msg.reply = f"x.x.x.x.x.{processor_seqid}"
-        writer_work_unit.nats_msg.reply = f"x.x.x.x.x.{writer_seqid}"
+        processor_work_unit = WorkUnit.from_msg(
+            gen_msg(seqid=processor_seqid, source=IndexMessageSource.PROCESSOR)
+        )
+        writer_work_unit = WorkUnit.from_msg(
+            gen_msg(seqid=writer_seqid, source=IndexMessageSource.WRITER)
+        )
 
         assert writer_work_unit < processor_work_unit
         assert processor_work_unit > writer_work_unit
@@ -105,15 +67,15 @@ class TestIndexerWorkUnit:
         assert processor_work_unit == processor_work_unit
 
     @pytest.mark.asyncio
-    async def test_work_units_in_an_asyncio_priority_queue(
-        self,
-        processor_work_unit: WorkUnit,
-        writer_work_unit: WorkUnit,
-    ):
-        processor_work_unit.nats_msg.reply = f"x.x.x.x.x.1"
-        writer_work_unit.nats_msg.reply = f"x.x.x.x.x.2"
+    async def test_work_units_in_an_asyncio_priority_queue(self):
+        processor_work_unit = WorkUnit.from_msg(
+            gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR)
+        )
+        writer_work_unit = WorkUnit.from_msg(
+            gen_msg(seqid=2, source=IndexMessageSource.WRITER)
+        )
 
-        queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        queue = asyncio.PriorityQueue()
         await queue.put(processor_work_unit)
         await queue.put(writer_work_unit)
 
@@ -133,24 +95,6 @@ class TestConcurrentShardIndexer:
         with patch("nucliadb_node.indexer.MessageProgressUpdater", new=mpu):
             yield mpu
 
-    def gen_msg(
-        self,
-        *,
-        seqid: int = 1,
-        source: IndexMessageSource.ValueType = IndexMessageSource.WRITER,
-    ):
-        msg = AsyncMock()
-        msg.reply = f"x.x.x.x.x.{seqid}"
-        pb = IndexMessage()
-        pb.shard = "test-shard-id"
-        pb.source = source
-        msg.data = pb.SerializeToString()
-        return msg
-
-    @pytest.fixture
-    def msg(self) -> Iterator[Msg]:
-        yield self.gen_msg(seqid=1)
-
     @pytest.fixture
     @pytest.mark.asyncio
     async def csi(self) -> AsyncIterator[ConcurrentShardIndexer]:
@@ -160,25 +104,39 @@ class TestConcurrentShardIndexer:
         await csi.finalize()
 
     @pytest.mark.asyncio
-    async def test_concurrent_indexer_do_index(
-        self, csi: ConcurrentShardIndexer, msg: Msg
+    async def test_creates_an_indexer_per_shard(
+        self,
+        csi: ConcurrentShardIndexer,
     ):
-        with patch("nucliadb_node.indexer.PriorityIndexer.index_soon") as index_soon:
-            count = 10
-            for i in range(count):
-                await csi.index_message_soon(msg)
-            assert index_soon.await_count == count
+        with patch("nucliadb_node.indexer.asyncio") as asyncio_mock:
+            seqid = 1
+            n_tasks = 5
+            for i in range(n_tasks):
+                shard_id = f"shard-{i}"
+                for j in range(2):
+                    msg = gen_msg(seqid=i, shard_id=shard_id)
+                    await csi.index_message_soon(msg)
+                    seqid += 1
+            assert asyncio_mock.create_task.call_count == n_tasks
 
     @pytest.mark.asyncio
-    async def test_concurrent_indexer_priority_indexing(
+    async def test_indexing_adds_work_to_priority_indexer(
         self, csi: ConcurrentShardIndexer
     ):
+        with patch("nucliadb_node.indexer.PriorityIndexer.index_soon") as index_soon:
+            count = 5
+            for i in range(count):
+                await csi.index_message_soon(gen_msg())
+            assert index_soon.call_count == count
+
+    @pytest.mark.asyncio
+    async def test_priority_indexing(self, csi: ConcurrentShardIndexer):
         messages = [
-            self.gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR),
-            self.gen_msg(seqid=2, source=IndexMessageSource.PROCESSOR),
-            self.gen_msg(seqid=3, source=IndexMessageSource.WRITER),
-            self.gen_msg(seqid=4, source=IndexMessageSource.WRITER),
-            self.gen_msg(seqid=5, source=IndexMessageSource.PROCESSOR),
+            gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR),
+            gen_msg(seqid=2, source=IndexMessageSource.PROCESSOR),
+            gen_msg(seqid=3, source=IndexMessageSource.WRITER),
+            gen_msg(seqid=4, source=IndexMessageSource.WRITER),
+            gen_msg(seqid=5, source=IndexMessageSource.PROCESSOR),
         ]
 
         processed = []
@@ -244,10 +202,25 @@ class TestPriorityIndexer:
         self,
         indexer: PriorityIndexer,
     ):
-        await indexer.index_soon(self.work())
-        await indexer.index_soon(self.work())
+        indexer.index_soon(self.work())
+        indexer.index_soon(self.work())
 
         assert indexer.work_queue.qsize() == 2
+
+    @pytest.mark.asyncio
+    async def test_work_until_finish_processes_everything(
+        self, indexer: PriorityIndexer, successful_indexing, writer: AsyncMock
+    ):
+        total = 10
+        for i in range(total):
+            indexer.index_soon(self.work())
+        assert indexer.work_queue.qsize() == total
+
+        await indexer.work_until_finish()
+
+        assert indexer.work_queue.qsize() == 0
+        assert writer.set_resource.await_count == total
+        assert successful_indexing.dispatch.await_count == total
 
     @pytest.mark.asyncio
     async def test_do_work_processes_a_work_unit(
@@ -260,30 +233,6 @@ class TestPriorityIndexer:
         assert writer.set_resource.await_count == 1  # type: ignore
         assert successful_indexing.dispatch.await_count == 1
         assert successful_indexing.dispatch.await_args.args[0].seqid == 10
-
-    @pytest.mark.asyncio
-    async def test_work_until_finish_processes_everything(
-        self, indexer: PriorityIndexer, successful_indexing, writer: AsyncMock
-    ):
-        total = 10
-        for i in range(total):
-            await indexer.index_soon(self.work())
-        assert indexer.work_queue.qsize() == total
-
-        await indexer.work_until_finish()
-
-        assert indexer.work_queue.qsize() == 0
-        assert writer.set_resource.await_count == total
-        assert successful_indexing.dispatch.await_count == total
-
-    @pytest.mark.asyncio
-    async def test_indexer_creates_new_task_when_empty(
-        self,
-        indexer: PriorityIndexer,
-    ):
-        with patch("nucliadb_node.indexer.asyncio") as asyncio_mock:
-            await indexer.index_soon(self.work())
-            assert asyncio_mock.create_task.called_once
 
     @pytest.mark.asyncio
     async def test_node_writer_errors_are_managed(
@@ -316,9 +265,9 @@ class TestPriorityIndexer:
         writer.delete_resource.return_value = status
 
         with patch("nucliadb_node.indexer.asyncio"):
-            await indexer.index_soon(self.work())
-            await indexer.index_soon(self.work())
-            await indexer.index_soon(self.work())
+            indexer.index_soon(self.work())
+            indexer.index_soon(self.work())
+            indexer.index_soon(self.work())
             assert indexer.work_queue.qsize() == 3
 
         indexer._do_work = AsyncMock(side_effect=indexer._do_work)
@@ -326,3 +275,18 @@ class TestPriorityIndexer:
 
         assert indexer._do_work.await_count == 1
         assert indexer.work_queue.qsize() == 0
+
+
+def gen_msg(
+    *,
+    seqid: int = 1,
+    shard_id: str = "test-shard-id",
+    source: IndexMessageSource.ValueType = IndexMessageSource.WRITER,
+):
+    msg = AsyncMock()
+    msg.reply = f"x.x.x.x.x.{seqid}"
+    pb = IndexMessage()
+    pb.shard = shard_id
+    pb.source = source
+    msg.data = pb.SerializeToString()
+    return msg
