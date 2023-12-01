@@ -179,6 +179,8 @@ async def find_post_knowledgebox(
         )
         response.status_code = 206 if incomplete else 200
         return results
+    except KnowledgeBoxNotFound:
+        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
     except InvalidQueryError as exc:
