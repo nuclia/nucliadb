@@ -162,10 +162,11 @@ class ConcurrentShardIndexer:
         logger.info(
             f"Index message for shard {work.shard_id} is being enqueued",
             extra={
-                "shard": work.shard_id,
                 "subject": msg.subject,
                 "reply": msg.reply,
                 "seqid": work.seqid,
+                "kbid": work.index_message.kbid,
+                "shard": work.shard_id,
                 "storage_key": work.index_message.storage_key,
             },
         )
@@ -226,6 +227,7 @@ class PriorityIndexer:
                 f"Check sentry for more details. Event id: {event_id}",
                 extra={
                     "seqid": work.seqid,
+                    "kbid": work.index_message.kbid,
                     "shard": work.index_message.shard,
                     "storage_key": work.index_message.storage_key,
                 },
@@ -244,6 +246,7 @@ class PriorityIndexer:
             f"Working on message for shard {work.index_message.shard} (seqid={work.seqid})",
             extra={
                 "seqid": work.seqid,
+                "kbid": work.index_message.kbid,
                 "shard": work.index_message.shard,
                 "storage_key": work.index_message.storage_key,
             },
@@ -267,6 +270,7 @@ class PriorityIndexer:
                 "Message indexing finished",
                 extra={
                     "seqid": work.seqid,
+                    "kbid": work.index_message.kbid,
                     "shard": work.index_message.shard,
                     "storage_key": work.index_message.storage_key,
                     "time": time.time() - start,
