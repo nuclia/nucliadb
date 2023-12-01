@@ -157,12 +157,15 @@ async def managed_serialize(
     extracted: List[ExtractedDataTypeName],
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
+    orm_resource: Optional[ORMResource] = None,
 ) -> Optional[Resource]:
-    orm_resource = await get_orm_resource(
-        txn, kbid, rid=rid, slug=slug, service_name=service_name
-    )
     if orm_resource is None:
-        return None
+        # Try getting from the maindb
+        orm_resource = await get_orm_resource(
+            txn, kbid, rid=rid, slug=slug, service_name=service_name
+        )
+        if orm_resource is None:
+            return None
 
     resource = Resource(id=orm_resource.uuid)
 

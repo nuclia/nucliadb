@@ -50,6 +50,6 @@ async def test_get_paragraph_text(
         field="/t/field",
         start=0,
         end=5,
-        orm_resource=orm_resource,
+        resource_cache={uid: orm_resource},
     )
     assert text1 == "Hello"

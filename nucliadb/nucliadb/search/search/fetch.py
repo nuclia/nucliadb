@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
@@ -32,11 +31,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
 
-from .cache import get_resource_from_cache
-
-rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
-    "rcache", default=None
-)
+from .cache import ResourceCacheType, get_resource_from_cache_or_db
 
 
 async def fetch_resources(
@@ -45,10 +40,18 @@ async def fetch_resources(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
+    resource_cache: ResourceCacheType,
 ) -> Dict[str, Resource]:
     txn = await get_transaction()
     result = {}
     for resource in resources:
+        orm_resource = await get_resource_from_cache_or_db(
+            kbid, resource, resource_cache
+        )
+        if orm_resource is None:
+            logger.warning(f"{resource} does not exist on DB")
+            continue
+
         serialization = await managed_serialize(
             txn,
             kbid,
@@ -57,6 +60,7 @@ async def fetch_resources(
             field_type_filter=field_type_filter,
             extracted=extracted,
             service_name=SERVICE_NAME,
+            orm_resource=orm_resource,
         )
         if serialization is not None:
             result[resource] = serialization
@@ -80,8 +84,12 @@ async def get_paragraph_from_resource(
     return paragraph
 
 
-async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
-    orm_resource = await get_resource_from_cache(kbid, result.uuid)
+async def get_labels_resource(
+    result: DocumentResult, kbid: str, resource_cache: ResourceCacheType
+) -> List[str]:
+    orm_resource = await get_resource_from_cache_or_db(
+        kbid, result.uuid, resource_cache
+    )
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
@@ -96,8 +104,12 @@ async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
     return labels
 
 
-async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
-    orm_resource = await get_resource_from_cache(kbid, result.uuid)
+async def get_labels_paragraph(
+    result: ParagraphResult, kbid: str, resource_cache: ResourceCacheType
+) -> List[str]:
+    orm_resource = await get_resource_from_cache_or_db(
+        kbid, result.uuid, resource_cache
+    )
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
@@ -129,9 +141,11 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
 
 
 async def get_seconds_paragraph(
-    result: ParagraphResult, kbid: str
+    result: ParagraphResult, kbid: str, resource_cache: ResourceCacheType
 ) -> Optional[Tuple[List[int], List[int]]]:
-    orm_resource = await get_resource_from_cache(kbid, result.uuid)
+    orm_resource = await get_resource_from_cache_or_db(
+        kbid, result.uuid, resource_cache
+    )
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")

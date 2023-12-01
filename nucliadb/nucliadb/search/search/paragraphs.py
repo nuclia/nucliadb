@@ -28,10 +28,9 @@ from nucliadb_protos.utils_pb2 import ExtractedText
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import KB_REVERSE
-from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_telemetry import metrics
 
-from .cache import get_resource_from_cache
+from .cache import ResourceCacheType, get_resource_from_cache_or_db
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -159,16 +158,13 @@ async def get_paragraph_text(
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
     matches: Optional[list[str]] = None,
-    orm_resource: Optional[
-        ResourceORM
-    ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
     extracted_text_cache: Optional[ExtractedTextCache] = None,
+    resource_cache: Optional[ResourceCacheType] = None,
 ) -> str:
+    orm_resource = await get_resource_from_cache_or_db(kbid, rid, resource_cache or {})
     if orm_resource is None:
-        orm_resource = await get_resource_from_cache(kbid, rid)
-        if orm_resource is None:
-            logger.error(f"{kbid}/{rid}:{field} does not exist on DB")
-            return ""
+        logger.error(f"{kbid}/{rid}:{field} does not exist on DB")
+        return ""
 
     _, field_type, field = field.split("/")
     field_type_int = KB_REVERSE[field_type]
@@ -196,12 +192,13 @@ async def get_text_sentence(
     start: int,
     end: int,
     split: Optional[str] = None,
+    resource_cache: Optional[ResourceCacheType] = None,
 ) -> str:
     """
     Leave separated from get paragraph for now until we understand the differences
     better.
     """
-    orm_resource = await get_resource_from_cache(kbid, rid)
+    orm_resource = await get_resource_from_cache_or_db(kbid, rid, resource_cache or {})
 
     if orm_resource is None:
         logger.warning(f"{rid} does not exist on DB")

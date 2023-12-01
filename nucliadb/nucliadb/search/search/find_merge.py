@@ -27,10 +27,15 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.ingest.serialize import serialize
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.cache import resource_cache
+from nucliadb.search.search.cache import (
+    ResourceCacheType,
+    get_resource_from_cache_or_db,
+    resource_cache,
+)
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -46,8 +51,8 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import metrics
 
-from . import paragraphs
 from .metrics import merge_observer
+from .paragraphs import ExtractedTextCache, extracted_text_cache, get_paragraph_text
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
     "nucliadb_find_fetch_operations",
@@ -62,12 +67,13 @@ async def set_text_value(
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: Optional[List[str]] = None,
-    extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
+    extracted_text_cache: Optional[ExtractedTextCache] = None,
+    resource_cache: Optional[ResourceCacheType] = None,
 ):
     async with max_operations:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
-        result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
+        result_paragraph.paragraph.text = await get_paragraph_text(
             kbid=kbid,
             rid=result_paragraph.rid,
             field=result_paragraph.field,
@@ -78,6 +84,7 @@ async def set_text_value(
             ematches=ematches,
             matches=[],  # TODO
             extracted_text_cache=extracted_text_cache,
+            resource_cache=resource_cache,
         )
 
 
@@ -89,16 +96,29 @@ async def set_resource_metadata_value(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     find_resources: Dict[str, FindResource],
+    txn: Transaction,
     max_operations: asyncio.Semaphore,
+    resource_cache: ResourceCacheType,
 ):
     async with max_operations:
-        serialized_resource = await serialize(
+        orm_resource = await get_resource_from_cache_or_db(
+            kbid, resource, resource_cache
+        )
+        if orm_resource is None:
+            logger.warning(f"Resource {resource} not found in {kbid}")
+            find_resources.pop(resource, None)
+            return
+
+        txn = await get_transaction()
+        serialized_resource = await managed_serialize(
+            txn,
             kbid,
             resource,
             show,
             field_type_filter=field_type_filter,
             extracted=extracted,
             service_name=SERVICE_NAME,
+            orm_resource=orm_resource,
         )
         if serialized_resource is not None:
             find_resources[resource].updated_from(serialized_resource)
@@ -144,11 +164,37 @@ async def fetch_find_metadata(
     highlight: bool = False,
     ematches: Optional[List[str]] = None,
 ):
+    with resource_cache() as rcache, extracted_text_cache() as etcache:
+        await _fetch_find_metadata_with_caches(
+            rcache,
+            etcache,
+            find_resources,
+            result_paragraphs,
+            kbid,
+            show,
+            field_type_filter,
+            extracted,
+            highlight,
+            ematches,
+        )
+
+
+async def _fetch_find_metadata_with_caches(
+    resource_cache: ResourceCacheType,
+    extracted_text_cache: ExtractedTextCache,
+    find_resources: Dict[str, FindResource],
+    result_paragraphs: List[TempFindParagraph],
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    highlight: bool = False,
+    ematches: Optional[List[str]] = None,
+):
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
     orderer = Orderer()
-    etcache = paragraphs.ExtractedTextCache()
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
             find_resource = find_resources.setdefault(
@@ -191,12 +237,12 @@ async def fetch_find_metadata(
                         highlight=highlight,
                         ematches=ematches,
                         max_operations=max_operations,
-                        extracted_text_cache=etcache,
+                        extracted_text_cache=extracted_text_cache,
+                        resource_cache=resource_cache,
                     )
                 )
             )
             resources.add(result_paragraph.rid)
-    etcache.clear()
 
     for order, (rid, field_id, paragraph_id) in enumerate(
         orderer.sorted_by_insertion()
@@ -214,6 +260,7 @@ async def fetch_find_metadata(
                     extracted=extracted,
                     find_resources=find_resources,
                     max_operations=max_operations,
+                    resource_cache=resource_cache,
                 )
             )
         )
@@ -382,34 +429,37 @@ async def find_merge_results(
 
         relations.append(response.relation)
 
-    with resource_cache():
-        result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-            paragraphs, vectors, count, page, min_score
-        )
-        next_page = next_page or merged_next_page
+    result_paragraphs, merged_next_page = merge_paragraphs_vectors(
+        paragraphs,
+        vectors,
+        count,
+        page,
+        min_score,
+    )
+    next_page = next_page or merged_next_page
 
-        api_results = KnowledgeboxFindResults(
-            resources={},
-            facets={},
-            query=real_query,
-            total=total_paragraphs,
-            page_number=page,
-            page_size=count,
-            next_page=next_page,
-            min_score=round(min_score, ndigits=3),
-        )
+    api_results = KnowledgeboxFindResults(
+        resources={},
+        facets={},
+        query=real_query,
+        total=total_paragraphs,
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+        min_score=round(min_score, ndigits=3),
+    )
 
-        await fetch_find_metadata(
-            api_results.resources,
-            result_paragraphs,
-            kbid,
-            show,
-            field_type_filter,
-            extracted,
-            highlight,
-            ematches,
-        )
-        api_results.relations = merge_relations_results(relations, requested_relations)
+    await fetch_find_metadata(
+        api_results.resources,
+        result_paragraphs,
+        kbid,
+        show,
+        field_type_filter,
+        extracted,
+        highlight,
+        ematches,
+    )
+    api_results.relations = merge_relations_results(relations, requested_relations)
 
-        await abort_transaction()
-        return api_results
+    await abort_transaction()
+    return api_results

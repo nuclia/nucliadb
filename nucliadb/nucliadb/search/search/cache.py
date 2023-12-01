@@ -20,12 +20,10 @@
 import asyncio
 import contextlib
 import logging
-from contextvars import ContextVar
 from typing import Dict, Generator, Optional
 
 from lru import LRU  # type: ignore
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.txn_utils import get_transaction
@@ -35,8 +33,6 @@ from nucliadb_utils.utilities import get_storage
 
 ResourceCacheType = Dict[str, ResourceORM]
 
-rcache: ContextVar[Optional[ResourceCacheType]] = ContextVar("rcache", default=None)
-
 logger = logging.getLogger(__name__)
 
 RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)  # type: ignore
@@ -45,37 +41,19 @@ RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"typ
 
 @contextlib.contextmanager
 def resource_cache() -> Generator[ResourceCacheType, None, None]:
-    rcache = get_resource_cache(clear=True)
+    rcache: ResourceCacheType = {}
     try:
         yield rcache
     finally:
-        clear_resource_cache(rcache)
+        for resource in rcache.values():
+            resource.clean()
+        rcache.clear()
 
 
-def get_resource_cache(clear: bool = False) -> ResourceCacheType:
-    value: Optional[Dict[str, ResourceORM]] = rcache.get()
-    if value is None or clear:
-        if clear and value is not None:
-            logger.warning(
-                f"Clearing a non-empty resource cache. This may lead to a memory leak."
-            )
-        value = {}
-        rcache.set(value)
-    return value
-
-
-def clear_resource_cache(rcache: ResourceCacheType) -> None:
-    for resource in rcache.values():
-        resource.clean()
-    rcache.clear()
-
-
-async def get_resource_from_cache(
-    kbid: str, uuid: str, txn: Optional[Transaction] = None
+async def get_resource_from_cache_or_db(
+    kbid: str, uuid: str, resource_cache: ResourceCacheType
 ) -> Optional[ResourceORM]:
     orm_resource: Optional[ResourceORM] = None
-
-    resource_cache = get_resource_cache()
 
     if uuid not in RESOURCE_LOCKS:
         RESOURCE_LOCKS[uuid] = asyncio.Lock()
@@ -83,11 +61,7 @@ async def get_resource_from_cache(
     async with RESOURCE_LOCKS[uuid]:
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
-            if txn is None:
-                txn = await get_transaction()
-            storage = await get_storage(service_name=SERVICE_NAME)
-            kb = KnowledgeBoxORM(txn, storage, kbid)
-            orm_resource = await kb.get(uuid)
+            orm_resource = await get_resource_from_db(kbid, uuid)
         else:
             RESOURCE_CACHE_OPS.inc({"type": "hit"})
 
@@ -97,3 +71,10 @@ async def get_resource_from_cache(
             orm_resource = resource_cache.get(uuid)
 
     return orm_resource
+
+
+async def get_resource_from_db(kbid: str, uuid: str) -> Optional[ResourceORM]:
+    txn = await get_transaction()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    kb = KnowledgeBoxORM(txn, storage, kbid)
+    return await kb.get(uuid)

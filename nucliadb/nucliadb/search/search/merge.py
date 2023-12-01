@@ -69,7 +69,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 
-from .cache import get_resource_from_cache, resource_cache
+from .cache import ResourceCacheType, get_resource_from_cache_or_db, resource_cache
 from .metrics import merge_observer
 from .paragraphs import extracted_text_cache, get_paragraph_text, get_text_sentence
 
@@ -87,6 +87,7 @@ async def text_score(
     item: Union[DocumentResult, ParagraphResult],
     sort_field: SortField,
     kbid: str,
+    resource_cache: ResourceCacheType,
 ) -> Optional[Score]:
     """Returns the score for given `item` and `sort_field`. If the resource is being
     deleted, it might appear on search results but not in maindb. In this
@@ -97,7 +98,7 @@ async def text_score(
         return (item.score.bm25, item.score.booster)
 
     score: Any = None
-    resource = await get_resource_from_cache(kbid, item.uuid)
+    resource = await get_resource_from_cache_or_db(kbid, item.uuid, resource_cache)
     if resource is None:
         return score
     basic = await resource.get_basic()
@@ -121,6 +122,7 @@ async def merge_documents_results(
     page: int,
     kbid: str,
     sort: SortOptions,
+    resource_cache: ResourceCacheType,
 ) -> Resources:
     raw_resource_list: List[Tuple[DocumentResult, Score]] = []
     facets: Dict[str, Any] = {}
@@ -141,7 +143,7 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            score = await text_score(result, sort.field, kbid)
+            score = await text_score(result, sort.field, kbid, resource_cache)
             if score is not None:
                 raw_resource_list.append((result, score))
         total += document_response.total
@@ -159,7 +161,7 @@ async def merge_documents_results(
     for result, _ in raw_resource_list[min(skip, length) : min(end, length)]:
         # /f/file
 
-        labels = await get_labels_resource(result, kbid)
+        labels = await get_labels_resource(result, kbid, resource_cache)
         _, field_type, field = result.field.split("/")
 
         result_resource_list.append(
@@ -204,7 +206,7 @@ async def merge_suggest_paragraph_results(
     if len(suggest_responses) > 1:
         sort_results_by_score(raw_paragraph_list)
 
-    with resource_cache(), extracted_text_cache() as etcache:
+    with resource_cache() as rcache, extracted_text_cache() as etcache:
         result_paragraph_list: List[Paragraph] = []
         for result in raw_paragraph_list[:10]:
             _, field_type, field = result.field.split("/")
@@ -219,8 +221,9 @@ async def merge_suggest_paragraph_results(
                 ematches=ematches,  # type: ignore
                 matches=result.matches,  # type: ignore
                 extracted_text_cache=etcache,
+                resource_cache=rcache,
             )
-            labels = await get_labels_paragraph(result, kbid)
+            labels = await get_labels_paragraph(result, kbid, resource_cache=rcache)
             new_paragraph = Paragraph(
                 score=result.score.bm25,
                 rid=result.uuid,
@@ -244,7 +247,9 @@ async def merge_suggest_paragraph_results(
                 new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
             else:
                 # TODO: Remove once we are sure all data has been migrated!
-                seconds_positions = await get_seconds_paragraph(result, kbid)
+                seconds_positions = await get_seconds_paragraph(
+                    result, kbid, resource_cache=rcache
+                )
                 if seconds_positions is not None:
                     new_paragraph.start_seconds = seconds_positions[0]
                     new_paragraph.end_seconds = seconds_positions[1]
@@ -259,6 +264,7 @@ async def merge_vectors_results(
     count: int,
     page: int,
     min_score: float,
+    resource_cache: ResourceCacheType,
 ):
     facets: Dict[str, Any] = {}
     raw_vectors_list: List[DocumentScored] = []
@@ -308,7 +314,15 @@ async def merge_vectors_results(
             except ValueError:
                 index_int = -1
         text = await get_text_sentence(
-            rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+            rid,
+            field_type,
+            field,
+            kbid,
+            index_int,
+            start_int,
+            end_int,
+            subfield,
+            resource_cache=resource_cache,
         )
         result_sentence_list.append(
             Sentence(
@@ -341,6 +355,7 @@ async def merge_paragraph_results(
     page: int,
     highlight: bool,
     sort: SortOptions,
+    resource_cache: ResourceCacheType,
 ):
     raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
     facets: Dict[str, Any] = {}
@@ -364,7 +379,9 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            score = await text_score(result, sort.field, kbid)
+            score = await text_score(
+                result, sort.field, kbid, resource_cache=resource_cache
+            )
             if score is not None:
                 raw_paragraph_list.append((result, score))
         total += paragraph_response.total
@@ -393,8 +410,11 @@ async def merge_paragraph_results(
                 ematches=ematches,
                 matches=result.matches,  # type: ignore
                 extracted_text_cache=etcache,
+                resource_cache=resource_cache,
             )
-            labels = await get_labels_paragraph(result, kbid)
+            labels = await get_labels_paragraph(
+                result, kbid, resource_cache=resource_cache
+            )
             new_paragraph = Paragraph(
                 score=result.score.bm25,
                 rid=result.uuid,
@@ -418,7 +438,9 @@ async def merge_paragraph_results(
                 new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
             else:
                 # TODO: Remove once we are sure all data has been migrated!
-                seconds_positions = await get_seconds_paragraph(result, kbid)
+                seconds_positions = await get_seconds_paragraph(
+                    result, kbid, resource_cache=resource_cache
+                )
                 if seconds_positions is not None:
                     new_paragraph.start_seconds = seconds_positions[0]
                     new_paragraph.end_seconds = seconds_positions[1]
@@ -513,10 +535,10 @@ async def merge_results(
 
     api_results = KnowledgeboxSearchResults()
 
-    with resource_cache():
+    with resource_cache() as rcache:
         resources: List[str] = list()
         api_results.fulltext = await merge_documents_results(
-            documents, resources, count, page, kbid, sort
+            documents, resources, count, page, kbid, sort, resource_cache=rcache
         )
 
         api_results.paragraphs = await merge_paragraph_results(
@@ -527,16 +549,23 @@ async def merge_results(
             page,
             highlight,
             sort,
+            resource_cache=rcache,
         )
 
         api_results.sentences = await merge_vectors_results(
-            vectors, resources, kbid, count, page, min_score=min_score
+            vectors,
+            resources,
+            kbid,
+            count,
+            page,
+            min_score=min_score,
+            resource_cache=rcache,
         )
 
         api_results.relations = merge_relations_results(relations, requested_relations)
 
         api_results.resources = await fetch_resources(
-            resources, kbid, show, field_type_filter, extracted
+            resources, kbid, show, field_type_filter, extracted, resource_cache=rcache
         )
         return api_results
 
@@ -557,7 +586,7 @@ async def merge_paragraphs_results(
 
     api_results = ResourceSearchResults()
 
-    with resource_cache():
+    with resource_cache() as rcache:
         resources: List[str] = list()
         api_results.paragraphs = await merge_paragraph_results(
             paragraphs,
@@ -571,6 +600,7 @@ async def merge_paragraphs_results(
                 order=SortOrder.DESC,
                 limit=None,
             ),
+            resource_cache=rcache,
         )
         return api_results
 
