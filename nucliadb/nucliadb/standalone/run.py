@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import contextlib
 import logging
 import os
 import sys
@@ -36,6 +35,7 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import LogSettings
+from nucliadb_utils.debug import profile_memory
 from nucliadb_utils.settings import nuclia_settings, storage_settings
 
 logger = logging.getLogger(__name__)
@@ -142,49 +142,6 @@ async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
     _, server = get_server(settings)
     await server.startup()
     return server
-
-
-@contextlib.contextmanager
-def profile_memory():
-    import tracemalloc
-
-    tracemalloc.start()
-    try:
-        yield
-    finally:
-        snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot, limit=20)
-
-
-def display_top(snapshot, key_type="lineno", limit=10):
-    import linecache
-    import tracemalloc
-
-    snapshot = snapshot.filter_traces(
-        (
-            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-            tracemalloc.Filter(False, "<unknown>"),
-        )
-    )
-    top_stats = snapshot.statistics(key_type)
-
-    print("Top %s lines" % limit)
-    for index, stat in enumerate(top_stats[:limit], 1):
-        frame = stat.traceback[0]
-        print(
-            "#%s: %s:%s: %.1f KiB"
-            % (index, frame.filename, frame.lineno, stat.size / 1024)
-        )
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
-            print("    %s" % line)
-
-    other = top_stats[limit:]
-    if other:
-        size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
-    total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f KiB" % (total / 1024))
 
 
 if __name__ == "__main__":
