@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import contextlib
 import logging
 import os
 import sys
@@ -142,5 +143,53 @@ async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
     return server
 
 
+@contextlib.contextmanager
+def profile_memory():
+    import tracemalloc
+
+    tracemalloc.start()
+    try:
+        yield
+    finally:
+        snapshot = tracemalloc.take_snapshot()
+        display_top(snapshot, limit=10, filters="/Users/ferran/Code/nucliadb")
+
+
+def display_top(snapshot, key_type="lineno", limit=10, filters=None):
+    import linecache
+    import tracemalloc
+
+    snapshot = snapshot.filter_traces(
+        (
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, "<unknown>"),
+        )
+    )
+    top_stats = snapshot.statistics(key_type)
+    if filters:
+        limit = limit * 3
+
+    print("Top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        if filters and filters not in frame.filename:
+            continue
+        print(
+            "#%s: %s:%s: %.1f KiB"
+            % (index, frame.filename, frame.lineno, stat.size / 1024)
+        )
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print("    %s" % line)
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f KiB" % (len(other), size / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f KiB" % (total / 1024))
+
+
 if __name__ == "__main__":
-    run()
+    with profile_memory():
+        run()
