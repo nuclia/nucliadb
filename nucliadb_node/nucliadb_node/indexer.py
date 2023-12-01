@@ -222,7 +222,7 @@ class PriorityIndexer:
             # redelivered
             event_id = capture_exception(exc)
             logger.error(
-                "An error happened on indexer, all messages for this queue will be flushed. "
+                "An error happened on an indexer, all messages for its queue will be flushed. "
                 f"Check sentry for more details. Event id: {event_id}",
                 extra={
                     "seqid": work.seqid,
@@ -252,6 +252,8 @@ class PriorityIndexer:
         try:
             await self._index_message(work.index_message)
         except Exception as exc:
+            # Unhandled exceptions are bubbled up and managed by the work loop
+            await work.nats_msg.nak()
             raise exc
         else:
             await work.nats_msg.ack()
@@ -302,6 +304,8 @@ class PriorityIndexer:
                     "An error ocurred on indexer worker while setting a resource. "
                     f"Check sentry for more details. Event id: {event_id}"
                 )
+                # REVIEW: we should always have metadata and the writer node
+                # should handle this in a better way than a panic
                 if brain.HasField("metadata"):
                     # Hard fail if we have the correct data
                     raise grpc_error
@@ -329,6 +333,7 @@ class PriorityIndexer:
                     "An error ocurred on indexer worker while deleting a resource. "
                     f"Check sentry for more details. Event id: {event_id}"
                 )
+                raise grpc_error
             return None
 
         else:

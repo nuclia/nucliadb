@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from functools import partial
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -107,19 +108,31 @@ class TestConcurrentShardIndexer:
             yield mpu
 
     @pytest.fixture
+    def writer(self):
+        writer = AsyncMock()
+        status = OpStatus()
+        status.status = OpStatus.Status.OK
+        status.detail = "Successful"
+        writer.set_resource = AsyncMock(return_value=status)
+        writer.delete_resource = AsyncMock(return_value=status)
+        yield writer
+
+    @pytest.fixture
     @pytest.mark.asyncio
-    async def csi(self) -> AsyncIterator[ConcurrentShardIndexer]:
-        csi = ConcurrentShardIndexer(writer=AsyncMock())
+    async def csi(self, writer) -> AsyncIterator[ConcurrentShardIndexer]:
+        csi = ConcurrentShardIndexer(writer=writer)
         await csi.initialize()
         yield csi
         await csi.finalize()
 
     @pytest.mark.asyncio
-    async def test_creates_an_indexer_per_shard(
+    async def test_creates_an_indexer_and_a_task_per_shard(
         self,
         csi: ConcurrentShardIndexer,
     ):
-        with patch("nucliadb_node.indexer.asyncio") as asyncio_mock:
+        with patch("nucliadb_node.indexer.asyncio") as asyncio_mock, patch(
+            "nucliadb_node.indexer.PriorityIndexer"
+        ) as PriorityIndexer_mock:
             seqid = 1
             n_tasks = 5
             for i in range(n_tasks):
@@ -129,6 +142,7 @@ class TestConcurrentShardIndexer:
                     await csi.index_message_soon(msg)
                     seqid += 1
             assert asyncio_mock.create_task.call_count == n_tasks
+            assert PriorityIndexer_mock.call_count == n_tasks
 
     @pytest.mark.asyncio
     async def test_indexing_adds_work_to_priority_indexer(
@@ -141,7 +155,7 @@ class TestConcurrentShardIndexer:
             assert index_soon.call_count == count
 
     @pytest.mark.asyncio
-    async def test_priority_indexing(self, csi: ConcurrentShardIndexer):
+    async def test_priority_indexing_on_one_shard(self, csi: ConcurrentShardIndexer):
         messages = [
             gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR),
             gen_msg(seqid=2, source=IndexMessageSource.PROCESSOR),
@@ -153,17 +167,18 @@ class TestConcurrentShardIndexer:
         processed = []
 
         def new_indexer(*args, **kwargs):
-            async def do_work_mock(work: WorkUnit):
+            async def do_work_wrapper(original_do_work, work: WorkUnit):
                 nonlocal processed
-                await asyncio.sleep(0.001)
+                await original_do_work(work)
                 processed.append(work.seqid)
 
             indexer = PriorityIndexer(*args, **kwargs)
-            indexer._do_work = AsyncMock(side_effect=do_work_mock)
+            original_do_work = indexer._do_work
+            indexer._do_work = partial(do_work_wrapper, original_do_work)
             return indexer
 
-        mock = Mock(side_effect=new_indexer)
-        with patch("nucliadb_node.indexer.PriorityIndexer", new=mock):
+        PriorityIndexer_mock = Mock(side_effect=new_indexer)
+        with patch("nucliadb_node.indexer.PriorityIndexer", new=PriorityIndexer_mock):
             for msg in messages:
                 await csi.index_message_soon(msg)
 
@@ -171,6 +186,19 @@ class TestConcurrentShardIndexer:
         await asyncio.sleep(0.01)
 
         assert processed == [3, 4, 1, 2, 5]
+
+    @pytest.mark.asyncio
+    async def test_autoremove_finished_indexers(self, csi: ConcurrentShardIndexer):
+        messages = [
+            gen_msg(seqid=1, shard_id="shard-1"),
+            gen_msg(seqid=2, shard_id="shard-2"),
+            gen_msg(seqid=3, shard_id="shard-3"),
+        ]
+        for msg in messages:
+            await csi.index_message_soon(msg)
+        assert len(csi.indexers) == 3
+        await asyncio.sleep(0.01)
+        assert len(csi.indexers) == 0
 
 
 class TestPriorityIndexer:
