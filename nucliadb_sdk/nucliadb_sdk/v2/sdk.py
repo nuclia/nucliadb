@@ -754,12 +754,14 @@ class NucliaDB(_NucliaDBBase):
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
+        if all([data, content]):
+            raise ValueError("Cannot provide both data and content")
         if data is not None:
-            opts["data"] = data
-        if query_params is not None:
-            opts["params"] = query_params
+            opts["content"] = data
         if content is not None:
             opts["content"] = content
+        if query_params is not None:
+            opts["params"] = query_params
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
