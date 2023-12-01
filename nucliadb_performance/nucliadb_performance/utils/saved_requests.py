@@ -34,20 +34,22 @@ class SavedRequests(BaseModel):
 def load_saved_request(
     saved_requests_file: str, kbid_or_slug: str, endpoint: str, with_tags=None
 ) -> list[Request]:
-    try:
-        saved_requests = SavedRequests.parse_file(saved_requests_file)
-        kb_requests = []
-        for rs in saved_requests.sets.values():
-            if kbid_or_slug not in rs.kbs:
-                continue
-            kb_requests.extend([r for r in rs.requests if r.endpoint == endpoint])
-        if with_tags is None:
-            return [kb_req.request for kb_req in kb_requests]
-        else:
-            return [
-                kb_req.request
-                for kb_req in kb_requests
-                if set(with_tags).issubset(kb_req.tags)
-            ]
-    except (FileNotFoundError, KeyError):
-        return []
+    saved_requests = load_all_saved_requests(saved_requests_file)
+    kb_requests = []
+    for rs in saved_requests.sets.values():
+        if kbid_or_slug not in rs.kbs:
+            continue
+        kb_requests.extend([r for r in rs.requests if r.endpoint == endpoint])
+    if with_tags is None:
+        return [kb_req.request for kb_req in kb_requests]
+    else:
+        return [
+            kb_req.request
+            for kb_req in kb_requests
+            if set(with_tags).issubset(kb_req.tags)
+        ]
+
+
+@cache
+def load_all_saved_requests(saved_requests_file: str) -> SavedRequests:
+    return SavedRequests.parse_file(saved_requests_file)

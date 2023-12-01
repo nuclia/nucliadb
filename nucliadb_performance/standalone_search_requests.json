@@ -7,6 +7,65 @@
             ],
             "requests": [
                 {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Category",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "ISO",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
                     "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
@@ -62,37 +121,6 @@
                             "range_creation_end": "3020-1-1T00:00:00"
                         }
                     }
-                },
-                {
-                    "endpoint": "suggest",
-                    "description": "Suggest some paragraphs",
-                    "tags": [],
-                    "request": {
-                        "url": "/v1/kb/{kbid}/suggest",
-                        "method": "GET",
-                        "params": {
-                            "query": "united kingdom",
-                            "features": [
-                                "paragraph"
-                            ],
-                            "fields": ["a/title"]
-                        }
-                    }
-                },
-                {
-                    "endpoint": "suggest",
-                    "description": "Suggest some paragraphs",
-                    "tags": [],
-                    "request": {
-                        "url": "/v1/kb/{kbid}/suggest",
-                        "method": "GET",
-                        "params": {
-                            "query": "united kingdom",
-                            "features": [
-                                "paragraph", "entities"
-                            ]
-                        }
-                    }
                 }
             ]
         },
@@ -102,6 +130,65 @@
                 "experimental-small"
             ],
             "requests": [
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "International",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "International",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
                 {
                     "endpoint": "find",
                     "description": "Filtered hybrid search",
@@ -137,7 +224,8 @@
                             ],
                             "features": [
                                 "vector"
-                            ]
+                            ],
+                            "min_score": 0.5
                         }
                     }
                 },
@@ -157,37 +245,6 @@
                             "range_creation_end": "3020-1-1T00:00:00"
                         }
                     }
-                },
-                {
-                    "endpoint": "suggest",
-                    "description": "Suggest some paragraphs",
-                    "tags": [],
-                    "request": {
-                        "url": "/v1/kb/{kbid}/suggest",
-                        "method": "GET",
-                        "params": {
-                            "query": "studies quarterly",
-                            "features": [
-                                "paragraph"
-                            ],
-                            "fields": ["a/title"]
-                        }
-                    }
-                },
-                {
-                    "endpoint": "suggest",
-                    "description": "Suggest some paragraphs",
-                    "tags": [],
-                    "request": {
-                        "url": "/v1/kb/{kbid}/suggest",
-                        "method": "GET",
-                        "params": {
-                            "query": "studies quarterly",
-                            "features": [
-                                "paragraph", "entities"
-                            ]
-                        }
-                    }
                 }
             ]
         },
@@ -197,6 +254,65 @@
                 "experimental-medium"
             ],
             "requests": [
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Celtic",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Celtic",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
                 {
                     "endpoint": "find",
                     "description": "Filtered hybrid search",
@@ -251,37 +367,6 @@
                             "query": "Napoleonic wars",
                             "range_creation_start": "2020-1-1T00:00:00",
                             "range_creation_end": "3020-1-1T00:00:00"
-                        }
-                    }
-                },
-                {
-                    "endpoint": "suggest",
-                    "description": "Suggest some paragraphs",
-                    "tags": [],
-                    "request": {
-                        "url": "/v1/kb/{kbid}/suggest",
-                        "method": "GET",
-                        "params": {
-                            "query": "Radiation protection",
-                            "features": [
-                                "paragraph"
-                            ],
-                            "fields": ["a/title"]
-                        }
-                    }
-                },
-                {
-                    "endpoint": "suggest",
-                    "description": "Suggest some paragraphs",
-                    "tags": [],
-                    "request": {
-                        "url": "/v1/kb/{kbid}/suggest",
-                        "method": "GET",
-                        "params": {
-                            "query": "Radiation protection",
-                            "features": [
-                                "paragraph", "entities"
-                            ]
                         }
                     }
                 }

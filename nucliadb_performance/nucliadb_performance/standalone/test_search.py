@@ -14,7 +14,26 @@ from nucliadb_performance.utils.misc import (
     make_kbid_request,
     print_errors,
 )
+from nucliadb_performance.utils.saved_requests import load_all_saved_requests
 from nucliadb_performance.utils.vectors import compute_vector
+
+FIND_WEIGHT = 1
+SEARCH_WEIGHT = 1
+SUGGEST_WEIGHT = 1
+
+
+def precompute_vectors():
+    """
+    Precompute vectors for all saved requests at the beginning of the test.
+    """
+    saved_requests = load_all_saved_requests(settings.saved_requests_file)
+    for request_set in saved_requests.sets.values():
+        for saved_request in request_set.requests:
+            if saved_request.request.payload is None:
+                continue
+            if "query" not in saved_request.request.payload:
+                continue
+            compute_vector(saved_request.request.payload["query"])
 
 
 @cache
@@ -27,9 +46,10 @@ def get_test_kb():
 @global_setup()
 def init_test(args):
     get_test_kb()
+    precompute_vectors()
 
 
-@scenario(weight=1)
+@scenario(weight=FIND_WEIGHT)
 async def test_find(session):
     kbid, slug = get_test_kb()
     request = get_request(slug, endpoint="find", with_tags=settings.request_tags)
@@ -41,19 +61,37 @@ async def test_find(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    # TODO: assert that there are results!
+    assert len(resp["resources"]) > 0
 
 
-@scenario(weight=2)
+@scenario(weight=SEARCH_WEIGHT)
+async def test_search(session):
+    kbid, slug = get_test_kb()
+    request = get_request(slug, endpoint="search", with_tags=settings.request_tags)
+    request.payload["vector"] = compute_vector(request.payload["query"])
+    resp = await make_kbid_request(
+        session,
+        kbid,
+        request.method.upper(),
+        request.url.format(kbid=kbid),
+        json=request.payload,
+    )
+    assert len(resp["resources"]) > 0
+
+
+@scenario(weight=SUGGEST_WEIGHT)
 async def test_suggest(session):
     kbid, slug = get_test_kb()
     request = get_request(slug, endpoint="suggest")
-    await make_kbid_request(
+    resp = await make_kbid_request(
         session,
         kbid,
         request.method.upper(),
         request.url.format(kbid=kbid),
         params=request.params,
+    )
+    assert (
+        len(resp["paragraphs"]["results"]) > 0 or len(resp["entities"]["entities"]) > 0
     )
 
 
