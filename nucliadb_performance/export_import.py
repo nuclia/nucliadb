@@ -89,7 +89,9 @@ def save_export_stream(uri, export_generator):
         unit="iB",
         unit_scale=True,
     )
-    stream_with_progress = progressify(export_generator, **tqdm_kwargs)
+    stream_with_progress = progressify(
+        export_generator(chunk_size=CHUNK_SIZE * 10), **tqdm_kwargs
+    )
     if uri.startswith("http"):
         save_export_to_url(uri, stream_with_progress)
     else:
@@ -98,7 +100,7 @@ def save_export_stream(uri, export_generator):
 
 def save_export_to_file(export_path, export_generator):
     with open(export_path, "wb") as f:
-        for chunk in export_generator(chunk_size=CHUNK_SIZE * 10):
+        for chunk in export_generator:
             f.write(chunk)
 
 
@@ -132,9 +134,10 @@ def read_from_file(path):
 
 
 def read_from_url(uri):
-    response = requests.get(uri, stream=True)
-    response.raise_for_status()
-    return response.iter_content(chunk_size=CHUNK_SIZE)
+    with requests.get(uri, stream=True) as response:
+        response.raise_for_status()
+        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            yield chunk
 
 
 def progressify(func, **tqdm_kwargs):
