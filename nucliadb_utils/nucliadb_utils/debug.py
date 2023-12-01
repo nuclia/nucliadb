@@ -23,7 +23,7 @@ import tracemalloc
 
 
 @contextlib.contextmanager
-def profile_memory(top_lines: int = 10):
+def profile_memory(top_lines: int = 10):  # pragma: no cover
     tracemalloc.start()
     before = tracemalloc.take_snapshot()
     try:
@@ -35,14 +35,14 @@ def profile_memory(top_lines: int = 10):
         tracemalloc.stop()
 
 
-def display_difference(before, after, key_type="lineno", limit=10):
+def display_difference(before, after, key_type="lineno", limit=10):  # pragma: no cover
     difference = after.compare_to(before, key_type)
     print(f"Top {limit} difference")
     for i, stat in enumerate(difference[:limit]):
         print(f"#{i}: {stat}")
 
 
-def display_top(snapshot, key_type="lineno", limit=10):
+def display_top(snapshot, key_type="lineno", limit=10):  # pragma: no cover
     snapshot = snapshot.filter_traces(
         (
             tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
