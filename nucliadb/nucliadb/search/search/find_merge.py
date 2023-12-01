@@ -27,7 +27,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
 from nucliadb.search import SERVICE_NAME, logger
@@ -96,7 +95,6 @@ async def set_resource_metadata_value(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     find_resources: Dict[str, FindResource],
-    txn: Transaction,
     max_operations: asyncio.Semaphore,
     resource_cache: ResourceCacheType,
 ):
