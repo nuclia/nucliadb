@@ -90,12 +90,11 @@ class WorkUnit:
     def __init__(self, *args, **kwargs):
         raise Exception("__init__ method not allowed. Use a from_* method instead")
 
-    @classmethod
     def __new__(
-        cls, *, index_messsage: IndexMessage, nats_msg: Msg, mpu: MessageProgressUpdater
+        cls, *, index_message: IndexMessage, nats_msg: Msg, mpu: MessageProgressUpdater
     ):
         instance = super().__new__(cls)
-        instance.index_message = index_messsage
+        instance.index_message = index_message
         instance.nats_msg = nats_msg
         instance.mpu = mpu
         return instance
@@ -107,7 +106,7 @@ class WorkUnit:
         pb = IndexMessage()
         pb.ParseFromString(msg.data)
 
-        return cls.__new__(index_messsage=pb, nats_msg=msg, mpu=mpu)
+        return cls.__new__(cls, index_message=pb, nats_msg=msg, mpu=mpu)
 
     @property
     def seqid(self) -> int:
@@ -124,10 +123,10 @@ class WorkUnit:
     def __eq__(self, other) -> bool:
         if not isinstance(other, WorkUnit):
             return NotImplemented
-        return self._priority_id.__eq__(other._priority_id)
+        return self._sortable_id.__eq__(other._sortable_id)
 
     @cached_property
-    def _priority_id(self) -> tuple[int, int]:
+    def _sortable_id(self) -> tuple[int, int]:
         # Priority based on message source and smaller seqid
         source_priority = self.priorities[self.index_message.source]
         return (source_priority, self.seqid)
@@ -135,7 +134,7 @@ class WorkUnit:
     def __lt__(self, other):
         if not isinstance(other, WorkUnit):
             return NotImplemented
-        return self._priority_id.__lt__(other._priority_id)
+        return self._sortable_id.__lt__(other._sortable_id)
 
 
 class ConcurrentShardIndexer:

@@ -38,6 +38,11 @@ from nucliadb_node.indexer import (
 
 
 class TestIndexerWorkUnit:
+    def test_default_constructor_not_allowed(self):
+        with pytest.raises(Exception) as exc:
+            WorkUnit(index_message=Mock(), nats_msg=Mock(), mpu=Mock())
+        assert "__init__ method not allowed" in str(exc.value)
+
     @pytest.mark.parametrize(
         "source",
         IndexMessageSource.keys(),
@@ -54,6 +59,10 @@ class TestIndexerWorkUnit:
         processor_seqid: int,
         writer_seqid: int,
     ):
+        """Test all comparison operators to make sure ordering is properly
+        implemented
+
+        """
         processor_work_unit = WorkUnit.from_msg(
             gen_msg(seqid=processor_seqid, source=IndexMessageSource.PROCESSOR)
         )
@@ -62,12 +71,14 @@ class TestIndexerWorkUnit:
         )
 
         assert writer_work_unit < processor_work_unit
+        assert writer_work_unit <= processor_work_unit  # type: ignore
         assert processor_work_unit > writer_work_unit
+        assert processor_work_unit >= writer_work_unit  # type: ignore
         assert writer_work_unit != processor_work_unit
         assert processor_work_unit == processor_work_unit
 
     @pytest.mark.asyncio
-    async def test_work_units_in_an_asyncio_priority_queue(self):
+    async def test_work_units_inside_an_asyncio_priority_queue(self):
         processor_work_unit = WorkUnit.from_msg(
             gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR)
         )
