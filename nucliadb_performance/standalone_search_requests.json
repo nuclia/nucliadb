@@ -101,7 +101,8 @@
                             ],
                             "features": [
                                 "vector"
-                            ]
+                            ],
+                            "min_score": 0.2
                         }
                     }
                 },
@@ -349,7 +350,8 @@
                             ],
                             "features": [
                                 "vector"
-                            ]
+                            ],
+                            "min_score": 0.2
                         }
                     }
                 },
