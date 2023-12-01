@@ -25,6 +25,7 @@ from typing import List, Optional, Tuple, Union
 from fastapi import Body, Header, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
+from nucliadb.search.search.transaction import shared_search_transaction
 from pydantic.error_wrappers import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -311,6 +312,7 @@ async def _search_endpoint(
         return HTTPClientError(status_code=412, detail=str(exc))
 
 
+@shared_search_transaction()
 async def search(
     kbid: str,
     item: SearchRequest,

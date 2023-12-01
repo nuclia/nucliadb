@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from symbol import try_stmt
 from typing import List, Optional, Union
 
 from fastapi import Header, Request, Response
@@ -41,6 +42,7 @@ from nucliadb_models.search import (
     SortField,
     SortOrder,
 )
+from nucliadb.search.search.transaction import shared_search_transaction
 from nucliadb_utils.authentication import requires_one
 
 
@@ -55,6 +57,78 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
+async def resource_search_endpoint(
+    request: Request,
+    response: Response,
+    kbid: str,
+    query: str,
+    rid: str,
+    fields: List[str] = fastapi_query(SearchParamDefaults.fields),
+    filters: List[str] = fastapi_query(SearchParamDefaults.filters),
+    faceted: List[str] = fastapi_query(SearchParamDefaults.faceted),
+    sort: Optional[SortField] = fastapi_query(
+        SearchParamDefaults.sort_field, alias="sort_field"
+    ),
+    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    range_creation_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_start
+    ),
+    range_creation_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_creation_end
+    ),
+    range_modification_start: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_start
+    ),
+    range_modification_end: Optional[datetime] = fastapi_query(
+        SearchParamDefaults.range_modification_end
+    ),
+    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
+    show: List[ResourceProperties] = fastapi_query(
+        SearchParamDefaults.show, default=list(ResourceProperties)
+    ),
+    field_type_filter: List[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
+    ),
+    extracted: List[ExtractedDataTypeName] = fastapi_query(
+        SearchParamDefaults.extracted
+    ),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
+    debug: bool = fastapi_query(SearchParamDefaults.debug),
+    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
+) -> Union[ResourceSearchResults, HTTPClientError]:
+    try:
+        return await resource_search(
+            request,
+            response,
+            kbid,
+            query,
+            rid,
+            fields,
+            filters,
+            faceted,
+            sort,
+            sort_order,
+            page_number,
+            page_size,
+            range_creation_start,
+            range_creation_end,
+            range_modification_start,
+            range_modification_end,
+            highlight,
+            show,
+            field_type_filter,
+            extracted,
+            x_ndb_client,
+            debug,
+            shards,
+        )
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
+
+
+@shared_search_transaction()
 async def resource_search(
     request: Request,
     response: Response,
@@ -96,27 +170,23 @@ async def resource_search(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: List[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> Union[ResourceSearchResults, HTTPClientError]:
-    # We need to query all nodes
-    try:
-        pb_query = await paragraph_query_to_pb(
-            kbid,
-            [SearchOptions.PARAGRAPH],
-            rid,
-            query,
-            fields,
-            filters,
-            faceted,
-            page_number,
-            page_size,
-            range_creation_start,
-            range_creation_end,
-            range_modification_start,
-            range_modification_end,
-            sort=sort.value if sort else None,
-            sort_ord=sort_order.value,
-        )
-    except InvalidQueryError as exc:
-        return HTTPClientError(status_code=412, detail=str(exc))
+    pb_query = await paragraph_query_to_pb(
+        kbid,
+        [SearchOptions.PARAGRAPH],
+        rid,
+        query,
+        fields,
+        filters,
+        faceted,
+        page_number,
+        page_size,
+        range_creation_start,
+        range_creation_end,
+        range_modification_start,
+        range_modification_end,
+        sort=sort.value if sort else None,
+        sort_ord=sort_order.value,
+    )
 
     results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.PARAGRAPH, pb_query, shards

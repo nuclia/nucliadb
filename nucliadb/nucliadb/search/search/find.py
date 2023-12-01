@@ -30,9 +30,11 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     SearchOptions,
 )
+from nucliadb.search.search.transaction import shared_search_transaction
 from nucliadb_utils.utilities import get_audit
 
 
+@shared_search_transaction()
 async def find(
     kbid: str,
     item: FindRequest,

@@ -21,6 +21,7 @@ import asyncio
 from dataclasses import dataclass
 from time import monotonic as time
 from typing import AsyncGenerator, AsyncIterator, List, Optional
+from nucliadb.search.search.transaction import shared_search_transaction
 
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
 
@@ -187,6 +188,7 @@ async def not_enough_context_generator():
     yield AnswerStatusCode.NO_CONTEXT.encode()
 
 
+@shared_search_transaction()
 async def chat(
     kbid: str,
     chat_request: ChatRequest,

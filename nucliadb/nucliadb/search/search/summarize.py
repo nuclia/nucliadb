@@ -19,6 +19,7 @@
 #
 import asyncio
 from typing import Optional
+from nucliadb.search.search.transaction import shared_search_transaction
 
 from nucliadb_protos.utils_pb2 import ExtractedText
 

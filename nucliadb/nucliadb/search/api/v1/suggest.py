@@ -31,6 +31,7 @@ from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
+from nucliadb.search.search.transaction import shared_search_transaction
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -112,6 +113,7 @@ async def suggest_knowledgebox(
         return HTTPClientError(status_code=412, detail=str(exc))
 
 
+@shared_search_transaction()
 async def suggest(
     response,
     kbid: str,
