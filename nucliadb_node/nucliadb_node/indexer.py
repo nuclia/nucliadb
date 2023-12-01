@@ -170,12 +170,12 @@ class ConcurrentShardIndexer:
             },
         )
 
-        await self.push_work_to_indexer(work)
+        self.push_work_to_indexer(work)
         CONCURRENT_INDEXERS_COUNT.set(
             len(self.indexers), labels=dict(node=work.node_id)
         )
 
-    async def push_work_to_indexer(self, work: WorkUnit):
+    def push_work_to_indexer(self, work: WorkUnit):
         exists = work.shard_id in self.indexers
         if exists:
             indexer, _ = self.indexers[work.shard_id]
