@@ -23,6 +23,8 @@ from typing import AsyncIterator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from grpc import StatusCode
+from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
     IndexMessageSource,
@@ -274,21 +276,41 @@ class TestPriorityIndexer:
         assert successful_indexing.dispatch.await_args.args[0].seqid == 10
 
     @pytest.mark.asyncio
-    async def test_node_writer_errors_are_managed(
+    async def test_node_writer_status_errors_are_handled(
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):
         status = OpStatus()
         status.status = OpStatus.Status.ERROR
         status.detail = "node writer error"
-        writer.set_resource.return_value = status
-        writer.delete_resource.return_value = status
 
+        writer.set_resource.return_value = status
         with pytest.raises(IndexNodeError):
             pb = IndexMessage()
             pb.typemessage = TypeMessage.CREATION
             await indexer._index_message(pb)
 
+        writer.delete_resource.return_value = status
         with pytest.raises(IndexNodeError):
+            pb = IndexMessage()
+            pb.typemessage = TypeMessage.DELETION
+            await indexer._index_message(pb)
+
+    @pytest.mark.asyncio
+    async def test_node_writer_aio_rpc_errors_are_handled(
+        self, indexer: PriorityIndexer, writer: AsyncMock
+    ):
+        writer.set_resource.side_effect = AioRpcError(
+            code=StatusCode.UNKNOWN, initial_metadata=None, trailing_metadata=None
+        )
+        with pytest.raises(AioRpcError):
+            pb = IndexMessage()
+            pb.typemessage = TypeMessage.CREATION
+            await indexer._index_message(pb)
+
+        writer.delete_resource.side_effect = AioRpcError(
+            code=StatusCode.UNKNOWN, initial_metadata=None, trailing_metadata=None
+        )
+        with pytest.raises(AioRpcError):
             pb = IndexMessage()
             pb.typemessage = TypeMessage.DELETION
             await indexer._index_message(pb)

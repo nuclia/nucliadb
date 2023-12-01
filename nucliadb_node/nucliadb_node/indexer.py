@@ -120,20 +120,20 @@ class WorkUnit:
     def shard_id(self) -> str:
         return self.index_message.shard
 
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, WorkUnit):
-            return NotImplemented
-        return self._sortable_id.__eq__(other._sortable_id)
-
     @cached_property
     def _sortable_id(self) -> tuple[int, int]:
         # Priority based on message source and smaller seqid
         source_priority = self.priorities[self.index_message.source]
         return (source_priority, self.seqid)
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, WorkUnit):
+            return NotImplemented  # pragma: no cover
+        return self._sortable_id.__eq__(other._sortable_id)
+
     def __lt__(self, other):
         if not isinstance(other, WorkUnit):
-            return NotImplemented
+            return NotImplemented  # pragma: no cover
         return self._sortable_id.__lt__(other._sortable_id)
 
 
