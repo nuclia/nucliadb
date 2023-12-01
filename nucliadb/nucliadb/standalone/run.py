@@ -134,7 +134,8 @@ def run():
 =================================================
 """
     )
-    server.run()
+    with profile_memory():
+        server.run()
 
 
 async def run_async_nucliadb(settings: Settings) -> uvicorn.Server:
@@ -152,10 +153,10 @@ def profile_memory():
         yield
     finally:
         snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot, limit=10, filters="/Users/ferran/Code/nucliadb")
+        display_top(snapshot, limit=10)
 
 
-def display_top(snapshot, key_type="lineno", limit=10, filters=None):
+def display_top(snapshot, key_type="lineno", limit=10):
     import linecache
     import tracemalloc
 
@@ -166,14 +167,10 @@ def display_top(snapshot, key_type="lineno", limit=10, filters=None):
         )
     )
     top_stats = snapshot.statistics(key_type)
-    if filters:
-        limit = limit * 3
 
     print("Top %s lines" % limit)
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
-        if filters and filters not in frame.filename:
-            continue
         print(
             "#%s: %s:%s: %.1f KiB"
             % (index, frame.filename, frame.lineno, stat.size / 1024)
@@ -191,5 +188,4 @@ def display_top(snapshot, key_type="lineno", limit=10, filters=None):
 
 
 if __name__ == "__main__":
-    with profile_memory():
-        run()
+    run()
