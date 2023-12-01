@@ -20,9 +20,7 @@
 import asyncio
 from collections.abc import Awaitable
 from enum import Enum
-from functools import partial, wraps
-from inspect import iscoroutinefunction
-from typing import Any, Callable, Type, Union
+from typing import Any, Callable, Type
 
 
 class ListenerPriority(Enum):
@@ -38,14 +36,12 @@ class Signal:
     def add_listener(
         self,
         listener_id: str,
-        cb: Union[Callable, Callable[..., Awaitable]],
+        cb: Callable[..., Awaitable],
         priority: ListenerPriority = ListenerPriority.DONT_CARE,
     ):
         if listener_id in self.callbacks:
             raise ValueError(f"Already registered a listener with id: {listener_id}")
 
-        if not iscoroutinefunction(cb):
-            cb = sync_to_async(cb)
         self.callbacks[listener_id] = (cb, priority.value)
 
     def remove_listener(self, listener_id: str):
@@ -70,13 +66,3 @@ class Signal:
                 raise result
 
         return results
-
-
-def sync_to_async(fn):
-    @wraps(fn)
-    async def wrapper(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        p_func = partial(fn, *args, **kwargs)
-        return await loop.run_in_executor(None, p_func)
-
-    return wrapper
