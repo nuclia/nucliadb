@@ -28,7 +28,7 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.ingest.txn_utils import abort_transaction, get_transaction
+from nucliadb.ingest.txn_utils import get_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import (
     ResourceCacheType,
@@ -459,5 +459,4 @@ async def find_merge_results(
     )
     api_results.relations = merge_relations_results(relations, requested_relations)
 
-    await abort_transaction()
     return api_results

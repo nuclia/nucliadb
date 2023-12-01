@@ -28,7 +28,6 @@ from fastapi_versioning import version
 from pydantic.error_wrappers import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -373,7 +372,6 @@ async def search(
         min_score=query_parser.min_score,
         highlight=item.highlight,
     )
-    await abort_transaction()
 
     if audit is not None and do_audit:
         await audit.search(

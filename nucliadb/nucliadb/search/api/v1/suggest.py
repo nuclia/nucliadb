@@ -24,7 +24,6 @@ from typing import List, Optional, Union
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
-from nucliadb.ingest.txn_utils import abort_transaction
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -161,7 +160,6 @@ async def suggest(
         field_type_filter=field_type_filter,
         highlight=highlight,
     )
-    await abort_transaction()
 
     response.status_code = 206 if incomplete_results else 200
     if debug and queried_shards:

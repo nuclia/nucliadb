@@ -59,11 +59,3 @@ async def get_transaction() -> Transaction:
             )
 
     return transaction
-
-
-async def abort_transaction() -> None:
-    transaction: Optional[Transaction] = txn.get()
-    if transaction is not None:
-        async with _get_transaction_lock():
-            await transaction.abort()
-            txn.set(None)
