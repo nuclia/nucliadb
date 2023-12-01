@@ -30,8 +30,16 @@ def profile_memory(top_lines: int = 10):
         yield
     finally:
         after = tracemalloc.take_snapshot()
-        top_stats = after.compare_to(before, "lineno")
-        display_top(top_stats, limit=top_lines)
+        display_top(after, limit=top_lines)
+        display_difference(before, after, limit=top_lines)
+        tracemalloc.stop()
+
+
+def display_difference(before, after, key_type="lineno", limit=10):
+    difference = after.compare_to(before, key_type)
+    print(f"Top {limit} difference")
+    for i, stat in enumerate(difference[:limit]):
+        print(f"#{i}: {stat}")
 
 
 def display_top(snapshot, key_type="lineno", limit=10):
@@ -43,7 +51,7 @@ def display_top(snapshot, key_type="lineno", limit=10):
     )
     top_stats = snapshot.statistics(key_type)
 
-    print("Top %s lines" % limit)
+    print(f"Top {limit} lines")
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
         print(
