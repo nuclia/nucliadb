@@ -544,9 +544,18 @@ class ResourceBrain:
                 for classification in paragraph_annotation.classifications:
                     if not classification.cancelled_by_user:
                         label = f"/l/{classification.labelset}/{classification.label}"
-                        self.brain.paragraphs[field_key].paragraphs[
-                            paragraph_annotation.key
-                        ].labels.append(label)
+                        # FIXME: this condition avoid adding duplicate labels
+                        # while importing a kb. We shouldn't add duplicates on
+                        # the first place
+                        if (
+                            label
+                            not in self.brain.paragraphs[field_key]
+                            .paragraphs[paragraph_annotation.key]
+                            .labels
+                        ):
+                            self.brain.paragraphs[field_key].paragraphs[
+                                paragraph_annotation.key
+                            ].labels.append(label)
         extend_unique(
             self.brain.texts[field_key].labels, flatten_resource_labels(labels)  # type: ignore
         )
