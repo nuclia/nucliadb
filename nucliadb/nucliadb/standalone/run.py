@@ -153,7 +153,7 @@ def profile_memory():
         yield
     finally:
         snapshot = tracemalloc.take_snapshot()
-        display_top(snapshot, limit=10)
+        display_top(snapshot, limit=20)
 
 
 def display_top(snapshot, key_type="lineno", limit=10):
