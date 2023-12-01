@@ -506,7 +506,7 @@ impl DataPoint {
         dir: &path::Path,
         operants: &[(Dlog, DpId)],
         similarity: Similarity,
-        channel: Channel,
+        #[allow(unused)] channel: Channel,
     ) -> VectorR<DataPoint>
     where
         Dlog: DeleteLog,
@@ -543,13 +543,10 @@ impl DataPoint {
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = data_store::stored_elements(&nodes);
 
-        // Creating the FSTs with the new nodes
-        let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
-            debug!("Indexing with experimental FSTs");
-            Self::create_fsts(&id, &nodes)?
-        } else {
-            (None, None)
-        };
+        // Creating the FSTs
+        let fst_indexes = Self::create_fsts(&id, &nodes)?;
+        let label_index = Some(fst_indexes.0);
+        let key_index = Some(fst_indexes.1);
 
         // Creating the hnsw for the new node store.
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
@@ -646,10 +643,7 @@ impl DataPoint {
         })
     }
 
-    fn create_fsts(
-        root_dir: &path::Path,
-        nodes: &[u8],
-    ) -> VectorR<(Option<LabelIndex>, Option<KeyIndex>)> {
+    fn create_fsts(root_dir: &path::Path, nodes: &[u8]) -> VectorR<(LabelIndex, KeyIndex)> {
         let no_nodes = data_store::stored_elements(nodes);
 
         // building the KeyIndex and LabelIndex FSTs
@@ -697,7 +691,7 @@ impl DataPoint {
         // creating the LabelIndex
         let label_index = LabelIndex::new(&fst_dir, labels_list.into_iter())?;
 
-        Ok((Some(label_index), Some(key_index)))
+        Ok((label_index, key_index))
     }
 
     pub fn new(
@@ -705,7 +699,7 @@ impl DataPoint {
         elems: Vec<Elem>,
         time: Option<SystemTime>,
         similarity: Similarity,
-        channel: Channel,
+        #[allow(unused)] channel: Channel,
     ) -> VectorR<DataPoint> {
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
@@ -733,17 +727,15 @@ impl DataPoint {
         let no_nodes = data_store::stored_elements(&nodes);
 
         // Creating the FSTs
-        let (label_index, key_index) = if channel == Channel::EXPERIMENTAL {
-            debug!("Indexing with experimental FSTs");
-            Self::create_fsts(&id, &nodes)?
-        } else {
-            (None, None)
-        };
+        let fst_indexes = Self::create_fsts(&id, &nodes)?;
+        let label_index = Some(fst_indexes.0);
+        let key_index = Some(fst_indexes.1);
 
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity, -1.0);
         let mut ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();
+
         for id in 0..no_nodes {
             ops.insert(Address(id), &mut index)
         }
