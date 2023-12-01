@@ -1,0 +1,162 @@
+# This is a reusable workflow.
+name: Build a container image
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: "Image tags."
+        type: string
+        required: false
+        default: ""
+      context:
+        description: "Docker build context (default: .)"
+        type: string
+        required: false
+        default: "."
+      file:
+        description: "Path to dockerfile."
+        type: string
+        required: false
+        default: ""
+      platforms:
+        description: "Platforms to build for (default: linux/amd64)"
+        type: string
+        required: false
+        default: "linux/amd64"
+      cache-gha-mode:
+        description: "Parameter `mode` for `cache-from type=gha` (default: max)"
+        type: string
+        required: false
+        default: "max"
+      skip:
+        description: "If `true`, skip everything (default: `false`)."
+        type: boolean
+        required: false
+        default: false
+    outputs:
+      imageid:
+        value: ${{ jobs.build-img.outputs.imageid }}
+      digest:
+        value: ${{ jobs.build-img.outputs.digest }}
+      metadata:
+        value: ${{ jobs.build-img.outputs.metadata }}
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
+jobs:
+
+  build-img:
+    name: Build image
+    runs-on: ubuntu-latest
+    outputs:
+      imageid: ${{ steps.build-push-gcp.outputs.imageid }}
+      digest: ${{ steps.build-push-gcp.outputs.digest }}
+      metadata: ${{ steps.build-push-gcp.outputs.metadata }}
+
+    steps:
+      - name: Skip everything, if needed.
+        run: |
+          if [[ "${{ inputs.skip }}" == "true" ]]; then
+            echo "Doing nothing because skip=true."
+            exit 0
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: default values for arguments
+        id: default
+        run: |
+          FILE="${{ inputs.file }}"
+          if [[ -z "$FILE" ]] ; then
+            FILE="${{ inputs.context }}/Dockerfile"
+          fi
+          echo "file=${FILE}" >> "${GITHUB_OUTPUT}"
+          echo "file: ${FILE}"
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=$(git rev-parse --short HEAD)
+          BRANCH=${GITHUB_REF##*/}
+          echo "short_sha=$HASH" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: "${{ secrets.GCP_REGISTRY_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ secrets.GCP_REGISTRY_SERVICE_ACCOUNT }}"
+          token_format: access_token
+
+      - name: Login to Google GCR
+        uses: docker/login-action@v3
+        with:
+          registry: eu.gcr.io
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "${{ secrets.AWS_ECR_ROLE }}"
+          aws-region: us-east-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # required for using buildx on self-hosted runners
+      - name: Set up Docker Context for Buildx
+        run: |
+          docker context create builders
+
+      # required for using gha cache backend
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          endpoint: builders
+
+      - name: Build and push to GCP
+        id: build-push-gcp
+        uses: docker/build-push-action@v5
+        env:
+          REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+        with:
+          context: ${{ inputs.context }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ inputs.image-name }}:${{ steps.env-vars.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ inputs.image-name }}:${{ steps.env-vars.outputs.branch }}
+            ${{ env.REGISTRY }}/${{ inputs.image-name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=${{ inputs.cache-gha-mode }}
+          file: ${{ steps.default.outputs.file }}
+          platforms: ${{ inputs.platforms }}
+
+      - name: Build and push to ECR
+        id: build-push-ecr
+        uses: docker/build-push-action@v5
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        with:
+          context: ${{ inputs.context }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ inputs.image-name }}:${{ steps.env-vars.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ inputs.image-name }}:${{ steps.env-vars.outputs.branch }}
+            ${{ env.REGISTRY }}/${{ inputs.image-name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=${{ inputs.cache-gha-mode }}
+          file: ${{ steps.default.outputs.file }}
+          platforms: ${{ inputs.platforms }}
+
+      - name: Info about failing to push to ECR
+        run: |
+          msg='If this is the first time pushing this image to ERC, please verify that the repository exists.'
+          echo "::error title=Failure to push to ECR::${msg}"
+        if: ${{ failure() && steps.build-push-ecr.conclusion == 'failure' }}

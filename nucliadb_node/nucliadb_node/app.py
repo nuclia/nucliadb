@@ -25,7 +25,6 @@ import pkg_resources
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
-from nucliadb_node.reader import Reader
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
@@ -36,7 +35,7 @@ from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
 
 
-async def start_worker(writer: Writer, reader: Reader) -> Worker:
+async def start_worker(writer: Writer) -> Worker:
     if settings.force_host_id is None:  # pragma: no cover
         node = None
         i = 0
@@ -56,7 +55,7 @@ async def start_worker(writer: Writer, reader: Reader) -> Worker:
     if node is None:
         raise Exception("No Key defined")
 
-    worker = Worker(writer=writer, reader=reader, node=node)
+    worker = Worker(writer=writer, node=node)
     await worker.initialize()
 
     return worker
@@ -64,14 +63,13 @@ async def start_worker(writer: Writer, reader: Reader) -> Worker:
 
 async def main():
     writer = Writer(settings.writer_listen_address)
-    reader = Reader(settings.reader_listen_address)
-    worker = await start_worker(writer, reader)
+    worker = await start_worker(writer)
 
     await setup_telemetry(SERVICE_NAME)
 
     logger.info(f"Node ID : {worker.node}")
 
-    grpc_finalizer = await start_grpc(writer=writer, reader=reader)
+    grpc_finalizer = await start_grpc(writer=writer)
 
     logger.info(f"======= Node sidecar started ======")
 
@@ -82,7 +80,6 @@ async def main():
         worker.finalize,
         metrics_server.shutdown,
         writer.close,
-        reader.close,
     ]
 
     await run_until_exit(finalizers)

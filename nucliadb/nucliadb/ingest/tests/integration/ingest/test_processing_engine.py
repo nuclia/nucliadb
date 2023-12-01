@@ -22,7 +22,8 @@ from unittest import mock
 from uuid import uuid4
 
 import pytest
-from aioresponses import aioresponses
+
+from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 
 
 @pytest.fixture(scope="function")
@@ -66,15 +67,9 @@ async def test_send_to_process(onprem, mock_payload, ingest_util):
         uuid=str(uuid4()), kbid=str(uuid4()), userid=str(uuid4()), partition=0
     )
 
-    with aioresponses() as m:
-        m.post(
-            f"{fake_nuclia_proxy_url}/api/internal/processing/push",
-            payload=mock_payload,
-        )
-        m.post(
-            f"{fake_nuclia_proxy_url}/api/v1/processing/push?partition=0",
-            payload=mock_payload,
-        )
+    processing_engine.session = get_mocked_session(
+        "POST", 200, json=mock_payload, context_manager=False
+    )
+    await processing_engine.send_to_process(payload, partition=0)
 
-        await processing_engine.send_to_process(payload, partition=0)
     await processing_engine.finalize()

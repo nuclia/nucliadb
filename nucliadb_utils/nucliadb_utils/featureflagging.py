@@ -39,21 +39,21 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
-    const.Features.DEFAULT_MIN_SCORE: {
-        "rollout": 0,
-        "variants": {"environment": ["none"]},
-    },
-    const.Features.ROLLOVER_SHARDS: {
-        "rollout": 0,
-        "variants": {"environment": ["stage"]},
-    },
     const.Features.ASK_YOUR_DOCUMENTS: {
         "rollout": 0,
         "variants": {"environment": ["stage", "local"]},
     },
-    const.Features.EXPORT_IMPORT_TASKS: {
+    const.Features.EXPERIMENTAL_KB: {
         "rollout": 0,
-        "variants": {"environment": ["stage", "local"]},
+        "variants": {"environment": ["local"]},
+    },
+    const.Features.READ_REPLICA_SEARCHES: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
+    const.Features.SUMMARIZATION: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
     },
 }
 

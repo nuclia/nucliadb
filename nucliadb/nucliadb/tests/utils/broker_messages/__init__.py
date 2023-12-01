@@ -139,6 +139,16 @@ class BrokerMessageBuilder:
 
         for field_builder in self.fields.values():
             field = field_builder.build()
+
+            if field.id.field_type == rpb.FieldType.GENERIC:
+                pass
+            elif field.id.field_type == rpb.FieldType.FILE:
+                file_field = self.bm.files[field.id.field]
+                file_field.added.FromDatetime(datetime.now())
+                file_field.file.source = rpb.CloudFile.Source.EXTERNAL
+            else:
+                raise Exception("Unsupported field type")
+
             if field.user.metadata is not None:
                 replace_if_exists(
                     self.bm.basic.fieldmetadata, field.id, field.user.metadata
@@ -150,4 +160,8 @@ class BrokerMessageBuilder:
             if field.extracted.text is not None:
                 replace_if_exists(
                     self.bm.extracted_text, field.id, field.extracted.text
+                )
+            if field.extracted.question_answers is not None:
+                replace_if_exists(
+                    self.bm.question_answers, field.id, field.extracted.question_answers
                 )

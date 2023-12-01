@@ -1,2 +1,2 @@
 -e ./nucliadb_protos/python
--e ./nucliadb_telemetry
+-e ./nucliadb_telemetry[all]

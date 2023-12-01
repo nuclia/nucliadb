@@ -17,13 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+
 import pytest
 from aioresponses import aioresponses
 from nucliadb_protos.train_pb2 import GetInfoRequest, TrainInfo
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
+VERSION = sys.version_info
+PY_GEQ_3_11 = VERSION.major > 3 or VERSION.major == 3 and VERSION.minor >= 11
+
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    PY_GEQ_3_11, reason="aioresponses not compatible with python 3.11 yet"
+)
 async def test_get_info(
     train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:

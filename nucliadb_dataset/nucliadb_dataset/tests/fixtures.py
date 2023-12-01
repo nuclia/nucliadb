@@ -20,7 +20,7 @@
 import re
 import tempfile
 from io import BytesIO
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 import boto3
 import docker  # type: ignore
@@ -28,6 +28,8 @@ import pytest
 import requests
 from google.auth.credentials import AnonymousCredentials  # type: ignore
 from google.cloud import storage  # type: ignore
+from grpc import aio  # type: ignore
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
@@ -99,9 +101,48 @@ def upload_data_token_classification(knowledgebox: KnowledgeBox):
 
 
 @pytest.fixture(scope="function")
+def text_editors_kb(knowledgebox: KnowledgeBox):
+    knowledgebox.upload(
+        "doc-emacs",
+        title="GNU Emacs",
+        summary="An extensible, customizable, free/libre text editor - and more",
+        text="Text won't appear as we are not mocking processing",
+    )
+    knowledgebox.upload(
+        "doc-vi",
+        title="vi",
+        summary="A screen-oriented text editor originally created for the Unix operating system",
+        text="Text won't appear as we are not mocking processing",
+    )
+    knowledgebox.upload(
+        "doc-vim",
+        title="VIM",
+        summary="Vi IMproved, a programmer's text editor",
+        text="Text won't appear as we are not mocking processing",
+    )
+    knowledgebox.upload(
+        "doc-ex",
+        title="ex",
+        summary="Line editor for Unix systems originally written by Bill Joy in 1976",
+        text="Text won't appear as we are not mocking processing",
+    )
+
+    yield knowledgebox
+
+
+@pytest.fixture(scope="function")
 def temp_folder():
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname
+
+
+@pytest.fixture
+@pytest.mark.asyncio
+async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
+    channel = aio.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
+    stub = WriterStub(channel)  # type: ignore
+    yield stub
+    await channel.close(grace=True)
 
 
 images.settings["gcs"] = {

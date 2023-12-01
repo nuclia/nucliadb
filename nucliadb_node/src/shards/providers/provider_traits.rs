@@ -47,7 +47,7 @@ pub trait ShardWriterProvider {
     fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>>;
     fn load_all(&self) -> NodeResult<()>;
 
-    fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter>;
+    fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>>;
     fn get(&self, id: ShardId) -> Option<Arc<ShardWriter>>;
     fn delete(&self, id: ShardId) -> NodeResult<()>;
 

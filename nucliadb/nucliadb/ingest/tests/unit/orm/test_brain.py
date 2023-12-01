@@ -33,6 +33,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 
 from nucliadb.ingest.orm.brain import ResourceBrain, get_page_number
+from nucliadb_protos import resources_pb2
 
 
 def test_apply_field_metadata_marks_duplicated_paragraphs():
@@ -216,3 +217,29 @@ def test_apply_field_metadata_populates_page_number():
         assert paragraph.metadata.position.end == 54
         assert paragraph.metadata.position.start_seconds == [0]
         assert paragraph.metadata.position.end_seconds == [10]
+
+
+def test_set_resource_metadata_promotes_origin_dates():
+    resource_brain = ResourceBrain("rid")
+    basic = Basic()
+    basic.created.seconds = 1
+    basic.modified.seconds = 2
+    origin = resources_pb2.Origin()
+    origin.created.seconds = 3
+    origin.modified.seconds = 4
+
+    resource_brain.set_resource_metadata(basic, origin)
+
+    assert resource_brain.brain.metadata.created.seconds == 3
+    assert resource_brain.brain.metadata.modified.seconds == 4
+
+
+def test_set_resource_metadata_handles_timestamp_not_present():
+    resource_brain = ResourceBrain("rid")
+    basic = Basic()
+    resource_brain.set_resource_metadata(basic, None)
+    created = resource_brain.brain.metadata.created.seconds
+    modified = resource_brain.brain.metadata.modified.seconds
+    assert created > 0
+    assert modified > 0
+    assert modified >= created

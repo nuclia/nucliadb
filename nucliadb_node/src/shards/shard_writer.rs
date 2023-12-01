@@ -18,18 +18,16 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity,
-};
+use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
+use tokio::sync::Mutex;
 
 use crate::disk_structure::*;
 use crate::shards::metadata::{ShardMetadata, Similarity};
@@ -49,30 +47,8 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
-    gc_lock: Mutex<()>,    // lock to be able to do GC or not
-    write_lock: Mutex<()>, // be able to lock writes on the shard
-}
-
-impl PartialOrd for ShardWriter {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-impl PartialEq for ShardWriter {
-    fn eq(&self, other: &Self) -> bool {
-        self.id.eq(&other.id)
-    }
-}
-impl Ord for ShardWriter {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-impl Eq for ShardWriter {}
-impl std::hash::Hash for ShardWriter {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
+    pub gc_lock: Mutex<()>, // lock to be able to do GC or not
+    write_lock: Mutex<()>,  // be able to lock writes on the shard
 }
 
 impl ShardWriter {
@@ -86,7 +62,10 @@ impl ShardWriter {
         vsc: VectorConfig,
         rsc: RelationConfig,
     ) -> NodeResult<ShardWriter> {
-        let versions = Versions::load_or_create(&path.join(VERSION_FILE))?;
+        let versions = Versions::load_or_create(
+            &path.join(VERSION_FILE),
+            metadata.channel.unwrap_or_default(),
+        )?;
         let text_task = || Some(versions.get_texts_writer(&tsc));
         let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
         let vector_task = || Some(versions.get_vectors_writer(&vsc));
@@ -164,6 +143,7 @@ impl ShardWriter {
         match self.relation_service_version {
             0 => RelationService::RelationV0,
             1 => RelationService::RelationV1,
+            2 => RelationService::RelationV2,
             i => panic!("Unknown relation version {i}"),
         }
     }
@@ -189,6 +169,7 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
@@ -213,6 +194,7 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
 
         std::fs::create_dir(path)?;
@@ -244,6 +226,7 @@ impl ShardWriter {
         };
         let rsc = RelationConfig {
             path: path.join(RELATIONS_DIR),
+            channel,
         };
 
         ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
@@ -308,7 +291,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.lock().unwrap();
+        let _lock = self.write_lock.blocking_lock();
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -320,7 +303,6 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
-
         self.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
         Ok(())
     }
@@ -369,7 +351,7 @@ impl ShardWriter {
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
 
-        let _lock = self.write_lock.lock().unwrap();
+        let _lock = self.write_lock.blocking_lock();
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
@@ -462,20 +444,6 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> NodeResult<()> {
-        let mut writer = relation_write(&self.relation_writer);
-        writer.delete_nodes(nodes)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn join_relations_graph(&self, graph: &JoinGraph) -> NodeResult<()> {
-        let mut writer = relation_write(&self.relation_writer);
-        writer.join_graph(graph)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn paragraph_count(&self) -> NodeResult<usize> {
         paragraph_read(&self.paragraph_writer).count()
     }
@@ -491,21 +459,9 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn merge(&self) -> NodeResult<()> {
-        // TODO: add relations merge when it becomes a Tantivy only index.
-        paragraph_write(&self.paragraph_writer).merge()?;
-        text_write(&self.text_writer).merge()?;
-        vector_write(&self.vector_writer).merge()?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
-        // TODO: add relations gc when it becomes a Tantivy only index.
-        paragraph_write(&self.paragraph_writer).garbage_collection()?;
-        text_write(&self.text_writer).garbage_collection()?;
-        vector_write(&self.vector_writer).garbage_collection()?;
-        Ok(())
+        let _lock = self.gc_lock.blocking_lock();
+        vector_write(&self.vector_writer).garbage_collection()
     }
 
     #[tracing::instrument(skip_all)]
@@ -542,10 +498,6 @@ impl ShardWriter {
         self.metadata.similarity().into()
     }
 
-    pub fn wait_for_gc_lock(&self) -> MutexGuard<()> {
-        self.gc_lock.lock().unwrap()
-    }
-
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
         let mut segments = HashMap::new();
 
@@ -570,7 +522,7 @@ impl ShardWriter {
         ignored_segement_ids: &HashMap<String, Vec<String>>,
     ) -> NodeResult<Vec<IndexFiles>> {
         let mut files = Vec::new();
-        let _lock = self.write_lock.lock().unwrap(); // need to make sure more writes don't happen while we are reading
+        let _lock = self.write_lock.blocking_lock(); // need to make sure more writes don't happen while we are reading
 
         files.push(
             paragraph_read(&self.paragraph_writer)
@@ -583,6 +535,10 @@ impl ShardWriter {
         files.push(
             vector_read(&self.vector_writer)
                 .get_index_files(ignored_segement_ids.get("vector").unwrap_or(&Vec::new()))?,
+        );
+        files.push(
+            relation_read(&self.relation_writer)
+                .get_index_files(ignored_segement_ids.get("relation").unwrap_or(&Vec::new()))?,
         );
 
         Ok(files)

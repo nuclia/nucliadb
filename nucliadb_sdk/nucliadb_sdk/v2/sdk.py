@@ -416,6 +416,44 @@ class _NucliaDBBase:
         docstring=docstrings.LIST_RESOURCES,
     )
 
+    # reindex/reprocess
+    reindex_resource = _request_builder(
+        name="reindex_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REINDEX_RESOURCE,
+    )
+    reindex_resource_by_slug = _request_builder(
+        name="reindex_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/reindex",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REINDEX_RESOURCE_BY_SLUG,
+    )
+    reprocess_resource = _request_builder(
+        name="reprocess_resource",
+        path_template="/v1/kb/{kbid}/resource/{rid}/reprocess",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REPROCESS_RESOURCE,
+    )
+    reprocess_resource_by_slug = _request_builder(
+        name="reprocess_resource_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/reprocess",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+        docstring=docstrings.REPROCESS_RESOURCE_BY_SLUG,
+    )
+
     # Conversation endpoints
     add_conversation_message = _request_builder(
         name="add_conversation_message",
@@ -430,7 +468,7 @@ class _NucliaDBBase:
     set_configuration = _request_builder(
         name="set_configuration",
         path_template="/v1/kb/{kbid}/configuration",
-        method="POST",
+        method="PATCH",
         path_params=("kbid",),
         request_type=KBConfiguration,
         response_type=None,
@@ -716,12 +754,14 @@ class NucliaDB(_NucliaDBBase):
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
+        if all([data, content]):
+            raise ValueError("Cannot provide both data and content")
         if data is not None:
-            opts["data"] = data
-        if query_params is not None:
-            opts["params"] = query_params
+            opts["content"] = data
         if content is not None:
             opts["content"] = content
+        if query_params is not None:
+            opts["params"] = query_params
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
@@ -740,7 +780,9 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(method.lower(), url=url, **opts) as response:
+            with self.session.stream(
+                method.lower(), url=url, **opts, timeout=30.0
+            ) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk

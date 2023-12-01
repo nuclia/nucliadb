@@ -24,7 +24,3 @@ spec:
     port: {{ .Values.serving.grpc_writer }}
     protocol: TCP
     appProtocol: grpc
-  - name: grpc-sidecar
-    port: {{ .Values.serving.grpc_sidecar }}
-    protocol: TCP
-    appProtocol: grpc

@@ -17,15 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import tempfile
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from nats.aio.client import Msg
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus, TypeMessage
 
-from nucliadb_node.pull import IndexedPublisher, Worker
+from nucliadb_node.pull import IndexedPublisher, IndexNodeError, ShardManager, Worker
 from nucliadb_node.settings import settings
 from nucliadb_utils import const
 
@@ -35,6 +36,58 @@ def pubsub():
     pubsub = AsyncMock()
     with mock.patch("nucliadb_node.pull.get_pubsub", return_value=pubsub):
         yield pubsub
+
+
+class TestShardManager:
+    @pytest.fixture()
+    def gc_lock(self):
+        yield asyncio.Semaphore(1)
+
+    @pytest.fixture()
+    def writer(self):
+        writer = MagicMock(garbage_collector=AsyncMock())
+        yield writer
+
+    @pytest.fixture()
+    def shard_manager(self, writer, gc_lock):
+        sm = ShardManager("shard_id", writer, gc_lock)
+        sm.target_gc_resources = 5
+        yield sm
+
+    @pytest.mark.asyncio
+    async def test_gc(self, shard_manager: ShardManager, writer):
+        await shard_manager.gc()
+
+        writer.garbage_collector.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_schedule_gc(self, shard_manager: ShardManager, writer):
+        shard_manager.shard_changed_event(0)
+
+        await asyncio.sleep(0.1)
+
+        writer.garbage_collector.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_schedule_gc_after_target(self, shard_manager: ShardManager, writer):
+        for _ in range(shard_manager.target_gc_resources):
+            shard_manager.shard_changed_event()
+
+        await asyncio.sleep(0.1)
+
+        writer.garbage_collector.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_schedule_gc_after_target_multiple_times(
+        self, shard_manager: ShardManager, writer
+    ):
+        for _ in range(shard_manager.target_gc_resources):
+            shard_manager.shard_changed_event()
+            shard_manager.shard_changed_event()
+
+        await asyncio.sleep(0.1)
+
+        writer.garbage_collector.assert_awaited_once()
 
 
 class TestIndexedPublisher:
@@ -104,9 +157,8 @@ class TestSubscriptionWorker:
     @pytest.fixture(scope="function")
     def worker(self, settings, nats_conn):
         writer = AsyncMock()
-        reader = AsyncMock()
         with mock.patch("nucliadb_node.pull.get_storage"):
-            worker = Worker(writer, reader, "node")
+            worker = Worker(writer, "node")
             worker.store_seqid = Mock()
             yield worker
 
@@ -136,3 +188,13 @@ class TestSubscriptionWorker:
             assert worker.nc.jetstream().subscribe.call_count == 2
         finally:
             await worker.finalize()
+
+    @pytest.mark.asyncio
+    async def test_node_writer_errors_are_managed(self, worker: Worker):
+        status = OpStatus()
+        status.status = OpStatus.Status.ERROR
+        status.detail = "node writer error"
+        with patch("nucliadb_node.pull.Worker.set_resource", return_value=status):
+            msg = self.get_msg(seqid=1)
+            with pytest.raises(IndexNodeError):
+                await worker.subscription_worker(msg)

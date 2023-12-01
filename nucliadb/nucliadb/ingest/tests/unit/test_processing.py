@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from unittest import mock
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -28,6 +28,7 @@ from nucliadb.ingest.processing import (
     ProcessingEngine,
     PushPayload,
 )
+from nucliadb.tests.utils.aiohttp_session import get_mocked_session
 from nucliadb_models import File, FileField
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 
@@ -77,26 +78,6 @@ def engine():
     )
     with mock.patch.object(pe, "get_configuration", return_value=None):
         yield pe
-
-
-def get_mocked_session(
-    http_method: str, status: int, text=None, json=None, context_manager=True
-):
-    response = Mock(status=status)
-    if text:
-        response.text = AsyncMock(return_value=text)
-    if json:
-        response.json = AsyncMock(return_value=json)
-    if context_manager:
-        # For when async with self.session.post() as response: is called
-        session = Mock()
-        http_method_mock = AsyncMock(__aenter__=AsyncMock(return_value=response))
-        getattr(session, http_method.lower()).return_value = http_method_mock
-    else:
-        # For when await self.session.post() is called
-        session = AsyncMock()
-        getattr(session, http_method.lower()).return_value = response
-    return session
 
 
 async def test_convert_filefield_to_str_200(engine):

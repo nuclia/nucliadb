@@ -21,9 +21,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::tracing::{info, warn};
+use nucliadb_core::tracing::{debug, error, warn};
 use nucliadb_core::NodeResult;
-use nucliadb_protos::replication;
+use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_stream::wrappers::ReceiverStream;
@@ -33,17 +33,24 @@ use crate::replication::NodeRole;
 use crate::settings::Settings;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
+use crate::shards::writer::ShardWriter;
 use crate::utils::list_shards;
 pub struct ReplicationServiceGRPCDriver {
-    settings: Arc<Settings>,
+    settings: Settings,
     shards: Arc<AsyncUnboundedShardWriterCache>,
+    node_id: String,
 }
 
 impl ReplicationServiceGRPCDriver {
-    pub fn new(settings: Arc<Settings>, shard_cache: Arc<AsyncUnboundedShardWriterCache>) -> Self {
+    pub fn new(
+        settings: Settings,
+        shard_cache: Arc<AsyncUnboundedShardWriterCache>,
+        node_id: String,
+    ) -> Self {
         Self {
             settings,
             shards: shard_cache,
+            node_id,
         }
     }
 
@@ -65,14 +72,14 @@ async fn stream_file(
     let filepath = shard_path.join(rel_filepath);
 
     if !filepath.exists() {
-        info!(
+        debug!(
             "File not found when index thought it should be: {}",
             filepath.to_string_lossy(),
         );
         return Ok(());
     }
 
-    info!("Streaming file {}", filepath.to_string_lossy());
+    debug!("Streaming file {}", filepath.to_string_lossy());
     let mut total = 0;
     let mut chunk = 1;
     let mut file = File::open(filepath.clone()).await?;
@@ -92,7 +99,7 @@ async fn stream_file(
             total_size: filesize,
         };
         chunk += 1;
-        sender.send(Ok(reply)).await.unwrap();
+        sender.send(Ok(reply)).await?;
         if total >= filesize {
             return Ok(());
         }
@@ -105,10 +112,10 @@ async fn stream_data(
     rel_filepath: &Path,
     data: Vec<u8>,
     sender: &tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
-) {
+) -> NodeResult<()> {
     let filepath = shard_path.join(rel_filepath);
     let filesize = data.len();
-    info!("Streaming file {} {}", filepath.to_string_lossy(), filesize);
+    debug!("Streaming file {} {}", filepath.to_string_lossy(), filesize);
 
     let reply = replication::ReplicateShardResponse {
         generation_id: generation_id.to_string(),
@@ -118,7 +125,63 @@ async fn stream_data(
         read_position: filesize as u64,
         total_size: filesize as u64,
     };
-    sender.send(Ok(reply)).await.unwrap();
+    sender.send(Ok(reply)).await?;
+
+    Ok(())
+}
+
+async fn replica_shard(
+    shard: Arc<ShardWriter>,
+    ignored_segement_ids: HashMap<String, Vec<String>>,
+    chunk_size: u64,
+    shard_path: PathBuf,
+    generation_id: &str,
+    sender: tokio::sync::mpsc::Sender<Result<replication::ReplicateShardResponse, tonic::Status>>,
+) -> NodeResult<()> {
+    // do not allow garbage collection while streaming out shard
+    let _gc_lock = shard.gc_lock.lock().await;
+
+    // getting shard files can block during an active write
+    let sshard = Arc::clone(&shard); // moved shard reference into blocking task
+    let shard_files =
+        tokio::task::spawn_blocking(move || sshard.get_shard_files(&ignored_segement_ids))
+            .await??;
+
+    for segment_files in shard_files {
+        for segment_file in segment_files.files {
+            stream_file(
+                chunk_size,
+                &shard_path,
+                generation_id,
+                &PathBuf::from(segment_file),
+                &sender,
+            )
+            .await?;
+        }
+        for (metadata_file, data) in segment_files.metadata_files {
+            stream_data(
+                &shard_path,
+                generation_id,
+                &PathBuf::from(metadata_file),
+                data,
+                &sender,
+            )
+            .await?;
+        }
+    }
+
+    // top level additional files
+    for filename in ["metadata.json", "versions.json"] {
+        stream_file(
+            chunk_size,
+            &shard_path,
+            generation_id,
+            &PathBuf::from(filename),
+            &sender,
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 #[tonic::async_trait]
@@ -151,7 +214,7 @@ impl replication::replication_service_server::ReplicationService for Replication
             if shard.is_none() {
                 let loaded = self.shards.load(shard_id.clone()).await;
                 if loaded.is_err() {
-                    warn!("Failed to load shard: {:?}", shard_id);
+                    warn!("Failed to load shard: {:?}, Error: {:?}", shard_id, loaded);
                     continue;
                 }
                 shard = Some(loaded.unwrap());
@@ -177,11 +240,11 @@ impl replication::replication_service_server::ReplicationService for Replication
                 warn!("Shard {} not found", shard_id);
             }
         }
-        // let shard = self.shards.get_shard(request.).await?;
 
         let response = replication::PrimaryCheckReplicationStateResponse {
             shard_states: resp_shard_states,
             shards_to_remove,
+            primary_id: self.node_id.clone(),
         };
         Ok(Response::new(response))
     }
@@ -215,54 +278,32 @@ impl replication::replication_service_server::ReplicationService for Replication
             .collect();
 
         tokio::spawn(async move {
-            // getting shard files can block during an active write
-            let shard_files = tokio::task::spawn_blocking(move || {
-                shard.get_shard_files(&ignored_segement_ids).unwrap()
-            })
-            .await
-            .map_err(|error| {
-                tonic::Status::internal(format!("Error getting shard files: {error:?}"))
-            })
-            .expect("Error getting shard files");
+            let result = replica_shard(
+                shard,
+                ignored_segement_ids,
+                chunk_size,
+                shard_path,
+                &generation_id,
+                sender,
+            )
+            .await;
 
-            for segment_files in shard_files {
-                for segment_file in segment_files.files {
-                    stream_file(
-                        chunk_size,
-                        &shard_path,
-                        &generation_id,
-                        &PathBuf::from(segment_file),
-                        &sender,
-                    )
-                    .await
-                    .unwrap();
-                }
-                for (metadata_file, data) in segment_files.metadata_files {
-                    stream_data(
-                        &shard_path,
-                        &generation_id,
-                        &PathBuf::from(metadata_file),
-                        data,
-                        &sender,
-                    )
-                    .await;
-                }
-            }
-
-            // top level additional files
-            for filename in ["metadata.json", "versions.json"] {
-                stream_file(
-                    chunk_size,
-                    &shard_path,
-                    &generation_id,
-                    &PathBuf::from(filename),
-                    &sender,
-                )
-                .await
-                .unwrap();
+            if let Err(error) = result {
+                error!("Error replicating shard: {}", error);
             }
         });
 
         Ok(Response::new(ReceiverStream::new(receiver.1)))
+    }
+
+    async fn get_metadata(
+        &self,
+        _request: tonic::Request<noderesources::EmptyQuery>,
+    ) -> Result<tonic::Response<noderesources::NodeMetadata>, tonic::Status> {
+        let metadata = crate::node_metadata::NodeMetadata::new(self.settings.clone()).await;
+        match metadata {
+            Ok(metadata) => Ok(tonic::Response::new(metadata.into())),
+            Err(error) => Err(tonic::Status::internal(error.to_string())),
+        }
     }
 }

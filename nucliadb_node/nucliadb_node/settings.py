@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     writer_listen_address: str = "0.0.0.0:10000"
     reader_listen_address: str = "0.0.0.0:10001"
-    sidecar_listen_address: str = "0.0.0.0:10002"
+    sidecar_listen_address: str = "0.0.0.0:10002"  # this component's listen address
 
     data_path: Optional[str] = None
 

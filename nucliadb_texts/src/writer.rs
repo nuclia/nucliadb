@@ -24,10 +24,11 @@ use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
 
+use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::tracing::{self, *};
-use nucliadb_core::{prelude::*, IndexFiles};
+use nucliadb_core::IndexFiles;
 use nucliadb_procs::measure;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -37,7 +38,6 @@ use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 use super::schema::{timestamp_to_datetime_utc, TextSchema};
 
 const TANTIVY_INDEX_ARENA_MEMORY: usize = 6_000_000;
-const MERGE_THRESHOLD: usize = 5;
 
 pub struct TextWriterService {
     index: Index,
@@ -144,24 +144,8 @@ impl WriterChild for TextWriterService {
         Ok(())
     }
 
-    #[measure(actor = "texts", metric = "garbage_collection")]
-    #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) -> NodeResult<()> {
-        self.writer.garbage_collect_files()?;
         Ok(())
-    }
-
-    #[measure(actor = "texts", metric = "merge")]
-    #[tracing::instrument(skip_all)]
-    fn merge(&mut self) -> NodeResult<()> {
-        let mut ids = self.index.searchable_segment_ids()?;
-        if ids.len() <= MERGE_THRESHOLD {
-            Ok(())
-        } else {
-            ids.truncate(MERGE_THRESHOLD);
-            self.writer.merge(&ids)?;
-            Ok(())
-        }
     }
 
     fn get_segment_ids(&self) -> NodeResult<Vec<String>> {
@@ -177,6 +161,12 @@ impl WriterChild for TextWriterService {
         // Should be called along with a lock at a higher level to be safe
         let mut meta_files = HashMap::new();
         let path = self.config.path.join("meta.json");
+        if !path.exists() {
+            return Ok(IndexFiles {
+                metadata_files: meta_files,
+                files: Vec::new(),
+            });
+        }
         meta_files.insert("text/meta.json".to_string(), fs::read(path)?);
 
         let mut files = Vec::new();
@@ -220,7 +210,9 @@ impl TextWriterService {
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(&config.path)?;
-        let writer = index.writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)?;
+        let writer = index
+            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
+            .unwrap();
 
         Ok(TextWriterService {
             index,
@@ -247,7 +239,9 @@ impl TextWriterService {
         let index = index_builder
             .create_in_dir(&config.path)
             .expect("Index directory should exist");
-        let writer = index.writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)?;
+        let writer = index
+            .writer_with_num_threads(1, TANTIVY_INDEX_ARENA_MEMORY)
+            .unwrap();
 
         Ok(TextWriterService {
             index,

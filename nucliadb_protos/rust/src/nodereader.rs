@@ -1,14 +1,16 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Filter {
     #[prost(string, repeated, tag="1")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="2")]
+    pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StreamFilter {
     #[prost(enumeration="stream_filter::Conjunction", tag="1")]
     pub conjunction: i32,
     #[prost(string, repeated, tag="2")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `StreamFilter`.
 pub mod stream_filter {
@@ -23,7 +25,7 @@ pub mod stream_filter {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Faceted {
     #[prost(string, repeated, tag="1")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OrderBy {
@@ -118,7 +120,7 @@ pub struct ParagraphSearchRequest {
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="7")]
     pub order: ::core::option::Option<OrderBy>,
-    /// Faceted{ tags: Vec<String>}
+    /// Faceted{ labels: Vec<String>}
     #[prost(message, optional, tag="8")]
     pub faceted: ::core::option::Option<Faceted>,
     #[prost(int32, tag="10")]
@@ -243,9 +245,12 @@ pub struct VectorSearchRequest {
     /// Embedded vector search.
     #[prost(float, repeated, tag="2")]
     pub vector: ::prost::alloc::vec::Vec<f32>,
-    /// tags to filter
+    /// labels to filter
     #[prost(string, repeated, tag="3")]
-    pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// paragraph labels to filter
+    #[prost(string, repeated, tag="18")]
+    pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// What page is the answer.
     #[prost(int32, tag="4")]
     pub page_number: i32,
@@ -308,6 +313,8 @@ pub struct RelationEdgeFilter {
     pub relation_type: i32,
     #[prost(string, optional, tag="2")]
     pub relation_subtype: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="3")]
+    pub relation_value: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationPrefixSearchRequest {
@@ -326,38 +333,34 @@ pub struct EntitiesSubgraphRequest {
     /// List of vertices where search will trigger
     #[prost(message, repeated, tag="1")]
     pub entry_points: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
-    /// Filters to apply while searching. It's an OR filtering: any
-    /// node (vertex) satisfying one condition will be returned
-    #[prost(message, repeated, tag="2")]
-    pub node_filters: ::prost::alloc::vec::Vec<RelationNodeFilter>,
-    /// Filters to apply while searching. It's an OR filtering: any
-    /// edge satisfying one condition will be returned
-    #[prost(message, repeated, tag="4")]
-    pub edge_filters: ::prost::alloc::vec::Vec<RelationEdgeFilter>,
     #[prost(int32, optional, tag="3")]
     pub depth: ::core::option::Option<i32>,
+    #[prost(message, repeated, tag="4")]
+    pub deleted_entities: ::prost::alloc::vec::Vec<entities_subgraph_request::DeletedEntities>,
+    #[prost(string, repeated, tag="5")]
+    pub deleted_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+/// Nested message and enum types in `EntitiesSubgraphRequest`.
+pub mod entities_subgraph_request {
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct DeletedEntities {
+        #[prost(string, tag="1")]
+        pub node_subtype: ::prost::alloc::string::String,
+        #[prost(string, repeated, tag="2")]
+        pub node_values: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EntitiesSubgraphResponse {
     #[prost(message, repeated, tag="1")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
 }
-// TODO: uncomment and implement (next iteration)
-// message RelationPathsSearchRequest {
-//     message PathEndpoints {
-//         utils.RelationNode origin = 1;
-//         utils.RelationNode destination = 2;
-//     }
-//     repeated PathEndpoints paths = 1;
-// }
-
 /// Query relation index to obtain different information about the
 /// knowledge graph. It can be queried using the following strategies:
 ///
 /// - prefix search over vertex (node) names
 /// - graph search:
 ///   - given some entry vertices, get the filtered subgraph around them
-///   - (TODO) given some vertices, get paths between them
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchRequest {
     #[prost(string, tag="1")]
@@ -367,8 +370,6 @@ pub struct RelationSearchRequest {
     pub reload: bool,
     #[prost(message, optional, tag="11")]
     pub prefix: ::core::option::Option<RelationPrefixSearchRequest>,
-    /// TODO: uncomment and implement (next iteration)
-    /// RelationPathsSearchRequest paths = 13;
     #[prost(message, optional, tag="12")]
     pub subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
 }
@@ -376,8 +377,6 @@ pub struct RelationSearchRequest {
 pub struct RelationSearchResponse {
     #[prost(message, optional, tag="11")]
     pub prefix: ::core::option::Option<RelationPrefixSearchResponse>,
-    /// TODO: uncomment and implement (next iteration)
-    /// repeated utils.RelationPath paths = 13;
     #[prost(message, optional, tag="12")]
     pub subgraph: ::core::option::Option<EntitiesSubgraphResponse>,
 }
@@ -394,7 +393,6 @@ pub struct SearchRequest {
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="5")]
     pub order: ::core::option::Option<OrderBy>,
-    /// Faceted{ tags: Vec<String>}
     #[prost(message, optional, tag="6")]
     pub faceted: ::core::option::Option<Faceted>,
     #[prost(int32, tag="7")]

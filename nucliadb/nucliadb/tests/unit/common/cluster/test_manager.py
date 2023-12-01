@@ -17,10 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+from unittest.mock import MagicMock
+
 import pytest
 
 from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.exceptions import NoHealthyNodeAvailable
 from nucliadb.common.cluster.settings import settings
+from nucliadb_protos import writer_pb2
 
 
 def test_should_create_new_shard():
@@ -54,4 +59,118 @@ async def fake_node():
         shard_count=0,
         dummy=True,
     )
+    manager.INDEX_NODES.clear()
+
+
+async def test_standalone_node_garbage_collects(fake_node):
+    mng = manager.StandaloneKBShardManager()
+
+    mng.max_ops_before_checks = 0
+
+    await mng.add_resource(
+        writer_pb2.ShardObject(
+            shard="123",
+            replicas=[
+                writer_pb2.ShardReplica(
+                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
+                )
+            ],
+        ),
+        resource=MagicMock(),
+        txid=-1,
+        partition=0,
+        kb="kb",
+    )
+
+    await asyncio.sleep(0.05)
+    assert len(fake_node.writer.calls["GC"]) == 1
+
+
+def test_choose_node():
+    manager.INDEX_NODES.clear()
+    manager.add_index_node(
+        id="node-0",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+    )
+    manager.add_index_node(
+        id="node-1",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+    )
+    _, _, node_id = manager.choose_node(
+        writer_pb2.ShardObject(
+            replicas=[
+                writer_pb2.ShardReplica(
+                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
+                )
+            ]
+        )
+    )
+    assert node_id == "node-0"
+    _, _, node_id = manager.choose_node(
+        writer_pb2.ShardObject(
+            replicas=[
+                writer_pb2.ShardReplica(
+                    shard=writer_pb2.ShardCreated(id="123"), node="node-1"
+                )
+            ]
+        )
+    )
+    assert node_id == "node-1"
+
+    manager.INDEX_NODES.clear()
+    manager.add_index_node(
+        id="node-replica-0",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+        primary_id="node-0",
+    )
+    manager.add_index_node(
+        id="node-replica-1",
+        address="nohost",
+        shard_count=0,
+        dummy=True,
+        primary_id="node-1",
+    )
+    _, _, node_id = manager.choose_node(
+        writer_pb2.ShardObject(
+            replicas=[
+                writer_pb2.ShardReplica(
+                    shard=writer_pb2.ShardCreated(id="123"), node="node-0"
+                )
+            ]
+        ),
+        read_only=True,
+    )
+    assert node_id == "node-replica-0"
+    _, _, node_id = manager.choose_node(
+        writer_pb2.ShardObject(
+            replicas=[
+                writer_pb2.ShardReplica(
+                    shard=writer_pb2.ShardCreated(id="123"), node="node-1"
+                )
+            ]
+        ),
+        read_only=True,
+    )
+    assert node_id == "node-replica-1"
+
+    manager.remove_index_node("node-replica-0", "node-0")
+
+    with pytest.raises(NoHealthyNodeAvailable):
+        manager.choose_node(
+            writer_pb2.ShardObject(
+                replicas=[
+                    writer_pb2.ShardReplica(
+                        shard=writer_pb2.ShardCreated(id="123"), node="node-0"
+                    )
+                ]
+            ),
+            read_only=True,
+        )
+
     manager.INDEX_NODES.clear()

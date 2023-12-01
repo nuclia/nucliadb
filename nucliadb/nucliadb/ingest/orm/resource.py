@@ -38,6 +38,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
+    FieldQuestionAnswerWrapper,
     FieldText,
     FieldType,
     FileExtractedData,
@@ -363,7 +364,8 @@ class Resource:
         origin = await self.get_origin()
         basic = await self.get_basic()
         if basic is not None:
-            brain.set_global_tags(basic, self.uuid, origin)
+            brain.set_resource_metadata(basic, origin)
+        await self.compute_global_tags(brain)
         fields = await self.get_fields(force=True)
         for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -801,6 +803,9 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
+        for question_answers in message.question_answers:
+            await self._apply_question_answers(question_answers)
+
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
 
@@ -851,6 +856,13 @@ class Resource:
         self._modified_extracted_text.append(
             extracted_text.field,
         )
+
+    async def _apply_question_answers(
+        self, question_answers: FieldQuestionAnswerWrapper
+    ):
+        field = question_answers.field
+        field_obj = await self.get_field(field.field, field.field_type, load=False)
+        await field_obj.set_question_answers(question_answers)
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None
@@ -1042,7 +1054,7 @@ class Resource:
             raise KeyError("Resource not found")
 
         brain.set_processing_status(basic=basic, previous_status=self._previous_status)
-        brain.set_global_tags(basic=basic, origin=origin, uuid=self.uuid)
+        brain.set_resource_metadata(basic=basic, origin=origin)
         for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)
             fieldid = FieldID(field_type=type, field=field)  # type: ignore
@@ -1056,7 +1068,7 @@ class Resource:
                 ):
                     valid_user_field_metadata = user_field_metadata
                     break
-            brain.apply_field_tags_globally(
+            brain.apply_field_labels(
                 fieldkey,
                 extracted_metadata,
                 self.uuid,

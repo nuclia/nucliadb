@@ -30,6 +30,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -106,7 +107,6 @@ async def find_knowledgebox(
     extracted: List[ExtractedDataTypeName] = fastapi_query(
         SearchParamDefaults.extracted
     ),
-    shards: List[str] = fastapi_query(SearchParamDefaults.shards),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
@@ -133,7 +133,6 @@ async def find_knowledgebox(
             show=show,
             field_type_filter=field_type_filter,
             extracted=extracted,
-            shards=shards,
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
@@ -150,6 +149,8 @@ async def find_knowledgebox(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
 
 @api.post(
@@ -180,3 +181,5 @@ async def find_post_knowledgebox(
         return results
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))

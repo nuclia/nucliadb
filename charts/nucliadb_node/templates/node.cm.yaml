@@ -10,11 +10,6 @@ metadata:
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
 data:
-{{- if .Values.debug }}
-  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs=DEBUG,nucliadb_vectors=DEBUG,nucliadb_texts=DEBUG,nucliadb_relations=DEBUG"
-{{- else }}
-  RUST_LOG: "nucliadb_node=WARN"
-{{- end }}
   RUST_LIB_BACKTRACE: "1"
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
   SENTRY_URL: {{ .Values.running.sentry_url }}
@@ -26,8 +21,9 @@ data:
 {{- if .Values.config.lazyloading }}
   LAZY_LOADING: "true"
 {{- end }}
-
-  INDEX_JETSTREAM_AUTH: {{ .Values.indexing.index_jetstream_auth }}
+{{- with .Values.indexing.index_jetstream_auth }}
+  INDEX_JETSTREAM_AUTH: {{ . }}
+{{- end }}  
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}

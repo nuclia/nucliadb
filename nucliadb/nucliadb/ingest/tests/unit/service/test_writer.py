@@ -17,10 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxNew, SemanticModelMetadata
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.resources_pb2 import FieldID, FieldText, FieldType
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
@@ -29,6 +30,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.service.writer import (
     WriterServicer,
+    get_release_channel,
     update_shards_with_updated_replica,
 )
 from nucliadb_protos import writer_pb2
@@ -656,3 +658,41 @@ class TestWriterServicer:
             txn.commit.assert_called_once()
 
             assert isinstance(resp, writer_pb2.IndexStatus)
+
+
+@pytest.mark.parametrize(
+    "req,has_feature,environment,expected_channel",
+    [
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.EXPERIMENTAL),
+            False,
+            "prod",
+            ReleaseChannel.EXPERIMENTAL,
+        ),
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
+            True,
+            "prod",
+            ReleaseChannel.STABLE,
+        ),
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
+            True,
+            "stage",
+            ReleaseChannel.EXPERIMENTAL,
+        ),
+        (
+            KnowledgeBoxNew(slug="foo", release_channel=ReleaseChannel.STABLE),
+            False,
+            "stage",
+            ReleaseChannel.STABLE,
+        ),
+    ],
+)
+def test_get_release_channel(req, has_feature, environment, expected_channel):
+    module = "nucliadb.ingest.service.writer"
+    with mock.patch(f"{module}.has_feature", return_value=has_feature):
+        with mock.patch(
+            f"{module}.running_settings", new=Mock(running_environment=environment)
+        ):
+            assert get_release_channel(req) == expected_channel

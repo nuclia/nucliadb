@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
+    sidecar.istio.io/inject: "false"
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
@@ -26,8 +27,7 @@ spec:
   template:
     metadata:
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.nats.port }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.metricsPort }},3031,3032"
+        sidecar.istio.io/inject: "false"
         # do not have access to dependency chart cm this component references
         checksum/cm: {{ include (print $.Template.BasePath "/node.cm.yaml") . | sha256sum }}
         {{- if hasKey .Values "extra_pod_annotations" }}
@@ -43,6 +43,7 @@ spec:
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
     spec:
+      terminationGracePeriodSeconds: 120
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:
@@ -52,6 +53,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.serviceAccount | default "default" }}
 {{- if .Values.nats.secretName }}
       volumes:
       - name: nats-creds
@@ -121,7 +123,7 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3032"
           {{- range $key, $value := .Values.env }}
           - name: "{{ $key }}"
@@ -160,7 +162,7 @@ spec:
         - configMapRef:
             name: nucliadb-config
         env:
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3031"
         {{- range $key, $value := .Values.env }}
           - name: "{{ $key }}"

@@ -72,7 +72,7 @@ class Streams:
 
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
-    DEFAULT_MIN_SCORE = "nucliadb_default_min_score"
-    ROLLOVER_SHARDS = "nuclaidb_rollover_shards"
     ASK_YOUR_DOCUMENTS = "nucliadb_ask_your_documents"
-    EXPORT_IMPORT_TASKS = "nucliadb_export_import_tasks"
+    EXPERIMENTAL_KB = "nucliadb_experimental_kb"
+    READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
+    SUMMARIZATION = "nuclia_summarization"

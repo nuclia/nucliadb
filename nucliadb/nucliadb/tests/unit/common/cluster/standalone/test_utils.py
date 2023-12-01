@@ -52,4 +52,8 @@ def test_get_self_k8s_host(cluster_settings: Settings, monkeypatch):
     monkeypatch.setenv("NUCLIADB_SERVICE_HOST", "host")
     monkeypatch.setenv("HOSTNAME", "nucliadb-0")
 
-    assert utils.get_self().address == "nucliadb-0.nucliadb"
+    with patch(
+        "nucliadb.common.cluster.standalone.grpc_node_binding.NodeWriter"
+    ), patch("nucliadb.common.cluster.standalone.grpc_node_binding.NodeReader"):
+        # patch because loading settings validates address now
+        assert utils.get_self().address == "nucliadb-0.nucliadb"

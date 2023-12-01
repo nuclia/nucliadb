@@ -24,10 +24,11 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, NodeResult};
 
+use crate::disk_structure;
+use crate::settings::Settings;
 use crate::shards::providers::ShardReaderProvider;
 use crate::shards::reader::ShardReader;
 use crate::shards::ShardId;
-use crate::{disk_structure, env};
 
 #[derive(Default)]
 pub struct UnboundedShardReaderCache {
@@ -36,23 +37,19 @@ pub struct UnboundedShardReaderCache {
 }
 
 impl UnboundedShardReaderCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
-            shards_path,
+            shards_path: settings.shards_path(),
         }
     }
 
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardReader>>> {
-        self.cache
-            .read()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.read().expect("Poisoned lock while reading")
     }
 
     fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardReader>>> {
-        self.cache
-            .write()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.write().expect("Poisoned lock while reading")
     }
 }
 
@@ -81,7 +78,7 @@ impl ShardReaderProvider for UnboundedShardReaderCache {
 
     fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
-        let shards_path = env::shards_path();
+        let shards_path = self.shards_path.clone();
         debug!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;

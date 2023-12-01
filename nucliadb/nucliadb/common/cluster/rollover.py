@@ -95,7 +95,7 @@ async def create_rollover_shards(
                     )
                 except Exception as e:
                     errors.capture_exception(e)
-                    logger.error(f"Error creating new shard at {node}")
+                    logger.exception(f"Error creating new shard at {node}")
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))
@@ -105,7 +105,7 @@ async def create_rollover_shards(
                 replicas_created += 1
     except Exception as e:
         errors.capture_exception(e)
-        logger.error("Unexpected error creating new shard")
+        logger.exception("Unexpected error creating new shard")
         for created_shard in created_shards:
             await sm.rollback_shard(created_shard)
         raise e
@@ -143,6 +143,10 @@ async def index_resource(
     resource_id: str,
     shard: writer_pb2.ShardObject,
 ) -> Optional[noderesources_pb2.Resource]:
+    logger.warning(
+        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
+    )
+
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
     resources_datamanager = ResourcesDataManager(
@@ -158,9 +162,6 @@ async def index_resource(
             extra={"kbid": kbid, "resource_id": resource_id},
         )
         return None
-    logger.warning(
-        "Indexing resource", extra={"kbid": kbid, "resource_id": resource_id}
-    )
     partition = partitioning.generate_partition(kbid, resource_id)
     await sm.add_resource(
         shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid

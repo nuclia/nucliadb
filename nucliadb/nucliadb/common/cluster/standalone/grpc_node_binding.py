@@ -42,7 +42,12 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
     TypeList,
 )
-from nucliadb_protos.noderesources_pb2 import EmptyQuery, Resource, ResourceID
+from nucliadb_protos.noderesources_pb2 import (
+    EmptyQuery,
+    EmptyResponse,
+    Resource,
+    ResourceID,
+)
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
@@ -53,7 +58,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetID,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
+from nucliadb_protos.nodewriter_pb2 import OpStatus
 
 from ..settings import settings
 
@@ -386,13 +391,13 @@ class StandaloneWriterWrapper:
         op_status.ParseFromString(pb_bytes)
         return op_status
 
-    async def JoinGraph(self, request: SetGraph) -> OpStatus:
+    async def GC(self, request: ShardId) -> EmptyResponse:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
-            self.executor, self.writer.join_graph, request.SerializeToString()
+            self.executor, self.writer.gc, request.SerializeToString()
         )
         pb_bytes = bytes(resp)
-        op_status = OpStatus()
+        op_status = EmptyResponse()
         op_status.ParseFromString(pb_bytes)
         return op_status
 
@@ -415,5 +420,5 @@ WRITER_METHODS = {
     "ListVectorSets": (ShardId, VectorSetList),
     "SetResource": (Resource, OpStatus),
     "RemoveResource": (ResourceID, OpStatus),
-    "JoinGraph": (SetGraph, OpStatus),
+    "GC": (ShardId, EmptyResponse),
 }

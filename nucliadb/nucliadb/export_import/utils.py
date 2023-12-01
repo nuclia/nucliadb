@@ -338,8 +338,8 @@ class ExportStreamReader:
         type_bytes = await self.stream.read(3)
         try:
             return ExportedItemType(type_bytes.decode())
-        except ValueError:
-            raise WrongExportStreamFormat()
+        except ValueError as ex:
+            raise WrongExportStreamFormat() from ex
 
     async def read_item(self) -> bytes:
         size_bytes = await self.stream.read(4)
@@ -354,8 +354,9 @@ class ExportStreamReader:
         cf = resources_pb2.CloudFile()
         try:
             cf.ParseFromString(data)
-        except ProtobufDecodeError:
-            raise WrongExportStreamFormat()
+        except ProtobufDecodeError as ex:
+            logger.exception(f"Unable to parse binary data: {ex}")
+            raise WrongExportStreamFormat() from ex
         binary_size_bytes = await self.stream.read(4)
         binary_size = int.from_bytes(binary_size_bytes, byteorder="big")
 
@@ -376,8 +377,9 @@ class ExportStreamReader:
         bm = writer_pb2.BrokerMessage()
         try:
             bm.ParseFromString(data)
-        except ProtobufDecodeError:
-            raise WrongExportStreamFormat()
+        except ProtobufDecodeError as ex:
+            logger.exception(f"Unable to parse broker message: {ex}")
+            raise WrongExportStreamFormat() from ex
         return bm
 
     async def read_entities(self) -> kb_pb2.EntitiesGroups:
@@ -385,8 +387,8 @@ class ExportStreamReader:
         entities = kb_pb2.EntitiesGroups()
         try:
             entities.ParseFromString(data)
-        except ProtobufDecodeError:
-            raise WrongExportStreamFormat()
+        except ProtobufDecodeError as ex:
+            raise WrongExportStreamFormat() from ex
         return entities
 
     async def read_labels(self) -> kb_pb2.Labels:
@@ -394,8 +396,8 @@ class ExportStreamReader:
         labels = kb_pb2.Labels()
         try:
             labels.ParseFromString(data)
-        except ProtobufDecodeError:
-            raise WrongExportStreamFormat()
+        except ProtobufDecodeError as ex:
+            raise WrongExportStreamFormat() from ex
         return labels
 
     async def iter_items(self) -> AsyncGenerator[ExportItem, None]:
@@ -434,6 +436,7 @@ class TaskRetryHandler:
     def wrap(self, func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            func_result = None
             metadata = self.metadata
             task = metadata.task
             if task.status in (Status.FINISHED, Status.ERRORED):
@@ -453,7 +456,7 @@ class TaskRetryHandler:
                 return
             try:
                 metadata.task.status = Status.RUNNING
-                await func(*args, **kwargs)
+                func_result = await func(*args, **kwargs)
             except Exception:
                 task.retries += 1
                 logger.info(
@@ -467,6 +470,7 @@ class TaskRetryHandler:
                     extra={"kbid": metadata.kbid, f"{self.type}_id": metadata.id},
                 )
                 task.status = Status.FINISHED
+                return func_result
             finally:
                 await self.dm.set_metadata(self.type, metadata)
 

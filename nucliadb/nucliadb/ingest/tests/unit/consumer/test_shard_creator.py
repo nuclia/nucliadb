@@ -22,11 +22,11 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from nucliadb_protos.nodesidecar_pb2 import Counter
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.consumer import shard_creator
+from nucliadb_protos import nodereader_pb2
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,7 +39,7 @@ def pubsub():
 
 
 @pytest.fixture()
-def sidecar():
+def reader():
     yield AsyncMock()
 
 
@@ -54,9 +54,9 @@ def kbdm():
 
 
 @pytest.fixture()
-def shard_manager(sidecar):
+def shard_manager(reader):
     sm = MagicMock()
-    node = MagicMock(sidecar=sidecar)
+    node = MagicMock(reader=reader)
     shards = Shards(shards=[ShardObject()], actual=0)
     sm.get_shards_by_kbid_inner = AsyncMock(return_value=shards)
     sm.maybe_create_new_shard = AsyncMock()
@@ -84,11 +84,11 @@ async def shard_creator_handler(pubsub, shard_manager):
 
 async def test_handle_message_create_new_shard(
     shard_creator_handler: shard_creator.ShardCreatorHandler,
-    sidecar,
+    reader,
     kbdm,
     shard_manager,
 ):
-    sidecar.GetCount.return_value = Counter(
+    reader.GetShard.return_value = nodereader_pb2.Shard(
         paragraphs=settings.max_shard_paragraphs + 1
     )
 
@@ -104,9 +104,9 @@ async def test_handle_message_create_new_shard(
 
 
 async def test_handle_message_do_not_create(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, sidecar, shard_manager
+    shard_creator_handler: shard_creator.ShardCreatorHandler, reader, shard_manager
 ):
-    sidecar.GetCount.return_value = Counter(
+    reader.GetShard.return_value = nodereader_pb2.Shard(
         paragraphs=settings.max_shard_paragraphs - 1
     )
 

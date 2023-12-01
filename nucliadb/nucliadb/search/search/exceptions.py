@@ -24,3 +24,10 @@ class IncompleteFindResultsError(Exception):
 
 class ResourceNotFoundError(Exception):
     pass
+
+
+class InvalidQueryError(Exception):
+    def __init__(self, param: str, reason: str):
+        self.param = param
+        self.reason = reason
+        super().__init__(f"Invalid query. Error in {param}: {reason}")

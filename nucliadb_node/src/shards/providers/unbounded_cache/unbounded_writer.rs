@@ -26,45 +26,46 @@ use nucliadb_core::tracing::{debug, error};
 use nucliadb_core::{node_error, NodeResult};
 use uuid::Uuid;
 
+use crate::disk_structure;
+use crate::settings::Settings;
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
-use crate::{disk_structure, env};
 
+#[derive(Default)]
 pub struct UnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
 }
 
 impl UnboundedShardWriterCache {
-    pub fn new(shards_path: PathBuf) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
-            shards_path,
             cache: RwLock::new(HashMap::new()),
+            shards_path: settings.shards_path(),
         }
     }
 
     fn read(&self) -> RwLockReadGuard<HashMap<ShardId, Arc<ShardWriter>>> {
-        self.cache
-            .read()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.read().expect("Poisoned lock while reading")
     }
 
     fn write(&self) -> RwLockWriteGuard<HashMap<ShardId, Arc<ShardWriter>>> {
-        self.cache
-            .write()
-            .unwrap_or_else(|poison| poison.into_inner())
+        self.cache.write().expect("Poisoned lock while reading")
     }
 }
 
 impl ShardWriterProvider for UnboundedShardWriterCache {
-    fn create(&self, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
+    fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = Uuid::new_v4().to_string();
+        let cache_shard_id = shard_id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
-        let new_shard = ShardWriter::new(shard_id, &shard_path, metadata)?;
-        Ok(new_shard)
+        let new_shard = ShardWriter::new(shard_id, &shard_path, metadata).map(Arc::new)?;
+        let returned_shard = Arc::clone(&new_shard);
+        self.write().insert(cache_shard_id, new_shard);
+        Ok(returned_shard)
     }
 
     fn load(&self, id: ShardId) -> NodeResult<Arc<ShardWriter>> {
@@ -93,8 +94,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
 
     fn load_all(&self) -> NodeResult<()> {
         let mut cache = self.write();
-        let shards_path = env::shards_path();
-        for entry in std::fs::read_dir(&shards_path)? {
+        for entry in std::fs::read_dir(&self.shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();

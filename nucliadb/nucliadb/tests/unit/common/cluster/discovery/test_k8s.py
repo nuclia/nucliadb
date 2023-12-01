@@ -44,7 +44,12 @@ def writer_stub():
     with patch(
         "nucliadb.common.cluster.discovery.base.nodewriter_pb2_grpc.NodeWriterStub",
         return_value=writer_stub,
-    ), patch("nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"):
+    ), patch(
+        "nucliadb.common.cluster.discovery.base.replication_pb2_grpc.ReplicationServiceStub",
+        return_value=writer_stub,
+    ), patch(
+        "nucliadb.common.cluster.discovery.base.get_traced_grpc_channel"
+    ):
         yield writer_stub
 
 
@@ -79,7 +84,7 @@ def create_k8s_event(
                 pod_ip="1.2.3.4",
             ),
             metadata=kubernetes_asyncio.client.models.v1_object_meta.V1ObjectMeta(
-                name=name,
+                name=name, labels={"readReplica": "false"}
             ),
         ),
     }
@@ -87,7 +92,7 @@ def create_k8s_event(
 
 async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub):
     assert await k8s_discovery.get_node_metadata(
-        "node-0", "1.1.1.1"
+        "node-0", "1.1.1.1", read_replica=False
     ) == IndexNodeMetadata(
         node_id="node_id",
         shard_count=1,
@@ -98,7 +103,7 @@ async def test_get_node_metadata(k8s_discovery: KubernetesDiscovery, writer_stub
     writer_stub.GetMetadata.assert_awaited_once()
 
     # should be cached now
-    await k8s_discovery.get_node_metadata("node-0", "1.1.1.1")
+    await k8s_discovery.get_node_metadata("node-0", "1.1.1.1", read_replica=False)
 
     assert len(writer_stub.GetMetadata.mock_calls) == 1
 

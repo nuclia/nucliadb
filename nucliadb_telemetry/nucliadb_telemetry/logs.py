@@ -234,12 +234,11 @@ def setup_logging(*, settings: Optional[LogSettings] = None) -> None:
         error_log_handler = RotatingFileHandler(
             settings.error_log, maxBytes=settings.max_log_file_size, backupCount=5
         )
+        error_log_handler.setLevel(logging.ERROR)
     else:
         # we only use error_log_handler for file output so this
         # ends up not being used
         log_handler = error_log_handler = logging.StreamHandler()
-
-    error_log_handler.setLevel(logging.ERROR)
 
     if not settings.debug and settings.log_format_type == LogFormatType.STRUCTURED:
         log_handler.setFormatter(JSONFormatter())

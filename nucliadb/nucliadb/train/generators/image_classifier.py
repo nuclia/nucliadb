@@ -19,7 +19,7 @@
 #
 
 import json
-from typing import Any, AsyncIterator, Dict, List, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Tuple
 
 from nucliadb_protos.dataset_pb2 import (
     ImageClassification,
@@ -33,7 +33,7 @@ from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
 from nucliadb.train import logger
-from nucliadb.train.generators.utils import get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 
 VISUALLY_ANNOTABLE_FIELDS = {FieldType.FILE, FieldType.LINK}
 
@@ -41,16 +41,28 @@ VISUALLY_ANNOTABLE_FIELDS = {FieldType.FILE, FieldType.LINK}
 PawlsPayload = Dict[str, Any]
 
 
+def image_classification_batch_generator(
+    kbid: str,
+    trainset: TrainSet,
+    node: AbstractIndexNode,
+    shard_replica_id: str,
+) -> AsyncGenerator[ImageClassificationBatch, None]:
+    generator = generate_image_classification_payloads(
+        kbid, trainset, node, shard_replica_id
+    )
+    batch_generator = batchify(generator, trainset.batch_size, ImageClassificationBatch)
+    return batch_generator
+
+
 async def generate_image_classification_payloads(
     kbid: str,
     trainset: TrainSet,
     node: AbstractIndexNode,
     shard_replica_id: str,
-) -> AsyncIterator[ImageClassificationBatch]:
+) -> AsyncGenerator[ImageClassification, None]:
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     request.reload = True
-    batch = ImageClassificationBatch()
     async for item in node.stream_get_fields(request):
         rid = item.uuid
         resource = await get_resource_from_cache_or_db(kbid, rid)
@@ -115,14 +127,8 @@ async def generate_image_classification_payloads(
             ic = ImageClassification()
             ic.page_uri = page_uri
             ic.selections = json.dumps(pawls_payload)
-            batch.data.append(ic)
 
-            if len(batch.data) == trainset.batch_size:
-                yield batch
-                batch = ImageClassificationBatch()
-
-    if len(batch.data):
-        yield batch
+            yield ic
 
 
 async def get_page_selections(

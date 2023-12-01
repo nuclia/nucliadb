@@ -70,26 +70,6 @@ pub mod relation_node {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct JoinGraphEdge {
-    #[prost(int32, tag="4")]
-    pub source: i32,
-    #[prost(int32, tag="1")]
-    pub target: i32,
-    #[prost(enumeration="relation::RelationType", tag="2")]
-    pub rtype: i32,
-    #[prost(string, tag="3")]
-    pub rsubtype: ::prost::alloc::string::String,
-    #[prost(message, optional, tag="5")]
-    pub metadata: ::core::option::Option<RelationMetadata>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct JoinGraph {
-    #[prost(map="int32, message", tag="1")]
-    pub nodes: ::std::collections::HashMap<i32, RelationNode>,
-    #[prost(message, repeated, tag="2")]
-    pub edges: ::prost::alloc::vec::Vec<JoinGraphEdge>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExtractedText {
     #[prost(string, tag="1")]
     pub text: ::prost::alloc::string::String,

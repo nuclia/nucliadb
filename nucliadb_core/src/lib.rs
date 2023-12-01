@@ -21,6 +21,7 @@
 pub mod fs_state;
 pub mod metrics;
 pub mod paragraphs;
+pub mod query_planner;
 pub mod relations;
 pub mod texts;
 pub mod vectors;
@@ -131,6 +132,7 @@ pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
     Arc::new(RwLock::new(writer))
 }
 
+#[derive(Debug)]
 pub struct IndexFiles {
     pub metadata_files: HashMap<String, Vec<u8>>,
     pub files: Vec<String>,
@@ -140,7 +142,6 @@ pub trait WriterChild: std::fmt::Debug + Send + Sync {
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
     fn garbage_collection(&mut self) -> NodeResult<()>;
-    fn merge(&mut self) -> NodeResult<()>;
     fn count(&self) -> NodeResult<usize>;
     fn get_segment_ids(&self) -> NodeResult<Vec<String>>;
     fn get_index_files(&self, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles>;

@@ -31,7 +31,7 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb_protos import audit_pb2, noderesources_pb2, nodesidecar_pb2, writer_pb2
+from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -120,12 +120,12 @@ class IndexAuditHandler:
 
         for shard_obj in shard_groups:
             node, shard_id, _ = choose_node(shard_obj)
-            shard_counter: nodesidecar_pb2.Counter = await node.sidecar.GetCount(
-                noderesources_pb2.ShardId(id=shard_id)  # type: ignore
+            shard: nodereader_pb2.Shard = await node.reader.GetShard(
+                nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
 
-            total_fields += shard_counter.fields
-            total_paragraphs += shard_counter.paragraphs
+            total_fields += shard.fields
+            total_paragraphs += shard.paragraphs
 
         await self.audit.report(
             kbid=kbid,

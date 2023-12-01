@@ -5,43 +5,41 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_search.yml"
-      - "charts/nucliadb_search/**"
-      - "nucliadb_utils/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb/nucliadb/search/**"
-      - "nucliadb/nucliadb/common/**"
-      - "nucliadb_models/**"
-      - "nucliadb_telemetry/**"
-      - "nucliadb_protos/python/**"
-      - "nucliadb_node/**"
-      - "nucliadb_vectors/**"
-      - "nucliadb_texts/**"
-      - "nucliadb_paragraphs/**"
-      - "nucliadb_core/**"
-      - "nucliadb_relations/**"
+      - '.github/workflows/nucliadb_search.yml'
+      - 'charts/nucliadb_search/**'
+      - 'nucliadb_utils/**'
+      - 'nucliadb/nucliadb/ingest/**'
+      - 'nucliadb/nucliadb/search/**'
+      - 'nucliadb/nucliadb/common/**'
+      - 'nucliadb_models/**'
+      - 'nucliadb_telemetry/**'
+      - 'nucliadb_protos/python/**'
+      - 'nucliadb_node/**'
+      - 'nucliadb_vectors/**'
+      - 'nucliadb_texts/**'
+      - 'nucliadb_paragraphs/**'
+      - 'nucliadb_core/**'
+      - 'nucliadb_relations/**'
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_search.yml"
-      - "charts/nucliadb_search/**"
-      - "nucliadb_utils/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb/nucliadb/search/**"
-      - "nucliadb/nucliadb/common/**"
-      - "nucliadb_models/**"
-      - "nucliadb_telemetry/**"
-      - "nucliadb_protos/python/**"
-      - "nucliadb_node/**"
+      - '.github/workflows/nucliadb_search.yml'
+      - 'charts/nucliadb_search/**'
+      - 'nucliadb_utils/**'
+      - 'nucliadb/nucliadb/ingest/**'
+      - 'nucliadb/nucliadb/search/**'
+      - 'nucliadb/nucliadb/common/**'
+      - 'nucliadb_models/**'
+      - 'nucliadb_telemetry/**'
+      - 'nucliadb_protos/python/**'
+      - 'nucliadb_node/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 env:
-  API_VERSION: 1
-  COMPONENT: nucliadb-search
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: search
 
@@ -51,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ['3.9', '3.10', '3.11']
 
     steps:
       - name: Checkout the repository
@@ -61,7 +59,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: 'pip'
 
       - name: Install package
         run: make -C nucliadb/ install-dev
@@ -75,7 +73,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ['3.11']
 
     steps:
       - name: Checkout the repository
@@ -84,10 +82,10 @@ jobs:
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
 
       # setup docker, as we need to pull the node image to run the tests
       - name: Configure Docker
@@ -97,7 +95,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          cache: 'pip'
 
       - name: Install the package
         run: make -C nucliadb/ install-dev
@@ -163,7 +161,7 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push'
         with:
-          tool: "pytest"
+          tool: 'pytest'
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: true
@@ -171,13 +169,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: "@nuclia/nuclia-db"
+          alert-comment-cc-users: '@nuclia/nuclia-db'
 
       - name: Comment benchmark result based on main
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name != 'push'
         with:
-          tool: "pytest"
+          tool: 'pytest'
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: false
@@ -185,76 +183,33 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: "@nuclia/nuclia-db"
+          alert-comment-cc-users: '@nuclia/nuclia-db'
 
       - name: Store on GH Pages
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push'
         with:
-          tool: "pytest"
+          tool: 'pytest'
           output-file-path: benchmarks.json
           auto-push: true
           gh-repository: github.com/nuclia/nucliadb_performance
           gh-pages-branch: main
           github-token: ${{ secrets.PERFORMANCE_TOKEN }}
 
-      - name: Extract docs
-        run: |
-          mkdir -p /tmp/openapi
-          nucliadb-extract-openapi-search /tmp/openapi/$COMPONENT.json $API_VERSION $GITHUB_SHA
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: openapi-${{ env.COMPONENT }}-${{ github.sha }}
-          path: /tmp/openapi/${{ env.COMPONENT }}.json
-
   # PR workflows END here
   # PUSH workflows contine with deploy activities
 
   build:
     name: Build image and push
-    runs-on: ubuntu-latest
     needs: tests
+    uses: ./.github/workflows/_build-img-nucliadb.yml
+    with:
+      platforms: linux/amd64,linux/arm64
+      image-name: search
+      cache-gha-mode: min
+    secrets:
+      inherit
     if: github.event_name == 'push'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Calculate short sha
-        id: env-vars
-        run: |-
-          HASH=`git rev-parse --short HEAD`
-          BRANCH=${GITHUB_REF##*/}
-          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
-      - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - name: Configure Docker
-        run: docker login -u oauth2accesstoken -p "$(gcloud auth application-default print-access-token)" https://eu.gcr.io
-
-      # We need to setup buildx to be able to cache with gha
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.short_sha }}
-            ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env-vars.outputs.branch }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
@@ -305,27 +260,3 @@ jobs:
           repository: nuclia/nucliadb_deploy
           event-type: promote
           client-payload: '{"component": "nucliadb_search", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
-
-  docs:
-    name: "Upload API specs to GCS"
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: github.event_name == 'push'
-
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: openapi-${{ env.COMPONENT }}-${{ github.sha }}
-          path: /tmp/openapi/
-
-      - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
-
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v1"
-
-      - name: Upload docs
-        run: |
-          gsutil copy /tmp/openapi/$COMPONENT.json gs://stashify-docs/api/nucliadb/v$API_VERSION/$COMPONENT/spec.json

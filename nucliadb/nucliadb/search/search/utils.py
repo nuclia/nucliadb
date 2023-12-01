@@ -17,56 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from fastapi import HTTPException
-
-from nucliadb_models.search import (
-    BaseSearchRequest,
-    SearchRequest,
-    SortField,
-    SortOptions,
-    SortOrder,
-)
-
-INDEX_SORTABLE_FIELDS = [
-    SortField.CREATED,
-    SortField.MODIFIED,
-]
-
-
-def parse_sort_options(item: SearchRequest) -> SortOptions:
-    if is_empty_query(item):
-        if item.sort is None:
-            sort_options = SortOptions(
-                field=SortField.CREATED,
-                order=SortOrder.DESC,
-                limit=None,
-            )
-        elif item.sort.field not in INDEX_SORTABLE_FIELDS:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
-                ),
-            )
-        else:
-            sort_options = item.sort
-    else:
-        if item.sort is None:
-            sort_options = SortOptions(
-                field=SortField.SCORE,
-                order=SortOrder.DESC,
-                limit=None,
-            )
-        elif item.sort.field not in INDEX_SORTABLE_FIELDS and item.sort.limit is None:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
-            )
-        else:
-            sort_options = item.sort
-
-    return sort_options
+from nucliadb_models.search import BaseSearchRequest
 
 
 def is_empty_query(request: BaseSearchRequest) -> bool:

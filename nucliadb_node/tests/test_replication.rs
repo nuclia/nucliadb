@@ -21,7 +21,6 @@
 mod common;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
@@ -29,6 +28,7 @@ use nucliadb_core::protos::{
     UserVector, UserVectors, VectorSetId, VectorSimilarity,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
+use nucliadb_node::shards::providers::AsyncShardWriterProvider;
 use tonic::Request;
 
 #[tokio::test]
@@ -45,6 +45,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     let mut reader = fixture.reader_client();
     let mut secondary_reader = fixture.secondary_reader_client();
 
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     let shard = create_shard(&mut writer).await;
 
     let mut query = create_search_request(&shard.id, "prince");
@@ -59,7 +61,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let repl_health_mng = ReplicationHealthManager::new(Arc::clone(&fixture.secondary_settings));
+    let health_manager_settings = fixture.secondary_settings.clone();
+    let repl_health_mng = ReplicationHealthManager::new(health_manager_settings);
     let healthy = repl_health_mng.healthy();
     assert!(healthy);
 
@@ -74,11 +77,25 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
     query.vectorset = "test_vector_set".to_string();
     query.vector = vec![1.0, 2.0, 3.0];
 
+    // Validate search against secondary
     let response = run_search(&mut secondary_reader, query.clone()).await;
     assert!(response.vector.is_some());
     assert_eq!(response.vector.unwrap().documents.len(), 1);
 
-    delete_shard(&mut writer, shard.id).await;
+    // Validate generation id is the same
+    let primary_shard = fixture.primary_shard_cache().load(shard.id.clone()).await?;
+    let secondary_shard = fixture
+        .secondary_shard_cache()
+        .load(shard.id.clone())
+        .await?;
+
+    assert_eq!(
+        primary_shard.get_generation_id(),
+        secondary_shard.get_generation_id()
+    );
+
+    // Test deleting shard deletes it from secondary
+    delete_shard(&mut writer, shard.id.clone()).await;
 
     // wait for the shard to be deleted
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;

@@ -271,18 +271,31 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     assert resources.pagination.last
 
     results = sdk.search(
-        kbid=kb.uuid, features=["document"], faceted=["/l"], page_size=0
+        kbid=kb.uuid,
+        features=["document"],
+        faceted=["/classification.labels"],
+        page_size=0,
     )
-    assert results.fulltext.facets == {"/l": {"/l/emoji": 50 * 2}}
+    assert results.fulltext.facets == {
+        "/classification.labels": {"/classification.labels/emoji": 50 * 2}
+    }
 
     resources = sdk.search(kbid=kb.uuid, query="love")
     assert resources.fulltext.total == 5
     assert len(resources.resources) == 5
 
     resources = sdk.search(
-        kbid=kb.uuid, features=["document"], faceted=["/l/emoji"], page_size=0
+        kbid=kb.uuid,
+        features=["document"],
+        faceted=["/classification.labels/emoji"],
+        page_size=0,
     )
-    assert resources.fulltext.facets["/l/emoji"]["/l/emoji/0"] == 9 * 2
+    assert (
+        resources.fulltext.facets["/classification.labels/emoji"][
+            "/classification.labels/emoji/0"
+        ]
+        == 9 * 2
+    )
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
     results = sdk.search(

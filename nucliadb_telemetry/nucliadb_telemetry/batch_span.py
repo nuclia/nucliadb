@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import time
 from typing import List, Optional
 
 from opentelemetry.context import (  # type: ignore
@@ -29,7 +30,6 @@ from opentelemetry.context import (  # type: ignore
 )
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor  # type: ignore
 from opentelemetry.sdk.trace.export import SpanExporter  # type: ignore
-from opentelemetry.util._time import _time_ns  # type: ignore
 
 from nucliadb_telemetry import logger
 
@@ -174,12 +174,12 @@ class BatchSpanProcessor(SpanProcessor):
                 self._spans_dropped = False
 
             # subtract the duration of this export call to the next timeout
-            start = _time_ns()
+            start = time.perf_counter_ns()
             try:
                 await asyncio.wait_for(self._export(flush_request), timeout)
             except asyncio.TimeoutError:
                 logger.exception("Took to much time to export, network problem ahead")
-            end = _time_ns()
+            end = time.perf_counter_ns()
             duration = (end - start) / 1e9
             timeout = self.schedule_delay_millis / 1e3 - duration
 

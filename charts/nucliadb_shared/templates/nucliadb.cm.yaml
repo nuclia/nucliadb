@@ -26,14 +26,17 @@ data:
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}
 {{- else if eq .Values.storage.file_backend "s3" }}
+{{- if eq .Values.storage.s3_irsa "disabled" }}
   S3_CLIENT_ID: {{ .Values.storage.s3_client_id }}
   S3_CLIENT_SECRET: {{ .Values.storage.s3_client_secret }}
+{{- end }}
 {{- if .Values.storage.s3_ssl }}
   S3_SSL: "True"
 {{- end }}
   S3_MAX_POOL_CONNECTIONS: {{ .Values.storage.s3_max_pool_connections | quote }}
   S3_REGION_NAME: {{ .Values.storage.s3_region_name }}
   S3_BUCKET: {{ .Values.storage.s3_bucket }}
+  S3_BUCKET_TAGS: {{ toJson .Values.storage.s3_bucket_tags | quote }}
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
 {{- end }}
@@ -54,12 +57,17 @@ data:
   NUCLIADB_INGEST: {{ .Values.nucliadb.ingest }}
   NODE_WRITER_PORT: {{ .Values.nucliadb.node_writer_port | quote }}
   NODE_READER_PORT: {{ .Values.nucliadb.node_reader_port | quote }}
-  NODE_SIDECAR_PORT: {{ .Values.nucliadb.node_sidecar_port | quote }}
   CACHE_PUBSUB_NATS_URL: {{ toJson .Values.cache.cache_pubsub_nats_url |quote }}
-  CACHE_PUBSUB_NATS_AUTH: {{ .Values.cache.cache_pubsub_nats_auth }}
-  TRANSACTION_JETSTREAM_AUTH: {{ .Values.transaction.transaction_jetstream_auth }}
+{{- with .Values.cache.cache_pubsub_nats_auth }}  
+  CACHE_PUBSUB_NATS_AUTH: {{ . }}
+{{- end}}  
+{{- with .Values.transaction.transaction_jetstream_auth }}
+  TRANSACTION_JETSTREAM_AUTH: {{ . }}
+{{- end}}
   TRANSACTION_JETSTREAM_SERVERS: {{ toJson .Values.transaction.transaction_jetstream_servers | quote }}
-  INDEX_JETSTREAM_AUTH: {{ .Values.indexing.index_jetstream_auth }}
+{{- with .Values.indexing.index_jetstream_auth }}  
+  INDEX_JETSTREAM_AUTH: {{ . }}
+{{- end}}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   DRIVER: {{ .Values.maindb.driver }}
 {{- if eq .Values.maindb.driver "redis" }}
@@ -70,7 +78,9 @@ data:
   AUDIT_DRIVER: {{ .Values.audit.driver }}
   AUDIT_JETSTREAM_TARGET: {{ .Values.audit.audit_jetstream_target }}
   AUDIT_JETSTREAM_SERVERS: {{ toJson .Values.audit.audit_jetstream_servers | quote }}
-  AUDIT_JETSTREAM_AUTH: {{ .Values.audit.audit_jetstream_auth }}
+{{- with .Values.audit.audit_jetstream_auth }}  
+  AUDIT_JETSTREAM_AUTH: {{ . }}
+{{- end}}  
   AUDIT_PARTITIONS: {{ .Values.audit.audit_partitions | quote }}
   AUDIT_HASH_SEED: {{ .Values.audit.audit_hash_seed | quote }}
   JAEGER_AGENT_HOST: "{{ .Values.tracing.jaeger_agent_host }}"
@@ -81,7 +91,7 @@ data:
   OTEL_EXPORTER_JAEGER_AGENT_SPLIT_OVERSIZED_BATCHES: "1"
 
 {{- if not .Values.telemetry.enabled }}
-  NUCLIADB_DISABLE_TELEMETRY: "True"
+  NUCLIADB_DISABLE_ANALYTICS: "True"
 {{- end }}
 
 {{- if .Values.flag_settings_url }}

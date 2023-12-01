@@ -9,11 +9,13 @@ metadata:
   labels:
     app: node-replicas-{{ $i }}
     appType: node
+    readReplica: "true"
     app.kubernetes.io/name: node-replicas-{{ $i }}
     app.kubernetes.io/instance: {{ $release.Name }}
     app.kubernetes.io/managed-by: {{ $release.Service }}
     version: "{{ $chart.Version | replace "+" "_" }}"
     chart: "{{ $chart.Name }}"
+    metrics: "enabled"
 spec:
   selector:
     app: node-replicas-{{ $i }}

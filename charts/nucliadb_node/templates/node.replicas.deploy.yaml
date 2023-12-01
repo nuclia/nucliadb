@@ -9,15 +9,17 @@ metadata:
   labels:
     app: node-replicas-{{ $i }}
     appType: node
+    readReplica: "true"
     app.kubernetes.io/name: node-replicas-{{ $i }}
     app.kubernetes.io/instance: "{{ $release.Name }}"
     app.kubernetes.io/managed-by: {{ $release.Service }}
     version: "{{ $chart.Version | replace "+" "_" }}"
     chart: "{{ $chart.Name }}"
+  annotations:
+    sidecar.istio.io/inject: "false"
 spec:
   replicas: {{ $values.readReplicas.count }}
   revisionHistoryLimit: {{ $values.revisionHistoryLimit }}
-  serviceName: node
   selector:
     matchLabels:
       app: node-replicas-{{ $i }}
@@ -27,6 +29,7 @@ spec:
   template:
     metadata:
       annotations:
+        sidecar.istio.io/inject: "false"
         # do not have access to dependency chart cm this component references
         {{- if hasKey $values "extra_pod_annotations" }}
 {{ toYaml $values.extra_pod_annotations | indent 8 }}
@@ -35,29 +38,39 @@ spec:
       labels:
         app: node-replicas-{{ $i }}
         appType: node
+        readReplica: "true"
         app.kubernetes.io/name: node-replicas-{{ $i }}
         app.kubernetes.io/instance: "{{ $release.Name }}"
         app.kubernetes.io/managed-by: {{ $release.Service }}
         version: "{{ $chart.Version | replace "+" "_" }}"
         chart: "{{ $chart.Name }}"
     spec:
+      terminationGracePeriodSeconds: 120
+{{- if $values.readReplicas.nodeSelector }}
       nodeSelector:
 {{ toYaml $values.readReplicas.nodeSelector | indent 8 }}
+{{- end }}
+{{- if $values.readReplicas.topologySpreadConstraints }}
       topologySpreadConstraints:
 {{ toYaml $values.readReplicas.topologySpreadConstraints | indent 8 }}
+{{- end }}
+{{- if $values.readReplicas.affinity }}
       affinity:
 {{ toYaml $values.readReplicas.affinity | indent 8 }}
+{{- end }}
+{{- if $values.readReplicas.tolerations }}
       tolerations:
 {{ toYaml $values.readReplicas.tolerations | indent 8 }}
+{{- end }}
       dnsPolicy: ClusterFirst
+      serviceAccount:  {{ (($values.readReplicas).serviceAccount) | default "default" }}
       volumes:
       - name: data-dir
         emptyDir:
-          sizeLimit: {{ mul $values.readReplicas.disk.numLocalDisks $values.readReplicas.disk.localDiskSize $values.readReplicas.disk.reservationPercentage | int }}Gi
-{{- if $values.nats.secretName }}
+{{- with $values.nats.secretName }}
       - name: nats-creds
         secret:
-          secretName: {{ $values.nats.secretName }}
+          secretName: {{ . }}
 {{- end }}
       containers:
       - name: writer
@@ -80,8 +93,8 @@ spec:
           - name: NODE_ROLE
             value: secondary
           - name: PRIMARY_ADDRESS
-            value: "node-{{ $i }}:{{ $values.serving.grpc_writer }}"
-          - name: METRICS_HTTP_PORT
+            value: "node-{{ $i }}.node:{{ $values.serving.grpc_writer }}"
+          - name: METRICS_PORT
             value: "3032"
           {{- range $key, $value := $values.env }}
           - name: "{{ $key }}"
@@ -125,7 +138,7 @@ spec:
         env:
           - name: NODE_ROLE
             value: secondary
-          - name: METRICS_HTTP_PORT
+          - name: METRICS_PORT
             value: "3031"
         {{- range $key, $value := $values.env }}
           - name: "{{ $key }}"
@@ -166,14 +179,5 @@ spec:
           - --reporter.grpc.host-port=dns:///{{ $values.tracing.jaegerCollectorHost }}:{{ $values.tracing.jaegerCollectorGrpcPort }}
           - --reporter.type=grpc
 {{- end }}
-  volumeClaimTemplates:
-  - metadata:
-      name: node-pv
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: {{ $values.storage.class }}
-      resources:
-        requests:
-          storage: {{ $values.storage.size }}
 ---
 {{- end }}

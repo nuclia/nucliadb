@@ -22,6 +22,7 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper
@@ -334,8 +335,8 @@ async def test_generate_broker_message(
     # Field vectors
     lfv = [v for v in bm.field_vectors if v.field.field == "link1"][0]
     assert len(lfv.vectors.vectors.vectors) == 1
-    assert lfv.vectors.vectors.vectors[0].start == 1
-    assert lfv.vectors.vectors.vectors[0].end == 2
+    assert lfv.vectors.vectors.vectors[0].start == 0
+    assert lfv.vectors.vectors.vectors[0].end == 20
     assert lfv.vectors.vectors.vectors[0].vector == list(map(int, b"ansjkdn"))
 
     # 2.3 CONVERSATION FIELD
@@ -355,3 +356,83 @@ async def test_generate_broker_message(
 
     # TODO: Add checks for remaining field types and
     # other broker message metadata that is missing
+
+
+async def test_generate_index_message_contains_all_metadata(
+    gcs_storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+):
+    # Create a resource with all possible metadata in it
+    resource = await create_resource(gcs_storage, maindb_driver, knowledgebox_ingest)
+    resource.disable_vectors = False
+
+    async with maindb_driver.transaction() as txn:
+        resource.txn = txn  # I don't like this but this is the API we have...
+        resource_brain = await resource.generate_index_message()
+    index_message = resource_brain.brain
+
+    # Global resource labels
+    assert set(index_message.labels) == {
+        "/l/labelset1/label1",
+        "/n/i/text/plain",
+        "/s/p/ca",
+        "/u/s/My Source",
+        "/o/My Source",
+        "/n/s/PROCESSED",
+    }
+
+    # Check texts are populated with field extracted text and field computed labels
+    expected_fields = {
+        "a/title",
+        "a/summary",
+        "u/link1",
+        "d/datetime1",
+        "c/conv1",
+        "f/file1",
+        "t/text1",
+        "k/keywordset1",
+        "l/layout1",
+    }
+    fields_to_be_found = expected_fields.copy()
+    for field, text in index_message.texts.items():
+        assert field in fields_to_be_found
+        fields_to_be_found.remove(field)
+        assert text.text == "MyText"
+        assert {"/l/labelset1/label1", "/e/ENTITY/document"}.issubset(set(text.labels))
+        if field in ("u/link", "t/text1"):
+            assert "/e/Location/My home" in text.labels
+
+    assert len(fields_to_be_found) == 0
+
+    # Metadata
+    assert index_message.metadata.created.seconds > 0
+    assert index_message.metadata.modified.seconds > 0
+    assert (
+        index_message.metadata.modified.seconds
+        >= index_message.metadata.created.seconds
+    )
+
+    # Processing status
+    assert index_message.status == Resource.ResourceStatus.PROCESSED
+
+    # Paragraphs
+    assert set(index_message.paragraphs.keys()) == expected_fields
+    for field, field_paragraphs in index_message.paragraphs.items():
+        for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
+            # Check that the key is correct
+            parts = paragraph_id.split("/")
+            uuid = parts[0]
+            field_id = "/".join(parts[1:3])
+            start, end = map(int, parts[-1].split("-"))
+            assert uuid == resource.uuid
+            assert field_id == field
+            assert start == paragraph.metadata.position.start == paragraph.start
+            assert end == paragraph.metadata.position.end == paragraph.end
+            assert start <= end
+
+    # relations
+    assert len(index_message.relations) > 0
+
+    # vectors in vectorset
+    assert len(index_message.vectors) == 1
+    vector = index_message.vectors["vectorset1"].vectors.popitem()[1].vector
+    assert len(vector) > 0

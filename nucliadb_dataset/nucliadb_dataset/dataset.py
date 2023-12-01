@@ -43,6 +43,8 @@ from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
+    ParagraphStreamingBatch,
+    QuestionAnswerStreamingBatch,
     SentenceClassificationBatch,
     TaskType,
     TokenClassificationBatch,
@@ -51,6 +53,8 @@ from nucliadb_protos.dataset_pb2 import (
 
 from nucliadb_dataset.mapping import (
     batch_to_image_classification_arrow,
+    batch_to_paragraph_streaming_arrow,
+    batch_to_question_answer_streaming_arrow,
     batch_to_text_classification_arrow,
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
@@ -79,6 +83,8 @@ class Task(str, Enum):
     SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
     TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
     IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
+    PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
+    QUESTION_ANSWER_STREAMING = "QUESTION_ANSWER_STREAMING"
 
 
 class NucliaDataset(object):
@@ -165,6 +171,8 @@ class NucliaDBDataset(NucliaDataset):
                 trainset.filter.labels.extend(labels)
             elif Task.IMAGE_CLASSIFICATION == task:
                 trainset = TrainSet(type=TaskType.IMAGE_CLASSIFICATION)
+            elif Task.QUESTION_ANSWER_STREAMING == task:
+                trainset = TrainSet(type=TaskType.QUESTION_ANSWER_STREAMING)
             else:
                 raise KeyError("Not a valid task")
         elif trainset is None and task is None:
@@ -181,23 +189,36 @@ class NucliaDBDataset(NucliaDataset):
         if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
             self._configure_paragraph_classification()
 
-        if self.trainset.type == TaskType.FIELD_CLASSIFICATION:
+        elif self.trainset.type == TaskType.FIELD_CLASSIFICATION:
             self._configure_field_classification()
 
-        if self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
+        elif self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
             self._configure_token_classification()
 
-        if self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
+        elif self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
             self._configure_sentence_classification()
 
-        if self.trainset.type == TaskType.IMAGE_CLASSIFICATION:
+        elif self.trainset.type == TaskType.IMAGE_CLASSIFICATION:
             self._configure_image_classification()
+
+        elif self.trainset.type == TaskType.PARAGRAPH_STREAMING:
+            self._configure_paragraph_streaming()
+
+        elif self.trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
+            self._configure_question_answer_streaming()
+
+        else:
+            raise AttributeError(
+                f"Trainset task '{TaskType.Name(self.trainset.type)}' not supported"
+            )
 
     def _configure_sentence_classification(self):
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
-            raise Exception("Labelset is not valid")
+            raise Exception(
+                f"Labelset is not valid {labelset} not in {self.labels.labelsets}"
+            )
 
         schema = pa.schema(
             [
@@ -222,10 +243,13 @@ class NucliaDBDataset(NucliaDataset):
         computed_labelset = False
 
         if labelset not in self.labels.labelsets:
-            if labelset in self.knowledgebox.get_uploaded_labels():
+            uploaded_labels = self.knowledgebox.get_uploaded_labels()
+            if labelset in uploaded_labels:
                 computed_labelset = True
             else:
-                raise Exception("Labelset is not valid")
+                raise Exception(
+                    f"Labelset is not valid {labelset} not in {uploaded_labels}"
+                )
 
         if (
             computed_labelset is False
@@ -275,7 +299,9 @@ class NucliaDBDataset(NucliaDataset):
         labelset = self.trainset.filter.labels[0]
 
         if labelset not in self.labels.labelsets:
-            raise Exception("Labelset is not valid")
+            raise Exception(
+                f"Labelset is not valid {labelset} not in {self.labels.labelsets}"
+            )
 
         if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")
@@ -305,6 +331,40 @@ class NucliaDBDataset(NucliaDataset):
             [
                 bytes_to_batch(ImageClassificationBatch),
                 batch_to_image_classification_arrow(schema),
+            ]
+        )
+        self._set_schema(schema)
+
+    def _configure_paragraph_streaming(self):
+        schema = pa.schema(
+            [
+                pa.field("paragraph_id", pa.string()),
+                pa.field("text", pa.string()),
+            ]
+        )
+        self._set_mappings(
+            [
+                bytes_to_batch(ParagraphStreamingBatch),
+                batch_to_paragraph_streaming_arrow(schema),
+            ]
+        )
+        self._set_schema(schema)
+
+    def _configure_question_answer_streaming(self):
+        schema = pa.schema(
+            [
+                pa.field("paragraph_id", pa.list_(pa.string())),
+                pa.field("paragraph", pa.list_(pa.string())),
+                pa.field("question", pa.string()),
+                pa.field("question_language", pa.string()),
+                pa.field("answer", pa.string()),
+                pa.field("answer_language", pa.string()),
+            ]
+        )
+        self._set_mappings(
+            [
+                bytes_to_batch(QuestionAnswerStreamingBatch),
+                batch_to_question_answer_streaming_arrow(schema),
             ]
         )
         self._set_schema(schema)

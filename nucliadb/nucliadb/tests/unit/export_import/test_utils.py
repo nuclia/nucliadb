@@ -235,10 +235,12 @@ class TestTaskRetryHandler:
         return ImportMetadata(kbid="kbid", id="import_id")
 
     async def test_ok(self, callback, dm, metadata):
+        callback.return_value = 100
         trh = TaskRetryHandler("foo", dm, metadata)
         callback_retried = trh.wrap(callback)
 
-        await callback_retried("foo", bar="baz")
+        result = await callback_retried("foo", bar="baz")
+        assert result == 100
 
         callback.assert_called_once_with("foo", bar="baz")
 

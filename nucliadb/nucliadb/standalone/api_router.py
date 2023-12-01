@@ -29,6 +29,7 @@ from jwcrypto import jwe, jwk  # type: ignore
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
+from nucliadb.standalone import versions
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.settings import nuclia_settings
@@ -123,3 +124,16 @@ async def ready(request: Request) -> JSONResponse:
     if len(manager.get_index_nodes()) == 0:
         return JSONResponse({"status": "not ready"}, status_code=503)
     return JSONResponse({"status": "ok"})
+
+
+@standalone_api_router.get("/versions")
+async def versions_endpoint(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            package: {
+                "installed": versions.get_installed_version(package),
+                "latest": await versions.get_latest_version(package),
+            }
+            for package in versions.WatchedPackages
+        }
+    )

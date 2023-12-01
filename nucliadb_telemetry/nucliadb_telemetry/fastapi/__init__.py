@@ -22,7 +22,9 @@ from urllib.parse import urlparse
 
 import prometheus_client  # type: ignore
 from fastapi import FastAPI
-from opentelemetry.instrumentation.fastapi import _get_route_details  # type: ignore
+from opentelemetry.instrumentation.fastapi import (  # type: ignore
+    _get_default_span_details,
+)
 from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.responses import PlainTextResponse
 
@@ -72,7 +74,9 @@ def instrument_app(
     trace_id_on_responses: bool = False,
 ):
     """
-    :param trace_id_on_responses: If set to True, trace ids will be returned in the X-NUCLIA-TRACE-ID header for all HTTP responses of this app.
+    :param trace_id_on_responses: If set to True, trace ids will be returned in the
+                                  X-NUCLIA-TRACE-ID header for all HTTP responses of
+                                  this app.
     """
     if metrics:
         # b/w compat
@@ -89,7 +93,7 @@ def instrument_app(
     app.add_middleware(
         OpenTelemetryMiddleware,
         excluded_urls=excluded_urls_obj,
-        default_span_details=_get_route_details,
+        default_span_details=_get_default_span_details,
         server_request_hook=server_request_hook,
         tracer_provider=tracer_provider,
     )

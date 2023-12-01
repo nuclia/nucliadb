@@ -21,6 +21,7 @@ import json
 import os
 from enum import Enum
 from typing import AsyncIterator, Dict, List, Optional, Tuple
+from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
@@ -37,6 +38,9 @@ from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
     RephraseModel,
+    SummarizedResource,
+    SummarizedResponse,
+    SummarizeModel,
 )
 from nucliadb_telemetry import metrics
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -46,6 +50,12 @@ from nucliadb_utils.utilities import Utility, set_utility
 
 class SendToPredictError(Exception):
     pass
+
+
+class ProxiedPredictAPIError(Exception):
+    def __init__(self, status: int, detail: str = ""):
+        self.status = status
+        self.detail = detail
 
 
 class PredictVectorMissing(Exception):
@@ -79,6 +89,7 @@ PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
+SUMMARIZE = "/summarize"
 CHAT = "/chat"
 ASK_DOCUMENT = "/ask_document"
 REPHRASE = "/rephrase"
@@ -134,73 +145,6 @@ def convert_relations(data: Dict[str, List[Dict[str, str]]]) -> List[RelationNod
     return result
 
 
-class DummyPredictEngine:
-    def __init__(self):
-        self.calls = []
-        self.generated_answer = [
-            b"valid ",
-            b"answer ",
-            b" to",
-            AnswerStatusCode.SUCCESS.encode(),
-        ]
-
-    async def initialize(self):
-        pass
-
-    async def finalize(self):
-        pass
-
-    async def send_feedback(
-        self,
-        kbid: str,
-        item: FeedbackRequest,
-        x_nucliadb_user: str,
-        x_ndb_client: str,
-        x_forwarded_for: str,
-    ):
-        self.calls.append(item)
-        return
-
-    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
-        self.calls.append(item)
-        return DUMMY_REPHRASE_QUERY
-
-    async def chat_query(
-        self, kbid: str, item: ChatModel
-    ) -> Tuple[str, AsyncIterator[bytes]]:
-        self.calls.append(item)
-
-        async def generate():
-            for i in self.generated_answer:
-                yield i
-
-        return (DUMMY_LEARNING_ID, generate())
-
-    async def ask_document(
-        self, kbid: str, query: str, blocks: list[list[str]], user_id: str
-    ) -> str:
-        self.calls.append((query, blocks, user_id))
-        answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
-        return answer
-
-    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
-        self.calls.append(sentence)
-        if (
-            os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
-        ):  # pragma: no cover
-            return Qm2023
-        else:
-            return Q
-
-    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
-        self.calls.append(sentence)
-        dummy_data = os.environ.get("TEST_RELATIONS", None)
-        if dummy_data is not None:  # pragma: no cover
-            return convert_relations(json.loads(dummy_data))
-        else:
-            return DUMMY_RELATION_NODE
-
-
 class PredictEngine:
     def __init__(
         self,
@@ -253,6 +197,8 @@ class PredictEngine:
             raise NUAKeyMissingError()
 
     def get_predict_url(self, endpoint: str) -> str:
+        if not endpoint.startswith("/"):
+            endpoint = "/" + endpoint
         if self.onprem:
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}"
         else:
@@ -279,14 +225,29 @@ class PredictEngine:
         else:
             return {"X-STF-KBID": kbid}
 
-    async def check_response(self, resp, expected: int = 200) -> None:
-        if resp.status == expected:
+    async def check_response(
+        self, resp: aiohttp.ClientResponse, expected_status: int = 200
+    ) -> None:
+        if resp.status == expected_status:
             return
+
         if resp.status == 402:
             data = await resp.json()
             raise LimitsExceededError(402, data["detail"])
-        else:
-            raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+
+        try:
+            data = await resp.json()
+            try:
+                detail = data["detail"]
+            except (KeyError, TypeError):
+                detail = data
+        except (
+            json.decoder.JSONDecodeError,
+            aiohttp.client_exceptions.ContentTypeError,
+        ):
+            detail = await resp.text()
+        logger.error(f"Predict API error at {resp.url}: {detail}")
+        raise ProxiedPredictAPIError(status=resp.status, detail=detail)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=MAX_TRIES)
     async def make_request(self, method: str, **request_args):
@@ -321,7 +282,7 @@ class PredictEngine:
             json=data,
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=204)
+        await self.check_response(resp, expected_status=204)
 
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
@@ -338,7 +299,7 @@ class PredictEngine:
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         return await _parse_rephrase_response(resp)
 
     @predict_observer.wrap({"type": "chat"})
@@ -357,8 +318,9 @@ class PredictEngine:
             url=self.get_predict_url(CHAT),
             json=item.dict(),
             headers=await self.get_predict_headers(kbid),
+            timeout=None,
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         ident = resp.headers.get("NUCLIA-LEARNING-ID")
         return ident, get_answer_generator(resp)
 
@@ -381,7 +343,7 @@ class PredictEngine:
             headers=await self.get_predict_headers(kbid),
             timeout=None,
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         return await resp.text()
 
     @predict_observer.wrap({"type": "sentence"})
@@ -400,7 +362,7 @@ class PredictEngine:
             params={"text": sentence},
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         data = await resp.json()
         if len(data["data"]) == 0:
             raise PredictVectorMissing()
@@ -422,10 +384,122 @@ class PredictEngine:
             params={"text": sentence},
             headers=await self.get_predict_headers(kbid),
         )
-        await self.check_response(resp, expected=200)
+        await self.check_response(resp, expected_status=200)
         data = await resp.json()
-
         return convert_relations(data)
+
+    @predict_observer.wrap({"type": "summarize"})
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined. Summarize operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(SUMMARIZE),
+            json=item.dict(),
+            headers=await self.get_predict_headers(kbid),
+            timeout=None,
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return SummarizedResponse.parse_obj(data)
+
+
+class DummyPredictEngine(PredictEngine):
+    def __init__(self):
+        self.onprem = True
+        self.cluster_url = "http://localhost:8000"
+        self.public_url = "http://localhost:8000"
+        self.calls = []
+        self.generated_answer = [
+            b"valid ",
+            b"answer ",
+            b" to",
+            AnswerStatusCode.SUCCESS.encode(),
+        ]
+
+    async def initialize(self):
+        pass
+
+    async def finalize(self):
+        pass
+
+    async def get_predict_headers(self, kbid: str) -> dict[str, str]:
+        return {}
+
+    async def make_request(self, method: str, **request_args):
+        self.calls.append((method, request_args))
+        response = Mock(status=200)
+        response.json = AsyncMock(return_value={"foo": "bar"})
+        response.headers = {"NUCLIA-LEARNING-ID": DUMMY_LEARNING_ID}
+        return response
+
+    async def send_feedback(
+        self,
+        kbid: str,
+        item: FeedbackRequest,
+        x_nucliadb_user: str,
+        x_ndb_client: str,
+        x_forwarded_for: str,
+    ):
+        self.calls.append(item)
+        return
+
+    async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
+        self.calls.append(item)
+        return DUMMY_REPHRASE_QUERY
+
+    async def chat_query(
+        self, kbid: str, item: ChatModel
+    ) -> Tuple[str, AsyncIterator[bytes]]:
+        self.calls.append(item)
+
+        async def generate():
+            for i in self.generated_answer:
+                yield i
+
+        return (DUMMY_LEARNING_ID, generate())
+
+    async def ask_document(
+        self, kbid: str, query: str, blocks: list[list[str]], user_id: str
+    ) -> str:
+        self.calls.append((query, blocks, user_id))
+        answer = os.environ.get("TEST_ASK_DOCUMENT") or "Answer to your question"
+        return answer
+
+    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
+        self.calls.append(sentence)
+        if (
+            os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21"
+        ):  # pragma: no cover
+            return Qm2023
+        else:
+            return Q
+
+    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+        self.calls.append(sentence)
+        dummy_data = os.environ.get("TEST_RELATIONS", None)
+        if dummy_data is not None:  # pragma: no cover
+            return convert_relations(json.loads(dummy_data))
+        else:
+            return DUMMY_RELATION_NODE
+
+    async def summarize(self, kbid: str, item: SummarizeModel) -> SummarizedResponse:
+        self.calls.append((kbid, item))
+        response = SummarizedResponse(
+            summary="global summary",
+        )
+        for rid in item.resources.keys():
+            rsummary = []
+            for field_id, field_text in item.resources[rid].fields.items():
+                rsummary.append(f"{field_id}: {field_text}")
+            response.resources[rid] = SummarizedResource(
+                summary="\n\n".join(rsummary), tokens=10
+            )
+        return response
 
 
 def get_answer_generator(response: aiohttp.ClientResponse):

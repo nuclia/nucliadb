@@ -18,18 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
-from unittest.mock import Mock, call
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode, VectorSimilarity
 
 from nucliadb.search.search.query import (
+    QueryParser,
     get_default_min_score,
     get_kb_model_default_min_score,
     parse_entities_to_filters,
-    record_filters_counter,
 )
 
 QUERY_MODULE = "nucliadb.search.search.query"
@@ -42,10 +42,10 @@ def test_parse_entities_to_filters():
 
     request = SearchRequest()
     assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
-    assert request.filter.tags == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/John"]
 
     assert parse_entities_to_filters(request, detected_entities) == []
-    assert request.filter.tags == ["/e/person/John"]
+    assert request.filter.field_labels == ["/e/person/John"]
 
 
 @pytest.fixture()
@@ -54,13 +54,7 @@ def get_kb_model_default_min_score_mock():
         yield mock
 
 
-@pytest.fixture(scope="function")
-def has_feature():
-    with unittest.mock.patch(f"{QUERY_MODULE}.has_feature", return_value=True) as mock:
-        yield mock
-
-
-async def test_get_default_min_score(has_feature, get_kb_model_default_min_score_mock):
+async def test_get_default_min_score(get_kb_model_default_min_score_mock):
     get_kb_model_default_min_score_mock.return_value = 1.5
 
     assert await get_default_min_score("kbid") == 1.5
@@ -68,9 +62,7 @@ async def test_get_default_min_score(has_feature, get_kb_model_default_min_score
     get_default_min_score.cache_clear()
 
 
-async def test_get_default_min_score_default_value(
-    has_feature, get_kb_model_default_min_score_mock
-):
+async def test_get_default_min_score_default_value(get_kb_model_default_min_score_mock):
     get_kb_model_default_min_score_mock.return_value = None
 
     assert await get_default_min_score("kbid") == 0.7
@@ -78,9 +70,7 @@ async def test_get_default_min_score_default_value(
     get_default_min_score.cache_clear()
 
 
-async def test_get_default_min_score_is_cached(
-    has_feature, get_kb_model_default_min_score_mock
-):
+async def test_get_default_min_score_is_cached(get_kb_model_default_min_score_mock):
     await get_default_min_score("kbid1")
     await get_default_min_score("kbid1")
     await get_default_min_score("kbid1")
@@ -90,15 +80,6 @@ async def test_get_default_min_score_is_cached(
     assert get_kb_model_default_min_score_mock.call_count == 2
 
     get_default_min_score.cache_clear()
-
-
-async def test_get_default_min_score_feature_not_enabled(
-    has_feature, get_kb_model_default_min_score_mock
-):
-    has_feature.return_value = False
-    get_kb_model_default_min_score_mock.return_value = 1.5
-
-    assert await get_default_min_score("kbid1") == 0.7
 
 
 @pytest.fixture()
@@ -124,7 +105,7 @@ def kbdm(driver):
         yield kbdm
 
 
-async def test_get_kb_model_default_min_score(has_feature, kbdm):
+async def test_get_kb_model_default_min_score(kbdm):
     # If min_score is set, it should return it
     kbdm.get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE,
@@ -133,7 +114,7 @@ async def test_get_kb_model_default_min_score(has_feature, kbdm):
     assert await get_kb_model_default_min_score("kbid") == 1.5
 
 
-async def test_get_kb_model_default_min_score_backward_compatible(has_feature, kbdm):
+async def test_get_kb_model_default_min_score_backward_compatible(kbdm):
     # If min_score is not set yet, it should return None
     kbdm.get_model_metadata.return_value = SemanticModelMetadata(
         similarity_function=VectorSimilarity.COSINE
@@ -141,15 +122,68 @@ async def test_get_kb_model_default_min_score_backward_compatible(has_feature, k
     assert await get_kb_model_default_min_score("kbid") is None
 
 
-def test_record_filters_counter():
-    counter = Mock()
+class TestApplySynonymsToRequest:
+    @pytest.fixture
+    def get_synonyms(self):
+        get_kb_synonyms = AsyncMock()
+        synonyms = Synonyms()
+        synonyms.terms["planet"].synonyms.extend(["earth", "globe"])
+        get_kb_synonyms.return_value = synonyms
+        yield get_kb_synonyms
 
-    record_filters_counter(["", "/l/ls/l1", "/e/ORG/Nuclia"], counter)
+    @pytest.fixture
+    def query_parser(self, get_synonyms):
+        qp = QueryParser(
+            kbid="kbid",
+            features=[],
+            query="query",
+            filters=[],
+            faceted=[],
+            page_number=0,
+            page_size=10,
+            min_score=0.5,
+            with_synonyms=True,
+        )
+        with patch("nucliadb.search.search.query.get_kb_synonyms", get_synonyms):
+            yield qp
 
-    counter.inc.assert_has_calls(
-        [
-            call({"type": "filters"}),
-            call({"type": "filters_entities"}),
-            call({"type": "filters_labels"}),
-        ]
-    )
+    @pytest.mark.asyncio
+    async def test_not_applies_if_empty_body(
+        self, query_parser: QueryParser, get_synonyms
+    ):
+        query_parser.query = ""
+        search_request = Mock()
+        await query_parser.parse_synonyms(search_request)
+
+        get_synonyms.assert_not_awaited()
+        search_request.ClearField.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_not_applies_if_synonyms_object_not_found(
+        self, query_parser: QueryParser, get_synonyms
+    ):
+        query_parser.query = "planet"
+        get_synonyms.return_value = None
+        request = Mock()
+
+        await query_parser.parse_synonyms(Mock())
+
+        request.ClearField.assert_not_called()
+        get_synonyms.assert_awaited_once_with("kbid")
+
+    @pytest.mark.asyncio
+    async def test_not_applies_if_synonyms_not_found_for_query(
+        self, query_parser: QueryParser, get_synonyms
+    ):
+        query_parser.query = "foobar"
+        request = Mock()
+
+        await query_parser.parse_synonyms(request)
+
+        request.ClearField.assert_not_called()
+
+        query_parser.query = "planet"
+        await query_parser.parse_synonyms(request)
+
+        request.ClearField.assert_called_once_with("body")
+        assert request.advanced_query == "planet OR earth OR globe"

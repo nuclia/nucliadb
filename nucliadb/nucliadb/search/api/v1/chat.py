@@ -31,7 +31,10 @@ from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import chat, get_relations_results
-from nucliadb.search.search.exceptions import IncompleteFindResultsError
+from nucliadb.search.search.exceptions import (
+    IncompleteFindResultsError,
+    InvalidQueryError,
+)
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     ChatOptions,
@@ -59,6 +62,14 @@ CHAT_EXAMPLES = {
         description="You can ask a question to your knowledge box",  # noqa
         value={
             "query": "Who won the league final?",
+        },
+    ),
+    "search_and_chat_with_custom_prompt": Example(
+        summary="Ask for the gold price evolution in 2023 in a very conscise way",
+        description="You can ask a question and specify a custom prompt to tweak the tone of the response",  # noqa
+        value={
+            "query": "How has the price of gold evolved during 2023?",
+            "prompt": "Given this context: {context}. Answer this {question} in a concise way using the provided context",  # noqa
         },
     ),
 }
@@ -94,8 +105,11 @@ async def chat_knowledgebox_endpoint(
         )
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    except predict.SendToPredictError:
-        return HTTPClientError(status_code=503, detail="Chat service unavailable")
+    except predict.ProxiedPredictAPIError as err:
+        return HTTPClientError(
+            status_code=503,
+            detail=f"Chat service unavailable. {err.status}: {err.detail}",
+        )
     except IncompleteFindResultsError:
         return HTTPClientError(
             status_code=529,
@@ -111,6 +125,8 @@ async def chat_knowledgebox_endpoint(
             status_code=529,
             detail=f"Temporary error while rephrasing the query. Please try again later. Error: {err}",
         )
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
 
 
 async def create_chat_response(

@@ -30,7 +30,9 @@ from nucliadb_utils.utilities import Utility, set_utility
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_autofilters_are_returned(
     nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
+    knowledge_graph,
 ):
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)
@@ -65,5 +67,9 @@ async def test_autofilters_are_returned(
     )
     assert resp.status_code == 200
     autofilters = resp.json()["autofilters"]
-    assert "/e/scientist/Newton" in autofilters
-    assert "/e/poet/Becquer" in autofilters
+    assert "/entities/scientist/Newton" in autofilters
+    assert "/entities/scientist/Isaac Newton" in autofilters
+    assert "/entities/poet/Becquer" in autofilters
+    assert "/entities/poet/Gustavo Adolfo Bécquer" in autofilters
+    # should also not include deleted entities
+    assert "/entities/scientist/Isaac Newsome" not in autofilters

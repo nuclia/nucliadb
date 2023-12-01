@@ -71,10 +71,10 @@ async def dummy_processing():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def telemetry_disabled():
-    os.environ["NUCLIADB_DISABLE_TELEMETRY"] = "True"
+def analytics_disabled():
+    os.environ["NUCLIADB_DISABLE_ANALYTICS"] = "True"
     yield
-    os.environ.pop("NUCLIADB_DISABLE_TELEMETRY")
+    os.environ.pop("NUCLIADB_DISABLE_ANALYTICS")
 
 
 def reset_config():
@@ -115,7 +115,7 @@ def tmpdir():
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(dummy_processing, telemetry_disabled, driver_settings, tmpdir):
+async def nucliadb(dummy_processing, analytics_disabled, driver_settings, tmpdir):
     from nucliadb.common.cluster import manager
 
     manager.INDEX_NODES.clear()
@@ -248,10 +248,13 @@ async def knowledge_graph(
             value="Joker", ntype=RelationNode.NodeType.ENTITY, subtype=""
         ),
         "Newton": RelationNode(
-            value="Newton", ntype=RelationNode.NodeType.ENTITY, subtype=""
+            value="Newton", ntype=RelationNode.NodeType.ENTITY, subtype="science"
+        ),
+        "Isaac Newsome": RelationNode(
+            value="Isaac Newsome", ntype=RelationNode.NodeType.ENTITY, subtype="science"
         ),
         "Physics": RelationNode(
-            value="Physics", ntype=RelationNode.NodeType.ENTITY, subtype=""
+            value="Physics", ntype=RelationNode.NodeType.ENTITY, subtype="science"
         ),
         "Poetry": RelationNode(
             value="Poetry", ntype=RelationNode.NodeType.ENTITY, subtype=""
@@ -301,6 +304,18 @@ async def knowledge_graph(
         Relation(
             relation=Relation.RelationType.ENTITY,
             source=nodes["Newton"],
+            to=nodes["Gravity"],
+            relation_label="formulate",
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=nodes["Isaac Newsome"],
+            to=nodes["Physics"],
+            relation_label="study",
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=nodes["Isaac Newsome"],
             to=nodes["Gravity"],
             relation_label="formulate",
         ),
@@ -371,6 +386,44 @@ async def knowledge_graph(
     bm.kbid = knowledgebox
     bm.relations.extend(edges)
     await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/entitiesgroups",
+        json={
+            "title": "scientist",
+            "color": "",
+            "entities": {
+                "Isaac": {"value": "Isaac"},
+                "Isaac Newton": {"value": "Isaac Newton", "represents": ["Newton"]},
+                "Isaac Newsome": {"value": "Isaac Newsome"},
+            },
+            "custom": True,
+            "group": "scientist",
+        },
+    )
+    assert resp.status_code == 200, resp.content
+    resp = await nucliadb_writer.patch(
+        f"/kb/{knowledgebox}/entitiesgroup/scientist",
+        json={"add": {}, "update": {}, "delete": ["Isaac Newsome"]},
+    )
+    assert resp.status_code == 200, resp.content
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/entitiesgroups",
+        json={
+            "title": "poet",
+            "color": "",
+            "entities": {
+                "Becquer": {
+                    "value": "Becquer",
+                    "represents": ["Gustavo Adolfo Bécquer"],
+                },
+                "Gustavo Adolfo Bécquer": {"value": "Gustavo Adolfo Bécquer"},
+            },
+            "custom": True,
+            "group": "poet",
+        },
+    )
+    assert resp.status_code == 200, resp.content
 
     return (nodes, edges)
 

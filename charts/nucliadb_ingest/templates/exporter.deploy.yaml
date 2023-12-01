@@ -46,6 +46,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+      serviceAccount: {{ ((.Values.exporter).serviceAccount) | default "default" }}
       containers:
       - name: metrics-exporter
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

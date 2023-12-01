@@ -155,5 +155,7 @@ async def test_service_lifecycle_configuration(writer_api):
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         conf = KBConfiguration(semantic_model="test")
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/configuration", json=conf.dict())
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{kbid}/configuration", json=conf.dict()
+        )
         assert resp.status_code == 200

@@ -44,6 +44,7 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
+    UserPrompt,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_utils.helpers import async_gen_lookahead
@@ -174,7 +175,9 @@ async def get_relations_results(
         _,
         _,
         _,
-    ) = await node_query(kbid, Method.RELATIONS, relation_request, chat_request.shards)
+    ) = await node_query(
+        kbid, Method.RELATIONS, relation_request, target_replicas=chat_request.shards
+    )
     return merge_relations_results(relations_results, relation_request.subgraph)
 
 
@@ -199,12 +202,12 @@ async def chat(
     rephrased_query = None
     if chat_request.context and len(chat_request.context) > 0:
         rephrased_query = await rephrase_query_from_chat_history(
-            kbid, chat_request.context, chat_request.query, user_id
+            kbid, chat_request.context, user_query, user_id
         )
 
     find_results: KnowledgeboxFindResults = await get_find_results(
         kbid=kbid,
-        query=user_query or rephrased_query or "",
+        query=rephrased_query or user_query or "",
         chat_request=chat_request,
         ndb_client=client_type,
         user=user_id,
@@ -218,12 +221,16 @@ async def chat(
         )
     else:
         query_context = await get_chat_prompt_context(kbid, find_results)
+        user_prompt = None
+        if chat_request.prompt is not None:
+            user_prompt = UserPrompt(prompt=chat_request.prompt)
         chat_model = ChatModel(
             user_id=user_id,
             query_context=query_context,
             chat_history=chat_history,
             question=chat_request.query,
             truncate=True,
+            user_prompt=user_prompt,
         )
         predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(
@@ -273,7 +280,7 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         # It may be a bug in the aiohttp.StreamResponse implementation,
         # but we haven't spotted it yet. For now, we just try to parse the status code
         # from the tail of the chunk.
-        logger.warning(
+        logger.debug(
             f"Error decoding status code from /chat's last chunk. Chunk: {chunk!r}"
         )
         if chunk == b"":

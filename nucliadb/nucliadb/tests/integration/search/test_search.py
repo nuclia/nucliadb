@@ -297,14 +297,14 @@ async def test_search_with_filters(
 
     # Check that filtering by pdf icon returns it
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/pdf"
+        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/pdf"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
     # With a different icon should return no results
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/docx"
+        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/docx"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 0
@@ -412,7 +412,7 @@ async def test_catalog_can_filter_by_processing_status(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "filters": ["/n/s/PENDING"],
+            "filters": ["/metadata.status/PENDING"],
         },
     )
     assert resp.status_code == 200
@@ -423,14 +423,14 @@ async def test_catalog_can_filter_by_processing_status(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "faceted": ["/n/s"],
+            "faceted": ["/metadata.status"],
         },
     )
     assert resp.status_code == 200
     resp_json = resp.json()
     facets = resp_json["fulltext"]["facets"]
     for status in valid_status:
-        assert facets["/n/s"][f"/n/s/{status}"] == 1
+        assert facets["/metadata.status"][f"/metadata.status/{status}"] == 1
 
 
 @pytest.mark.skip(reason="Needs sc-5626")
@@ -503,7 +503,7 @@ async def test_search_returns_sentence_positions(
     assert "page_number" not in position
 
 
-async def inject_resource_with_a_sentence(knowledgebox, writer):
+def get_resource_with_a_sentence(knowledgebox):
     bm = broker_resource(knowledgebox)
 
     bm.files["file"].file.uri = "http://nofile"
@@ -545,7 +545,11 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
     ev.vectors.vectors.vectors.append(v1)
 
     bm.field_vectors.append(ev)
+    return bm
 
+
+async def inject_resource_with_a_sentence(knowledgebox, writer):
+    bm = get_resource_with_a_sentence(knowledgebox)
     await inject_message(writer, bm)
 
 
@@ -730,13 +734,13 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
         f"/kb/{knowledgebox}/catalog",
         params={
             "query": "",
-            "faceted": ["/n/s"],
+            "faceted": ["/metadata.status"],
         },
     )
     assert resp.status_code == 200
     resp_json = resp.json()
     facets = resp_json["fulltext"]["facets"]
-    assert facets["/n/s"] == {"/n/s/PENDING": 1}
+    assert facets["/metadata.status"] == {"/metadata.status/PENDING": 1}
 
 
 @pytest.mark.asyncio

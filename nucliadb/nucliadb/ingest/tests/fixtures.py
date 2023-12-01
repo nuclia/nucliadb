@@ -313,6 +313,13 @@ TEST_CLOUDFILE = rpb.CloudFile(
 # HELPERS
 
 
+async def make_field(field, extracted_text):
+    await field.set_extracted_text(make_extracted_text(field.id, body=extracted_text))
+    await field.set_field_metadata(make_field_metadata(field.id))
+    await field.set_large_field_metadata(make_field_large_metadata(field.id))
+    await field.set_vectors(make_extracted_vectors(field.id))
+
+
 def make_extracted_text(field_id, body: str):
     ex1 = rpb.ExtractedTextWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
@@ -326,10 +333,10 @@ def make_field_metadata(field_id):
     ex1.metadata.metadata.links.append("https://nuclia.com")
 
     p1 = rpb.Paragraph(start=0, end=20)
-    p1.sentences.append(rpb.Sentence(start=0, end=10, key="test"))
-    p1.sentences.append(rpb.Sentence(start=11, end=20, key="test"))
+    p1.sentences.append(rpb.Sentence(start=0, end=20, key=""))
     cl1 = rpb.Classification(labelset="labelset1", label="label1")
-    p1.classifications.append(cl1)
+    cl2 = rpb.Classification(labelset="paragraph-labelset", label="label1")
+    p1.classifications.append(cl2)
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
     # ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
@@ -340,7 +347,7 @@ def make_field_metadata(field_id):
     ex1.metadata.metadata.thumbnail.CopyFrom(THUMBNAIL)
     ex1.metadata.metadata.positions["ENTITY/document"].entity = "document"
     ex1.metadata.metadata.positions["ENTITY/document"].position.extend(
-        [rpb.Position(start=0, end=5), rpb.Position(start=23, end=28)]
+        [rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)]
     )
     return ex1
 
@@ -359,7 +366,7 @@ def make_field_large_metadata(field_id):
 def make_extracted_vectors(field_id):
     ex1 = rpb.ExtractedVectorsWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
-    v1 = rpb.Vector(start=1, end=2, vector=b"ansjkdn")
+    v1 = rpb.Vector(start=0, end=20, vector=b"ansjkdn")
     ex1.vectors.vectors.vectors.append(v1)
     return ex1
 
@@ -573,6 +580,18 @@ async def create_resource(
     #
     # Add an example of each of the files, containing all possible metadata
 
+    # Title
+    title_field = await test_resource.get_field(
+        "title", rpb.FieldType.GENERIC, load=False
+    )
+    await make_field(title_field, "MyText")
+
+    # Summary
+    summary_field = await test_resource.get_field(
+        "summary", rpb.FieldType.GENERIC, load=False
+    )
+    await make_field(summary_field, "MyText")
+
     # 2.1 FILE FIELD
 
     t2 = rpb.FieldFile(
@@ -581,10 +600,10 @@ async def create_resource(
     t2.added.FromDatetime(datetime.now())
     t2.file.CopyFrom(TEST_CLOUDFILE)
 
-    await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+    file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+    await make_field(file_field, "MyText")
 
     # 2.2 LINK FIELD
-
     li2 = rpb.FieldLink(
         uri="htts://nuclia.cloud",
         language="ca",
@@ -603,21 +622,13 @@ async def create_resource(
     ex1.link_thumbnail.CopyFrom(THUMBNAIL)
 
     await linkfield.set_link_extracted_data(ex1)
-
-    await linkfield.set_extracted_text(make_extracted_text(linkfield.id, body="MyText"))
-    await linkfield.set_field_metadata(make_field_metadata(linkfield.id))
-    await linkfield.set_large_field_metadata(make_field_large_metadata(linkfield.id))
-    await linkfield.set_vectors(make_extracted_vectors(linkfield.id))
+    await make_field(linkfield, "MyText")
 
     # 2.3 TEXT FIELDS
 
     t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
     textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
-
-    await textfield.set_extracted_text(make_extracted_text(textfield.id, body="MyText"))
-    await textfield.set_field_metadata(make_field_metadata(textfield.id))
-    await textfield.set_large_field_metadata(make_field_large_metadata(textfield.id))
-    await textfield.set_vectors(make_extracted_vectors(textfield.id))
+    await make_field(textfield, "MyText")
 
     # 2.4 LAYOUT FIELD
 
@@ -667,20 +678,26 @@ async def create_resource(
         c2.messages.append(new_message)
 
     convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
-    await convfield.set_extracted_text(make_extracted_text(convfield.id, body="MyText"))
+    await make_field(convfield, extracted_text="MyText")
 
     # 2.6 KEYWORDSET FIELD
 
     k2 = rpb.FieldKeywordset(
         keywords=[rpb.Keyword(value="kw1"), rpb.Keyword(value="kw2")]
     )
-    await test_resource.set_field(rpb.FieldType.KEYWORDSET, "keywordset1", k2)
+    kws_field = await test_resource.set_field(
+        rpb.FieldType.KEYWORDSET, "keywordset1", k2
+    )
+    await make_field(kws_field, "MyText")
 
     # 2.7 DATETIMES FIELD
 
     d2 = rpb.FieldDatetime()
     d2.value.FromDatetime(datetime.now())
-    await test_resource.set_field(rpb.FieldType.DATETIME, "datetime1", d2)
+    datetime_field = await test_resource.set_field(
+        rpb.FieldType.DATETIME, "datetime1", d2
+    )
+    await make_field(datetime_field, "MyText")
 
     # 3 USER VECTORS
 
@@ -690,6 +707,24 @@ async def create_resource(
         (0.1, 0.2, 0.3)
     )
     await field_obj.set_user_vectors(user_vectors)
+
+    # Q/A
+    question_answers = rpb.FieldQuestionAnswerWrapper()
+    for i in range(10):
+        qa = rpb.QuestionAnswer()
+
+        qa.question.text = f"My question {i}"
+        qa.question.language = "catalan"
+        qa.question.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+
+        answer = rpb.Answers()
+        answer.text = f"My answer {i}"
+        answer.language = "catalan"
+        answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+        qa.answers.append(answer)
+        question_answers.question_answers.question_answer.append(qa)
+
+    await field_obj.set_question_answers(question_answers)
 
     await txn.commit()
     return test_resource
@@ -705,9 +740,8 @@ async def entities_manager_mock():
     """
     klass = "nucliadb.ingest.service.writer.EntitiesManager"
     with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
-        with patch(f"{klass}.index_entities_group", AsyncMock(return_value=None)):
-            with patch(
-                f"nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
-                AsyncMock(return_value=[]),
-            ):
-                yield
+        with patch(
+            f"nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
+            AsyncMock(return_value=[]),
+        ):
+            yield

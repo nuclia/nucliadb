@@ -41,5 +41,5 @@ roleRef:
   name: statefulset-viewer
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: {{ .Values.serviceAccount | default "default" }}
   namespace: {{ .Release.Namespace }}

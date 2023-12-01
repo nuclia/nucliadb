@@ -28,15 +28,11 @@ use std::net::SocketAddr;
 use axum::routing::get;
 use axum::Router;
 
-use crate::env::metrics_http_port;
+use crate::settings::Settings;
 
-pub struct ServerOptions {
-    pub default_http_port: u16,
-}
-
-pub async fn run_http_server(options: ServerOptions) {
+pub async fn run_http_server(settings: Settings) {
     // Add routes to services
-    let addr = SocketAddr::from(([0, 0, 0, 0], metrics_http_port(options.default_http_port)));
+    let addr = SocketAddr::from(([0, 0, 0, 0], settings.metrics_port()));
     let router = Router::new().route("/metrics", get(metrics_service::metrics_service));
     let router = router.route("/__dump", get(traces_service::thread_dump_service));
     axum_server::bind(addr)

@@ -18,8 +18,11 @@ tempfile = "3"
 rand = "0.8.4"
 ring = "0.16.20"
 data-encoding = "2.3.2"
-tantivy = "0.17.0"
-heed = { version = "0.11.0", default-features = false, features = ["lmdb", "sync-read-txn"] }
+tantivy = { git = "https://github.com/nuclia/tantivy.git", rev = "2183120aaa565b14fde05aa35342e5c5a3306d3b" }
+heed = { version = "0.11.0", default-features = false, features = [
+    "lmdb",
+    "sync-read-txn",
+] }
 
 nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_procs = { path = "../nucliadb_procs" }
