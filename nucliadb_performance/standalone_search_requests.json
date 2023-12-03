@@ -3,7 +3,8 @@
         "tiny": {
             "kbs": [
                 "tiny",
-                "experimental-tiny"
+                "tiny-stable",
+                "tiny-experimental"
             ],
             "requests": [
                 {
@@ -128,7 +129,8 @@
         "small": {
             "kbs": [
                 "small",
-                "experimental-small"
+                "small-stable",
+                "small-experimental"
             ],
             "requests": [
                 {
@@ -252,7 +254,8 @@
         "medium": {
             "kbs": [
                 "medium",
-                "experimental-medium"
+                "medium-stable",
+                "medium-experimental"
             ],
             "requests": [
                 {

@@ -1,12 +1,24 @@
 #!/bin/bash
-KB=${1:-small}
+RUN_ID=${1:-`date +%Y%m%d%H%M%S`}
+KB=${2:-small}
+RELEASE_CHANNEL=${3:-stable}
 
-echo "Installing requirements..."
-python3 -m venv performance_env
-source performance_env/bin/activate
+KB_SLUG=$KB-$RELEASE_CHANNEL
+GCS_BUCKET="https://storage.googleapis.com/nucliadb_indexer/nucliadb_performance/exports"
+EXPORT_FILE="$KB.export"
+BENCHMARK_OUTPUT_FILE="standalone_$RUN_ID.json"
+
+VENV=venv_$RUN_ID
+
+echo "Installing requirements at $VENV..."
+python3 -m venv $VENV
+source $VENV/bin/activate
 python3 -m pip install -q --upgrade pip wheel
 pip install -q -e .
-pip install -q -e ../nucliadb 
+pip install -q -e ../nucliadb
+
+echo "Waiting for lock..."
+python lock.py --action=acquire
 
 echo "Starting NucliaDB..."
 DEBUG=true nucliadb &
@@ -25,20 +37,23 @@ while : ; do
 done
 
 echo "Importing data..."
-python export_import.py --action=import --kb=$KB --uri=https://storage.googleapis.com/nucliadb_indexer/nucliadb_performance/exports/$KB.export
+python export_import.py --action=import --kb=$KB_SLUG --uri=$GCS_BUCKET/$EXPORT_FILE --release_channel=$RELEASE_CHANNEL
 
 echo "Running performance tests..."
-make test-standalone-search kb_slug=$KB max_workers=4 ramp_up=2 duration_s=60
+make test-standalone-search benchmark_output=$BENCHMARK_OUTPUT_FILE kb_slug=$KB_SLUG max_workers=4 ramp_up=2 duration_s=60
 
 # Show results
-cat standalone.json
+cat $BENCHMARK_OUTPUT_FILE
 
 echo "Stopping NucliaDB at ${NDB_PID}..."
 kill $NDB_PID
 
+echo "Releasing lock..."
+python lock.py --action=release
+
 echo "Cleaning up..."
 source deactivate
-# rm -rf ./performance_env
+# rm -rf $VENV
 rm ./cache.data.db
-rm -rf ./data
+# rm -rf ./data
 # rm -rf ./logs

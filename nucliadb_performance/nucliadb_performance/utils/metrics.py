@@ -42,7 +42,7 @@ def get_percentile(metric_name, *, p):
 
 def print_metrics():
     print("Metrics summary:")
-    for metric_name in METRICS:
+    for metric_name in sorted(METRICS.keys()):
         p50 = get_percentile(metric_name, p=0.5)
         p95 = get_percentile(metric_name, p=0.95)
         print(

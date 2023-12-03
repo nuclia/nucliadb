@@ -26,6 +26,7 @@ def precompute_vectors():
     """
     Precompute vectors for all saved requests at the beginning of the test.
     """
+    print("Precomputing vectors for all saved requests...")
     saved_requests = load_all_saved_requests(settings.saved_requests_file)
     for request_set in saved_requests.sets.values():
         for saved_request in request_set.requests:

@@ -36,6 +36,9 @@ ndb = NucliaDB(
     writer=NucliaSDK(url=WRITER_API, headers={"X-Nucliadb-Roles": "WRITER;MANAGER"}),
 )
 
+class ImportedKBAlreadyExists(Exception):
+    pass
+
 
 def get_kb(ndb, slug_or_kbid) -> str:
     try:
@@ -46,18 +49,25 @@ def get_kb(ndb, slug_or_kbid) -> str:
     return kbid
 
 
-def get_or_create_kb(ndb, slug_or_kbid, release_channel=None) -> str:
+def create_kb(ndb, slug_or_kbid, release_channel=None) -> str:
+    lower_slug_or_kbid = slug_or_kbid.lower()
     try:
-        kbid = get_kb(ndb, slug_or_kbid)
+        kbid = get_kb(ndb, lower_slug_or_kbid)
     except NotFoundError:
         kbid = ndb.writer.create_knowledge_box(
-            slug=slug_or_kbid, release_channel=release_channel
+            slug=lower_slug_or_kbid, release_channel=release_channel
         ).uuid
+    else:
+        raise ImportedKBAlreadyExists(kbid)
     return kbid
 
 
 def import_kb(*, uri, kb, release_channel=None):
-    kbid = get_or_create_kb(ndb, kb, release_channel=release_channel)
+    try:
+        kbid = create_kb(ndb, kb, release_channel=release_channel)
+    except ImportedKBAlreadyExists:
+        print(f"Skipping import, as the Knowledge Box {kb} already exists")
+        return
     print(f"Importing from {uri} to kb={kb}")
 
     import_id = ndb.writer.start_import(
@@ -143,6 +153,7 @@ def read_import_stream(uri):
         stream = read_from_url
     else:
         if path_for_uri_exists:
+            print(f"Using local file {path_for_uri} instead of URL {uri}")
             uri = path_for_uri
         stream = read_from_file
         tqdm_kwargs["total"] = os.path.getsize(uri)
@@ -193,7 +204,7 @@ def parse_arguments():
     parser.add_argument(
         "--release_channel",
         type=str,
-        choices=[v.value for v in ReleaseChannel],
+        choices=[v.value.lower() for v in ReleaseChannel],
         default=ReleaseChannel.STABLE.value,
     )
     args = parser.parse_args()
@@ -205,7 +216,7 @@ def main():
     if args.action == "export":
         export_kb(uri=args.uri, kb=args.kb)
     elif args.action == "import":
-        release_channel = ReleaseChannel(args.release_channel)
+        release_channel = ReleaseChannel(args.release_channel.upper())
         import_kb(uri=args.uri, kb=args.kb, release_channel=release_channel)
     else:
         raise ValueError(f"Unknown action {args.action}")

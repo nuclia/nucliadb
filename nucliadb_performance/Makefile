@@ -8,6 +8,8 @@ sizing=--sizing
 kbid=tiny
 kb_slug=tiny
 test=test-search-cluster
+benchmark_output=benchmark_output.json
+
 
 RED=\033[0;31m
 NC=\033[0m
@@ -83,7 +85,7 @@ test-search-kb: # Stress test search on a KB
 test-standalone-search: export READER_API=http://localhost:8080/api
 test-standalone-search: export SEARCH_API=http://localhost:8080/api
 test-standalone-search: export KB_SLUG=$(kb_slug)
-test-standalone-search: export BENCHMARK_OUTPUT=standalone.json
+test-standalone-search: export BENCHMARK_OUTPUT=$(benchmark_output)
 test-standalone-search: export SEARCH_TAGS=$(search_tags)
 test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.json
 test-standalone-search:
