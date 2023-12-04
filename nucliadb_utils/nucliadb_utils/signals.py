@@ -20,6 +20,7 @@
 import asyncio
 from collections.abc import Awaitable
 from enum import Enum
+from inspect import iscoroutinefunction
 from typing import Any, Callable, Type
 
 
@@ -41,6 +42,9 @@ class Signal:
     ):
         if listener_id in self.callbacks:
             raise ValueError(f"Already registered a listener with id: {listener_id}")
+
+        if not iscoroutinefunction(cb):
+            raise NotImplementedError("Only async listeners are allowed")
 
         self.callbacks[listener_id] = (cb, priority.value)
 
