@@ -190,12 +190,39 @@ class ConcurrentShardIndexer:
             self.indexers[work.shard_id] = (indexer, task)
 
     def _indexer_done_callback(self, shard_id: str, task: asyncio.Task):
-        # autoremove indexer when finished
-        self.indexers.pop(shard_id)
+        # NOTE: there is an unusual situation where an indexer finishes but new
+        # work is added before this done callback is executed. If we find
+        # pending work in the indexer we are going to remove, we need to create
+        # a new task and keep the indexer.
+        #
+        # If this happens for an indexer that found an error, we can't be sure
+        # the new work is in transactional order, so we must flush the queue and
+        # nak all extra work, hoping when the work is redelivered, this doesn't
+        # happen.
 
-        # propagate errors
+        indexer, _ = self.indexers[shard_id]
+
         if task.exception() is not None:
+            if indexer.has_pending_work():
+                task = asyncio.create_task(indexer.flush_pending_work())
+                task.add_done_callback(
+                    partial(ConcurrentShardIndexer._indexer_done_callback, shard_id)
+                )
+                self.indexers[shard_id] = (indexer, task)
+            # propagate errors
             raise task.exception()  # type: ignore
+
+        if indexer.has_pending_work():
+            task = asyncio.create_task(indexer.work_until_finish())
+            task.add_done_callback(
+                partial(ConcurrentShardIndexer._indexer_done_callback, self, shard_id)
+            )
+            self.indexers[shard_id] = (indexer, task)
+        else:
+            self.indexers.pop(shard_id)
+            CONCURRENT_INDEXERS_COUNT.set(
+                len(self.indexers), labels=dict(node=self.node_id)
+            )
 
 
 class PriorityIndexer:
@@ -208,11 +235,14 @@ class PriorityIndexer:
     def index_soon(self, work: WorkUnit):
         self.work_queue.put_nowait(work)
 
+    def has_pending_work(self) -> bool:
+        return self.work_queue.qsize() > 0
+
     async def work_until_finish(self):
         self.working = True
         try:
             while not self.work_queue.empty():
-                work = await self.work_queue.get()
+                work = self.work_queue.get_nowait()
                 await self._do_work(work)
         except Exception as exc:
             # if an exception occurred, we can't longer ensure proper ordering
@@ -230,17 +260,22 @@ class PriorityIndexer:
                 },
                 exc_info=exc,
             )
-            while not self.work_queue.empty():
-                work = await self.work_queue.get()
-                await work.nats_msg.nak()
+            await self.flush_pending_work()
+            raise exc
         finally:
             self.working = False
+
+    async def flush_pending_work(self):
+        logger.info(f"Flushing {self.work_queue.qsize()} messages from indexer")
+        while not self.work_queue.empty():
+            work = self.work_queue.get()
+            await work.nats_msg.nak()
 
     @indexer_observer.wrap()
     async def _do_work(self, work: WorkUnit):
         start = time.time()
         logger.info(
-            f"Working on message for shard {work.index_message.shard} (seqid={work.seqid})",
+            f"Working on message for shard {work.index_message.shard} (pending work: {self.work_queue.qsize()})",
             extra={
                 "seqid": work.seqid,
                 "kbid": work.index_message.kbid,
