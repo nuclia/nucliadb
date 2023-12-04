@@ -122,7 +122,7 @@ class TestConcurrentShardIndexer:
     @pytest.fixture
     @pytest.mark.asyncio
     async def csi(self, writer) -> AsyncIterator[ConcurrentShardIndexer]:
-        csi = ConcurrentShardIndexer(writer=writer)
+        csi = ConcurrentShardIndexer(writer=writer, node_id="node-id")
         await csi.initialize()
         yield csi
         await csi.finalize()

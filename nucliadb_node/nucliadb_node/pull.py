@@ -45,7 +45,7 @@ class Worker:
         self.writer = writer
         self.subscriptions = []
         self.node = node
-        self.indexer = ConcurrentShardIndexer(self.writer)
+        self.indexer = ConcurrentShardIndexer(writer, node)
         self.nats_connection_manager = nats_connection_manager
 
     async def initialize(self):

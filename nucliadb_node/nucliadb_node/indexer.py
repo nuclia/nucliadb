@@ -113,10 +113,6 @@ class WorkUnit:
         return int(self.nats_msg.reply.split(".")[5])
 
     @property
-    def node_id(self) -> str:
-        return self.index_message.node
-
-    @property
     def shard_id(self) -> str:
         return self.index_message.shard
 
@@ -138,8 +134,9 @@ class WorkUnit:
 
 
 class ConcurrentShardIndexer:
-    def __init__(self, writer: Writer):
+    def __init__(self, writer: Writer, node_id: str):
         self.writer = writer
+        self.node_id = node_id
         self.indexers: dict[str, tuple[PriorityIndexer, asyncio.Task]] = {}
 
     async def initialize(self):
@@ -173,7 +170,7 @@ class ConcurrentShardIndexer:
 
         self.push_work_to_indexer(work)
         CONCURRENT_INDEXERS_COUNT.set(
-            len(self.indexers), labels=dict(node=work.node_id)
+            len(self.indexers), labels=dict(node=self.node_id)
         )
 
     def push_work_to_indexer(self, work: WorkUnit):
