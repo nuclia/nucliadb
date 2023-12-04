@@ -26,6 +26,7 @@ from nucliadb_node.settings import settings
 from nucliadb_node.signals import SuccessfulIndexingPayload
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry import metrics
+from nucliadb_telemetry.errors import capture_exception
 
 gc_observer = metrics.Observer(
     "gc_processor",
@@ -100,9 +101,11 @@ class ShardManager:
                     logger.info(
                         "Garbage collection finished", extra={"shard": self._shard_id}
                     )
-            except Exception:
+            except Exception as exc:
+                event_id = capture_exception(exc)
                 logger.exception(
-                    "Could not garbage collect", extra={"shard": self._shard_id}
+                    f"Could not garbage collect. Check sentry for more details. Event id: {event_id}",
+                    extra={"shard": self._shard_id},
                 )
 
 
