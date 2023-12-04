@@ -6,38 +6,41 @@ from dataclasses import dataclass
 import requests
 from tqdm import tqdm
 
-from nucliadb_models.resource import ReleaseChannel
-from nucliadb_sdk import NucliaSDK
+from nucliadb_sdk import NucliaDB
 from nucliadb_sdk.v2.exceptions import NotFoundError
 
 
 @dataclass
-class NucliaDB:
-    reader: NucliaSDK
-    writer: NucliaSDK
+class NucliaDBClient:
+    reader: NucliaDB
+    writer: NucliaDB
 
 
 LOCAL_API = "http://localhost:8080/api"
 CLUSTER_API = "http://{service}.nucliadb.svc.cluster.local:8080/api"
+ROLES_HEADER = "READER;WRITER;MANAGER"
 
-LOCAL_NUCLIADB = True
-if LOCAL_NUCLIADB:
-    READER_API = WRITER_API = LOCAL_API
-else:
-    READER_API = CLUSTER_API.format(service="reader")
-    WRITER_API = CLUSTER_API.format(service="writer")
+
+def get_nucliadb_client(local=True) -> NucliaDBClient:
+    if local:
+        return NucliaDBClient(
+            reader=NucliaDB(url=LOCAL_API, headers={"X-Nucliadb-Roles": ROLES_HEADER}),
+            writer=NucliaDB(url=LOCAL_API, headers={"X-Nucliadb-Roles": ROLES_HEADER}),
+        )
+    return NucliaDBClient(
+        reader=NucliaDB(
+            url=CLUSTER_API.format(service="reader"),
+            headers={"X-Nucliadb-Roles": ROLES_HEADER},
+        ),
+        writer=NucliaDB(
+            url=CLUSTER_API.format(service="writer"),
+            headers={"X-Nucliadb-Roles": ROLES_HEADER},
+        ),
+    )
+
 
 MB = 1024 * 1024
 CHUNK_SIZE = 10 * MB
-
-
-ndb = NucliaDB(
-    reader=NucliaSDK(url=READER_API, headers={"X-Nucliadb-Roles": "READER"}),
-    writer=NucliaSDK(url=WRITER_API, headers={"X-Nucliadb-Roles": "WRITER;MANAGER"}),
-)
-
-class ImportedKBAlreadyExists(Exception):
-    pass
 
 
 def get_kb(ndb, slug_or_kbid) -> str:
@@ -49,25 +52,8 @@ def get_kb(ndb, slug_or_kbid) -> str:
     return kbid
 
 
-def create_kb(ndb, slug_or_kbid, release_channel=None) -> str:
-    lower_slug_or_kbid = slug_or_kbid.lower()
-    try:
-        kbid = get_kb(ndb, lower_slug_or_kbid)
-    except NotFoundError:
-        kbid = ndb.writer.create_knowledge_box(
-            slug=lower_slug_or_kbid, release_channel=release_channel
-        ).uuid
-    else:
-        raise ImportedKBAlreadyExists(kbid)
-    return kbid
-
-
-def import_kb(*, uri, kb, release_channel=None):
-    try:
-        kbid = create_kb(ndb, kb, release_channel=release_channel)
-    except ImportedKBAlreadyExists:
-        print(f"Skipping import, as the Knowledge Box {kb} already exists")
-        return
+def import_kb(ndb, *, uri, kb):
+    kbid = get_kb(ndb, kb)
     print(f"Importing from {uri} to kb={kb}")
 
     import_id = ndb.writer.start_import(
@@ -80,7 +66,7 @@ def import_kb(*, uri, kb, release_channel=None):
     print(f"Import finished!")
 
 
-def export_kb(*, uri, kb):
+def export_kb(ndb, *, uri, kb):
     kbid = get_kb(ndb, kb)
     export_id = ndb.writer.start_export(kbid=kbid).export_id
 
@@ -147,14 +133,12 @@ def read_import_stream(uri):
         unit="iB",
         unit_scale=True,
     )
-    path_for_uri = get_export_file_from_url(uri)
-    path_for_uri_exists = os.path.exists(path_for_uri)
-    if uri.startswith("http") and not path_for_uri_exists:
+    if uri.startswith("http"):
         stream = read_from_url
+        resp = requests.head(uri)
+        resp.raise_for_status()
+        tqdm_kwargs["total"] = int(resp.headers["Content-Length"])
     else:
-        if path_for_uri_exists:
-            print(f"Using local file {path_for_uri} instead of URL {uri}")
-            uri = path_for_uri
         stream = read_from_file
         tqdm_kwargs["total"] = os.path.getsize(uri)
     for chunk in progressify(stream(uri), **tqdm_kwargs):
@@ -174,19 +158,10 @@ def read_from_url(uri):
     """
     Read from a URL using requests, but also save the read chunks to disk.
     """
-    path_for_uri = get_export_file_from_url(uri)
-    with open(path_for_uri, mode="wb") as f:
-        with requests.get(uri, stream=True) as response:
-            response.raise_for_status()
-            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-                yield chunk
-                # Save to disk too
-                f.write(chunk)
-
-
-def get_export_file_from_url(uri):
-    export_name = uri.split("/")[-1]
-    return f"./{export_name}"
+    with requests.get(uri, stream=True) as response:
+        response.raise_for_status()
+        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            yield chunk
 
 
 def progressify(func, **tqdm_kwargs):
@@ -201,23 +176,18 @@ def parse_arguments():
     parser.add_argument("--action", choices=["export", "import"], required=True)
     parser.add_argument("--uri", type=str, required=True)
     parser.add_argument("--kb", type=str, required=True)
-    parser.add_argument(
-        "--release_channel",
-        type=str,
-        choices=[v.value.lower() for v in ReleaseChannel],
-        default=ReleaseChannel.STABLE.value,
-    )
+    args.add_argument("--cluster", action="store_true")
     args = parser.parse_args()
     return args
 
 
 def main():
     args = parse_arguments()
+    ndb = get_nucliadb_client(local=not args.cluster)
     if args.action == "export":
-        export_kb(uri=args.uri, kb=args.kb)
+        export_kb(ndb, uri=args.uri, kb=args.kb)
     elif args.action == "import":
-        release_channel = ReleaseChannel(args.release_channel.upper())
-        import_kb(uri=args.uri, kb=args.kb, release_channel=release_channel)
+        import_kb(ndb, uri=args.uri, kb=args.kb)
     else:
         raise ValueError(f"Unknown action {args.action}")
 

@@ -32,7 +32,9 @@ def release():
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Acquire or release a file system lock")
+    parser = argparse.ArgumentParser(
+        description="Acquire or release a file system lock"
+    )
     parser.add_argument("-a", "--action", choices=["acquire", "release"])
     args = parser.parse_args()
     return args
