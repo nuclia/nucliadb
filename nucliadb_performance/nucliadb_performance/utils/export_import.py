@@ -1,59 +1,18 @@
 import argparse
 import os
 import time
-from dataclasses import dataclass
 
 import requests
 from tqdm import tqdm
 
-from nucliadb_sdk import NucliaDB
-from nucliadb_sdk.v2.exceptions import NotFoundError
-
-
-@dataclass
-class NucliaDBClient:
-    reader: NucliaDB
-    writer: NucliaDB
-
-
-LOCAL_API = "http://localhost:8080/api"
-CLUSTER_API = "http://{service}.nucliadb.svc.cluster.local:8080/api"
-ROLES_HEADER = "READER;WRITER;MANAGER"
-
-
-def get_nucliadb_client(local=True) -> NucliaDBClient:
-    if local:
-        return NucliaDBClient(
-            reader=NucliaDB(url=LOCAL_API, headers={"X-Nucliadb-Roles": ROLES_HEADER}),
-            writer=NucliaDB(url=LOCAL_API, headers={"X-Nucliadb-Roles": ROLES_HEADER}),
-        )
-    return NucliaDBClient(
-        reader=NucliaDB(
-            url=CLUSTER_API.format(service="reader"),
-            headers={"X-Nucliadb-Roles": ROLES_HEADER},
-        ),
-        writer=NucliaDB(
-            url=CLUSTER_API.format(service="writer"),
-            headers={"X-Nucliadb-Roles": ROLES_HEADER},
-        ),
-    )
-
+from nucliadb_performance.utils.nucliadb import get_kbid, get_nucliadb_client
 
 MB = 1024 * 1024
 CHUNK_SIZE = 10 * MB
 
 
-def get_kb(ndb, slug_or_kbid) -> str:
-    try:
-        kbid = ndb.reader.get_knowledge_box_by_slug(slug=slug_or_kbid).uuid
-    except NotFoundError:
-        ndb.reader.get_knowledge_box(kbid=slug_or_kbid)
-        kbid = slug_or_kbid
-    return kbid
-
-
 def import_kb(ndb, *, uri, kb):
-    kbid = get_kb(ndb, kb)
+    kbid = get_kbid(ndb, kb)
     print(f"Importing from {uri} to kb={kb}")
 
     import_id = ndb.writer.start_import(
@@ -67,7 +26,7 @@ def import_kb(ndb, *, uri, kb):
 
 
 def export_kb(ndb, *, uri, kb):
-    kbid = get_kb(ndb, kb)
+    kbid = get_kbid(ndb, kb)
     export_id = ndb.writer.start_export(kbid=kbid).export_id
 
     print(f"Starting export for {kb}. Export id: {export_id}")
@@ -176,7 +135,11 @@ def parse_arguments():
     parser.add_argument("--action", choices=["export", "import"], required=True)
     parser.add_argument("--uri", type=str, required=True)
     parser.add_argument("--kb", type=str, required=True)
-    args.add_argument("--cluster", action="store_true")
+    parser.add_argument(
+        "--cluster",
+        action="store_true",
+        help="Use nucliadb's k8s cluster services instead of localhost",
+    )
     args = parser.parse_args()
     return args
 

@@ -32,7 +32,7 @@ class SavedRequests(BaseModel):
 
 @cache
 def load_saved_request(
-    saved_requests_file: str, kbid_or_slug: str, endpoint: str, with_tags=None
+    saved_requests_file: str, kbid_or_slug: str, endpoint: str
 ) -> list[Request]:
     saved_requests = load_all_saved_requests(saved_requests_file)
     kb_requests = []
@@ -40,14 +40,7 @@ def load_saved_request(
         if kbid_or_slug not in rs.kbs:
             continue
         kb_requests.extend([r for r in rs.requests if r.endpoint == endpoint])
-    if with_tags is None:
-        return [kb_req.request for kb_req in kb_requests]
-    else:
-        return [
-            kb_req.request
-            for kb_req in kb_requests
-            if set(with_tags).issubset(kb_req.tags)
-        ]
+    return [kb_req.request for kb_req in kb_requests]
 
 
 @cache

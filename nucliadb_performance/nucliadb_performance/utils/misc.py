@@ -235,7 +235,7 @@ def print_errors():
     print("=" * 50)
 
 
-def get_request(kbid_or_slug: str, endpoint: str, with_tags=None) -> Request:
+def get_request(kbid_or_slug: str, endpoint: str) -> Request:
     if settings.saved_requests_file is None:
         raise AttributeError("SAVED_REQUESTS_FILE env var is not set!")
     saved_requests_file = CURRENT_DIR + "/" + settings.saved_requests_file
@@ -243,7 +243,6 @@ def get_request(kbid_or_slug: str, endpoint: str, with_tags=None) -> Request:
         saved_requests_file,
         kbid_or_slug,
         endpoint=endpoint,
-        with_tags=tuple(with_tags) if with_tags else None,
     )
     if len(requests) == 0:
         raise ValueError("Could not find any request saved")

@@ -1,8 +1,11 @@
 from functools import cache
+import re
 
 from molotov import global_setup, global_teardown, scenario
 
+from nucliadb_models.resource import ReleaseChannel
 from nucliadb_performance.settings import settings
+from nucliadb_performance.utils.export_import import import_kb
 from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_performance.utils.metrics import (
     print_metrics,
@@ -14,8 +17,10 @@ from nucliadb_performance.utils.misc import (
     make_kbid_request,
     print_errors,
 )
+from nucliadb_performance.utils.nucliadb import get_nucliadb_client
 from nucliadb_performance.utils.saved_requests import load_all_saved_requests
 from nucliadb_performance.utils.vectors import compute_vector
+from nucliadb_sdk.v2.exceptions import ConflictError
 
 FIND_WEIGHT = 1
 SEARCH_WEIGHT = 1
@@ -44,8 +49,42 @@ def get_test_kb():
     return (kbid, slug)
 
 
+def create_kb(kb_slug: str):
+    ndb = get_nucliadb_client(local=True)
+    release_channel = (
+        ReleaseChannel.EXPERIMENTAL
+        if "experimental" in kb_slug
+        else ReleaseChannel.STABLE
+    )
+    print(f"Creating KB {kb_slug}...")
+    ndb.writer.create_knowledge_box(slug=kb_slug, release_channel=release_channel)
+
+
+def import_test_data(kb_slug: str):
+    ndb = get_nucliadb_client(local=True)
+    export_path = settings.exports_folder + f"/{kb_slug}.export"
+    print(f"Importing test data from {export_path}...")
+    import_kb(
+        ndb,
+        uri=export_path,
+        kb=kb_slug,
+    )
+
+
+def maybe_import_test_data(kb_slug: str):
+    try:
+        create_kb(kb_slug)
+    except ConflictError:
+        print(f"KB {kb_slug} already exists. Skipping importing data.")
+        pass
+    else:
+        import_test_data(kb_slug)
+
+
 @global_setup()
 def init_test(args):
+    kb_slug = parse_input_kb_slug()
+    maybe_import_test_data(kb_slug)
     get_test_kb()
     precompute_vectors()
 
@@ -53,8 +92,9 @@ def init_test(args):
 @scenario(weight=FIND_WEIGHT)
 async def test_find(session):
     kbid, slug = get_test_kb()
-    request = get_request(slug, endpoint="find", with_tags=settings.request_tags)
-    request.payload["vector"] = compute_vector(request.payload["query"])
+    request = get_request(slug, endpoint="find")
+    if request.payload is not None and "query" in request.payload:
+        request.payload["vector"] = compute_vector(request.payload["query"])
     resp = await make_kbid_request(
         session,
         kbid,
@@ -68,8 +108,9 @@ async def test_find(session):
 @scenario(weight=SEARCH_WEIGHT)
 async def test_search(session):
     kbid, slug = get_test_kb()
-    request = get_request(slug, endpoint="search", with_tags=settings.request_tags)
-    request.payload["vector"] = compute_vector(request.payload["query"])
+    request = get_request(slug, endpoint="search")
+    if request.payload is not None and "query" in request.payload:
+        request.payload["vector"] = compute_vector(request.payload["query"])
     resp = await make_kbid_request(
         session,
         kbid,

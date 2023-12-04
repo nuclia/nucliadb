@@ -86,7 +86,6 @@ test-standalone-search: export READER_API=http://localhost:8080/api
 test-standalone-search: export SEARCH_API=http://localhost:8080/api
 test-standalone-search: export KB_SLUG=$(kb_slug)
 test-standalone-search: export BENCHMARK_OUTPUT=$(benchmark_output)
-test-standalone-search: export SEARCH_TAGS=$(search_tags)
 test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.json
 test-standalone-search:
 	echo " *  Test Started at: $$(date -u)"
@@ -94,3 +93,13 @@ test-standalone-search:
 	molotov ./nucliadb_performance/standalone/test_search.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
+
+
+lock-acquire:
+	python lock.py --action=acquire
+
+
+lock-release:
+	python lock.py --action=release
+
+run:	test-standalone-search
