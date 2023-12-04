@@ -96,10 +96,10 @@ test-standalone-search:
 
 
 lock-acquire:
-	python lock.py --action=acquire
+	python3 lock.py --action=acquire
 
 
 lock-release:
-	python lock.py --action=release
+	python3 lock.py --action=release
 
 run:	test-standalone-search
