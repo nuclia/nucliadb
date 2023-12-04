@@ -58,6 +58,7 @@ message AuditRequest {
     SUGGEST = 9;
     INDEXED = 10;
     CHAT = 11;
+    AI_TOKENS_USED = 12;
   }
 
   AuditType type = 1;
@@ -80,4 +81,5 @@ message AuditRequest {
   string trace_id = 17;
   AuditKBCounter kb_counter = 18;
   ChatAudit chat = 19;
+  uint64 count = 20;
 }

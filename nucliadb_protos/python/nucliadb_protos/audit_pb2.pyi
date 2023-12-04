@@ -178,6 +178,7 @@ class AuditRequest(google.protobuf.message.Message):
         SUGGEST: AuditRequest._AuditType.ValueType  # 9
         INDEXED: AuditRequest._AuditType.ValueType  # 10
         CHAT: AuditRequest._AuditType.ValueType  # 11
+        AI_TOKENS_USED: AuditRequest._AuditType.ValueType  # 12
 
     class AuditType(_AuditType, metaclass=_AuditTypeEnumTypeWrapper): ...
     VISITED: AuditRequest.AuditType.ValueType  # 0
@@ -192,6 +193,7 @@ class AuditRequest(google.protobuf.message.Message):
     SUGGEST: AuditRequest.AuditType.ValueType  # 9
     INDEXED: AuditRequest.AuditType.ValueType  # 10
     CHAT: AuditRequest.AuditType.ValueType  # 11
+    AI_TOKENS_USED: AuditRequest.AuditType.ValueType  # 12
 
     TYPE_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
@@ -210,6 +212,7 @@ class AuditRequest(google.protobuf.message.Message):
     TRACE_ID_FIELD_NUMBER: builtins.int
     KB_COUNTER_FIELD_NUMBER: builtins.int
     CHAT_FIELD_NUMBER: builtins.int
+    COUNT_FIELD_NUMBER: builtins.int
     type: global___AuditRequest.AuditType.ValueType
     kbid: builtins.str
     userid: builtins.str
@@ -234,6 +237,7 @@ class AuditRequest(google.protobuf.message.Message):
     def kb_counter(self) -> global___AuditKBCounter: ...
     @property
     def chat(self) -> global___ChatAudit: ...
+    count: builtins.int
     def __init__(
         self,
         *,
@@ -254,8 +258,9 @@ class AuditRequest(google.protobuf.message.Message):
         trace_id: builtins.str = ...,
         kb_counter: global___AuditKBCounter | None = ...,
         chat: global___ChatAudit | None = ...,
+        count: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["chat", b"chat", "kb_counter", b"kb_counter", "search", b"search", "time", b"time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["chat", b"chat", "client_type", b"client_type", "field_metadata", b"field_metadata", "fields", b"fields", "fields_audit", b"fields_audit", "kb_counter", b"kb_counter", "kbid", b"kbid", "origin", b"origin", "resources", b"resources", "rid", b"rid", "search", b"search", "task", b"task", "time", b"time", "timeit", b"timeit", "trace_id", b"trace_id", "type", b"type", "userid", b"userid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["chat", b"chat", "client_type", b"client_type", "count", b"count", "field_metadata", b"field_metadata", "fields", b"fields", "fields_audit", b"fields_audit", "kb_counter", b"kb_counter", "kbid", b"kbid", "origin", b"origin", "resources", b"resources", "rid", b"rid", "search", b"search", "task", b"task", "time", b"time", "timeit", b"timeit", "trace_id", b"trace_id", "type", b"type", "userid", b"userid"]) -> None: ...
 
 global___AuditRequest = AuditRequest
