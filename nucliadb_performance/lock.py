@@ -3,7 +3,7 @@ import os
 import random
 import time
 
-LOCK_FILE = "lock.txt"
+LOCK_FILE = os.environ.get("LOCK_FILE", "lock.txt")
 
 
 def acquire():

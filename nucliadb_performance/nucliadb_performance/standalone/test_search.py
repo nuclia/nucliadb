@@ -1,5 +1,5 @@
-from functools import cache
 import re
+from functools import cache
 
 from molotov import global_setup, global_teardown, scenario
 
