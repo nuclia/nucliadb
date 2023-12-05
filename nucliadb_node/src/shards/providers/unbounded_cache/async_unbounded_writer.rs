@@ -30,6 +30,7 @@ use uuid::Uuid;
 
 use crate::disk_structure;
 use crate::settings::Settings;
+use crate::shards::change_state::{ShardChangeStateManager, ShardsChangeStateManager};
 use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardWriterProvider;
@@ -40,6 +41,7 @@ use crate::shards::ShardId;
 pub struct AsyncUnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
+    change_state: Arc<ShardsChangeStateManager>,
 }
 
 impl AsyncUnboundedShardWriterCache {
@@ -51,6 +53,7 @@ impl AsyncUnboundedShardWriterCache {
             // writting.
             cache: RwLock::new(HashMap::new()),
             shards_path: settings.shards_path(),
+            change_state: Arc::new(ShardsChangeStateManager::new(settings.shards_path())),
         }
     }
 }
@@ -61,9 +64,10 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         let shard_id = metadata.id.clone().unwrap_or(Uuid::new_v4().to_string());
         let shard_id_moved = shard_id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
+        let change_state = self.change_state.get(shard_id.clone());
         let new_shard = Arc::new(
             tokio::task::spawn_blocking(move || {
-                ShardWriter::new(shard_id_moved, &shard_path, metadata)
+                ShardWriter::new(shard_id_moved, &shard_path, metadata, change_state)
             })
             .await
             .context("Blocking task panicked")??,
@@ -83,13 +87,14 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
+        let change_state = self.change_state.get(id.clone());
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
                 return Err(node_error!(ShardNotFoundError(
                     "Shard {shard_path:?} is not on disk"
                 )));
             }
-            ShardWriter::open(id.clone(), &shard_path).map_err(|error| {
+            ShardWriter::open(id.clone(), &shard_path, change_state).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
             })
         })
@@ -104,13 +109,15 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
 
     async fn load_all(&self) -> NodeResult<()> {
         let shards_path = self.shards_path.clone();
+        let csm = Arc::clone(&self.change_state);
         let shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {
                 let entry = entry?;
                 let file_name = entry.file_name().to_str().unwrap().to_string();
                 let shard_path = entry.path();
-                match ShardWriter::open(file_name.clone(), &shard_path) {
+                let change_state = csm.get(file_name.clone());
+                match ShardWriter::open(file_name.clone(), &shard_path, change_state) {
                     Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                     Ok(shard) => {
                         debug!("Shard loaded: {shard_path:?}");
@@ -150,8 +157,9 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
 
         let id_ = id.clone();
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
+        let change_state = self.change_state.get(id.clone());
         let (upgraded, details) = tokio::task::spawn_blocking(move || -> NodeResult<_> {
-            let upgraded = ShardWriter::clean_and_create(id, &shard_path)?;
+            let upgraded = ShardWriter::clean_and_create(id, &shard_path, change_state)?;
             let details = ShardCleaned {
                 document_service: upgraded.document_version() as i32,
                 paragraph_service: upgraded.paragraph_version() as i32,
@@ -165,5 +173,9 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
 
         self.cache.write().await.insert(id_, Arc::new(upgraded));
         Ok(details)
+    }
+
+    fn get_change_state(&self, id: ShardId) -> Option<Arc<ShardChangeStateManager>> {
+        self.change_state.get(id)
     }
 }

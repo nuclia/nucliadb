@@ -18,6 +18,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
@@ -30,9 +31,11 @@ use nucliadb_procs::measure;
 use tokio::sync::Mutex;
 
 use crate::disk_structure::*;
-use crate::shards::metadata::{ShardMetadata, Similarity};
+use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
+
+use super::change_state::ShardChangeStateManager;
 
 #[derive(Debug)]
 pub struct ShardWriter {
@@ -47,6 +50,7 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
+    change_state: Option<Arc<ShardChangeStateManager>>,
     pub gc_lock: Mutex<()>, // lock to be able to do GC or not
     write_lock: Mutex<()>,  // be able to lock writes on the shard
 }
@@ -61,6 +65,7 @@ impl ShardWriter {
         psc: ParagraphConfig,
         vsc: VectorConfig,
         rsc: RelationConfig,
+        change_state: Option<Arc<ShardChangeStateManager>>,
     ) -> NodeResult<ShardWriter> {
         let versions = Versions::load_or_create(
             &path.join(VERSION_FILE),
@@ -109,6 +114,7 @@ impl ShardWriter {
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
             relation_service_version: versions.version_relations() as i32,
+            change_state,
             gc_lock: Mutex::new(()),
             write_lock: Mutex::new(()),
         })
@@ -147,7 +153,11 @@ impl ShardWriter {
             i => panic!("Unknown relation version {i}"),
         }
     }
-    pub fn clean_and_create(id: String, path: &Path) -> NodeResult<ShardWriter> {
+    pub fn clean_and_create(
+        id: String,
+        path: &Path,
+        change_state: Option<Arc<ShardChangeStateManager>>,
+    ) -> NodeResult<ShardWriter> {
         let metadata = ShardMetadata::open(&path.join(METADATA_FILE))?;
         std::fs::remove_dir_all(path)?;
         std::fs::create_dir(path)?;
@@ -171,11 +181,20 @@ impl ShardWriter {
             path: path.join(RELATIONS_DIR),
             channel,
         };
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        let sw = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc, change_state)?;
+
+        sw.new_generation_id();
+
+        Ok(sw)
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(id: String, path: &Path, metadata: ShardMetadata) -> NodeResult<ShardWriter> {
+    pub fn new(
+        id: String,
+        path: &Path,
+        metadata: ShardMetadata,
+        change_state: Option<Arc<ShardChangeStateManager>>,
+    ) -> NodeResult<ShardWriter> {
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -201,11 +220,18 @@ impl ShardWriter {
         let metadata_path = path.join(METADATA_FILE);
         metadata.serialize(&metadata_path)?;
 
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        let sw = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc, change_state)?;
+        sw.new_generation_id();
+
+        Ok(sw)
     }
 
     #[measure(actor = "shard", metric = "open")]
-    pub fn open(id: String, path: &Path) -> NodeResult<ShardWriter> {
+    pub fn open(
+        id: String,
+        path: &Path,
+        change_state: Option<Arc<ShardChangeStateManager>>,
+    ) -> NodeResult<ShardWriter> {
         let metadata_path = path.join(METADATA_FILE);
         let metadata = ShardMetadata::open(&metadata_path)?;
         let tsc = TextConfig {
@@ -229,7 +255,7 @@ impl ShardWriter {
             channel,
         };
 
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc, change_state)
     }
 
     #[measure(actor = "shard", metric = "set_resource")]
@@ -464,38 +490,24 @@ impl ShardWriter {
         vector_write(&self.vector_writer).garbage_collection()
     }
 
-    #[tracing::instrument(skip_all)]
     pub fn get_generation_id(&self) -> String {
-        // we can not cache this on the ShardWriter instance unless we get swap our
-        // Arc implementation for a RwLock implementation because we'd need
-        // to write the cache on modification
-
-        let filepath = self.path.join(GENERATION_FILE);
-        // check if file does not exist
-        if !filepath.exists() {
-            return self.new_generation_id();
+        if let Some(cs) = self.change_state.as_ref() {
+            return cs.get_generation_id().unwrap_or("".to_string());
         }
-        std::fs::read_to_string(filepath).unwrap()
+        "".to_string()
     }
 
-    #[tracing::instrument(skip_all)]
     pub fn new_generation_id(&self) -> String {
-        let generation_id = uuid::Uuid::new_v4().to_string();
-        self.set_generation_id(generation_id.clone());
-        generation_id
+        if let Some(cs) = self.change_state.as_ref() {
+            return cs.new_generation_id();
+        }
+        "".to_string()
     }
 
     pub fn set_generation_id(&self, generation_id: String) {
-        let filepath = self.path.join(GENERATION_FILE);
-        std::fs::write(filepath, generation_id).unwrap();
-    }
-
-    pub fn get_kbid(&self) -> String {
-        self.metadata.kbid().unwrap_or_default().to_string()
-    }
-
-    pub fn get_similarity(&self) -> Similarity {
-        self.metadata.similarity().into()
+        if let Some(cs) = self.change_state.as_ref() {
+            cs.set_generation_id(generation_id)
+        }
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {

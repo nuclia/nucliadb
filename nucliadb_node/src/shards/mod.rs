@@ -19,6 +19,7 @@
 
 //! This module provides tools for managing shards
 
+pub mod change_state;
 pub mod errors;
 pub mod metadata;
 pub mod providers;
