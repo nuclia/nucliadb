@@ -119,6 +119,7 @@ async def finalize():
 
 
 def get_dm() -> FileDataManager:  # type: ignore
+    breakpoint()
     if writer_settings.dm_enabled:
         global REDIS_FILE_DATA_MANAGER_FACTORY
         if REDIS_FILE_DATA_MANAGER_FACTORY is None:

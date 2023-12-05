@@ -100,25 +100,32 @@ DROP table IF EXISTS kb_files_fileparts;
     await storage.finalize()
 
 
+@pytest.fixture(scope="function")
+async def redis_dm(redis):
+    prev = settings.dm_enabled
+
+    settings.dm_enabled = True
+    settings.dm_redis_host = redis[0]
+    settings.dm_redis_port = redis[1]
+
+    yield
+
+    settings.dm_enabled = prev
+
+
 @pytest.mark.asyncio
-async def test_pg_driver(pg_storage_tus: PGBlobStore):
-    settings.dm_enabled = False
+async def test_pg_driver(pg_storage_tus: PGBlobStore, redis_dm):
     await storage_test(pg_storage_tus, PGFileStorageManager(pg_storage_tus))
-    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio
-async def test_s3_driver(s3_storage_tus: S3BlobStore):
-    settings.dm_enabled = False
+async def test_s3_driver(s3_storage_tus: S3BlobStore, redis_dm):
     await storage_test(s3_storage_tus, S3FileStorageManager(s3_storage_tus))
-    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio
-async def test_gcs_driver(gcs_storage_tus: GCloudBlobStore):
-    settings.dm_enabled = False
+async def test_gcs_driver(gcs_storage_tus: GCloudBlobStore, redis_dm):
     await storage_test(gcs_storage_tus, GCloudFileStorageManager(gcs_storage_tus))
-    settings.dm_enabled = True
 
 
 @pytest.mark.asyncio
