@@ -24,6 +24,8 @@ import orjson
 from redis import asyncio as aioredis
 from starlette.requests import Request
 
+from nucliadb.writer import logger
+
 from .exceptions import HTTPPreconditionFailed
 
 
@@ -34,7 +36,7 @@ class NoRedisConfigured(Exception):
 DATA: Dict[str, Any] = {}
 
 
-class FileDataMangaer:
+class FileDataManager:
     _data: Optional[Dict[str, Any]] = None
     _loaded = False
     key = None
@@ -133,10 +135,14 @@ class RedisFileDataManagerFactory:
         return RedisFileDataManager(self.redis)
 
     async def finalize(self):
-        await self.redis.close(close_connection_pool=True)
+        try:
+            await self.redis.close(close_connection_pool=True)
+        except Exception:
+            logger.warning("Error closing redis connection", exc_info=True)
+            pass
 
 
-class RedisFileDataManager(FileDataMangaer):
+class RedisFileDataManager(FileDataManager):
     def __init__(self, redis: aioredis.Redis):
         self.redis = redis
 

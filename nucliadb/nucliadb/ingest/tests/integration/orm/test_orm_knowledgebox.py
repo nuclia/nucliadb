@@ -25,7 +25,7 @@ from nucliadb.ingest.tests.fixtures import broker_resource
 
 @pytest.mark.asyncio
 async def test_knowledgebox_purge_handles_unexisting_shard_payload(
-    gcs_storage, maindb_driver
+    storage, maindb_driver
 ):
     await KnowledgeBox.purge(maindb_driver, "idonotexist")
 
@@ -51,7 +51,7 @@ def test_chunker():
 
 @pytest.mark.asyncio
 async def test_knowledgebox_delete_all_kb_keys(
-    gcs_storage,
+    storage,
     cache,
     fake_node,
     maindb_driver,
@@ -59,7 +59,7 @@ async def test_knowledgebox_delete_all_kb_keys(
 ):
     txn = await maindb_driver.begin()
     kbid = knowledgebox_ingest
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
     # Create some resources in the KB
     n_resources = 100
@@ -74,7 +74,7 @@ async def test_knowledgebox_delete_all_kb_keys(
 
     # Check that all of them are there
     txn = await maindb_driver.begin()
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
     await txn.abort()
@@ -84,7 +84,7 @@ async def test_knowledgebox_delete_all_kb_keys(
 
     # Check that all of them were deleted
     txn = await maindb_driver.begin()
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
     await txn.abort()

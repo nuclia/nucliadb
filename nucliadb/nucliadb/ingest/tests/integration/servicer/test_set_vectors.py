@@ -29,7 +29,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_set_vectors(grpc_servicer, gcs_storage):
+async def test_set_vectors(grpc_servicer, storage):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     # Create a kb
@@ -74,8 +74,8 @@ async def test_set_vectors(grpc_servicer, gcs_storage):
     assert result.found is True
 
     # Check that vectors were updated at gcs storage
-    sf = gcs_storage.file_extracted(
+    sf = storage.file_extracted(
         kb_id, rid, "t", field_id, FieldTypes.FIELD_VECTORS.value
     )
-    vo = await gcs_storage.download_pb(sf, VectorObject)
+    vo = await storage.download_pb(sf, VectorObject)
     assert vo == req.vectors

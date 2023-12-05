@@ -25,7 +25,7 @@ from nucliadb.ingest.orm.synonyms import Synonyms
 
 
 @pytest.mark.asyncio
-async def test_set_get(txn, gcs_storage, fake_node, knowledgebox_ingest):
+async def test_set_get(txn, storage, fake_node, knowledgebox_ingest):
     synonyms = Synonyms(txn, knowledgebox_ingest)
 
     assert await synonyms.get() is None
@@ -39,7 +39,7 @@ async def test_set_get(txn, gcs_storage, fake_node, knowledgebox_ingest):
 
 
 @pytest.mark.asyncio
-async def test_clear(txn, gcs_storage, fake_node, knowledgebox_ingest):
+async def test_clear(txn, storage, fake_node, knowledgebox_ingest):
     synonyms = Synonyms(txn, knowledgebox_ingest)
 
     await synonyms.clear()

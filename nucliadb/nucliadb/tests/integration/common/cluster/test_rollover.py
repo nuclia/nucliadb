@@ -27,7 +27,7 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-async def app_context(natsd, gcs_storage, nucliadb):
+async def app_context(natsd, storage, nucliadb):
     ctx = ApplicationContext()
     await ctx.initialize()
     yield ctx

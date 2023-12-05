@@ -68,14 +68,14 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def processor(maindb_driver, gcs_storage, pubsub):
-    proc = Processor(maindb_driver, gcs_storage, pubsub, partition="1")
+async def processor(maindb_driver, storage, pubsub):
+    proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
 
 @pytest.fixture(scope="function")
-async def stream_processor(maindb_driver, gcs_storage, pubsub):
-    proc = Processor(maindb_driver, gcs_storage, pubsub, partition="1")
+async def stream_processor(maindb_driver, storage, pubsub):
+    proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
 
@@ -94,7 +94,7 @@ class IngestFixture:
 
 @pytest.fixture(scope="function")
 async def ingest_consumers(
-    redis_config, transaction_utility, gcs_storage, fake_node, nats_manager
+    redis_config, transaction_utility, storage, fake_node, nats_manager
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
@@ -106,7 +106,7 @@ async def ingest_consumers(
 
 @pytest.fixture(scope="function")
 async def ingest_processed_consumer(
-    redis_config, transaction_utility, gcs_storage, fake_node, nats_manager
+    redis_config, transaction_utility, storage, fake_node, nats_manager
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
@@ -182,7 +182,7 @@ async def fake_node(_natsd_reset, indexing_utility_ingest, shard_manager):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(gcs_storage, maindb_driver: Driver, shard_manager):
+async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     async with maindb_driver.transaction() as txn:
@@ -372,12 +372,12 @@ def make_extracted_vectors(field_id):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(gcs_storage, maindb_driver, knowledgebox_ingest, fake_node):
+async def test_resource(storage, maindb_driver, knowledgebox_ingest, fake_node):
     """
     Create a resource that has every possible bit of information
     """
     resource = await create_resource(
-        storage=gcs_storage,
+        storage=storage,
         driver=maindb_driver,
         knowledgebox_ingest=knowledgebox_ingest,
     )

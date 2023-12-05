@@ -69,7 +69,7 @@ EXAMPLE_VECTOR = base64.b64decode(
 
 @pytest.fixture(autouse=True)
 async def audit_consumers(
-    maindb_driver, gcs_storage, pubsub, stream_audit: StreamAuditStorage
+    maindb_driver, storage, pubsub, stream_audit: StreamAuditStorage
 ):
     index_auditor = IndexAuditHandler(
         driver=maindb_driver,
@@ -78,7 +78,7 @@ async def audit_consumers(
     )
     resource_writes_auditor = ResourceWritesAuditHandler(
         driver=maindb_driver,
-        storage=gcs_storage,
+        storage=storage,
         audit=stream_audit,
         pubsub=pubsub,
     )
@@ -93,7 +93,7 @@ async def audit_consumers(
 @pytest.fixture()
 def kbid(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     txn,
     cache,
     fake_node,
@@ -204,7 +204,7 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
 
 @pytest.mark.asyncio
 async def test_ingest_error_message(
-    kbid: str, gcs_storage: Storage, processor, maindb_driver
+    kbid: str, storage: Storage, processor, maindb_driver
 ):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
@@ -228,7 +228,7 @@ async def test_ingest_error_message(
     await processor.process(message=message1, seqid=2)
 
     async with maindb_driver.transaction() as txn:
-        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message1.uuid)
         assert r is not None
         field_obj = await r.get_field("wikipedia_ml", TEXT)
@@ -250,7 +250,7 @@ async def test_ingest_error_message(
 @pytest.mark.asyncio
 async def test_ingest_messages_origin(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     fake_node,
     processor,
     knowledgebox_ingest,
@@ -348,7 +348,7 @@ async def get_audit_messages(sub):
 @pytest.mark.asyncio
 async def test_ingest_audit_stream_files_only(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     txn,
     cache,
     fake_node,
@@ -503,7 +503,7 @@ async def test_ingest_audit_stream_files_only(
 @pytest.mark.asyncio
 async def test_qa(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     cache,
     fake_node,
     stream_processor,
@@ -542,7 +542,7 @@ async def test_qa(
     await stream_processor.process(message=message, seqid=1)
 
     async with driver.transaction() as txn:
-        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
         res = await r.get_field(key="qa", type=FieldType.FILE)
@@ -558,7 +558,7 @@ async def test_qa(
 @pytest.mark.asyncio
 async def test_ingest_audit_stream_mixed(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     cache,
     fake_node,
     stream_processor,
@@ -628,7 +628,7 @@ async def test_ingest_audit_stream_mixed(
 @pytest.mark.asyncio
 async def test_ingest_account_seq_stored(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     fake_node,
     stream_processor,
     test_resource: Resource,
@@ -643,7 +643,7 @@ async def test_ingest_account_seq_stored(
     await stream_processor.process(message=message, seqid=1)
 
     async with driver.transaction() as txn:
-        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
         basic = await r.get_basic()
@@ -656,7 +656,7 @@ async def test_ingest_account_seq_stored(
 @pytest.mark.asyncio
 async def test_ingest_processor_handles_missing_kb(
     local_files,
-    gcs_storage: Storage,
+    storage: Storage,
     fake_node,
     stream_processor,
     test_resource: Resource,
@@ -670,7 +670,7 @@ async def test_ingest_processor_handles_missing_kb(
 
 @pytest.mark.asyncio
 async def test_ingest_autocommit_deadletter_marks_resource(
-    kbid: str, processor: Processor, gcs_storage, maindb_driver
+    kbid: str, processor: Processor, storage, maindb_driver
 ):
     rid = str(uuid.uuid4())
     message = make_message(kbid, rid)
@@ -683,7 +683,7 @@ async def test_ingest_autocommit_deadletter_marks_resource(
         await processor.process(message=message, seqid=1)
 
     async with maindb_driver.transaction() as txn:
-        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=kbid)
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         resource = await kb_obj.get(message.uuid)
 
     mock_notify.assert_called_once()
