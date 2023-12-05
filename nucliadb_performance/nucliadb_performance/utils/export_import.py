@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+from typing import Any
 
 import requests
 from tqdm import tqdm
@@ -87,7 +88,7 @@ def save_export_to_url(uri, export_generator):
 
 
 def read_import_stream(uri):
-    tqdm_kwargs = dict(
+    tqdm_kwargs: dict[str, Any] = dict(
         desc="Uploading export to NucliaDB",
         unit="iB",
         unit_scale=True,
@@ -99,6 +100,8 @@ def read_import_stream(uri):
         tqdm_kwargs["total"] = int(resp.headers["Content-Length"])
     else:
         stream = read_from_file
+        if not os.path.exists(uri):
+            raise ValueError(f"File {uri} does not exist")
         tqdm_kwargs["total"] = os.path.getsize(uri)
     for chunk in progressify(stream(uri), **tqdm_kwargs):
         yield chunk
