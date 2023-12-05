@@ -79,6 +79,7 @@ async def writer_api(
 
     await application.router.startup()
     yield make_client_fixture
+
     await application.router.shutdown()
     clear_storage()
 
