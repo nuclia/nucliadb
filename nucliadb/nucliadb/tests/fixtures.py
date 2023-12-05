@@ -41,7 +41,7 @@ from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.redis import RedisDriver
 from nucliadb.common.maindb.tikv import TiKVDriver
-from nucliadb.common.maindb.utils import _DRIVER_UTIL_NAME, get_driver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.standalone.config import config_nucliadb
@@ -648,12 +648,12 @@ def driver_lazy_fixtures(default_drivers: str = "redis"):
 )
 async def maindb_driver(request):
     driver = request.param
-    MAIN[_DRIVER_UTIL_NAME] = driver
+    MAIN[Utility.MAINDB_DRIVER] = driver
 
     yield driver
 
     await cleanup_maindb(driver)
-    MAIN.pop(_DRIVER_UTIL_NAME, None)
+    MAIN.pop(Utility.MAINDB_DRIVER, None)
 
 
 async def maybe_cleanup_maindb():

@@ -21,6 +21,7 @@ import pytest
 
 from nucliadb_utils.storages.pg import PostgresStorage
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility
 
 pytest_plugins = [
     "pytest_docker_fixtures",
@@ -35,7 +36,7 @@ pytest_plugins = [
 async def pg_storage(pg):
     dsn = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
     storage = PostgresStorage(dsn)
-    MAIN["storage"] = storage
+    MAIN[Utility.STORAGE] = storage
     conn = await asyncpg.connect(dsn)
     await conn.execute(
         """
@@ -47,5 +48,5 @@ DROP table IF EXISTS kb_files_fileparts;
     await storage.initialize()
     yield storage
     await storage.finalize()
-    if "storage" in MAIN:
-        del MAIN["storage"]
+    if Utility.STORAGE in MAIN:
+        del MAIN[Utility.STORAGE]
