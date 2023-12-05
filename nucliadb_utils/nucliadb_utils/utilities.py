@@ -81,17 +81,16 @@ class Utility(str, Enum):
     MAINDB_DRIVER = "driver"
 
 
-def get_utility(ident: Union[Utility, str]):
+def get_utility(ident: Utility):
     return MAIN.get(ident)
 
 
-def set_utility(ident: Union[Utility, str], util: Any):
+def set_utility(ident: Utility, util: Any):
     MAIN[ident] = util
 
 
-def clean_utility(ident: Union[Utility, str]):
-    if ident in MAIN:
-        del MAIN[ident]
+def clean_utility(ident: Utility):
+    MAIN.pop(ident, None)
 
 
 async def get_storage(
