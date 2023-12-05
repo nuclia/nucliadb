@@ -27,7 +27,7 @@ from typing import AsyncIterator
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
-from nucliadb.writer.tus.dm import FileDataMangaer
+from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -45,7 +45,7 @@ class LocalFileStorageManager(FileStorageManager):
         bucket_path = self.storage.get_bucket_path(bucket)
         return f"{bucket_path}/{key}"
 
-    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
+    async def start(self, dm: FileDataManager, path: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         init_url = self.get_file_path(bucket, upload_file_id)
@@ -95,7 +95,7 @@ class LocalFileStorageManager(FileStorageManager):
         except FileNotFoundError:
             raise CloudFileNotFound()
 
-    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
+    async def append(self, dm: FileDataManager, iterable, offset) -> int:
         count = 0
         bucket = dm.get("bucket")
         upload_file_id = dm.get("upload_file_id")
@@ -110,7 +110,7 @@ class LocalFileStorageManager(FileStorageManager):
             await aio_fi.flush()
         return count
 
-    async def finish(self, dm: FileDataMangaer):
+    async def finish(self, dm: FileDataManager):
         # Move from old to new
         bucket = dm.get("bucket")
 
