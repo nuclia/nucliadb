@@ -23,7 +23,6 @@ use async_trait::async_trait;
 use nucliadb_core::protos::ShardCleaned;
 use nucliadb_core::NodeResult;
 
-use crate::shards::change_state::ShardChangeStateManager;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::reader::ShardReader;
 use crate::shards::writer::ShardWriter;
@@ -54,7 +53,7 @@ pub trait ShardWriterProvider {
 
     fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
 
-    fn get_change_state(&self, id: ShardId) -> Option<Arc<ShardChangeStateManager>>;
+    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>>;
 }
 
 #[async_trait]
@@ -68,5 +67,5 @@ pub trait AsyncShardWriterProvider {
 
     async fn upgrade(&self, id: ShardId) -> NodeResult<ShardCleaned>;
 
-    fn get_change_state(&self, id: ShardId) -> Option<Arc<ShardChangeStateManager>>;
+    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>>;
 }

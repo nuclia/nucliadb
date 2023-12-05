@@ -29,10 +29,9 @@ use tokio::io::AsyncReadExt;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 
-use crate::disk_structure::METADATA_FILE;
 use crate::replication::NodeRole;
 use crate::settings::Settings;
-use crate::shards::metadata::{ShardMetadata, Similarity};
+use crate::shards::metadata::Similarity;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
@@ -212,39 +211,28 @@ impl replication::replication_service_server::ReplicationService for Replication
             .collect();
 
         for shard_id in shard_ids {
-            if let Some(Some(gen_id)) = self
-                .shards
-                .get_change_state(shard_id.clone())
-                .map(|cs| cs.get_generation_id())
-            {
+            if let Some(metadata) = self.shards.get_metadata(shard_id.clone()) {
+                let gen_id = metadata.get_generation_id();
+
                 let req_shard_gen_id = request_shard_states
                     .clone()
                     .into_iter()
                     .find(|s| s.shard_id == shard_id)
                     .map(|s| s.generation_id);
                 if req_shard_gen_id.is_none()
-                    || req_shard_gen_id.unwrap_or("".to_string()) != gen_id
+                    || req_shard_gen_id.unwrap_or("missing_req_id".to_string()) != gen_id
                 {
-                    if let Ok(metadata) = ShardMetadata::open(
-                        &self
-                            .settings
-                            .shards_path()
-                            .join(&shard_id.clone())
-                            .join(METADATA_FILE),
-                    ) {
-                        resp_shard_states.push(replication::PrimaryShardReplicationState {
-                            shard_id,
-                            generation_id: gen_id,
-                            kbid: metadata.kbid().unwrap_or_default().to_string(),
-                            similarity: metadata
-                                .similarity
-                                .unwrap_or(Similarity::Cosine)
-                                .to_string(),
-                        });
-                    } else {
-                        warn!("Shard {} metadata not found", shard_id);
-                    }
+                    let similarity: Similarity = metadata.similarity().into();
+
+                    resp_shard_states.push(replication::PrimaryShardReplicationState {
+                        shard_id,
+                        generation_id: gen_id,
+                        kbid: metadata.kbid().unwrap_or_default(),
+                        similarity: similarity.to_string(),
+                    });
                 }
+            } else {
+                warn!("Shard {} metadata not found", shard_id);
             }
         }
 
@@ -275,7 +263,7 @@ impl replication::replication_service_server::ReplicationService for Replication
             )));
         }
         let shard = shard_lookup.unwrap();
-        let generation_id = shard.get_generation_id();
+        let generation_id = shard.metadata.get_generation_id();
         let shard_path = shard.path.clone();
         let chunk_size = request.chunk_size;
         let ignored_segement_ids: HashMap<String, Vec<String>> = request

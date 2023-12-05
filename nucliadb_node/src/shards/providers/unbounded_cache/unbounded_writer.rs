@@ -22,15 +22,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use nucliadb_core::protos::ShardCleaned;
-use nucliadb_core::tracing::{debug, error};
+use nucliadb_core::tracing::{debug, error, warn};
 use nucliadb_core::{node_error, NodeResult};
-use uuid::Uuid;
 
 use crate::disk_structure;
 use crate::settings::Settings;
-use crate::shards::change_state::{ShardChangeStateManager, ShardsChangeStateManager};
 use crate::shards::errors::ShardNotFoundError;
-use crate::shards::metadata::ShardMetadata;
+use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
 use crate::shards::providers::ShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
@@ -39,7 +37,7 @@ use crate::shards::ShardId;
 pub struct UnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
-    change_state: Arc<ShardsChangeStateManager>,
+    metadata_manager: ShardsMetadataManager,
 }
 
 impl UnboundedShardWriterCache {
@@ -47,7 +45,7 @@ impl UnboundedShardWriterCache {
         Self {
             cache: RwLock::new(HashMap::new()),
             shards_path: settings.shards_path(),
-            change_state: Arc::new(ShardsChangeStateManager::new(settings.shards_path())),
+            metadata_manager: ShardsMetadataManager::new(settings.shards_path()),
         }
     }
 
@@ -62,14 +60,13 @@ impl UnboundedShardWriterCache {
 
 impl ShardWriterProvider for UnboundedShardWriterCache {
     fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
-        let shard_id = Uuid::new_v4().to_string();
-        let cache_shard_id = shard_id.clone();
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
-        let change_state = self.change_state.get(shard_id.clone());
-        let new_shard =
-            ShardWriter::new(shard_id, &shard_path, metadata, change_state).map(Arc::new)?;
+        let metadata = Arc::new(metadata);
+        let shard_id = metadata.id();
+        self.metadata_manager.add_metadata(Arc::clone(&metadata));
+        let new_shard = ShardWriter::new(metadata).map(Arc::new)?;
         let returned_shard = Arc::clone(&new_shard);
-        self.write().insert(cache_shard_id, new_shard);
+
+        self.write().insert(shard_id, new_shard);
         Ok(returned_shard)
     }
 
@@ -83,13 +80,13 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
-        if !shard_path.is_dir() {
+        if !ShardMetadata::exists(shard_path.clone()) {
             return Err(node_error!(ShardNotFoundError(
                 "Shard {shard_path:?} is not on disk"
             )));
         }
-        let change_state = self.change_state.get(id.clone());
-        let shard = ShardWriter::open(id.clone(), &shard_path, change_state).map_err(|error| {
+        let sm = Arc::new(ShardMetadata::open(shard_path.clone())?);
+        let shard = ShardWriter::open(sm).map_err(|error| {
             node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
         })?;
 
@@ -102,14 +99,21 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         let mut cache = self.write();
         for entry in std::fs::read_dir(&self.shards_path)? {
             let entry = entry?;
-            let file_name = entry.file_name().to_str().unwrap().to_string();
+            let shard_id = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let change_state = self.change_state.get(file_name.clone());
-            match ShardWriter::open(file_name.clone(), &shard_path, change_state) {
+            let metadata = self.metadata_manager.get(shard_id.clone());
+            if metadata.is_none() {
+                warn!(
+                    "Shard {shard_path:?} is not on disk",
+                    shard_path = shard_path
+                );
+                continue;
+            }
+            match ShardWriter::open(metadata.unwrap()) {
                 Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                 Ok(shard) => {
                     debug!("Shard loaded: {shard_path:?}");
-                    cache.insert(file_name, Arc::new(shard));
+                    cache.insert(shard_id, Arc::new(shard));
                 }
             }
         }
@@ -135,8 +139,17 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         self.write().remove(&id);
 
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
-        let change_state = self.change_state.get(id.clone());
-        let upgraded = ShardWriter::clean_and_create(id.clone(), &shard_path, change_state)?;
+        let metadata = self.metadata_manager.get(id.clone());
+        if metadata.is_none() {
+            warn!(
+                "Shard {shard_path:?} is not on disk",
+                shard_path = shard_path
+            );
+            return Err(node_error!(ShardNotFoundError(
+                "Shard {shard_path:?} is not on disk"
+            )));
+        }
+        let upgraded = ShardWriter::clean_and_create(metadata.unwrap())?;
         let details = ShardCleaned {
             document_service: upgraded.document_version() as i32,
             paragraph_service: upgraded.paragraph_version() as i32,
@@ -148,7 +161,7 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
         Ok(details)
     }
 
-    fn get_change_state(&self, id: ShardId) -> Option<Arc<ShardChangeStateManager>> {
-        self.change_state.get(id)
+    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {
+        self.metadata_manager.get(id)
     }
 }

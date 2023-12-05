@@ -17,7 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use nucliadb_core::prelude::*;
@@ -35,11 +35,9 @@ use crate::shards::metadata::ShardMetadata;
 use crate::shards::versions::Versions;
 use crate::telemetry::run_with_telemetry;
 
-use super::change_state::ShardChangeStateManager;
-
 #[derive(Debug)]
 pub struct ShardWriter {
-    pub metadata: ShardMetadata,
+    pub metadata: Arc<ShardMetadata>,
     pub id: String,
     pub path: PathBuf,
     text_writer: TextsWriterPointer,
@@ -50,7 +48,6 @@ pub struct ShardWriter {
     paragraph_service_version: i32,
     vector_service_version: i32,
     relation_service_version: i32,
-    change_state: Option<Arc<ShardChangeStateManager>>,
     pub gc_lock: Mutex<()>, // lock to be able to do GC or not
     write_lock: Mutex<()>,  // be able to lock writes on the shard
 }
@@ -58,18 +55,15 @@ pub struct ShardWriter {
 impl ShardWriter {
     #[tracing::instrument(skip_all)]
     fn initialize(
-        id: String,
-        path: &Path,
-        metadata: ShardMetadata,
+        metadata: Arc<ShardMetadata>,
         tsc: TextConfig,
         psc: ParagraphConfig,
         vsc: VectorConfig,
         rsc: RelationConfig,
-        change_state: Option<Arc<ShardChangeStateManager>>,
     ) -> NodeResult<ShardWriter> {
         let versions = Versions::load_or_create(
-            &path.join(VERSION_FILE),
-            metadata.channel.unwrap_or_default(),
+            &metadata.shard_path().join(VERSION_FILE),
+            metadata.channel(),
         )?;
         let text_task = || Some(versions.get_texts_writer(&tsc));
         let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
@@ -103,9 +97,9 @@ impl ShardWriter {
         let relations = relation_result.transpose()?;
 
         Ok(ShardWriter {
-            id,
+            id: metadata.id(),
+            path: metadata.shard_path(),
             metadata,
-            path: path.to_path_buf(),
             text_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
@@ -114,7 +108,6 @@ impl ShardWriter {
             paragraph_service_version: versions.version_paragraphs() as i32,
             vector_service_version: versions.version_vectors() as i32,
             relation_service_version: versions.version_relations() as i32,
-            change_state,
             gc_lock: Mutex::new(()),
             write_lock: Mutex::new(()),
         })
@@ -153,48 +146,39 @@ impl ShardWriter {
             i => panic!("Unknown relation version {i}"),
         }
     }
-    pub fn clean_and_create(
-        id: String,
-        path: &Path,
-        change_state: Option<Arc<ShardChangeStateManager>>,
-    ) -> NodeResult<ShardWriter> {
-        let metadata = ShardMetadata::open(&path.join(METADATA_FILE))?;
-        std::fs::remove_dir_all(path)?;
-        std::fs::create_dir(path)?;
+    pub fn clean_and_create(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let path = metadata.shard_path();
+        std::fs::remove_dir_all(path.clone())?;
+        std::fs::create_dir(path.clone())?;
         let tsc = TextConfig {
-            path: path.join(TEXTS_DIR),
+            path: path.clone().join(TEXTS_DIR),
         };
 
         let psc = ParagraphConfig {
-            path: path.join(PARAGRAPHS_DIR),
+            path: path.clone().join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
-            path: path.join(VECTORS_DIR),
-            vectorset: path.join(VECTORSET_DIR),
+            path: path.clone().join(VECTORS_DIR),
+            vectorset: path.clone().join(VECTORSET_DIR),
             channel,
         };
         let rsc = RelationConfig {
-            path: path.join(RELATIONS_DIR),
+            path: path.clone().join(RELATIONS_DIR),
             channel,
         };
-        let sw = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc, change_state)?;
-
-        sw.new_generation_id();
+        let sw = ShardWriter::initialize(Arc::clone(&metadata), tsc, psc, vsc, rsc)?;
+        metadata.new_generation_id();
 
         Ok(sw)
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(
-        id: String,
-        path: &Path,
-        metadata: ShardMetadata,
-        change_state: Option<Arc<ShardChangeStateManager>>,
-    ) -> NodeResult<ShardWriter> {
+    pub fn new(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let path = metadata.shard_path();
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -203,7 +187,7 @@ impl ShardWriter {
             path: path.join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: Some(metadata.similarity()),
@@ -217,23 +201,15 @@ impl ShardWriter {
         };
 
         std::fs::create_dir(path)?;
-        let metadata_path = path.join(METADATA_FILE);
-        metadata.serialize(&metadata_path)?;
 
-        let sw = ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc, change_state)?;
-        sw.new_generation_id();
-
+        let sw = ShardWriter::initialize(Arc::clone(&metadata), tsc, psc, vsc, rsc)?;
+        metadata.serialize_metadata()?;
         Ok(sw)
     }
 
     #[measure(actor = "shard", metric = "open")]
-    pub fn open(
-        id: String,
-        path: &Path,
-        change_state: Option<Arc<ShardChangeStateManager>>,
-    ) -> NodeResult<ShardWriter> {
-        let metadata_path = path.join(METADATA_FILE);
-        let metadata = ShardMetadata::open(&metadata_path)?;
+    pub fn open(metadata: Arc<ShardMetadata>) -> NodeResult<ShardWriter> {
+        let path = metadata.shard_path();
         let tsc = TextConfig {
             path: path.join(TEXTS_DIR),
         };
@@ -242,7 +218,7 @@ impl ShardWriter {
             path: path.join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: None,
@@ -255,7 +231,7 @@ impl ShardWriter {
             channel,
         };
 
-        ShardWriter::initialize(id, path, metadata, tsc, psc, vsc, rsc, change_state)
+        ShardWriter::initialize(metadata, tsc, psc, vsc, rsc)
     }
 
     #[measure(actor = "shard", metric = "set_resource")]
@@ -329,7 +305,7 @@ impl ShardWriter {
         paragraph_result?;
         vector_result?;
         relation_result?;
-        self.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
+        self.metadata.new_generation_id(); // VERY NAIVE, SHOULD BE DONE AFTER MERGE AS WELL
         Ok(())
     }
 
@@ -390,7 +366,7 @@ impl ShardWriter {
         vector_result?;
         relation_result?;
 
-        self.new_generation_id();
+        self.metadata.new_generation_id();
 
         Ok(())
     }
@@ -454,7 +430,7 @@ impl ShardWriter {
         let mut writer = vector_write(&self.vector_writer);
         writer.add_vectorset(setid, similarity)?;
 
-        self.new_generation_id();
+        self.metadata.new_generation_id();
 
         Ok(())
     }
@@ -464,7 +440,7 @@ impl ShardWriter {
         let mut writer = vector_write(&self.vector_writer);
         writer.remove_vectorset(setid)?;
 
-        self.new_generation_id();
+        self.metadata.new_generation_id();
 
         Ok(())
     }
@@ -488,26 +464,6 @@ impl ShardWriter {
     pub fn gc(&self) -> NodeResult<()> {
         let _lock = self.gc_lock.blocking_lock();
         vector_write(&self.vector_writer).garbage_collection()
-    }
-
-    pub fn get_generation_id(&self) -> String {
-        if let Some(cs) = self.change_state.as_ref() {
-            return cs.get_generation_id().unwrap_or("".to_string());
-        }
-        "".to_string()
-    }
-
-    pub fn new_generation_id(&self) -> String {
-        if let Some(cs) = self.change_state.as_ref() {
-            return cs.new_generation_id();
-        }
-        "".to_string()
-    }
-
-    pub fn set_generation_id(&self, generation_id: String) {
-        if let Some(cs) = self.change_state.as_ref() {
-            cs.set_generation_id(generation_id)
-        }
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {

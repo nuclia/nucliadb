@@ -23,16 +23,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use nucliadb_core::protos::ShardCleaned;
-use nucliadb_core::tracing::{debug, error};
+use nucliadb_core::tracing::{debug, error, info};
 use nucliadb_core::{node_error, Context, NodeResult};
 use tokio::sync::RwLock;
-use uuid::Uuid;
 
 use crate::disk_structure;
 use crate::settings::Settings;
-use crate::shards::change_state::{ShardChangeStateManager, ShardsChangeStateManager};
 use crate::shards::errors::ShardNotFoundError;
-use crate::shards::metadata::ShardMetadata;
+use crate::shards::metadata::{ShardMetadata, ShardsMetadataManager};
 use crate::shards::providers::AsyncShardWriterProvider;
 use crate::shards::writer::ShardWriter;
 use crate::shards::ShardId;
@@ -41,7 +39,7 @@ use crate::shards::ShardId;
 pub struct AsyncUnboundedShardWriterCache {
     cache: RwLock<HashMap<ShardId, Arc<ShardWriter>>>,
     pub shards_path: PathBuf,
-    change_state: Arc<ShardsChangeStateManager>,
+    metadata_manager: Arc<ShardsMetadataManager>,
 }
 
 impl AsyncUnboundedShardWriterCache {
@@ -53,7 +51,7 @@ impl AsyncUnboundedShardWriterCache {
             // writting.
             cache: RwLock::new(HashMap::new()),
             shards_path: settings.shards_path(),
-            change_state: Arc::new(ShardsChangeStateManager::new(settings.shards_path())),
+            metadata_manager: Arc::new(ShardsMetadataManager::new(settings.shards_path())),
         }
     }
 }
@@ -61,16 +59,12 @@ impl AsyncUnboundedShardWriterCache {
 #[async_trait]
 impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
-        let shard_id = metadata.id.clone().unwrap_or(Uuid::new_v4().to_string());
-        let shard_id_moved = shard_id.clone();
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &shard_id);
-        let change_state = self.change_state.get(shard_id.clone());
+        let shard_id = metadata.id();
+        let metadata = Arc::new(metadata);
         let new_shard = Arc::new(
-            tokio::task::spawn_blocking(move || {
-                ShardWriter::new(shard_id_moved, &shard_path, metadata, change_state)
-            })
-            .await
-            .context("Blocking task panicked")??,
+            tokio::task::spawn_blocking(move || ShardWriter::new(metadata))
+                .await
+                .context("Blocking task panicked")??,
         );
         self.cache.write().await.insert(shard_id, new_shard.clone());
         Ok(new_shard)
@@ -87,14 +81,14 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
-        let change_state = self.change_state.get(id.clone());
+        let metadata = Arc::new(ShardMetadata::open(shard_path.clone())?);
         let shard = tokio::task::spawn_blocking(move || {
             if !shard_path.is_dir() {
                 return Err(node_error!(ShardNotFoundError(
                     "Shard {shard_path:?} is not on disk"
                 )));
             }
-            ShardWriter::open(id.clone(), &shard_path, change_state).map_err(|error| {
+            ShardWriter::open(metadata).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
             })
         })
@@ -109,19 +103,26 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
 
     async fn load_all(&self) -> NodeResult<()> {
         let shards_path = self.shards_path.clone();
-        let csm = Arc::clone(&self.change_state);
+        let metadata_manager = Arc::clone(&self.metadata_manager);
         let shards = tokio::task::spawn_blocking(move || -> NodeResult<_> {
             let mut shards = HashMap::new();
             for entry in std::fs::read_dir(&shards_path)? {
                 let entry = entry?;
-                let file_name = entry.file_name().to_str().unwrap().to_string();
+                let shard_id = entry.file_name().to_str().unwrap().to_string();
                 let shard_path = entry.path();
-                let change_state = csm.get(file_name.clone());
-                match ShardWriter::open(file_name.clone(), &shard_path, change_state) {
+                if !ShardMetadata::exists(shard_path.clone()) {
+                    info!(
+                        "Shard {shard_path:?} is not on disk",
+                        shard_path = shard_path
+                    );
+                    continue;
+                }
+                let metadata = metadata_manager.get(shard_id.clone());
+                match ShardWriter::open(metadata.unwrap()) {
                     Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                     Ok(shard) => {
                         debug!("Shard loaded: {shard_path:?}");
-                        shards.insert(file_name, Arc::new(shard));
+                        shards.insert(shard_id, Arc::new(shard));
                     }
                 }
             }
@@ -156,10 +157,9 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         self.cache.write().await.remove(&id);
 
         let id_ = id.clone();
-        let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), &id);
-        let change_state = self.change_state.get(id.clone());
+        let metadata = self.metadata_manager.get(id.clone());
         let (upgraded, details) = tokio::task::spawn_blocking(move || -> NodeResult<_> {
-            let upgraded = ShardWriter::clean_and_create(id, &shard_path, change_state)?;
+            let upgraded = ShardWriter::clean_and_create(metadata.unwrap())?;
             let details = ShardCleaned {
                 document_service: upgraded.document_version() as i32,
                 paragraph_service: upgraded.paragraph_version() as i32,
@@ -175,7 +175,7 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         Ok(details)
     }
 
-    fn get_change_state(&self, id: ShardId) -> Option<Arc<ShardChangeStateManager>> {
-        self.change_state.get(id)
+    fn get_metadata(&self, id: ShardId) -> Option<Arc<ShardMetadata>> {
+        self.metadata_manager.get(id)
     }
 }
