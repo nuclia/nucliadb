@@ -17,9 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-
 use std::collections::HashMap;
-/// Shard metadata, defined at the moment of creation.
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
@@ -293,6 +291,24 @@ mod test {
         assert_eq!(
             Some(protos::VectorSimilarity::Cosine).map(|i| i.into()),
             Some(Similarity::Cosine)
+        );
+    }
+
+    #[test]
+    fn test_cache_generation_id() {
+        let dir = TempDir::new().unwrap();
+        let meta = ShardMetadata::new(
+            dir.path().to_path_buf(),
+            "ID".to_string(),
+            Some("KB".to_string()),
+            Similarity::Cosine,
+            Some(Channel::EXPERIMENTAL),
+        );
+        assert!(meta.generation_id.read().unwrap().is_none());
+        let gen_id = meta.get_generation_id();
+        assert_eq!(
+            *meta.generation_id.read().unwrap().as_ref().unwrap(),
+            gen_id
         );
     }
 }

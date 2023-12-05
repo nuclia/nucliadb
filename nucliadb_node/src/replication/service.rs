@@ -214,14 +214,13 @@ impl replication::replication_service_server::ReplicationService for Replication
             if let Some(metadata) = self.shards.get_metadata(shard_id.clone()) {
                 let gen_id = metadata.get_generation_id();
 
-                let req_shard_gen_id = request_shard_states
+                let shard_changed_or_not_present = request_shard_states
                     .clone()
                     .into_iter()
                     .find(|s| s.shard_id == shard_id)
-                    .map(|s| s.generation_id);
-                if req_shard_gen_id.is_none()
-                    || req_shard_gen_id.unwrap_or("missing_req_id".to_string()) != gen_id
-                {
+                    .map(|s| s.generation_id != gen_id)
+                    .unwrap_or(true);
+                if shard_changed_or_not_present {
                     let similarity: Similarity = metadata.similarity().into();
 
                     resp_shard_states.push(replication::PrimaryShardReplicationState {
