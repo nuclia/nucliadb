@@ -41,12 +41,15 @@ RETRIABLE_EXCEPTIONS = (
     aiohttp.client_exceptions.ClientPayloadError,
     botocore.exceptions.BotoCoreError,
 )
-CHUNK_SIZE = 5 * 1024 * 1024
+
+MB = 1024 * 1024
+CHUNK_SIZE = 5 * MB
+MINIMUM_CHUNK_SIZE = 5 * MB
 
 
 class S3FileStorageManager(FileStorageManager):
     storage: S3BlobStore
-    chunk_size = CHUNK_SIZE
+    chunk_size = minimum_chunk_size = CHUNK_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _abort_multipart(self, dm: FileDataManager):
@@ -86,7 +89,6 @@ class S3FileStorageManager(FileStorageManager):
             # It seems that starlette stream() finishes with an emtpy chunk of data
             size += len(chunk)
             part = await self._upload_part(dm, chunk)
-
             multipart = dm.get("multipart")
             multipart["Parts"].append(
                 {"PartNumber": dm.get("block"), "ETag": part["ETag"]}

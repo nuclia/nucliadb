@@ -68,6 +68,8 @@ def lazy_storage_fixtures():
         fixtures.append(lazy_fixture.lf("gcs_storage"))
     if "pg" in configured:
         fixtures.append(lazy_fixture.lf("pg_storage"))
+    if len(fixtures) == 0:
+        fixtures.append(lazy_fixture.lf("gcs_storage"))
     return fixtures
 
 

@@ -359,6 +359,14 @@ class S3Storage(Storage):
         self._s3aioclient = await self._exit_stack.enter_async_context(
             session.create_client("s3", **self.opts)
         )
+        for bucket in (self.deadletter_bucket, self.indexing_bucket):
+            if bucket is not None:
+                await self._ensure_bucket(bucket)
+
+    async def _ensure_bucket(self, bucket_name: str):
+        bucket_exists = await self.bucket_exists(bucket_name)
+        if not bucket_exists:
+            await self.create_bucket(bucket_name)
 
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)

@@ -78,6 +78,7 @@ async def writer_api(
     await driver.flushall()
 
     await application.router.startup()
+
     yield make_client_fixture
 
     await application.router.shutdown()
@@ -103,14 +104,6 @@ def s3_storage_writer(s3):
     storage_settings.s3_bucket = "test_{kbid}"
 
 
-@pytest.fixture(scope="function")
-def pg_storage_writer(pg):
-    storage_settings.file_backend = FileBackendConfig.PG
-    storage_settings.driver_pg_url = (
-        f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    )
-
-
 def lazy_storage_writer_fixtures():
     fixtures = []
     configured = get_testing_storage_backends()
@@ -118,8 +111,8 @@ def lazy_storage_writer_fixtures():
         fixtures.append(lazy_fixture.lf("gcs_storage_writer"))
     if "s3" in configured:
         fixtures.append(lazy_fixture.lf("s3_storage_writer"))
-    if "pg" in configured:
-        fixtures.append(lazy_fixture.lf("pg_storage_writer"))
+    if len(fixtures) == 0:
+        fixtures.append(lazy_fixture.lf("gcs_storage_writer"))
     return fixtures
 
 

@@ -19,6 +19,7 @@
 #
 import asyncio
 import base64
+import io
 import os
 from typing import Callable, List
 
@@ -35,6 +36,9 @@ from nucliadb_utils import const
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction_utility
 
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
+
+MB = 1024 * 1024
+MINIMUM_CHUNK_SIZE = 5 * MB
 
 
 @pytest.mark.asyncio
@@ -93,32 +97,33 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         url = resp.headers["location"]
 
         offset = 0
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            data = f.read(10000)
-            while data != b"":
-                resp = await client.head(
-                    url,
-                )
 
-                assert resp.headers["Upload-Length"] == f"0"
-                assert resp.headers["Upload-Offset"] == f"{offset}"
+        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        io_bytes = io.BytesIO(raw_bytes)
+        data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+        while data != b"":
+            resp = await client.head(url)
 
-                headers = {
-                    "upload-offset": f"{offset}",
-                    "content-length": f"{len(data)}",
-                }
-                if len(data) < 10000:
-                    headers["upload-length"] = f"{offset + len(data)}"
+            assert resp.headers["Upload-Length"] == f"0"
+            assert resp.headers["Upload-Offset"] == f"{offset}"
 
-                resp = await client.patch(
-                    url,
-                    content=data,
-                    headers=headers,
-                )
-                offset += len(data)
-                data = f.read(10000)
+            headers = {
+                "upload-offset": f"{offset}",
+                "content-length": f"{len(data)}",
+            }
+            is_last_chunk = len(data) < MINIMUM_CHUNK_SIZE
+            if is_last_chunk:
+                headers["upload-length"] = f"{offset + len(data)}"
 
-        assert resp.headers["Tus-Upload-Finished"] == "1"
+            resp = await client.patch(
+                url,
+                content=data,
+                headers=headers,
+            )
+            offset += len(data)
+            data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+
+    assert resp.headers["Tus-Upload-Finished"] == "1"
 
     transaction = get_transaction_utility()
 
@@ -138,7 +143,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == "image.jpg"
     assert writer.files[field].language == "ca"
-    assert writer.files[field].file.size == 30472
+    assert writer.files[field].file.size == len(raw_bytes)
     assert writer.files[field].file.filename == "image.jpg"
     assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
 
@@ -147,7 +152,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == 30472
+    assert len(data.read()) == len(raw_bytes)
     await asyncio.sleep(1)
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -165,7 +170,8 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
 @pytest.mark.asyncio
 async def test_knowledgebox_file_upload_root(
-    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient],
+    knowledgebox_writer: str,
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
@@ -220,7 +226,8 @@ async def test_knowledgebox_file_upload_root(
 
 @pytest.mark.asyncio
 async def test_knowledgebox_file_upload_root_headers(
-    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
+    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient],
+    knowledgebox_writer: str,
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         filename = base64.b64encode(b"image.jpg").decode()
@@ -299,31 +306,31 @@ async def test_knowledgebox_file_tus_upload_field(
         url = resp.headers["location"]
 
         offset = 0
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            data = f.read(10000)
-            while data != b"":
-                resp = await client.head(
-                    url,
-                )
+        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        io_bytes = io.BytesIO(raw_bytes)
+        data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+        while data != b"":
+            resp = await client.head(url)
 
-                assert resp.headers["Upload-Length"] == f"0"
-                assert resp.headers["Upload-Offset"] == f"{offset}"
+            assert resp.headers["Upload-Length"] == f"0"
+            assert resp.headers["Upload-Offset"] == f"{offset}"
 
-                headers = {
-                    "upload-offset": f"{offset}",
-                    "content-length": f"{len(data)}",
-                }
-                if len(data) < 10000:
-                    headers["upload-length"] = f"{offset + len(data)}"
+            headers = {
+                "upload-offset": f"{offset}",
+                "content-length": f"{len(data)}",
+            }
+            is_last_chunk = len(data) < MINIMUM_CHUNK_SIZE
+            if is_last_chunk:
+                headers["upload-length"] = f"{offset + len(data)}"
 
-                resp = await client.patch(
-                    url,
-                    content=data,
-                    headers=headers,
-                )
-                assert resp.status_code == 200
-                offset += len(data)
-                data = f.read(10000)
+            resp = await client.patch(
+                url,
+                content=data,
+                headers=headers,
+            )
+            assert resp.status_code == 200
+            offset += len(data)
+            data = io_bytes.read(MINIMUM_CHUNK_SIZE)
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
@@ -345,7 +352,7 @@ async def test_knowledgebox_file_tus_upload_field(
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == ""
     assert writer.files[field].language == "ca"
-    assert writer.files[field].file.size == 30472
+    assert writer.files[field].file.size == len(raw_bytes)
     assert writer.files[field].file.filename == "image.jpg"
     assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
 
@@ -354,7 +361,7 @@ async def test_knowledgebox_file_tus_upload_field(
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == 30472
+    assert len(data.read()) == len(raw_bytes)
 
 
 @pytest.mark.asyncio
@@ -469,31 +476,31 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         assert f"{RSLUG_PREFIX}/{rslug}" in url
 
         offset = 0
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            data = f.read(10000)
-            while data != b"":
-                resp = await client.head(
-                    url,
-                )
+        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        io_bytes = io.BytesIO(raw_bytes)
+        data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+        while data != b"":
+            resp = await client.head(url)
 
-                assert resp.headers["Upload-Length"] == f"0"
-                assert resp.headers["Upload-Offset"] == f"{offset}"
+            assert resp.headers["Upload-Length"] == f"0"
+            assert resp.headers["Upload-Offset"] == f"{offset}"
 
-                headers = {
-                    "upload-offset": f"{offset}",
-                    "content-length": f"{len(data)}",
-                }
-                if len(data) < 10000:
-                    headers["upload-length"] = f"{offset + len(data)}"
+            headers = {
+                "upload-offset": f"{offset}",
+                "content-length": f"{len(data)}",
+            }
+            is_last_chunk = len(data) < MINIMUM_CHUNK_SIZE
+            if is_last_chunk:
+                headers["upload-length"] = f"{offset + len(data)}"
 
-                resp = await client.patch(
-                    url,
-                    content=data,
-                    headers=headers,
-                )
-                assert resp.status_code == 200
-                offset += len(data)
-                data = f.read(10000)
+            resp = await client.patch(
+                url,
+                content=data,
+                headers=headers,
+            )
+            assert resp.status_code == 200
+            offset += len(data)
+            data = io_bytes.read(MINIMUM_CHUNK_SIZE)
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
@@ -515,7 +522,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
     assert writer.basic.icon == "image/jpg"
     assert writer.basic.title == ""
     assert writer.files[field].language == "ca"
-    assert writer.files[field].file.size == 30472
+    assert writer.files[field].file.size == len(raw_bytes)
     assert writer.files[field].file.filename == "image.jpg"
     assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
 
@@ -524,7 +531,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == 30472
+    assert len(data.read()) == len(raw_bytes)
 
 
 @pytest.mark.asyncio
@@ -650,3 +657,48 @@ def test_maybe_b64decode():
     something_encoded = base64.b64encode(something.encode())
     assert maybe_b64decode(something_encoded) == something
     assert maybe_b64decode(something) == something
+
+
+@pytest.mark.asyncio
+async def test_tus_validates_intermediate_chunks_length(
+    writer_api, knowledgebox_writer
+):
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        language = base64.b64encode(b"ca").decode()
+        filename = base64.b64encode(b"image.jpg").decode()
+        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
+            headers={
+                "tus-resumable": "1.0.0",
+                "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+                "content-type": "image/jpg",
+                "upload-defer-length": "1",
+            },
+        )
+        assert resp.status_code == 201
+        url = resp.headers["location"]
+
+        offset = 0
+
+        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        io_bytes = io.BytesIO(raw_bytes)
+        data = io_bytes.read(10)
+        resp = await client.head(url)
+
+        assert resp.headers["Upload-Length"] == f"0"
+        assert resp.headers["Upload-Offset"] == f"{offset}"
+
+        headers = {
+            "upload-offset": f"{offset}",
+            "content-length": f"{len(data)}",
+        }
+        resp = await client.patch(
+            url,
+            content=data,
+            headers=headers,
+        )
+        assert resp.status_code == 412
+        assert resp.json()["detail"].startswith(
+            "Intermediate chunks cannot be smaller than"
+        )
