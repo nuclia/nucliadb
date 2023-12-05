@@ -21,7 +21,7 @@ import re
 from concurrent.futures.thread import ThreadPoolExecutor
 from typing import Optional
 
-import docker
+import docker  # type: ignore
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
