@@ -226,6 +226,15 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
         )
         ERRORS.append(error)
         raise
+    except Exception as err:
+        error = Error(
+            kbid=kbid,
+            endpoint=path.split("/")[-1],
+            status_code=-1,
+            error=str(err),
+        )
+        ERRORS.append(error)
+        raise
 
 
 def print_errors():
