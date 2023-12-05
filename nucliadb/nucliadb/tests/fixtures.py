@@ -567,13 +567,13 @@ async def redis_driver(redis_driver_settings) -> AsyncIterator[RedisDriver]:
     await driver.redis.flushall()
     logging.info(f"Redis driver ready at {url}")
 
-    set_utility("driver", driver)
+    set_utility(Utility.MAINDB_DRIVER, driver)
 
     yield driver
 
     await driver.finalize()
     ingest_settings.driver_redis_url = None
-    MAIN.pop("driver", None)
+    MAIN.pop(Utility.MAINDB_DRIVER, None)
 
 
 @pytest.fixture(scope="function")
@@ -687,7 +687,7 @@ async def txn(maindb_driver):
 
 
 @pytest.fixture(scope="function")
-async def shard_manager(gcs_storage, maindb_driver):
+async def shard_manager(storage, maindb_driver):
     mng = cluster_manager.KBShardManager()
     set_utility(Utility.SHARD_MANAGER, mng)
     yield mng

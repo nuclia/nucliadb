@@ -31,11 +31,11 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_field_link(
-    gcs_storage: Storage, cache, fake_node, knowledgebox_ingest: str, maindb_driver
+    storage: Storage, cache, fake_node, knowledgebox_ingest: str, maindb_driver
 ):
     async with maindb_driver.transaction() as txn:
         uuid = str(uuid4())
-        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         r = await kb_obj.add_resource(uuid=uuid, slug="slug")
         assert r is not None
         await txn.commit()

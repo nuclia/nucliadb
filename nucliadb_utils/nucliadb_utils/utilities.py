@@ -81,15 +81,15 @@ class Utility(str, Enum):
     MAINDB_DRIVER = "driver"
 
 
-def get_utility(ident: Utility):
+def get_utility(ident: Union[Utility, str]):
     return MAIN.get(ident)
 
 
-def set_utility(ident: Utility, util: Any):
+def set_utility(ident: Union[Utility, str], util: Any):
     MAIN[ident] = util
 
 
-def clean_utility(ident: Utility):
+def clean_utility(ident: Union[Utility, str]):
     MAIN.pop(ident, None)
 
 

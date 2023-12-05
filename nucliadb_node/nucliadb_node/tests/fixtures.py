@@ -227,7 +227,7 @@ async def grpc_server(writer):
 async def worker(
     node_single,
     writer_stub: NodeWriterStub,
-    gcs_storage,
+    storage,
     natsd,
     data_path: str,
     writer,

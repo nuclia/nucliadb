@@ -28,13 +28,13 @@ from nucliadb.search.search import paragraphs
 
 
 async def test_get_paragraph_text(
-    gcs_storage, cache, txn, fake_node, processor, knowledgebox_ingest
+    storage, cache, txn, fake_node, processor, knowledgebox_ingest
 ):
     kbid = knowledgebox_ingest
     uid = uuid.uuid4().hex
     basic = Basic(slug="slug", uuid=uid)
     await set_basic(txn, kbid, uid, basic)
-    kb = KnowledgeBox(txn, gcs_storage, kbid)
+    kb = KnowledgeBox(txn, storage, kbid)
     orm_resource = await kb.get(uid)
     field_obj = await orm_resource.get_field("field", 4, load=False)
     await field_obj.set_extracted_text(

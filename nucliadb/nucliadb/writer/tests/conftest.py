@@ -25,6 +25,7 @@ pytest_plugins = [
     "nucliadb.tests.tikv",
     "nucliadb.ingest.tests.fixtures",  # should be refactored out
     "nucliadb.writer.tests.fixtures",
+    "nucliadb_utils.tests.conftest",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
 ]

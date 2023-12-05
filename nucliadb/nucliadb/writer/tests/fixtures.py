@@ -22,6 +22,7 @@ from typing import AsyncIterator, Callable, List, Optional
 
 import pytest
 from httpx import AsyncClient
+from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
@@ -36,13 +37,16 @@ from nucliadb_utils.settings import (
     nucliadb_settings,
     storage_settings,
 )
+from nucliadb_utils.store import MAIN
+from nucliadb_utils.tests.conftest import get_testing_storage_backends
+from nucliadb_utils.utilities import Utility
 
 
 @pytest.fixture(scope="function")
 async def writer_api(
     redis,
+    storage_writer,
     grpc_servicer: IngestFixture,
-    gcs_storage_writer,
     transaction_utility,
     processing_utility,
     tus_manager,
@@ -87,6 +91,38 @@ async def gcs_storage_writer(gcs):
     storage_settings.gcs_endpoint_url = gcs
     storage_settings.file_backend = FileBackendConfig.GCS
     storage_settings.gcs_bucket = "test_{kbid}"
+
+
+@pytest.fixture(scope="function")
+async def s3_storage_writer(s3):
+    storage_settings.s3_endpoint = s3
+    storage_settings.s3_client_id = ""
+    storage_settings.s3_client_secret = ""
+    storage_settings.file_backend = FileBackendConfig.S3
+    storage_settings.s3_bucket = "test_{kbid}"
+
+
+def lazy_storage_writer_fixtures():
+    fixtures = []
+    configured = get_testing_storage_backends()
+    if "gcs" in configured:
+        fixtures.append(lazy_fixture.lf("gcs_storage_writer"))
+    if "s3" in configured:
+        fixtures.append(lazy_fixture.lf("s3_storage_writer"))
+    return fixtures
+
+
+@pytest.fixture(scope="function", params=lazy_storage_writer_fixtures())
+async def storage_writer(request):
+    """
+    Generic storage fixture that allows us to run the same tests for different storage backends.
+    """
+    storage_driver = request.param
+    MAIN[Utility.STORAGE] = storage_driver
+
+    yield storage_driver
+
+    MAIN.pop(Utility.STORAGE, None)
 
 
 @pytest.fixture(scope="function")

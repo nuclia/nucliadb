@@ -32,7 +32,7 @@ pytestmark = pytest.mark.asyncio
 async def test_shard_auto_create(
     maindb_driver,
     pubsub,
-    gcs_storage,
+    storage,
     fake_node,
     knowledgebox_ingest,
 ):
@@ -42,7 +42,7 @@ async def test_shard_auto_create(
 
     sc = shard_creator.ShardCreatorHandler(
         driver=maindb_driver,
-        storage=gcs_storage,
+        storage=storage,
         pubsub=pubsub,
         check_delay=0.05,
     )

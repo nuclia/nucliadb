@@ -36,10 +36,10 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_file_extracted(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+    local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -77,7 +77,7 @@ async def test_create_resource_orm_file_extracted(
     assert ex2.file_preview.source == CloudFile.Source.GCS
     assert ex2.file_thumbnail.source == CloudFile.Source.GCS
     assert ex1.file_pages_previews.pages[0].source == CloudFile.Source.GCS
-    data = await gcs_storage.downloadbytescf(ex1.file_pages_previews.pages[0])
+    data = await storage.downloadbytescf(ex1.file_pages_previews.pages[0])
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     assert data.read() == data2

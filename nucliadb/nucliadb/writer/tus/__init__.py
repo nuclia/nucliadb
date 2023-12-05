@@ -47,7 +47,6 @@ REDIS_FILE_DATA_MANAGER_FACTORY: Optional[RedisFileDataManagerFactory] = None
 
 async def initialize():
     global DRIVER
-
     if storage_settings.file_backend == FileBackendConfig.GCS:
         storage_backend = GCloudBlobStore()
 
@@ -119,7 +118,6 @@ async def finalize():
 
 
 def get_dm() -> FileDataManager:  # type: ignore
-    breakpoint()
     if writer_settings.dm_enabled:
         global REDIS_FILE_DATA_MANAGER_FACTORY
         if REDIS_FILE_DATA_MANAGER_FACTORY is None:
