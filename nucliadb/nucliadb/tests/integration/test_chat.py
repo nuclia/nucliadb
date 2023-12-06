@@ -160,7 +160,15 @@ def parse_chat_response(content: bytes):
     relations_result = None
     if len(relations_payload) > 0:
         relations_result = json.loads(base64.b64decode(relations_payload))
-    return find_result, answer, relations_result
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_part = tail[4 : 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_part).decode())
+    except ValueError:
+        answer = answer
+        citations = {}
+    return find_result, answer, relations_result, citations
 
 
 @pytest.mark.asyncio()

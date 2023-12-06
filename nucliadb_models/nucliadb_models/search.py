@@ -668,17 +668,23 @@ class ChatModel(BaseModel):
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    query_context: List[str] = Field(
-        [], description="The information retrieval context for the current query"
+    query_context: Union[List[str], Dict[str, str]] = Field(
+        default={},
+        description="The information retrieval context for the current query",
     )
     chat_history: List[ChatContextMessage] = Field(
-        [], description="The chat conversation history"
+        default=[], description="The chat conversation history"
     )
     truncate: bool = Field(
-        True,
+        default=True,
         description="Truncate the chat context in case it doesn't fit the generative input",
     )
-    user_prompt: Optional[UserPrompt] = None
+    user_prompt: Optional[UserPrompt] = Field(
+        default=None, description="Optional custom prompt input by the user"
+    )
+    citations: bool = Field(
+        default=False, description="Whether to include the citations in the answer"
+    )
 
 
 class RephraseModel(BaseModel):
@@ -730,6 +736,10 @@ class ChatRequest(BaseModel):
         str
     ] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[str] = SearchParamDefaults.prompt.to_pydantic_field()
+    citations: bool = Field(
+        default=False,
+        description="Whether to include the citations for the answer in the response",
+    )
 
 
 class SummarizeResourceModel(BaseModel):

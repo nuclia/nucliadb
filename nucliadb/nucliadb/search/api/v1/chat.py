@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from typing import Optional, Union
+import json
+from typing import Any, Optional, Union
 
 import pydantic
 from fastapi import Body, Header, Request, Response
@@ -27,7 +28,7 @@ from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import predict
+from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import chat, get_relations_results
@@ -43,10 +44,12 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     Relations,
 )
+from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
 END_OF_STREAM = "_END_"
+START_OF_CITATIONS = b"_CIT_"
 
 
 class SyncChatResponse(pydantic.BaseModel):
@@ -54,6 +57,7 @@ class SyncChatResponse(pydantic.BaseModel):
     relations: Optional[Relations]
     results: KnowledgeboxFindResults
     status: AnswerStatusCode
+    citations: dict[str, Any] = {}
 
 
 CHAT_EXAMPLES = {
@@ -145,22 +149,29 @@ async def create_chat_response(
         origin,
     )
     if x_synchronous:
-        text_answer = b""
+        streamed_answer = b""
         async for chunk in chat_result.answer_stream:
-            text_answer += chunk
+            streamed_answer += chunk
+
+        if chat_request.citations:
+            answer, citations = parse_citations(streamed_answer)
+        else:
+            answer = streamed_answer.decode("utf-8")
+            citations = {}
 
         relations_results = None
         if ChatOptions.RELATIONS in chat_request.features:
             relations_results = await get_relations_results(
-                kbid=kbid, chat_request=chat_request, text_answer=text_answer
+                kbid=kbid, chat_request=chat_request, text_answer=answer
             )
 
         return Response(
             content=SyncChatResponse(
-                answer=text_answer.decode(),
+                answer=answer,
                 relations=relations_results,
                 results=chat_result.find_results,
                 status=chat_result.status_code.value,
+                citations=citations,
             ).json(),
             headers={
                 "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
@@ -175,15 +186,20 @@ async def create_chat_response(
             yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
             yield bytes_results
 
-            text_answer = b""
+            streamed_answer = b""
             async for chunk in chat_result.answer_stream:
-                text_answer += chunk
+                streamed_answer += chunk
                 yield chunk
+
+            if chat_request.citations:
+                answer, _ = parse_citations(streamed_answer)
+            else:
+                answer = streamed_answer.decode("utf-8")
 
             yield END_OF_STREAM.encode()
             if ChatOptions.RELATIONS in chat_request.features:
                 relations_results = await get_relations_results(
-                    kbid=kbid, chat_request=chat_request, text_answer=text_answer
+                    kbid=kbid, chat_request=chat_request, text_answer=answer
                 )
                 yield base64.b64encode(relations_results.json().encode())
 
@@ -195,3 +211,24 @@ async def create_chat_response(
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
             },
         )
+
+
+def parse_citations(text_answer: bytes) -> tuple[str, dict[str, Any]]:
+    if START_OF_CITATIONS not in text_answer:
+        logger.warning(
+            "Citations were requested but not found in the answer. "
+            "Returning the answer without citations."
+        )
+        return text_answer.decode("utf-8"), {}
+    text_answer, tail = text_answer.split(START_OF_CITATIONS, 1)
+    try:
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_bytes = tail[4 : 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_bytes).decode())
+        return text_answer.decode("utf-8"), citations
+    except Exception as exc:
+        capture_exception(exc)
+        logger.exception(
+            "Error parsing citations. Returning the answer without citations."
+        )
+        return text_answer.decode("utf-8"), {}

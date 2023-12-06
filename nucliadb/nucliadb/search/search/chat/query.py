@@ -47,6 +47,7 @@ from nucliadb_models.search import (
     UserPrompt,
 )
 from nucliadb_protos import audit_pb2
+from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.utilities import get_audit
 
@@ -92,7 +93,6 @@ async def rephrase_query_from_chat_history(
 async def format_generated_answer(
     answer_generator: AsyncGenerator[bytes, None], output_status_code: FoundStatusCode
 ):
-    answer = []
     status_code: Optional[AnswerStatusCode] = None
     is_last_chunk = False
     async for answer_chunk, is_last_chunk in async_gen_lookahead(answer_generator):
@@ -104,7 +104,6 @@ async def format_generated_answer(
                 # just for bw compatibility until predict
                 # is updated to the new protocol
                 status_code = AnswerStatusCode.SUCCESS
-                answer.append(answer_chunk)
                 yield answer_chunk
             else:
                 # TODO: this should be needed but, in case we receive the status
@@ -113,7 +112,6 @@ async def format_generated_answer(
                     answer_chunk = answer_chunk.rstrip(status_code.encode())
                     yield answer_chunk
             break
-        answer.append(answer_chunk)
         yield answer_chunk
     if not is_last_chunk:
         logger.warning("BUG: /chat endpoint without last chunk")
@@ -161,24 +159,32 @@ async def get_find_results(
 
 
 async def get_relations_results(
-    *, kbid: str, chat_request: ChatRequest, text_answer: bytes
+    *, kbid: str, chat_request: ChatRequest, text_answer: str
 ) -> Relations:
-    predict = get_predict()
-    detected_entities = await predict.detect_entities(kbid, text_answer.decode("utf-8"))
-    relation_request = RelationSearchRequest()
-    relation_request.subgraph.entry_points.extend(detected_entities)
-    relation_request.subgraph.depth = 1
+    try:
+        predict = get_predict()
+        detected_entities = await predict.detect_entities(kbid, text_answer)
+        relation_request = RelationSearchRequest()
+        relation_request.subgraph.entry_points.extend(detected_entities)
+        relation_request.subgraph.depth = 1
 
-    relations_results: List[RelationSearchResponse]
-    (
-        relations_results,
-        _,
-        _,
-        _,
-    ) = await node_query(
-        kbid, Method.RELATIONS, relation_request, target_replicas=chat_request.shards
-    )
-    return merge_relations_results(relations_results, relation_request.subgraph)
+        relations_results: List[RelationSearchResponse]
+        (
+            relations_results,
+            _,
+            _,
+            _,
+        ) = await node_query(
+            kbid,
+            Method.RELATIONS,
+            relation_request,
+            target_replicas=chat_request.shards,
+        )
+        return merge_relations_results(relations_results, relation_request.subgraph)
+    except Exception as exc:
+        capture_exception(exc)
+        logger.exception("Error getting relations results")
+        return Relations(entities={})
 
 
 async def not_enough_context_generator():
@@ -231,6 +237,7 @@ async def chat(
             question=chat_request.query,
             truncate=True,
             user_prompt=user_prompt,
+            citations=chat_request.citations,
         )
         predict = get_predict()
         nuclia_learning_id, predict_generator = await predict.chat_query(
