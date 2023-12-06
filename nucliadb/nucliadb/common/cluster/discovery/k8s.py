@@ -54,7 +54,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
     Load cluster members from kubernetes.
     """
 
-    node_heart_beat_interval = 10
+    node_heartbeat_interval = 10
     cluster_task: asyncio.Task
     update_node_data_cache_task: asyncio.Task
 
@@ -113,7 +113,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 status.pod_ip,
                 read_replica=read_replica,
             )
-        except NodeConnectionError:
+        except NodeConnectionError:  # pragma: no cover
             logger.warning(
                 "Error connecting to node",
                 extra={
@@ -222,7 +222,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
             return
 
         node_data = self.node_id_cache[pod_name]
-        if time.time() - node_data.updated_at > (self.node_heart_beat_interval * 2):
+        if time.time() - node_data.updated_at > (self.node_heartbeat_interval * 2):
             node = manager.get_index_node(node_data.node_id)
             if node is not None:
                 logger.warning(
@@ -238,7 +238,7 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
 
     async def update_node_data_cache(self) -> None:
         while True:
-            await asyncio.sleep(self.node_heart_beat_interval)
+            await asyncio.sleep(self.node_heartbeat_interval)
             try:
                 for pod_name in list(self.node_id_cache.keys()):
                     # force updating cache
