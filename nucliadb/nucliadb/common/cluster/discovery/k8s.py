@@ -198,10 +198,22 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                     # force updating cache
                     async with self.update_lock:
                         existing = self.node_id_cache[pod_name]
-                        self.node_id_cache[pod_name] = await self._query_node_metadata(
-                            existing.address,
-                            read_replica=existing.primary_id is not None,
-                        )
+                        try:
+                            self.node_id_cache[
+                                pod_name
+                            ] = await self._query_node_metadata(
+                                existing.address,
+                                read_replica=existing.primary_id is not None,
+                            )
+                        except Exception:  # pragma: no cover
+                            logger.exception(
+                                "Error while updating node data cache",
+                                extra={
+                                    "pod_name": pod_name,
+                                    "address": existing.address,
+                                    "primary": existing.primary_id,
+                                },
+                            )
             except (
                 asyncio.CancelledError,
                 KeyboardInterrupt,
