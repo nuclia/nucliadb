@@ -90,7 +90,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
     AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
 
-@backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
+@backoff.on_exception(backoff.constant, (Exception,), interval=0.5, max_tries=2)
 async def _get_index_node_metadata(
     settings: Settings, address: str, read_replica: bool = False
 ) -> IndexNodeMetadata:
