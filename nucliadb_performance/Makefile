@@ -95,11 +95,4 @@ test-standalone-search:
 	echo " *  Test Finished at: $$(date -u)"
 
 
-lock-acquire:
-	python3 lock.py --action=acquire
-
-
-lock-release:
-	python3 lock.py --action=release
-
 run:	test-standalone-search

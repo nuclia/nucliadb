@@ -1,4 +1,3 @@
-import re
 from functools import cache
 
 from molotov import global_setup, global_teardown, scenario
@@ -22,10 +21,6 @@ from nucliadb_performance.utils.nucliadb import get_nucliadb_client
 from nucliadb_performance.utils.saved_requests import load_all_saved_requests
 from nucliadb_performance.utils.vectors import compute_vector
 from nucliadb_sdk.v2.exceptions import ConflictError
-
-FIND_WEIGHT = 1
-SEARCH_WEIGHT = 1
-SUGGEST_WEIGHT = 1
 
 
 def precompute_vectors():
@@ -90,7 +85,7 @@ def init_test(args):
     precompute_vectors()
 
 
-@scenario(weight=FIND_WEIGHT)
+@scenario(weight=1)
 async def test_find(session):
     kbid, slug = get_test_kb()
     request = get_request(slug, endpoint="find")
@@ -108,7 +103,7 @@ async def test_find(session):
     )
 
 
-@scenario(weight=SEARCH_WEIGHT)
+@scenario(weight=1)
 async def test_search(session):
     kbid, slug = get_test_kb()
     request = get_request(slug, endpoint="search")
@@ -126,7 +121,7 @@ async def test_search(session):
     )
 
 
-@scenario(weight=SUGGEST_WEIGHT)
+@scenario(weight=1)
 async def test_suggest(session):
     kbid, slug = get_test_kb()
     request = get_request(slug, endpoint="suggest")

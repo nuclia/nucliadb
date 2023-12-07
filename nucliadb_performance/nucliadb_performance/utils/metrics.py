@@ -75,5 +75,6 @@ def save_benchmark_json_results(file):
                 "value": get_percentile(metric_name, p=0.95),
             }
         )
+    print(f"Saving benchmark results to {file}")
     with open(file, mode="w") as f:
         f.write(json.dumps(json_results, indent=4, sort_keys=True))

@@ -1,11 +1,11 @@
 from molotov import global_setup, global_teardown, scenario
 
 from nucliadb_performance.settings import get_predict_api_url
+from nucliadb_performance.utils.errors import print_errors
 from nucliadb_performance.utils.misc import (
     get_kb_to_test,
     get_request,
     make_kbid_request,
-    print_errors,
 )
 from nucliadb_performance.utils.vectors import predict_sentence_to_vector
 

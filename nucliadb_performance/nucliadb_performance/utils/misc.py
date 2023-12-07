@@ -3,7 +3,6 @@ import os
 import random
 import shelve
 import statistics
-from dataclasses import dataclass
 from functools import cache
 from typing import Optional
 
