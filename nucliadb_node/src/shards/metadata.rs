@@ -23,7 +23,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use nucliadb_core::{protos, Channel, NodeResult};
+use nucliadb_core::{node_error, protos, Channel, NodeResult};
 use serde::*;
 
 use crate::disk_structure;
@@ -96,7 +96,7 @@ impl ShardMetadata {
     pub fn open(shard_path: PathBuf) -> NodeResult<ShardMetadata> {
         let metadata_path = shard_path.join(disk_structure::METADATA_FILE);
         if !metadata_path.exists() {
-            return Ok(ShardMetadata::default());
+            return Err(node_error!("Shard metadata file does not exist"));
         }
 
         let mut reader = BufReader::new(File::open(metadata_path)?);
@@ -262,7 +262,9 @@ mod test {
     #[test]
     fn open_empty() {
         let dir = TempDir::new().unwrap();
-        assert!(ShardMetadata::exists(dir.path().to_path_buf()));
+        assert!(!ShardMetadata::exists(dir.path().to_path_buf()));
+        let meta = ShardMetadata::open(dir.path().to_path_buf());
+        assert!(meta.is_err());
     }
 
     #[test]
