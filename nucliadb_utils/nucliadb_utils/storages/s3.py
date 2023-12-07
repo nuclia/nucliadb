@@ -210,7 +210,7 @@ class S3StorageField(StorageField):
                 )
                 logger.warning("Error deleting object", exc_info=True)
 
-        if self.field.resumable_uri is not None:
+        if self.field.resumable_uri != "":
             await self._complete_multipart_upload()
 
         self.field.uri = self.key
@@ -248,10 +248,10 @@ class S3StorageField(StorageField):
 
         key = None
         bucket = None
-        if self.field is not None and self.field.uri is not None:
+        if self.field is not None and self.field.uri != "":
             key = self.field.uri
             bucket = self.field.bucket_name
-        elif self.key is not None:
+        elif self.key != "":
             key = self.key
             bucket = self.bucket
         else:
@@ -377,7 +377,7 @@ class S3Storage(Storage):
         await self._exit_stack.__aexit__(None, None, None)
 
     async def delete_upload(self, uri: str, bucket: str):
-        if uri is not None:
+        if uri:
             try:
                 await self._s3aioclient.delete_object(Bucket=bucket, Key=uri)
             except botocore.exceptions.ClientError:
