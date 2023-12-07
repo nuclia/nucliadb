@@ -103,7 +103,7 @@ async def test_find(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    assert len(resp["resources"]) > 100, append_error(
+    assert len(resp["resources"]) > 0, append_error(
         kbid, "find", -1, "No resources returned"
     )
 
