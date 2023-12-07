@@ -63,6 +63,7 @@ from nucliadb.writer.tus.exceptions import (
     HTTPServiceUnavailable,
     InvalidTUSMetadata,
 )
+from nucliadb.writer.tus.storage import FileStorageManager  # type: ignore
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
@@ -549,9 +550,20 @@ async def _tus_patch(
 
         headers["NDB-Seq"] = f"{seqid}"
     else:
+        check_uploaded_chunk_size(read_bytes, storage_manager)
         await dm.save()
 
     return Response(headers=headers)
+
+
+def check_uploaded_chunk_size(read_bytes: int, storage_manager: FileStorageManager):
+    if (
+        storage_manager.min_upload_size is not None
+        and read_bytes < storage_manager.min_upload_size
+    ):
+        raise HTTPPreconditionFailed(
+            detail=f"Intermediate chunks cannot be smaller than {storage_manager.min_upload_size} bytes"
+        )
 
 
 @api.post(
@@ -676,7 +688,6 @@ async def _upload(
         raise HTTPConflict("A resource with the same uploaded file already exists")
     except IngestNotAvailable:
         raise HTTPServiceUnavailable("Upload not available right now, try again")
-
     dm = get_dm()
     storage_manager = get_storage_manager()
 
