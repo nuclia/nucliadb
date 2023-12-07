@@ -361,12 +361,15 @@ class S3Storage(Storage):
         )
         for bucket in (self.deadletter_bucket, self.indexing_bucket):
             if bucket is not None:
-                await self._ensure_bucket(bucket)
+                await self._create_bucket_if_not_exists(bucket)
 
-    async def _ensure_bucket(self, bucket_name: str):
+    async def _create_bucket_if_not_exists(self, bucket_name: str) -> bool:
+        created = False
         bucket_exists = await self.bucket_exists(bucket_name)
         if not bucket_exists:
+            created = True
             await self.create_bucket(bucket_name)
+        return created
 
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)
@@ -390,13 +393,8 @@ class S3Storage(Storage):
                 yield item
 
     async def create_kb(self, kbid: str):
-        created = False
         bucket_name = self.get_bucket_name(kbid)
-        bucket_exists = await self.bucket_exists(bucket_name)
-        if not bucket_exists:
-            await self.create_bucket(bucket_name)
-            created = True
-        return created
+        return await self._create_bucket_if_not_exists(bucket_name)
 
     async def bucket_exists(self, bucket_name: str) -> bool:
         return await bucket_exists(self._s3aioclient, bucket_name)
