@@ -54,7 +54,7 @@ class BlobStore:
 
 class FileStorageManager:
     chunk_size: int
-    minimum_chunk_size: int
+    min_upload_size: int
 
     def __init__(self, storage):
         self.storage = storage

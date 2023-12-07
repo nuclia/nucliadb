@@ -34,7 +34,12 @@ from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
-from nucliadb_utils.storages.s3 import bucket_exists, create_bucket
+from nucliadb_utils.storages.s3 import (
+    CHUNK_SIZE,
+    MIN_UPLOAD_SIZE,
+    bucket_exists,
+    create_bucket,
+)
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
@@ -42,14 +47,11 @@ RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.BotoCoreError,
 )
 
-MB = 1024 * 1024
-CHUNK_SIZE = 5 * MB
-MINIMUM_CHUNK_SIZE = 5 * MB
-
 
 class S3FileStorageManager(FileStorageManager):
     storage: S3BlobStore
-    chunk_size = minimum_chunk_size = CHUNK_SIZE
+    chunk_size = CHUNK_SIZE
+    min_upload_size = MIN_UPLOAD_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _abort_multipart(self, dm: FileDataManager):

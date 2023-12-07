@@ -30,15 +30,12 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
-from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
+from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_storage_manager
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils import const
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction_utility
 
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
-
-MB = 1024 * 1024
-MINIMUM_CHUNK_SIZE = 5 * MB
 
 
 @pytest.mark.asyncio
@@ -98,9 +95,11 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
         offset = 0
 
-        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        # We upload a file that spans across more than one chunk
+        min_chunk_size = get_storage_manager().min_upload_size
+        raw_bytes = b"x" * min_chunk_size + b"y" * 500
         io_bytes = io.BytesIO(raw_bytes)
-        data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+        data = io_bytes.read(min_chunk_size)
         while data != b"":
             resp = await client.head(url)
 
@@ -111,7 +110,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
                 "upload-offset": f"{offset}",
                 "content-length": f"{len(data)}",
             }
-            is_last_chunk = len(data) < MINIMUM_CHUNK_SIZE
+            is_last_chunk = len(data) < min_chunk_size
             if is_last_chunk:
                 headers["upload-length"] = f"{offset + len(data)}"
 
@@ -121,7 +120,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
                 headers=headers,
             )
             offset += len(data)
-            data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+            data = io_bytes.read(min_chunk_size)
 
     assert resp.headers["Tus-Upload-Finished"] == "1"
 
@@ -306,9 +305,11 @@ async def test_knowledgebox_file_tus_upload_field(
         url = resp.headers["location"]
 
         offset = 0
-        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        # We upload a file that spans across more than one chunk
+        min_chunk_size = get_storage_manager().min_upload_size
+        raw_bytes = b"x" * min_chunk_size + b"y" * 500
         io_bytes = io.BytesIO(raw_bytes)
-        data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+        data = io_bytes.read(min_chunk_size)
         while data != b"":
             resp = await client.head(url)
 
@@ -319,7 +320,7 @@ async def test_knowledgebox_file_tus_upload_field(
                 "upload-offset": f"{offset}",
                 "content-length": f"{len(data)}",
             }
-            is_last_chunk = len(data) < MINIMUM_CHUNK_SIZE
+            is_last_chunk = len(data) < min_chunk_size
             if is_last_chunk:
                 headers["upload-length"] = f"{offset + len(data)}"
 
@@ -330,7 +331,7 @@ async def test_knowledgebox_file_tus_upload_field(
             )
             assert resp.status_code == 200
             offset += len(data)
-            data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+            data = io_bytes.read(min_chunk_size)
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
@@ -476,9 +477,10 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         assert f"{RSLUG_PREFIX}/{rslug}" in url
 
         offset = 0
-        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        min_chunk_size = get_storage_manager().min_upload_size
+        raw_bytes = b"x" * min_chunk_size + b"y" * 500
         io_bytes = io.BytesIO(raw_bytes)
-        data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+        data = io_bytes.read(min_chunk_size)
         while data != b"":
             resp = await client.head(url)
 
@@ -489,7 +491,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
                 "upload-offset": f"{offset}",
                 "content-length": f"{len(data)}",
             }
-            is_last_chunk = len(data) < MINIMUM_CHUNK_SIZE
+            is_last_chunk = len(data) < min_chunk_size
             if is_last_chunk:
                 headers["upload-length"] = f"{offset + len(data)}"
 
@@ -500,7 +502,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
             )
             assert resp.status_code == 200
             offset += len(data)
-            data = io_bytes.read(MINIMUM_CHUNK_SIZE)
+            data = io_bytes.read(min_chunk_size)
 
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
@@ -678,24 +680,21 @@ async def test_tus_validates_intermediate_chunks_length(
         )
         assert resp.status_code == 201
         url = resp.headers["location"]
-
-        offset = 0
-
-        raw_bytes = b"x" * MINIMUM_CHUNK_SIZE + b"y" * 500
+        # We upload a chunk that is smaller than the minimum chunk size
+        min_chunk_size = get_storage_manager().min_upload_size
+        raw_bytes = b"x" * min_chunk_size + b"y" * 500
         io_bytes = io.BytesIO(raw_bytes)
-        data = io_bytes.read(10)
+        chunk = io_bytes.read(min_chunk_size - 10)
+
         resp = await client.head(url)
 
-        assert resp.headers["Upload-Length"] == f"0"
-        assert resp.headers["Upload-Offset"] == f"{offset}"
-
         headers = {
-            "upload-offset": f"{offset}",
-            "content-length": f"{len(data)}",
+            "upload-offset": f"0",
+            "content-length": f"{len(chunk)}",
         }
         resp = await client.patch(
             url,
-            content=data,
+            content=chunk,
             headers=headers,
         )
         assert resp.status_code == 412

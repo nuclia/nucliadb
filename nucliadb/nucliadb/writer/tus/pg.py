@@ -34,7 +34,7 @@ from nucliadb_utils.storages.pg import PostgresFileDataLayer
 class PGFileStorageManager(FileStorageManager):
     _handler = None
     storage: PGBlobStore
-    chunk_size = minimum_chunk_size = CHUNK_SIZE
+    chunk_size = min_upload_size = CHUNK_SIZE
 
     async def start(self, dm: FileDataManager, path: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)

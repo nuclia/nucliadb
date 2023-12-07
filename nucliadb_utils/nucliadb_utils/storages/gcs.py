@@ -56,7 +56,11 @@ def strip_query_params(url: yarl.URL) -> str:
     return str(url.with_query(None))
 
 
-OBJECT_DATA_CHUNK_SIZE = 1024 * 1024
+KB = 1024
+MB = 1024 * KB
+
+MIN_UPLOAD_SIZE = 256 * KB
+OBJECT_DATA_CHUNK_SIZE = 1 * MB
 
 
 DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.read_write"]

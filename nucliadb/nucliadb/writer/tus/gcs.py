@@ -47,6 +47,7 @@ from nucliadb.writer.tus.exceptions import (
 )
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb.writer.tus.utils import to_str
+from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE
 
 
 class GoogleCloudException(Exception):
@@ -61,11 +62,6 @@ RETRIABLE_EXCEPTIONS = (
     GoogleCloudException,
     aiohttp.client_exceptions.ClientPayloadError,
 )
-
-KB = 1024
-MB = 1024 * KB
-CHUNK_SIZE = 5 * MB
-MINIMUM_CHUNK_SIZE = 256 * KB
 
 
 class GCloudBlobStore(BlobStore):
@@ -172,7 +168,7 @@ class GCloudBlobStore(BlobStore):
 class GCloudFileStorageManager(FileStorageManager):
     storage: GCloudBlobStore
     chunk_size = CHUNK_SIZE
-    minimum_chunk_size = MINIMUM_CHUNK_SIZE
+    min_upload_size = MIN_UPLOAD_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     async def start(self, dm: FileDataManager, path: str, kbid: str):
