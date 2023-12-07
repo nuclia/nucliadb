@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import logging
 import time
 from functools import cached_property, partial, total_ordering
 from typing import Optional
@@ -137,24 +138,24 @@ class ConcurrentShardIndexer:
     def __init__(self, writer: Writer, node_id: str):
         self.writer = writer
         self.node_id = node_id
-        self.indexers: dict[str, tuple[PriorityIndexer, asyncio.Task]] = {}
+        self.indexers: dict[str, tuple["PriorityIndexer", asyncio.Task]] = {}
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
 
     async def finalize(self):
-        for _, task in self.indexers.items():
+        for shard_id, (_, task) in self.indexers.items():
             try:
                 await task
             except Exception as exc:
                 logger.exception(
-                    "Indexer task raised an error while finalizing it", exc_info=exc
+                    f"Indexer task for shard {shard_id} raised an error while finalizing it",
+                    exc_info=exc,
                 )
         self.indexers.clear()
 
-    async def index_message_soon(self, msg: Msg):
+    def index_message_soon(self, msg: Msg):
         work = WorkUnit.from_msg(msg)
-        await work.mpu.start()
 
         logger.info(
             f"Index message for shard {work.shard_id} is being enqueued",
@@ -169,6 +170,7 @@ class ConcurrentShardIndexer:
         )
 
         self.push_work_to_indexer(work)
+        work.mpu.start()
         CONCURRENT_INDEXERS_COUNT.set(
             len(self.indexers), labels=dict(node=self.node_id)
         )
@@ -182,41 +184,28 @@ class ConcurrentShardIndexer:
             indexer = PriorityIndexer(writer=self.writer, storage=self.storage)
             indexer.index_soon(work)
             task = asyncio.create_task(indexer.work_until_finish())
-            task.add_done_callback(
-                partial(
-                    ConcurrentShardIndexer._indexer_done_callback, self, work.shard_id
-                )
-            )
+            task.add_done_callback(partial(self._indexer_done_callback, work.shard_id))
             self.indexers[work.shard_id] = (indexer, task)
 
     def _indexer_done_callback(self, shard_id: str, task: asyncio.Task):
-        # NOTE: there is an unusual situation where an indexer finishes but new
-        # work is added before this done callback is executed. If we find
-        # pending work in the indexer we are going to remove, we need to create
-        # a new task and keep the indexer.
-        #
-        # If this happens for an indexer that found an error, we can't be sure
-        # the new work is in transactional order, so we must flush the queue and
-        # nak all extra work, hoping when the work is redelivered, this doesn't
-        # happen.
+        error = task.exception()
+        if error is not None:
+            event_id = capture_exception(error)
+            logger.error(
+                f"Unexpected error on an indexer for shard {shard_id}. "
+                f"Check sentry for more details. Event id: {event_id}",
+                exc_info=error,
+            )
+            # TODO: bubble up error and restart pod?
+            raise error
 
         indexer, _ = self.indexers[shard_id]
-
-        if task.exception() is not None:
-            if indexer.has_pending_work():
-                task = asyncio.create_task(indexer.flush_pending_work())
-                task.add_done_callback(
-                    partial(ConcurrentShardIndexer._indexer_done_callback, shard_id)
-                )
-                self.indexers[shard_id] = (indexer, task)
-            # propagate errors
-            raise task.exception()  # type: ignore
-
+        # NOTE: there is an unusual situation where an indexer finishes but
+        # new work is added before this done callback is executed. If
+        # there's pending work on the indexer, we start a new task for it
         if indexer.has_pending_work():
             task = asyncio.create_task(indexer.work_until_finish())
-            task.add_done_callback(
-                partial(ConcurrentShardIndexer._indexer_done_callback, self, shard_id)
-            )
+            task.add_done_callback(partial(self._indexer_done_callback, shard_id))
             self.indexers[shard_id] = (indexer, task)
         else:
             self.indexers.pop(shard_id)
@@ -229,53 +218,101 @@ class PriorityIndexer:
     def __init__(self, writer: Writer, storage: Storage):
         self.writer = writer
         self.storage = storage
-        self.work_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self.work_queue: asyncio.PriorityQueue[WorkUnit] = asyncio.PriorityQueue()
         self.working = False
-
-    def index_soon(self, work: WorkUnit):
-        self.work_queue.put_nowait(work)
+        self.error = False
+        self.last_worked_seqid: Optional[int] = None
+        self.back_to_work = asyncio.Event()
 
     def has_pending_work(self) -> bool:
         return self.work_queue.qsize() > 0
 
+    def index_soon(self, work: WorkUnit):
+        self.work_queue.put_nowait(work)
+
+        if self.error:
+            if self.last_worked_seqid is None:
+                # this should never happen, but if last_worked_seqid is never
+                # set, we should resume work, as we'll never find the culprit
+                self.back_to_work.set()
+                self.error = False
+            elif work.seqid == self.last_worked_seqid:
+                # if we find the message that generated the error, we can go
+                # back to work
+                self.back_to_work.set()
+                self.error = False
+
     async def work_until_finish(self):
         self.working = True
-        try:
-            while not self.work_queue.empty():
-                work = self.work_queue.get_nowait()
-                await self._do_work(work)
-        except Exception as exc:
-            # if an exception occurred, we can't longer ensure proper ordering
-            # for this queue. We flush the queue and wait for the messages to be
-            # redelivered
+        while self.working:
+            try:
+                while not self.work_queue.empty():
+                    work = self.work_queue.get_nowait()
+                    self.last_worked_seqid = work.seqid
+                    await self._do_work(work)
+                self.working = False
+
+            except Exception as exc:
+                # if an exception occurred, we can't longer ensure proper
+                # ordering for this queue. We flush the queue and wait for the
+                # messages to be redelivered
+
+                self.error = True
+                self.report_exception(exc, work)
+
+                # remove all elements without yielding the event loop
+                logger.info(f"Flushing {self.work_queue.qsize()} messages from indexer")
+                pending_work = []
+                while not self.work_queue.empty():
+                    pending_work.append(self.work_queue.get_nowait())
+
+                await work.nats_msg.nak()
+                await work.mpu.end()
+
+                for w in pending_work:
+                    logger.debug(
+                        "Flushing message from indexer",
+                        extra={
+                            "seqid": w.seqid,
+                            "kbid": w.index_message.kbid,
+                            "shard": w.index_message.shard,
+                            "storage_key": w.index_message.storage_key,
+                        },
+                    )
+                    await w.nats_msg.nak()
+                    await w.mpu.end()
+
+                await self.back_to_work.wait()
+                self.back_to_work.clear()
+
+    def report_exception(self, exc: Exception, work: WorkUnit):
+        if isinstance(exc, AioRpcError):
+            grpc_error = exc
+            if grpc_error.code() == StatusCode.UNAVAILABLE:
+                level = logging.WARNING
+                message = (
+                    f"Writer node is unavailable. All messages for indexer {work.shard_id} "
+                    "will be flushed and retried in a while"
+                )
+            else:
+                event_id = capture_exception(exc)
+                level = logging.ERROR
+                message = (
+                    "A gRPC error happened on an indexer, all messages for its queue will be flushed. "
+                    f"Check sentry for more details. Event id: {event_id}"
+                )
+        else:
             event_id = capture_exception(exc)
-            logger.error(
+            level = logging.ERROR
+            message = (
                 "An error happened on an indexer, all messages for its queue will be flushed. "
-                f"Check sentry for more details. Event id: {event_id}",
-                extra={
-                    "seqid": work.seqid,
-                    "kbid": work.index_message.kbid,
-                    "shard": work.index_message.shard,
-                    "storage_key": work.index_message.storage_key,
-                },
-                exc_info=exc,
+                f"Check sentry for more details. Event id: {event_id}"
             )
-            await self.flush_pending_work()
-            raise exc
-        finally:
-            self.working = False
 
-    async def flush_pending_work(self):
-        logger.info(f"Flushing {self.work_queue.qsize()} messages from indexer")
-        while not self.work_queue.empty():
-            work = self.work_queue.get()
-            await work.nats_msg.nak()
-
-    @indexer_observer.wrap()
-    async def _do_work(self, work: WorkUnit):
-        start = time.time()
-        logger.info(
-            f"Working on message for shard {work.index_message.shard} (pending work: {self.work_queue.qsize()})",
+        logger.log(
+            level,
+            message,
+            exc_info=exc,
             extra={
                 "seqid": work.seqid,
                 "kbid": work.index_message.kbid,
@@ -284,32 +321,36 @@ class PriorityIndexer:
             },
         )
 
-        try:
-            await self._index_message(work.index_message)
-        except Exception as exc:
-            # Unhandled exceptions are bubbled up and managed by the work loop
-            await work.nats_msg.nak()
-            raise exc
-        else:
-            await work.nats_msg.ack()
-
-            await signals.successful_indexing.dispatch(
-                SuccessfulIndexingPayload(
-                    seqid=work.seqid, index_message=work.index_message
-                )
+    @indexer_observer.wrap()
+    async def _do_work(self, work: WorkUnit):
+        _extra = {
+            "seqid": work.seqid,
+            "kbid": work.index_message.kbid,
+            "shard": work.index_message.shard,
+            "storage_key": work.index_message.storage_key,
+        }
+        start = time.time()
+        logger.info(
+            "Working on message for shard {shard_id} (pending work: {pending_work})".format(
+                shard_id=work.index_message.shard, pending_work=self.work_queue.qsize()
+            ),
+            extra=_extra,
+        )
+        await self._index_message(work.index_message)
+        await work.nats_msg.ack()
+        await work.mpu.end()
+        await signals.successful_indexing.dispatch(
+            SuccessfulIndexingPayload(
+                seqid=work.seqid, index_message=work.index_message
             )
-            logger.info(
-                "Message indexing finished",
-                extra={
-                    "seqid": work.seqid,
-                    "kbid": work.index_message.kbid,
-                    "shard": work.index_message.shard,
-                    "storage_key": work.index_message.storage_key,
-                    "time": time.time() - start,
-                },
-            )
-        finally:
-            await work.mpu.end()
+        )
+        logger.info(
+            "Message indexing finished",
+            extra={
+                **_extra,
+                "time": time.time() - start,
+            },
+        )
 
     async def _index_message(self, pb: IndexMessage):
         status = None
@@ -326,52 +367,72 @@ class PriorityIndexer:
         shard_id = pb.shard
         rid = brain.resource.uuid
         brain.shard_id = brain.resource.shard_id = shard_id
+        _extra = {
+            "kbid": pb.kbid,
+            "shard": pb.shard,
+            "rid": rid,
+            "storage_key": pb.storage_key,
+        }
 
-        logger.info(f"Adding {rid} at {shard_id} otx:{pb.txid}")
+        logger.debug(f"Adding {rid} at {shard_id} otx:{pb.txid}", extra=_extra)
         try:
             status = await self.writer.set_resource(brain)
 
         except AioRpcError as grpc_error:
             if grpc_error.code() == StatusCode.NOT_FOUND:
-                logger.error(f"Shard does not exist {pb.shard}")
-            else:
-                event_id = errors.capture_exception(grpc_error)
                 logger.error(
-                    "An error ocurred on indexer worker while setting a resource. "
-                    f"Check sentry for more details. Event id: {event_id}"
+                    f"Shard does not exist {pb.shard}. This message will be ignored",
+                    extra=_extra,
                 )
+            else:
                 # REVIEW: we should always have metadata and the writer node
                 # should handle this in a better way than a panic
                 if brain.HasField("metadata"):
                     # Hard fail if we have the correct data
                     raise grpc_error
+                else:
+                    event_id = errors.capture_exception(grpc_error)
+                    logger.error(
+                        "Error on indexer worker trying to set a resource without metadata. "
+                        "This message won't be retried. Check sentry for more details. "
+                        f"Event id: {event_id}",
+                        extra=_extra,
+                    )
             return None
 
         else:
-            logger.info(f"...done (Added {rid} at {shard_id} otx:{pb.txid})")
+            logger.debug(
+                f"...done (Added {rid} at {shard_id} otx:{pb.txid})", extra=_extra
+            )
             return status
 
     async def _delete_resource(self, pb: IndexMessage) -> Optional[OpStatus]:
         shard_id = pb.shard
         rid = pb.resource
         resource = ResourceID(uuid=rid, shard_id=shard_id)
+        _extra = {
+            "kbid": pb.kbid,
+            "shard": pb.shard,
+            "rid": rid,
+            "storage_key": pb.storage_key,
+        }
 
-        logger.info(f"Deleting {rid} in {shard_id} otx:{pb.txid}")
+        logger.debug(f"Deleting {rid} in {shard_id} otx:{pb.txid}", extra=_extra)
         try:
             status = await self.writer.delete_resource(resource)
 
         except AioRpcError as grpc_error:
             if grpc_error.code() == StatusCode.NOT_FOUND:
-                logger.error(f"Shard does not exist {pb.shard}")
-            else:
-                event_id = errors.capture_exception(grpc_error)
                 logger.error(
-                    "An error ocurred on indexer worker while deleting a resource. "
-                    f"Check sentry for more details. Event id: {event_id}"
+                    f"Shard does not exist {pb.shard}. This message will be ignored",
+                    extra=_extra,
                 )
+            else:
                 raise grpc_error
             return None
 
         else:
-            logger.info(f"...done (Deleted {rid} in {shard_id} otx:{pb.txid})")
+            logger.debug(
+                f"...done (Deleted {rid} in {shard_id} otx:{pb.txid})", extra=_extra
+            )
             return status

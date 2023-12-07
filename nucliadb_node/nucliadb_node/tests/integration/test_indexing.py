@@ -19,7 +19,10 @@
 
 import asyncio
 import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from typing import Optional
 from unittest.mock import AsyncMock, patch
 
@@ -32,6 +35,7 @@ from nucliadb_protos.writer_pb2 import Notification
 from nucliadb_node import SERVICE_NAME
 from nucliadb_node.pull import Worker
 from nucliadb_node.settings import settings
+from nucliadb_node.signals import SuccessfulIndexingPayload, successful_indexing
 from nucliadb_node.tests.fixtures import Reader
 from nucliadb_utils import const
 from nucliadb_utils.utilities import get_pubsub, get_storage
@@ -81,7 +85,6 @@ async def test_indexing(worker, shard: str, reader: Reader):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_prioritary_indexing_on_one_shard(
-    concurrent_nats_processing,
     worker,
     shard: str,
     reader: Reader,
@@ -133,6 +136,164 @@ async def test_prioritary_indexing_on_one_shard(
         IndexMessageSource.PROCESSOR,
         IndexMessageSource.PROCESSOR,
     ]
+
+
+class TestConcurrentIndexingFailureRecovery:
+    """Index messages from writer and from processor into a bunch of shards.
+
+    Make some percentage of the messages fail while indexing and validate
+    failure recovery and correct processing without suplicates or missing
+    messages.
+
+    """
+
+    @dataclass
+    class IndexLogEntry:
+        shard_id: str
+        seqid: int
+        source: str
+
+    @staticmethod
+    @contextmanager
+    def successful_indexing_context(listener_id: str, async_cb):
+        successful_indexing.add_listener(listener_id, async_cb)
+        yield
+        successful_indexing.remove_listener(listener_id)
+
+    # TODO remove this logging setup, this is only for local debugging!
+    @pytest.fixture(autouse=True)
+    def setup_logging(self):
+        from nucliadb_telemetry.logs import setup_logging
+        from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogSettings
+
+        setup_logging(
+            settings=LogSettings(
+                debug=True,
+                log_level=LogLevel.DEBUG,
+                log_format_type=LogFormatType.PLAIN,
+            )
+        )
+
+    @pytest.fixture
+    def node_id(self, worker):
+        node = settings.force_host_id
+        assert node is not None
+        yield node
+
+    @pytest.fixture
+    def index_log(self):
+        index_log = []
+
+        async def on_indexing(payload: SuccessfulIndexingPayload):
+            nonlocal index_log
+            entry = self.IndexLogEntry(
+                shard_id=payload.index_message.shard,
+                seqid=payload.seqid,
+                source=IndexMessageSource.Name(payload.index_message.source),
+            )
+            index_log.append(entry)
+
+        with self.successful_indexing_context(
+            "test_concurrent_indexing_failure_recovery", on_indexing
+        ):
+            yield index_log
+
+    @pytest.fixture
+    def faulty_worker(self, worker):
+        fail_ratio = 0.1
+        work_done_count = 0
+
+        async def run_or_fail(func, fail_ratio: float, *args, **kwargs):
+            nonlocal work_done_count
+            work_done_count += 1
+            if work_done_count % round(1 / fail_ratio) == 0:
+                raise Exception("Intended exception to test failure recovery")
+            else:
+                await func(*args, **kwargs)
+
+        original_set_resource = worker.writer.set_resource
+        worker.writer.set_resource = partial(
+            run_or_fail, original_set_resource, fail_ratio
+        )
+        original_delete_resource = worker.writer.delete_resource
+        worker.writer.delete_resource = partial(
+            run_or_fail, original_delete_resource, fail_ratio
+        )
+
+        yield worker
+
+        worker.writer.set_resource = original_set_resource
+        worker.writer.delete_resource = original_delete_resource
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "bunch_of_shards", ("EXPERIMENTAL", "STABLE"), indirect=True
+    )
+    async def test(
+        self,
+        bunch_of_shards: list[str],
+        node_id: str,
+        reader: Reader,
+        faulty_worker,
+        index_log,
+    ):
+        resources_per_shard = 10
+        seqids_by_shard: dict[str, list[int]] = {
+            shard_id: [] for shard_id in bunch_of_shards
+        }
+
+        for _ in range(resources_per_shard):
+            for shard_id in bunch_of_shards:
+                resource = resource_payload(shard_id)
+                writer_index = await create_indexing_message(
+                    resource, "kb", shard_id, node_id, source=IndexMessageSource.WRITER
+                )
+                processor_index = await create_indexing_message(
+                    resource, "kb", shard_id, node_id, source=IndexMessageSource.WRITER
+                )
+                seqid_writer = await send_indexing_message(
+                    faulty_worker, writer_index, node_id
+                )
+                seqid_processor = await send_indexing_message(
+                    faulty_worker, processor_index, node_id
+                )
+                seqids_by_shard.setdefault(shard_id, []).extend(
+                    [seqid_writer, seqid_processor]
+                )
+
+        start = datetime.now()
+        while True:
+            await asyncio.sleep(0.1)
+
+            shards_processed = []
+
+            for shard_id in bunch_of_shards:
+                sipb = ShardId()
+                sipb.id = shard_id
+
+                shard_pb = await reader.get_shard(sipb)
+                is_processed = (
+                    shard_pb is not None
+                    and shard_pb.fields == shard_pb.sentences == resources_per_shard * 2
+                )
+                shards_processed.append(is_processed)
+
+            if all(shards_processed):
+                break
+
+            elapsed = datetime.now() - start
+            assert elapsed.seconds < 60, "too much time waiting"
+
+        # check all messages have been indexed
+        expected_messages = len(bunch_of_shards) * resources_per_shard * 2
+        assert len(index_log) == expected_messages
+
+        # check correct order
+        seqids_log: dict[str, list[int]] = {}
+        for log in index_log:
+            seqids_log.setdefault(log.shard_id, []).append(log.seqid)
+
+        assert seqids_by_shard == seqids_log
 
 
 @pytest.mark.asyncio
@@ -232,12 +393,13 @@ async def create_indexing_message(
     return index
 
 
-async def send_indexing_message(worker: Worker, index: IndexMessage, node: str):
+async def send_indexing_message(worker: Worker, index: IndexMessage, node: str) -> int:
     # Push on stream
-    await worker.nats_connection_manager.js.publish(
+    info = await worker.nats_connection_manager.js.publish(
         const.Streams.INDEX.subject.format(node=node),
         index.SerializeToString(),
     )
+    return info.seq
 
 
 async def wait_for_indexed_message(kbid: str):

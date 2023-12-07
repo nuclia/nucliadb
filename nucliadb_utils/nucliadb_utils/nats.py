@@ -61,8 +61,9 @@ class MessageProgressUpdater:
         self.msg = msg
         self.timeout = timeout
 
-    async def start(self):
-        task_name = f"MessageProgressUpdater: {id(self)}"
+    def start(self):
+        seqid = self.msg.reply.split(".")[5]
+        task_name = f"MessageProgressUpdater: {id(self)} (seqid={seqid})"
         self._task = asyncio.create_task(self._progress(), name=task_name)
 
     async def end(self):

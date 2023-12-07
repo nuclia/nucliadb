@@ -90,4 +90,4 @@ class Worker:
         logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
 
     async def subscription_worker(self, msg: Msg):
-        await self.indexer.index_message_soon(msg)
+        self.indexer.index_message_soon(msg)

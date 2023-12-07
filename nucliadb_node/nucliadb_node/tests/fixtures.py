@@ -320,11 +320,36 @@ async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
 
 
 @pytest.fixture(scope="function")
+async def bunch_of_shards(
+    request, writer_stub: NodeWriterStub
+) -> AsyncIterable[list[str]]:
+    channel = (
+        ReleaseChannel.EXPERIMENTAL
+        if request.param == "EXPERIMENTAL"
+        else ReleaseChannel.STABLE
+    )
+    request = NewShardRequest(kbid="test", release_channel=channel)
+
+    try:
+        shard_ids = []
+        for _ in range(5):
+            shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
+            shard_ids.append(shard.id)
+
+        yield shard_ids
+
+    finally:
+        for shard_id in shard_ids:
+            await writer_stub.DeleteShard(ShardId(id=shard_id))  # type: ignore
+
+
+@pytest.fixture(scope="function")
 def data_path():
     with tempfile.TemporaryDirectory() as td:
         previous = os.environ.get("DATA_PATH")
         os.environ["DATA_PATH"] = str(td)
 
+        print("DATA_PATH set to:", str(td))
         yield str(td)
 
         if previous is None:
