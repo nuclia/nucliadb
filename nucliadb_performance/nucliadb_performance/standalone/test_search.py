@@ -5,6 +5,7 @@ from molotov import global_setup, global_teardown, scenario
 
 from nucliadb_models.resource import ReleaseChannel
 from nucliadb_performance.settings import settings
+from nucliadb_performance.utils.errors import print_errors
 from nucliadb_performance.utils.export_import import import_kb
 from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_performance.utils.metrics import (
@@ -16,7 +17,6 @@ from nucliadb_performance.utils.misc import (
     get_kb,
     get_request,
     make_kbid_request,
-    print_errors,
 )
 from nucliadb_performance.utils.nucliadb import get_nucliadb_client
 from nucliadb_performance.utils.saved_requests import load_all_saved_requests

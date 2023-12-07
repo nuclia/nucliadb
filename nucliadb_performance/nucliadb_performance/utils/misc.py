@@ -17,6 +17,7 @@ from nucliadb_performance.settings import (
 from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_sdk import NucliaDB
 
+from .errors import append_error
 from .metrics import record_request_process_time
 from .saved_requests import Request, load_saved_request
 
@@ -37,33 +38,11 @@ _DATA = {}
 MIN_KB_PARAGRAPHS = 5_000
 
 
-@dataclass
-class Error:
-    kbid: str
-    endpoint: str
-    status_code: int
-    error: str
-
-
 class RequestError(Exception):
     def __init__(self, status, content=None, text=None):
         self.status = status
         self.content = content
         self.text = text
-
-
-ERRORS: list[Error] = []
-
-
-def append_error(kbid: str, endpoint: str, status_code: str, error: str):
-    ERRORS.append(
-        Error(
-            kbid=kbid,
-            endpoint=endpoint,
-            status_code=-1,
-            error=error,
-        )
-    )
 
 
 def cache_to_disk(func):
@@ -235,13 +214,6 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
         endpoint = path.split("/")[-1]
         append_error(kbid, endpoint, -1, str(err))
         raise
-
-
-def print_errors():
-    print("Errors summary:")
-    for error in ERRORS:
-        print(error)
-    print("=" * 50)
 
 
 def get_request(kbid_or_slug: str, endpoint: str) -> Request:
