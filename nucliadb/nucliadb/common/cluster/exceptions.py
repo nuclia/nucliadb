@@ -66,3 +66,7 @@ class EntitiesGroupNotFound(NotFound):
 
 class NoHealthyNodeAvailable(Exception):
     pass
+
+
+class NodeConnectionError(Exception):
+    pass
