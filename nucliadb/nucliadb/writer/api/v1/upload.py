@@ -557,7 +557,10 @@ async def _tus_patch(
 
 
 def check_uploaded_chunk_size(read_bytes: int, storage_manager: FileStorageManager):
-    if read_bytes < storage_manager.min_upload_size:
+    if (
+        storage_manager.min_upload_size is not None
+        and read_bytes < storage_manager.min_upload_size
+    ):
         raise HTTPPreconditionFailed(
             detail=f"Intermediate chunks cannot be smaller than {storage_manager.min_upload_size} bytes"
         )

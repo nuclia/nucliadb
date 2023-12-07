@@ -37,6 +37,7 @@ class LocalFileStorageManager(FileStorageManager):
     _handler = None
     storage: LocalBlobStore
     chunk_size = CHUNK_SIZE
+    min_chunk_size = None
 
     def metadata_key(self, uri: str) -> str:
         return f"{uri}.metadata"
