@@ -58,7 +58,7 @@ def prettify_latency(latency):
         return f"{(latency * 1000):.2f}ms"
 
 
-def save_benchmark_json_results(file):
+def save_benchmark_json_results(file_path: str):
     json_results = []
     for metric_name in METRICS:
         json_results.append(
@@ -75,6 +75,7 @@ def save_benchmark_json_results(file):
                 "value": get_percentile(metric_name, p=0.95),
             }
         )
-    print(f"Saving benchmark results to {file}")
-    with open(file, mode="w") as f:
+
+    print(f"Saving benchmark results to {file_path}")
+    with open(file_path, mode="w") as f:
         f.write(json.dumps(json_results, indent=4, sort_keys=True))

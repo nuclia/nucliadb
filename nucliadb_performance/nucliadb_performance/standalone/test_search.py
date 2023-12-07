@@ -3,7 +3,7 @@ from functools import cache
 from molotov import global_setup, global_teardown, scenario
 
 from nucliadb_models.resource import ReleaseChannel
-from nucliadb_performance.settings import settings
+from nucliadb_performance.settings import get_benchmark_output_file, settings
 from nucliadb_performance.utils.errors import print_errors
 from nucliadb_performance.utils.export_import import import_kb
 from nucliadb_performance.utils.kbs import parse_input_kb_slug
@@ -142,6 +142,6 @@ async def test_suggest(session):
 def end_test():
     print("This is the end of the test.")
     if settings.benchmark_output:
-        save_benchmark_json_results(settings.benchmark_output)
+        save_benchmark_json_results(get_benchmark_output_file())
     print_metrics()
     print_errors()

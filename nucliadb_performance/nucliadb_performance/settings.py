@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     exports_folder: str = "exports"
 
 
+def get_benchmark_output_file():
+    return settings.benchmark_output or "benchmark.json"
+
+
 def get_search_api_url():
     return settings.search_api or settings.main_api
 
