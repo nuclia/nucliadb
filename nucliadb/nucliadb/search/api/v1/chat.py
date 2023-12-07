@@ -214,13 +214,14 @@ async def create_chat_response(
 
 
 def parse_citations(text_answer: bytes) -> tuple[str, dict[str, Any]]:
-    if START_OF_CITATIONS not in text_answer:
+    try:
+        text_answer, tail = text_answer.split(START_OF_CITATIONS, 1)
+    except ValueError:
         logger.warning(
             "Citations were requested but not found in the answer. "
             "Returning the answer without citations."
         )
         return text_answer.decode("utf-8"), {}
-    text_answer, tail = text_answer.split(START_OF_CITATIONS, 1)
     try:
         citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
         citations_bytes = tail[4 : 4 + citations_length]
