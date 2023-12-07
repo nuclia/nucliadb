@@ -114,10 +114,11 @@ class S3StorageField(StorageField):
             logger.warning("Could not abort multipart upload", exc_info=True)
 
     async def start(self, cf: CloudFile) -> CloudFile:
-        if self.field is not None and self.field.upload_uri is not None:
+        if self.field is not None and self.field.upload_uri != "":
             # Field has already a file beeing uploaded, cancel
             await self._abort_multipart()
-        elif self.field is not None and self.field.uri is not None:
+
+        if self.field is not None and self.field.uri != "":
             # If exist the file copy the old url to delete
             field = CloudFile(
                 filename=cf.filename,
