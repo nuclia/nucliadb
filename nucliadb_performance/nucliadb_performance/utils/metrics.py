@@ -1,4 +1,5 @@
 import json
+import os
 import statistics as stats
 from typing import Optional
 
@@ -76,6 +77,7 @@ def save_benchmark_json_results(file_path: str):
             }
         )
 
-    print(f"Saving benchmark results to {file_path}")
-    with open(file_path, mode="w") as f:
+    real_path = os.path.realpath(file_path)
+    print(f"Saving benchmark results to {real_path}")
+    with open(real_path, mode="w") as f:
         f.write(json.dumps(json_results, indent=4, sort_keys=True))
