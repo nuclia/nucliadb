@@ -33,21 +33,21 @@ pytestmark = pytest.mark.asyncio
 async def test_materialize_kb_data(
     maindb_driver,
     pubsub,
-    gcs_storage,
+    storage,
     fake_node,
     knowledgebox_ingest,
 ):
     count = 10
     for _ in range(count):
         await create_resource(
-            storage=gcs_storage,
+            storage=storage,
             driver=maindb_driver,
             knowledgebox_ingest=knowledgebox_ingest,
         )
 
     mz = materializer.MaterializerHandler(
         driver=maindb_driver,
-        storage=gcs_storage,
+        storage=storage,
         pubsub=pubsub,
         check_delay=0.05,
     )

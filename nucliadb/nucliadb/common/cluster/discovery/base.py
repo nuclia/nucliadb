@@ -22,9 +22,11 @@ import asyncio
 import logging
 
 import backoff
+from grpc.aio import AioRpcError  # type: ignore
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
+from nucliadb.common.cluster.exceptions import NodeConnectionError
 from nucliadb.common.cluster.settings import Settings
 from nucliadb_protos import (
     noderesources_pb2,
@@ -88,7 +90,7 @@ def update_members(members: list[IndexNodeMetadata]) -> None:
     AVAILABLE_NODES.set(len(manager.get_index_nodes()))
 
 
-@backoff.on_exception(backoff.expo, (Exception,), max_tries=4)
+@backoff.on_exception(backoff.constant, (Exception,), interval=0.5, max_tries=2)
 async def _get_index_node_metadata(
     settings: Settings, address: str, read_replica: bool = False
 ) -> IndexNodeMetadata:
@@ -112,7 +114,11 @@ async def _get_index_node_metadata(
         stub = replication_pb2_grpc.ReplicationServiceStub(channel)  # type: ignore
     else:
         stub = nodewriter_pb2_grpc.NodeWriterStub(channel)  # type: ignore
-    metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
+    try:
+        metadata: nodewriter_pb2.NodeMetadata = await stub.GetMetadata(noderesources_pb2.EmptyQuery())  # type: ignore
+    except AioRpcError as exc:
+        raise NodeConnectionError() from exc
+
     primary_id = (
         getattr(metadata, "primary_node_id", None)
         # the or None here is important because the proto returns an empty string

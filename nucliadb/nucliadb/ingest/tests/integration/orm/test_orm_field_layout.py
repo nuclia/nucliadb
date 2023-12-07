@@ -32,10 +32,10 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_field_layout(
-    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+    storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -73,10 +73,10 @@ async def test_create_resource_orm_field_layout(
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_field_layout_file(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+    local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -107,9 +107,7 @@ async def test_create_resource_orm_field_layout_file(
     assert layoutfield.value.body == l2.body
 
     assert layoutfield.value.body.blocks["field1"].file.source == CloudFile.Source.GCS
-    data = await gcs_storage.downloadbytescf(
-        layoutfield.value.body.blocks["field1"].file
-    )
+    data = await storage.downloadbytescf(layoutfield.value.body.blocks["field1"].file)
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     assert data.read() == data2

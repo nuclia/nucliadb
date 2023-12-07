@@ -26,7 +26,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from starlette.responses import StreamingResponse
 
 from nucliadb.writer import logger
-from nucliadb.writer.tus.dm import FileDataMangaer
+from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import HTTPRangeNotSatisfiable
 
 CACHED_BUCKETS = LRU(50)  # type: ignore
@@ -54,6 +54,7 @@ class BlobStore:
 
 class FileStorageManager:
     chunk_size: int
+    min_upload_size: Optional[int] = None
 
     def __init__(self, storage):
         self.storage = storage
@@ -68,13 +69,13 @@ class FileStorageManager:
     ) -> AsyncIterator[bytes]:
         raise NotImplementedError()
 
-    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
+    async def start(self, dm: FileDataManager, path: str, kbid: str):
         raise NotImplementedError()
 
-    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
+    async def append(self, dm: FileDataManager, iterable, offset) -> int:
         raise NotImplementedError()
 
-    async def finish(self, dm: FileDataMangaer):
+    async def finish(self, dm: FileDataManager):
         raise NotImplementedError()
 
     async def delete_upload(self, uri, kbid):

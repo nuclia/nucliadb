@@ -16,11 +16,15 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import os
+
 import asyncpg
 import pytest
+from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb_utils.storages.pg import PostgresStorage
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility
 
 pytest_plugins = [
     "pytest_docker_fixtures",
@@ -35,7 +39,7 @@ pytest_plugins = [
 async def pg_storage(pg):
     dsn = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
     storage = PostgresStorage(dsn)
-    MAIN["storage"] = storage
+    MAIN[Utility.STORAGE] = storage
     conn = await asyncpg.connect(dsn)
     await conn.execute(
         """
@@ -47,5 +51,30 @@ DROP table IF EXISTS kb_files_fileparts;
     await storage.initialize()
     yield storage
     await storage.finalize()
-    if "storage" in MAIN:
-        del MAIN["storage"]
+    if Utility.STORAGE in MAIN:
+        del MAIN[Utility.STORAGE]
+
+
+def get_testing_storage_backend(default="gcs"):
+    return os.environ.get("TESTING_STORAGE_BACKEND", default)
+
+
+def lazy_storage_fixture():
+    backend = get_testing_storage_backend()
+    if backend == "gcs":
+        return [lazy_fixture.lf("gcs_storage")]
+    elif backend == "s3":
+        return [lazy_fixture.lf("s3_storage")]
+    elif backend == "pg":
+        return [lazy_fixture.lf("pg_storage")]
+    else:
+        print(f"Unknown storage backend {backend}, using gcs")
+        return [lazy_fixture.lf("gcs_storage")]
+
+
+@pytest.fixture(scope="function", params=lazy_storage_fixture())
+async def storage(request):
+    """
+    Generic storage fixture that allows us to run the same tests for different storage backends.
+    """
+    return request.param

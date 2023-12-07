@@ -45,9 +45,10 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      max-parallel: 2
       matrix:
         python-version: ['3.11']
-
+        storage_backend: ["gcs", "s3"]
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -62,6 +63,8 @@ jobs:
         run: make -C nucliadb/ install-dev
 
       - name: Run tests
+        env:
+          TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
           pytest -rfE --cov=nucliadb.writer -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/writer
 

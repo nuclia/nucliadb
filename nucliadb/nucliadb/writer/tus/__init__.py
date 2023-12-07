@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
-from nucliadb.writer.tus.dm import FileDataMangaer, RedisFileDataManagerFactory
+from nucliadb.writer.tus.dm import FileDataManager, RedisFileDataManagerFactory
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
@@ -47,7 +47,6 @@ REDIS_FILE_DATA_MANAGER_FACTORY: Optional[RedisFileDataManagerFactory] = None
 
 async def initialize():
     global DRIVER
-
     if storage_settings.file_backend == FileBackendConfig.GCS:
         storage_backend = GCloudBlobStore()
 
@@ -118,16 +117,16 @@ async def finalize():
         REDIS_FILE_DATA_MANAGER_FACTORY = None
 
 
-def get_dm() -> FileDataMangaer:  # type: ignore
+def get_dm() -> FileDataManager:  # type: ignore
     if writer_settings.dm_enabled:
         global REDIS_FILE_DATA_MANAGER_FACTORY
         if REDIS_FILE_DATA_MANAGER_FACTORY is None:
             REDIS_FILE_DATA_MANAGER_FACTORY = RedisFileDataManagerFactory(
                 f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
             )
-        dm_driver: FileDataMangaer = REDIS_FILE_DATA_MANAGER_FACTORY()
+        dm_driver: FileDataManager = REDIS_FILE_DATA_MANAGER_FACTORY()
     else:
-        dm_driver = FileDataMangaer()
+        dm_driver = FileDataManager()
     return dm_driver
 
 

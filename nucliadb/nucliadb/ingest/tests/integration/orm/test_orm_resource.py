@@ -52,7 +52,7 @@ from nucliadb_protos import utils_pb2 as upb
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_with_basic(
-    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+    storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     basic = PBBasic(
         icon="text/plain",
@@ -84,7 +84,7 @@ async def test_create_resource_orm_with_basic(
 
     basic.fieldmetadata.append(ufm1)
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -109,7 +109,7 @@ async def test_create_resource_orm_with_basic(
 
 @pytest.mark.asyncio
 async def test_iterate_paragraphs(
-    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+    storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     # Create a resource
     basic = PBBasic(
@@ -125,7 +125,7 @@ async def test_iterate_paragraphs(
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -157,13 +157,13 @@ async def test_iterate_paragraphs(
 
 @pytest.mark.asyncio
 async def test_vector_duplicate_fields(
-    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
+    storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -222,14 +222,14 @@ async def test_vector_duplicate_fields(
 
 
 async def test_generate_broker_message(
-    gcs_storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+    storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
-    resource = await create_resource(gcs_storage, maindb_driver, knowledgebox_ingest)
+    resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
 
     # Now fetch it
     async with maindb_driver.transaction() as txn:
-        kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
         r = await kb_obj.get(resource.uuid)
         assert r is not None
 
@@ -289,7 +289,7 @@ async def test_generate_broker_message(
     assert file_field.HasField("added")
     assert file_field.file.uri
     assert file_field.file.filename == "text.pb"
-    assert file_field.file.source == gcs_storage.source
+    assert file_field.file.source == storage.source
     assert file_field.file.bucket_name
     assert file_field.file.size
     assert file_field.file.content_type == "application/octet-stream"
@@ -359,10 +359,10 @@ async def test_generate_broker_message(
 
 
 async def test_generate_index_message_contains_all_metadata(
-    gcs_storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+    storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
-    resource = await create_resource(gcs_storage, maindb_driver, knowledgebox_ingest)
+    resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
     resource.disable_vectors = False
 
     async with maindb_driver.transaction() as txn:

@@ -16,7 +16,8 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -27,3 +28,4 @@ class IndexNodeMetadata:
     address: str
     shard_count: int
     primary_id: Optional[str] = None
+    updated_at: float = field(default_factory=time.time)
