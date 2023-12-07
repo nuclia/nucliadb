@@ -153,11 +153,9 @@ async def create_chat_response(
         async for chunk in chat_result.answer_stream:
             streamed_answer += chunk
 
-        if chat_request.citations:
-            answer, citations = parse_citations(streamed_answer)
-        else:
-            answer = streamed_answer.decode("utf-8")
-            citations = {}
+        answer, citations = parse_streamed_answer(
+            streamed_answer, chat_request.citations
+        )
 
         relations_results = None
         if ChatOptions.RELATIONS in chat_request.features:
@@ -191,10 +189,7 @@ async def create_chat_response(
                 streamed_answer += chunk
                 yield chunk
 
-            if chat_request.citations:
-                answer, _ = parse_citations(streamed_answer)
-            else:
-                answer = streamed_answer.decode("utf-8")
+            answer, _ = parse_streamed_answer(streamed_answer, chat_request.citations)
 
             yield END_OF_STREAM.encode()
             if ChatOptions.RELATIONS in chat_request.features:
@@ -213,12 +208,21 @@ async def create_chat_response(
         )
 
 
-def parse_citations(text_answer: bytes) -> tuple[str, dict[str, Any]]:
+def parse_streamed_answer(
+    streamed_bytes: bytes, requested_citations: bool
+) -> tuple[str, dict[str, Any]]:
     try:
-        text_answer, tail = text_answer.split(START_OF_CITATIONS, 1)
+        text_answer, tail = streamed_bytes.split(START_OF_CITATIONS, 1)
     except ValueError:
+        if requested_citations:
+            logger.warning(
+                "Citations were requested but not found in the answer. "
+                "Returning the answer without citations."
+            )
+        return streamed_bytes.decode("utf-8"), {}
+    if not requested_citations:
         logger.warning(
-            "Citations were requested but not found in the answer. "
+            "Citations were not requested but found in the answer. "
             "Returning the answer without citations."
         )
         return text_answer.decode("utf-8"), {}
