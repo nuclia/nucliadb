@@ -38,7 +38,7 @@ from nucliadb_utils.settings import (
     storage_settings,
 )
 from nucliadb_utils.store import MAIN
-from nucliadb_utils.tests.conftest import get_testing_storage_backends
+from nucliadb_utils.tests.conftest import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility
 
 
@@ -111,21 +111,20 @@ def pg_storage_writer(pg):
     storage_settings.driver_pg_url = url
 
 
-def lazy_storage_writer_fixtures():
-    fixtures = []
-    configured = get_testing_storage_backends()
-    if "gcs" in configured:
-        fixtures.append(lazy_fixture.lf("gcs_storage_writer"))
-    if "s3" in configured:
-        fixtures.append(lazy_fixture.lf("s3_storage_writer"))
-    if "pg" in configured:
-        fixtures.append(lazy_fixture.lf("pg_storage_writer"))
-    if len(fixtures) == 0:
-        fixtures.append(lazy_fixture.lf("gcs_storage_writer"))
-    return fixtures
+def lazy_storage_writer_fixture():
+    backend = get_testing_storage_backend()
+    if backend == "gcs":
+        return [lazy_fixture.lf("gcs_storage_writer")]
+    elif backend == "s3":
+        return [lazy_fixture.lf("s3_storage_writer")]
+    elif backend == "pg":
+        return [lazy_fixture.lf("pg_storage_writer")]
+    else:
+        print(f"Unknown storage backend {backend}, using gcs")
+        return [lazy_fixture.lf("gcs_storage_writer")]
 
 
-@pytest.fixture(scope="function", params=lazy_storage_writer_fixtures())
+@pytest.fixture(scope="function", params=lazy_storage_writer_fixture())
 async def storage_writer(request):
     """
     Generic storage fixture that allows us to run the same tests for different storage backends.
@@ -182,3 +181,4 @@ async def processing_utility():
 async def tus_manager(redis):
     settings.dm_redis_host = redis[0]
     settings.dm_redis_port = redis[1]
+    yield

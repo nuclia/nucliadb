@@ -55,25 +55,24 @@ DROP table IF EXISTS kb_files_fileparts;
         del MAIN[Utility.STORAGE]
 
 
-def get_testing_storage_backends(default="gcs"):
-    return os.environ.get("TESTING_STORAGE_BACKENDS", default).split(",")
+def get_testing_storage_backend(default="gcs"):
+    return os.environ.get("TESTING_STORAGE_BACKEND", default)
 
 
-def lazy_storage_fixtures():
-    fixtures = []
-    configured = get_testing_storage_backends()
-    if "s3" in configured:
-        fixtures.append(lazy_fixture.lf("s3_storage"))
-    if "gcs" in configured:
-        fixtures.append(lazy_fixture.lf("gcs_storage"))
-    if "pg" in configured:
-        fixtures.append(lazy_fixture.lf("pg_storage"))
-    if len(fixtures) == 0:
-        fixtures.append(lazy_fixture.lf("gcs_storage"))
-    return fixtures
+def lazy_storage_fixture():
+    backend = get_testing_storage_backend()
+    if backend == "gcs":
+        return [lazy_fixture.lf("gcs_storage")]
+    elif backend == "s3":
+        return [lazy_fixture.lf("s3_storage")]
+    elif backend == "pg":
+        return [lazy_fixture.lf("pg_storage")]
+    else:
+        print(f"Unknown storage backend {backend}, using gcs")
+        return [lazy_fixture.lf("gcs_storage")]
 
 
-@pytest.fixture(scope="function", params=lazy_storage_fixtures())
+@pytest.fixture(scope="function", params=lazy_storage_fixture())
 async def storage(request):
     """
     Generic storage fixture that allows us to run the same tests for different storage backends.
