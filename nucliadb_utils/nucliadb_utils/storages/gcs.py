@@ -56,7 +56,11 @@ def strip_query_params(url: yarl.URL) -> str:
     return str(url.with_query(None))
 
 
-OBJECT_DATA_CHUNK_SIZE = 1024 * 1024
+KB = 1024
+MB = 1024 * KB
+
+MIN_UPLOAD_SIZE = 256 * KB
+OBJECT_DATA_CHUNK_SIZE = 1 * MB
 
 
 DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.read_write"]
@@ -401,10 +405,10 @@ class GCSStorageField(StorageField):
             raise AttributeError()
         key = None
         bucket = None
-        if self.field is not None and self.field.uri is not None:
+        if self.field is not None and self.field.uri != "":
             key = self.field.uri
             bucket = self.field.bucket_name
-        elif self.key is not None:
+        elif self.key != "":
             key = self.key
             bucket = self.bucket
         else:
@@ -536,7 +540,7 @@ class GCSStorage(Storage):
     async def delete_upload(self, uri: str, bucket_name: str):
         if self.session is None:
             raise AttributeError()
-        if uri is not None:
+        if uri:
             url = "{}/{}/o/{}".format(
                 self.object_base_url, bucket_name, quote_plus(uri)
             )

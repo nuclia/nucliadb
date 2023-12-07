@@ -34,19 +34,24 @@ from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
-from nucliadb_utils.storages.s3 import bucket_exists, create_bucket
+from nucliadb_utils.storages.s3 import (
+    CHUNK_SIZE,
+    MIN_UPLOAD_SIZE,
+    bucket_exists,
+    create_bucket,
+)
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
     aiohttp.client_exceptions.ClientPayloadError,
     botocore.exceptions.BotoCoreError,
 )
-CHUNK_SIZE = 5 * 1024 * 1024
 
 
 class S3FileStorageManager(FileStorageManager):
     storage: S3BlobStore
     chunk_size = CHUNK_SIZE
+    min_upload_size = MIN_UPLOAD_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _abort_multipart(self, dm: FileDataManager):
@@ -86,7 +91,6 @@ class S3FileStorageManager(FileStorageManager):
             # It seems that starlette stream() finishes with an emtpy chunk of data
             size += len(chunk)
             part = await self._upload_part(dm, chunk)
-
             multipart = dm.get("multipart")
             multipart["Parts"].append(
                 {"PartNumber": dm.get("block"), "ETag": part["ETag"]}
