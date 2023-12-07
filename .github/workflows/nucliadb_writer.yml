@@ -62,7 +62,8 @@ jobs:
         run: make -C nucliadb/ install-dev
 
       - name: Run tests
-        env: TESTING_STORAGE_BACKENDS=gcs,s3
+        env: 
+          TESTING_STORAGE_BACKENDS: "gcs,s3"
         run: |
           pytest -rfE --cov=nucliadb.writer -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/writer
 
