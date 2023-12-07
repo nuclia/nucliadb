@@ -55,6 +55,17 @@ class RequestError(Exception):
 ERRORS: list[Error] = []
 
 
+def append_error(kbid: str, endpoint: str, status_code: str, error: str):
+    ERRORS.append(
+        Error(
+            kbid=kbid,
+            endpoint=endpoint,
+            status_code=-1,
+            error=error,
+        )
+    )
+
+
 def cache_to_disk(func):
     def new_func(*args, **kwargs):
         d = shelve.open("cache.data")
@@ -209,7 +220,6 @@ def get_search_client(session):
 
 
 async def make_kbid_request(session, kbid, method, path, params=None, json=None):
-    global ERRORS
     try:
         client = get_search_client(session)
         return await client.make_request(method, path, params=params, json=json)
@@ -218,13 +228,8 @@ async def make_kbid_request(session, kbid, method, path, params=None, json=None)
         detail = (
             err.content and err.content.get("detail", None) if err.content else err.text
         )
-        error = Error(
-            kbid=kbid,
-            endpoint=path.split("/")[-1],
-            status_code=err.status,
-            error=detail,
-        )
-        ERRORS.append(error)
+        endpoint = path.split("/")[-1]
+        append_error(kbid, endpoint, err.status, detail)
         raise
     except Exception as err:
         error = Error(

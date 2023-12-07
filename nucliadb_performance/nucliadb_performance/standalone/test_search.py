@@ -12,6 +12,7 @@ from nucliadb_performance.utils.metrics import (
     save_benchmark_json_results,
 )
 from nucliadb_performance.utils.misc import (
+    append_error,
     get_kb,
     get_request,
     make_kbid_request,
@@ -102,7 +103,9 @@ async def test_find(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    assert len(resp["resources"]) > 0
+    assert len(resp["resources"]) > 100, append_error(
+        kbid, "find", -1, "No resources returned"
+    )
 
 
 @scenario(weight=SEARCH_WEIGHT)
@@ -118,7 +121,9 @@ async def test_search(session):
         request.url.format(kbid=kbid),
         json=request.payload,
     )
-    assert len(resp["resources"]) > 0
+    assert len(resp["resources"]) > 0, append_error(
+        kbid, "search", -1, "No resources returned"
+    )
 
 
 @scenario(weight=SUGGEST_WEIGHT)
@@ -132,9 +137,10 @@ async def test_suggest(session):
         request.url.format(kbid=kbid),
         params=request.params,
     )
-    assert (
+    results_returned = (
         len(resp["paragraphs"]["results"]) > 0 or len(resp["entities"]["entities"]) > 0
     )
+    assert results_returned, append_error(kbid, "suggest", -1, "No results returned")
 
 
 @global_teardown()
