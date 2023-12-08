@@ -152,6 +152,9 @@ class IngestConsumer:
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), self.lock:
+            logger.info(
+                f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}"
+            )
             try:
                 pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
