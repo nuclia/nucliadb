@@ -80,5 +80,7 @@ class Settings(DriverSettings):
     relation_search_timeout: float = 10.0
     relation_types_timeout: float = 10.0
 
+    max_concurrent_ingest_processing: int = 5
+
 
 settings = Settings()
