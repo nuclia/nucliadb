@@ -100,6 +100,8 @@ async def start_ingest_consumers(
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
     nats_connection_manager = get_nats_manager()
 
+    max_concurrent_handlers = asyncio.Semaphore(1)
+
     for partition in settings.partitions:
         consumer = IngestConsumer(
             driver=driver,
@@ -107,6 +109,7 @@ async def start_ingest_consumers(
             storage=storage,
             pubsub=pubsub,
             nats_connection_manager=nats_connection_manager,
+            lock=max_concurrent_handlers,
         )
         await consumer.initialize()
 
