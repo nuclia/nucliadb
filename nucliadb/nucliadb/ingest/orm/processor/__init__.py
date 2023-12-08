@@ -244,6 +244,7 @@ class Processor:
             for message in messages:
                 if resource is not None:
                     assert resource.uuid == message.uuid
+                logger.info("Applying resource")
                 result = await self.apply_resource(message, kb, resource)
 
                 if result is None:
@@ -253,12 +254,16 @@ class Processor:
                 created = created or _created
 
             if resource:
+                logger.info("Global test")
                 await resource.compute_global_text()
+                logger.info("Global tags")
                 await resource.compute_global_tags(resource.indexer)
                 if message.reindex:
+                    logger.info("Reindexing")
                     # when reindexing, let's just generate full new index message
                     resource.replace_indexer(await resource.generate_index_message())
 
+            logger.info("push to index")
             if resource and resource.modified:
                 await self.index_resource(  # noqa
                     resource=resource,
