@@ -166,7 +166,7 @@ class IngestConsumer:
                 else:
                     audit_time = ""
 
-                logger.debug(
+                logger.info(
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
                 )
                 context.add_context({"kbid": pb.kbid, "rid": pb.uuid})
