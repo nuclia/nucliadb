@@ -65,24 +65,6 @@ def shards():
 
 
 @pytest.fixture()
-def cluster_datamanager(shards):
-    mock = MagicMock()
-    mock.get_kb_rollover_shards = AsyncMock()
-    mock.get_kb_rollover_shards.return_value = None
-    mock.get_kb_shards = AsyncMock()
-    mock.get_kb_shards.return_value = shards
-    mock.update_kb_rollover_shards = AsyncMock()
-    mock.update_kb_shards = AsyncMock()
-    mock.delete_kb_rollover_shard = AsyncMock()
-    mock.delete_kb_rollover_shards = AsyncMock()
-
-    with patch(
-        "nucliadb.common.cluster.rollover.ClusterDataManager", return_value=mock
-    ):
-        yield mock
-
-
-@pytest.fixture()
 def resource_ids():
     yield ["1", "2", "3"]
 
@@ -118,7 +100,41 @@ def resources_datamanager(resource_ids):
 
 
 @pytest.fixture()
-def app_context(cluster_datamanager, resources_datamanager, available_nodes):
+def cluster_datamanager(resource_ids, shards):
+    mock = MagicMock()
+    mock.get_kb_shards = AsyncMock()
+    mock.get_kb_shards.return_value = shards
+    mock.update_kb_shards = AsyncMock()
+
+    with patch(
+        "nucliadb.common.cluster.rollover.ClusterDataManager", return_value=mock
+    ):
+        yield mock
+
+
+@pytest.fixture()
+def rollover_datamanager(resource_ids, cluster_datamanager):
+    mock = MagicMock()
+    mock.get_kb_rollover_shards = AsyncMock()
+    mock.get_kb_rollover_shards.return_value = None
+    mock.update_kb_rollover_shards = AsyncMock()
+    mock.delete_kb_rollover_shard = AsyncMock()
+    mock.delete_kb_rollover_shards = AsyncMock()
+    mock.get_to_index = AsyncMock(side_effect=["1", None])
+    mock.add_indexed = AsyncMock()
+    mock.remove_to_index = AsyncMock()
+    mock.get_indexed_data = AsyncMock(return_value=("1", 1))
+    mock.get_indexed_keys = AsyncMock(return_value=["1"])
+    mock.remove_indexed = AsyncMock()
+
+    with patch(
+        "nucliadb.common.cluster.rollover.RolloverDataManager", return_value=mock
+    ):
+        yield mock
+
+
+@pytest.fixture()
+def app_context(rollover_datamanager, resources_datamanager, available_nodes):
     mock = MagicMock()
     mock.shard_manager = MagicMock()
     mock.shard_manager.rollback_shard = AsyncMock()
@@ -133,7 +149,7 @@ def app_context(cluster_datamanager, resources_datamanager, available_nodes):
 
 
 async def test_create_rollover_shards(
-    app_context, available_nodes, shards: writer_pb2.Shards, cluster_datamanager
+    app_context, available_nodes, shards: writer_pb2.Shards, rollover_datamanager
 ):
     new_shards = await rollover.create_rollover_shards(app_context, "kbid")
 
@@ -141,59 +157,63 @@ async def test_create_rollover_shards(
     assert len(available_nodes["0"].writer.calls["NewShard"]) == sum(
         [len(s.replicas) for s in shards.shards]
     )
-    cluster_datamanager.update_kb_rollover_shards.assert_called_with("kbid", new_shards)
+    rollover_datamanager.update_kb_rollover_shards.assert_called_with(
+        "kbid", new_shards
+    )
 
 
-async def test_create_rollover_shards_rollback_existing(
-    app_context, shards: writer_pb2.Shards, cluster_datamanager
+async def test_create_rollover_shards_does_not_recreate(
+    app_context, shards: writer_pb2.Shards, rollover_datamanager
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
 
     await rollover.create_rollover_shards(app_context, "kbid")
 
-    assert len(app_context.shard_manager.rollback_shard.mock_calls) == 2
+    app_context.shard_manager.rollback_shard.assert_not_called()
+    rollover_datamanager.update_kb_rollover_shards.assert_not_called()
 
 
 async def test_index_rollover_shards(
-    app_context, cluster_datamanager, resources_datamanager, shards, resource_ids
+    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
 
-    indexed_res = await rollover.index_rollover_shards(app_context, "kbid")
-    assert len(indexed_res) == len(resource_ids)
-    [
-        resources_datamanager.get_resource_index_message.assert_any_call("kbid", res_id)
-        for res_id in resource_ids
-    ]
+    await rollover.index_rollover_shards(app_context, "kbid")
+    rollover_datamanager.add_indexed.assert_called_with("kbid", "1", "1", 1)
 
 
 async def test_index_rollover_shards_handles_missing_shards(
-    app_context, cluster_datamanager, resources_datamanager, shards, resource_ids
+    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = None
+    rollover_datamanager.get_kb_rollover_shards.return_value = None
     with pytest.raises(rollover.UnexpectedRolloverError):
         await rollover.index_rollover_shards(app_context, "kbid")
 
 
 async def test_index_rollover_shards_handles_missing_shard_id(
-    app_context, cluster_datamanager, resources_datamanager, shards, resource_ids
+    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
     resources_datamanager.get_resource_shard_id.return_value = None
     with pytest.raises(rollover.UnexpectedRolloverError):
         await rollover.index_rollover_shards(app_context, "kbid")
 
 
 async def test_index_rollover_shards_handles_missing_res(
-    app_context, cluster_datamanager, resources_datamanager, shards, resource_ids
+    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
     resources_datamanager.get_resource_index_message.return_value = None
-    assert len(await rollover.index_rollover_shards(app_context, "kbid")) == 0
+
+    await rollover.index_rollover_shards(app_context, "kbid")
+
+    rollover_datamanager.remove_to_index.assert_called_with("kbid", "1")
 
 
-async def test_cutover_shards(app_context, cluster_datamanager, shards):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+async def test_cutover_shards(
+    app_context, rollover_datamanager, cluster_datamanager, shards
+):
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
 
     await rollover.cutover_shards(app_context, "kbid")
 
@@ -204,23 +224,19 @@ async def test_cutover_shards(app_context, cluster_datamanager, shards):
     ]
 
 
-async def test_cutover_shards_missing(app_context, cluster_datamanager):
-    cluster_datamanager.get_kb_rollover_shards.return_value = None
+async def test_cutover_shards_missing(app_context, rollover_datamanager):
+    rollover_datamanager.get_kb_rollover_shards.return_value = None
 
     with pytest.raises(rollover.UnexpectedRolloverError):
         await rollover.cutover_shards(app_context, "kbid")
 
 
 async def test_validate_indexed_data(
-    app_context, cluster_datamanager, resources_datamanager, shards, resource_ids
+    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
 
-    indexed_res = await rollover.validate_indexed_data(
-        app_context,
-        "kbid",
-        {res_id: ("1", datetime.min) for res_id in resource_ids},
-    )
+    indexed_res = await rollover.validate_indexed_data(app_context, "kbid")
     assert len(indexed_res) == len(resource_ids)
     [
         resources_datamanager.get_resource_index_message.assert_any_call("kbid", res_id)
@@ -229,24 +245,15 @@ async def test_validate_indexed_data(
 
 
 async def test_validate_indexed_data_handles_missing_res(
-    app_context, cluster_datamanager, resources_datamanager, shards, resource_ids
+    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
     resources_datamanager.get_resource_index_message.return_value = None
-    assert (
-        len(
-            await rollover.validate_indexed_data(
-                app_context,
-                "kbid",
-                {res_id: ("1", datetime.min) for res_id in resource_ids},
-            )
-        )
-        == 0
-    )
+    assert len(await rollover.validate_indexed_data(app_context, "kbid")) == 0
 
 
-async def test_rollover_shards(app_context, cluster_datamanager, shards, resource_ids):
-    cluster_datamanager.get_kb_rollover_shards.return_value = shards
+async def test_rollover_shards(app_context, rollover_datamanager, shards, resource_ids):
+    rollover_datamanager.get_kb_rollover_shards.return_value = shards
     resource_ids.clear()
 
     await rollover.rollover_kb_shards(app_context, "kbid")
