@@ -80,24 +80,21 @@ class RedisTransaction(Transaction):
         self.clean()
         self.open = False
 
-    async def batch_get(self, keys: list[str]) -> list[bytes]:
-        results = []
-        for key in keys:
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
+        if len(keys) == 0:
+            return []
+
+        bytes_keys: List[bytes] = [x.encode() for x in keys]
+        results = await self.redis.mget(bytes_keys)
+
+        for idx, key in enumerate(keys):
             if key in self.deleted_keys:
-                raise KeyError(f"Not found {key}")
-
+                results[idx] = None
             if key in self.modified_keys:
-                results.append(self.modified_keys[key])
-                keys.remove(key)
-
+                results[idx] = self.modified_keys[key]
             if key in self.visited_keys:
-                results.append(self.visited_keys[key])
-                keys.remove(key)
+                results[idx] = self.visited_keys[key]
 
-        if len(keys) > 0:
-            bytes_keys: List[bytes] = [x.encode() for x in keys]
-            objs = await self.redis.mget(bytes_keys)
-            results.extend(objs)
         return results
 
     async def get(self, key: str) -> Optional[bytes]:

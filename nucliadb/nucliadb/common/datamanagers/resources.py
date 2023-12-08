@@ -58,7 +58,7 @@ class ResourcesDataManager:
             rids = await txn.batch_get(
                 [KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs]
             )
-        return [rid.decode() for rid in rids]
+        return [rid.decode() for rid in rids if rid is not None]
 
     async def iterate_resource_ids(self, kbid: str) -> AsyncGenerator[str, None]:
         """

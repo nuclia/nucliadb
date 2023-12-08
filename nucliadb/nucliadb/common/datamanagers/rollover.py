@@ -126,6 +126,10 @@ class RolloverDataManager:
         # take values a batch at a time
         for i in range(0, len(all_keys), 100):
             batch = all_keys[i : i + 100]
+            batch = [
+                KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource=resource_id)
+                for resource_id in batch
+            ]
             async with self.driver.transaction(wait_for_abort=False) as txn:
                 values = await txn.batch_get(batch)
                 for key, val in zip(batch, values):

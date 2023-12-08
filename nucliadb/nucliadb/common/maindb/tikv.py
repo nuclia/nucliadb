@@ -80,13 +80,13 @@ class TiKVTransaction(Transaction):
                     raise
         self.open = False
 
-    async def batch_get(self, keys: list[str]) -> list[bytes]:
+    async def batch_get(self, keys: list[str]) -> list[Optional[bytes]]:
         bytes_keys: list[bytes] = [x.encode() for x in keys]
         with tikv_observer({"type": "batch_get"}):
             output = {}
             for key, value in await self.txn.batch_get(bytes_keys):
                 output[key.decode()] = value
-        return [output.get(key, None) for key in keys]
+        return [output.get(key) for key in keys]
 
     @backoff.on_exception(backoff.expo, (TimeoutError,), max_tries=2)
     async def get(self, key: str) -> Optional[bytes]:
