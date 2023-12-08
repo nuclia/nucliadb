@@ -62,13 +62,13 @@ spec:
           privileged: true
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
-          initialDelaySeconds: 60
-          periodSeconds: 120
-          timeoutSeconds: 10
-          failureThreshold: 10
+        # livenessProbe:
+        #   exec:
+        #     command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+        #   initialDelaySeconds: 60
+        #   periodSeconds: 120
+        #   timeoutSeconds: 10
+        #   failureThreshold: 10
         command: ["nucliadb-ingest"]
         envFrom:
         - configMapRef:

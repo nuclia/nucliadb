@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - r706d233
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
