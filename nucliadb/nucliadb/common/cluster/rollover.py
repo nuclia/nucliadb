@@ -190,7 +190,6 @@ async def schedule_resource_indexing(
     """
     Schedule indexing all data in a kb in rollover shards
     """
-
     logger.warning("Indexing rollover shards", extra={"kbid": kbid})
 
     resources_datamanager = ResourcesDataManager(
@@ -215,9 +214,8 @@ async def schedule_resource_indexing(
         if len(batch) > 100:
             await rollover_datamanager.add_batch_to_index(kbid, batch)
             batch = []
-    if len(batch) > 100:
+    if len(batch) > 0:
         await rollover_datamanager.add_batch_to_index(kbid, batch)
-        batch = []
 
     _set_rollover_status(rollover_shards, RolloverStatus.RESOURCES_SCHEDULED)
     await rollover_datamanager.update_kb_rollover_shards(kbid, rollover_shards)
@@ -309,15 +307,15 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
     rollover_datamanager = RolloverDataManager(app_context.kv_driver)
     sm = app_context.shard_manager
 
-    active_shards = await cluster_datamanager.get_kb_shards(kbid)
+    previously_active_shards = await cluster_datamanager.get_kb_shards(kbid)
     rollover_shards = await rollover_datamanager.get_kb_rollover_shards(kbid)
-    if active_shards is None or rollover_shards is None:
+    if previously_active_shards is None or rollover_shards is None:
         raise UnexpectedRolloverError("Shards for kb not found")
 
     await cluster_datamanager.update_kb_shards(kbid, rollover_shards)
     await rollover_datamanager.delete_kb_rollover_shards(kbid)
 
-    for shard in active_shards.shards:
+    for shard in previously_active_shards.shards:
         await sm.rollback_shard(shard)
 
 
@@ -332,7 +330,6 @@ async def validate_indexed_data(
 
     If a resource was removed during the rollover, it will be removed as well.
     """
-
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
 
@@ -422,7 +419,7 @@ async def validate_indexed_data(
         await sm.delete_resource(shard, resource_id, -1, str(partition), kbid)
 
     _set_rollover_status(rolled_over_shards, RolloverStatus.RESOURCES_VALIDATED)
-    await rollover_datamanager.update_kb_rollover_shards(kbid, rolled_over_shards)
+    await cluster_datamanager.update_kb_shards(kbid, rolled_over_shards)
 
     return repaired_resources
 
@@ -447,9 +444,11 @@ async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None
 
     Process:
     - Create new shards
+    - Schedule all resources to be indexed
     - Index all resources into new shards
     - Cut over replicas to new shards
     - Validate that all resources are in the new shards
+    - Clean up indexed data
     """
     node_ready_checks = 0
     while len(cluster_manager.INDEX_NODES) == 0:
@@ -462,6 +461,7 @@ async def rollover_kb_shards(app_context: ApplicationContext, kbid: str) -> None
     logger.warning("Rolling over shards", extra={"kbid": kbid})
 
     await create_rollover_shards(app_context, kbid)
+    await schedule_resource_indexing(app_context, kbid)
     await index_rollover_shards(app_context, kbid)
     await cutover_shards(app_context, kbid)
     # we need to cut over BEFORE we validate the data

@@ -69,7 +69,7 @@ class RolloverDataManager:
         async with self.driver.transaction(wait_for_abort=False) as txn:
             found = [key async for key in txn.keys(key, count=1)]
             if found:
-                return found[0]
+                return found[0].split("/")[-1]
         return None
 
     async def remove_to_index(self, kbid: str, resource: str) -> None:
@@ -116,7 +116,7 @@ class RolloverDataManager:
         all_keys = []
         async with self.driver.transaction(wait_for_abort=False) as txn:
             async for key in txn.keys(match=start_key, count=-1):
-                all_keys.append(key)
+                all_keys.append(key.split("/")[-1])
         return all_keys
 
     async def iterate_indexed_data(
@@ -131,4 +131,4 @@ class RolloverDataManager:
                 for key, val in zip(batch, values):
                     if val is not None:
                         data = orjson.loads(val)
-                        yield key, tuple(data)  # type: ignore
+                        yield key.split("/")[-1], tuple(data)  # type: ignore
