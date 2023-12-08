@@ -167,7 +167,7 @@ def _request_builder(
     stream_response: bool = False,
     docstring: Optional[docstrings.Docstring] = None,
 ):
-    def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
+    def _func(self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -202,9 +202,14 @@ def _request_builder(
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
         if not stream_response:
-            resp = self._request(
-                path, method, data=data, query_params=query_params, content=raw_content
-            )
+            if isinstance(self, NucliaDBAsync):
+                resp = self._request(
+                    path, method, data=data, query_params=query_params
+                )
+            else:
+                resp = self._request(
+                    path, method, data=data, query_params=query_params, content=raw_content
+                )
             if asyncio.iscoroutine(resp):
 
                 async def _wrapped_resp():
