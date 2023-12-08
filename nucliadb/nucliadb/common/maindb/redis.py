@@ -80,7 +80,7 @@ class RedisTransaction(Transaction):
         self.clean()
         self.open = False
 
-    async def batch_get(self, keys: List[str]):
+    async def batch_get(self, keys: list[str]) -> list[bytes]:
         results = []
         for key in keys:
             if key in self.deleted_keys:

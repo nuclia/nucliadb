@@ -275,7 +275,8 @@ class KBShardManager:
                 except Exception as rollback_error:
                     errors.capture_exception(rollback_error)
                     logger.error(
-                        f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
+                        f"New shard rollback error. Node: {node_id} Shard: {replica_id}",
+                        exc_info=True,
                     )
 
     def indexing_replicas(self, shard: writer_pb2.ShardObject) -> list[tuple[str, str]]:

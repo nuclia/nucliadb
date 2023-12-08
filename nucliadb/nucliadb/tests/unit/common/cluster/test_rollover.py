@@ -249,4 +249,4 @@ async def test_rollover_shards(app_context, cluster_datamanager, shards, resourc
     cluster_datamanager.get_kb_rollover_shards.return_value = shards
     resource_ids.clear()
 
-    await rollover.rollover_shards(app_context, "kbid")
+    await rollover.rollover_kb_shards(app_context, "kbid")

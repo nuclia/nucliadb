@@ -346,7 +346,7 @@ async def test_filtering_before_and_after_reindexing(
 ):
     await _test_filtering(nucliadb_reader, kbid, filters)
 
-    await rollover.rollover_shards(app_context, kbid)
+    await rollover.rollover_kb_shards(app_context, kbid)
 
     await _test_filtering(nucliadb_reader, kbid, filters)
 

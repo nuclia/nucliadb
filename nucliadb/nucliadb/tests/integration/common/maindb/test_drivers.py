@@ -144,9 +144,10 @@ async def driver_basic(driver: Driver):
     result = await txn.get("/kbs/kb1/r/uuid1/text")
     assert result == b"My title"
 
-    result = await txn.batch_get(
+    result = await txn.batch_get(  # type: ignore
         ["/kbs/kb1/r/uuid1/text", "/internal/kbs/kb1/shards/shard1"]
     )
+    assert result == [b"My title", b"node1"]
     await txn.abort()
 
     current_internal_kbs_keys = set()

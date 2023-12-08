@@ -51,13 +51,14 @@ class ResourcesDataManager:
         return all_slugs
 
     @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
-    async def get_resource_id_from_slug(self, kbid: str, slug: str) -> Optional[str]:
+    async def get_resource_ids_from_slugs(
+        self, kbid: str, slugs: list[str]
+    ) -> list[str]:
         async with self.driver.transaction() as txn:
-            rid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
-        if rid is not None:
-            return rid.decode()
-        else:
-            return None
+            rids = await txn.batch_get(
+                [KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs]
+            )
+        return [rid.decode() for rid in rids]
 
     async def iterate_resource_ids(self, kbid: str) -> AsyncGenerator[str, None]:
         """
@@ -65,10 +66,14 @@ class ResourcesDataManager:
         how long a transaction will be open since the caller controls
         how long each item that is yielded will be processed.
         """
-        all_slugs = await self.get_all_resource_slugs(kbid)
-        for slug in all_slugs:
-            rid = await self.get_resource_id_from_slug(kbid, slug)
-            if rid is not None:
+        batch = []
+        for slug in await self.get_all_resource_slugs(kbid):
+            batch.append(slug)
+            if len(batch) >= 100:
+                for rid in await self.get_resource_ids_from_slugs(kbid, batch):
+                    yield rid
+        if len(batch) > 0:
+            for rid in await self.get_resource_ids_from_slugs(kbid, batch):
                 yield rid
 
     @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
