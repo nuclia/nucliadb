@@ -111,28 +111,41 @@ class RolloverDataManager:
                 await txn.delete(key)
             await txn.commit()
 
-    async def get_indexed_keys(self, kbid: str) -> list[str]:
+    async def iter_indexed_keys(self, kbid: str) -> AsyncGenerator[str, None]:
         start_key = KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource="")
-        all_keys = []
         async with self.driver.transaction(wait_for_abort=False) as txn:
             async for key in txn.keys(match=start_key, count=-1):
-                all_keys.append(key.split("/")[-1])
-        return all_keys
+                yield key.split("/")[-1]
+
+    async def _get_batch_indexed_data(
+        self, kbid, batch: list[str]
+    ) -> list[tuple[str, tuple[str, int]]]:
+        async with self.driver.transaction(wait_for_abort=False) as txn:
+            values = await txn.batch_get(
+                [
+                    KB_ROLLOVER_RESOURCES_INDEXED.format(
+                        kbid=kbid, resource=resource_id
+                    )
+                    for resource_id in batch
+                ]
+            )
+        results: list[tuple[str, tuple[str, int]]] = []
+        for key, val in zip(batch, values):
+            if val is not None:
+                data: tuple[str, int] = tuple(orjson.loads(val))  # type: ignore
+                results.append((key.split("/")[-1], data))
+        return results
 
     async def iterate_indexed_data(
         self, kbid: str
     ) -> AsyncGenerator[tuple[str, tuple[str, int]], None]:
-        all_keys = await self.get_indexed_keys(kbid)
-        # take values a batch at a time
-        for i in range(0, len(all_keys), 100):
-            batch = all_keys[i : i + 100]
-            batch = [
-                KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource=resource_id)
-                for resource_id in batch
-            ]
-            async with self.driver.transaction(wait_for_abort=False) as txn:
-                values = await txn.batch_get(batch)
-                for key, val in zip(batch, values):
-                    if val is not None:
-                        data = orjson.loads(val)
-                        yield key.split("/")[-1], tuple(data)  # type: ignore
+        batch = []
+        async for resource_id in self.iter_indexed_keys(kbid):
+            batch.append(resource_id)
+            if len(batch) >= 200:
+                for key, val in await self._get_batch_indexed_data(kbid, batch):
+                    yield key, val
+                batch = []
+        if len(batch) > 0:
+            for key, val in await self._get_batch_indexed_data(kbid, batch):
+                yield key, val

@@ -426,9 +426,13 @@ async def validate_indexed_data(
 
 async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None:
     rollover_datamanager = RolloverDataManager(app_context.kv_driver)
-    indexed_keys = await rollover_datamanager.get_indexed_keys(kbid)
-    for i in range(0, len(indexed_keys), 100):
-        batch = indexed_keys[i : i + 100]
+    batch = []
+    async for key in rollover_datamanager.iter_indexed_keys(kbid):
+        batch.append(key)
+        if len(batch) >= 100:
+            await rollover_datamanager.remove_indexed(kbid, batch)
+            batch = []
+    if len(batch) >= 0:
         await rollover_datamanager.remove_indexed(kbid, batch)
 
 

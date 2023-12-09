@@ -124,8 +124,12 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
     mock.add_indexed = AsyncMock()
     mock.remove_to_index = AsyncMock()
     mock.get_indexed_data = AsyncMock(return_value=("1", 1))
-    mock.get_indexed_keys = AsyncMock(return_value=["1"])
     mock.remove_indexed = AsyncMock()
+
+    async def _mock_indexed_keys(kbid):
+        yield "1"
+
+    mock.iter_indexed_keys = _mock_indexed_keys
 
     with patch(
         "nucliadb.common.cluster.rollover.RolloverDataManager", return_value=mock

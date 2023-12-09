@@ -40,15 +40,12 @@ class ResourcesDataManager:
         self.storage = storage
 
     @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
-    async def get_all_resource_slugs(self, kbid: str) -> list[str]:
-        all_slugs = []
+    async def iter_resource_slugs(self, kbid: str) -> AsyncGenerator[str, None]:
         async with self.driver.transaction() as txn:
             async for key in txn.keys(
                 match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
             ):
-                slug = key.split("/")[-1]
-                all_slugs.append(slug)
-        return all_slugs
+                yield key.split("/")[-1]
 
     @backoff.on_exception(backoff.expo, (Exception,), max_tries=3)
     async def get_resource_ids_from_slugs(
@@ -67,11 +64,12 @@ class ResourcesDataManager:
         how long each item that is yielded will be processed.
         """
         batch = []
-        for slug in await self.get_all_resource_slugs(kbid):
+        async for slug in self.iter_resource_slugs(kbid):
             batch.append(slug)
-            if len(batch) >= 100:
+            if len(batch) >= 200:
                 for rid in await self.get_resource_ids_from_slugs(kbid, batch):
                     yield rid
+                batch = []
         if len(batch) > 0:
             for rid in await self.get_resource_ids_from_slugs(kbid, batch):
                 yield rid
