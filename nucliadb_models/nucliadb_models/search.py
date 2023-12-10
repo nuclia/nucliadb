@@ -672,6 +672,7 @@ class ChatModel(BaseModel):
         default={},
         description="The information retrieval context for the current query",
     )
+    query_context_metadata: Optional[QueryContextMetadata] = None
     chat_history: List[ChatContextMessage] = Field(
         default=[], description="The chat conversation history"
     )
