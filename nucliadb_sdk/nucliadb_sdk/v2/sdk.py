@@ -20,6 +20,7 @@ import asyncio
 import base64
 import enum
 import io
+import json
 from typing import (
     Any,
     AsyncGenerator,
@@ -90,6 +91,7 @@ class ChatResponse(BaseModel):
     answer: str
     relations: Optional[Relations]
     learning_id: Optional[str]
+    citations: dict[str, Any] = {}
 
 
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
@@ -111,12 +113,19 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     relations_result = None
     if len(relations_payload) > 0:
         relations_result = Relations.parse_raw(base64.b64decode(relations_payload))
-
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_bytes = tail[4 : 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_bytes).decode())
+    except ValueError:
+        citations = {}
     return ChatResponse(
         result=find_result,
         answer=answer.decode("utf-8"),
         relations=relations_result,
         learning_id=learning_id,
+        citations=citations,
     )
 
 

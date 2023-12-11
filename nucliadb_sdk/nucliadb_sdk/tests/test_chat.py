@@ -33,6 +33,15 @@ def test_chat_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     assert len(result.relations.entities["Nuclia"].related_to) == 18
 
 
+def test_chat_on_kb_with_citations(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    result = sdk.chat(
+        kbid=docs_dataset,
+        query="Nuclia loves Semantic Search",
+        citations=True,
+    )
+    assert result.citations == {}
+
+
 def test_chat_on_kb_no_context_found(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result = sdk.chat(kbid=docs_dataset, query="penguin")
     assert result.answer == "Not enough data to answer this."

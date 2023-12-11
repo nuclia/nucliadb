@@ -182,4 +182,7 @@ async def test_get_chat_prompt_context(kb):
                 min_score=-1,
             ),
         )
-        assert prompt_result == [result_text, result_text]
+        assert prompt_result == {
+            "bmid/c/conv/ident": result_text,
+            "vecid/c/conv/ident": result_text,
+        }
