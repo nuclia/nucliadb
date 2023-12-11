@@ -62,7 +62,7 @@ async def start_worker(
     writer: Writer, nats_connection_manager: NatsConnectionManager
 ) -> Worker:
     node = await get_node_id()
-    if node is None:
+    if node is None:  # pragma: nocover
         raise Exception("No Key defined")
 
     worker = Worker(
