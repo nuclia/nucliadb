@@ -167,7 +167,9 @@ def _request_builder(
     stream_response: bool = False,
     docstring: Optional[docstrings.Docstring] = None,
 ):
-    def _func(self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs):
+    def _func(
+        self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs
+    ):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
