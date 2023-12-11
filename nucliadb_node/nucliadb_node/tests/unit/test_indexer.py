@@ -151,6 +151,11 @@ class TestConcurrentShardIndexer:
             assert asyncio_mock.create_task.call_count == n_tasks
             assert PriorityIndexer_mock.call_count == n_tasks
 
+            # if we finish the concurrent shard indexer with mock subscriptions,
+            # we'll have to wait for a timeout, as it'll wait all open tasks and
+            # mocks won't finish
+            csi.indexers.clear()
+
     @pytest.mark.asyncio
     async def test_indexing_adds_work_to_priority_indexer(
         self, csi: ConcurrentShardIndexer

@@ -144,14 +144,29 @@ class ConcurrentShardIndexer:
         self.storage = await get_storage(service_name=SERVICE_NAME)
 
     async def finalize(self):
+        tasks = []
+        reverse_indexers = {}
         for shard_id, (_, task) in self.indexers.items():
-            try:
-                await task
-            except Exception as exc:
-                logger.exception(
-                    f"Indexer task for shard {shard_id} raised an error while finalizing it",
-                    exc_info=exc,
+            tasks.append(task)
+            reverse_indexers[task] = shard_id
+
+        if tasks:
+            # REVIEW timeout. Is 10 a good timeout? Should we implement some
+            # indexer finalize policy? Nak everything and close, for example?
+            done, pending = await asyncio.wait(tasks, timeout=10)
+            if pending:
+                logger.error(
+                    f"{len(pending)} pending tasks are still running after concurrent shard indexer finalizes!"
                 )
+
+            for task in done:
+                if isinstance(task, Exception):
+                    shard_id = reverse_indexers[task]
+                    logger.exception(
+                        f"Indexer task for shard {shard_id} raised an error while finalizing it",
+                        exc_info=task,
+                    )
+
         self.indexers.clear()
 
     def index_message_soon(self, msg: Msg):
