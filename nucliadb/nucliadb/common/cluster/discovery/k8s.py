@@ -107,22 +107,32 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
 
         pod_name = event_metadata.name
         read_replica = event_metadata.labels.get("readReplica", "") == "true"
-        try:
-            node_data = await self.get_node_metadata(
-                pod_name,
-                status.pod_ip,
-                read_replica=read_replica,
-            )
-        except NodeConnectionError:  # pragma: no cover
-            logger.warning(
-                "Error connecting to node",
-                extra={
-                    "pod_name": pod_name,
-                    "node_ip": status.pod_ip,
-                    "read_replica": read_replica,
-                },
-            )
-            raise
+        if not ready:
+            if pod_name not in self.node_id_cache:
+                logger.debug(
+                    "Node not ready and not in cache, ignore",
+                    extra={"pod_name": pod_name},
+                )
+                return
+            else:
+                node_data = self.node_id_cache[pod_name]
+        else:
+            try:
+                node_data = await self.get_node_metadata(
+                    pod_name,
+                    status.pod_ip,
+                    read_replica=read_replica,
+                )
+            except NodeConnectionError:  # pragma: no cover
+                logger.warning(
+                    "Error connecting to node",
+                    extra={
+                        "pod_name": pod_name,
+                        "node_ip": status.pod_ip,
+                        "read_replica": read_replica,
+                    },
+                )
+                raise
 
         if ready:
             node = manager.get_index_node(node_data.node_id)
@@ -243,6 +253,9 @@ class KubernetesDiscovery(AbstractClusterDiscovery):
                 for pod_name in list(self.node_id_cache.keys()):
                     # force updating cache
                     async with self.update_lock:
+                        if pod_name not in self.node_id_cache:
+                            # could change in the meantime since we're waiting for lock
+                            continue
                         existing = self.node_id_cache[pod_name]
                         try:
                             self.node_id_cache[
