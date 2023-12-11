@@ -215,7 +215,7 @@ def _request_builder(
 
                 return _wrapped_resp()
             else:
-                return _parse_response(response_type, resp)
+                return _parse_response(response_type, resp)  # type: ignore
         else:
             resp = self._stream_request(
                 path, method, data=data, query_params=query_params
