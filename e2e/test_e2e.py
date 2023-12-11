@@ -144,8 +144,10 @@ def test_search(kbid: str, resource_id: str):
 
     toread_bytes = data.read(4)
     toread = int.from_bytes(toread_bytes, byteorder="big")
+    print(f"toread: {toread}")
     raw_search_results = data.read(toread)
     search_results = json.loads(base64.b64decode(raw_search_results))
+    print(f"Search results: {search_results}")
     chat_response = data.read().decode("utf-8")
     print(f"Cht response: {chat_response}")
     print(f"Search results: {search_results}")
