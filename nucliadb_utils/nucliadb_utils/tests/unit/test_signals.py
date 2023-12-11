@@ -56,6 +56,18 @@ class TestSignals:
         await signal.dispatch(payload)
         assert listener.await_count == 1
 
+    async def test_signal_despatch_with_failure(self, signal, listener, payload):
+        ok_listener = AsyncMock()
+        signal.add_listener("ok-listener", ok_listener)
+        nok_listener = AsyncMock(side_effect=Exception)
+        signal.add_listener("nok-listener", nok_listener)
+
+        with pytest.raises(Exception):
+            await signal.dispatch(payload)
+
+        assert ok_listener.await_count == 1
+        assert nok_listener.await_count == 1
+
     async def test_remove_listener(self, signal, listener, payload):
         id = "test-listener"
 
