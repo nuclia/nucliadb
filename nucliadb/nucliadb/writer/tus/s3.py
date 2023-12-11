@@ -31,25 +31,30 @@ from aiobotocore.session import AioSession  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer import logger
-from nucliadb.writer.tus.dm import FileDataMangaer
+from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
-from nucliadb_utils.storages.s3 import bucket_exists, create_bucket
+from nucliadb_utils.storages.s3 import (
+    CHUNK_SIZE,
+    MIN_UPLOAD_SIZE,
+    bucket_exists,
+    create_bucket,
+)
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
     aiohttp.client_exceptions.ClientPayloadError,
     botocore.exceptions.BotoCoreError,
 )
-CHUNK_SIZE = 5 * 1024 * 1024
 
 
 class S3FileStorageManager(FileStorageManager):
     storage: S3BlobStore
     chunk_size = CHUNK_SIZE
+    min_upload_size = MIN_UPLOAD_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _abort_multipart(self, dm: FileDataMangaer):
+    async def _abort_multipart(self, dm: FileDataManager):
         try:
             mpu = dm.get("mpu")
             upload_file_id = dm.get("upload_file_id")
@@ -59,7 +64,7 @@ class S3FileStorageManager(FileStorageManager):
         except Exception:
             logger.warning("Could not abort multipart upload", exc_info=True)
 
-    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
+    async def start(self, dm: FileDataManager, path: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         if dm.get("mpu") is not None:
@@ -80,13 +85,12 @@ class S3FileStorageManager(FileStorageManager):
             Bucket=bucket, Key=path
         )
 
-    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
+    async def append(self, dm: FileDataManager, iterable, offset) -> int:
         size = 0
         async for chunk in iterable:
             # It seems that starlette stream() finishes with an emtpy chunk of data
             size += len(chunk)
             part = await self._upload_part(dm, chunk)
-
             multipart = dm.get("multipart")
             multipart["Parts"].append(
                 {"PartNumber": dm.get("block"), "ETag": part["ETag"]}
@@ -96,7 +100,7 @@ class S3FileStorageManager(FileStorageManager):
         return size
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _upload_part(self, dm: FileDataMangaer, data):
+    async def _upload_part(self, dm: FileDataManager, data):
         return await self.storage._s3aioclient.upload_part(
             Bucket=dm.get("bucket"),
             Key=dm.get("path"),
@@ -105,7 +109,7 @@ class S3FileStorageManager(FileStorageManager):
             Body=data,
         )
 
-    async def finish(self, dm: FileDataMangaer):
+    async def finish(self, dm: FileDataManager):
         path = dm.get("path")
         if dm.get("mpu") is not None:
             await self._complete_multipart_upload(dm)
@@ -113,7 +117,7 @@ class S3FileStorageManager(FileStorageManager):
         return path
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _complete_multipart_upload(self, dm: FileDataMangaer):
+    async def _complete_multipart_upload(self, dm: FileDataManager):
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
         if dm.get("block") == 1:

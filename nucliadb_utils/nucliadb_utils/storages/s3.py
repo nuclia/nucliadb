@@ -33,7 +33,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils import logger
 from nucliadb_utils.storages.storage import Storage, StorageField
 
-MIN_UPLOAD_SIZE = 5 * 1024 * 1024
+MB = 1024 * 1024
+MIN_UPLOAD_SIZE = 5 * MB
 CHUNK_SIZE = MIN_UPLOAD_SIZE
 MAX_TRIES = 3
 
@@ -113,10 +114,11 @@ class S3StorageField(StorageField):
             logger.warning("Could not abort multipart upload", exc_info=True)
 
     async def start(self, cf: CloudFile) -> CloudFile:
-        if self.field is not None and self.field.upload_uri is not None:
+        if self.field is not None and self.field.upload_uri != "":
             # Field has already a file beeing uploaded, cancel
             await self._abort_multipart()
-        elif self.field is not None and self.field.uri is not None:
+
+        if self.field is not None and self.field.uri != "":
             # If exist the file copy the old url to delete
             field = CloudFile(
                 filename=cf.filename,
@@ -167,7 +169,7 @@ class S3StorageField(StorageField):
         async for chunk in iterable:
             size += len(chunk)
             upload_chunk += chunk
-            if len(upload_chunk) >= CHUNK_SIZE:
+            if len(upload_chunk) >= MIN_UPLOAD_SIZE:
                 part = await self._upload_part(cf, upload_chunk)
                 self.field.parts.append(part["ETag"])
                 self.field.offset += 1
@@ -208,7 +210,7 @@ class S3StorageField(StorageField):
                 )
                 logger.warning("Error deleting object", exc_info=True)
 
-        if self.field.resumable_uri is not None:
+        if self.field.resumable_uri != "":
             await self._complete_multipart_upload()
 
         self.field.uri = self.key
@@ -246,10 +248,10 @@ class S3StorageField(StorageField):
 
         key = None
         bucket = None
-        if self.field is not None and self.field.uri is not None:
+        if self.field is not None and self.field.uri != "":
             key = self.field.uri
             bucket = self.field.bucket_name
-        elif self.key is not None:
+        elif self.key != "":
             key = self.key
             bucket = self.bucket
         else:
@@ -359,12 +361,23 @@ class S3Storage(Storage):
         self._s3aioclient = await self._exit_stack.enter_async_context(
             session.create_client("s3", **self.opts)
         )
+        for bucket in (self.deadletter_bucket, self.indexing_bucket):
+            if bucket is not None:
+                await self._create_bucket_if_not_exists(bucket)
+
+    async def _create_bucket_if_not_exists(self, bucket_name: str) -> bool:
+        created = False
+        bucket_exists = await self.bucket_exists(bucket_name)
+        if not bucket_exists:
+            created = True
+            await self.create_bucket(bucket_name)
+        return created
 
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)
 
     async def delete_upload(self, uri: str, bucket: str):
-        if uri is not None:
+        if uri:
             try:
                 await self._s3aioclient.delete_object(Bucket=bucket, Key=uri)
             except botocore.exceptions.ClientError:
@@ -382,13 +395,8 @@ class S3Storage(Storage):
                 yield item
 
     async def create_kb(self, kbid: str):
-        created = False
         bucket_name = self.get_bucket_name(kbid)
-        bucket_exists = await self.bucket_exists(bucket_name)
-        if not bucket_exists:
-            await self.create_bucket(bucket_name)
-            created = True
-        return created
+        return await self._create_bucket_if_not_exists(bucket_name)
 
     async def bucket_exists(self, bucket_name: str) -> bool:
         return await bucket_exists(self._s3aioclient, bucket_name)

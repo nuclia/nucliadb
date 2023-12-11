@@ -23,6 +23,7 @@ import pytest
 
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility
 
 
 @pytest.fixture(scope="function")
@@ -30,10 +31,9 @@ async def local_storage():
     folder = tempfile.TemporaryDirectory()
     storage = LocalStorage(local_testing_files=folder.name)
 
-    MAIN["storage"] = storage
+    MAIN[Utility.STORAGE] = storage
     await storage.initialize()
     yield storage
     await storage.finalize()
     folder.cleanup()
-    if "storage" in MAIN:
-        del MAIN["storage"]
+    MAIN.pop(Utility.STORAGE, None)

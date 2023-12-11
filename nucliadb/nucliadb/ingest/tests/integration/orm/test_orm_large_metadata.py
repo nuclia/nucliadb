@@ -38,10 +38,10 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_large_metadata(
-    gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+    storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -65,10 +65,10 @@ async def test_create_resource_orm_large_metadata(
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_large_metadata_file(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+    local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, kbid=knowledgebox_ingest)
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 

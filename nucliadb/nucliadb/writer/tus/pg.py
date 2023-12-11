@@ -24,7 +24,7 @@ from typing import AsyncIterator
 import asyncpg
 from nucliadb_protos.resources_pb2 import CloudFile
 
-from nucliadb.writer.tus.dm import FileDataMangaer
+from nucliadb.writer.tus.dm import FileDataManager
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -34,9 +34,9 @@ from nucliadb_utils.storages.pg import PostgresFileDataLayer
 class PGFileStorageManager(FileStorageManager):
     _handler = None
     storage: PGBlobStore
-    chunk_size = CHUNK_SIZE
+    chunk_size = min_upload_size = CHUNK_SIZE
 
-    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
+    async def start(self, dm: FileDataManager, path: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
 
         async with self.storage.pool.acquire() as conn:
@@ -81,7 +81,7 @@ class PGFileStorageManager(FileStorageManager):
             ):
                 yield data
 
-    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
+    async def append(self, dm: FileDataManager, iterable, offset) -> int:
         bucket = dm.get("bucket")
         path = dm.get("path")
         count = 0
@@ -94,7 +94,7 @@ class PGFileStorageManager(FileStorageManager):
                 offset += len(chunk)
         return count
 
-    async def finish(self, dm: FileDataMangaer):
+    async def finish(self, dm: FileDataManager):
         path = dm.get("path")
         await dm.finish()
         return path
