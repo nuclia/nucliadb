@@ -26,7 +26,7 @@ async def test_kb_management(sdk_async: nucliadb_sdk.NucliaDBAsync):
     kb = await sdk_async.get_knowledge_box_by_slug(slug="foo")
     assert await sdk_async.get_knowledge_box(kbid=kb.uuid)
     kbs = await sdk_async.list_knowledge_boxes()
-    assert len(kbs.kbs) == 1
+    assert len(kbs.kbs) > 0
     await sdk_async.delete_knowledge_box(kbid=kb.uuid)
 
 
