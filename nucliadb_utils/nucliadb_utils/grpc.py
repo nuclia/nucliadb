@@ -52,6 +52,7 @@ RETRY_OPTIONS = [
             }
         ),
     ),
+    ("grpc.max_metadata_size", 1 * 1024 * 1024),
 ]
 
 
