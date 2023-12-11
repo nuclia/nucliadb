@@ -28,6 +28,8 @@ use tokio::sync::RwLock;
 
 use crate::disk_structure;
 use crate::settings::Settings;
+use crate::shards::errors::ShardNotFoundError;
+use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::AsyncShardReaderProvider;
 use crate::shards::reader::ShardReader;
 use crate::shards::ShardId;
@@ -68,8 +70,10 @@ impl AsyncShardReaderProvider for AsyncUnboundedShardReaderCache {
         // writes to disk)
         let id_ = id.clone();
         let shard = tokio::task::spawn_blocking(move || {
-            if !shard_path.is_dir() {
-                return Err(node_error!("Shard {shard_path:?} is not on disk"));
+            if !ShardMetadata::exists(shard_path.clone()) {
+                return Err(node_error!(ShardNotFoundError(
+                    "Shard {shard_path:?} is not on disk"
+                )));
             }
             ShardReader::new(id.clone(), &shard_path).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
