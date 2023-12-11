@@ -227,14 +227,17 @@ async def chat(
         )
     else:
         query_context = await get_chat_prompt_context(kbid, find_results)
-        query_context_metadata = {pid: {"order": i} for i, pid in enumerate(query_context.keys())}
+        query_context_order = {
+            paragraph_id: order
+            for order, paragraph_id in enumerate(query_context.keys())
+        }
         user_prompt = None
         if chat_request.prompt is not None:
             user_prompt = UserPrompt(prompt=chat_request.prompt)
         chat_model = ChatModel(
             user_id=user_id,
             query_context=query_context,
-            query_context_metadata=QueryContextMetadata.parse_obj(query_context_metadata),
+            query_context_order=query_context_order,
             chat_history=chat_history,
             question=chat_request.query,
             truncate=True,

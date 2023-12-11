@@ -668,11 +668,14 @@ class ChatModel(BaseModel):
     user_id: str
     retrieval: bool = True
     system: Optional[str] = None
-    query_context: Union[List[str], Dict[str, str]] = Field(
+    query_context: Dict[str, str] = Field(
         default={},
         description="The information retrieval context for the current query",
     )
-    query_context_metadata: Optional[QueryContextMetadata] = None
+    query_context_order: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="The order of the query context elements. This is used to sort the context elements by relevance before sending them to the generative model",  # noqa
+    )
     chat_history: List[ChatContextMessage] = Field(
         default=[], description="The chat conversation history"
     )
