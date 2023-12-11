@@ -76,7 +76,7 @@ class MessageProgressUpdater:
             pass
 
     async def __aenter__(self):
-        await self.start()
+        self.start()
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
