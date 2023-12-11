@@ -20,7 +20,7 @@
 import asyncio
 import logging
 import time
-from typing import Optional
+from typing import Optional, Union
 
 import backoff
 import nats
@@ -73,6 +73,7 @@ class IngestConsumer:
         storage: Storage,
         nats_connection_manager: NatsConnectionManager,
         pubsub: Optional[PubSubDriver] = None,
+        lock: Optional[Union[asyncio.Lock, asyncio.Semaphore]] = None,
     ):
         self.driver = driver
         self.partition = partition
@@ -80,7 +81,7 @@ class IngestConsumer:
         self.storage = storage
         self.initialized = False
 
-        self.lock = asyncio.Lock()
+        self.lock = lock or asyncio.Lock()
         self.processor = Processor(driver, storage, pubsub, partition)
 
     async def initialize(self):
@@ -142,15 +143,15 @@ class IngestConsumer:
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])
-        logger.info(
-            f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
-        )
         message_source = "<msg source not set>"
         start = time.monotonic()
 
         async with MessageProgressUpdater(
             msg, nats_consumer_settings.nats_ack_wait * 0.66
         ), self.lock:
+            logger.info(
+                f"Message processing: subject:{subject}, seqid: {seqid}, reply: {reply}"
+            )
             try:
                 pb = await self.get_broker_message(msg)
                 if pb.source == pb.MessageSource.PROCESSOR:
