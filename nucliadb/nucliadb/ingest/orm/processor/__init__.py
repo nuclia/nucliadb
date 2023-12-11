@@ -690,12 +690,23 @@ class Processor:
 def messages_source(messages: list[writer_pb2.BrokerMessage]):
     from_writer = all(
         (
-            message.source is writer_pb2.BrokerMessage.MessageSource.WRITER
+            message.source == writer_pb2.BrokerMessage.MessageSource.WRITER
+            for message in messages
+        )
+    )
+    from_processor = all(
+        (
+            message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
             for message in messages
         )
     )
     if from_writer:
         source = nodewriter_pb2.IndexMessageSource.WRITER
-    else:
+    elif from_processor:
+        source = nodewriter_pb2.IndexMessageSource.PROCESSOR
+    else:  # pragma: nocover
+        msg = "Processor received multiple broker messages with different sources in the same txn!"
+        logger.error(msg)
+        errors.capture_exception(Exception(msg))
         source = nodewriter_pb2.IndexMessageSource.PROCESSOR
     return source
