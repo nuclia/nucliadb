@@ -54,6 +54,7 @@ class Worker:
         await self.setup_nats_subscription()
 
     async def finalize(self):
+        await self.teardown_nats_subscriptions()
         await self.indexer.finalize()
 
     async def setup_nats_subscription(self):
@@ -70,7 +71,7 @@ class Worker:
             await self.nats_connection_manager.js.stream_info(const.Streams.INDEX.name)
 
         subject = const.Streams.INDEX.subject.format(node=self.node)
-        await self.nats_connection_manager.subscribe(
+        subscription = await self.nats_connection_manager.subscribe(
             subject=subject,
             queue=const.Streams.INDEX.group.format(node=self.node),
             stream=const.Streams.INDEX.name,
@@ -87,7 +88,13 @@ class Worker:
                 idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
+        self.subscriptions.append(subscription)
         logger.info(f"Subscribed to {subject} on stream {const.Streams.INDEX.name}")
+
+    async def teardown_nats_subscriptions(self):
+        for subscription in self.subscriptions:
+            await self.nats_connection_manager.unsubscribe(subscription)
+        self.subscriptions.clear()
 
     async def subscription_worker(self, msg: Msg):
         self.indexer.index_message_soon(msg)
