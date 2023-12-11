@@ -98,6 +98,12 @@ impl ShardMetadata {
         if !metadata_path.exists() {
             return Err(node_error!("Shard metadata file does not exist"));
         }
+        let requested_shard_id = shard_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
 
         let mut reader = BufReader::new(File::open(metadata_path)?);
         let metadata: ShardMetadataFile = serde_json::from_reader(&mut reader)?;
@@ -105,7 +111,7 @@ impl ShardMetadata {
             shard_path,
             kbid: metadata.kbid,
             similarity: metadata.similarity,
-            id: metadata.id.unwrap(),
+            id: metadata.id.unwrap_or(requested_shard_id),
             channel: metadata.channel,
             generation_id: RwLock::new(None),
         })
