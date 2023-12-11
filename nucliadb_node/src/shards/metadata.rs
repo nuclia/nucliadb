@@ -132,8 +132,9 @@ impl ShardMetadata {
     }
     pub fn serialize_metadata(&self) -> NodeResult<()> {
         let metadata_path = self.shard_path.join(disk_structure::METADATA_FILE);
+        let temp_metadata_path = metadata_path.with_extension("tmp");
 
-        let mut writer = BufWriter::new(File::create(metadata_path)?);
+        let mut writer = BufWriter::new(File::create(temp_metadata_path.clone())?);
         serde_json::to_writer(
             &mut writer,
             &ShardMetadataFile {
@@ -144,6 +145,8 @@ impl ShardMetadata {
             },
         )?;
         writer.flush()?;
+
+        std::fs::rename(temp_metadata_path, metadata_path)?;
 
         self.new_generation_id();
 
