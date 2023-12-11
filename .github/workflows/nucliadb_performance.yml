@@ -2,7 +2,7 @@ name: Performance Regression
 on:
   push:
     branches:
-      - main
+      - trigger
   issue_comment:
     types: [created]
   schedule:
@@ -12,6 +12,12 @@ on:
 permissions: write-all
 
 jobs:
+  trigger-internal-perf-job:
+    name: "Trigger internal Performance Tests"
+    uses: nuclia/nucliadb_deploy/.github/workflows/nucliadb_performance.yaml@main
+    with:
+      nucliadb_checkout_id: ${{ github.sha }}
+
   check-perf-main-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Record performance on main (nightly)
