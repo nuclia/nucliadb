@@ -160,20 +160,6 @@ class TestConcurrentIndexingFailureRecovery:
         yield
         successful_indexing.remove_listener(listener_id)
 
-    # TODO remove this logging setup, this is only for local debugging!
-    @pytest.fixture(autouse=True)
-    def setup_logging(self):
-        from nucliadb_telemetry.logs import setup_logging
-        from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogSettings
-
-        setup_logging(
-            settings=LogSettings(
-                debug=True,
-                log_level=LogLevel.DEBUG,
-                log_format_type=LogFormatType.PLAIN,
-            )
-        )
-
     @pytest.fixture
     def node_id(self, worker):
         node = settings.force_host_id
@@ -242,8 +228,8 @@ class TestConcurrentIndexingFailureRecovery:
             shard_id: [] for shard_id in bunch_of_shards
         }
 
-        for _ in range(resources_per_shard):
-            for shard_id in bunch_of_shards:
+        for shard_id in bunch_of_shards:
+            for _ in range(resources_per_shard):
                 resource = resource_payload(shard_id)
                 writer_index = await create_indexing_message(
                     resource, "kb", shard_id, node_id, source=IndexMessageSource.WRITER
