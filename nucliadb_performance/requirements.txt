@@ -4,3 +4,5 @@ certifi
 faker
 httpx
 sentence-transformers
+tqdm
+types-tqdm

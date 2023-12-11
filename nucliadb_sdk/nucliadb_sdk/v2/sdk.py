@@ -20,6 +20,7 @@ import asyncio
 import base64
 import enum
 import io
+import json
 from typing import (
     Any,
     AsyncGenerator,
@@ -90,6 +91,7 @@ class ChatResponse(BaseModel):
     answer: str
     relations: Optional[Relations]
     learning_id: Optional[str]
+    citations: dict[str, Any] = {}
 
 
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
@@ -111,12 +113,19 @@ def chat_response_parser(response: httpx.Response) -> ChatResponse:
     relations_result = None
     if len(relations_payload) > 0:
         relations_result = Relations.parse_raw(base64.b64decode(relations_payload))
-
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_bytes = tail[4 : 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_bytes).decode())
+    except ValueError:
+        citations = {}
     return ChatResponse(
         result=find_result,
         answer=answer.decode("utf-8"),
         relations=relations_result,
         learning_id=learning_id,
+        citations=citations,
     )
 
 
@@ -167,7 +176,9 @@ def _request_builder(
     stream_response: bool = False,
     docstring: Optional[docstrings.Docstring] = None,
 ):
-    def _func(self: "NucliaDB", content: Optional[Any] = None, **kwargs):
+    def _func(
+        self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs
+    ):
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -213,7 +224,7 @@ def _request_builder(
 
                 return _wrapped_resp()
             else:
-                return _parse_response(response_type, resp)
+                return _parse_response(response_type, resp)  # type: ignore
         else:
             resp = self._stream_request(
                 path, method, data=data, query_params=query_params
@@ -846,18 +857,22 @@ class NucliaDBAsync(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
+        if all([data, content]):
+            raise ValueError("Cannot provide both data and content")
         if data is not None:
             opts["data"] = data
+        if content is not None:
+            opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
         response: httpx.Response = await getattr(self.session, method.lower())(
             url, **opts
         )
-        self._check_response(response)
-        return response
+        return self._check_response(response)
 
     def _stream_request(
         self,

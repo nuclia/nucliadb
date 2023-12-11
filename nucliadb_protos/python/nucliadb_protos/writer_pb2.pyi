@@ -1557,12 +1557,29 @@ global___ShardObject = ShardObject
 class Shards(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
+    class ExtraEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     SHARDS_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     ACTUAL_FIELD_NUMBER: builtins.int
     SIMILARITY_FIELD_NUMBER: builtins.int
     MODEL_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
+    EXTRA_FIELD_NUMBER: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     kbid: builtins.str
@@ -1572,6 +1589,8 @@ class Shards(google.protobuf.message.Message):
     @property
     def model(self) -> nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata: ...
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
+    @property
+    def extra(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     def __init__(
         self,
         *,
@@ -1581,9 +1600,10 @@ class Shards(google.protobuf.message.Message):
         similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         model: nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata | None = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
+        extra: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["model", b"model"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "model", b"model", "release_channel", b"release_channel", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "extra", b"extra", "kbid", b"kbid", "model", b"model", "release_channel", b"release_channel", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
 
 global___Shards = Shards
 

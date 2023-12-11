@@ -3,10 +3,71 @@
         "tiny": {
             "kbs": [
                 "tiny",
-                "experimental-tiny"
+                "tiny-stable",
+                "tiny-experimental"
             ],
             "requests": [
                 {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Category",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "ISO",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
                         "filtered",
@@ -25,6 +86,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Filtered vector search",
                     "tags": [
                         "filtered",
@@ -40,11 +102,13 @@
                             ],
                             "features": [
                                 "vector"
-                            ]
+                            ],
+                            "min_score": 0.2
                         }
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Hybrid search with date range filter",
                     "tags": [
                         "date_range",
@@ -65,10 +129,71 @@
         "small": {
             "kbs": [
                 "small",
-                "experimental-small"
+                "small-stable",
+                "small-experimental"
             ],
             "requests": [
                 {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "International",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "International",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
                         "filtered",
@@ -86,6 +211,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Filtered vector search",
                     "tags": [
                         "filtered",
@@ -101,11 +227,13 @@
                             ],
                             "features": [
                                 "vector"
-                            ]
+                            ],
+                            "min_score": 0.5
                         }
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Hybrid search with date range filter",
                     "tags": [
                         "date_range",
@@ -126,10 +254,71 @@
         "medium": {
             "kbs": [
                 "medium",
-                "experimental-medium"
+                "medium-stable",
+                "medium-experimental"
             ],
             "requests": [
                 {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some"
+                        }
+                    }
+                },
+                {
+                    "endpoint": "search",
+                    "description": "Search",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/search",
+                        "method": "POST",
+                        "payload": {
+                            "query": "Some",
+                            "min_score": 0
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest on titles only",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Celtic",
+                            "features": [
+                                "paragraph"
+                            ],
+                            "fields": [
+                                "a/title"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "suggest",
+                    "description": "Suggest entities and paragraphs",
+                    "tags": [],
+                    "request": {
+                        "url": "/v1/kb/{kbid}/suggest",
+                        "method": "GET",
+                        "params": {
+                            "query": "Celtic",
+                            "features": [
+                                "paragraph",
+                                "entities"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "endpoint": "find",
                     "description": "Filtered hybrid search",
                     "tags": [
                         "filtered",
@@ -148,6 +337,7 @@
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Filtered vector search",
                     "tags": [
                         "filtered",
@@ -163,11 +353,13 @@
                             ],
                             "features": [
                                 "vector"
-                            ]
+                            ],
+                            "min_score": 0.2
                         }
                     }
                 },
                 {
+                    "endpoint": "find",
                     "description": "Hybrid search with date range filter",
                     "tags": [
                         "date_range",

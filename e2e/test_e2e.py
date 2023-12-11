@@ -140,15 +140,32 @@ def test_search(kbid: str, resource_id: str):
 
     resp.raise_for_status()
 
-    data = io.BytesIO(resp.content)
-
-    toread_bytes = data.read(4)
-    toread = int.from_bytes(toread_bytes, byteorder="big")
-    raw_search_results = data.read(toread)
+    raw = io.BytesIO(resp.content)
+    toread_bytes = raw.read(4)
+    toread = int.from_bytes(toread_bytes, byteorder="big", signed=False)
+    print(f"toread: {toread}")
+    raw_search_results = raw.read(toread)
     search_results = json.loads(base64.b64decode(raw_search_results))
-    chat_response = data.read().decode("utf-8")
-    print(f"Cht response: {chat_response}")
     print(f"Search results: {search_results}")
+
+    data = raw.read()
+    try:
+        answer, relations_payload = data.split(b"_END_")
+    except ValueError:
+        answer = data
+        relations_payload = b""
+    if len(relations_payload) > 0:
+        decoded_relations_payload = base64.b64decode(relations_payload)
+        print(f"Relations payload: {decoded_relations_payload}")
+    try:
+        answer, tail = answer.split(b"_CIT_")
+        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
+        citations_bytes = tail[4: 4 + citations_length]
+        citations = json.loads(base64.b64decode(citations_bytes).decode())
+    except ValueError:
+        citations = {}
+    print(f"Answer: {answer}")
+    print(f"Citations: {citations}")
 
     # assert "Not enough data to answer this" not in chat_response
     # assert len(search_results["resources"]) == 1
