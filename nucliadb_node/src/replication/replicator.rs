@@ -134,9 +134,14 @@ pub async fn replicate_shard(
     drop(file);
     drop(_gc_lock);
 
-    if generation_id.is_some() {
+    if let Some(gen_id) = generation_id {
         // After successful sync, set the generation id
-        shard.metadata.set_generation_id(generation_id.unwrap());
+        shard.metadata.set_generation_id(gen_id);
+    } else {
+        warn!(
+            "No generation id received for shard: {:?}",
+            shard_state.shard_id
+        );
     }
 
     // cleanup leftovers
@@ -170,7 +175,9 @@ impl ReplicateWorkerPool {
     }
 
     pub async fn add<F>(&mut self, worker: F) -> NodeResult<()>
-    where F: Future<Output = NodeResult<()>> + Send + 'static {
+    where
+        F: Future<Output = NodeResult<()>> + Send + 'static,
+    {
         let work_lock = Arc::clone(&self.work_lock);
         let permit = work_lock.acquire_owned().await.unwrap();
 
