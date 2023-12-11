@@ -4,12 +4,12 @@ import random
 from faker import Faker
 from molotov import get_context, global_setup, global_teardown, scenario
 
+from nucliadb_performance.utils.errors import print_errors
 from nucliadb_performance.utils.misc import (
     get_fake_word,
     load_kbs,
     make_kbid_request,
     pick_kb,
-    print_errors,
 )
 
 fake = Faker()

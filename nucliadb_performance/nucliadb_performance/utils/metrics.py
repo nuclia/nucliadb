@@ -1,4 +1,5 @@
 import json
+import os
 import statistics as stats
 from typing import Optional
 
@@ -42,7 +43,7 @@ def get_percentile(metric_name, *, p):
 
 def print_metrics():
     print("Metrics summary:")
-    for metric_name in METRICS:
+    for metric_name in sorted(METRICS.keys()):
         p50 = get_percentile(metric_name, p=0.5)
         p95 = get_percentile(metric_name, p=0.95)
         print(
@@ -58,7 +59,7 @@ def prettify_latency(latency):
         return f"{(latency * 1000):.2f}ms"
 
 
-def save_benchmark_json_results(file):
+def save_benchmark_json_results(file_path: str):
     json_results = []
     for metric_name in METRICS:
         json_results.append(
@@ -75,5 +76,8 @@ def save_benchmark_json_results(file):
                 "value": get_percentile(metric_name, p=0.95),
             }
         )
-    with open(file, mode="w") as f:
+
+    real_path = os.path.realpath(file_path)
+    print(f"Saving benchmark results to {real_path}")
+    with open(real_path, mode="w") as f:
         f.write(json.dumps(json_results, indent=4, sort_keys=True))

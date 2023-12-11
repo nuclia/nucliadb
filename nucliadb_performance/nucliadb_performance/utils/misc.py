@@ -3,7 +3,6 @@ import os
 import random
 import shelve
 import statistics
-from dataclasses import dataclass
 from functools import cache
 from typing import Optional
 
@@ -17,6 +16,7 @@ from nucliadb_performance.settings import (
 from nucliadb_performance.utils.kbs import parse_input_kb_slug
 from nucliadb_sdk import NucliaDB
 
+from .errors import append_error
 from .metrics import record_request_process_time
 from .saved_requests import Request, load_saved_request
 
@@ -37,22 +37,11 @@ _DATA = {}
 MIN_KB_PARAGRAPHS = 5_000
 
 
-@dataclass
-class Error:
-    kbid: str
-    endpoint: str
-    status_code: int
-    error: str
-
-
 class RequestError(Exception):
     def __init__(self, status, content=None, text=None):
         self.status = status
         self.content = content
         self.text = text
-
-
-ERRORS: list[Error] = []
 
 
 def cache_to_disk(func):
@@ -96,10 +85,10 @@ class Client:
         kwargs_headers.update(base_headers)
         kwargs["headers"] = kwargs_headers
         async with func(url, *args, **kwargs) as resp:
-            if resp.status == 200:
-                record_request_process_time(resp)
-                return
-            await self.handle_search_error(resp)
+            if resp.status != 200:
+                await self.handle_search_error(resp)
+            record_request_process_time(resp)
+            return await resp.json()
 
     async def handle_search_error(self, resp):
         content = None
@@ -209,40 +198,31 @@ def get_search_client(session):
 
 
 async def make_kbid_request(session, kbid, method, path, params=None, json=None):
-    global ERRORS
     try:
         client = get_search_client(session)
-        await client.make_request(method, path, params=params, json=json)
+        return await client.make_request(method, path, params=params, json=json)
     except RequestError as err:
         # Store error info so we can inspect after the script runs
         detail = (
             err.content and err.content.get("detail", None) if err.content else err.text
         )
-        error = Error(
-            kbid=kbid,
-            endpoint=path.split("/")[-1],
-            status_code=err.status,
-            error=detail,
-        )
-        ERRORS.append(error)
+        endpoint = path.split("/")[-1]
+        append_error(kbid, endpoint, err.status, detail)
+        raise
+    except Exception as err:
+        endpoint = path.split("/")[-1]
+        append_error(kbid, endpoint, -1, str(err))
         raise
 
 
-def print_errors():
-    print("Errors summary:")
-    for error in ERRORS:
-        print(error)
-    print("=" * 50)
-
-
-def get_request(kbid_or_slug: str, with_tags=None) -> Request:
+def get_request(kbid_or_slug: str, endpoint: str) -> Request:
     if settings.saved_requests_file is None:
         raise AttributeError("SAVED_REQUESTS_FILE env var is not set!")
     saved_requests_file = CURRENT_DIR + "/" + settings.saved_requests_file
     requests = load_saved_request(
         saved_requests_file,
         kbid_or_slug,
-        with_tags=tuple(with_tags) if with_tags else None,
+        endpoint=endpoint,
     )
     if len(requests) == 0:
         raise ValueError("Could not find any request saved")

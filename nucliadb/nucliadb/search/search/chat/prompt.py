@@ -102,7 +102,7 @@ async def get_expanded_conversation_messages(
 
 async def get_chat_prompt_context(
     kbid: str, results: KnowledgeboxFindResults
-) -> list[str]:
+) -> dict[str, str]:
     ordered_paras = []
     for result in results.resources.values():
         for field_path, field in result.fields.items():
@@ -139,4 +139,4 @@ async def get_chat_prompt_context(
                     pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
                     output[pid] = text
 
-    return list(output.values())
+    return output
