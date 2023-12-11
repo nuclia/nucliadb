@@ -202,14 +202,9 @@ def _request_builder(
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
         if not stream_response:
-            if isinstance(self, NucliaDBAsync):
-                resp = self._request(
-                    path, method, data=data, query_params=query_params
-                )
-            else:
-                resp = self._request(
-                    path, method, data=data, query_params=query_params, content=raw_content
-                )
+            resp = self._request(
+                path, method, data=data, query_params=query_params, content=raw_content
+            )
             if asyncio.iscoroutine(resp):
 
                 async def _wrapped_resp():
@@ -851,18 +846,22 @@ class NucliaDBAsync(_NucliaDBBase):
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
+        if all([data, content]):
+            raise ValueError("Cannot provide both data and content")
         if data is not None:
             opts["data"] = data
+        if content is not None:
+            opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
         response: httpx.Response = await getattr(self.session, method.lower())(
             url, **opts
         )
-        self._check_response(response)
-        return response
+        return self._check_response(response)
 
     def _stream_request(
         self,
