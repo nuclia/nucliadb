@@ -28,8 +28,6 @@ from .utils import get_kv_pb
 
 logger = logging.getLogger(__name__)
 
-KB_ROLLOVER_SHARDS = "/kbs/{kbid}/rollover-shards"
-
 
 class ClusterDataManager:
     def __init__(self, driver: Driver):
@@ -44,25 +42,6 @@ class ClusterDataManager:
         key = KB_SHARDS.format(kbid=kbid)
         async with self.driver.transaction() as txn:
             await txn.set(key, kb_shards.SerializeToString())
-            await txn.commit()
-
-    async def get_kb_rollover_shards(self, kbid: str) -> Optional[writer_pb2.Shards]:
-        key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
-        async with self.driver.transaction(wait_for_abort=False) as txn:
-            return await get_kv_pb(txn, key, writer_pb2.Shards)
-
-    async def update_kb_rollover_shards(
-        self, kbid: str, kb_shards: writer_pb2.Shards
-    ) -> None:
-        key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
-        async with self.driver.transaction() as txn:
-            await txn.set(key, kb_shards.SerializeToString())
-            await txn.commit()
-
-    async def delete_kb_rollover_shards(self, kbid: str) -> None:
-        key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
-        async with self.driver.transaction() as txn:
-            await txn.delete(key)
             await txn.commit()
 
     async def get_kb_shard(

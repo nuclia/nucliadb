@@ -62,7 +62,7 @@ DO UPDATE SET value = EXCLUDED.value
         async with self.lock:
             await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
 
-    async def batch_get(self, keys: List[str]) -> List[bytes]:
+    async def batch_get(self, keys: List[str]) -> List[Optional[bytes]]:
         async with self.lock:
             records = {
                 record["key"]: record["value"]
@@ -71,7 +71,7 @@ DO UPDATE SET value = EXCLUDED.value
                 )
             }
         # get sorted by keys
-        return [records[key] for key in keys]
+        return [records.get(key) for key in keys]
 
     async def scan_keys(
         self,

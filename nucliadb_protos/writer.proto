@@ -410,6 +410,7 @@ message Shards {
     utils.VectorSimilarity similarity = 4 [deprecated = true];
     knowledgebox.SemanticModelMetadata model = 5;
     utils.ReleaseChannel release_channel = 6;
+    map<string, string> extra = 7;
 }
 
 message ResourceFieldId {
