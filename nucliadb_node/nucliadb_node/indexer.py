@@ -160,11 +160,12 @@ class ConcurrentShardIndexer:
                 )
 
             for task in done:
-                if isinstance(task, Exception):
+                error = task.exception()
+                if error is not None:
                     shard_id = reverse_indexers[task]
                     logger.exception(
                         f"Indexer task for shard {shard_id} raised an error while finalizing it",
-                        exc_info=task,
+                        exc_info=error,
                     )
 
         self.indexers.clear()
