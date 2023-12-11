@@ -1,13 +1,15 @@
 reader_api=http://reader.nucliadb.svc.cluster.local:8080/api
 search_api=http://search.nucliadb.svc.cluster.local:8080/api
 error_tolerance=5
-max_workers=100
-duration_s=3600
-ramp_up=300
+max_workers=10
+duration_s=60
+ramp_up=10
 sizing=--sizing
 kbid=tiny
 kb_slug=tiny
 test=test-search-cluster
+benchmark_output=benchmark_output.json
+
 
 RED=\033[0;31m
 NC=\033[0m
@@ -83,12 +85,14 @@ test-search-kb: # Stress test search on a KB
 test-standalone-search: export READER_API=http://localhost:8080/api
 test-standalone-search: export SEARCH_API=http://localhost:8080/api
 test-standalone-search: export KB_SLUG=$(kb_slug)
-test-standalone-search: export BENCHMARK_OUTPUT=standalone.json
-test-standalone-search: export SEARCH_TAGS=$(search_tags)
+test-standalone-search: export BENCHMARK_OUTPUT=$(benchmark_output)
 test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.json
 test-standalone-search:
 	echo " *  Test Started at: $$(date -u)"
 
-	molotov ./nucliadb_performance/standalone/test_search.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
+	molotov ./nucliadb_performance/standalone/test_search.py -w $(max_workers) -d $(duration_s) --force-shutdown
 
 	echo " *  Test Finished at: $$(date -u)"
+
+
+run:	test-standalone-search

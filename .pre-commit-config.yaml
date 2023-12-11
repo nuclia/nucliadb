@@ -5,21 +5,21 @@ repos:
         name: Isort
         entry: isort --profile black -c
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
         types: ["python"]
 
       - id: black_nucliadb
         name: Black
         entry: black --check --verbose
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
         types: ["python"]
 
       - id: flake8_nucliadb
         name: Flake8
         entry: flake8 --config=nucliadb/setup.cfg
         language: system
-        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+        files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)(^nucliadb_performace/)
         types: ["python"]
 
       - id: rustfmt_nucliadb

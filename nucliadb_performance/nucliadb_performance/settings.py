@@ -12,7 +12,11 @@ class Settings(BaseSettings):
     )
     benchmark_output: Optional[str] = None
     saved_requests_file: Optional[str] = None
-    request_tags: Optional[list[str]] = None
+    exports_folder: str = "exports"
+
+
+def get_benchmark_output_file():
+    return settings.benchmark_output or "benchmark.json"
 
 
 def get_search_api_url():
