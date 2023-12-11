@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 
 use crossbeam_utils::thread as crossbeam_thread;
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
@@ -173,7 +174,10 @@ impl ShardReader {
         .expect("Failed to join threads");
 
         Ok(Shard {
-            metadata: Some(self.metadata.clone().into()),
+            metadata: Some(protos::ShardMetadata {
+                kbid: self.metadata.kbid().unwrap_or_default(),
+                release_channel: self.metadata.channel() as i32,
+            }),
             shard_id: self.id.clone(),
             // naming issue here, this is not number of resource
             // but more like number of fields
@@ -218,7 +222,7 @@ impl ShardReader {
     pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReader> {
         let span = tracing::Span::current();
 
-        let metadata = ShardMetadata::open(&shard_path.join(METADATA_FILE))?;
+        let metadata = ShardMetadata::open(shard_path.to_path_buf())?;
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
         };
@@ -227,7 +231,7 @@ impl ShardReader {
             path: shard_path.join(PARAGRAPHS_DIR),
         };
 
-        let channel = metadata.channel.unwrap_or_default();
+        let channel = metadata.channel();
 
         let vsc = VectorConfig {
             similarity: None,

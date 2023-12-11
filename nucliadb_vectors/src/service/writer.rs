@@ -461,7 +461,10 @@ impl VectorWriterService {
             Err(node_error!("Shard does exist".to_string()))
         } else {
             let Some(similarity) = config.similarity.map(|i| i.into()) else {
-                return Err(node_error!("A similarity must be specified"));
+                return Err(node_error!(
+                    "A similarity must be specified, {:?}",
+                    config.similarity
+                ));
             };
             Ok(VectorWriterService {
                 index: Index::new(

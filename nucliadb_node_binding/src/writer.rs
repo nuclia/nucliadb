@@ -19,16 +19,18 @@
 
 use std::fs;
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use nucliadb_core::protos::*;
+use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
-use nucliadb_node::shards::metadata::ShardMetadata;
+use nucliadb_node::shards::metadata::{ShardMetadata, Similarity};
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
 use nucliadb_node::shards::writer::ShardWriter;
@@ -36,6 +38,7 @@ use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use uuid;
 
 use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
@@ -44,6 +47,7 @@ use crate::RawProtos;
 #[derive(Default)]
 pub struct NodeWriter {
     shards: UnboundedShardWriterCache,
+    shards_path: PathBuf,
 }
 
 impl NodeWriter {
@@ -72,8 +76,10 @@ impl NodeWriter {
                 "Unable to initialize writer: {error}"
             )));
         };
+        let shards_path = settings.shards_path();
         Ok(Self {
             shards: UnboundedShardWriterCache::new(settings),
+            shards_path,
         })
     }
 
@@ -82,7 +88,15 @@ impl NodeWriter {
 
         let request =
             NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
-        let metadata = ShardMetadata::from(request);
+        let shard_id = uuid::Uuid::new_v4().to_string();
+        let similarity = VectorSimilarity::from_i32(request.similarity).unwrap();
+        let metadata = ShardMetadata::new(
+            self.shards_path.join(shard_id.clone()),
+            shard_id,
+            Some(request.kbid),
+            similarity.into(),
+            Some(Channel::from(request.release_channel)),
+        );
         let new_shard = self.shards.create(metadata);
         match new_shard {
             Ok(new_shard) => Ok(PyList::new(

@@ -90,8 +90,8 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
         .await?;
 
     assert_eq!(
-        primary_shard.get_generation_id(),
-        secondary_shard.get_generation_id()
+        primary_shard.metadata.get_generation_id(),
+        secondary_shard.metadata.get_generation_id()
     );
 
     // Test deleting shard deletes it from secondary

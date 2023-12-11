@@ -136,7 +136,7 @@ pub async fn replicate_shard(
 
     if generation_id.is_some() {
         // After successful sync, set the generation id
-        shard.set_generation_id(generation_id.unwrap());
+        shard.metadata.set_generation_id(generation_id.unwrap());
     }
 
     // cleanup leftovers
@@ -221,6 +221,7 @@ pub async fn connect_to_primary_and_replicate(
 
     set_primary_node_id(settings.data_path(), primary_node_metadata.node_id)?;
 
+    let shards_path = settings.shards_path();
     loop {
         if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(());
@@ -231,31 +232,12 @@ pub async fn connect_to_primary_and_replicate(
         let mut worker_pool =
             ReplicateWorkerPool::new(settings.replication_max_concurrency() as usize);
         for shard_id in existing_shards.clone() {
-            let mut shard = shard_cache.get(shard_id.clone()).await;
-            if shard.is_none() {
-                let loaded = shard_cache.load(shard_id.clone()).await;
-                if loaded.is_err() {
-                    warn!(
-                        "Failed to load shard from disk, deleting shard in case of corruption and \
-                         retrying: {:?}, Error: {:?}",
-                        shard_id.clone(),
-                        loaded
-                    );
-                    // delete directory
-                    let shard_path = settings.shards_path().join(shard_id.clone());
-                    if shard_path.exists() {
-                        std::fs::remove_dir_all(shard_path)?;
-                    }
-                    continue;
-                }
-                shard = Some(loaded?);
+            if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
+                shard_states.push(replication::SecondaryShardReplicationState {
+                    shard_id: shard_id.clone(),
+                    generation_id: metadata.get_generation_id(),
+                });
             }
-            let shard = shard.unwrap();
-            let gen_id = shard.get_generation_id();
-            shard_states.push(replication::SecondaryShardReplicationState {
-                shard_id: shard_id.clone(),
-                generation_id: gen_id,
-            });
         }
         debug!("Sending shard states: {:?}", shard_states.clone());
 
@@ -289,12 +271,13 @@ pub async fn connect_to_primary_and_replicate(
             } else {
                 warn!("Creating shard to replicate: {shard_id}");
                 let shard_create = shard_cache
-                    .create(ShardMetadata {
-                        id: Some(shard_state.shard_id.clone()),
-                        kbid: Some(shard_state.kbid.clone()),
-                        similarity: Some(shard_state.similarity.clone().into()),
-                        channel: None,
-                    })
+                    .create(ShardMetadata::new(
+                        shards_path.join(shard_id.clone()),
+                        shard_state.shard_id.clone(),
+                        Some(shard_state.kbid.clone()),
+                        shard_state.similarity.clone().into(),
+                        None,
+                    ))
                     .await;
                 if shard_create.is_err() {
                     warn!("Failed to create shard: {:?}", shard_create);
@@ -303,12 +286,14 @@ pub async fn connect_to_primary_and_replicate(
                 shard_lookup = shard_create;
             }
             let shard = shard_lookup?;
+            let mut current_gen_id = "UNKNOWN".to_string();
+            if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
+                current_gen_id = metadata.get_generation_id();
+            }
 
             info!(
                 "Replicating shard: {:?}, Primary generation: {:?}, Current generation: {:?}",
-                shard_id,
-                shard_state.generation_id,
-                shard.get_generation_id()
+                shard_id, shard_state.generation_id, current_gen_id
             );
 
             let replicate_work_path = shard.path.join("replication");

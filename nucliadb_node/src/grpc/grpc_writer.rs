@@ -27,7 +27,7 @@ use nucliadb_core::protos::{
     VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::NodeResult;
+use nucliadb_core::{Channel, NodeResult};
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 
@@ -110,7 +110,15 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<ShardCreated>, Status> {
         send_analytics_event(AnalyticsEvent::Create).await;
         let request = request.into_inner();
-        let metadata = ShardMetadata::from(request);
+        let kbid = request.kbid.clone();
+        let shard_id = uuid::Uuid::new_v4().to_string();
+        let metadata = ShardMetadata::new(
+            self.shards.shards_path.join(shard_id.clone()),
+            shard_id,
+            Some(kbid),
+            request.similarity().into(),
+            Some(Channel::from(request.release_channel)),
+        );
         let new_shard = self.shards.create(metadata).await;
         match new_shard {
             Ok(new_shard) => {
