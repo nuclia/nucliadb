@@ -81,13 +81,13 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
         }
 
         // Avoid blocking while interacting with the file system
-        let metadata = Arc::new(ShardMetadata::open(shard_path.clone())?);
         let shard = tokio::task::spawn_blocking(move || {
             if !ShardMetadata::exists(shard_path.clone()) {
                 return Err(node_error!(ShardNotFoundError(
                     "Shard {shard_path:?} is not on disk"
                 )));
             }
+            let metadata = Arc::new(ShardMetadata::open(shard_path.clone())?);
             ShardWriter::open(metadata).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
             })
