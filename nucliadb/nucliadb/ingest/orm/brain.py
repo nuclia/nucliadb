@@ -351,7 +351,6 @@ class ResourceBrain:
         if basic.modified.seconds > 0:
             self.brain.metadata.modified.CopyFrom(basic.modified)
         else:
-            logging.warning(f"Basic metadata has no modified field for {self.rid}")
             if basic.created.seconds > 0:
                 self.brain.metadata.modified.CopyFrom(basic.created)
             else:
