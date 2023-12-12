@@ -18,7 +18,7 @@ def run(args):
     version_post = ""
 
     if args.build:
-        version_post = f"-post{args.build}"
+        version_post = f".post{args.build}"
     elif args.sem == "major":
         major += 1
         minor = 0
