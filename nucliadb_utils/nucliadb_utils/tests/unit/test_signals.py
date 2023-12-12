@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -62,8 +62,9 @@ class TestSignals:
         nok_listener = AsyncMock(side_effect=Exception)
         signal.add_listener("nok-listener", nok_listener)
 
-        with pytest.raises(Exception):
+        with patch("nucliadb_utils.signals.capture_exception") as mock:
             await signal.dispatch(payload)
+            assert mock.call_count == 1
 
         assert ok_listener.await_count == 1
         assert nok_listener.await_count == 1
