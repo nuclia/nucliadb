@@ -24,7 +24,7 @@ from uuid import uuid4
 from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError  # type: ignore
+from grpc.aio import AioRpcError
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -39,6 +39,10 @@ from starlette.requests import Request
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.resources import ResourcesDataManager  # type: ignore
+from nucliadb.common.maindb.exceptions import (  # type: ignore
+    ConflictError,
+    NotFoundError,
+)
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
@@ -51,11 +55,7 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
     api,
 )
-from nucliadb.writer.exceptions import (
-    ConflictError,
-    IngestNotAvailable,
-    ResourceNotFound,
-)
+from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
@@ -655,7 +655,7 @@ async def update_resource_slug(
         await _update_resource_slug(
             context, kbid, new_slug, path_rid=path_rid, path_slug=path_slug
         )
-    except ResourceNotFound:
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Resource does not exist")
     except ConflictError:
         raise HTTPException(status_code=409, detail="Slug already exists")

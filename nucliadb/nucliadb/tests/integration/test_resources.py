@@ -261,7 +261,7 @@ async def test_resource_slug_modification(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    await check_resource_slug(nucliadb_reader, knowledgebox, rid, old_slug)
+    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug)
 
     # Update the slug
     new_slug = "my-resource-2"
@@ -276,16 +276,43 @@ async def test_resource_slug_modification(
             "slug": new_slug,
             "title": "New title",
         },
-        timeout=None,
     )
     assert resp.status_code == 200
 
-    await check_resource_slug(
+    await check_resource(
         nucliadb_reader, knowledgebox, rid, new_slug, title="New title"
     )
 
+    # Check that conflicts are detected
+    if update_by == "slug":
+        path = f"/{KB_PREFIX}/{knowledgebox}/slug/{new_slug}"
+    else:
+        path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}"
+    resp = await nucliadb_writer.patch(
+        path,
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": new_slug,
+        },
+    )
+    assert resp.status_code == 409
 
-async def check_resource_slug(nucliadb_reader, kbid, rid, slug, **body_checks):
+    # Check that unknown resources are detected
+    if update_by == "slug":
+        path = f"/{KB_PREFIX}/{knowledgebox}/slug/foobar"
+    else:
+        path = f"/{KB_PREFIX}/{knowledgebox}/resource/foobar"
+    resp = await nucliadb_writer.patch(
+        path,
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": new_slug,
+        },
+    )
+    assert resp.status_code == 404
+
+
+async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["slug"] == slug
