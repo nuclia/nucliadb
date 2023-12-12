@@ -219,7 +219,10 @@ class PGDriver(Driver):
     async def initialize(self):
         async with self._lock:
             if self.initialized is False:
-                self.pool = await asyncpg.create_pool(self.url)
+                self.pool = await asyncpg.create_pool(
+                    self.url,
+                    max_size=100,  # XXX should make this configurable
+                )
 
                 # check if table exists
                 try:
