@@ -36,7 +36,7 @@ def _get_transaction_lock() -> asyncio.Lock:
     return lock
 
 
-async def get_transaction() -> Transaction:
+async def get_transaction(*, read_only: bool = False) -> Transaction:
     transaction: Optional[Transaction] = txn.get()
     if transaction is None:
         async with _get_transaction_lock():
@@ -47,7 +47,7 @@ async def get_transaction() -> Transaction:
                 return check_txn_again
 
             driver = get_driver()
-            transaction = await driver.begin()
+            transaction = await driver.begin(read_only)
             txn.set(transaction)
 
             asyncio.current_task().add_done_callback(  # type: ignore

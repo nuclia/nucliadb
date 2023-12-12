@@ -214,7 +214,7 @@ class LocalDriver(Driver):
     async def finalize(self):
         pass
 
-    async def begin(self) -> LocalTransaction:
+    async def begin(self, read_only: bool = False) -> LocalTransaction:
         if self.url is None:
             raise AttributeError("Invalid url")
         return LocalTransaction(self.url, self)

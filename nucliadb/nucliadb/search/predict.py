@@ -180,7 +180,7 @@ class PredictEngine:
 
     @alru_cache(maxsize=None)
     async def _get_configuration(self, kbid: str) -> Optional[KBConfiguration]:
-        txn = await get_transaction()
+        txn = await get_transaction(read_only=True)
         config_key = KB_CONFIGURATION.format(kbid=kbid)
         payload = await txn.get(config_key)
         if payload is None:

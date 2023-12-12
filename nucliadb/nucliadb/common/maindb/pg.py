@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, List, Optional
+from typing import Any, AsyncGenerator, List, Optional, Union
 
 import asyncpg
 
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS resources (
 
 
 class DataLayer:
-    def __init__(self, connection: asyncpg.Connection):
+    def __init__(self, connection: Union[asyncpg.Connection, asyncpg.Pool]):
         self.connection = connection
         self.lock = asyncio.Lock()
 
@@ -167,6 +167,48 @@ class PGTransaction(Transaction):
         return await self.data_layer.count(match)
 
 
+class ReadOnlyPGTransaction(Transaction):
+    driver: PGDriver
+
+    def __init__(self, pool: asyncpg.Pool, driver: PGDriver):
+        self.pool = pool
+        self.driver = driver
+        self.open = True
+
+    async def abort(self):
+        ...
+
+    async def commit(self):
+        ...
+
+    async def batch_get(self, keys: List[str]):
+        return await DataLayer(self.pool).batch_get(keys)
+
+    async def get(self, key: str) -> Optional[bytes]:
+        return await DataLayer(self.pool).get(key)
+
+    async def set(self, key: str, value: bytes):
+        await DataLayer(self.pool).set(key, value)
+
+    async def delete(self, key: str):
+        await DataLayer(self.pool).delete(key)
+
+    async def keys(
+        self,
+        match: str,
+        count: int = DEFAULT_SCAN_LIMIT,
+        include_start: bool = True,
+    ):
+        async with self.pool.acquire() as conn, conn.transaction():
+            # all txn implementations implement this API outside of the current txn
+            dl = DataLayer(conn)
+            async for key in dl.scan_keys(match, count, include_start=include_start):
+                yield key
+
+    async def count(self, match: str) -> int:
+        return await DataLayer(self.pool).count(match)
+
+
 class PGDriver(Driver):
     pool: asyncpg.Pool
 
@@ -193,8 +235,13 @@ class PGDriver(Driver):
             await self.pool.close()
             self.initialized = False
 
-    async def begin(self) -> PGTransaction:
-        conn: asyncpg.Connection = await self.pool.acquire()
-        txn = conn.transaction()
-        await txn.start()
-        return PGTransaction(self.pool, conn, txn, driver=self)
+    async def begin(
+        self, read_only: bool = False
+    ) -> Union[PGTransaction, ReadOnlyPGTransaction]:
+        if read_only:
+            return ReadOnlyPGTransaction(self.pool, driver=self)
+        else:
+            conn: asyncpg.Connection = await self.pool.acquire()
+            txn = conn.transaction()
+            await txn.start()
+            return PGTransaction(self.pool, conn, txn, driver=self)

@@ -364,7 +364,7 @@ async def find_merge_results(
     # force getting transaction on current asyncio task
     # so all sub tasks will use the same transaction
     # this is contextvar magic that is probably not ideal
-    await get_transaction()
+    await get_transaction(read_only=True)
 
     paragraphs: List[List[ParagraphResult]] = []
     vectors: List[List[DocumentScored]] = []

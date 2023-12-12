@@ -62,7 +62,7 @@ async def get_resource_from_cache(
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
             if txn is None:
-                txn = await get_transaction()
+                txn = await get_transaction(read_only=True)
             storage = await get_storage(service_name=SERVICE_NAME)
             kb = KnowledgeBoxORM(txn, storage, kbid)
             orm_resource = await kb.get(uuid)
