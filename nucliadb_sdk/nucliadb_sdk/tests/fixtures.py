@@ -115,6 +115,14 @@ def sdk(nucliadb: NucliaFixture):
 
 
 @pytest.fixture(scope="function")
+def sdk_async(nucliadb: NucliaFixture):
+    sdk = nucliadb_sdk.NucliaDBAsync(
+        region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url
+    )
+    return sdk
+
+
+@pytest.fixture(scope="function")
 def kb(sdk: nucliadb_sdk.NucliaDB):
     kbslug = uuid4().hex
     kb = sdk.create_knowledge_box(slug=kbslug)

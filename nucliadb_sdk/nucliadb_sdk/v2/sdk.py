@@ -19,6 +19,7 @@
 import asyncio
 import base64
 import enum
+import inspect
 import io
 import json
 from typing import (
@@ -155,7 +156,8 @@ def is_raw_request_content(content: Any) -> bool:
     return (
         isinstance(content, str)
         or isinstance(content, bytes)
-        or (isinstance(content, Iterable) and not isinstance(content, (list, tuple)))
+        or inspect.isgenerator(content)
+        or inspect.isasyncgen(content)
     )
 
 
@@ -282,6 +284,7 @@ class _NucliaDBBase:
         method: str,
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
+        content: Optional[RawRequestContent] = None,
     ):
         raise NotImplementedError
 
@@ -545,7 +548,6 @@ class _NucliaDBBase:
         request_type=CreateEntitiesGroupPayload,
         response_type=None,
     )
-
     update_entitygroup = _request_builder(
         name="update_entitygroup",
         path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
@@ -591,7 +593,7 @@ class _NucliaDBBase:
     delete_vectorset = _request_builder(
         name="delete_vectorset",
         path_template="/v1/kb/{kbid}/vectorset/{vectorset}",
-        method="POST",
+        method="DELETE",
         path_params=("kbid", "vectorset"),
         request_type=None,
         response_type=None,
@@ -864,7 +866,7 @@ class NucliaDBAsync(_NucliaDBBase):
         if all([data, content]):
             raise ValueError("Cannot provide both data and content")
         if data is not None:
-            opts["data"] = data
+            opts["content"] = data
         if content is not None:
             opts["content"] = content
         if query_params is not None:

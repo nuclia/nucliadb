@@ -54,6 +54,29 @@ def test_export_import_kb(src_kbid, dst_kbid, sdk: nucliadb_sdk.NucliaDB):
     _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
 
 
+async def test_export_import_kb_async(
+    src_kbid, dst_kbid, sdk, sdk_async: nucliadb_sdk.NucliaDB
+):
+    # Export src kb
+    resp = await sdk_async.start_export(kbid=src_kbid)
+    export_id = resp.export_id
+    assert (
+        await sdk_async.export_status(kbid=src_kbid, export_id=export_id)
+    ).status == "finished"
+    export_generator = sdk_async.download_export(kbid=src_kbid, export_id=export_id)
+
+    # Import to dst kb
+    resp = await sdk_async.start_import(
+        kbid=dst_kbid, content=export_generator(chunk_size=1024)
+    )
+    import_id = resp.import_id
+    assert (
+        await sdk_async.import_status(kbid=dst_kbid, import_id=import_id)
+    ).status == "finished"
+
+    _check_kbs_are_equal(sdk, src_kbid, dst_kbid)
+
+
 def _check_kbs_are_equal(sdk: nucliadb_sdk.NucliaDB, kb1: str, kb2: str):
     kb1_resources = sdk.list_resources(kbid=kb1)
     kb2_resources = sdk.list_resources(kbid=kb2)
