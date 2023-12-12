@@ -150,7 +150,7 @@ class ConcurrentShardIndexer:
             tasks.append(task)
             reverse_indexers[task] = shard_id
 
-        if tasks:
+        if len(tasks):
             # REVIEW timeout. Is 10 a good timeout? Should we implement some
             # indexer finalize policy? Nak everything and close, for example?
             done, pending = await asyncio.wait(tasks, timeout=10)
@@ -164,7 +164,10 @@ class ConcurrentShardIndexer:
                 if error is not None:
                     shard_id = reverse_indexers[task]
                     logger.exception(
-                        f"Indexer task for shard {shard_id} raised an error while finalizing it",
+                        "Indexer task raised an error while finalizing it",
+                        extra={
+                            "shard": shard_id,
+                        },
                         exc_info=error,
                     )
 
@@ -174,7 +177,7 @@ class ConcurrentShardIndexer:
         work = WorkUnit.from_msg(msg)
 
         logger.info(
-            f"Index message for shard {work.shard_id} is being enqueued",
+            "Index message is being enqueued",
             extra={
                 "subject": msg.subject,
                 "reply": msg.reply,
