@@ -23,6 +23,9 @@ from enum import Enum
 from inspect import iscoroutinefunction
 from typing import Any, Callable, Type
 
+from nucliadb_telemetry.errors import capture_exception
+from nucliadb_utils import logger
+
 
 class ListenerPriority(Enum):
     DONT_CARE = 0
@@ -67,6 +70,7 @@ class Signal:
         results = await asyncio.gather(*awaitables, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
-                raise result
-
-        return results
+                event_id = capture_exception(result)
+                logger.error(
+                    f"Error on listener dispatch. Check sentry for more details. Event id: {event_id}",
+                )
