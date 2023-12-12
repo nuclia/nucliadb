@@ -367,7 +367,7 @@ class PriorityIndexer:
             "Message indexing finished",
             extra={
                 **_extra,
-                "time": time.time() - start,
+                "indexing_time": time.time() - start,
             },
         )
 
