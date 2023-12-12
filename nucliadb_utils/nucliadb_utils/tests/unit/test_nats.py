@@ -40,7 +40,10 @@ class TestNatsConnectionManager:
     @pytest.fixture()
     def js(self):
         conn = AsyncMock()
-        with patch("nucliadb_utils.nats.get_traced_jetstream", return_value=conn):
+        with patch(
+            "nucliadb_utils.nats.get_traced_jetstream",
+            return_value=conn,
+        ):
             yield conn
 
     @pytest.fixture()

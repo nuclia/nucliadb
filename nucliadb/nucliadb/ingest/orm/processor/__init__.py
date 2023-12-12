@@ -42,6 +42,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import (
     knowledgebox_pb2,
     noderesources_pb2,
+    nodewriter_pb2,
     resources_pb2,
     utils_pb2,
     writer_pb2,
@@ -268,6 +269,7 @@ class Processor:
                     seqid=seqid,
                     partition=partition,
                     kb=kb,
+                    source=messages_source(messages),
                 )
 
                 if transaction_check:
@@ -291,7 +293,7 @@ class Processor:
                 await self.notify_abort(
                     partition=partition, seqid=seqid, multi=multi, kbid=kbid, rid=uuid
                 )
-                logger.warning(f"This message did not modify the resource")
+                logger.warning("This message did not modify the resource")
         except (
             asyncio.TimeoutError,
             asyncio.CancelledError,
@@ -345,6 +347,7 @@ class Processor:
         seqid: int,
         partition: str,
         kb: KnowledgeBox,
+        source: nodewriter_pb2.IndexMessageSource.ValueType,
     ) -> None:
         validate_indexable_resource(resource.indexer.brain)
 
@@ -378,7 +381,12 @@ class Processor:
         if shard is not None:
             index_message = resource.indexer.brain
             await self.shard_manager.add_resource(
-                shard, index_message, seqid, partition=partition, kb=kbid
+                shard,
+                index_message,
+                seqid,
+                partition=partition,
+                kb=kbid,
+                source=source,
             )
         else:
             raise AttributeError("Shard is not available")
@@ -677,3 +685,28 @@ class Processor:
             raise exc
         await txn.commit()
         return uuid
+
+
+def messages_source(messages: list[writer_pb2.BrokerMessage]):
+    from_writer = all(
+        (
+            message.source == writer_pb2.BrokerMessage.MessageSource.WRITER
+            for message in messages
+        )
+    )
+    from_processor = all(
+        (
+            message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+            for message in messages
+        )
+    )
+    if from_writer:
+        source = nodewriter_pb2.IndexMessageSource.WRITER
+    elif from_processor:
+        source = nodewriter_pb2.IndexMessageSource.PROCESSOR
+    else:  # pragma: nocover
+        msg = "Processor received multiple broker messages with different sources in the same txn!"
+        logger.error(msg)
+        errors.capture_exception(Exception(msg))
+        source = nodewriter_pb2.IndexMessageSource.PROCESSOR
+    return source

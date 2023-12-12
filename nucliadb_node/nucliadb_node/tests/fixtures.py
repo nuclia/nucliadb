@@ -34,13 +34,17 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
-from nucliadb_node.app import start_worker
+from nucliadb_node import SERVICE_NAME
+from nucliadb_node.app import start_listeners, start_worker
 from nucliadb_node.pull import Worker
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import indexing_settings, settings
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodereader_pb2, nodereader_pb2_grpc, noderesources_pb2
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import nats_consumer_settings
+from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_manager
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -182,7 +186,7 @@ def node_single():
 
 
 @pytest.fixture(scope="function")
-async def writer_stub(node_single):
+async def writer_stub(node_single) -> AsyncIterable[NodeWriterStub]:
     channel = aio.insecure_channel(settings.writer_listen_address)
     stub = NodeWriterStub(channel)
     yield stub
@@ -223,23 +227,69 @@ async def grpc_server(writer):
     await grpc_finalizer()
 
 
+# As consumers are not removed and recreated changes per test won't have effect,
+# so we set this value per session
+@pytest.fixture(scope="session", autouse=True)
+def concurrent_nats_processing():
+    original = nats_consumer_settings.nats_max_ack_pending
+    nats_consumer_settings.nats_max_ack_pending = 10
+    yield
+    nats_consumer_settings.nats_max_ack_pending = original
+
+
 @pytest.fixture(scope="function")
-async def worker(
-    node_single,
-    writer_stub: NodeWriterStub,
-    storage,
-    natsd,
-    data_path: str,
-    writer,
-    reader,
-    grpc_server,
-) -> AsyncIterable[Worker]:
-    settings.force_host_id = "node1"
-    settings.data_path = data_path
+def nats_settings(natsd):
+    original_index_jetstream_servers = indexing_settings.index_jetstream_servers
+    original_cache_pubsub_nats_url = cache_settings.cache_pubsub_nats_url
+
     indexing_settings.index_jetstream_servers = [natsd]
     cache_settings.cache_pubsub_nats_url = [natsd]
 
-    worker = await start_worker(writer)
+    yield
+
+    indexing_settings.index_jetstream_servers = original_index_jetstream_servers
+    cache_settings.cache_pubsub_nats_url = original_cache_pubsub_nats_url
+
+
+@pytest.fixture(scope="function")
+async def nats_manager(
+    natsd,
+    nats_settings,
+) -> AsyncIterable[NatsConnectionManager]:
+    nats_manager = await start_nats_manager(
+        SERVICE_NAME,
+        nats_servers=indexing_settings.index_jetstream_servers,
+        nats_creds=None,
+    )
+    yield nats_manager
+    await stop_nats_manager()
+
+
+@pytest.fixture(scope="function")
+async def listeners(writer: Writer):
+    listeners = await start_listeners(writer)
+    yield
+    for listener in listeners:
+        await listener.finalize()
+
+
+@pytest.fixture(scope="function")
+async def worker(
+    node_single,
+    gcs_storage,
+    nats_manager: NatsConnectionManager,
+    data_path: str,
+    writer: Writer,
+    writer_stub: NodeWriterStub,
+    grpc_server,
+    listeners,
+) -> AsyncIterable[Worker]:
+    settings.force_host_id = "node1"
+    settings.data_path = data_path
+
+    await get_storage(service_name=SERVICE_NAME)
+    worker = await start_worker(writer, nats_manager)
+
     yield worker
 
     # Cleanup all shards to be ready for following tests
@@ -270,11 +320,36 @@ async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
 
 
 @pytest.fixture(scope="function")
+async def bunch_of_shards(
+    request, writer_stub: NodeWriterStub
+) -> AsyncIterable[list[str]]:
+    channel = (
+        ReleaseChannel.EXPERIMENTAL
+        if request.param == "EXPERIMENTAL"
+        else ReleaseChannel.STABLE
+    )
+    request = NewShardRequest(kbid="test", release_channel=channel)
+
+    try:
+        shard_ids = []
+        for _ in range(5):
+            shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
+            shard_ids.append(shard.id)
+
+        yield shard_ids
+
+    finally:
+        for shard_id in shard_ids:
+            await writer_stub.DeleteShard(ShardId(id=shard_id))  # type: ignore
+
+
+@pytest.fixture(scope="function")
 def data_path():
     with tempfile.TemporaryDirectory() as td:
         previous = os.environ.get("DATA_PATH")
         os.environ["DATA_PATH"] = str(td)
 
+        print("DATA_PATH set to:", str(td))
         yield str(td)
 
         if previous is None:
