@@ -20,14 +20,17 @@
 from typing import AsyncGenerator, Optional
 
 import backoff
+from nucliadb_protos.resources_pb2 import Basic
 
-from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.ingest.orm.knowledgebox import KB_RESOURCE_SHARD
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 
 # These should be refactored
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG, KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
+from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_protos import noderesources_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
@@ -153,3 +156,73 @@ class ResourcesDataManager:
             resource.txn = txn
             bm = await resource.generate_broker_message()
             return bm
+
+    @classmethod
+    async def get_resource_basic(
+        cls, txn: Transaction, kbid: str, rid: str
+    ) -> Optional[Basic]:
+        raw_basic = await get_basic(txn, kbid, rid)
+        if not raw_basic:
+            return None
+        basic = Basic()
+        basic.ParseFromString(raw_basic)
+        return basic
+
+    @classmethod
+    async def get_resource_uuid_from_slug(
+        cls, txn: Transaction, kbid: str, slug: str
+    ) -> Optional[str]:
+        encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
+        if not encoded_uuid:
+            return None
+        return encoded_uuid.decode()
+
+    @classmethod
+    async def modify_slug_by_uuid(
+        cls, txn: Transaction, kbid: str, rid: str, new_slug: str
+    ) -> None:
+        basic = await cls.get_resource_basic(txn, kbid, rid)
+        if basic is None:
+            raise NotFoundError()
+        old_slug = basic.slug
+        await cls._modify_slug(txn, kbid, rid, old_slug, new_slug, basic)
+
+    @classmethod
+    async def modify_slug_by_slug(
+        cls, txn: Transaction, kbid: str, old_slug: str, new_slug: str
+    ) -> None:
+        rid = await cls.get_resource_uuid_from_slug(txn, kbid, old_slug)
+        if rid is None:
+            raise NotFoundError()
+        basic = await cls.get_resource_basic(txn, kbid, rid)
+        if basic is None:
+            raise NotFoundError()
+        await cls._modify_slug(txn, kbid, rid, old_slug, new_slug, basic)
+
+    @classmethod
+    async def _modify_slug(
+        cls,
+        txn: Transaction,
+        kbid: str,
+        rid: str,
+        old_slug: str,
+        new_slug: str,
+        basic: Basic,
+    ) -> None:
+        # First check if the slug is already taken
+        if await cls.get_resource_uuid_from_slug(txn, kbid, new_slug) is not None:
+            raise ConflictError(f"Slug {new_slug} already exists")
+        await cls.delete_slug(txn, kbid, old_slug)
+        await cls.set_slug(txn, kbid, rid, new_slug)
+        basic.slug = new_slug
+        await set_basic(txn, kbid, rid, basic)
+
+    @classmethod
+    async def set_slug(cls, txn: Transaction, kbid: str, rid: str, slug: str) -> None:
+        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
+        await txn.set(key, rid.encode())
+
+    @classmethod
+    async def delete_slug(cls, txn: Transaction, kbid: str, slug: str) -> None:
+        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
+        await txn.delete(key)

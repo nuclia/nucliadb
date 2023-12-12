@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import time
-from typing import Optional
+from typing import Optional, cast
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
@@ -36,6 +36,9 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.context import ApplicationContext
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.resources import ResourcesDataManager  # type: ignore
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
@@ -48,7 +51,11 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
     api,
 )
-from nucliadb.writer.exceptions import IngestNotAvailable
+from nucliadb.writer.exceptions import (
+    ConflictError,
+    IngestNotAvailable,
+    ResourceNotFound,
+)
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
@@ -256,6 +263,16 @@ async def _modify_resource(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ):
+    if item.slug is not None:
+        await update_resource_slug(
+            get_app_context(request.app),
+            kbid,
+            item.slug,
+            path_rid=rid,
+            path_slug=rslug,
+        )
+        rslug = item.slug
+
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
 
@@ -625,3 +642,42 @@ def needs_reprocess(processing_payload: PushPayload) -> bool:
         if len(getattr(processing_payload, field)) > 0:
             return True
     return False
+
+
+async def update_resource_slug(
+    context: ApplicationContext,
+    kbid: str,
+    new_slug: str,
+    path_rid: Optional[str] = None,
+    path_slug: Optional[str] = None,
+):
+    try:
+        await _update_resource_slug(
+            context, kbid, new_slug, path_rid=path_rid, path_slug=path_slug
+        )
+    except ResourceNotFound:
+        raise HTTPException(status_code=404, detail="Resource does not exist")
+    except ConflictError:
+        raise HTTPException(status_code=409, detail="Slug already exists")
+
+
+async def _update_resource_slug(
+    context: ApplicationContext,
+    kbid: str,
+    new_slug: str,
+    path_rid: Optional[str] = None,
+    path_slug: Optional[str] = None,
+):
+    if all([path_rid, path_slug]) or not any([path_rid, path_slug]):
+        raise ValueError("Either rid or slug must be set")
+    async with context.kv_driver.transaction(wait_for_abort=True) as txn:
+        if path_rid:
+            await ResourcesDataManager.modify_slug_by_uuid(
+                txn, kbid, rid=path_rid, new_slug=new_slug
+            )
+        else:
+            path_slug = cast(str, path_slug)
+            await ResourcesDataManager.modify_slug_by_slug(
+                txn, kbid, old_slug=path_slug, new_slug=new_slug
+            )
+        await txn.commit()

@@ -238,3 +238,61 @@ async def test_title_is_set_automatically_if_not_provided(
     assert resp.status_code == 200
     body = resp.json()
     assert body["title"] == rid
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("update_by", ["slug", "uuid"])
+async def test_resource_slug_modification(
+    nucliadb_reader,
+    nucliadb_writer,
+    knowledgebox,
+    update_by,
+):
+    old_slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "My Resource",
+            "slug": old_slug,
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await check_resource_slug(nucliadb_reader, knowledgebox, rid, old_slug)
+
+    # Update the slug
+    new_slug = "my-resource-2"
+    if update_by == "slug":
+        path = f"/{KB_PREFIX}/{knowledgebox}/slug/{old_slug}"
+    else:
+        path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}"
+    resp = await nucliadb_writer.patch(
+        path,
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": new_slug,
+            "title": "New title",
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    await check_resource_slug(
+        nucliadb_reader, knowledgebox, rid, new_slug, title="New title"
+    )
+
+
+async def check_resource_slug(nucliadb_reader, kbid, rid, slug, **body_checks):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["slug"] == slug
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/{slug}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == rid
+    for key, value in body_checks.items():
+        assert body[key] == value

@@ -150,7 +150,6 @@ class Resource:
         self.origin: Optional[PBOrigin] = None
         self.extra: Optional[PBExtra] = None
         self.modified: bool = False
-        self.slug_modified: bool = False
         self._indexer: Optional[ResourceBrain] = None
         self._modified_extracted_text: list[FieldID] = []
 
@@ -213,7 +212,6 @@ class Resource:
     async def set_basic(
         self,
         payload: PBBasic,
-        slug: Optional[str] = None,
         deleted_fields: Optional[list[FieldID]] = None,
     ):
         await self.get_basic()
@@ -276,11 +274,6 @@ class Resource:
                             extracted_text=await field_obj.get_extracted_text(),
                             basic_user_field_metadata=user_field_metadata,
                         )
-
-        if slug:
-            unique_slug = await self.kb.get_unique_slug(self.uuid, slug)
-            self.basic.slug = unique_slug
-            self.slug_modified = True
 
         # Some basic fields are computed off field metadata.
         # This means we need to recompute upon field deletions.

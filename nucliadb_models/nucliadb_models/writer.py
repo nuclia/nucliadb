@@ -147,6 +147,7 @@ class CreateResourcePayload(BaseModel):
 class UpdateResourcePayload(BaseModel):
     title: Optional[str] = FieldDefaults.title
     summary: Optional[str] = FieldDefaults.summary
+    slug: Optional[SlugString] = FieldDefaults.slug
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
