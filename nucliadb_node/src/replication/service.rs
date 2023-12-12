@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::tracing::{debug, error, warn};
+use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::NodeResult;
 use nucliadb_protos::{noderesources, replication};
 use tokio::fs::File;
@@ -141,6 +141,7 @@ async fn replica_shard(
 ) -> NodeResult<()> {
     // do not allow garbage collection while streaming out shard
     let _gc_lock = shard.gc_lock.lock().await;
+    info!("Streaming shard: {:?}", shard.id);
 
     // getting shard files can block during an active write
     let sshard = Arc::clone(&shard); // moved shard reference into blocking task

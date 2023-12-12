@@ -134,9 +134,14 @@ pub async fn replicate_shard(
     drop(file);
     drop(_gc_lock);
 
-    if generation_id.is_some() {
+    if let Some(gen_id) = generation_id {
         // After successful sync, set the generation id
-        shard.metadata.set_generation_id(generation_id.unwrap());
+        shard.metadata.set_generation_id(gen_id);
+    } else {
+        warn!(
+            "No generation id received for shard: {:?}",
+            shard_state.shard_id
+        );
     }
 
     // cleanup leftovers

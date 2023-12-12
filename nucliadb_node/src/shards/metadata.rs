@@ -89,7 +89,8 @@ pub struct ShardMetadata {
     // A new id means that something in the shard has changed.
     // This is used by replication to track which shards have changed
     // and to efficiently replicate them.
-    generation_id: RwLock<Option<String>>,
+    #[allow(dead_code)]
+    generation_id: RwLock<Option<String>>, // [debugging] cache not used currently
 }
 
 impl ShardMetadata {
@@ -175,19 +176,19 @@ impl ShardMetadata {
     }
 
     pub fn get_generation_id(&self) -> String {
-        if let Ok(gen_id_read) = self.generation_id.read() {
-            match &*gen_id_read {
-                Some(value) => return value.clone(),
-                None => {}
-            }
-        }
+        // if let Ok(gen_id_read) = self.generation_id.read() {
+        //     match &*gen_id_read {
+        //         Some(value) => return value.clone(),
+        //         None => {}
+        //     }
+        // }
 
         let filepath = self.shard_path.join(disk_structure::GENERATION_FILE);
         // check if file does not exist
         if filepath.exists() {
             let gen_id = std::fs::read_to_string(filepath).unwrap();
-            let mut gen_id_write = self.generation_id.write().unwrap();
-            *gen_id_write = Some(gen_id.clone());
+            // let mut gen_id_write = self.generation_id.write().unwrap();
+            // *gen_id_write = Some(gen_id.clone());
             return gen_id;
         }
         self.new_generation_id()
@@ -202,8 +203,8 @@ impl ShardMetadata {
     pub fn set_generation_id(&self, generation_id: String) {
         let filepath = self.shard_path.join(disk_structure::GENERATION_FILE);
         std::fs::write(filepath, generation_id.clone()).unwrap();
-        let mut gen_id_write = self.generation_id.write().unwrap();
-        *gen_id_write = Some(generation_id);
+        // let mut gen_id_write = self.generation_id.write().unwrap();
+        // *gen_id_write = Some(generation_id);
     }
 }
 
@@ -315,11 +316,25 @@ mod test {
             Similarity::Cosine,
             Some(Channel::EXPERIMENTAL),
         );
-        assert!(meta.generation_id.read().unwrap().is_none());
         let gen_id = meta.get_generation_id();
-        assert_eq!(
-            *meta.generation_id.read().unwrap().as_ref().unwrap(),
-            gen_id
-        );
+        assert_eq!(gen_id, meta.get_generation_id());
+        // assert!(meta.generation_id.read().unwrap().is_none());
+        // let gen_id = meta.get_generation_id();
+        // assert_eq!(
+        //     *meta.generation_id.read().unwrap().as_ref().unwrap(),
+        //     gen_id
+        // );
+
+        // let new_id = meta.new_generation_id();
+        // assert_ne!(gen_id, new_id);
+        // assert_eq!(
+        //     *meta.generation_id.read().unwrap().as_ref().unwrap(),
+        //     new_id
+        // );
+        // assert_eq!(meta.get_generation_id(), new_id);
+
+        // let set_id = "set_id".to_string();
+        // meta.set_generation_id(set_id.clone());
+        // assert_eq!(meta.get_generation_id(), set_id);
     }
 }
