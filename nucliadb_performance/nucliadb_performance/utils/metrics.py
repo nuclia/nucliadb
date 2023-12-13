@@ -19,15 +19,20 @@ def get_samples(metric_name):
 
 
 def record_request_process_time(
-    resp: aiohttp.ClientResponse, *, metric_name: Optional[str] = None
+    resp: aiohttp.ClientResponse,
+    *,
+    client_time: float,
+    metric_name: Optional[str] = None,
 ):
+    if metric_name is None:
+        # Get endpoint name from url
+        endpoint = resp.url.path.split("/")[-1]
+        metric_name = endpoint
+    metric_name = f"{metric_name}_latency_s"
     server_request_process_time = resp.headers.get(PROCESS_TIME_HEADER, None)
-    if server_request_process_time is not None:
-        if metric_name is None:
-            # Get endpoint name from url
-            endpoint = resp.url.path.split("/")[-1]
-            metric_name = endpoint
-        metric_name = f"{metric_name}_latency_s"
+    if server_request_process_time is None:
+        record_sample(metric_name, client_time)
+    else:
         record_sample(metric_name, float(server_request_process_time))
 
 

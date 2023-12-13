@@ -3,6 +3,7 @@ import os
 import random
 import shelve
 import statistics
+import time
 from functools import cache
 from typing import Optional
 
@@ -84,10 +85,12 @@ class Client:
         kwargs_headers = kwargs.get("headers") or {}
         kwargs_headers.update(base_headers)
         kwargs["headers"] = kwargs_headers
+        start = time.perf_counter()
         async with func(url, *args, **kwargs) as resp:
+            elapsed = time.perf_counter() - start
             if resp.status != 200:
                 await self.handle_search_error(resp)
-            record_request_process_time(resp)
+            record_request_process_time(resp, client_time=elapsed)
             return await resp.json()
 
     async def handle_search_error(self, resp):

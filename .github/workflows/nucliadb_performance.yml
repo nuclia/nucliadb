@@ -12,6 +12,19 @@ on:
 permissions: write-all
 
 jobs:
+
+  trigger-internal-perf-job:
+    name: Trigger Internal Performance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GH_CICD_PUBLIC }}
+          repository: nuclia/nucliadb_deploy
+          event-type: performance-tests
+          client-payload: '{"nucliadb_checkout_id": "${{ github.sha }}"}'
+
   check-perf-main-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Record performance on main (nightly)
@@ -31,6 +44,7 @@ jobs:
       - name: Store performance data
         uses: nuclia/nucliadb_performance@main
         with:
+          head_ref: main
           metrics_file: vectors_benchmark/benchmark.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
@@ -56,6 +70,7 @@ jobs:
       - name: Store performance data
         uses: nuclia/nucliadb_performance@main
         with:
+          head_ref: main
           metrics_file: vectors_benchmark/benchmark.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
