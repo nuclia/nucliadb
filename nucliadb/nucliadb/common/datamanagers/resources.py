@@ -185,11 +185,14 @@ class ResourcesDataManager:
         if basic is None:
             raise NotFoundError()
         old_slug = basic.slug
-        slug_exists = (
-            await cls.get_resource_uuid_from_slug(txn, kbid, new_slug) is not None
-        )
-        if slug_exists:
-            raise ConflictError(f"Slug {new_slug} already exists")
+
+        uuid_for_new_slug = await cls.get_resource_uuid_from_slug(txn, kbid, new_slug)
+        if uuid_for_new_slug is not None:
+            if uuid_for_new_slug == rid:
+                # Nothing to change
+                return old_slug
+            else:
+                raise ConflictError(f"Slug {new_slug} already exists")
         key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=old_slug)
         await txn.delete(key)
         key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=new_slug)
