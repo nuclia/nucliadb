@@ -361,7 +361,6 @@ async def safe_update_resource_slug(
     rid: str,
     new_slug: str,
 ):
-    old_slug = None
     driver = get_app_context(request.app).kv_driver
     try:
         old_slug = await update_resource_slug(driver, kbid, rid=rid, new_slug=new_slug)
@@ -372,8 +371,6 @@ async def safe_update_resource_slug(
     try:
         yield
     except Exception:
-        if old_slug is None:
-            return
         # Rollback slug update if something goes wrong
         try:
             await update_resource_slug(driver, kbid, rid=rid, new_slug=old_slug)
@@ -390,17 +387,12 @@ async def update_resource_slug(
     rid: str,
     new_slug: str,
 ):
-    try:
-        async with driver.transaction() as txn:
-            old_slug = await ResourcesDataManager.modify_slug(
-                txn, kbid, rid=rid, new_slug=new_slug
-            )
-            await txn.commit()
-            return old_slug
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail=f"Resource does not exist: {rid}")
-    except ConflictError:
-        raise HTTPException(status_code=409, detail=f"Slug already exists: {new_slug}")
+    async with driver.transaction() as txn:
+        old_slug = await ResourcesDataManager.modify_slug(
+            txn, kbid, rid=rid, new_slug=new_slug
+        )
+        await txn.commit()
+        return old_slug
 
 
 @api.post(
