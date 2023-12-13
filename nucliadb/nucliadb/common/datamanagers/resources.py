@@ -180,28 +180,20 @@ class ResourcesDataManager:
     @classmethod
     async def modify_slug(
         cls, txn: Transaction, kbid: str, rid: str, new_slug: str
-    ) -> None:
+    ) -> str:
         basic = await cls.get_resource_basic(txn, kbid, rid)
         if basic is None:
             raise NotFoundError()
         old_slug = basic.slug
-
         slug_exists = (
             await cls.get_resource_uuid_from_slug(txn, kbid, new_slug) is not None
         )
         if slug_exists:
             raise ConflictError(f"Slug {new_slug} already exists")
-        await cls.delete_slug(txn, kbid, old_slug)
-        await cls.set_slug(txn, kbid, rid, new_slug)
+        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=old_slug)
+        await txn.delete(key)
+        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=new_slug)
+        await txn.set(key, rid.encode())
         basic.slug = new_slug
         await set_basic(txn, kbid, rid, basic)
-
-    @classmethod
-    async def set_slug(cls, txn: Transaction, kbid: str, rid: str, slug: str) -> None:
-        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
-        await txn.set(key, rid.encode())
-
-    @classmethod
-    async def delete_slug(cls, txn: Transaction, kbid: str, slug: str) -> None:
-        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
-        await txn.delete(key)
+        return old_slug
