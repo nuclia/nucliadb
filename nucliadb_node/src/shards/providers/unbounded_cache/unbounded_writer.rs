@@ -85,7 +85,10 @@ impl ShardWriterProvider for UnboundedShardWriterCache {
                 "Shard {shard_path:?} is not on disk"
             )));
         }
-        let sm = Arc::new(ShardMetadata::open(shard_path.clone())?);
+        let sm = self
+            .metadata_manager
+            .get(id.clone())
+            .expect("Shard metadata not found. This should not happen.");
         let shard = ShardWriter::open(sm).map_err(|error| {
             node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
         })?;
