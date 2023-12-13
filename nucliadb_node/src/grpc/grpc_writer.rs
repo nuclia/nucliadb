@@ -38,7 +38,7 @@ use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
-use crate::shards::writer::{GarbageCollectorStatus, ShardWriter};
+use crate::shards::writer::ShardWriter;
 use crate::telemetry::run_with_telemetry;
 use crate::utils::list_shards;
 
@@ -379,16 +379,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;
         match result {
-            Ok(GarbageCollectorStatus::GarbageCollected) => {
-                Ok(tonic::Response::new(GarbageCollectorResponse {
-                    status: garbage_collector_response::Status::Ok.into(),
-                }))
-            }
-            Ok(GarbageCollectorStatus::TryLater) => {
-                Ok(tonic::Response::new(GarbageCollectorResponse {
-                    status: garbage_collector_response::Status::TryLater.into(),
-                }))
-            }
+            Ok(status) => Ok(tonic::Response::new(GarbageCollectorResponse {
+                status: garbage_collector_response::Status::from(status) as i32,
+            })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }

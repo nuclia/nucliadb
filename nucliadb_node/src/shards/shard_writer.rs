@@ -53,11 +53,6 @@ pub struct ShardWriter {
     write_lock: Mutex<()>,  // be able to lock writes on the shard
 }
 
-pub enum GarbageCollectorStatus {
-    GarbageCollected,
-    TryLater,
-}
-
 impl ShardWriter {
     #[tracing::instrument(skip_all)]
     fn initialize(
@@ -523,5 +518,23 @@ impl ShardWriter {
         );
 
         Ok(files)
+    }
+}
+
+pub enum GarbageCollectorStatus {
+    GarbageCollected,
+    TryLater,
+}
+
+impl From<GarbageCollectorStatus> for nucliadb_core::protos::garbage_collector_response::Status {
+    fn from(value: GarbageCollectorStatus) -> Self {
+        match value {
+            GarbageCollectorStatus::GarbageCollected => {
+                nucliadb_core::protos::garbage_collector_response::Status::Ok
+            }
+            GarbageCollectorStatus::TryLater => {
+                nucliadb_core::protos::garbage_collector_response::Status::TryLater
+            }
+        }
     }
 }
