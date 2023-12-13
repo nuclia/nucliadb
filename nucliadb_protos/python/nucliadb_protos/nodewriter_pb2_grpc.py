@@ -38,7 +38,7 @@ class NodeWriterStub(object):
         self.GC = channel.unary_unary(
                 '/nodewriter.NodeWriter/GC',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.GarbageCollectorResponse.FromString,
                 )
         self.SetResource = channel.unary_unary(
                 '/nodewriter.NodeWriter/SetResource',
@@ -167,7 +167,7 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'GC': grpc.unary_unary_rpc_method_handler(
                     servicer.GC,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
-                    response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.SerializeToString,
+                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.GarbageCollectorResponse.SerializeToString,
             ),
             'SetResource': grpc.unary_unary_rpc_method_handler(
                     servicer.SetResource,
@@ -290,7 +290,7 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/GC',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
-            nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+            nucliadb__protos_dot_nodewriter__pb2.GarbageCollectorResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

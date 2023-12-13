@@ -48,6 +48,20 @@ pub struct IndexMessage {
     pub source: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GarbageCollectorResponse {
+    #[prost(enumeration="garbage_collector_response::Status", tag="1")]
+    pub status: i32,
+}
+/// Nested message and enum types in `GarbageCollectorResponse`.
+pub mod garbage_collector_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        TryLater = 1,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewShardRequest {
     #[prost(enumeration="super::utils::VectorSimilarity", tag="1")]
     pub similarity: i32,
@@ -232,10 +246,7 @@ pub mod node_writer_client {
         pub async fn gc(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyResponse>,
-            tonic::Status,
-        > {
+        ) -> Result<tonic::Response<super::GarbageCollectorResponse>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -409,10 +420,7 @@ pub mod node_writer_server {
         async fn gc(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<
-            tonic::Response<super::super::noderesources::EmptyResponse>,
-            tonic::Status,
-        >;
+        ) -> Result<tonic::Response<super::GarbageCollectorResponse>, tonic::Status>;
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
@@ -657,7 +665,7 @@ pub mod node_writer_server {
                         T: NodeWriter,
                     > tonic::server::UnaryService<super::super::noderesources::ShardId>
                     for GCSvc<T> {
-                        type Response = super::super::noderesources::EmptyResponse;
+                        type Response = super::GarbageCollectorResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,

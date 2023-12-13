@@ -22,9 +22,9 @@ use std::sync::Arc;
 
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    op_status, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest, NodeMetadata,
-    OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
-    VectorSetList,
+    garbage_collector_response, op_status, EmptyQuery, GarbageCollectorResponse, NewShardRequest,
+    NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
+    ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::{Channel, NodeResult};
@@ -365,7 +365,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
+    async fn gc(
+        &self,
+        request: Request<ShardId>,
+    ) -> Result<Response<GarbageCollectorResponse>, Status> {
         send_analytics_event(AnalyticsEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
@@ -376,7 +379,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;
         match result {
-            Ok(()) => Ok(tonic::Response::new(EmptyResponse {})),
+            Ok(status) => Ok(tonic::Response::new(GarbageCollectorResponse {
+                status: garbage_collector_response::Status::from(status) as i32,
+            })),
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
