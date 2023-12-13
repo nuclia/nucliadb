@@ -178,39 +178,18 @@ class ResourcesDataManager:
         return encoded_uuid.decode()
 
     @classmethod
-    async def modify_slug_by_uuid(
+    async def modify_slug(
         cls, txn: Transaction, kbid: str, rid: str, new_slug: str
     ) -> None:
         basic = await cls.get_resource_basic(txn, kbid, rid)
         if basic is None:
             raise NotFoundError()
         old_slug = basic.slug
-        await cls._modify_slug(txn, kbid, rid, old_slug, new_slug, basic)
 
-    @classmethod
-    async def modify_slug_by_slug(
-        cls, txn: Transaction, kbid: str, old_slug: str, new_slug: str
-    ) -> None:
-        rid = await cls.get_resource_uuid_from_slug(txn, kbid, old_slug)
-        if rid is None:
-            raise NotFoundError()
-        basic = await cls.get_resource_basic(txn, kbid, rid)
-        if basic is None:
-            raise NotFoundError()
-        await cls._modify_slug(txn, kbid, rid, old_slug, new_slug, basic)
-
-    @classmethod
-    async def _modify_slug(
-        cls,
-        txn: Transaction,
-        kbid: str,
-        rid: str,
-        old_slug: str,
-        new_slug: str,
-        basic: Basic,
-    ) -> None:
-        # First check if the slug is already taken
-        if await cls.get_resource_uuid_from_slug(txn, kbid, new_slug) is not None:
+        slug_exists = (
+            await cls.get_resource_uuid_from_slug(txn, kbid, new_slug) is not None
+        )
+        if slug_exists:
             raise ConflictError(f"Slug {new_slug} already exists")
         await cls.delete_slug(txn, kbid, old_slug)
         await cls.set_slug(txn, kbid, rid, new_slug)

@@ -243,11 +243,13 @@ async def test_title_is_set_automatically_if_not_provided(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("update_by", ["slug", "uuid"])
+@pytest.mark.parametrize("x_synchronous", [True, False])
 async def test_resource_slug_modification(
     nucliadb_reader,
     nucliadb_writer,
     knowledgebox,
     update_by,
+    x_synchronous,
 ):
     old_slug = "my-resource"
     resp = await nucliadb_writer.post(
@@ -271,11 +273,12 @@ async def test_resource_slug_modification(
         path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}"
     resp = await nucliadb_writer.patch(
         path,
-        headers={"X-Synchronous": "true"},
+        headers={"X-Synchronous": str(x_synchronous).lower()},
         json={
             "slug": new_slug,
             "title": "New title",
         },
+        timeout=None,
     )
     assert resp.status_code == 200
 

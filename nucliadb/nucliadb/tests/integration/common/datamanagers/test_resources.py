@@ -54,25 +54,12 @@ async def resource_with_slug(maindb_driver: Driver):
     return kbid, rid, slug
 
 
-async def test_modify_slug_by_uuid(resource_with_slug, maindb_driver: Driver):
-    kbid, rid, old_slug = resource_with_slug
+async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
+    kbid, rid, _ = resource_with_slug
     new_slug = "new_slug"
 
-    # Modify the slug
     async with maindb_driver.transaction() as txn:
-        await ResourcesDataManager.modify_slug_by_uuid(txn, kbid, rid, new_slug)
-        await txn.commit()
-
-    await check_slug(maindb_driver, kbid, rid, new_slug)
-
-
-async def test_modify_slug_by_slug(resource_with_slug, maindb_driver: Driver):
-    kbid, rid, old_slug = resource_with_slug
-    new_slug = "new_slug"
-
-    # Modify the slug
-    async with maindb_driver.transaction() as txn:
-        await ResourcesDataManager.modify_slug_by_slug(txn, kbid, old_slug, new_slug)
+        await ResourcesDataManager.modify_slug(txn, kbid, rid, new_slug)
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, new_slug)
