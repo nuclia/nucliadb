@@ -21,6 +21,10 @@ import asyncio
 from functools import partial
 from typing import Optional
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError  # type: ignore
+from nucliadb_protos.nodewriter_pb2 import GarbageCollectorResponse
+
 from nucliadb_node import logger, signals
 from nucliadb_node.settings import settings
 from nucliadb_node.signals import SuccessfulIndexingPayload
@@ -96,10 +100,30 @@ class ShardManager:
             self._change_count = 0
             try:
                 with gc_observer():
-                    # NOTE: garbage collector may not run if the shard is busy. We currently don't do anything to retry.
-                    await self._writer.garbage_collector(self._shard_id)
-                    logger.info(
-                        "Garbage collection finished", extra={"shard": self._shard_id}
+                    # NOTE: garbage collector may not run if the shard is busy.
+                    # We currently don't do anything to retry.
+                    status = await self._writer.garbage_collector(self._shard_id)
+                    if status.status == GarbageCollectorResponse.Status.OK:
+                        logger.info(
+                            "Garbage collection finished correctly",
+                            extra={"shard": self._shard_id},
+                        )
+                    elif status.status == GarbageCollectorResponse.Status.TRY_LATER:
+                        logger.warning(
+                            "Garbage collection unavailable",
+                            extra={"shard": self._shard_id},
+                        )
+            except AioRpcError as grpc_error:
+                if grpc_error.code() == StatusCode.NOT_FOUND:
+                    logger.error(
+                        "Shard does not exist and can't be garbage collected",
+                        extra={"shard": self._shard_id},
+                    )
+                else:
+                    event_id = capture_exception(grpc_error)
+                    logger.exception(
+                        f"Could not garbage collect. Check sentry for more details. Event id: {event_id}",
+                        extra={"shard": self._shard_id},
                     )
             except Exception as exc:
                 event_id = capture_exception(exc)

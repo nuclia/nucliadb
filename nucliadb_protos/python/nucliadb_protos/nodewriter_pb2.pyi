@@ -163,6 +163,34 @@ class IndexMessage(google.protobuf.message.Message):
 global___IndexMessage = IndexMessage
 
 @typing_extensions.final
+class GarbageCollectorResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GarbageCollectorResponse._Status.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: GarbageCollectorResponse._Status.ValueType  # 0
+        TRY_LATER: GarbageCollectorResponse._Status.ValueType  # 1
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: GarbageCollectorResponse.Status.ValueType  # 0
+    TRY_LATER: GarbageCollectorResponse.Status.ValueType  # 1
+
+    STATUS_FIELD_NUMBER: builtins.int
+    status: global___GarbageCollectorResponse.Status.ValueType
+    def __init__(
+        self,
+        *,
+        status: global___GarbageCollectorResponse.Status.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["status", b"status"]) -> None: ...
+
+global___GarbageCollectorResponse = GarbageCollectorResponse
+
+@typing_extensions.final
 class NewShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

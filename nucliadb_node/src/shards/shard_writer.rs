@@ -28,6 +28,7 @@ use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorS
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
+use nucliadb_vectors::VectorErr;
 use tokio::sync::Mutex;
 
 use crate::disk_structure::*;
@@ -50,6 +51,11 @@ pub struct ShardWriter {
     relation_service_version: i32,
     pub gc_lock: Mutex<()>, // lock to be able to do GC or not
     write_lock: Mutex<()>,  // be able to lock writes on the shard
+}
+
+pub enum GarbageCollectorStatus {
+    GarbageCollected,
+    TryLater,
 }
 
 impl ShardWriter {
@@ -461,9 +467,16 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn gc(&self) -> NodeResult<()> {
+    pub fn gc(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
-        vector_write(&self.vector_writer).garbage_collection()
+        let result = vector_write(&self.vector_writer).garbage_collection();
+        match result {
+            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
+            Err(error) => match error.downcast_ref::<VectorErr>() {
+                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                _ => Err(error),
+            },
+        }
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {

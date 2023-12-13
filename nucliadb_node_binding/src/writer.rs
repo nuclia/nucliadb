@@ -30,7 +30,7 @@ use nucliadb_node::lifecycle;
 use nucliadb_node::settings::providers::env::EnvSettingsProvider;
 use nucliadb_node::settings::providers::SettingsProvider;
 use nucliadb_node::settings::Settings;
-use nucliadb_node::shards::metadata::{ShardMetadata, Similarity};
+use nucliadb_node::shards::metadata::ShardMetadata;
 use nucliadb_node::shards::providers::unbounded_cache::UnboundedShardWriterCache;
 use nucliadb_node::shards::providers::ShardWriterProvider;
 use nucliadb_node::shards::writer::ShardWriter;
@@ -38,7 +38,6 @@ use prost::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use uuid;
 
 use crate::errors::{IndexNodeException, LoadShardError};
 use crate::RawProtos;
@@ -305,7 +304,7 @@ impl NodeWriter {
         let shard = self.obtain_shard(shard_id.id)?;
         let result = shard.gc();
         match result {
-            Ok(()) => {
+            Ok(_) => {
                 let response = EmptyResponse {};
                 Ok(PyList::new(py, response.encode_to_vec()))
             }

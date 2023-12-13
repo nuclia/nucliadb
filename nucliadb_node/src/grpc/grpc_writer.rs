@@ -22,9 +22,9 @@ use std::sync::Arc;
 
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
-    op_status, EmptyQuery, EmptyResponse, NewShardRequest, NewVectorSetRequest, NodeMetadata,
-    OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
-    VectorSetList,
+    garbage_collector_response, op_status, EmptyQuery, GarbageCollectorResponse, NewShardRequest,
+    NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
+    ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
 use nucliadb_core::{Channel, NodeResult};
@@ -38,7 +38,7 @@ use crate::shards::errors::ShardNotFoundError;
 use crate::shards::metadata::ShardMetadata;
 use crate::shards::providers::unbounded_cache::AsyncUnboundedShardWriterCache;
 use crate::shards::providers::AsyncShardWriterProvider;
-use crate::shards::writer::ShardWriter;
+use crate::shards::writer::{GarbageCollectorStatus, ShardWriter};
 use crate::telemetry::run_with_telemetry;
 use crate::utils::list_shards;
 
@@ -365,7 +365,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
+    async fn gc(
+        &self,
+        request: Request<ShardId>,
+    ) -> Result<Response<GarbageCollectorResponse>, Status> {
         send_analytics_event(AnalyticsEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         let shard = self.obtain_shard(&shard_id.id).await?;
@@ -376,7 +379,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
             tonic::Status::internal(format!("Blocking task panicked: {error:?}"))
         })?;
         match result {
-            Ok(()) => Ok(tonic::Response::new(EmptyResponse {})),
+            Ok(GarbageCollectorStatus::GarbageCollected) => {
+                Ok(tonic::Response::new(GarbageCollectorResponse {
+                    status: garbage_collector_response::Status::Ok.into(),
+                }))
+            }
+            Ok(GarbageCollectorStatus::TryLater) => {
+                Ok(tonic::Response::new(GarbageCollectorResponse {
+                    status: garbage_collector_response::Status::TryLater.into(),
+                }))
+            }
             Err(error) => Err(tonic::Status::internal(error.to_string())),
         }
     }
