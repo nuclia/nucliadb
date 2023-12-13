@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import time
-from typing import Optional
+from typing import Optional, cast
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.resources_pb2 import Metadata
@@ -36,6 +36,10 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
@@ -206,11 +210,11 @@ async def modify_resource_rslug_prefix(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _modify_resource(
+    return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        rslug=rslug,
+        path_rslug=rslug,
         x_skip_store=x_skip_store,
         x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
@@ -235,18 +239,46 @@ async def modify_resource_rid_prefix(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _modify_resource(
+    return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        rid=rid,
+        path_rid=rid,
         x_skip_store=x_skip_store,
         x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
 
-async def _modify_resource(
+async def modify_resource_endpoint(
+    request: Request,
+    item: UpdateResourcePayload,
+    kbid: str,
+    x_skip_store: bool,
+    x_synchronous: bool,
+    x_nucliadb_user: str,
+    path_rid: Optional[str] = None,
+    path_rslug: Optional[str] = None,
+):
+    response = await modify_resource(
+        request,
+        item,
+        kbid,
+        x_skip_store=x_skip_store,
+        x_synchronous=x_synchronous,
+        x_nucliadb_user=x_nucliadb_user,
+        rid=path_rid,
+        rslug=path_rslug,
+    )
+    if item.slug:
+        # Slug is modified in a separate transaction
+        await update_resource_slug(
+            request, kbid, rid=path_rid, slug=path_rslug, new_slug=item.slug
+        )
+    return response
+
+
+async def modify_resource(
     request: Request,
     item: UpdateResourcePayload,
     kbid: str,
@@ -311,6 +343,50 @@ async def _modify_resource(
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=seqid)
+
+
+async def update_resource_slug(
+    request: Request,
+    kbid: str,
+    new_slug: str,
+    rid: Optional[str] = None,
+    slug: Optional[str] = None,
+):
+    try:
+        driver = get_app_context(request.app).kv_driver
+        async with driver.transaction() as txn:
+            await _update_resource_slug(
+                txn, kbid, rid=rid, slug=slug, new_slug=new_slug
+            )
+            await txn.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail=f"Resource does not exist: {rid}")
+    except ConflictError:
+        raise HTTPException(status_code=409, detail=f"Slug already exists: {new_slug}")
+
+
+async def _update_resource_slug(
+    txn: Transaction,
+    kbid: str,
+    *,
+    new_slug: str,
+    rid: Optional[str] = None,
+    slug: Optional[str] = None,
+) -> str:
+    if all([rid, slug]) or not any([rid, slug]):
+        raise ValueError("Either rid or slug must be set")
+
+    if rid is None:
+        slug = cast(str, slug)
+        resource_uuid = await ResourcesDataManager.get_resource_uuid_from_slug(
+            txn, kbid, slug
+        )
+        if resource_uuid is None:
+            raise NotFoundError()
+        rid = resource_uuid
+
+    await ResourcesDataManager.modify_slug(txn, kbid, rid=rid, new_slug=new_slug)
+    return rid
 
 
 @api.post(
