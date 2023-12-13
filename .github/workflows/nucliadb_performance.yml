@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - trigger
   issue_comment:
     types: [created]
   schedule:
@@ -45,6 +44,7 @@ jobs:
       - name: Store performance data
         uses: nuclia/nucliadb_performance@main
         with:
+          head_ref: main
           metrics_file: vectors_benchmark/benchmark.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
@@ -70,6 +70,7 @@ jobs:
       - name: Store performance data
         uses: nuclia/nucliadb_performance@main
         with:
+          head_ref: main
           metrics_file: vectors_benchmark/benchmark.json
           influxdb_url: ${{ secrets.INFLUXDB_SERVER }}
           influxdb_token: ${{ secrets.INFLUXDB_TOKEN }}
