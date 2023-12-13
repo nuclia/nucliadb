@@ -72,8 +72,10 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      max-parallel: 4
       matrix:
         python-version: ['3.11']
+        storage_backend: ["gcs", "s3"]
 
     steps:
       - name: Checkout the repository
@@ -142,6 +144,8 @@ jobs:
           make build-sidecar
 
       - name: Run tests
+        env:
+          TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
           pytest -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/search
 

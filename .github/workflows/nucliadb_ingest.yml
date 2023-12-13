@@ -50,6 +50,7 @@ jobs:
       matrix:
         python-version: ["3.11"]
         maindb_driver: ["tikv", "pg"]
+        storage_backend: ["gcs", "s3"]
 
     steps:
       - name: Checkout the repository
@@ -68,9 +69,10 @@ jobs:
         if: matrix.maindb_driver == 'tikv'
         run: ./scripts/run-tikv.sh
 
-      - name: Run tests
+      - name: Run tests (GCS storage driver)
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
+          TESTING_STORAGE_BACKEND: ${{ matrix.storage_backend }}
         run: |
           make -C nucliadb/ test-cov-ingest
 
