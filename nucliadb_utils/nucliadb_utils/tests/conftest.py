@@ -20,7 +20,7 @@ import os
 
 import asyncpg
 import pytest
-from pytest_docker_fixtures import images
+from pytest_docker_fixtures import images  # type: ignore
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb_utils.storages.pg import PostgresStorage
