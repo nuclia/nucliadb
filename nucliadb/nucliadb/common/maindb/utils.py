@@ -81,7 +81,10 @@ async def setup_driver() -> Driver:
             raise ConfigurationError("`asyncpg` python package not installed.")
         if settings.driver_pg_url is None:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
-        pg_driver = PGDriver(settings.driver_pg_url)
+        pg_driver = PGDriver(
+            url=settings.driver_pg_url,
+            max_connection_pool_size=settings.driver_pg_max_pool_size,
+        )
         MAIN[Utility.MAINDB_DRIVER] = pg_driver
     elif settings.driver == "local":
         if not FILES:

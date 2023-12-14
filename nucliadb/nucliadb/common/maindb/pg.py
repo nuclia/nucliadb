@@ -212,8 +212,9 @@ class ReadOnlyPGTransaction(Transaction):
 class PGDriver(Driver):
     pool: asyncpg.Pool
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, max_connection_pool_size: int = 100):
         self.url = url
+        self.max_connection_pool_size = max_connection_pool_size
         self._lock = asyncio.Lock()
 
     async def initialize(self):
@@ -221,7 +222,7 @@ class PGDriver(Driver):
             if self.initialized is False:
                 self.pool = await asyncpg.create_pool(
                     self.url,
-                    max_size=100,  # XXX should make this configurable
+                    max_size=self.max_connection_pool_size,
                 )
 
                 # check if table exists

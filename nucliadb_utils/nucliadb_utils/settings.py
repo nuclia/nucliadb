@@ -115,6 +115,7 @@ class StorageSettings(BaseSettings):
     )
 
     driver_pg_url: Optional[str] = None  # match same env var for k/v storage
+    driver_pg_max_pool_size: int = 100  # match same env var for k/v storage
 
 
 storage_settings = StorageSettings()
