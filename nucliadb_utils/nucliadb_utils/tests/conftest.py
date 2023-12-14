@@ -20,6 +20,7 @@ import os
 
 import asyncpg
 import pytest
+from pytest_docker_fixtures import images  # type: ignore
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb_utils.storages.pg import PostgresStorage
@@ -33,6 +34,17 @@ pytest_plugins = [
     "nucliadb_utils.tests.s3",
     "nucliadb_utils.tests.local",
 ]
+
+images.settings["postgresql"].update(
+    {
+        "version": "16.1",
+        "env": {
+            "POSTGRES_PASSWORD": "postgres",
+            "POSTGRES_DB": "postgres",
+            "POSTGRES_USER": "postgres",
+        },
+    }
+)
 
 
 @pytest.fixture(scope="function")
