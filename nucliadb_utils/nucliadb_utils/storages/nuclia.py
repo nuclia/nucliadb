@@ -50,7 +50,7 @@ class NucliaStorage:
                 "X-STF-NUAKEY": f"Bearer {self.service_account}",
             },
         ) as resp:
-            assert resp.status == 200
+            resp.raise_for_status()
             async for chunk in resp.content.iter_chunked(CHUNK_SIZE):
                 yield chunk
 
