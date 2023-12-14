@@ -23,8 +23,15 @@ import asyncio
 from typing import Any, AsyncGenerator, List, Optional
 
 import asyncpg
+import backoff
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
+
+RETRIABLE_EXCEPTIONS = (
+    asyncpg.CannotConnectNowError,
+    OSError,
+    ConnectionResetError,
+)
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS resources (
@@ -151,6 +158,7 @@ class PGTransaction(Transaction):
     async def delete(self, key: str):
         await self.data_layer.delete(key)
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=2)
     async def keys(
         self,
         match: str,
@@ -193,6 +201,7 @@ class PGDriver(Driver):
             await self.pool.close()
             self.initialized = False
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def begin(self) -> PGTransaction:
         conn: asyncpg.Connection = await self.pool.acquire()
         txn = conn.transaction()

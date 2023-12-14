@@ -465,7 +465,7 @@ class StandaloneKBShardManager(KBShardManager):
                 raise NodesUnsync(
                     f"Node {shardreplica.node} is not found or not available"
                 )
-            await index_node.writer.SetResource(resource)
+            await index_node.writer.SetResource(resource)  # type: ignore
             asyncio.create_task(
                 self._resource_change_event(
                     kb, shardreplica.node, shardreplica.shard.id
