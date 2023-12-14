@@ -213,8 +213,9 @@ impl replication::replication_service_server::ReplicationService for Replication
 
         for shard_id in shard_ids {
             if let Some(metadata) = self.shards.get_metadata(shard_id.clone()) {
-                let gen_id = metadata.get_generation_id();
-
+                let gen_id = metadata
+                    .get_generation_id()
+                    .unwrap_or("UNSET_PRIMARY".to_string());
                 let shard_changed_or_not_present = request_shard_states
                     .clone()
                     .into_iter()
@@ -255,15 +256,21 @@ impl replication::replication_service_server::ReplicationService for Replication
             Result<replication::ReplicateShardResponse, tonic::Status>,
         > = receiver.0.clone();
 
-        let shard_lookup = self.shards.get(request.shard_id.clone()).await;
-        if shard_lookup.is_none() {
+        let shard_lookup = self.shards.load(request.shard_id.clone()).await;
+        if let Err(error) = shard_lookup {
             return Err(tonic::Status::not_found(format!(
-                "Shard {} not found",
-                request.shard_id
+                "Shard {} not found, error: {}",
+                request.shard_id, error
             )));
         }
+
         let shard = shard_lookup.unwrap();
-        let generation_id = shard.metadata.get_generation_id();
+        let mut generation_id = shard.metadata.get_generation_id();
+        if generation_id.is_none() {
+            generation_id = Some(shard.metadata.new_generation_id());
+        }
+        let generation_id = generation_id.unwrap();
+
         let shard_path = shard.path.clone();
         let chunk_size = request.chunk_size;
         let ignored_segement_ids: HashMap<String, Vec<String>> = request

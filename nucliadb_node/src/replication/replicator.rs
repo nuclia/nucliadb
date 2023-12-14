@@ -153,6 +153,7 @@ pub async fn replicate_shard(
 
     // GC after replication to clean up old segments
     // We only do this here because GC will not be done otherwise on a secondary
+    // XXX this should be removed once we refactor gc/merging
     let sshard = Arc::clone(&shard); // moved shard for gc
     tokio::task::spawn_blocking(move || sshard.gc())
         .await?
@@ -240,7 +241,9 @@ pub async fn connect_to_primary_and_replicate(
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
                 shard_states.push(replication::SecondaryShardReplicationState {
                     shard_id: shard_id.clone(),
-                    generation_id: metadata.get_generation_id(),
+                    generation_id: metadata
+                        .get_generation_id()
+                        .unwrap_or("UNSET_SECONDARY".to_string()),
                 });
             }
         }
@@ -293,7 +296,9 @@ pub async fn connect_to_primary_and_replicate(
             let shard = shard_lookup?;
             let mut current_gen_id = "UNKNOWN".to_string();
             if let Some(metadata) = shard_cache.get_metadata(shard_id.clone()) {
-                current_gen_id = metadata.get_generation_id();
+                current_gen_id = metadata
+                    .get_generation_id()
+                    .unwrap_or("UNSET_SECONDARY".to_string());
             }
 
             info!(

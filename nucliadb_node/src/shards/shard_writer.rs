@@ -28,6 +28,7 @@ use nucliadb_core::protos::{OpStatus, Resource, ResourceId, VectorSetId, VectorS
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
+use nucliadb_vectors::VectorErr;
 use tokio::sync::Mutex;
 
 use crate::disk_structure::*;
@@ -461,9 +462,16 @@ impl ShardWriter {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn gc(&self) -> NodeResult<()> {
+    pub fn gc(&self) -> NodeResult<GarbageCollectorStatus> {
         let _lock = self.gc_lock.blocking_lock();
-        vector_write(&self.vector_writer).garbage_collection()
+        let result = vector_write(&self.vector_writer).garbage_collection();
+        match result {
+            Ok(()) => Ok(GarbageCollectorStatus::GarbageCollected),
+            Err(error) => match error.downcast_ref::<VectorErr>() {
+                Some(VectorErr::WorkDelayed) => Ok(GarbageCollectorStatus::TryLater),
+                _ => Err(error),
+            },
+        }
     }
 
     pub fn get_shard_segments(&self) -> NodeResult<HashMap<String, Vec<String>>> {
@@ -510,5 +518,23 @@ impl ShardWriter {
         );
 
         Ok(files)
+    }
+}
+
+pub enum GarbageCollectorStatus {
+    GarbageCollected,
+    TryLater,
+}
+
+impl From<GarbageCollectorStatus> for nucliadb_core::protos::garbage_collector_response::Status {
+    fn from(value: GarbageCollectorStatus) -> Self {
+        match value {
+            GarbageCollectorStatus::GarbageCollected => {
+                nucliadb_core::protos::garbage_collector_response::Status::Ok
+            }
+            GarbageCollectorStatus::TryLater => {
+                nucliadb_core::protos::garbage_collector_response::Status::TryLater
+            }
+        }
     }
 }

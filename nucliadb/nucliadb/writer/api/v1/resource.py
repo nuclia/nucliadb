@@ -17,12 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import contextlib
 from time import time
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.resources_pb2 import Metadata
@@ -36,10 +37,14 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.datamanagers.resources import ResourcesDataManager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
-from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, SYNC_CALL, X_NUCLIADB_USER
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -73,6 +78,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
+from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -206,11 +212,11 @@ async def modify_resource_rslug_prefix(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _modify_resource(
+    return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        rslug=rslug,
+        path_rslug=rslug,
         x_skip_store=x_skip_store,
         x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
@@ -235,31 +241,65 @@ async def modify_resource_rid_prefix(
     x_synchronous: bool = SYNC_CALL,
     x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
-    return await _modify_resource(
+    return await modify_resource_endpoint(
         request,
         item,
         kbid,
-        rid=rid,
+        path_rid=rid,
         x_skip_store=x_skip_store,
         x_synchronous=x_synchronous,
         x_nucliadb_user=x_nucliadb_user,
     )
 
 
-async def _modify_resource(
+async def modify_resource_endpoint(
     request: Request,
     item: UpdateResourcePayload,
     kbid: str,
     x_skip_store: bool,
     x_synchronous: bool,
     x_nucliadb_user: str,
-    rid: Optional[str] = None,
-    rslug: Optional[str] = None,
+    path_rid: Optional[str] = None,
+    path_rslug: Optional[str] = None,
+):
+    resource_uuid = await get_rid_from_params_or_raise_error(kbid, path_rid, path_rslug)
+    if item.slug is None:
+        return await modify_resource(
+            request,
+            item,
+            kbid,
+            x_skip_store=x_skip_store,
+            x_synchronous=x_synchronous,
+            x_nucliadb_user=x_nucliadb_user,
+            rid=resource_uuid,
+        )
+
+    async with safe_update_resource_slug(
+        request, kbid, rid=resource_uuid, new_slug=item.slug
+    ):
+        return await modify_resource(
+            request,
+            item,
+            kbid,
+            x_skip_store=x_skip_store,
+            x_synchronous=x_synchronous,
+            x_nucliadb_user=x_nucliadb_user,
+            rid=resource_uuid,
+        )
+
+
+async def modify_resource(
+    request: Request,
+    item: UpdateResourcePayload,
+    kbid: str,
+    x_skip_store: bool,
+    x_synchronous: bool,
+    x_nucliadb_user: str,
+    *,
+    rid: str,
 ):
     transaction = get_transaction_utility()
     partitioning = get_partitioning()
-
-    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -311,6 +351,48 @@ async def _modify_resource(
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=seqid)
+
+
+@contextlib.asynccontextmanager
+async def safe_update_resource_slug(
+    request,
+    kbid: str,
+    *,
+    rid: str,
+    new_slug: str,
+):
+    driver = get_app_context(request.app).kv_driver
+    try:
+        old_slug = await update_resource_slug(driver, kbid, rid=rid, new_slug=new_slug)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail=f"Resource does not exist: {rid}")
+    except ConflictError:
+        raise HTTPException(status_code=409, detail=f"Slug already exists: {new_slug}")
+    try:
+        yield
+    except Exception:
+        # Rollback slug update if something goes wrong
+        try:
+            await update_resource_slug(driver, kbid, rid=rid, new_slug=old_slug)
+        except Exception as ex:
+            capture_exception(ex)
+            logger.exception("Error while rolling back slug update")
+        raise
+
+
+async def update_resource_slug(
+    driver: Driver,
+    kbid: str,
+    *,
+    rid: str,
+    new_slug: str,
+):
+    async with driver.transaction() as txn:
+        old_slug = await ResourcesDataManager.modify_slug(
+            txn, kbid, rid=rid, new_slug=new_slug
+        )
+        await txn.commit()
+        return old_slug
 
 
 @api.post(

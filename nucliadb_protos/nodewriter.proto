@@ -44,6 +44,14 @@ message IndexMessage {
     IndexMessageSource source = 10;
 }
 
+message GarbageCollectorResponse {
+    enum Status {
+        OK = 0;
+        TRY_LATER = 1;
+    }
+    Status status = 1;
+}
+
 message NewShardRequest {
     utils.VectorSimilarity similarity = 1;
     string kbid = 2;
@@ -60,7 +68,7 @@ service NodeWriter {
     rpc CleanAndUpgradeShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
-    rpc GC(noderesources.ShardId) returns (noderesources.EmptyResponse) {}
+    rpc GC(noderesources.ShardId) returns (GarbageCollectorResponse) {}
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}

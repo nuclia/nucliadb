@@ -25,11 +25,8 @@ help: # Show help for each of the Makefile recipes.
 	@grep -E '^[a-zA-Z0-9 -]+:.*#'  Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
 	@echo ""
 	@echo "Example usages:\n"
-	@echo "By default, tests take 10 minutes, but use the ${RED}duration_s${NC} param to change it.\nWorkers are added incrementally up to 100 or ${RED}max_workers${NC} param.\n"
-	@echo "- To run with a fixed number of workers\n"
-	@echo "    make test-search-cluster max_workers=100 sizing= ramp_up=0 duration_s=30\n"
-	@echo "- To point to a local NucliaDB, use the ${RED}reader_api${NC} and ${RED}search_api${NC} params\n"
-	@echo "    make test-search-cluster reader_api=http://localhost:8080/api search_api=http://localhost:8080/api\n"
+	@echo "- Run tests against a local nucliadb at port 8080:\n"
+	@echo "    make run kb_slug=tiny max_workers=4 duration_s=20\n"
 
 
 .PHONY: install
@@ -61,7 +58,7 @@ lint: # Run lint checks
 .PHONY: test-search-cluster
 test-search-cluster: export SEARCH_API=$(search_api)
 test-search-cluster: export READER_API=$(reader_api)
-test-search-cluster: # Stress test search on a cluster.
+test-search-cluster:
 	echo " *  Test Started at: $$(date -u)"
 
 	molotov ./nucliadb_performance/hosted/test_search_cluster.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
@@ -73,7 +70,7 @@ test-search-cluster: # Stress test search on a cluster.
 test-search-kb: export SEARCH_API=$(search_api)
 test-search-kb: export READER_API=$(reader_api)
 test-search-kb: export KBID=$(kbid)
-test-search-kb: # Stress test search on a KB
+test-search-kb:
 	echo " *  Test Started at: $$(date -u)"
 
 	molotov ./nucliadb_performance/hosted/test_search_kb.py $(sizing) --sizing-tolerance=$(error_tolerance) -w $(max_workers) --ramp-up $(ramp_up) -d $(duration_s) --force-shutdown
@@ -87,7 +84,7 @@ test-standalone-search: export SEARCH_API=http://localhost:8080/api
 test-standalone-search: export KB_SLUG=$(kb_slug)
 test-standalone-search: export BENCHMARK_OUTPUT=$(benchmark_output)
 test-standalone-search: export SAVED_REQUESTS_FILE=standalone_search_requests.json
-test-standalone-search:
+test-standalone-search:	download-test-data # Stress test search on a standalone instance.
 	echo " *  Test Started at: $$(date -u)"
 
 	molotov ./nucliadb_performance/standalone/test_search.py -w $(max_workers) -d $(duration_s) --force-shutdown
@@ -95,4 +92,15 @@ test-standalone-search:
 	echo " *  Test Finished at: $$(date -u)"
 
 
-run:	test-standalone-search
+.PHONY: download-test-data
+download-test-data: # Download the test data for standalone search
+	@mkdir -p exports
+	@if [ -f exports/$(kb_slug).export ]; then \
+		echo "File exports/$(kb_slug).export already exists, skipping download"; \
+	else \
+		echo "Downloading $(kb_slug).export"; \
+		wget https://storage.googleapis.com/nucliadb_indexer/nucliadb_performance/exports/$(kb_slug).export -q -O exports/$(kb_slug).export --show-progress; \
+	fi; \
+
+
+run:	test-standalone-search # Run the performance tests

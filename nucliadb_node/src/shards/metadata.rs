@@ -89,8 +89,7 @@ pub struct ShardMetadata {
     // A new id means that something in the shard has changed.
     // This is used by replication to track which shards have changed
     // and to efficiently replicate them.
-    #[allow(dead_code)]
-    generation_id: RwLock<Option<String>>, // [debugging] cache not used currently
+    generation_id: RwLock<Option<String>>,
 }
 
 impl ShardMetadata {
@@ -175,23 +174,26 @@ impl ShardMetadata {
         self.id.clone()
     }
 
-    pub fn get_generation_id(&self) -> String {
-        // if let Ok(gen_id_read) = self.generation_id.read() {
-        //     match &*gen_id_read {
-        //         Some(value) => return value.clone(),
-        //         None => {}
-        //     }
-        // }
+    pub fn get_generation_id(&self) -> Option<String> {
+        if let Ok(gen_id_read) = self.generation_id.read() {
+            match &*gen_id_read {
+                Some(value) => {
+                    return Some(value.clone());
+                }
+                None => {}
+            }
+        }
 
         let filepath = self.shard_path.join(disk_structure::GENERATION_FILE);
         // check if file does not exist
         if filepath.exists() {
             let gen_id = std::fs::read_to_string(filepath).unwrap();
-            // let mut gen_id_write = self.generation_id.write().unwrap();
-            // *gen_id_write = Some(gen_id.clone());
-            return gen_id;
+            if let Ok(mut gen_id_write) = self.generation_id.write() {
+                *gen_id_write = Some(gen_id.clone());
+            }
+            return Some(gen_id);
         }
-        self.new_generation_id()
+        None
     }
 
     pub fn new_generation_id(&self) -> String {
@@ -203,8 +205,9 @@ impl ShardMetadata {
     pub fn set_generation_id(&self, generation_id: String) {
         let filepath = self.shard_path.join(disk_structure::GENERATION_FILE);
         std::fs::write(filepath, generation_id.clone()).unwrap();
-        // let mut gen_id_write = self.generation_id.write().unwrap();
-        // *gen_id_write = Some(generation_id);
+        if let Ok(mut gen_id_write) = self.generation_id.write() {
+            *gen_id_write = Some(generation_id.clone());
+        }
     }
 }
 

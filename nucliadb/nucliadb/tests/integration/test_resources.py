@@ -17,7 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
+
 import pytest
+from fastapi import HTTPException
 from httpx import AsyncClient
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
@@ -238,3 +241,156 @@ async def test_title_is_set_automatically_if_not_provided(
     assert resp.status_code == 200
     body = resp.json()
     assert body["title"] == rid
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.parametrize("update_by", ["slug", "uuid"])
+@pytest.mark.parametrize("x_synchronous", [True, False])
+async def test_resource_slug_modification(
+    nucliadb_reader,
+    nucliadb_writer,
+    knowledgebox,
+    update_by,
+    x_synchronous,
+):
+    old_slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "My Resource",
+            "slug": old_slug,
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug)
+
+    # Update the slug
+    new_slug = "my-resource-2"
+    if update_by == "slug":
+        path = f"/{KB_PREFIX}/{knowledgebox}/slug/{old_slug}"
+    else:
+        path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}"
+    resp = await nucliadb_writer.patch(
+        path,
+        headers={"X-Synchronous": str(x_synchronous).lower()},
+        json={
+            "slug": new_slug,
+            "title": "New title",
+        },
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    await check_resource(
+        nucliadb_reader, knowledgebox, rid, new_slug, title="New title"
+    )
+
+
+async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["slug"] == slug
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/slug/{slug}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == rid
+    for key, value in body_checks.items():
+        assert body[key] == value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_resource_slug_modification_rollbacks(
+    nucliadb_reader,
+    nucliadb_writer,
+    knowledgebox,
+):
+    old_slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "Old title",
+            "slug": old_slug,
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug)
+
+    # Mock an error in the sending to process
+    with mock.patch(
+        "nucliadb.writer.api.v1.resource.maybe_send_to_process",
+        side_effect=HTTPException(status_code=506),
+    ):
+        resp = await nucliadb_writer.patch(
+            f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
+            headers={"X-Synchronous": "true"},
+            json={
+                "slug": "my-resource-2",
+                "title": "New title",
+            },
+        )
+        assert resp.status_code == 506
+
+    # Check that slug and title were not updated
+    await check_resource(
+        nucliadb_reader, knowledgebox, rid, old_slug, title="Old title"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_resource_slug_modification_handles_conflicts(
+    nucliadb_writer,
+    knowledgebox,
+):
+    rids = []
+    slugs = []
+    for i in range(2):
+        slug = f"my-resource-{i}"
+        slugs.append(slug)
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            headers={"X-Synchronous": "true"},
+            json={
+                "title": "My Resource",
+                "slug": slug,
+            },
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+        rids.append(rid)
+
+    # Check that conflicts on slug are detected
+    path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rids[0]}"
+    resp = await nucliadb_writer.patch(
+        path,
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": slugs[1],
+        },
+    )
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_resource_slug_modification_handles_unknown_resources(
+    nucliadb_writer,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{knowledgebox}/resource/foobar",
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": "foo",
+        },
+    )
+    assert resp.status_code == 404

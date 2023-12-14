@@ -50,7 +50,7 @@ class NodeWriterStub:
     ]
     GC: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.EmptyResponse,
+        nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse,
     ]
     SetResource: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.Resource,
@@ -107,7 +107,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
+    ) -> nucliadb_protos.nodewriter_pb2.GarbageCollectorResponse: ...
     @abc.abstractmethod
     def SetResource(
         self,

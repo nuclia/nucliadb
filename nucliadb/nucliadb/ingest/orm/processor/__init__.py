@@ -276,7 +276,7 @@ class Processor:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
                 await txn.commit()
 
-                if created or resource.slug_modified:
+                if created:
                     await self.commit_slug(resource)
 
                 await self.notify_commit(
@@ -477,14 +477,12 @@ class Processor:
         self, resource: Resource, message: writer_pb2.BrokerMessage
     ) -> None:
         basic_field_updates = message.HasField("basic")
-        slug_updates = message.slug != ""
         deleted_fields = len(message.delete_fields) > 0
-        if not (basic_field_updates or slug_updates or deleted_fields):
+        if not (basic_field_updates or deleted_fields):
             return
 
         await resource.set_basic(
             message.basic,
-            slug=message.slug,
             deleted_fields=message.delete_fields,  # type: ignore
         )
 

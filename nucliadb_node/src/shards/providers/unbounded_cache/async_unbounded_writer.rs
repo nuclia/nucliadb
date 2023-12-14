@@ -61,11 +61,13 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
     async fn create(&self, metadata: ShardMetadata) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = metadata.id();
         let metadata = Arc::new(metadata);
+        let mmetadata = Arc::clone(&metadata);
         let new_shard = Arc::new(
-            tokio::task::spawn_blocking(move || ShardWriter::new(metadata))
+            tokio::task::spawn_blocking(move || ShardWriter::new(mmetadata))
                 .await
                 .context("Blocking task panicked")??,
         );
+        self.metadata_manager.add_metadata(metadata);
         self.cache.write().await.insert(shard_id, new_shard.clone());
         Ok(new_shard)
     }
@@ -80,6 +82,7 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
             return Ok(Arc::clone(shard));
         }
 
+        let metadata_manager = Arc::clone(&self.metadata_manager);
         // Avoid blocking while interacting with the file system
         let shard = tokio::task::spawn_blocking(move || {
             if !ShardMetadata::exists(shard_path.clone()) {
@@ -87,8 +90,10 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
                     "Shard {shard_path:?} is not on disk"
                 )));
             }
-            let metadata = Arc::new(ShardMetadata::open(shard_path.clone())?);
-            ShardWriter::open(metadata).map_err(|error| {
+            let metadata = metadata_manager
+                .get(id.clone())
+                .expect("Shard metadata not found. This should not happen");
+            ShardWriter::open(Arc::clone(&metadata)).map_err(|error| {
                 node_error!("Shard {shard_path:?} could not be loaded from disk: {error:?}")
             })
         })
@@ -117,8 +122,10 @@ impl AsyncShardWriterProvider for AsyncUnboundedShardWriterCache {
                     );
                     continue;
                 }
-                let metadata = metadata_manager.get(shard_id.clone());
-                match ShardWriter::open(metadata.unwrap()) {
+                let metadata = metadata_manager
+                    .get(shard_id.clone())
+                    .expect("Shard metadata not found. This should not happen");
+                match ShardWriter::open(metadata) {
                     Err(err) => error!("Loading shard {shard_path:?} from disk raised {err}"),
                     Ok(shard) => {
                         debug!("Shard loaded: {shard_path:?}");
