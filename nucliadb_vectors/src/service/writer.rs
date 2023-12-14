@@ -34,6 +34,7 @@ use nucliadb_procs::measure;
 use crate::data_point::{DataPoint, Elem, LabelDictionary};
 use crate::data_point_provider::*;
 use crate::indexset::{IndexKeyCollector, IndexSet};
+use crate::VectorErr;
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -326,7 +327,14 @@ impl WriterChild for VectorWriterService {
     fn garbage_collection(&mut self) -> NodeResult<()> {
         let time = SystemTime::now();
 
-        let lock = self.index.try_elock()?;
+        let lock = match self.index.try_elock() {
+            Ok(lock) => lock,
+            Err(VectorErr::FsError(fs_error)) => {
+                warn!("Garbage collection error: {fs_error}");
+                return Err(VectorErr::WorkDelayed.into());
+            }
+            Err(error) => return NodeResult::Err(error.into()),
+        };
         self.index.collect_garbage(&lock)?;
 
         let took = time.elapsed().map(|i| i.as_secs_f64()).unwrap_or(f64::NAN);

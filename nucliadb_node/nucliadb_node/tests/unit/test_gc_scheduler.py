@@ -74,3 +74,25 @@ class TestShardGcScheduler:
             await successful_indexing.dispatch(payload)
             assert sm_constructor.call_count == 1
             assert sm.shard_changed_event.call_count == 1
+
+
+class TestShardManager:
+    @pytest.mark.asyncio
+    async def test_garbage_collector_try_later_handling(self):
+        from nucliadb_protos.nodewriter_pb2 import GarbageCollectorResponse
+
+        from nucliadb_node.listeners.gc_scheduler import ShardManager
+
+        try_later = GarbageCollectorResponse(
+            status=GarbageCollectorResponse.Status.TRY_LATER
+        )
+        writer = AsyncMock(side_effect=try_later)
+
+        with patch("nucliadb_node.listeners.gc_scheduler.asyncio"), patch(
+            "nucliadb_node.listeners.gc_scheduler.capture_exception"
+        ) as capture_exception:
+            sm = ShardManager(shard_id="shard", writer=writer, gc_lock=AsyncMock())
+            await sm.gc()
+
+            assert writer.garbage_collector.await_count == 1
+            assert capture_exception.call_count == 0
